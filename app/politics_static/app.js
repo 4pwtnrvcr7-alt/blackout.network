@@ -86,23 +86,24 @@ M.addEventListener("click",e=>{const b=e.target.closest(".pol-hx");if(b){const b
 // ---------- track record ----------
 const A={d:null,h:"7",plat:"all",topic:"all",shown:40};
 const TMAP={"Control of Congress":"Control of Congress","Senate races":"Senate races","Governor races":"Governor races","House races":"House races","Presidential & nominations":"Presidential & nominations","Other races":"Other races","Policy & government":"Policy & government"};
-function recFor(plat,topic,h){const G=A.d&&A.d.groups[plat];if(!G)return null;const g=(G[topic]||{})[h];return g&&g.nontrivial&&g.nontrivial.n_fav?g:null}
+function recFor(plat,topic,h){const G=A.d&&(A.d.groups||{})[plat];if(!G)return null;const g=(G[topic]||{})[h];return g&&g.nontrivial&&g.nontrivial.n_fav?g:null}
 function trackLine(m){if(!A.d)return"";const g=recFor(m.src,m.topic,"7"),o=recFor(m.src,"all","7");
  const f=(x,lab)=>x?`${lab}: favorite won <b>${x.nontrivial.acc}%</b> (n=${x.nontrivial.n_fav}) · Brier ${x.nontrivial.brier}`:`${lab}: no resolved comparable markets with price history yet`;
  return `<div class=pol-tr title="This market has not resolved; the figures are the platform's record on comparable past US political markets, 7 days before they were decided, excluding favorites priced above 97%.">🎯 ${f(g,e_(m.src)+" · "+e_(m.topic))}<br><span>${f(o,e_(m.src)+" overall")}</span></div>`}
-function accRender(){const D=A.d,b=$("pol_acc_body");if(!D){b.innerHTML="<div class=meta>Track record unavailable.</div>";return}
+function accRender(){const D=A.d,b=$("pol_acc_body");if(!D||!Array.isArray(D.events)||!D.counts){b.innerHTML="<div class=meta>Track record loading…</div>";return}
+ const G0=(D.groups||{}).all||{},GG=D.groups||{};
  const c=D.counts,hz=D.horizon_counts,run=D.running?` · harvest in progress since ${etF(D.running)}`:"";
  const cell=g=>g&&g.n_fav?`<b>${g.acc}%</b> <small>(${g.n_fav})</small>`:"<small>—</small>",br=g=>g&&g.n?`${g.brier} <small>(${g.n})</small>`:"<small>—</small>";
  const row=(lab,G)=>`<tr><td>${lab}</td>${["30","7","1"].map(h=>`<td>${cell(G&&G[h]&&G[h].nontrivial)}</td><td class=mu>${cell(G&&G[h]&&G[h].all)}</td><td>${br(G&&G[h]&&G[h].nontrivial)}</td>`).join("")}</tr>`;
  const hd=`<tr><th rowspan=2></th>${["30 days before","7 days before","1 day before"].map(h=>`<th colspan=3>${h}</th>`).join("")}</tr><tr>${["30","7","1"].map(()=>`<th>Accuracy</th><th class=mu>incl. >97%</th><th>Brier</th>`).join("")}</tr>`;
  const plats=["all","Polymarket","Kalshi"],pl={all:"Both platforms (running overall)",Polymarket:"Polymarket",Kalshi:"Kalshi"};
- const topics=[...new Set(Object.keys(D.groups.all||{}).filter(t=>t!="all"))];
+ const topics=[...new Set(Object.keys(G0).filter(t=>t!="all"))];
  let ev=D.events.filter(r=>(A.plat=="all"||r.platform==A.plat)&&(A.topic=="all"||r.topic==A.topic));
  const scored=ev.filter(r=>r.horizons[A.h]),uns=ev.filter(r=>!r.horizons[A.h]);ev=[...scored,...uns];
  b.innerHTML=`<div class=pol-src><span><b>Polymarket</b> ${c.Polymarket.resolved} resolved markets scored · ${c.Polymarket.with_history} with price history (30 d: ${hz.Polymarket["30"]}, 7 d: ${hz.Polymarket["7"]}, 1 d: ${hz.Polymarket["1"]})</span><span><b>Kalshi</b> ${c.Kalshi.resolved} resolved · ${c.Kalshi.with_history} with price history (30 d: ${hz.Kalshi["30"]}, 7 d: ${hz.Kalshi["7"]}, 1 d: ${hz.Kalshi["1"]})</span><span>last harvest ${D.last?etF(D.last):"not finished yet"}${run} · refreshed daily</span></div>
- <div class=pol-acc-grid><div><div class=pol-tbw><table class=pol-tb>${hd}${plats.map(p=>row(pl[p],D.groups[p]&&D.groups[p].all)).join("")}</table></div>
- <h4>By topic (both platforms)</h4><div class=pol-tbw><table class=pol-tb>${hd}${topics.map(t=>row(e_(t),D.groups.all[t])).join("")}</table></div>
- <h4>By topic and platform</h4><div class=pol-tbw><table class=pol-tb>${hd}${["Polymarket","Kalshi"].flatMap(p=>Object.keys(D.groups[p]||{}).filter(t=>t!="all").map(t=>row(e_(p)+" · "+e_(t),D.groups[p][t]))).join("")}</table></div></div>
+ <div class=pol-acc-grid><div><div class=pol-tbw><table class=pol-tb>${hd}${plats.map(p=>row(pl[p],GG[p]&&GG[p].all)).join("")}</table></div>
+ <h4>By topic (both platforms)</h4><div class=pol-tbw><table class=pol-tb>${hd}${topics.map(t=>row(e_(t),G0[t])).join("")}</table></div>
+ <h4>By topic and platform</h4><div class=pol-tbw><table class=pol-tb>${hd}${["Polymarket","Kalshi"].flatMap(p=>Object.keys(GG[p]||{}).filter(t=>t!="all").map(t=>row(e_(p)+" · "+e_(t),GG[p][t]))).join("")}</table></div></div>
  <div class=pol-method><b>Method.</b> Only markets the platforms themselves have resolved are used, with their own resolution fields as the outcome (nothing is inferred). Each market's <i>decision time</i> is the first day from which the eventual winner stayed at or above ${D.method.decided*100}% until close (or the last price point). At 30, 7 and 1 day(s) before that, the highest-priced outcome is the <i>favorite</i>; a price must be no older than ${D.method.stale_days} days at that point. <b>Accuracy</b> = share of markets whose favorite was priced above 50% and won. <b>Brier</b> = mean of (favorite's price − 1 if it won, else 0)², 0 is perfect and 0.25 equals a coin flip. Headline figures leave out favorites priced above ${D.method.trivial_cut*100}% (near-certain markets); the gray column includes them. Multi-outcome markets use their ${D.method.max_outcomes} highest-volume outcomes plus the winner; mutually exclusive markets only. Up to ${D.method.max_scored} of the largest resolved US political events per platform, newest first. Small samples (n) are shown in brackets; treat them with care. The live markets above have <b>not</b> resolved: their 🎯 line shows the record of comparable past markets, not their own.</div></div>
  <div class=pol-ctl style="margin-top:10px"><span class=pol-seg id=pol_ah>${["30","7","1"].map(h=>`<button data-h=${h} class="${A.h==h?"on":""}">${h} d before</button>`).join("")}</span><span class=pol-seg id=pol_ap>${plats.map(p=>`<button data-p=${p} class="${A.plat==p?"on":""}">${p=="all"?"Both":p}</button>`).join("")}</span>
  <select id=pol_at><option value=all>All topics</option>${topics.map(t=>`<option ${A.topic==t?"selected":""}>${e_(t)}</option>`).join("")}</select><span class=meta>${scored.length} scored at this horizon · ${uns.length} without a price at this horizon</span></div>
@@ -113,7 +114,7 @@ function accRender(){const D=A.d,b=$("pol_acc_body");if(!D){b.innerHTML="<div cl
  ${ev.length>A.shown?`<button class=pol-more id=pol_amore>Show more (${ev.length-A.shown} left)</button>`:""}`;
  b.querySelectorAll("#pol_ah button").forEach(x=>x.onclick=()=>{A.h=x.dataset.h;accRender()});b.querySelectorAll("#pol_ap button").forEach(x=>x.onclick=()=>{A.plat=x.dataset.p;accRender()});
  $("pol_at").onchange=e=>{A.topic=e.target.value;accRender()};const mb=$("pol_amore");if(mb)mb.onclick=()=>{A.shown+=60;accRender()}}
-async function accLoad(){try{A.d=await (await fetch("api/politics/accuracy",{cache:"no-store"})).json()}catch(e){A.d=null}accRender();render()}
+async function accLoad(){try{A.d=await (await fetch("api/politics/accuracy",{cache:"no-store"})).json()}catch(e){A.d=null}if(!A.d||!Array.isArray(A.d.events)){A.d=null;setTimeout(accLoad,60000)}accRender();render()}
 // ---------- who's behind this ----------
 async function ownLoad(){const b=$("pol_own_body");try{const o=await (await fetch("api/politics/ownership.json",{cache:"no-store"})).json();
  const det=o.detected||{},dn=o.detected_n||{};const shown=o.orgs.filter(x=>x.always||det[x.id]);const watchHit=(o.watch||[]).filter(w=>det[w.id]);
