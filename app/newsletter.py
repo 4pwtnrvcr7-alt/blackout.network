@@ -598,7 +598,7 @@ def _outbox_write(msg, kind, sid):
     return stem + ".html"
 
 def _http_json(url, payload, headers):
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers={"Content-Type": "application/json", "Accept": "application/json", **headers})
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "blackout.network-newsletter/1.0 (+https://blackout.network)", **headers})
     with urllib.request.urlopen(req, timeout=20) as r: return r.status, r.read(2000).decode("utf-8", "replace")
 
 def deliver(msg, kind="issue", sid=None, force_preview=False):
