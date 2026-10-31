@@ -22,9 +22,9 @@ from email.utils import parsedate_to_datetime
 BASE = os.path.dirname(os.path.abspath(__file__)); DB = os.path.join(BASE, "intel_streams.db")
 STATIC = os.path.join(BASE, "intel_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css"}
 WEB_ONLY = os.environ.get("BN_WEB_ONLY") == "1"
-UA = "Mozilla/5.0 (compatible; blackout.network research monitor; newsletter@blackout.network)"   # SEC asks for a contact address in the UA
-SEC_UA = "blackout.network research monitor newsletter@blackout.network"
-MAILTO = "newsletter@blackout.network"
+UA = "Mozilla/5.0 (compatible; blackout.network research monitor; hello@blackout.network)"   # SEC asks for a contact address in the UA
+SEC_UA = "blackout.network research monitor hello@blackout.network"
+MAILTO = "hello@blackout.network"
 STREAMS = {"research": "Research", "leaks": "Leaks", "patents": "Patents", "mna": "M&A", "markets": "Markets"}
 DEDUPE_H = 12
 KEEP_DAYS = 30
