@@ -18,3 +18,5 @@
 #tab-noise .bn-more{text-align:center;margin:10px 0 4px}
 #tab-noise .bn-row{content-visibility:auto;contain-intrinsic-size:auto 86px}
 @media(max-width:700px){#tab-noise .bn-seg button{padding:5px 8px}}
+#tab-noise .bn-row .wl,#tab-noise .bn-row .unc{display:inline-block;margin-left:6px;vertical-align:1px}
+#tab-noise .bn-seg button .meta{margin-left:3px}
