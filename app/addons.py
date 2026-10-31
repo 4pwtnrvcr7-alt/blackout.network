@@ -50,4 +50,11 @@ ROUTES = {
     "/api/report": "reports",
     "/api/reports": "reports",
     "/report-status": "reports",
+    "/manifest.webmanifest": "pwa",
+    "/manifest.json": "pwa",
+    "/apple-touch-icon.png": "pwa",
+    "/apple-touch-icon-precomposed.png": "pwa",
+    "/icons": "pwa",
+    "/install-guide.js": "pwa",
+    "/install-guide.css": "pwa",
 }

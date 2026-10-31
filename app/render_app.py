@@ -222,9 +222,9 @@ OWNED_WRITERS = ["/api/vote", "/api/newsletter", "/newsletter"]
 BOX_ONLY = {"/api/refresh": "Scans run on the blackout.network scanner node; this page updates automatically every few minutes.",
             "/api/interval": "Scan settings are managed on the scanner node.", "/api/jets/settings": "Jet settings are managed on the scanner node.",
             "/api/settings": "Alert settings are managed on the scanner node."}
-WARMING = b"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=refresh content=20><title>blackout.network</title>
-<link rel=stylesheet href=/theme.css></head><body style="font-family:system-ui;background:#0b0f14;color:#d7dde5;display:grid;place-items:center;height:100vh">
-<div style="text-align:center"><h1>blackout.network</h1><p>The world's threats, scored and sourced, before cable news catches up.</p>
+WARMING = b"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=refresh content=20><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Know first. Be ready.</title>
+<link rel=stylesheet href=/theme.css><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png"><meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script></head><body style="font-family:system-ui;background:#0b0f14;color:#d7dde5;display:grid;place-items:center;height:100vh">
+<div style="text-align:center"><h1>blackout.network</h1><p>Know first. Be ready.</p>
 <p>Syncing the latest data&hellip; this page refreshes automatically.</p></div></body></html>"""
 
 class RH(server.H):

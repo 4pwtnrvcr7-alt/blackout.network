@@ -12,7 +12,7 @@ import sources_catalog as SC
 
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 BRAND = "blackout.network"
-TAGLINE = "The world's threats, scored and sourced, before cable news catches up."
+TAGLINE = "Know first. Be ready."
 STATIC = os.path.join(BASE, "sources_static")
 TYPES = ["Agency feed", "News outlet", "Research center", "Disease surveillance", "RSS feed", "X account", "Telegram channel", "Mastodon account",
          "Bluesky account", "YouTube channel", "Reddit community", "Other"]
@@ -299,7 +299,7 @@ def et(s, with_date=True):
 
 def shell(title, body, robots="index", wide=True):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<meta name="robots" content="{robots}"><title>{E(title)} · {BRAND}</title>'
+            f'<meta name="robots" content="{robots}"><title>Know first. Be ready.</title>'
             '<meta name="description" content="Every source blackout.network has used, with item counts, profiles and a transparent 0–10 confidence rating. Suggest a source for review.">'
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="stylesheet" href="/api/sources/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="sc-page"><a class="skip" href="#main">Skip to content</a>'

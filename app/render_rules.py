@@ -34,7 +34,7 @@ SYNC_DIRS = ["snapshots", "static/vsubs", "video_subs"]
 SYNC_JSON = ["page_data.json", "config.json", "keywords.json", "arcs_settings.json", "tips.json", "newsletter_config.json",
              "translate_glossary.json", "translate_langs.json", "sources*.json", "youtube*.json"]
 # Code/static that hot-reloads on Render (add-ons re-import on mtime change; dashboard.html is read per request).
-CODE_GLOBS = ["*.py", "*.html", "*.css", "*.js", "*_static/*", "games_static/*", "static/theme.css", "static/img/*", "static/guides/*",
+CODE_GLOBS = ["*.py", "*.html", "*.css", "*.js", "*_static/*", "games_static/*", "static/theme.css", "static/img/*", "static/pwa/*", "static/guides/*",
               "heatmap_data/*.json", "newsletter_disposable.txt"]
 SNAPSHOT_MAX_AGE_DAYS = float(os.environ.get("BN_SYNC_SNAPSHOT_DAYS", "7"))
 

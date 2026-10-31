@@ -143,6 +143,28 @@ def addon_for(path):
 
 # "Report a problem" widget (reports.py): added to every HTML page that doesn't already load it (dashboard.html loads it itself).
 _RW = b'<link rel="stylesheet" href="/api/report/app.css"><script src="/api/report/app.js" defer></script>'
+# PWA / home-screen support + site title (pwa.py, static/pwa/): every full HTML page served through send() gets the manifest, icons,
+# iOS/Android web-app meta tags and the install guide in its <head>, and the public title "Know first. Be ready." (2026-10-31).
+SITE_TITLE = b"Know first. Be ready."
+PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
+            b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">'
+            b'<meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
+            b'<meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+            b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
+_OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
+                 b"The world&#39;s threats, scored and sourced, before cable news catches up."]
+def pwa_head(b):
+    try:
+        lo = b[:20000].lower(); i = lo.find(b"</head>")
+        if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
+        if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]
+        b = re.sub(rb"<title>[^<]*</title>", b"<title>" + SITE_TITLE + b"</title>", b, count=1)
+        b = re.sub(rb'(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*(")', rb"\g<1>" + SITE_TITLE + rb"\g<2>", b)
+        b = re.sub(rb'(<meta name="viewport" content="width=device-width,\s*initial-scale=1)(")', rb"\g<1>,viewport-fit=cover\g<2>", b, count=1)
+        for t in _OLD_TAGLINES: b = b.replace(t, SITE_TITLE)
+        return b
+    except Exception: return b
+
 def report_widget(b):
     try:
         i = b.rfind(b"</body>")
@@ -156,8 +178,8 @@ class H(BaseHTTPRequestHandler):
     def ip(self): return self.headers.get("CF-Connecting-IP") or self.client_address[0]
     def send(self, code, body, ctype="application/json"):
         b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
-        if ctype == "text/html": b = report_widget(b)
-        self.send_response(code); self.send_header("Content-Type", ctype + "; charset=utf-8")
+        if ctype == "text/html": b = report_widget(pwa_head(b))
+        self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         self.send_header("Cache-Control", "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def body(self):

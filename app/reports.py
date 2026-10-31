@@ -346,7 +346,7 @@ def status_page(rid=""):
     rid = html.escape(norm_id(rid) or "", quote=True)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
-<title>Report status · blackout.network</title><link rel="icon" href="/favicon.ico"><link rel="stylesheet" href="/api/report/status.css"></head>
+<title>Know first. Be ready.</title><link rel="icon" href="/favicon.ico"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png"><meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script><link rel="stylesheet" href="/api/report/status.css"></head>
 <body data-report-id="{rid}"><header class="rs-hd"><a href="/" class="rs-brand">blackout<b>.network</b></a><nav><a href="/">← Back to the dashboard</a></nav></header>
 <main class="rs-main" id="main">
 <h1>Check a problem report</h1>
