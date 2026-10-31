@@ -28,6 +28,7 @@
  },
  "mx_check": false,
  "live_sending_approved": false,
+ "transactional_sending_approved": true,
  "outbox_retention_days": 30,
  "retry_backoff_minutes": [
   2,

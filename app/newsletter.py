@@ -69,6 +69,7 @@ DEFAULTS = {
     "rate_limit": {"ip_per_hour": 5, "email_per_day": 3},
     "mx_check": False,
     "live_sending_approved": False,
+    "transactional_sending_approved": False,   # confirm/already emails only; issues still need live_sending_approved
     "outbox_retention_days": 30,
     "retry_backoff_minutes": [2, 10, 30],
     "editorial_ttl_hours": 24,
@@ -539,7 +540,7 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
            f'<p style="font-size:12px;color:#8b95a3;word-break:break-all">Or paste this link into your browser: {E(button[1])}</p>') if button else ""
     xl = "".join(f'<p style="font-size:12px;margin:0 0 6px 0"><a href="{E(u)}" style="color:#4aa3ff">{E(l)}</a></p>' for l, u in (extra_links or []))
     foot = (f'<p style="font-size:12px;color:#8b95a3;margin-top:18px">{E(DISCLAIMER)}<br>{BRAND} · '
-            + (E(addr) if addr else '[Mailing address not set: required by CAN-SPAM before live sending]') + "</p>")
+            + (E(addr) if addr else 'https://blackout.network') + "</p>")
     body = "".join(f'<p style="font-size:14px;line-height:1.55;color:#c9d1d9;margin:0 0 10px 0">{E(p)}</p>' for p in paras)
     html_ = ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark light"><title>' + E(title) + '</title></head>'
              '<body style="margin:0;background:#0b0d10"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0d10"><tr><td align="center" style="padding:16px 8px">'
@@ -549,7 +550,7 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
              f'<div style="font-size:12px;color:#8b95a3;margin:4px 0 14px 0">{E(TAGLINE)}</div><h1 style="font-size:17px;color:#e6e9ee;margin:0 0 10px 0">{E(title)}</h1>'
              + body + btn + xl + foot + '</td></tr></table></td></tr></table></body></html>')
     text = "\n\n".join([f"BLACKOUT.NETWORK — {title}", *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
-                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, f"{BRAND} · {addr or '[Mailing address not set]'}"])
+                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, f"{BRAND} · {addr or 'https://blackout.network'}"])
     return html_, text
 
 # ------------------------------------------------------------------ MIME + pluggable senders
@@ -569,8 +570,12 @@ def build_mime(to, subject, html_, text, unsub_url=None, kind="issue", c=None):
     return m
 
 RESERVED = re.compile(r"(@|\.)(example\.(com|net|org)|test|invalid|localhost|example)$")
-def sender_status():
-    """Effective mode + why. Never returns secret values, only whether each required key is present."""
+TRANSACTIONAL_KINDS = ("confirm", "already")
+def sender_status(kind="issue"):
+    """Effective mode + why. Never returns secret values, only whether each required key is present.
+    Transactional mail (confirm / already-subscribed) may go live with transactional_sending_approved alone; issues stay gated by
+    live_sending_approved + mailing_address."""
+    tx = kind in TRANSACTIONAL_KINDS
     e = env(); c = cfg(); want = (e.get("NEWSLETTER_SENDER") or "preview").strip().lower()
     if want not in SENDER_MODES: return {"requested": want, "mode": "preview", "reason": f"unknown sender '{want}': using preview"}
     need = {"smtp": ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"], "resend": ["RESEND_API_KEY"], "brevo": ["BREVO_API_KEY"], "sendgrid": ["SENDGRID_API_KEY"]}.get(want, [])
@@ -579,6 +584,8 @@ def sender_status():
           "mailing_address_set": bool((c.get("mailing_address") or "").strip()), "from": c["from_email"]}
     if want == "preview": return {**st, "mode": "preview", "reason": "preview mode: emails are written to newsletter_outbox/ and nothing is sent"}
     if missing: return {**st, "mode": "preview", "reason": f"{want} selected but {', '.join(missing)} not set: using preview"}
+    if tx and (c.get("transactional_sending_approved") or c.get("live_sending_approved")):
+        return {**st, "mode": want, "reason": f"live (transactional only): sending {kind} email through {want}"}
     if not c.get("live_sending_approved"): return {**st, "mode": "preview", "reason": f"{want} configured but live_sending_approved is false: using preview"}
     if not st["mailing_address_set"]: return {**st, "mode": "preview", "reason": f"{want} configured but mailing_address is empty (CAN-SPAM): using preview"}
     return {**st, "mode": want, "reason": f"live: sending through {want}"}
@@ -596,7 +603,7 @@ def _http_json(url, payload, headers):
 
 def deliver(msg, kind="issue", sid=None, force_preview=False):
     """Send one message with the effective sender. Returns (ok, mode, outbox_file|None, error|None)."""
-    mode = "preview" if force_preview else sender_status()["mode"]
+    mode = "preview" if force_preview else sender_status(kind)["mode"]
     to = str(msg["To"])
     if mode != "preview" and RESERVED.search(to.lower()): mode = "preview"   # never hand a reserved/test domain to a real provider
     if mode == "preview":
@@ -948,7 +955,7 @@ def admin_stats():
     rmin, smin = main_rule(c)
     return {"counts": {"active": cnt.get("active", 0), "pending": cnt.get("pending", 0), "unsubscribed": cnt.get("unsubscribed", 0)},
             "active_by_frequency": freq, "growth": growth, "runs": runs, "mail": mails, "recent": recent, "events": ev, "editorial": ed,
-            "next_slots": next_slots(n=4, c=c), "sender": sender_status(), "worker_running": worker_alive(), "outbox_eml": outbox,
+            "next_slots": next_slots(n=4, c=c), "sender": sender_status(), "sender_transactional": sender_status("confirm"), "worker_running": worker_alive(), "outbox_eml": outbox,
             "settings": {x: c[x] for x in ("global_frequency", "paused", "slots", "max_watchlist", "min_main_items", "dedupe_hours", "catchup_hours",
                                            "base_url", "from_email", "from_name", "mailing_address", "live_sending_approved")},
             "rule": {"main_min_rank": rmin, "main_min_sources": smin}, "now_et": fmt_et(now())}

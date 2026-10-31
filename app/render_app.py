@@ -74,7 +74,11 @@ def apply_secrets(d):
     if d.get("admin_passcode") and not os.environ.get("BN_ADMIN_PASSCODE"):
         _write_secret(os.path.join(BASE, "ADMIN_PASSCODE.txt"), str(d["admin_passcode"]).strip() + "\n")
     ns = os.environ.get("NEWSLETTER_SECRET") or d.get("newsletter_secret")
-    if ns: _write_secret(os.environ["NEWSLETTER_ENV"], f"NEWSLETTER_SECRET={ns}\nNEWSLETTER_SENDER=preview\n")
+    if ns:   # sender + provider keys come only from Render env vars (never synced, never logged); default stays preview
+        lines = [f"NEWSLETTER_SECRET={ns}", "NEWSLETTER_SENDER=" + (os.environ.get("NEWSLETTER_SENDER") or "preview").strip()]
+        lines += [f"{k}={os.environ[k].strip()}" for k in MAIL_ENV_KEYS if os.environ.get(k)]
+        _write_secret(os.environ["NEWSLETTER_ENV"], "\n".join(lines) + "\n")
+MAIL_ENV_KEYS = ("RESEND_API_KEY", "BREVO_API_KEY", "SENDGRID_API_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_SECURITY")
 if os.environ.get("BN_ADMIN_PASSCODE"): _write_secret(os.path.join(BASE, "ADMIN_PASSCODE.txt"), os.environ["BN_ADMIN_PASSCODE"].strip() + "\n")
 if os.environ.get("NEWSLETTER_SECRET"): apply_secrets({})
 
