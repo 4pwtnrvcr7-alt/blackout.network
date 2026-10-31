@@ -1,0 +1,20 @@
+/* Background Noise tab (bnoise.py): every alert ranked 0-6. Uses the shared palette in theme.css and the Wire's .sc score chip / .h .m .l severity colours. */
+#tab-noise .bn-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:2px 0 10px}
+#tab-noise .bn-seg{display:inline-flex;border:1px solid var(--bd2,#2f3742);border-radius:8px;overflow:hidden}
+#tab-noise .bn-seg button{border:0;border-radius:0;padding:5px 11px;background:transparent;color:var(--mu);font-size:12.5px}
+#tab-noise .bn-seg button.on{background:var(--ac);color:#000;font-weight:600}
+#tab-noise .bn-seg button.on .meta{color:#000}
+#tab-noise .bn-sum{font-size:13px;color:#c9d0d9;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--lo,#52c41a);border-radius:6px;padding:6px 10px;margin:0 0 10px}
+#tab-noise .bn-row{border-left:4px solid var(--mu);padding:8px 10px;margin:8px 0;background:#181d23;border-radius:6px}
+#tab-noise .bn-row.h{border-left-color:var(--hi)}
+#tab-noise .bn-row.m{border-left-color:var(--md)}
+#tab-noise .bn-row.l{border-left-color:var(--lo)}
+#tab-noise .bn-rk{display:inline-block;font-size:11px;font-weight:700;border-radius:8px;padding:0 6px;margin-right:6px;vertical-align:1px;border:1px solid var(--bd2,#2f3742);color:var(--mu)}
+#tab-noise .bn-rk.l2{color:#c9d0d9;border-color:#4a5463}
+#tab-noise .bn-rk.m{color:var(--md);border-color:#5a4300}
+#tab-noise .bn-lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}
+#tab-noise .bn-row b{word-break:break-word}
+#tab-noise .bn-row .brief{white-space:pre-line}
+#tab-noise .bn-more{text-align:center;margin:10px 0 4px}
+#tab-noise .bn-row{content-visibility:auto;contain-intrinsic-size:auto 86px}
+@media(max-width:700px){#tab-noise .bn-seg button{padding:5px 8px}}

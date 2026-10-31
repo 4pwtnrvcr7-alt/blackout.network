@@ -26,6 +26,7 @@ ROUTES = {
     "/api/heatmap": "heatmap",
     "/api/weather": "weather",
     "/api/trends": "trends",
+    "/api/noise": "bnoise",
     "/api/politics": "politics",
     "/api/games": "games",
     "/api/translate": "translate",
