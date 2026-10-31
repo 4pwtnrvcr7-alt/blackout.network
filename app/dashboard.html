@@ -1,0 +1,943 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>blackout.network — Threat Monitor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0b0d10;--pn:#14181d;--bd:#252b33;--tx:#e6e9ee;--mu:#8b95a3;--hi:#ff4d4f;--md:#faad14;--lo:#52c41a;--ac:#4aa3ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:1000}
+h1{font-size:18px;margin:0;letter-spacing:.5px}h1 b{color:var(--hi)}h2{font-size:15px;margin:0 0 10px}
+.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--mu);font-size:13px}
+button,select,input{background:#1d232b;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;font:inherit}
+button{cursor:pointer}button.pri{background:var(--ac);border-color:var(--ac);color:#000;font-weight:600}button:disabled{opacity:.5;cursor:default}
+main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;padding:16px 20px}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.pn{background:var(--pn);border:1px solid var(--bd);border-radius:10px;padding:14px}
+.card{border-left:4px solid var(--mu);padding:8px 10px;margin:8px 0;background:#181d23;border-radius:6px}
+.card.h{border-color:var(--hi)}.card.m{border-color:var(--md)}.card.l{border-color:var(--lo)}
+.sc{display:inline-block;min-width:34px;text-align:center;font-weight:700;border-radius:4px;padding:0 5px;margin-right:6px}
+.sc.h{background:var(--hi);color:#fff}.sc.m{background:var(--md);color:#000}.sc.l{background:#2c3440}
+.meta{color:var(--mu);font-size:12px}.brief{margin-top:6px;font-size:13px;background:#0f1317;padding:8px;border-radius:6px;white-space:pre-wrap}
+a{color:var(--ac)}#map{height:340px;border-radius:8px}.tag{font-size:11px;border:1px solid var(--bd);border-radius:10px;padding:0 6px;margin-left:4px;color:var(--mu)}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px solid var(--bd);padding:4px;text-align:left;vertical-align:top}
+.ok{color:var(--lo)}.bad{color:var(--hi)}.dis{color:var(--mu)}#msg,#smsg{font-size:12px;min-height:16px}.scroll{max-height:720px;overflow:auto}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}label.sw{display:flex;gap:6px;align-items:center}
+.filters button.on{border-color:var(--ac);color:var(--ac)}
+.tabs{display:flex;gap:6px;padding:10px 20px 0}.tabs button.on{border-color:var(--ac);color:var(--ac)}
+.big{font-size:56px;font-weight:800;line-height:1;color:var(--ac)}.warn{background:#3a2a00;border:1px solid var(--md);color:var(--md);padding:6px 10px;border-radius:6px;margin:8px 0}
+.note{background:#0f1317;border:1px solid var(--bd);padding:8px;border-radius:6px;font-size:12px;color:var(--mu);margin-top:8px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.bar{background:var(--ac);height:8px;border-radius:4px;display:inline-block;vertical-align:middle}
+.badge{font-size:11px;border-radius:10px;padding:1px 7px;margin-left:6px}.badge.rec{background:#3a2a00;color:var(--md)}.badge.sup{background:#2c3440;color:var(--mu)}
+/* ---- The Thread (Story Arcs) ---- */
+#th_board{position:relative;height:760px;border-radius:10px;overflow:hidden;border:1px solid #3a2a1c;margin-top:8px;
+ background:radial-gradient(ellipse at 50% 40%,rgba(0,0,0,0) 0,rgba(0,0,0,.65) 100%),radial-gradient(circle at 20% 30%,#3b2a1d 0 1px,transparent 2px) 0 0/7px 7px,radial-gradient(circle at 70% 60%,#2e2016 0 1px,transparent 2px) 0 0/11px 11px,linear-gradient(135deg,#2a1d14,#1b130d 60%,#24180f)}
+#th_svg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}#th_svg.drag{cursor:grabbing}
+#th_svg .str{fill:none;stroke:var(--c-link);stroke-linecap:round;opacity:.8;filter:drop-shadow(1px 2px 1px rgba(0,0,0,.6))}#th_svg .str.hl{stroke:var(--c-link-hl);opacity:1}
+#th_svg .hit{fill:none;stroke:transparent;stroke-width:12;cursor:help}
+#th_svg .nd{cursor:pointer}#th_svg .nd text{font:600 13px "Segoe Print","Bradley Hand","Marker Felt","Comic Sans MS","Comic Neue",cursive;fill:#f4efe6;paint-order:stroke;stroke:#140c07;stroke-width:3.5px;pointer-events:none}
+#th_svg .nd.sel circle.pinc{stroke:#fff;stroke-width:2.5}
+#th_svg .pulse{fill:none;stroke:#ff2a2a;animation:thpulse 1.6s ease-out infinite;transform-box:fill-box;transform-origin:center}@keyframes thpulse{0%{stroke-width:2;opacity:.9;transform:scale(1)}100%{stroke-width:.5;opacity:0;transform:scale(2.1)}}
+#th_svg .marker{fill:none;stroke:#ff2020;stroke-width:3.5;opacity:.85;stroke-linecap:round}
+#th_svg .mtext{font:700 15px "Segoe Print","Bradley Hand","Marker Felt","Comic Sans MS",cursive;fill:#ff3030}
+.th-note{position:absolute;padding:8px 12px;background:#f7e463;color:#2b1d00;font:700 15px "Segoe Print","Bradley Hand","Marker Felt","Comic Sans MS",cursive;box-shadow:2px 4px 8px rgba(0,0,0,.55);pointer-events:none;max-width:190px;line-height:1.2}
+.th-note.pink{background:#ff9ec4}.th-note.blue{background:#9fd8ff}.th-note:before{content:"";position:absolute;top:-6px;left:50%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d11 45%,#600)}
+#th_tip{position:absolute;display:none;pointer-events:none;background:#0c0f12ee;border:1px solid #c8141b;color:#fff;padding:6px 9px;border-radius:6px;font-size:12.5px;max-width:320px;z-index:5}
+#th_panel{position:absolute;top:0;right:0;bottom:0;width:410px;max-width:92%;background:#0e1216f2;border-left:2px solid #c8141b;overflow:auto;padding:12px 14px;display:none;z-index:6;box-shadow:-6px 0 18px rgba(0,0,0,.5)}
+#th_panel .x{float:right;cursor:pointer;color:var(--mu);font-size:18px}#th_panel h3{margin:0 0 6px;font-size:16px;padding-right:24px}
+.th-help{position:absolute;left:10px;bottom:8px;font-size:11.5px;color:#b9a891;pointer-events:none}
+.th-views button.on{border-color:#ff4d4f;color:#ff4d4f}#th_pepe.on{background:#c8141b;border-color:#c8141b;color:#fff}
+@media(max-width:700px){#th_board{height:560px}#th_panel{width:100%}}
+/* ---- Story Arcs list ---- */
+#arcs .arc{background:#181d23;border-radius:6px;margin:8px 0;padding:8px 10px;border-left:4px solid var(--mu)}
+#arcs .arc.h{border-color:var(--hi)}#arcs .arc.m{border-color:var(--md)}#arcs .arc.l{border-color:var(--lo)}
+#arcs .arc-hd{cursor:pointer;display:flex;gap:8px;align-items:flex-start}#arcs .arc-hd b{flex:1}
+#arcs .arc-tog{color:var(--mu);font-size:12px;white-space:nowrap}
+#arcs .tl{list-style:none;margin:8px 0 2px 6px;padding:0 0 0 14px;border-left:2px solid var(--bd)}
+#arcs .tl li{position:relative;margin:0 0 7px;font-size:12.5px}
+#arcs .tl li:before{content:"";position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:#2c3440;border:2px solid var(--pn)}
+#arcs .tl li.h:before{background:var(--hi)}#arcs .tl li.m:before{background:var(--md)}#arcs .tl li.l:before{background:var(--lo)}
+#arcs .chg{color:var(--md);font-size:11.5px}#arcs .chip{display:inline-block;font-size:11px;border:1px solid var(--bd);border-radius:10px;padding:1px 8px;margin:2px 4px 0 0;color:var(--ac);cursor:pointer;background:#10151b}
+#arcs .chip i{color:var(--mu);font-style:normal}#arcs .unc{font-size:10.5px;color:var(--md);border:1px solid #5a4300;border-radius:8px;padding:0 5px;margin-left:4px}
+#arcs .flash{outline:2px solid var(--ac)}
+/* ---- Live Broadcasts ---- */
+#tab-bcast .kwcat{margin:6px 0}#tab-bcast .kwchip{display:inline-block;border-radius:12px;padding:2px 9px;margin:3px 4px 0 0;font-size:12.5px;cursor:pointer;border:1px solid var(--bd);background:#10151b}
+#tab-bcast .kwchip.on{outline:2px solid #fff}#tab-bcast .kwchip .x{margin-left:6px;color:var(--mu);font-size:11px}#tab-bcast .kwchip .x:hover{color:#fff}
+#tab-bcast .clip{display:block;text-decoration:none;color:var(--tx);background:#181d23;border-radius:6px;padding:8px 10px;margin:8px 0;border-left:4px solid #2c3440}
+#tab-bcast .clip:hover{background:#1e252d}#tab-bcast .clip.audio{border-left-color:var(--ac)}#tab-bcast .clip .txt{font-size:13px;color:#c9d0d9;margin-top:3px}
+#tab-bcast mark{background:none;font-weight:700;border-bottom:2px solid;padding:0 1px}
+#tab-bcast .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:5px}
+/* ---- Maps tab ---- */
+#tab-maps .mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;margin-top:8px}
+#tab-maps .mp-card{background:#181d23;border:1px solid var(--bd);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+#tab-maps .mp-card b{font-size:14.5px}#tab-maps .mp-card .meta{flex:1}
+#tab-maps a.dl{display:inline-block;text-align:center;background:var(--ac);color:#000;font-weight:700;border-radius:6px;padding:8px 10px;text-decoration:none}
+#tab-maps a.dl.sec{background:#1d232b;color:var(--tx);border:1px solid var(--bd);font-weight:600}
+#tab-maps .pill{font-size:11px;border:1px solid var(--bd);border-radius:10px;padding:0 7px;color:var(--mu);margin-right:4px}
+#mp_map{height:620px;border-radius:8px;margin-top:8px}@media(max-width:700px){#mp_map{height:460px}}
+#tab-maps label.cb{display:inline-flex;gap:5px;align-items:center;font-size:13px;background:#10151b;border:1px solid var(--bd);border-radius:14px;padding:3px 9px}
+.mp-ic{font-size:18px;line-height:22px;text-align:center;filter:drop-shadow(0 0 2px #000)}
+/* ---- How this works (i) notes ---- */
+.hw-i{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;margin-left:8px;border-radius:50%;border:1px solid var(--mu);background:transparent;color:var(--mu);font:italic 700 11px Georgia,serif;vertical-align:2px;cursor:pointer}
+.hw-i:hover,.hw-i[aria-expanded=true]{border-color:var(--ac);color:var(--ac)}
+.hw-p{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--hi);border-radius:6px;padding:8px 12px;margin:0 0 10px;font-size:12.5px;color:#c9d0d9;font-weight:400}
+.hw-p[hidden]{display:none}.hw-p .hw-t{flex:1 1 320px}.hw-p .hw-t i{color:var(--mu)}
+.hw-svg{height:84px;width:auto;max-width:180px;flex:0 0 auto;opacity:.95}
+.hw-head{margin:0 0 4px}.hw-head h2{margin:0 0 8px}
+/* ---- Timeline slider ---- */
+#tl_hist{display:flex;align-items:flex-end;gap:1px;height:46px;margin:2px 0 0;padding:0 7px}
+#tl_hist i{flex:1;background:#2c3440;min-height:1px;border-radius:1px 1px 0 0;cursor:pointer}#tl_hist i.h{background:var(--hi)}#tl_hist i.sel{outline:1px solid var(--ac);background:#3d5a7a}#tl_hist i.h.sel{background:#ff7a7c}
+#tl_rng{width:100%;padding:0;margin:4px 0;accent-color:var(--hi)}
+#tl .row button.on{border-color:var(--hi);color:var(--hi)}
+.tl-strip{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 10px;scroll-snap-type:x proximity}
+.tl-card{flex:0 0 300px;background:#181d23;border-radius:8px;border-top:4px solid #2c3440;padding:8px 10px;scroll-snap-align:start;font-size:12.5px}
+.tl-card.h{border-top-color:var(--hi)}.tl-card.m{border-top-color:var(--md)}.tl-card.l{border-top-color:var(--lo)}
+.tl-card img{width:100%;height:170px;object-fit:cover;object-position:top;border-radius:5px;display:block;margin:6px 0;border:1px solid var(--bd);background:#000}
+.tl-card .noimg{height:60px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--bd);border-radius:5px;margin:6px 0;color:var(--mu);font-size:11.5px}
+.tl-card b{display:block;line-height:1.3}.tl-card .wl{font-size:10.5px;color:var(--md);border:1px solid #5a4300;border-radius:8px;padding:0 5px}
+/* ---- Live push + per-tab refresh ---- */
+#live_ind{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--mu);border:1px solid var(--bd);border-radius:12px;padding:2px 9px}
+#live_ind i{width:8px;height:8px;border-radius:50%;background:#555;display:inline-block}#live_ind.on{color:var(--lo);border-color:#2b5a1a}#live_ind.on i{background:var(--lo);animation:livep 2s infinite}
+@keyframes livep{0%{box-shadow:0 0 0 0 rgba(82,196,26,.7)}70%{box-shadow:0 0 0 7px rgba(82,196,26,0)}100%{box-shadow:0 0 0 0 rgba(82,196,26,0)}}
+#toasts{position:fixed;right:14px;bottom:14px;z-index:5000;display:flex;flex-direction:column;gap:8px;max-width:360px;width:calc(100% - 28px)}
+.toast{background:#14181df5;border:1px solid var(--bd);border-left:4px solid var(--mu);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.5);animation:tin .25s ease-out}
+.toast.h{border-left-color:var(--hi)}.toast.m{border-left-color:var(--md)}.toast .x{float:right;cursor:pointer;color:var(--mu)}.toast img{width:100%;max-height:150px;object-fit:cover;object-position:top;border-radius:5px;margin-top:6px;display:block}
+.toast .wait{font-size:11px;color:var(--mu);margin-top:4px}@keyframes tin{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.tab-ref{font-size:12px;padding:2px 9px;margin-left:10px;vertical-align:1px}
+/* ---- Live Streams ---- */
+.st-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-top:10px}
+.st-card{background:#181d23;border:1px solid var(--bd);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.st-play{position:relative;aspect-ratio:16/9;background:#000;cursor:pointer}.st-play img{width:100%;height:100%;object-fit:cover;display:block;opacity:.85}
+.st-play:after{content:"▶";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:58px;height:40px;border-radius:10px;background:#c00c;color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center}
+.st-play.on:after{display:none}.st-play iframe{width:100%;height:100%;border:0;display:block}
+.st-body{padding:8px 10px;display:flex;flex-direction:column;gap:5px;font-size:12.5px}.st-body .nm{font-size:14.5px;font-weight:700}
+.st-badge{font-size:10.5px;border-radius:8px;padding:1px 6px;margin-left:5px;font-weight:700}.st-badge.live{background:#c8141b;color:#fff}.st-badge.off{background:#2c3440;color:var(--mu)}.st-badge.watch{background:#173a12;color:var(--lo)}
+.st-sum{background:#0f1317;border-radius:6px;padding:6px 8px;color:#c9d0d9}.st-tr{max-height:190px;overflow:auto;border-top:1px solid var(--bd);padding-top:4px}
+.st-seg{margin:4px 0;color:#c9d0d9}.st-seg .sc{min-width:26px;font-size:11px}
+#tab-streams mark{background:none;font-weight:700;border-bottom:2px solid;padding:0 1px}
+#tab-streams .kwchip{display:inline-block;border-radius:12px;padding:2px 9px;margin:3px 4px 0 0;font-size:12.5px;cursor:pointer;border:1px solid var(--bd);background:#10151b}#tab-streams .kwchip.on{outline:2px solid #fff}
+/* ---- Cross-page red threads (same pin + string language as The Thread board) ---- */
+.xt-host{position:relative}
+.xt{position:absolute;top:6px;right:30px;width:18px;height:18px;z-index:4;cursor:pointer;display:block}
+.xt .pin{position:absolute;left:3px;top:3px;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d11 45%,#600);box-shadow:0 1px 3px rgba(0,0,0,.7)}
+.xt svg{position:absolute;left:9px;top:-30px;overflow:visible;pointer-events:none}
+.xt svg path{fill:none;stroke:var(--c-link);stroke-width:2;stroke-linecap:round;opacity:.85;filter:drop-shadow(1px 2px 1px rgba(0,0,0,.6))}
+.xt:hover svg path{stroke:var(--c-link-hl);opacity:1;stroke-width:2.6}.xt:hover .pin{box-shadow:0 0 0 3px rgba(255,59,59,.35)}
+.xt .lab{position:absolute;right:20px;top:-2px;white-space:nowrap;font-size:11px;color:#ff6b6b;background:#0c0f12ee;border:1px solid #c8141b;border-radius:10px;padding:1px 7px;display:none}
+.xt:hover .lab{display:block}
+.card.xt-host{padding-right:52px}.tl-card.xt-host>b{padding-right:30px}
+/* ---- Tips ---- */
+.tips-box{max-width:560px;margin:10px auto;font-size:15px;line-height:1.55}.tips-box p{margin:6px 0 10px;color:#c9d0d9}
+.tip-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 6px}.tip-lab{width:100%;font-size:13px;color:var(--mu)}
+.tip-in{display:flex;align-items:center;gap:4px;background:#1d232b;border:1px solid var(--bd);border-radius:6px;padding:0 8px}.tip-in span{color:var(--mu);font-size:16px}
+.tip-in input{border:0;background:transparent;font-size:18px;width:120px;padding:8px 2px}.tip-in input:focus{outline:none}.tip-in:focus-within{border-color:var(--ac)}
+#tip_btn{font-size:15px;padding:9px 16px}
+#th_pepe{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 4px}.pepe-ic{width:30px;height:30px;border-radius:7px;object-fit:cover;display:block;border:1px solid #5a1a1a}
+/* ---- The Thread string colours + legend ---- */
+#th_svg .str2{stroke-dasharray:7 7;opacity:.95}
+.th-legend{position:absolute;right:12px;bottom:12px;z-index:4;background:#f7e463;color:#2b1d00;padding:8px 10px 6px;font:600 11.5px system-ui,sans-serif;box-shadow:2px 4px 8px rgba(0,0,0,.55);transform:rotate(-1.5deg);max-width:230px;pointer-events:none}
+.th-legend:before{content:"";position:absolute;top:-6px;left:50%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#d11 45%,#600)}
+.th-legend b{display:block;font:700 13px "Segoe Print","Bradley Hand","Marker Felt","Comic Sans MS",cursive;margin-bottom:3px}.th-legend div{display:flex;align-items:center;gap:6px;line-height:1.5}
+.th-legend i{display:inline-block;width:22px;height:4px;border-radius:2px}.th-legend span{margin-left:auto;opacity:.6}.th-legend i.dash{background:repeating-linear-gradient(90deg,#ff4d4f 0 6px,#4aa3ff 6px 12px)}
+@media(max-width:700px){.th-legend{transform:none;font-size:10.5px;max-width:170px}}
+/* ---- User votes + Ranked by Users ---- */
+.vt{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--mu);margin-top:3px;opacity:.75}.vt:hover,.vt.has{opacity:1}
+.vt input{width:74px;height:14px;padding:0;accent-color:#b37feb;background:transparent;border:0}.vt .vt-l b{color:#d3adf7}
+.vt.pulse{animation:vtp .9s}@keyframes vtp{0%{background:#3a1d5a}100%{background:transparent}}
+#tab-ranked .tick{overflow:hidden;white-space:nowrap;border:1px solid #3a1d5a;background:#120d1a;border-radius:8px;padding:6px 0;position:relative}
+#tab-ranked .tick-in{display:inline-block;padding-left:100%;animation:mq 40s linear infinite}#tab-ranked .tick:hover .tick-in{animation-play-state:paused}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-100%)}}#tab-ranked .tick span{margin-right:34px;font-size:13px}#tab-ranked .tick span b{color:#d3adf7}
+#rk_list{position:relative;margin-top:10px}.rk-row{display:grid;grid-template-columns:44px 1fr 110px 150px 130px;gap:10px;align-items:center;background:#181d23;border-radius:8px;padding:8px 10px;margin:6px 0;border-left:4px solid #b37feb;transition:transform .6s cubic-bezier(.2,.8,.2,1),background .6s}
+.rk-row.new{background:#2a1840}.rk-pos{font-size:20px;font-weight:800;color:#b37feb;text-align:center}.rk-big{font-size:20px;font-weight:800;color:#d3adf7}
+.rk-badge{font-size:11px;border-radius:10px;padding:2px 8px;font-weight:700;display:inline-block}.rk-badge.up{background:#3a1010;color:#ff7875}.rk-badge.dn{background:#0f2a3a;color:#69c0ff}.rk-badge.eq{background:#2c3440;color:var(--mu)}
+@media(max-width:800px){.rk-row{grid-template-columns:34px 1fr;}.rk-row>div:nth-child(n+3){grid-column:2}}
+/* ---- Network Status ---- */
+.tabs .ns-badge{display:inline-block;min-width:16px;padding:0 5px;margin-left:5px;border-radius:9px;background:#f5222d;color:#fff;font-size:10.5px;font-weight:800;line-height:16px;text-align:center}
+#ns_gbanner{display:none;background:#3a1010;border:1px solid #a8071a;color:#ffccc7;border-radius:8px;padding:7px 12px;margin:8px 16px 0;font-size:13px;cursor:pointer}#ns_gbanner b{color:#fff}
+#tab-net .ns-grid{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr);gap:14px}@media(max-width:1000px){#tab-net .ns-grid{grid-template-columns:1fr}}
+#tab-net h3{font-size:13px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 4px}
+.ns-row{display:grid;grid-template-columns:14px minmax(150px,1.1fr) minmax(0,1.6fr) minmax(170px,1.3fr);gap:10px;align-items:center;padding:6px 8px;border-radius:6px;background:#161b21;margin:3px 0;font-size:12.5px}
+.ns-row:hover{background:#1c232b}.ns-row .d{width:11px;height:11px;border-radius:50%}.ns-row .st{color:var(--tx)}.ns-row .dt{color:var(--mu);font-size:11.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ns-row a{color:var(--tx);text-decoration:none}.ns-row a:hover{text-decoration:underline}
+.ns-h{display:flex;gap:1px;height:16px}.ns-h i{flex:1;border-radius:1px;background:#1f252c}
+.ns-l0{background:#389e0d!important}.ns-l1{background:#d4b106!important}.ns-l2{background:#d46b08!important}.ns-l3{background:#cf1322!important}.ns-l-1{background:#434343!important}.ns-l-2{background:#531dab!important}
+#ns_banner{display:none;background:#3a1010;border:1px solid #a8071a;border-radius:8px;padding:8px 12px;margin:6px 0;color:#ffccc7}
+.ns-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--mu);margin:6px 0}.ns-leg span{display:inline-flex;align-items:center;gap:4px}.ns-leg i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.ns-cor a{display:block;color:var(--tx);font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--bd);text-decoration:none}.ns-cor a:hover{color:#fff}
+</style>
+<link rel="stylesheet" href="theme.css"><link rel="icon" href="favicon.ico" sizes="any"></head><body>
+<header><h1>BLACKOUT.<b>NETWORK</b> · Early-Warning Threat Monitor <span id="scope_badge" title="Scan scope: worldwide. Items are ranked by global relevance; no region gets extra weight." style="font-size:11px;font-weight:600;letter-spacing:.4px;border:1px solid var(--ac);color:var(--ac);border-radius:10px;padding:2px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap">🌐 Scope: Global</span><a id="howscore_link" href="scoring" title="How the 0–100 score and 0–10 rank are computed" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">ⓘ How we score</a><a id="nl_head_link" href="newsletter" title="Get the morning/evening brief by email (double opt-in, unsubscribe anytime)" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">✉ Newsletter</a><a id="sc_head_link" href="sources" title="Every source we use, with a 0–10 confidence rating" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">📚 Sources</a><span id="brand_tagline" style="display:block;font-size:12px;font-weight:400;letter-spacing:.2px;color:var(--mu);margin-top:4px">The world's threats, scored and sourced, before cable news catches up.</span></h1>
+<div class="ctl"><span id="status">loading…</span>
+<button class="pri" id="refresh">⟳ Manual refresh</button>
+<label>Scan every <select id="interval"></select></label>
+<span id="msg"></span></div></header>
+<nav class="tabs"><button class="on" data-tab="threat">📡 The Wire</button><button data-tab="jets">✈ Private jets</button><button data-tab="thread">🧵 The Thread</button><button data-tab="bcast">📻 Live Broadcasts</button><button data-tab="streams">📺 Live Streams</button><button data-tab="radio">📻 Radio</button><button data-tab="res">📍 Local Resources</button><button data-tab="bush">🏕 Bushcraft</button><button data-tab="med">⛑ Medical</button><button data-tab="maps">🗺 Maps</button><button data-tab="net">🌐 Network Status</button><button data-tab="solar_seismic">☀ Solar &amp; Seismic</button><button data-tab="heatmap">🔥 Heat Map</button><button data-tab="ranked">🗳 Ranked by Users</button><button data-tab="tips">☕ Tips</button></nav>
+<div id="ns_gbanner" role="alert"></div>
+<main id="tab-threat">
+<section class="pn" id="tl" style="grid-column:1/-1"><h2>⏱ Timeline — scrub through everything cataloged <span class="meta" id="tl_meta"></span></h2>
+ <div id="tl_hist" title="Items per hour (red = high severity)"></div>
+ <input type="range" id="tl_rng" min="0" max="0" value="0" step="1" aria-label="Timeline position">
+ <div class="row"><button id="tl_prev" title="Back one step">◀</button><button id="tl_play" title="Play forward">▶ Play</button><button id="tl_next" title="Forward one step">▶</button><button id="tl_live" class="on" title="Jump to now and follow new scans">● Live</button>
+ <label>Window <select id="tl_win"><option value="1">1 hour</option><option value="6" selected>6 hours</option><option value="24">24 hours</option></select></label>
+ <label class="sw"><input type="checkbox" id="tl_snaponly"> only items with a snapshot</label><label class="sw"><input type="checkbox" id="tl_main"> hide Watchlist items</label>
+ <b id="tl_at"></b><span class="meta" id="tl_cnt"></span></div>
+ <div id="tl_items" class="tl-strip"></div>
+ <div class="meta" id="tl_snapinfo"></div></section>
+<div>
+ <section class="pn"><h2>The Wire — severity timeline <span class="meta">(confirmed / official sources · high ≥ <span id="thr"></span>) · <a href="scoring" class="howscore" style="color:var(--ac);text-decoration:none">How we score →</a></span></h2>
+ <div class="filters row" id="filters"></div><div id="feed" class="scroll"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Watchlist — single-source, low confidence (<span id="wcount">0</span>)</h2><div id="watch" class="scroll" style="max-height:360px"></div></section>
+</div>
+<div>
+ <section class="pn"><h2>Geographic heat map</h2><div id="map"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Alert volume by category (7 days) <a href="#trends" class="meta" style="float:right;font-weight:400" title="Open the Trends tab: hourly, 6-hour and daily charts, Wire vs Watchlist, scan volume">More charts in Trends →</a></h2><canvas id="vol" height="190"></canvas></section>
+ <section class="pn" style="margin-top:16px"><h2>Severity trend (daily max / avg / # high)</h2><canvas id="trend" height="170"></canvas></section>
+ <section class="pn" style="margin-top:16px"><h2>Notification settings</h2><div class="meta">Alert delivery is managed on the scanner node, not on this public site.</div><div hidden><input id="phone"><span id="phonecur"></span><input type="checkbox" id="ch_sms"><span id="d_sms"></span><input type="checkbox" id="ch_email"><span id="d_email"></span><input type="checkbox" id="ch_app"><span id="d_app"></span><input id="pass" type="hidden"><button id="save" disabled></button><div id="smsg"></div></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Sources &amp; health</h2><div id="sources" class="scroll" style="max-height:380px"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>API</h2><div class="meta">High-severity items for chat checks: <a href="api/new_high?since=" id="apilink">/api/new_high?since=&lt;ISO time&gt;</a> · full state: <a href="api/state">/api/state</a></div></section>
+</div>
+</main>
+<main id="tab-jets" style="display:none">
+<div>
+ <section class="pn"><h2>Private / business jets airborne now (worldwide, transponding)</h2>
+  <div class="big" id="j_big">—</div><div class="meta" id="j_fresh"></div><div id="j_warn"></div>
+  <div class="note" id="j_note"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Last 24 hours (hourly): avg airborne · takeoffs · spike threshold</h2><canvas id="j_trend" height="170"></canvas><div class="meta" id="j_base"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Jet Activity Alerts — takeoff spikes (<span id="j_nsp">0</span>)</h2><div id="j_recur"></div><div id="j_spikes" class="scroll" style="max-height:420px"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Takeoffs, last 3 hours</h2><div class="grid2"><div id="j_dreg"></div><div id="j_dap"></div></div></section>
+</div>
+<div>
+ <section class="pn"><h2>Spike alert settings</h2>
+  <div class="row"><label class="sw"><input type="checkbox" id="j_en" disabled> Takeoff spike alerts on</label></div>
+  <div class="row"><label>Sensitivity k <input type="range" id="j_k" min="1.5" max="4" step="0.1" disabled> <b id="j_kv"></b></label></div>
+  <div class="meta">Spike = hourly takeoffs &gt; baseline mean + k × std dev. Lower k = more alerts. Range 1.5–4.0, default 2.0.</div>
+  <div class="meta">Read-only here: spike settings are managed on the scanner node.</div><div hidden><input id="j_pass" type="hidden"><button id="j_save" disabled></button></div><div id="j_msg" class="meta"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>By region</h2><div id="j_reg"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>By manufacturer</h2><div id="j_mfr"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>By flight status</h2><div id="j_st"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>By registration country (top 15)</h2><div id="j_cty"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Top aircraft types</h2><div id="j_typ"></div></section>
+ <section class="pn" style="margin-top:16px"><h2>Jet data sources</h2><div id="j_src"></div><div class="meta" id="j_links" style="margin-top:8px"></div>
+  <div class="meta">API: <a href="api/jets">/api/jets</a> · <a href="api/jet_spikes">/api/jet_spikes</a> · <a href="api/jet_spikes/new">/api/jet_spikes/new?since=&lt;ISO&gt;</a></div></section>
+</div></main>
+<main id="tab-thread" data-addon="thread" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="arcs"><h2>🧵 The Thread <span class="meta">— related alerts strung together into developing stories: every update, its severity, its verification links, and what connects to what</span></h2>
+ <div class="row"><label>Time window <select id="arcs_window"><option value="6h">Last 6 hours</option><option value="24h">Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option></select></label>
+ <label class="sw"><input type="checkbox" id="arcs_multi"> Only stories with 2+ updates</label><span class="th-views"><button id="th_vboard" class="on">📌 Board</button><button id="th_vlist">☰ List view</button></span>
+ <label class="sw" id="th_isol_l"><input type="checkbox" id="th_isol"> Hide isolated stories</label><button id="th_reset" title="reset zoom and layout">⤢ Reset view</button><button id="th_pepe" title="easter egg"><img class="pepe-ic" src="img/pepe_silvia.jpg" alt="Charlie from It's Always Sunny in front of the Pepe Silvia conspiracy board" width="30" height="30"><span id="th_pepe_l">Pepe Silvia mode</span></button>
+ <span class="meta" id="arcs_meta"></span><span class="meta" id="arcs_msg"></span></div>
+ <div id="th_board"><svg id="th_svg"><defs><radialGradient id="th_pin" cx="35%" cy="35%" r="65%"><stop offset="0" stop-color="#ff8a8a"/><stop offset=".45" stop-color="#e01b1b"/><stop offset="1" stop-color="#6d0000"/></radialGradient>
+  <filter id="th_glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g id="th_vp"><g id="th_edges"></g><g id="th_marks"></g><g id="th_nodes"></g></g></svg>
+  <div id="th_notes"></div><div id="th_tip"></div><div id="th_panel"></div><div class="th-help">drag pins · scroll to zoom · drag the board to pan · click a pin for its timeline</div></div>
+ <div id="th_listwrap" style="display:none"><div id="arcs_list"></div><div class="row"><button id="arcs_more" style="display:none">Show more stories</button></div></div>
+ <div class="meta">Severity badge = peak rank in the window on the 0–10 chat scale (raw score shown on each update). "Unconfirmed" = single source family. Board: pin size = number of sources, glowing/pulsing pins = higher severity, string thickness = connection strength (hover a string for the shared places/terms); up to 80 stories by severity, then recency. List view: click a story to expand its timeline; "Connected to" chips jump to related stories. Read-only view: it never changes scanner scores.</div>
+</section>
+</main>
+<main id="tab-res" data-addon="res" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="res"><h2>📍 Local Resources <span class="meta">— pick a place · nearby emergency services and essentials from OpenStreetMap</span></h2>
+ <form class="row" id="rs_form"><input id="rs_q" placeholder="Address, city or postcode" size="46" maxlength="120"><button class="pri" type="submit">Search</button>
+ <span id="rs_geo"></span>
+ <button type="button" id="rs_all">Expand all</button><span class="meta" id="rs_meta"></span></form>
+ <div class="warn">⚠ In an emergency call <a href="tel:911" style="color:var(--md);font-weight:700">911</a>. OpenStreetMap data can be incomplete or out of date — call ahead to confirm hours and services.</div>
+ <div id="rs_fema"></div><div id="rs_cats"></div>
+ <div class="meta" id="rs_src" style="margin-top:8px"></div></section></main>
+<main id="tab-bush" data-addon="bush" style="display:none;grid-template-columns:minmax(0,1fr)"><div id="gd_bush"><div class="meta">Loading guide…</div></div></main>
+<main id="tab-med" data-addon="med" style="display:none;grid-template-columns:minmax(0,1fr)"><div id="gd_med"><div class="meta">Loading guide…</div></div></main>
+<main id="tab-maps" data-addon="maps" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="mp_pdfs"><h2>🗺 Maps — printable PDF maps <span class="meta">— download these while the internet works; they keep working with no power, cell or internet</span></h2>
+ <div class="warn">⬇ Grid-down tip: download the PDFs to your phone (Files app) and print them now. The live map below needs internet and will not load in an outage.</div>
+ <div id="mp_list" class="mp-grid"><div class="meta">Loading map list…</div></div>
+ <h2 style="margin-top:16px">USGS US Topo quads <span class="meta">— official free 1:24,000 topographic GeoPDFs (contours, water, roads, aerial imagery layer) (shown when available for a region)</span></h2>
+ <div id="mp_topo" class="mp-grid"></div>
+ <div class="meta" id="mp_attr" style="margin-top:10px"></div></section>
+<section class="pn" style="margin-top:16px"><h2>Interactive map <span class="meta">— start from the world or your chosen location, zoom to street level (street names, house numbers, buildings) · secondary to the PDFs</span></h2>
+ <form class="row" id="mp_form"><input id="mp_q" placeholder="Search an address, city or postcode" size="46" maxlength="120"><button class="pri" type="submit">Find</button>
+ <button type="button" id="mp_fl">🌐 World</button><button type="button" id="mp_home">📍 My location</button><span class="meta" id="mp_msg"></span></form>
+ <div class="row" id="mp_cats"></div>
+ <div id="mp_map"></div>
+ <div class="note">🌐 The live map streams tiles from OpenStreetMap and needs internet. Emergency markers stay visible at every zoom (grouped into numbered clusters until you zoom in). Evacuation routes: Florida Division of Emergency Management “Designated Evacuation Routes” (public ArcGIS layer). Points: OpenStreetMap, may be incomplete — call 911 in an emergency.</div></section>
+</main>
+<main id="tab-streams" data-addon="streams" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn"><h2>📺 Live Streams — news channels live now, watched and transcribed <span class="meta" id="st_meta"></span></h2>
+ <div class="row"><button class="pri" id="st_ref">⟳ Re-check &amp; re-rank streams</button><label>Region <select id="st_reg"><option value="">All regions</option></select></label>
+ <label class="sw"><input type="checkbox" id="st_live" checked> live now only</label><label>Transcript window <select id="st_hrs"><option value="1">1 h</option><option value="3" selected>3 h</option><option value="12">12 h</option><option value="24">24 h</option></select></label>
+ <span id="st_filt"></span><span class="meta" id="st_msg"></span></div>
+ <div class="note" id="st_worker"></div>
+ <div id="st_kw" style="margin-top:8px"></div>
+ <div id="st_grid" class="st-grid"></div></section>
+<section class="pn" style="margin-top:16px"><h2>Stream watchlist — single-channel, unconfirmed segments</h2><div id="st_watch" class="scroll" style="max-height:340px"></div></section>
+</main>
+<main id="tab-radio" data-addon="radio" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="rd_top"><h2>📻 Radio <span class="meta">— number stations, military HF and live radio, playable right here, with a rolling audio archive</span><button type="button" class="tab-ref" id="rd_ref" title="Re-check every stream now">⟳ Refresh</button></h2>
+ <div id="rd_app"><div class="meta">Loading Radio…</div></div></section></main>
+<main id="tab-tips" data-addon="tips" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn tips-box"><h2>☕ Tips</h2>
+ <p>blackout.network is a free public utility, built and run as a sole endeavor by Matt.</p>
+ <p>If it's useful to you, you're welcome to leave a tip. It goes toward keeping the work going. It's a tip, not a donation, and it never unlocks anything: everything here stays free.</p>
+ <form id="tip_form" class="tip-row" autocomplete="off"><label for="tip_amt" class="tip-lab">Amount (USD)</label>
+  <div class="tip-in"><span>$</span><input id="tip_amt" type="text" inputmode="decimal" placeholder="5" maxlength="9" aria-describedby="tip_msg"></div>
+  <button class="pri" type="submit" id="tip_btn" disabled>Tip with PayPal</button></form>
+ <div class="meta" id="tip_msg">Opens PayPal in a new tab. No login or account here, and nothing you type is stored.</div>
+</section></main>
+<main id="tab-net" data-addon="net" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn"><h2>🌐 Network Status: internet, cloud, apps and ISPs <span class="meta" id="ns_meta"></span></h2>
+ <div id="ns_banner"></div>
+ <div class="row"><label>History <select id="ns_win"><option value="24h">24 hours</option><option value="7d">7 days</option></select></label>
+  <div class="ns-leg"><span><i class="ns-l0"></i>operational</span><span><i class="ns-l1"></i>notice</span><span><i class="ns-l2"></i>degraded</span><span><i class="ns-l3"></i>major outage</span><span><i class="ns-l-1"></i>unreachable</span><span><i class="ns-l-2"></i>blocked by site</span><span><i style="background:#1f252c"></i>no data</span></div></div>
+ <div class="ns-grid"><div id="ns_list"></div>
+ <div><h3>Corroborating signals (last 24 h)</h3><div class="note">Items that mention outages, DNS, carriers or cloud providers. They're read from The Wire and Live Broadcasts and never change any score.</div>
+  <div class="ns-cor" id="ns_cor"></div>
+  <div class="note" style="margin-top:12px">Box probes measure <b>this computer's own network path</b>, not conditions where you are. X and YouTube have no official public status feed, so they're covered by probes only. Downdetector is checked politely once an hour. When it blocks automated requests, this tab shows <i>blocked</i> and doesn't try to get around it.</div></div></div>
+</section></main>
+<main id="tab-ranked" data-addon="ranked" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn"><h2>🗳 Ranked by Users — the crowd's threat level vs. the bot's <span class="meta" id="rk_meta"></span></h2>
+ <div class="tick" id="rk_tick"><div class="tick-in" id="rk_tick_in"><span class="meta">No votes yet: rate any item 0–10 with the small slider under it on The Wire, Watchlist, Timeline, The Thread, Live Broadcasts or Live Streams.</span></div></div>
+ <div class="row" style="margin-top:8px"><label>Sort <select id="rk_sort"><option value="bayes">Weighted average (small-sample guard)</option><option value="avg">Raw average</option><option value="votes">Most votes</option></select></label>
+ <label>Window <select id="rk_win"><option value="24h">24 hours</option><option value="7d" selected>7 days</option><option value="30d">30 days</option><option value="all">All time</option></select></label>
+ <label>Min votes <select id="rk_min"><option>1</option><option>2</option><option>3</option><option>5</option><option>10</option></select></label></div>
+ <div class="note">Only you can vote right now: the dashboard is private and runs on this computer only, so Matt is the only voter until it goes public. Ratings never change the bot's scores, ranks or The Wire's order.</div>
+ <div id="rk_list"></div></section></main>
+<main id="tab-bcast" data-addon="bcast" style="display:none">
+<div>
+ <section class="pn"><h2>Live Broadcasts — wire, local TV and live radio transcripts <span class="meta" id="bc_meta"></span></h2>
+  <div class="row"><label>Source <select id="bc_src"><option value="">All sources</option></select></label>
+  <label>Time <select id="bc_win"><option value="1h">Last 1 hour</option><option value="6h">Last 6 hours</option><option value="24h" selected>Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option></select></label>
+  <span class="meta" id="bc_filt"></span></div>
+  <div id="bc_clips" class="scroll" style="max-height:900px"></div>
+  <div class="meta">Each clip opens its raw source in a new tab (audio clips open the live stream; the capture time is in the link). Informational only: never changes threat scores.</div></section>
+</div>
+<div>
+ <section class="pn"><h2>Keyword key <span class="meta">(click a keyword to filter · click again to clear · × removes it)</span></h2><div id="bc_kw"></div>
+  <div class="row"><input id="bc_new" placeholder="new keyword" size="16" maxlength="40"><select id="bc_cat"></select><button id="bc_add">Add keyword</button></div><div id="bc_kmsg" class="meta"></div>
+  <div class="meta">Whole-word, case-insensitive matching. Changes apply to new and existing clips.</div></section>
+ <section class="pn" style="margin-top:16px"><h2>Broadcast source health</h2><div id="bc_health"></div><div class="meta" id="bc_audio"></div></section>
+</div></main>
+<main id="tab-heatmap" data-addon="heatmap" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="hm_top"><h2><span class="hm-ic">🔥</span> Regional Heat Map <span class="meta">— where the alerts are: countries, then states and provinces, then cities</span><button type="button" class="tab-ref" id="hm_ref" title="Run a scan, geocode any new alerts and redraw the map">⟳ Refresh</button></h2>
+ <div id="hm_app"><div class="meta">Loading the heat map…</div></div></section></main>
+<main id="tab-politics" data-addon="politics" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="pol_top"><h2><span class="pol-ic">🏛</span> Politics <span class="meta">— political developments from the scanner, plus public prediction-market prices</span><button type="button" class="tab-ref" id="pol_ref" title="Run a scan now and re-check Polymarket and Kalshi">⟳ Refresh</button></h2>
+ <div id="pol_app"><div class="meta">Loading Politics…</div></div></section></main>
+<main id="tab-solar" data-addon="solar_seismic" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="ss_top"><h2><span class="ss-sun">☀</span> Solar &amp; Seismic <span class="meta">— the Sun, Earth's magnetic shield and the planet's earthquakes, side by side</span><button type="button" class="tab-ref" id="ss_ref" title="Run a scan and re-check NOAA / USGS (upstream data is cached for 5 minutes)">⟳ Refresh</button></h2>
+ <div id="ss_app"><div class="meta">Loading Solar &amp; Seismic…</div></div></section></main>
+<main id="tab-weather" data-addon="weather" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="wx_top"><h2><span class="wx-ic">🌦</span> Weather <span class="meta">— current conditions, official alerts and the forecast for a place you choose</span><button type="button" class="tab-ref" id="wx_ref" title="Re-check the weather sources now (upstream data is cached for 10 minutes; a forced re-check is allowed once a minute)">⟳ Refresh</button></h2>
+ <div id="wx_app"><div class="meta">Loading Weather…</div></div></section></main>
+<main id="tab-games" data-addon="games" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="gm_top"><h2><span class="gm-ic">👾</span> Games <span class="meta">— original 8-bit style arcade, puzzle and board games, playable right here with the keyboard</span></h2>
+ <div id="gm_app"><div class="meta">Loading Games…</div></div></section></main>
+<main id="tab-trends" data-addon="trends" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="tr_top"><h2><span class="tr-ic">📈</span> Trends <span class="meta">— how the scanner's alert volume, severity and source health have moved over time</span><button type="button" class="tab-ref" id="tr_ref" title="Run a scan now, then redraw the charts">⟳ Refresh</button></h2>
+ <div id="tr_app"><div class="meta">Loading Trends…</div></div></section></main>
+<main id="tab-newsletter" data-addon="newsletter" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn nl-card" id="nl_top"><h2>✉ Newsletter <span class="meta">— the highest-severity, source-verified threats by email, once or twice a day · <a href="newsletter" style="color:var(--ac);text-decoration:none">full page →</a> · <a href="newsletter/sample" target="_blank" rel="noopener" style="color:var(--ac);text-decoration:none">sample issue →</a></span></h2>
+ <div id="nl_app" data-mode="card"><div class="meta">Loading the signup form…</div></div></section></main>
+<main id="tab-sources" data-addon="sources" style="display:none;grid-template-columns:minmax(0,1fr)">
+<section class="pn" id="sc_top"><h2>📚 Sources <span class="meta">— every source we use, with item counts, profiles and a 0–10 confidence rating · <a href="sources" style="color:var(--ac);text-decoration:none">full catalog →</a> · <a href="sources#submit" style="color:var(--ac);text-decoration:none">submit a source →</a></span></h2>
+ <div id="sc_app"><div class="meta">Loading the Sources summary…</div></div></section></main>
+<script>
+const $=id=>document.getElementById(id);
+// ---- Cohesion: shared palette lookups, shared red-string path, one tab bar, deep links (#wire, #thread, #network …) ----
+function catColor(id,fb){const al={infrastructure:"infra",link:"link"}[id]||id;const v=getComputedStyle(document.documentElement).getPropertyValue("--c-"+al).trim();return v||fb||"#8a5a5a"}
+function redStringD(ax,ay,bx,by,sag,wob){wob=wob||0;const mx=(ax+bx)/2,my=(ay+by)/2;return `M${ax.toFixed(1)},${ay.toFixed(1)} Q${(mx+wob).toFixed(1)},${(my+sag+wob*.5).toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}`}
+const TABHASH={threat:"wire",jets:"jets",thread:"thread",bcast:"broadcasts",streams:"streams",radio:"radio",net:"network",solar_seismic:"solar",ranked:"ranked",res:"resources",maps:"maps",bush:"bushcraft",med:"medical",tips:"tips"};
+const HASHTAB=Object.fromEntries(Object.entries(TABHASH).map(([k,v])=>[v,k]));
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(u||"")?u:"#";
+const fmt=t=>{if(!t)return"time n/a";const d=new Date(t);return d.toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET"};
+const lv=s=>s>=60?"h":s>=35?"m":"l";
+const CATS=["war/conflict","disease","natural disaster","cyber","space weather","other"];
+const COL={"war/conflict":"#ff4d4f","disease":"#b37feb","natural disaster":"#faad14","cyber":"#36cfc9","space weather":"#4aa3ff","other":"#8c8c8c"};
+let S=null,filter="all",map,heat,markers,volC,trC,settingsLoaded=false;
+function card(c){return `<div class="card ${lv(c.score)}" data-cid="${esc(c.cluster_id)}"><span class="sc ${lv(c.score)}">${c.score}</span><b>${esc(c.title)}</b>
+<div class="meta">${esc(c.category)} · ${esc(c.location||"")} · ${fmt(c.event_time)} · confidence <b>${esc(c.confidence)}</b> · ${c.n_items} report(s) from ${c.n_families} source famil${c.n_families==1?"y":"ies"}: ${c.families.map(esc).join(", ")}</div>
+<div class="meta">${c.links.slice(0,6).map(l=>`<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.source)}</a>`).join(" · ")}</div>
+${c.brief?`<div class="brief">${esc(c.brief)}</div>`:""}</div>`}
+function render(){
+ $("thr").textContent=S.high_threshold;
+ $("status").textContent=`Updated ${fmt(S.generated)} · last scan ${S.scans[0]?fmt(S.scans[0].finished):"—"} · next ${S.next_scan?fmt(S.next_scan):"—"}${S.scanning?" · scanning…":""}`;
+ const sel=$("interval");if(!sel.options.length){S.allowed_intervals.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=m<60?m+" min":(m/60)+" h";sel.appendChild(o)})}
+ if(document.activeElement!==sel)sel.value=S.interval_minutes;
+ $("filters").innerHTML=["all",...CATS].map(c=>`<button class="${c==filter?"on":""}" data-c="${c}">${c}</button>`).join("");
+ const feed=S.main.filter(c=>filter=="all"||c.category==filter).sort((a,b)=>(b.score>=S.high_threshold)-(a.score>=S.high_threshold)||(b.score-a.score));
+ $("feed").innerHTML=feed.map(card).join("")||"<div class=meta>No items.</div>";
+ $("wcount").textContent=S.watchlist_count;$("watch").innerHTML=S.watchlist.map(card).join("")||"<div class=meta>Empty.</div>";
+ $("sources").innerHTML="<table><tr><th>Source</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+S.sources.map(s=>`<tr><td><a href="${esc(safeUrl(s.url))}" target=_blank rel="noopener noreferrer">${esc(s.name)}</a>${s.error?`<div class=meta>${esc(s.error)}</div>`:""}</td><td class="${s.ok==1?"ok":s.ok==0?"bad":"dis"}">${s.ok==1?"OK":s.ok==0?"FAIL":"disabled"}</td><td>${s.items}</td><td>${fmt(s.last_checked)}</td></tr>`).join("")+"</table>";
+ // map
+ if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors",maxZoom:10}).addTo(map);markers=L.layerGroup().addTo(map)}
+ heatDirty=true;if($("map").offsetWidth)drawHeat();
+ markers.clearLayers();S.geo.filter(g=>g.score>=35).forEach(g=>L.circleMarker([g.lat,g.lon],{radius:4+g.score/12,color:COL[g.category],weight:1,fillOpacity:.6}).bindPopup(`<b>${g.score}</b> ${esc(g.title)}`).addTo(markers));
+ // charts
+ const days=[...new Set(S.volume.map(v=>v.d).concat(S.trend.map(t=>t.d)))].sort();
+ const ds=CATS.map(c=>({label:c,backgroundColor:COL[c],data:days.map(d=>(S.volume.find(v=>v.d==d&&v.category==c)||{n:0}).n)}));
+ const opt={responsive:true,plugins:{legend:{labels:{color:"#ccc",boxWidth:10}}},scales:{x:{stacked:true,ticks:{color:"#999"}},y:{stacked:true,ticks:{color:"#999"},grid:{color:"#222"}}}};
+ if(volC){volC.data.labels=days;volC.data.datasets=ds;volC.update()}else volC=new Chart($("vol"),{type:"bar",data:{labels:days,datasets:ds},options:opt});
+ const tl=S.trend.map(t=>t.d),td=[{label:"max",data:S.trend.map(t=>t.mx),borderColor:"#ff4d4f"},{label:"avg",data:S.trend.map(t=>t.avg),borderColor:"#faad14"},{label:"# high",data:S.trend.map(t=>t.high),borderColor:"#4aa3ff"}];
+ const o2={responsive:true,plugins:{legend:{labels:{color:"#ccc",boxWidth:10}}},scales:{x:{ticks:{color:"#999"}},y:{min:0,ticks:{color:"#999"},grid:{color:"#222"}}}};
+ if(trC){trC.data.labels=tl;trC.data.datasets=td;trC.update()}else trC=new Chart($("trend"),{type:"line",data:{labels:tl,datasets:td},options:o2});
+ if(!settingsLoaded){applySettings(S.settings);settingsLoaded=true}
+ $("apilink").href="api/new_high?since="+new Date(Date.now()-864e5).toISOString().slice(0,19)+"Z";
+}
+if(L.HeatLayer&&!L.HeatLayer.prototype._bnGuard){const o=L.HeatLayer.prototype._redraw;L.HeatLayer.prototype._redraw=function(){if(!this._map||!this._map.getSize().x||!this._canvas||!this._canvas.width){this._frame=null;return}return o.call(this)};L.HeatLayer.prototype._bnGuard=1}
+let heatDirty=false;function drawHeat(){if(!map||!S||!heatDirty||!$("map").offsetWidth)return;heatDirty=false;if(heat)map.removeLayer(heat);heat=L.heatLayer(S.geo.map(g=>[g.lat,g.lon,Math.max(.15,g.score/100)]),{radius:22,blur:18,maxZoom:6}).addTo(map)}
+function applySettings(s){
+ $("phonecur").textContent=s.phone_saved?"saved: "+s.phone_masked:"no number saved";
+ $("ch_email").checked=s.channels.email;$("ch_app").checked=s.channels.app;$("ch_sms").checked=s.channels.sms;
+ $("d_sms").textContent=s.delivery_status.sms;$("d_email").textContent=s.delivery_status.email;$("d_app").textContent=s.delivery_status.app;
+ updSms(s.phone_saved);
+}
+function normPhone(v){let d=v.replace(/[\s().\-]/g,"");if(d.startsWith("+1"))d=d.slice(2);else if(d.length==11&&d[0]=="1")d=d.slice(1);return /^[2-9]\d{2}[2-9]\d{6}$/.test(d)?d:null}
+let phoneSaved=false;function updSms(saved){phoneSaved=saved;const ok=saved;$("ch_sms").disabled=!ok;if(!ok)$("ch_sms").checked=false;$("ch_sms").title=ok?"":"Save a valid phone number first"}
+$("phone").addEventListener("input",()=>{const v=$("phone").value.trim();$("smsg").textContent=v&&!normPhone(v)?"Not a valid US 10-digit number yet":"";$("smsg").className=""});
+$("save").onclick=async()=>{
+ const v=$("phone").value.trim(),body={passcode:$("pass").value,channels:{email:$("ch_email").checked,app:$("ch_app").checked,sms:$("ch_sms").checked}};
+ if(v){const n=normPhone(v);if(!n){$("smsg").innerHTML='<span class=bad>✗ Phone must be a valid US 10-digit number, e.g. (555) 555-0100</span>';return}body.phone=n}
+ if(!body.passcode){$("smsg").innerHTML='<span class=bad>✗ Enter the admin passcode</span>';return}
+ $("save").disabled=true;
+ try{const r=await fetch("api/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();
+  if(r.ok){$("smsg").innerHTML='<span class=ok>✓ Settings saved '+esc(fmt(j.updated))+'</span>';$("phone").value="";applySettings(j)}
+  else $("smsg").innerHTML='<span class=bad>✗ '+esc(j.error||r.status)+'</span>'}catch(e){$("smsg").innerHTML='<span class=bad>✗ '+esc(e)+'</span>'}
+ $("save").disabled=false};
+$("filters").onclick=e=>{if(e.target.dataset.c){filter=e.target.dataset.c;render()}};
+async function load(){try{const r=await fetch("api/state",{cache:"no-store"});S=await r.json();render();try{fdr()}catch(_){}}catch(e){$("status").textContent="dashboard offline: "+e}}
+$("refresh").onclick=async()=>{const b=$("refresh");b.disabled=true;$("msg").textContent="scanning…";
+ try{const r=await fetch("api/refresh",{method:"POST"});const j=await r.json();
+ $("msg").textContent=r.status==429?`rate-limited, retry in ${j.retry_after_s}s`:j.status=="ok"?`✓ scan done: ${j.fetched} fetched, ${j.new} new, ${j.ok_sources} sources OK, ${j.failed_sources} failed`:"status: "+j.status;await load()}catch(e){$("msg").textContent="error "+e}b.disabled=false};
+$("interval").disabled=true;$("interval").title="Scan interval is managed on the scanner node.";$("interval").onchange=async e=>{let p=$("pass").value;if(!p){load();return}
+ const r=await fetch("api/interval",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({minutes:+e.target.value,passcode:p})});const j=await r.json();
+ $("msg").textContent=r.ok?`✓ interval set to ${j.interval_minutes} min`:"✗ "+(j.error||r.status);load()};
+load();setInterval(load,60000);
+// ---- private jets tab (informational only; never affects threat ranks) ----
+let J=null,jTab=false,jC=null,jKTouched=false;
+const tbl=(o,n)=>{const e=Object.entries(o||{}).slice(0,n||99);const mx=Math.max(1,...e.map(x=>x[1]));return e.length?"<table>"+e.map(([k,v])=>`<tr><td>${esc(k)}</td><td style="width:45%"><span class=bar style="width:${Math.round(100*v/mx)}%"></span></td><td>${v}</td></tr>`).join("")+"</table>":"<div class=meta>No data yet.</div>"};
+document.querySelector(".tabs").onclick=e=>{const t=e.target.dataset.tab;if(!t)return;document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab==t));
+ $("tab-threat").style.display=t=="threat"?"":"none";$("tab-jets").style.display=t=="jets"?"":"none";jTab=t=="jets";if(jTab)loadJets();else if(map)setTimeout(()=>{map.invalidateSize();drawHeat()},50)};
+async function loadJets(){try{const r=await fetch("api/jets",{cache:"no-store"});J=await r.json();renderJets()}catch(e){$("j_fresh").textContent="jet data offline: "+e}}
+function renderJets(){
+ const s=J.snapshot;$("j_big").textContent=s?s.airborne.toLocaleString():"—";
+ $("j_fresh").textContent=s?`Last good sample ${fmt(s.ts)} (${s.age_minutes} min ago) · ${s.on_ground} more on the ground · ${s.privacy} privacy-flagged (LADD/PIA) · sampler every ${J.settings.sample_minutes} min (scan interval ${J.settings.scan_interval_minutes} min)`:"No sample yet.";
+ let w=[];if(!s)w.push("No jet data yet.");else{if(s.stale)w.push(`⚠ STALE: showing last-known value from ${fmt(s.ts)}; the source has not answered since.`);if(J.last_attempt_failed)w.push(`⚠ Last fetch at ${fmt(J.last_attempt)} failed; value shown is last-known.`);if(s.partial)w.push("⚠ Partial sample: one or more source requests failed.")}
+ $("j_warn").innerHTML=w.map(x=>`<div class=warn>${esc(x)}</div>`).join("");$("j_note").textContent="What this counts: "+J.note;
+ if(s){$("j_reg").innerHTML=tbl(s.by_region);$("j_mfr").innerHTML=tbl(s.by_mfr);$("j_st").innerHTML=tbl(s.by_status);$("j_cty").innerHTML=tbl(s.by_country,15);$("j_typ").innerHTML=tbl(s.by_type,15)}
+ const b=J.baseline;$("j_base").innerHTML=`Baseline for this hour: <b>${esc(b.basis_for_current_hour)}</b>${b.mean!=null&&b.basis_for_current_hour!="warming_up"?` · mean ${b.mean.toFixed(1)} ± ${b.std.toFixed(1)} (n=${b.n})`:""} · valid hours in last 7 days: ${b.valid_hours_7d} · ${esc(b.warmup_rule)}${J.last_eval?` · last hour evaluated: ${fmt(J.last_eval.hour)} → ${J.last_eval.count} takeoffs, ${esc(J.last_eval.status)}`:""}`;
+ $("j_nsp").textContent=J.spikes.length;
+ $("j_recur").innerHTML=Object.keys(J.recurring_hours).length?`<div class=warn>Recurring spike hours (likely routine schedule peaks): ${Object.entries(J.recurring_hours).map(([k,v])=>esc(k)+" ×"+v).join(", ")}</div>`:"";
+ $("j_spikes").innerHTML=J.spikes.map(x=>`<div class="card ${x.suppressed?"l":"m"}"><b>${esc(x.hour_et)}</b> · ${x.count} takeoffs · ${x.pct_above!=null?"+"+x.pct_above+"%":""} vs baseline${x.recurring?'<span class="badge rec">recurring pattern</span>':""}${x.suppressed?`<span class="badge sup">${esc(x.suppressed)}</span>`:""}
+  <div class=brief>${esc(x.paragraph)}</div>${(x.coinciding||[]).map(c=>`<div class=meta>[${c.rank}] ${esc(c.title)} ${(c.links||[]).map(l=>`<a href="${esc(safeUrl(l))}" target=_blank rel="noopener noreferrer">link</a>`).join(" ")}</div>`).join("")}</div>`).join("")||"<div class=meta>No takeoff spikes logged yet.</div>";
+ $("j_dreg").innerHTML="<div class=meta>By region</div>"+tbl(J.departures_3h.by_region);
+ $("j_dap").innerHTML="<div class=meta>Top departure airports</div>"+(J.departures_3h.top_airports.length?"<table>"+J.departures_3h.top_airports.map(a=>`<tr><td>${esc(a.airport)}</td><td>${esc(a.airport_name)} (${esc(a.airport_country)})</td><td>${a.n}</td></tr>`).join("")+"</table>":"<div class=meta>None yet.</div>");
+ $("j_src").innerHTML="<table><tr><th>Request</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+J.sources.map(x=>`<tr><td><a href="${esc(safeUrl(x.url))}" target=_blank rel="noopener noreferrer">${esc(x.name)}</a>${x.error?`<div class=meta>${esc(x.error)}</div>`:""}</td><td class="${x.ok?"ok":"bad"}">${x.ok?"OK":"FAIL"}</td><td>${x.items}</td><td>${fmt(x.last_checked)}${!x.ok&&x.last_ok?"<div class=meta>last OK "+fmt(x.last_ok)+"</div>":""}</td></tr>`).join("")+"</table>";
+ $("j_links").innerHTML="Sources: "+J.source_links.map(l=>`<a href="${esc(safeUrl(l.url))}" target=_blank rel="noopener noreferrer">${esc(l.name)}</a>`).join(" · ")+" · No API keys required.";
+ if(document.activeElement!==$("j_k")&&!jKTouched){$("j_k").value=J.settings.k;$("j_kv").textContent=J.settings.k}
+ if(document.activeElement!==$("j_en"))$("j_en").checked=J.settings.enabled;
+ const t=J.trend24,lab=t.map(x=>x.label),ds=[{type:"line",label:"avg airborne",data:t.map(x=>x.avg_airborne),borderColor:"#4aa3ff",yAxisID:"y"},
+  {type:"bar",label:"takeoffs",data:t.map(x=>x.departures),backgroundColor:"#faad14",yAxisID:"y2"},{type:"line",label:"spike threshold",data:t.map(x=>x.threshold),borderColor:"#ff4d4f",borderDash:[4,4],yAxisID:"y2"}];
+ if(jC){jC.data.labels=lab;jC.data.datasets=ds;jC.update()}else jC=new Chart($("j_trend"),{data:{labels:lab,datasets:ds},options:{responsive:true,plugins:{legend:{labels:{color:"#ccc",boxWidth:10}}},
+  scales:{x:{ticks:{color:"#999"}},y:{position:"left",min:0,ticks:{color:"#4aa3ff"},grid:{color:"#222"}},y2:{position:"right",min:0,ticks:{color:"#faad14"},grid:{display:false}}}}});
+}
+$("j_k").oninput=()=>{jKTouched=true;$("j_kv").textContent=(+$("j_k").value).toFixed(1)};
+$("j_save").onclick=async()=>{const p=$("j_pass").value||$("pass").value;if(!p){$("j_msg").innerHTML='<span class=bad>✗ Enter the admin passcode</span>';return}
+ try{const r=await fetch("api/jets/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({passcode:p,k:+$("j_k").value,enabled:$("j_en").checked})});const j=await r.json();
+ $("j_msg").innerHTML=r.ok?`<span class=ok>✓ Saved: alerts ${j.jet_spike_alerts_enabled?"on":"off"}, k=${j.jet_spike_k}</span>`:'<span class=bad>✗ '+esc(j.error||r.status)+'</span>';if(r.ok){jKTouched=false;loadJets()}}catch(e){$("j_msg").innerHTML='<span class=bad>✗ '+esc(e)+'</span>'}};
+setInterval(()=>{if(jTab)loadJets()},60000);
+// ---- Story Arcs (read-only add-on; separate functions, does not alter existing behaviour) ----
+let ARCS=null,arcsOpen=new Set(),arcsShown=30,arcsAuto=true;
+const arcLv=r=>r>=6?"h":r>=4?"m":"l";
+function arcsInit(){const sel=$("arcs_window");const ls=localStorage.getItem("arcs_window");if(ls)sel.value=ls;$("arcs_multi").checked=localStorage.getItem("arcs_multi")=="1";
+ fetch("api/arcs_window",{cache:"no-store"}).then(r=>r.json()).then(j=>{if(j.window){sel.value=j.window;localStorage.setItem("arcs_window",j.window)}arcsLoad()}).catch(()=>arcsLoad())}
+async function arcsLoad(){try{const w=$("arcs_window").value||"24h";const r=await fetch("api/arcs?window="+encodeURIComponent(w),{cache:"no-store"});const j=await r.json();if(!r.ok)throw j.error||r.status;ARCS=j;
+ if(arcsAuto){ARCS.arcs.slice(0,2).forEach(a=>{if(a.n_updates>1)arcsOpen.add(a.id)});arcsAuto=false}arcsRender()}catch(e){$("arcs_meta").textContent="story arcs unavailable: "+e}}
+function arcUpd(u){const lk=(u.links||[]).map(l=>`<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">${esc(l.source||"link")}</a>`).join(" · ")||"<span class=meta>no link</span>";
+ return `<li class="${arcLv(u.rank)}"><span class="meta">${esc(u.time_et)}</span> · <b>${u.rank}/10</b> <span class=meta>(score ${u.score})</span>${u.unconfirmed?'<span class=unc>unconfirmed</span>':""}<br>${esc(u.title)}<br><span class=chg>${esc(u.changed)}</span> · ${lk}</li>`}
+function arcCard(a){const open=arcsOpen.has(a.id);const con=(a.connections||[]).map(c=>`<span class=chip data-arc="${esc(c.arc)}" title="${esc(c.title)}">${esc(c.title.slice(0,48))}${c.title.length>48?"…":""} <i>${c.shared.map(esc).join(", ")}</i></span>`).join("");
+ return `<div class="arc ${arcLv(a.severity)}" id="${esc(a.id)}"><div class="arc-hd" data-tog="${esc(a.id)}"><span class="sc ${arcLv(a.severity)=="h"?"h":arcLv(a.severity)=="m"?"m":"l"}">${a.severity}</span><b>${esc(a.title)}</b><span class=arc-tog>${open?"▾ hide":"▸ "+a.n_updates+" update"+(a.n_updates==1?"":"s")}</span></div>
+ <div class=meta>${esc(a.category)} · started ${esc(a.start_et)} · latest ${esc(a.latest_et)} · ${a.n_updates} update${a.n_updates==1?"":"s"} · ${a.n_sources} source${a.n_sources==1?"":"s"}${a.confirmed?"":' <span class=unc>unconfirmed</span>'} · latest ${a.latest_rank}/10${a.places.length?" · "+a.places.map(esc).join(", "):""}</div>
+ ${con?`<div class=meta style="margin-top:3px">Connected to: ${con}</div>`:""}
+ ${open?`<ul class=tl>${a.updates.slice().reverse().map(arcUpd).join("")}</ul>${a.updates_truncated?`<div class=meta>+${a.updates_truncated} older updates not shown</div>`:""}`:""}</div>`}
+function arcsRender(){if(!ARCS)return;const multi=$("arcs_multi").checked;const list=ARCS.arcs.filter(a=>!multi||a.n_updates>1);
+ $("arcs_meta").textContent=` ${list.length} stories (${ARCS.multi_update_arcs} with 2+ updates) from ${ARCS.clusters_in_window} alerts in the last ${ARCS.window_label} · updated ${ARCS.generated_et}`;
+ $("arcs_list").innerHTML=list.slice(0,arcsShown).map(arcCard).join("")||"<div class=meta>No stories in this window.</div>";
+ $("arcs_more").style.display=list.length>arcsShown?"":"none"}
+$("arcs_list").onclick=e=>{const c=e.target.closest(".chip[data-arc]");if(c){const id=c.dataset.arc;let el=$(id);if(!el){const i=ARCS.arcs.findIndex(a=>a.id==id);if(i>=0){arcsShown=Math.max(arcsShown,i+1);arcsRender();el=$(id)}}
+ if(el){arcsOpen.add(id);arcsRender();el=$(id);el.scrollIntoView({behavior:"smooth",block:"center"});el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1500)}return}
+ const t=e.target.closest("[data-tog]");if(t&&!e.target.closest("a")){const id=t.dataset.tog;arcsOpen.has(id)?arcsOpen.delete(id):arcsOpen.add(id);arcsRender()}};
+$("arcs_more").onclick=()=>{arcsShown+=30;arcsRender()};
+$("arcs_multi").onchange=()=>{localStorage.setItem("arcs_multi",$("arcs_multi").checked?"1":"0");arcsRender()};
+$("arcs_window").onchange=async e=>{const w=e.target.value;localStorage.setItem("arcs_window",w);arcsShown=30;
+ try{const r=await fetch("api/arcs_window",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({window:w})});const j=await r.json();$("arcs_msg").textContent=r.ok?` · ✓ window saved: ${j.label}`:" · ✗ "+(j.error||r.status)}catch(err){$("arcs_msg").textContent=" · ✗ "+err}
+ arcsLoad()};
+arcsInit();setInterval(arcsLoad,60000);
+// ---- add-on tabs: show/hide <main data-addon> panels (runs alongside the existing tab handler) ----
+document.querySelector(".tabs").addEventListener("click",e=>{const t=e.target.closest("button")&&e.target.closest("button").dataset.tab;if(!t)return;
+ document.querySelectorAll("main[data-addon]").forEach(m=>m.style.display=m.dataset.addon==t?"":"none");if(t=="bcast")bcLoad()});
+// ---- Live Broadcasts ----
+let BC=null,bcKw="",bcRe=null,bcCat={},bcCol={};
+function bcBuild(kw){bcCat={};bcCol={};const ws=[];kw.categories.forEach(c=>{bcCol[c.id]=catColor(c.id,c.color);c.words.forEach(w=>{bcCat[w.toLowerCase().replace(/\s+/g," ")]=c.id;ws.push(w)})});
+ ws.sort((a,b)=>b.length-a.length);bcRe=ws.length?new RegExp("(?<![A-Za-z0-9])("+ws.map(w=>w.trim().split(/\s+/).map(p=>p.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("\\s+")).join("|")+")(?![A-Za-z0-9])","gi"):null}
+function bcHi(t){t=String(t??"");if(!bcRe)return esc(t);let out="",i=0;t.replace(bcRe,(m,g,off)=>{out+=esc(t.slice(i,off));const c=bcCat[m.toLowerCase().replace(/\s+/g," ")];out+=`<mark style="color:${bcCol[c]||"#fff"};border-color:${bcCol[c]||"#fff"}">${esc(m)}</mark>`;i=off+m.length;return m});return out+esc(t.slice(i))}
+async function bcLoad(){try{const q=new URLSearchParams({window:$("bc_win").value,source:$("bc_src").value,kw:bcKw});const r=await fetch("api/broadcasts?"+q,{cache:"no-store"});BC=await r.json();if(!r.ok)throw BC.error;bcRender()}catch(e){$("bc_meta").textContent="broadcasts unavailable: "+e}}
+function bcRender(){const B=BC;bcBuild(B.keywords);
+ const sel=$("bc_src"),cur=sel.value;sel.innerHTML='<option value="">All sources</option>'+B.sources.map(x=>`<option${x==cur?" selected":""}>${esc(x)}</option>`).join("");
+ $("bc_meta").textContent=`· ${B.total} clips · updated ${B.generated_et}`;$("bc_filt").innerHTML=bcKw?`filtered to “<b>${esc(bcKw)}</b>” <button id="bc_clr">clear</button>`:"";if($("bc_clr"))$("bc_clr").onclick=()=>{bcKw="";bcLoad()};
+ $("bc_clips").innerHTML=B.clips.map(c=>`<a class="clip ${c.kind=="audio"?"audio":""}" data-bid="${esc(c.id)}" href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer">
+  <div class=meta>${c.kind=="audio"?"🎙 ":"📰 "}<b>${esc(c.source)}</b> · ${esc(c.published_et)}${c.matches.length?" · "+[...new Set(c.matches.map(m=>m.cat))].map(k=>`<span class=swatch style="background:${bcCol[k]}"></span>`).join(""):""}</div>
+  <div><b>${bcHi(c.title)}</b></div>${c.text?`<div class=txt>${bcHi(c.kind=="audio"?c.text:c.text.slice(0,300))}</div>`:""}</a>`).join("")+(B.truncated?`<div class=meta>+${B.truncated} more; narrow the filters</div>`:"")||"<div class=meta>No clips match.</div>";
+ $("bc_kw").innerHTML=B.keywords.categories.map(c=>`<div class=kwcat><span class=swatch style="background:${catColor(c.id,c.color)}"></span><b style="color:${catColor(c.id,c.color)}">${esc(c.label)}</b><br>${c.words.map(w=>`<span class="kwchip${bcKw==w.toLowerCase()?" on":""}" style="color:${c.color}" data-w="${esc(w)}" data-c="${c.id}">${esc(w)} <span class=meta>${B.keyword_counts[w.toLowerCase()]||0}</span><span class=x data-del="1" title="remove">×</span></span>`).join("")}</div>`).join("");
+ const cs=$("bc_cat"),cv=cs.value;cs.innerHTML=B.keywords.categories.map(c=>`<option value="${c.id}"${c.id==cv?" selected":""}>${esc(c.label)}</option>`).join("");
+ $("bc_health").innerHTML="<table><tr><th>Source</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+B.health.map(h=>`<tr><td><a href="${esc(safeUrl(h.url))}" target=_blank rel="noopener noreferrer">${esc(h.name)}</a><div class=meta>${esc(h.note||"")}${h.error?" · "+esc(h.error):""}</div></td><td class="${h.ok?"ok":"bad"}">${h.ok?"OK":"FAIL"}</td><td>${h.items}</td><td>${esc(h.last_checked_et||"—")}${!h.ok&&h.last_ok_et?"<div class=meta>last OK "+esc(h.last_ok_et)+"</div>":""}</td></tr>`).join("")+"</table>";
+ $("bc_audio").textContent="Audio transcription: "+B.audio_transcription+` · text feeds polled every ${B.text_poll_minutes} min`}
+async function bcKwPost(body){const r=await fetch("api/broadcast_keywords",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();
+ $("bc_kmsg").innerHTML=r.ok?`<span class=ok>✓ ${esc(j.action=="add"?"added":"removed")} “${esc(j.word)}”</span>`:`<span class=bad>✗ ${esc(j.error||r.status)}</span>`;if(r.ok)bcLoad()}
+$("bc_kw").onclick=e=>{const ch=e.target.closest(".kwchip");if(!ch)return;if(e.target.dataset.del){if(confirm(`Remove keyword “${ch.dataset.w}”?`))bcKwPost({action:"remove",category:ch.dataset.c,word:ch.dataset.w});return}
+ const w=ch.dataset.w.toLowerCase();bcKw=bcKw==w?"":w;bcLoad()};
+$("bc_add").onclick=()=>{const w=$("bc_new").value.trim();if(!w)return;bcKwPost({action:"add",category:$("bc_cat").value,word:w});$("bc_new").value=""};
+$("bc_src").onchange=bcLoad;$("bc_win").onchange=bcLoad;
+setInterval(()=>{if($("tab-bcast").style.display!="none")bcLoad()},60000);
+// ---- The Thread: conspiracy-board graph view of Story Arcs (plain JS + SVG, no external libraries) ----
+const TH={nodes:[],edges:[],pos:{},sel:null,view:"board",pepe:false,k:1,tx:0,ty:0,alpha:0,raf:0,drag:null,t0:performance.now()};
+const thNS="http://www.w3.org/2000/svg",thEl=(t,a)=>{const e=document.createElementNS(thNS,t);for(const k in a)e.setAttribute(k,a[k]);return e};
+const TH_NOTES=["IT'S ALL CONNECTED","coincidence? …","follow the oil","who benefits??","check the timestamps!!","they don't want you to see this","3 sources = a pattern","not a drill (probably)"];
+const TH_PEPE=["PEPE SILVIA","who is CAROL in HR??","there IS no Pepe!!","I've been in the mailroom for DAYS","BARNEY'S DEAD?!"];
+function thPick(){const a=ARCS?ARCS.arcs.slice():[];a.sort((x,y)=>y.severity-x.severity||(y.latest>x.latest?1:-1));let top=a.slice(0,80);
+ const ids=new Set(top.map(x=>x.id));let edges=[];top.forEach(x=>(x.connections||[]).forEach(c=>{if(ids.has(c.arc)&&x.id<c.arc)edges.push({a:x.id,b:c.arc,s:c.strength,sh:c.shared,ta:x.title,tb:c.title})}));
+ if($("th_isol").checked){const lk=new Set();edges.forEach(e=>{lk.add(e.a);lk.add(e.b)});top=top.filter(x=>lk.has(x.id))}return{top,edges}}
+function thBuild(){if(!ARCS)return;const {top,edges}=thPick();const W=$("th_board").clientWidth||1200,H=$("th_board").clientHeight||760;
+ TH.nodes=top.map(a=>{const p=TH.pos[a.id]||{x:W/2+(Math.random()-.5)*W*.5,y:H/2+(Math.random()-.5)*H*.5,vx:0,vy:0};TH.pos[a.id]=p;
+  return{id:a.id,a,p,r:Math.min(24,6+Math.sqrt(a.n_sources)*2.6),seed:Math.random()*6.28}});
+ const by={};TH.nodes.forEach(n=>by[n.id]=n);TH.edges=edges.filter(e=>by[e.a]&&by[e.b]).map(e=>({...e,A:by[e.a],B:by[e.b],seed:Math.random()*6.28}));TH.by=by;
+ const eg=$("th_edges"),ng=$("th_nodes");eg.innerHTML="";ng.innerHTML="";
+ TH.edges.forEach(e=>{e.el=thEl("path",{class:"str","stroke-width":(1.2+e.s*9).toFixed(1)});e.hit=thEl("path",{class:"hit"});
+  const tip=`🧵 <b>${esc(e.ta.slice(0,60))}</b><br>↔ <b>${esc(e.tb.slice(0,60))}</b><br>shared: <span style="color:#ff6b6b">${e.sh.map(esc).join(", ")}</span> · strength ${e.s}`;
+  e.hit.addEventListener("mousemove",ev=>thTip(ev,tip));e.hit.addEventListener("mouseleave",()=>{$("th_tip").style.display="none";e.el.classList.remove("hl")});e.hit.addEventListener("mouseenter",()=>e.el.classList.add("hl"));
+  eg.appendChild(e.el);eg.appendChild(e.hit)});
+ const showLab=new Set(TH.nodes.slice().sort((x,y)=>y.a.severity-x.a.severity||y.a.n_sources-x.a.n_sources).slice(0,28).map(n=>n.id));TH.showLab=showLab;
+ TH.nodes.forEach(n=>{const g=thEl("g",{class:"nd"});const sv=n.a.severity;
+  if(sv>=5)g.appendChild(thEl("circle",{class:"pulse",r:n.r,cx:0,cy:0}));
+  g.appendChild(thEl("ellipse",{cx:2,cy:n.r*.55,rx:n.r*.8,ry:n.r*.35,fill:"rgba(0,0,0,.45)"}));
+  const c=thEl("circle",{class:"pinc",r:n.r,fill:"url(#th_pin)",opacity:(.55+Math.min(sv,8)*.06).toFixed(2)});if(sv>=6)c.setAttribute("filter","url(#th_glow)");g.appendChild(c);
+  g.appendChild(thEl("circle",{r:Math.max(2,n.r*.28),cx:-n.r*.3,cy:-n.r*.3,fill:"rgba(255,255,255,.75)"}));
+  const t=thEl("text",{x:n.r+5,y:4});t.textContent=(n.a.title.length>38?n.a.title.slice(0,37)+"…":n.a.title);if(!showLab.has(n.id))t.style.display="none";g.appendChild(t);n.lab=t;
+  g.addEventListener("mouseenter",ev=>{t.style.display="";thTip(ev,`<b>[${sv}/10]</b> ${esc(n.a.title)}<br><span class=meta>${n.a.n_updates} updates · ${n.a.n_sources} sources · latest ${esc(n.a.latest_et)}</span>`)});
+  g.addEventListener("mousemove",ev=>thTip(ev));g.addEventListener("mouseleave",()=>{$("th_tip").style.display="none";if(!showLab.has(n.id)&&TH.sel!==n.id)t.style.display="none"});
+  g.addEventListener("pointerdown",ev=>{ev.stopPropagation();TH.drag={n,moved:false,sx:ev.clientX,sy:ev.clientY};$("th_svg").setPointerCapture(ev.pointerId)});
+  n.g=g;ng.appendChild(g)});
+ const mk=$("th_marks");mk.innerHTML="";TH.top=null;const top1=TH.nodes.slice().sort((x,y)=>y.a.severity-x.a.severity||y.a.n_sources-x.a.n_sources)[0];
+ if(top1){TH.top=top1;TH.mark=thEl("path",{class:"marker"});TH.mtxt=thEl("text",{class:"mtext"});TH.mtxt.textContent="← THIS!!";mk.appendChild(TH.mark);mk.appendChild(TH.mtxt)}
+ if(TH.sel&&by[TH.sel])by[TH.sel].g.classList.add("sel");
+ if(!TH.notesDone){thNotes();TH.notesDone=true}if(!TH.userMoved)TH.fitPending=true;TH.alpha=Math.max(TH.alpha,.9);thKick()}
+function thFit(){const N=TH.nodes;if(!N.length)return;const W=$("th_board").clientWidth,H=$("th_board").clientHeight,pw=$("th_panel").style.display=="block"?Math.min(410,W*.92):0;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;N.forEach(n=>{x0=Math.min(x0,n.p.x-n.r);y0=Math.min(y0,n.p.y-n.r);x1=Math.max(x1,n.p.x+n.r+150);y1=Math.max(y1,n.p.y+n.r+10)});const aw=W-pw-40,ah=H-60,k=Math.max(.35,Math.min(1.6,aw/(x1-x0),ah/(y1-y0)));TH.k=k;TH.tx=20+(aw-(x1-x0)*k)/2-x0*k;TH.ty=30+(ah-(y1-y0)*k)/2-y0*k;TH.fitPending=false;thDraw()}
+function thNotes(){const W=$("th_board").clientWidth||1200,H=$("th_board").clientHeight||760;const list=TH.pepe?TH_PEPE.concat(TH_NOTES.slice(0,3)):TH_NOTES.slice().sort(()=>Math.random()-.5).slice(0,4);
+ const spots=[[14,14],[W*.42,10],[W-230,18],[18,H-110],[W*.55,H-80],[W-240,H-150],[W*.25,H*.42],[W*.7,H*.4]];
+ $("th_notes").innerHTML=list.slice(0,TH.pepe?8:4).map((t,i)=>`<div class="th-note ${["","pink","blue"][i%3]}" style="left:${Math.max(6,spots[i][0])}px;top:${spots[i][1]}px;transform:rotate(${(Math.random()*14-7).toFixed(1)}deg)">${esc(t)}</div>`).join("")}
+function thTip(ev,h){const tp=$("th_tip"),b=$("th_board").getBoundingClientRect();if(h)tp.innerHTML=h;tp.style.display="block";tp.style.left=Math.max(0,Math.min(b.width-330,ev.clientX-b.left+14))+"px";tp.style.top=(ev.clientY-b.top+14)+"px"}
+function thStep(){const N=TH.nodes,E=TH.edges,W=$("th_board").clientWidth||1200,H=$("th_board").clientHeight||760,al=TH.alpha;
+ for(let i=0;i<N.length;i++){const a=N[i].p;for(let j=i+1;j<N.length;j++){const b=N[j].p;let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy+.01;if(d2>32000)continue;const f=900/d2*al;a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f}}
+ E.forEach(e=>{const a=e.A.p,b=e.B.p,dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=(d-110)/d*.03*al*(.5+e.s);a.vx+=dx*f;a.vy+=dy*f;b.vx-=dx*f;b.vy-=dy*f});
+ N.forEach(n=>{const p=n.p;p.vx+=(W*.42-p.x)*.012*al;p.vy+=(H/2-p.y)*.016*al;if(TH.drag&&TH.drag.n===n)return;p.vx*=.82;p.vy*=.82;p.x+=p.vx;p.y+=p.vy});TH.alpha*=.985}
+function thDraw(){const t=(performance.now()-TH.t0)/1000,pp=TH.pepe;
+ TH.nodes.forEach(n=>{const jx=pp?Math.sin(t*9+n.seed)*2.5:0,jy=pp?Math.cos(t*11+n.seed)*2.5:0;n.g.setAttribute("transform",`translate(${(n.p.x+jx).toFixed(1)},${(n.p.y+jy).toFixed(1)})`)});
+ TH.edges.forEach(e=>{const a=e.A.p,b=e.B.p,mx=(a.x+b.x)/2,my=(a.y+b.y)/2,d=Math.hypot(b.x-a.x,b.y-a.y),wob=pp?Math.sin(t*7+e.seed)*(14+d*.08):Math.sin(t*.8+e.seed)*2,sag=10+d*.12;
+  const dd=redStringD(a.x,a.y,b.x,b.y,sag,wob);e.el.setAttribute("d",dd);e.hit.setAttribute("d",dd)});
+ if(TH.top&&TH.mark){const p=TH.top.p,r=TH.top.r+16;let d="";for(let i=0;i<=26;i++){const an=i/24*6.6-0.4,rr=r*(1+.08*Math.sin(i*1.7));d+=(i?"L":"M")+(p.x+Math.cos(an)*rr*1.35).toFixed(1)+","+(p.y+Math.sin(an)*rr).toFixed(1)}TH.mark.setAttribute("d",d);TH.mtxt.setAttribute("x",p.x+r*1.4+6);TH.mtxt.setAttribute("y",p.y-r*.6)}
+ $("th_vp").setAttribute("transform",`translate(${TH.tx},${TH.ty}) scale(${TH.k})`)}
+function thKick(){if(TH.raf)return;const loop=()=>{TH.raf=0;if(TH.view!="board"||$("tab-thread").style.display=="none")return;if(TH.alpha>.02||TH.drag)thStep();if(TH.fitPending&&TH.alpha<.08&&!TH.userMoved)thFit();
+ if(TH.alpha>.02||TH.drag||TH.pepe||(performance.now()-(TH.lastDraw||0))>120){thDraw();TH.lastDraw=performance.now()}TH.raf=requestAnimationFrame(loop)};TH.raf=requestAnimationFrame(loop)}
+function thPanel(id){const a=ARCS&&ARCS.arcs.find(x=>x.id==id);if(!a)return;TH.sel=id;TH.nodes.forEach(n=>{n.g.classList.toggle("sel",n.id==id)});
+ const con=(a.connections||[]).map(c=>`<span class=chip data-th="${esc(c.arc)}">${esc(c.title.slice(0,52))}${c.title.length>52?"…":""} <i>${c.shared.map(esc).join(", ")}</i></span>`).join("")||"<span class=meta>none found</span>";
+ const P=$("th_panel");P.style.display="block";P.innerHTML=`<span class=x title=close>✕</span><h3><span class="sc ${arcLv(a.severity)}">${a.severity}</span>${esc(a.title)}</h3>
+ <div class=meta>${esc(a.category)} · started ${esc(a.start_et)} · latest ${esc(a.latest_et)}<br>${a.n_updates} update${a.n_updates==1?"":"s"} · ${a.n_sources} source${a.n_sources==1?"":"s"}${a.confirmed?"":' <span class=unc>unconfirmed</span>'} · peak ${a.severity}/10 · latest ${a.latest_rank}/10</div>
+ <div class=meta style="margin-top:6px">🧵 Connected to: ${con}</div><ul class=tl>${a.updates.slice().reverse().map(arcUpd).join("")}</ul>${a.updates_truncated?`<div class=meta>+${a.updates_truncated} older updates not shown</div>`:""}`}
+function thFocus(id){const n=TH.by&&TH.by[id];if(!n){thPanel(id);return}TH.userMoved=true;const W=$("th_board").clientWidth,H=$("th_board").clientHeight;TH.tx=W*.33-n.p.x*TH.k;TH.ty=H/2-n.p.y*TH.k;n.lab.style.display="";thPanel(id);thDraw()}
+$("th_panel").onclick=e=>{if(e.target.classList.contains("x")){$("th_panel").style.display="none";TH.sel=null;TH.nodes.forEach(n=>n.g.classList.remove("sel"));return}const c=e.target.closest("[data-th]");if(c)thFocus(c.dataset.th)};
+(()=>{const sv=$("th_svg");let pan=null;
+ sv.addEventListener("pointerdown",ev=>{if(TH.drag)return;pan={x:ev.clientX,y:ev.clientY,tx:TH.tx,ty:TH.ty};sv.classList.add("drag");sv.setPointerCapture(ev.pointerId)});
+ sv.addEventListener("pointermove",ev=>{if(TH.drag){const d=TH.drag;const b=sv.getBoundingClientRect();d.n.p.x=(ev.clientX-b.left-TH.tx)/TH.k;d.n.p.y=(ev.clientY-b.top-TH.ty)/TH.k;d.n.p.vx=d.n.p.vy=0;if(Math.hypot(ev.clientX-d.sx,ev.clientY-d.sy)>4)d.moved=true;TH.alpha=Math.max(TH.alpha,.3);thKick()}
+  else if(pan){TH.userMoved=true;TH.tx=pan.tx+ev.clientX-pan.x;TH.ty=pan.ty+ev.clientY-pan.y;thDraw()}});
+ const up=()=>{if(TH.drag){if(!TH.drag.moved)thPanel(TH.drag.n.id);TH.drag=null}pan=null;sv.classList.remove("drag")};sv.addEventListener("pointerup",up);sv.addEventListener("pointercancel",up);
+ sv.addEventListener("wheel",ev=>{ev.preventDefault();const b=sv.getBoundingClientRect(),mx=ev.clientX-b.left,my=ev.clientY-b.top,k2=Math.min(4,Math.max(.3,TH.k*Math.exp(-ev.deltaY*.0015)));
+  TH.userMoved=true;TH.tx=mx-(mx-TH.tx)*k2/TH.k;TH.ty=my-(my-TH.ty)*k2/TH.k;TH.k=k2;thDraw()},{passive:false})})();
+function thSetView(v){TH.view=v;$("th_vboard").classList.toggle("on",v=="board");$("th_vlist").classList.toggle("on",v=="list");$("th_board").style.display=v=="board"?"":"none";$("th_listwrap").style.display=v=="list"?"":"none";
+ ["th_isol_l","th_reset","th_pepe"].forEach(i=>$(i).style.display=v=="board"?"":"none");$("arcs_multi").parentElement.style.display=v=="list"?"":"none";localStorage.setItem("th_view",v);if(v=="board"){thBuild();thKick()}}
+$("th_vboard").onclick=()=>thSetView("board");$("th_vlist").onclick=()=>thSetView("list");
+$("th_isol").onchange=()=>{localStorage.setItem("th_isol",$("th_isol").checked?"1":"0");thBuild()};
+$("th_reset").onclick=()=>{TH.k=1;TH.tx=TH.ty=0;TH.pos={};TH.userMoved=false;thBuild()};
+$("th_pepe").onclick=()=>{TH.pepe=!TH.pepe;$("th_pepe").classList.toggle("on",TH.pepe);$("th_pepe_l").textContent=TH.pepe?"PEPE SILVIA MODE (on)":"Pepe Silvia mode";thNotes();TH.alpha=Math.max(TH.alpha,.4);thKick()};
+$("th_isol").checked=localStorage.getItem("th_isol")=="1";
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="thread")setTimeout(()=>thSetView(localStorage.getItem("th_view")||"board"),30)});
+const thOrigRender=arcsRender;arcsRender=function(){thOrigRender();if(TH.view=="board"&&$("tab-thread").style.display!="none")thBuild();if(TH.sel&&$("th_panel").style.display!="none")thPanel(TH.sel)};
+// ---- Local Resources ----
+let RS=null,rsOpen=new Set(JSON.parse(localStorage.getItem("rs_open")||'["police","fire","hospital"]')),rsLoaded=false;
+function rsItem(i){const ph=i.phone&&i.phone.tel?`<a href="tel:${esc(i.phone.tel)}">📞 ${esc(i.phone.display)}</a>`:'<span class=meta>no phone listed</span>';
+ return `<div class="card l" style="border-color:#2c3440"><b>${esc(i.name)}</b> <span class=tag>${i.miles.toFixed(1)} mi</span>${i.er?' <span class=tag style="color:#ff7875;border-color:#ff7875">ER</span>':""}
+ <div class=meta>${i.address?esc(i.address):"address not listed"}${i.hours?" · 🕒 "+esc(i.hours):""}${i.status?" · status: "+esc(i.status):""}</div>
+ <div class=meta>${ph} · <a href="${esc(safeUrl(i.map))}" target=_blank rel="noopener noreferrer">🗺 map</a>${i.website?` · <a href="${esc(safeUrl(i.website))}" target=_blank rel="noopener noreferrer">website</a>`:""}${i.osm?` · <a href="${esc(safeUrl(i.osm))}" target=_blank rel="noopener noreferrer">OSM</a>`:""}</div></div>`}
+function rsRender(){const R=RS;$("rs_meta").textContent=` ${R.geocode.display.slice(0,90)} · within ${R.radius_miles} mi (${R.radius_km} km)`;
+ $("rs_fema").innerHTML=R.fema_open_shelters.length?`<details open class=pn style="margin:8px 0;background:#181d23"><summary><b>🏠 FEMA open shelters nearby (${R.fema_open_shelters.length})</b></summary>${R.fema_open_shelters.map(rsItem).join("")}</details>`:
+  `<div class=meta style="margin:6px 0">🏠 FEMA open shelters: ${R.fema_error?"feed unavailable ("+esc(R.fema_error)+")":"none open near this location right now (FEMA National Shelter System)"}.</div>`;
+ $("rs_cats").innerHTML=R.categories.map(c=>`<details class=pn style="margin:8px 0;background:#14181d" data-c="${c.id}"${rsOpen.has(c.id)?" open":""}><summary style="cursor:pointer;font-size:15px"><b>${c.emoji} ${esc(c.label)}</b> <span class=meta>(${c.total} found${c.total>c.items.length?", nearest "+c.items.length+" shown":""})</span></summary>
+  ${c.note?`<div class=meta style="margin:4px 0">ℹ️ ${esc(c.note)}${c.link?` <a href="${esc(safeUrl(c.link))}" target=_blank rel="noopener noreferrer">FDEM county directory</a>`:""}</div>`:""}${c.items.map(rsItem).join("")||"<div class=meta>None mapped in OpenStreetMap within this radius.</div>"}</details>`).join("");
+ $("rs_src").innerHTML=`Sources: ${esc(R.sources.geocoder)} · ${esc(R.sources.pois)} · ${esc(R.sources.shelters)} · ${esc(R.attribution)} · No paid API keys used${R.google_places_key_found?" (a Google Places key variable exists on the box but is not used)":" (no Google Places key on the box)"}.`}
+async function rsSearch(q){q=(q||"").trim();if(!q){$("rs_meta").textContent=" Enter an address, city or postcode, or pick a location (nothing is pre-selected).";return}$("rs_q").value=q;localStorage.setItem("rs_last",q);$("rs_meta").textContent=" searching… (first lookup of a place can take up to a minute)";
+ try{const r=await fetch("api/resources?q="+encodeURIComponent(q),{cache:"no-store"});const j=await r.json();if(!r.ok)throw j.error||r.status;RS=j;rsRender()}catch(e){$("rs_meta").innerHTML=' <span class=bad>✗ '+esc(e)+'</span>'}}
+$("rs_form").onsubmit=e=>{e.preventDefault();rsSearch($("rs_q").value)};
+$("rs_form").addEventListener("click",e=>{const b=e.target.closest("button[data-q]");if(b)rsSearch(b.dataset.q)});
+$("rs_all").onclick=()=>{const ds=[...document.querySelectorAll("#rs_cats details")];const open=!ds.every(d=>d.open);ds.forEach(d=>d.open=open)};
+$("rs_cats").addEventListener("toggle",e=>{const d=e.target;if(!d.dataset||!d.dataset.c)return;d.open?rsOpen.add(d.dataset.c):rsOpen.delete(d.dataset.c);localStorage.setItem("rs_open",JSON.stringify([...rsOpen]))},true);
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="res"&&!rsLoaded){rsLoaded=true;rsSearch(localStorage.getItem("rs_last")||(window.BNGeo&&BNGeo.get()?(BNGeo.get().resources_q||BNGeo.get().label):""))}});
+// ---- static guide tabs (Bushcraft, Medical): content lives in /guides/*.html, loaded once ----
+const GD={css:false,loaded:{}};
+async function gdLoad(tab,file){if(GD.loaded[tab])return;GD.loaded[tab]=true;const box=$("gd_"+tab);
+ try{if(!GD.css){const c=await (await fetch("guides/guide.css")).text();const st=document.createElement("style");st.textContent=c;document.head.appendChild(st);GD.css=true}
+  const r=await fetch("guides/"+file);if(!r.ok)throw r.status;box.innerHTML=await r.text();
+  if(innerWidth<900)box.querySelectorAll(".toc details").forEach(d=>d.open=false)}catch(e){GD.loaded[tab]=false;box.innerHTML='<div class="warn">Guide failed to load: '+esc(e)+'</div>'}}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-print]");if(!b)return;const m=b.closest("main");document.body.classList.add("gd-print");m.classList.add("gd-printing");
+ window.print();setTimeout(()=>{document.body.classList.remove("gd-print");m.classList.remove("gd-printing")},500)});
+document.addEventListener("click",e=>{const a=e.target.closest(".gd .toc a");if(!a)return;const t=document.querySelector(a.getAttribute("href"));if(t){e.preventDefault();t.scrollIntoView({behavior:"smooth",block:"start"});if(innerWidth<900)a.closest("details").open=false}});
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.tab=="bush")gdLoad("bush","bushcraft.html");if(b.dataset.tab=="med")gdLoad("med","medical.html")});
+// ---- Maps tab: printable PDF downloads (priority) + interactive Leaflet map (secondary) ----
+const MP={map:null,cl:null,pois:null,cats:null,on:new Set(["hospital","clinic","fire","ems","police","em","shelter","water"]),evac:null,pin:null};
+const mpSize=b=>b>=1e6?(b/1e6).toFixed(1)+" MB":Math.max(1,Math.round(b/1e3))+" KB";
+async function mpList(){try{const j=await (await fetch("api/maps/list",{cache:"no-store"})).json();
+ const card=m=>`<div class="mp-card"><b>${esc(m.title)}</b><div class="meta">${esc(m.desc||"")}</div><div>${(m.tags||[]).map(t=>`<span class=pill>${esc(t)}</span>`).join("")}<span class=pill>${m.available?mpSize(m.bytes):"not built yet"}</span></div>
+  ${m.available?`<a class="dl" href="maps/${encodeURIComponent(m.file)}" download>⬇ Download PDF (${mpSize(m.bytes)})</a>`:`<span class=meta>Not available yet</span>`}${m.source_url?`<a class="dl sec" href="${esc(safeUrl(m.source_url))}" target=_blank rel="noopener noreferrer">Official USGS copy ↗</a>`:""}</div>`;
+ $("mp_list").innerHTML=j.maps.filter(m=>m.group!="topo").map(card).join("")||"<div class=meta>No maps built yet.</div>";
+ $("mp_topo").innerHTML=j.maps.filter(m=>m.group=="topo").map(card).join("")||"<div class=meta>None.</div>";
+ $("mp_attr").textContent=(j.attribution||"")+(j.built_et?" · built "+j.built_et:"")}catch(e){$("mp_list").innerHTML='<div class=warn>Map list unavailable: '+esc(e)+'</div>'}}
+function mpDraw(){if(!MP.cl||!MP.pois)return;MP.cl.clearLayers();const ms=[];
+ MP.pois.pois.forEach(p=>{if(!MP.on.has(p[0]))return;const c=MP.cats[p[0]];
+  ms.push(L.marker([p[1],p[2]],{icon:L.divIcon({className:"mp-ic",html:c.emoji,iconSize:[22,22]}),title:p[3]||c.label}).bindPopup(`<b>${esc(p[3]||c.label)}</b><br>${esc(c.label)}${p[4]?"<br>"+esc(p[4]):""}${p[5]?`<br><a href="tel:${esc(p[5].replace(/[^0-9+]/g,""))}">${esc(p[5])}</a>`:""}<br><a href="https://www.openstreetmap.org/${esc(p[6])}" target=_blank rel="noopener noreferrer">OSM ↗</a>`))});
+ MP.cl.addLayers(ms);$("mp_msg").textContent=`${ms.length.toLocaleString()} emergency points shown`}
+async function mpInit(){if(MP.map){setTimeout(()=>MP.map.invalidateSize(),60);return}
+ MP.map=L.map("mp_map",{maxZoom:19,minZoom:2,zoomSnap:.5,worldCopyJump:true});{const g=window.BNGeo&&BNGeo.get();g&&g.lat!=null?MP.map.setView([g.lat,g.lon],11):MP.map.setView([20,0],2)}
+ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(MP.map);
+ L.control.scale({imperial:true,metric:true}).addTo(MP.map);
+ MP.cl=L.markerClusterGroup?L.markerClusterGroup({disableClusteringAtZoom:16,maxClusterRadius:50,chunkedLoading:true}):L.layerGroup();MP.cl.addTo(MP.map);
+ try{const j=await (await fetch("api/maps/pois")).json();MP.pois=j;MP.cats=j.cats;
+  $("mp_cats").innerHTML=Object.entries(j.cats).map(([k,c])=>`<label class=cb><input type=checkbox data-k="${k}" checked> ${c.emoji} ${esc(c.label)} <span class=meta>${j.pois.filter(p=>p[0]==k).length}</span></label>`).join("")+`<label class=cb><input type=checkbox id=mp_evac checked> <span style="color:#b36bff">┅</span> Evacuation routes (FDEM)</label>`;
+  mpDraw()}catch(e){$("mp_msg").textContent="points unavailable: "+e}
+ try{const g=await (await fetch("maps/evac_routes.json")).json();MP.evac=L.geoJSON(g,{style:{color:"#b36bff",weight:3,opacity:.85,dashArray:"6 4"},onEachFeature:(f,l)=>l.bindPopup("Evacuation route: "+esc(f.properties.NAME||"")+(f.properties.NAMELSAD?" · "+esc(f.properties.NAMELSAD)+" Co.":""))}).addTo(MP.map)}catch(e){}}
+$("mp_cats").onchange=e=>{const k=e.target.dataset.k;if(k){e.target.checked?MP.on.add(k):MP.on.delete(k);mpDraw()}if(e.target.id=="mp_evac"&&MP.evac)e.target.checked?MP.evac.addTo(MP.map):MP.map.removeLayer(MP.evac)};
+$("mp_form").onsubmit=async e=>{e.preventDefault();const q=$("mp_q").value.trim();if(q.length<3)return;$("mp_msg").textContent="searching…";
+ try{const r=await fetch("api/maps/geocode?q="+encodeURIComponent(q));const j=await r.json();if(!r.ok)throw j.error||r.status;
+  if(MP.pin)MP.map.removeLayer(MP.pin);MP.pin=L.marker([j.lat,j.lon]).addTo(MP.map).bindPopup(esc(j.display)).openPopup();MP.map.setView([j.lat,j.lon],17);$("mp_msg").textContent=j.display}catch(err){$("mp_msg").textContent="✗ "+err}};
+$("mp_fl").onclick=()=>MP.map&&MP.map.setView([20,0],2);$("mp_home").onclick=()=>{if(!MP.map)return;const g=window.BNGeo&&BNGeo.get();if(g&&g.lat!=null)return MP.map.setView([g.lat,g.lon],12);if(g&&g.label){$("mp_q").value=g.label;$("mp_form").requestSubmit();return}$("mp_msg").textContent="Pick a location (Radio, Local Resources) or search above."};
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="maps"){mpList();mpInit()}});
+// ---- Timeline slider: hourly histogram since the first scan + items/snapshots for the chosen window. Polls every 60 s (live push may also call tlRefresh). ----
+const TL={hours:[],idx:0,live:true,play:0,ov:null,req:0};
+const tlEt=t=>new Date(t).toLocaleString("en-US",{timeZone:"America/New_York",weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET";
+async function tlRefresh(){try{const j=await (await fetch("api/timeline",{cache:"no-store"})).json();TL.ov=j;const by={};j.hours.forEach(h=>by[h.h]=h);
+ const s=new Date(j.start);s.setUTCMinutes(0,0,0);const e=new Date(j.now);const H=[];for(let t=s.getTime();t<=e.getTime();t+=36e5){const k=new Date(t).toISOString().slice(0,13)+":00:00Z";H.push(by[k]||{h:k,n:0,high:0,max:0,main:0})}
+ TL.hours=H;const r=$("tl_rng");r.max=H.length-1;if(TL.live)TL.idx=H.length-1;r.value=TL.idx;
+ const mx=Math.max(1,...H.map(h=>Math.sqrt(h.n)));$("tl_hist").innerHTML=H.map((h,i)=>`<i data-i="${i}" class="${h.high?"h":""}" style="height:${Math.max(2,Math.round(44*Math.sqrt(h.n)/mx))}px" title="${esc(tlEt(h.h))}: ${h.n} item(s), ${h.high} high"></i>`).join("");
+ const sn=j.snapshots;$("tl_meta").textContent=`· ${j.total.toLocaleString()} items since ${tlEt(j.start)} · ${sn.ok} source snapshots`;
+ $("tl_snapinfo").textContent=`Snapshots: ${sn.ok} captured, ${sn.failed} unavailable · ${(sn.bytes/1e6).toFixed(1)} MB of ${(sn.cap_bytes/1073741824).toFixed(0)} GB cap · worker ${sn.worker_running?"running":"stopped"} · rule: ${sn.rule}. Each image has a black bar below the page with the headline, rank/score, sources, full source link and capture time (ET and UTC), and the same details embedded in the file.`;
+ tlShow()}catch(e){$("tl_meta").textContent="timeline unavailable: "+e}}
+async function tlShow(){if(!TL.hours.length)return;const w=+$("tl_win").value,i=TL.idx,end=new Date(new Date(TL.hours[i].h).getTime()+36e5),st=new Date(end.getTime()-w*36e5);
+ $("tl_hist").querySelectorAll("i").forEach((b,k)=>b.classList.toggle("sel",k>i-w&&k<=i));$("tl_at").textContent=`${tlEt(st)} → ${tlEt(end)}`;$("tl_live").classList.toggle("on",TL.live);
+ const q=++TL.req;try{const j=await (await fetch(`api/timeline/items?from=${st.toISOString().slice(0,19)}Z&to=${end.toISOString().slice(0,19)}Z`,{cache:"no-store"})).json();if(q!=TL.req)return;
+  let it=j.items;if($("tl_snaponly").checked)it=it.filter(x=>x.snapshot&&x.snapshot.file);if($("tl_main").checked)it=it.filter(x=>!x.watchlist);
+  $("tl_cnt").textContent=` · ${it.length} item(s)${j.items.length>=400?" (first 400)":""}`;
+  $("tl_items").innerHTML=it.map(x=>`<div class="tl-card ${lv(x.score)}" data-cid="${esc(x.cluster_id)}"><div class=meta>${esc(tlEt(x.first_seen))} · <span class="sc ${lv(x.score)}">${x.score}</span>rank ${x.rank}/10 ${x.watchlist?'<span class=wl>Watchlist</span>':""}</div>
+   ${x.snapshot&&x.snapshot.file?`<a href="${esc(x.snapshot.file)}" target=_blank rel="noopener" title="Open full snapshot (metadata bar at the bottom)"><img loading=lazy src="${esc(x.snapshot.file)}" alt="Snapshot of the source page for: ${esc(x.title)}"></a>`:`<div class=noimg>${x.snapshot?"snapshot unavailable":(x.rank>=4||x.n_families>=2||x.eff_families>=2?"snapshot queued":"no snapshot (below rank 4, single source)")}</div>`}
+   <b>${esc(x.title)}</b><div class=meta>${esc(x.category)}${x.location?" · "+esc(x.location):""} · ${x.n_families} source famil${x.n_families==1?"y":"ies"}: ${x.families.map(esc).join(", ")}</div>
+   <div class=meta>${x.links.slice(0,3).map(l=>`<a href="${esc(safeUrl(l.url))}" target=_blank rel="noopener noreferrer">${esc(l.source)}</a>`).join(" · ")}</div></div>`).join("")||"<div class=meta>Nothing cataloged in this window.</div>";
+  if(TL.live)$("tl_items").scrollLeft=$("tl_items").scrollWidth}catch(e){$("tl_cnt").textContent=" · error "+e}}
+$("tl_rng").oninput=e=>{TL.idx=+e.target.value;TL.live=TL.idx==TL.hours.length-1;clearTimeout(TL.t);TL.t=setTimeout(tlShow,120);$("tl_hist").querySelectorAll("i").forEach((b,k)=>b.classList.toggle("sel",k==TL.idx))};
+$("tl_hist").onclick=e=>{const i=e.target.dataset.i;if(i==null)return;TL.idx=+i;TL.live=TL.idx==TL.hours.length-1;$("tl_rng").value=i;tlShow()};
+const tlStep=d=>{TL.idx=Math.max(0,Math.min(TL.hours.length-1,TL.idx+d));TL.live=TL.idx==TL.hours.length-1;$("tl_rng").value=TL.idx;tlShow()};
+$("tl_prev").onclick=()=>tlStep(-(+$("tl_win").value));$("tl_next").onclick=()=>tlStep(+$("tl_win").value);
+$("tl_live").onclick=()=>{TL.live=true;TL.idx=TL.hours.length-1;$("tl_rng").value=TL.idx;tlShow()};
+$("tl_play").onclick=()=>{if(TL.play){clearInterval(TL.play);TL.play=0;$("tl_play").textContent="▶ Play";return}if(TL.idx>=TL.hours.length-1)TL.idx=0;$("tl_play").textContent="❚❚ Pause";
+ TL.play=setInterval(()=>{if(TL.idx>=TL.hours.length-1){clearInterval(TL.play);TL.play=0;$("tl_play").textContent="▶ Play";return}tlStep(1)},1600)};
+$("tl_win").onchange=tlShow;$("tl_snaponly").onchange=tlShow;$("tl_main").onchange=tlShow;
+tlRefresh();setInterval(tlRefresh,60000);
+
+// ---- Live Streams tab: curated channels, click-to-play youtube-nocookie embeds, live transcripts with shared keyword colors ----
+const STR={d:null,kw:"",playing:new Set()};
+async function stLoad(){try{const q=new URLSearchParams({region:$("st_reg").value,live_only:$("st_live").checked?"1":"0",hours:$("st_hrs").value,kw:STR.kw});
+ const r=await fetch("api/streams?"+q,{cache:"no-store"});const d=await r.json();if(!r.ok)throw d.error||r.status;STR.d=d;stRender()}catch(e){$("st_meta").textContent="streams unavailable: "+e}}
+function stRender(){const d=STR.d;bcBuild(d.keywords);const sel=$("st_reg");if(sel.options.length<2)d.regions.forEach(x=>sel.add(new Option(x,x)));
+ const w=d.worker||{};$("st_meta").textContent=`· ${d.n_live} of ${d.n_channels} channels live · live status checked ${d.last_live_check?fmt(d.last_live_check):"—"} (every ${d.check_minutes} min)`;
+ $("st_worker").innerHTML=`🎧 Continuous watcher ${w.running?"<b class=ok>running</b>":"<b class=bad>stopped</b>"}: listening to <b>${esc(w.slots||0)}</b> stream(s) at once (auto-tuned to keep total CPU ${esc(w.cpu_target||"")}; now ${esc(w.cpu_pct||"?")}%), rotating every ${Math.round((w.rotate_seconds||600)/60)} min across all live channels · ${esc(w.chunks||0)} × ${esc(w.chunk_seconds||30)} s chunks transcribed (faster-whisper base.en on CPU, ${esc(w.rtf||"?")}× real time) · now: ${(w.watching||[]).map(id=>esc((d.channels.find(c=>c.id==id)||{name:id}).name)).join(", ")||"—"}`;
+ $("st_filt").innerHTML=STR.kw?`filtered to “<b>${esc(STR.kw)}</b>” across all streams <button id="st_clr">clear</button>`:"";if($("st_clr"))$("st_clr").onclick=()=>{STR.kw="";stLoad()};
+ $("st_kw").innerHTML=d.keywords.categories.map(c=>`<span class=swatch style="background:${catColor(c.id,c.color)}"></span><b style="color:${catColor(c.id,c.color)};font-size:12.5px">${esc(c.label)}</b> `+c.words.map(x=>`<span class="kwchip${STR.kw==x.toLowerCase()?" on":""}" style="color:${c.color}" data-w="${esc(x.toLowerCase())}">${esc(x)} <span class=meta>${d.keyword_counts[x.toLowerCase()]||0}</span></span>`).join("")).join("<br>");
+ const seg=s=>`<div data-sid="${s.id}" class=st-seg${(s.confirmed_by.find(c=>c.cluster_id)||{}).cluster_id?` data-cid="${esc(s.confirmed_by.find(c=>c.cluster_id).cluster_id)}"`:""}><span class="sc ${s.high?"h":lv(s.score)}">${s.score}</span><span class=meta>${esc(fmt(s.t_start))} · r${s.rank}${s.high?" · HIGH (confirmed on The Wire)":s.confirmed_by.length?" · confirmed by "+s.confirmed_by.map(c=>esc(c.name)).join(", "):" · single source"}</span><br>${bcHi(s.text)}</div>`;
+ $("st_grid").innerHTML=d.channels.map(c=>{const v=c.live[0];return `<div class=st-card>${v?`<div class="st-play${STR.playing.has(v.video_id)?" on":""}" data-v="${esc(v.video_id)}" title="Click to play">${STR.playing.has(v.video_id)?`<iframe src="https://www.youtube-nocookie.com/embed/${esc(v.video_id)}?autoplay=1&mute=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${esc(c.name)} live"></iframe>`:`<img loading=lazy src="https://i.ytimg.com/vi/${esc(v.video_id)}/hqdefault_live.jpg" alt="${esc(c.name)} live thumbnail">`}</div>`:""}
+  <div class=st-body><div><span class=nm>${esc(c.name)}</span>${v?'<span class="st-badge live">● LIVE NOW</span>':'<span class="st-badge off">offline</span>'}${c.watching?'<span class="st-badge watch">🎧 transcribing</span>':""} <span class=meta>${esc(c.region)}</span></div>
+  ${v?`<div class=meta><a href="https://www.youtube.com/watch?v=${esc(v.video_id)}" target=_blank rel="noopener noreferrer">${esc(v.title)}</a></div>`:`<div class=meta><a href="https://www.youtube.com/channel/${esc(c.id)}/live" target=_blank rel="noopener noreferrer">channel ↗</a></div>`}
+  <div class=st-sum>${c.summary?"<b>What's on:</b> "+bcHi(c.summary):'<span class=meta>No transcript yet — summary appears after the watcher has listened to this stream.</span>'}</div>
+  ${c.segments.length?`<div class=st-tr>${c.segments.map(seg).join("")}</div>`:""}<div class=meta>${c.n_segments} segment(s) in window · top score ${c.max_score}</div></div></div>`}).join("")||"<div class=meta>No channels match.</div>";
+ $("st_watch").innerHTML=d.stream_watchlist.map(s=>`<div class="card ${lv(s.score)}"><span class="sc ${lv(s.score)}">${s.score}</span><b>${esc(s.channel)}</b> <span class=meta>${esc(fmt(s.t_start))} · single channel, unconfirmed</span><div>${bcHi(s.text)}</div></div>`).join("")||"<div class=meta>Empty.</div>"}
+$("st_grid").onclick=e=>{const p=e.target.closest(".st-play");if(!p||p.classList.contains("on"))return;STR.playing.add(p.dataset.v);p.classList.add("on");p.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.dataset.v)}?autoplay=1&mute=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="live stream"></iframe>`};
+$("st_kw").onclick=e=>{const c=e.target.closest(".kwchip");if(!c)return;STR.kw=STR.kw==c.dataset.w?"":c.dataset.w;stLoad()};
+$("st_reg").onchange=stLoad;$("st_live").onchange=stLoad;$("st_hrs").onchange=stLoad;
+$("st_ref").onclick=async()=>{const b=$("st_ref");b.disabled=true;$("st_msg").textContent=" checking every channel…";try{const r=await fetch("api/streams/refresh",{method:"POST"});const j=await r.json();$("st_msg").textContent=r.status==429?` rate-limited, retry in ${j.retry_after_s}s`:" ✓ "+j.note;stLoad()}catch(e){$("st_msg").textContent=" ✗ "+e}b.disabled=false};
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="streams")stLoad()});
+setInterval(()=>{if($("tab-streams").style.display!="none")stLoad()},45000);
+
+// ---- Cross-page red threads: any item (data-cid = cluster id) that belongs to a multi-update or connected story on The Thread gets a red
+// push-pin with a red string running off the right edge of the page; clicking it opens #thread/<arc_id>. Map refreshed every 5 min (7-day window). ----
+const XT={map:{},arcs:{},t:0};
+async function xtLoad(){try{const j=await (await fetch("api/arcs?window=7d",{cache:"no-store"})).json();const m={},A={};
+ j.arcs.forEach(a=>{if(a.n_updates<2&&!(a.connections||[]).length)return;A[a.id]=a;a.updates.forEach(u=>{if(u.cluster_id)m[u.cluster_id]=a.id})});XT.map=m;XT.arcs=A;xtApply(true)}catch(e){}}
+function xtPath(i,w){const sag=26+(i%4)*14,dy=-(i%3)*10;return redStringD(0,30,w,30+dy-8,sag,0)}
+function xtApply(all){const vw=document.documentElement.clientWidth;let i=0;
+ document.querySelectorAll("[data-cid]").forEach(el=>{const aid=XT.map[el.dataset.cid];let x=el.querySelector(":scope > .xt");
+  if(!aid){if(x)x.remove();return}if(x&&!all&&x.dataset.arc==aid)return;if(x)x.remove();
+  const r=el.getBoundingClientRect();if(!r.width)return;const a=XT.arcs[aid];const w=Math.max(60,vw-r.right+36);i++;
+  el.classList.add("xt-host");x=document.createElement("a");x.className="xt";x.dataset.arc=aid;x.href="#thread/"+aid;
+  x.title=`🧵 On The Thread: ${a.title} — ${a.n_updates} update(s), ${a.n_sources} source(s)${(a.connections||[]).length?`, tied to ${a.connections.length} other stor${a.connections.length==1?"y":"ies"}`:""}. Click to follow the string.`;
+  x.innerHTML=`<svg width="${w}" height="80"><path class="redstring" d="${xtPath(i,w)}"/></svg><span class=pin></span><span class=lab>🧵 follow the thread →</span>`;el.appendChild(x)})}
+let xtMo=0;new MutationObserver(m=>{if(m.some(r=>[...r.addedNodes].some(n=>n.nodeType==1&&!(n.classList&&n.classList.contains("xt")))) ){clearTimeout(xtMo);xtMo=setTimeout(()=>xtApply(false),250)}}).observe(document.body,{childList:true,subtree:true});
+addEventListener("resize",()=>{clearTimeout(XT.t);XT.t=setTimeout(()=>xtApply(true),300)});
+document.querySelector(".tabs").addEventListener("click",()=>setTimeout(()=>xtApply(true),120));
+async function xtOpen(){const m=location.hash.match(/^#thread\/(arc_[\w-]+)/);if(!m)return;const id=m[1];
+ document.querySelector('.tabs button[data-tab="thread"]').click();
+ const tryFocus=()=>ARCS&&ARCS.arcs.some(a=>a.id==id);
+ if(!tryFocus()){$("arcs_window").value="7d";await arcsLoad()}
+ setTimeout(()=>{if(TH.view!="board")thSetView("board");setTimeout(()=>{thFocus(id);const n=TH.by&&TH.by[id];if(n)n.g.classList.add("sel")},400)},250)}
+addEventListener("hashchange",xtOpen);if(location.hash.startsWith("#thread/"))setTimeout(xtOpen,1500);
+xtLoad();setInterval(xtLoad,300000);
+
+// ---- Tips tab: builds https://www.paypal.me/<handle>/<amount>USD from tips.json; disabled until a handle is set ----
+const TIP={h:""};
+const tipAmt=()=>{const v=$("tip_amt").value.trim().replace(/^\$/,"");return /^\d{1,5}(\.\d{1,2})?$/.test(v)&&+v>=1?(+v).toFixed(2).replace(/\.00$/,""):null};
+function tipUpd(){const a=tipAmt();$("tip_btn").disabled=!TIP.h||!a;$("tip_msg").textContent=!TIP.h?"Tip link not set up yet":$("tip_amt").value.trim()&&!a?"Enter an amount of $1 or more (up to 2 decimals).":"Opens PayPal in a new tab. No login or account here, and nothing you type is stored."}
+async function tipInit(){try{const j=await (await fetch("api/tips",{cache:"no-store"})).json();TIP.h=j.configured?j.paypal_me:""}catch(e){TIP.h=""}tipUpd()}
+$("tip_amt").oninput=tipUpd;
+$("tip_form").onsubmit=e=>{e.preventDefault();const a=tipAmt();if(!TIP.h||!a)return;window.open(`https://www.paypal.me/${encodeURIComponent(TIP.h)}/${a}USD`,"_blank","noopener,noreferrer")};
+tipInit();
+
+// ---- The Thread: string colour = connection type (keywords.json palette, shared with Live Broadcasts); pins unchanged ----
+const THC={kw:null,get neutral(){return catColor("neutral","#8a5a5a")},catMap:{"war/conflict":"violence","disease":"disease","cyber":"cyber","political":"unrest"}};
+async function thcKw(){if(THC.kw)return THC.kw;try{THC.kw=(await (await fetch("api/broadcast_keywords",{cache:"no-store"})).json())}catch(e){}
+ if(!THC.kw||!THC.kw.categories)try{THC.kw=(await (await fetch("api/broadcasts?window=1h",{cache:"no-store"})).json()).keywords}catch(e){THC.kw={categories:[]}}return THC.kw}
+function thcClass(e){const K=THC.kw;if(!K||!K.categories)return null;const sc={};const add=(c,w)=>{if(c)sc[c]=(sc[c]||0)+w};
+ const words=K.categories.flatMap(c=>c.words.map(w=>[w.toLowerCase(),c.id]));
+ const hit=(txt,w)=>{const t=" "+String(txt||"").toLowerCase().replace(/[^a-z0-9 ]+/g," ")+" ";words.forEach(([k,c])=>{if(t.includes(" "+k+" ")||(k.length>4&&t.includes(" "+k)))add(c,w)})};
+ (e.sh||[]).forEach(s=>hit(s,3));hit(e.A.a.title,1);hit(e.B.a.title,1);hit((e.A.a.terms||[]).join(" "),.5);hit((e.B.a.terms||[]).join(" "),.5);
+ add(THC.catMap[e.A.a.category],1.5);add(THC.catMap[e.B.a.category],1.5);
+ const best=Object.entries(sc).sort((a,b)=>b[1]-a[1]);if(!best.length||best[0][1]<2)return null;
+ const col=c=>(K.categories.find(x=>x.id==c)||{}).color;return{c:best[0][0],col:col(best[0][0]),c2:best[1]&&best[1][1]>=.7*best[0][1]?best[1][0]:null,col2:best[1]?col(best[1][0]):null}}
+function thcPaint(){if(!TH.edges)return;TH.edges.forEach(e=>{const k=thcClass(e);e.cat=k?k.c:"link";e.el.style.stroke=k?catColor(k.c,k.col):THC.neutral;
+ if(e.el2){e.el2.remove();e.el2=null}if(k&&k.c2){e.el2=thEl("path",{class:"str str2","stroke-width":e.el.getAttribute("stroke-width")});e.el2.style.stroke=k.col2;e.el.after(e.el2)}});thcLegend();if(typeof thDraw=="function")thDraw()}
+function thcLegend(){const K=THC.kw;if(!K||!K.categories)return;let L=$("th_legend");if(!L){L=document.createElement("div");L.id="th_legend";L.className="th-legend";$("th_board").appendChild(L)}
+ const n={};(TH.edges||[]).forEach(e=>n[e.cat]=(n[e.cat]||0)+1);
+ L.innerHTML=`<b>STRING KEY</b>`+K.categories.map(c=>`<div><i style="background:${catColor(c.id,c.color)}"></i>${esc(c.label)} <span>${n[c.id]||0}</span></div>`).join("")+`<div><i style="background:${THC.neutral}"></i>other / shared place or topic <span>${n.link||0}</span></div><div class=mix><i class=dash></i>two-tone dash = mixed</div>`}
+const thcOrigBuild=thBuild;thBuild=function(){thcOrigBuild();thcKw().then(thcPaint)};
+const thcOrigDraw=thDraw;thDraw=function(){thcOrigDraw();(TH.edges||[]).forEach(e=>{if(e.el2)e.el2.setAttribute("d",e.el.getAttribute("d"))})};
+
+// ---- "How this works" (i) notes: one collapsed note + one line-icon per tab/section. Text describes the real mechanics in scanner.py/server.py/config.json. ----
+const HW_TAIL="Automated research tool: it monitors and reports only, and takes no live actions.";
+const HW_RANK="Every item gets a 0–100 severity score and a 0–10 rank; rank 7+ confirmed by 2+ independent sources is high severity, while single-source, low-confidence items are capped and go to the Watchlist instead of The Wire.";
+const HW_SCAN=()=>`The bot scans its public sources automatically every ${(S&&S.interval_minutes)||60} minutes by default (adjustable from 5 minutes to 6 hours) and on Manual refresh.`;
+const hwI=(b)=>`<svg class="hw-svg" viewBox="0 0 200 110" role="img" aria-hidden="true" fill="none" stroke="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${b}</svg>`;
+const R="#ff4d4f";
+const HW_ICONS={
+ wire:hwI(`<rect x="8" y="12" width="34" height="16" rx="3"/><rect x="8" y="47" width="34" height="16" rx="3"/><rect x="8" y="82" width="34" height="16" rx="3"/><path d="M42 20 L82 52 M42 55 L82 55 M42 90 L82 58" stroke="${R}"/><circle cx="96" cy="55" r="14"/><path d="M106 65 L116 75"/><path d="M128 55 h12" stroke="${R}"/><path d="M146 22 h46 M146 40 h40 M146 58 h34 M146 76 h28 M146 94 h20"/><circle cx="150" cy="22" r="3" fill="${R}" stroke="${R}"/>`),
+ watch:hwI(`<path d="M30 55 Q100 5 170 55 Q100 105 30 55Z"/><circle cx="100" cy="55" r="16"/><circle cx="100" cy="55" r="5" fill="${R}" stroke="${R}"/><rect x="146" y="80" width="40" height="18" rx="3"/><text x="166" y="93" font-size="11" fill="#e6e9ee" stroke="none" text-anchor="middle">1 src</text>`),
+ heat:hwI(`<circle cx="100" cy="55" r="44"/><path d="M56 55 h88 M100 11 v88 M70 22 Q100 55 70 88 M130 22 Q100 55 130 88"/><circle cx="82" cy="40" r="9" fill="${R}" stroke="none" opacity=".75"/><circle cx="120" cy="66" r="6" fill="${R}" stroke="none" opacity=".55"/>`),
+ volume:hwI(`<path d="M20 98 h160"/><rect x="34" y="60" width="20" height="38"/><rect x="34" y="44" width="20" height="16" stroke="${R}"/><rect x="74" y="40" width="20" height="58"/><rect x="74" y="24" width="20" height="16" stroke="${R}"/><rect x="114" y="70" width="20" height="28"/><rect x="154" y="50" width="20" height="48"/><rect x="154" y="34" width="20" height="16" stroke="${R}"/>`),
+ trend:hwI(`<path d="M20 98 h160 M20 98 V12"/><path d="M28 80 L60 70 L90 76 L120 44 L150 50 L176 22" stroke="${R}"/><path d="M28 90 L60 86 L90 88 L120 72 L150 74 L176 62"/>`),
+ notify:hwI(`<path d="M70 80 V52 a30 30 0 0 1 60 0 V80 l10 10 H60Z"/><path d="M92 98 a8 8 0 0 0 16 0"/><path d="M146 30 q12 10 0 20 M156 22 q22 18 0 36" stroke="${R}"/>`),
+ sources:hwI(`<rect x="30" y="12" width="110" height="20" rx="3"/><rect x="30" y="45" width="110" height="20" rx="3"/><rect x="30" y="78" width="110" height="20" rx="3"/><path d="M152 18 l6 8 l12 -14 M152 51 l6 8 l12 -14"/><path d="M152 82 l14 14 M166 82 l-14 14" stroke="${R}"/>`),
+ api:hwI(`<path d="M60 20 Q40 20 40 38 V48 Q40 55 30 55 Q40 55 40 62 V72 Q40 90 60 90 M140 20 Q160 20 160 38 V48 Q160 55 170 55 Q160 55 160 62 V72 Q160 90 140 90"/><path d="M80 55 h40" stroke="${R}"/><circle cx="100" cy="55" r="3" fill="${R}" stroke="${R}"/>`),
+ jets:hwI(`<path d="M30 70 L110 50 L150 30 Q162 26 160 36 L120 62 L40 82 Z"/><path d="M90 56 L76 30 M100 66 L96 90"/><path d="M130 96 l12 -20 l12 10 l14 -40" stroke="${R}"/>`),
+ thread:hwI(`<path d="M30 30 Q70 60 100 34 Q130 14 170 40 M100 34 Q96 70 60 86 M100 34 Q130 70 150 86" stroke="${R}"/><circle cx="30" cy="30" r="7" fill="${R}" stroke="#fff" stroke-width="1.5"/><circle cx="100" cy="34" r="9" fill="${R}" stroke="#fff" stroke-width="1.5"/><circle cx="170" cy="40" r="7" fill="${R}" stroke="#fff" stroke-width="1.5"/><circle cx="60" cy="86" r="6" fill="${R}" stroke="#fff" stroke-width="1.5"/><circle cx="150" cy="86" r="6" fill="${R}" stroke="#fff" stroke-width="1.5"/>`),
+ bcast:hwI(`<path d="M100 40 L80 100 M100 40 L120 100 M86 80 h28 M83 92 h34"/><circle cx="100" cy="36" r="6" fill="${R}" stroke="${R}"/><path d="M80 22 q-12 14 0 28 M120 22 q12 14 0 28 M66 12 q-22 24 0 48 M134 12 q22 24 0 48" stroke="${R}"/>`),
+ res:hwI(`<path d="M100 96 C80 66 70 56 70 40 a30 30 0 0 1 60 0 C130 56 120 66 100 96Z" stroke="${R}"/><circle cx="100" cy="40" r="10"/><circle cx="40" cy="70" r="6"/><circle cx="160" cy="62" r="6"/><circle cx="150" cy="96" r="5"/><circle cx="46" cy="30" r="5"/><path d="M40 70 L70 60 M160 62 L130 56" stroke-dasharray="3 4"/>`),
+ bush:hwI(`<path d="M50 96 L110 80 M50 80 L110 96"/><path d="M80 78 C60 60 74 46 80 26 C86 46 100 56 80 78Z" stroke="${R}"/><path d="M80 74 C72 64 78 56 80 48 C82 56 88 64 80 74Z"/><path d="M150 30 C150 30 132 56 132 68 a18 18 0 0 0 36 0 C168 56 150 30 150 30Z"/>`),
+ med:hwI(`<rect x="62" y="17" width="76" height="76" rx="14"/><path d="M90 33 h20 v22 h22 v20 h-22 v22 h-20 v-22 h-22 v-20 h22Z" stroke="${R}" transform="translate(0,-8) scale(1,.95)"/>`),
+ maps:hwI(`<path d="M20 24 L70 12 L130 24 L180 12 V86 L130 98 L70 86 L20 98Z M70 12 V86 M130 24 V98"/><circle cx="118" cy="56" r="20" stroke="${R}"/><path d="M132 70 L150 88" stroke="${R}"/><path d="M106 56 h24 M118 44 v24" stroke-width="1.4"/>`),
+ systems:hwI(`<rect x="20" y="16" width="34" height="24" rx="4"/><rect x="146" y="16" width="34" height="24" rx="4"/><rect x="83" y="70" width="34" height="24" rx="4"/><path d="M54 28 h92 M37 40 L90 70 M163 40 L110 70" stroke="${R}"/><path d="M96 82 h8 M30 28 h6 M156 28 h6"/>`),
+ timeline:hwI(`<path d="M16 70 h168"/><path d="M30 64 v12 M70 64 v12 M110 64 v12 M150 64 v12"/><rect x="96" y="58" width="16" height="24" rx="4" stroke="${R}"/><rect x="60" y="14" width="80" height="32" rx="3"/><rect x="60" y="38" width="80" height="8" fill="#e6e9ee"/>`),
+ streams:hwI(`<rect x="18" y="14" width="110" height="70" rx="6"/><path d="M62 36 L86 49 L62 62Z" stroke="${R}"/><path d="M48 96 h50"/><path d="M144 40 v20 M154 32 v36 M164 44 v12 M174 36 v28" stroke="${R}"/>`),
+ tips:hwI(`<path d="M60 40 h70 v30 a26 26 0 0 1 -26 26 h-18 a26 26 0 0 1 -26 -26Z"/><path d="M130 48 h10 a12 12 0 0 1 0 24 h-10"/><path d="M95 34 C80 22 80 10 90 10 C95 10 95 16 95 16 C95 16 95 10 100 10 C110 10 110 22 95 34Z" stroke="${R}"/>`),
+ net:hwI(`<circle cx="70" cy="56" r="40"/><path d="M30 56 h80 M70 16 c-22 22 -22 58 0 80 M70 16 c22 22 22 58 0 80"/><path d="M128 84 l18 -36 l18 36 Z" stroke="${R}"/><path d="M146 62 v10 M146 77 v2" stroke="${R}"/>`),
+ solar:hwI(`<circle cx="50" cy="50" r="18" stroke="${R}"/><path d="M50 14 v10 M50 76 v10 M14 50 h10 M76 50 h10 M25 25 l7 7 M68 68 l7 7 M25 75 l7 -7 M68 32 l7 -7" stroke="${R}"/><path d="M100 60 h14 l6 -22 l8 44 l8 -34 l6 12 h18 l5 -8 l5 8 h12"/>`),
+ ranked:hwI(`<path d="M20 98 h160"/><rect x="34" y="50" width="30" height="48"/><rect x="85" y="26" width="30" height="72" stroke="${R}"/><rect x="136" y="64" width="30" height="34"/><path d="M100 8 l4 8 l9 1 l-7 6 l2 9 l-8 -5 l-8 5 l2 -9 l-7 -6 l9 -1Z" fill="${R}" stroke="${R}"/>`)
+};
+// key -> [main id, h2 text prefix (or null = add a header to the tab), text()]
+const HW_NOTES=[
+ ["wire","tab-threat","The Wire",()=>`${HW_SCAN()} It pulls about 40 public feeds (official alerts such as USGS, NWS, GDACS, NOAA, WHO, CIDRAP and CISA; news searches such as Google News and GDELT; and public OSINT channels such as Telegram, Reddit and Bluesky), then merges reports of the same event across sources. Scope is global: it monitors worldwide (war, disease, disasters, cyber, space weather and more) and ranks by worldwide relevance; no region gets extra weight. ${HW_RANK}`],
+ ["timeline","tab-threat","Timeline",()=>"Drag the slider to scrub hour by hour through every item the bot has cataloged since it started scanning; bar height is items per hour and red bars contain high-severity items. New scans extend the timeline automatically. For items ranked 4+ or reported by 2+ sources, a background worker screenshots the source page and burns a black bar under it with the headline, rank, sources, link and capture time."],
+ ["watch","tab-threat","Watchlist",()=>"Items here came from only one source family or are otherwise low confidence, so their score is capped at 45 and they stay out of The Wire. If a second independent source confirms an item on a later scan, it moves up to The Wire automatically. "+HW_SCAN()],
+ ["heat","tab-threat","Geographic heat map",()=>"Every item from the last 7 days that has a location is plotted here; hotter color means a higher 0–100 severity score. Dots mark items scoring 35 or more, colored by category, and clicking one shows its headline. Locations come from the source or are estimated from place names, so treat them as approximate."],
+ ["volume","tab-threat","Alert volume",()=>"Counts of merged items per day for the last 7 days, stacked by category (war/conflict, disease, natural disaster, cyber, space weather, other). It shows how busy each category is, not how severe. The chart refreshes with every scan."],
+ ["trend","tab-threat","Severity trend",()=>`For each day of items on The Wire it plots the highest score, the average score and how many items reached the high-severity line (${(S&&S.high_threshold)||60}+ on the 0–100 scale). Watchlist items are excluded. Scores never change because of this chart.`],
+ ["notify","tab-threat","Notification settings",()=>"Pushes go out only for items ranked 7+ (0–10 rank) that are confirmed by 2+ independent sources; each item is pushed once. Today the active channel is a message in the Grok Bot chat after each hourly check; email and SMS are not yet connected. Changing settings needs the admin passcode."],
+ ["sources","tab-threat","Sources",()=>`One row per feed the scanner reads, with whether the last fetch worked, how many items it returned and when it was checked. ${HW_SCAN()} A failed source is skipped for that scan and retried on the next one.`],
+ ["api","tab-threat","API",()=>"Read-only JSON endpoints used by the hourly chat check and this page: /api/new_high lists high-severity items since a given time, and /api/state returns everything on this dashboard. Nothing here can change scores or take action."],
+ ["jets","tab-jets","Private / business jets",()=>"Every 5 minutes the bot samples public ADS-B trackers for business jets that are airborne and transponding, then counts takeoffs per hour. An hour is flagged as a spike when takeoffs exceed the 7-day average for that hour by the set number of standard deviations. Jet data is informational only and never changes threat scores or ranks."],
+ ["jets_trend","tab-jets","Last 24 hours",()=>"Hourly averages of airborne business jets and takeoff counts for the past day, with the spike threshold line. The threshold is the 7-day mean for that hour plus the chosen multiple of the standard deviation; until a week of data exists the baseline is still warming up."],
+ ["jets_alerts","tab-jets","Jet Activity Alerts",()=>"An hour is listed here when its takeoff count crosses the spike threshold; recurring patterns are grouped above the list. Spike alerts can be pushed to chat if enabled, but they never change threat scores or ranks."],
+ ["jets_set","tab-jets","Spike alert settings",()=>"Sets how many standard deviations above normal counts as a spike and whether spike alerts are sent. Changes need the admin passcode and only affect the jet tab."],
+ ["jets_src","tab-jets","Jet data sources",()=>"The public ADS-B feeds sampled every 5 minutes, with their last status. Aircraft that block tracking (LADD/PIA) are counted but not identified, and jets with transponders off are not seen at all."],
+ ["thread","tab-thread","The Thread",()=>"Related alerts are grouped into story threads when they share an event, place or topic, and new alerts that match an existing thread are linked into it on every scan. Each red pin is a thread (bigger = more sources); a string means two threads share terms, colored by connection type (red violence, orange disease, yellow infrastructure, blue cyber, purple unrest, teal nuclear, muted gray-red for a shared place or topic). Use the time-window control to choose how far back to look."],
+ ["bcast","tab-bcast","Live Broadcasts",()=>"Text feeds (AP and Reuters via Google News, WESH 2, Spectrum News 13 and ClickOrlando RSS) are polled every 7 minutes, and short samples of NPR and BBC World Service live audio are transcribed on this computer with speech-to-text every 15 minutes. Every clip is scanned for the keywords in the color key; click a keyword, source or time window to filter. Clips are not scored here; the main scanner still decides severity."],
+ ["bcast_kw","tab-bcast","Keyword key",()=>"Each color is one keyword category (red violence/attack, orange disease/outbreak, yellow infrastructure/grid, blue cyber, purple civil unrest). Adding or removing a keyword changes only highlighting and filtering on this tab and Live Streams, never the bot's scores."],
+ ["bcast_h","tab-bcast","Broadcast source health",()=>"Whether each broadcast or text feed answered on its last poll, how many items it returned and when. Failed feeds are retried automatically on the next poll."],
+ ["streams","tab-streams","Live Streams",()=>"Every 10 minutes the bot checks each curated news channel's public YouTube live page (no account or API key) and shows the ones on air; video loads only when you click. A background watcher listens to a few live streams at a time, rotating every 10 minutes, transcribes 30-second chunks on this computer and colors keywords like Live Broadcasts. Each segment is scored 0–100 with the same rules as the scanner: a single channel stays capped and goes to the stream watchlist, and it only counts as confirmed when another channel or The Wire reports the same thing."],
+ ["streams_w","tab-streams","Stream watchlist",()=>"Transcript segments with threat terms that only one channel has said so far. They are capped at 45 like single-source items on The Wire and move up if another channel or a Wire item confirms them. Transcripts are machine-generated and can mishear words."],
+ ["solar","tab-solar","Solar & Seismic",()=>"A separate add-on (solar_seismic.py) reads NOAA Space Weather Prediction Center data (solar flares, the geomagnetic Kp index, solar wind) and the USGS earthquake feeds, and shows them side by side with plain-language explanations. Strong geomagnetic storms can disturb GPS, HF radio and, rarely, power grids. Earthquakes come from USGS's own magnitude and location data. This tab doesn't feed The Wire's scoring."],
+ ["net","tab-net","Network Status",()=>"Every 5 minutes the server checks official public status feeds (AWS, Google Cloud and Workspace, Azure, Microsoft 365, Apple, Meta, Slack, and the Statuspage feeds for Cloudflare, Akamai, GitHub, Discord, Reddit, Zoom, Dropbox, OpenAI and DigitalOcean). It also tests DNS and HTTPS from this computer, including direct lookups through Cloudflare 1.1.1.1, Google 8.8.8.8 and Quad9 9.9.9.9. Results go into a separate netstatus.db; the colored strips show the worst status in each time slice. An alert means a feed reports degraded or major trouble, or a probe fails twice in a row. A worldwide sprinkling of Cloudflare edge sites being down is normal; it counts when one of ~30 major hubs worldwide is fully out, 3+ major hubs are degraded, 60+ sites are out at once, or a site near Florida is hit (labelled 'near Florida'). Downdetector ISP pages are tried once an hour; they usually block automated visitors, and this tab says so rather than evading it. Probes reflect this box's network, not yours. Nothing here affects The Wire's scores."],
+ ["ranked","tab-ranked","Ranked by Users",()=>"Anyone viewing the dashboard can rate an item's threat level from 0 to 10 with the small slider under it; each browser gets a random anonymous id, one vote per item, and re-voting updates it. This list sorts by a weighted average that pulls items with few votes toward the overall mean, and shows the bot's own rank beside the crowd's. User ratings never change the bot's scores, ranks or The Wire's order. The dashboard is private for now, so Matt is the only voter until it goes public."],
+ ["tips","tab-tips","Tips",()=>"The button opens Matt's PayPal.me page in a new tab with your amount filled in; the payment happens entirely on PayPal. This dashboard has no login, stores nothing you type and processes no payments."],
+ ["res","tab-res","Local Resources",()=>"Enter an address or ZIP and the bot geocodes it with OpenStreetMap's free Nominatim service, then lists the nearest police, fire, EMS, hospitals, urgent care, pharmacies, fuel, government offices, shelters and water from a statewide OpenStreetMap index, plus any FEMA open shelters. Distances are straight-line. Data can be incomplete, so call ahead and dial 911 in an emergency."],
+ ["bush","tab-bush",null,()=>"A static beginner survival guide written from Ready.gov/FEMA, CDC, EPA and Red Cross guidance, ordered by survival priority starting with the first 72 hours. Nothing on this tab is automated or scanned, so it works the same offline once loaded or printed. Educational only, not professional advice."],
+ ["med","tab-med",null,()=>"A static first-aid reference ordered by priority (scene safety, bleeding, wounds, burns, fractures, CPR, choking, allergies, heat, medications). Nothing here is automated, personalised or scanned; it is general education, not medical advice. In an emergency call 911."],
+ ["maps","tab-maps","Maps — printable",()=>"The PDFs were rendered on this computer from OpenStreetMap, US Census county lines and the Florida Division of Emergency Management evacuation-route layer, plus the official USGS US Topo quads. Download or print them now: they work with no power, cell or internet. Each map has a scale bar, north arrow, legend, date and attribution."],
+ ["maps_live","tab-maps","Interactive map",()=>"Map tiles stream from OpenStreetMap and need internet; emergency points come from the same statewide OpenStreetMap index as Local Resources and are grouped into clusters until you zoom in. Address search uses the same free Nominatim lookup. Use the category boxes to show or hide point types."]
+];
+function hwAttach(h2,key,txt){if(!h2||h2.querySelector(".hw-i"))return;const id="hw_"+key;
+ const b=document.createElement("button");b.type="button";b.className="hw-i";b.title="How this works";b.setAttribute("aria-expanded","false");b.setAttribute("aria-controls",id);b.textContent="i";
+ const p=document.createElement("div");p.className="hw-p";p.id=id;p.hidden=true;p.dataset.key=key;
+ b.onclick=e=>{e.stopPropagation();p.hidden=!p.hidden;b.setAttribute("aria-expanded",String(!p.hidden));if(!p.hidden)p.innerHTML=`<div class="hw-t"><b>How this works.</b> ${esc(txt())} <i>${esc(HW_TAIL)}</i></div>${HW_ICONS[key]||HW_ICONS[key.split("_")[0]]||""}`};
+ h2.appendChild(b);h2.insertAdjacentElement("afterend",p)}
+function hwInit(){HW_NOTES.forEach(([key,mid,pre,txt])=>{const m=$(mid);if(!m)return;let h2;
+ if(pre===null){h2=m.querySelector(":scope > .hw-head h2");if(!h2){const d=document.createElement("div");d.className="hw-head";d.innerHTML=`<h2>${key=="bush"?"🏕 Bushcraft — grid-down survival guide":"⛑ Medical — grid-down first aid"}</h2>`;m.prepend(d);h2=d.querySelector("h2")}}
+ else h2=[...m.querySelectorAll("h2")].find(h=>h.textContent.trim().replace(/^[^A-Za-z]+/,"").startsWith(pre.replace(/^[^A-Za-z]+/,"")));
+ hwAttach(h2,key,txt)})}
+hwInit();
+// ---- Live push (SSE /api/stream) + a Manual refresh button on every tab (same /api/refresh, same 60 s cooldown) ----
+const LV={es:null,n:0};
+function lvToast(a){if(a.watchlist!=0&&!(a.rank>=4||a.high))return;const box=$("toasts");const d=document.createElement("div");d.className="toast "+(a.high?"h":lv(a.score));d.dataset.cid=a.cluster_id;
+ const u=(a.links&&a.links[0])?safeUrl(a.links[0].url):"#";
+ d.innerHTML=`<span class=x title="Dismiss">✕</span><div class=meta>${a.high?"🚨 HIGH · ":"New · "}rank ${a.rank}/10 · score ${a.score} · ${esc(a.category)}${a.watchlist?" · Watchlist":" · The Wire"}</div><b><a href="${esc(u)}" target=_blank rel="noopener noreferrer" style="color:var(--tx);text-decoration:none">${esc(a.title)}</a></b>
+ ${a.snapshot&&a.snapshot.file?`<a href="${esc(a.snapshot.file)}" target=_blank rel=noopener><img src="${esc(a.snapshot.file)}" alt="Source snapshot"></a>`:a.snapshot_pending?`<div class=wait>📸 snapshot still capturing — it will appear here</div>`:""}`;
+ d.querySelector(".x").onclick=()=>d.remove();box.prepend(d);while(box.children.length>4)box.lastChild.remove();setTimeout(()=>d.remove(),a.high?60000:20000)}
+const LVB={w:0,l:0,t:0};function lvBatch(a){a.watchlist==0?LVB.w++:LVB.l++;clearTimeout(LVB.t);LVB.t=setTimeout(()=>{const d=document.createElement("div");d.className="toast";
+ d.innerHTML=`<span class=x title="Dismiss">✕</span><b>📡 ${LVB.w+LVB.l} new item(s) just landed</b><div class=meta>${LVB.w} on The Wire · ${LVB.l} on the Watchlist · pushed live, no refresh needed</div>`;d.querySelector(".x").onclick=()=>d.remove();
+ $("toasts").prepend(d);while($("toasts").children.length>4)$("toasts").lastChild.remove();setTimeout(()=>d.remove(),20000);LVB.w=LVB.l=0},2500)}
+let lvT=0;function lvReload(){clearTimeout(lvT);lvT=setTimeout(()=>{load();if(typeof tlRefresh=="function")tlRefresh()},1500)}
+function lvConnect(){if(!window.EventSource)return;const es=new EventSource("api/stream");LV.es=es;const ind=$("live_ind");
+ es.addEventListener("hello",()=>{ind.classList.add("on");ind.title="Connected: new alerts arrive instantly"});
+ es.onerror=()=>{ind.classList.remove("on");ind.title="Reconnecting…"};
+ es.addEventListener("alert",e=>{const a=JSON.parse(e.data);if(a.watchlist==2)return;LV.n++;lvBatch(a);$("live_n").textContent=LV.n?` · ${LV.n} new`:"";lvToast(a);lvReload()});
+ es.addEventListener("snapshot",e=>{const s=JSON.parse(e.data);document.querySelectorAll(`.toast[data-cid="${CSS.escape(s.cluster_id)}"] .wait`).forEach(w=>w.outerHTML=`<a href="${esc(s.file)}" target=_blank rel=noopener><img src="${esc(s.file)}" alt="Source snapshot"></a>`);if(typeof tlRefresh=="function")tlRefresh()});
+ es.addEventListener("scan",()=>lvReload())}
+(()=>{const c=document.querySelector("header .ctl");const s=document.createElement("span");s.id="live_ind";s.innerHTML='<i></i>Live<span id="live_n"></span>';s.title="Connecting…";c.prepend(s);
+ const t=document.createElement("div");t.id="toasts";document.body.appendChild(t);lvConnect();
+ document.querySelectorAll("body>main").forEach(m=>{if(m.id=="tab-threat")return;const h=m.querySelector("h2");if(!h||h.querySelector(".tab-ref"))return;
+  const b=document.createElement("button");b.type="button";b.className="tab-ref";b.textContent="⟳ Refresh";b.title="Run a scan now (same as Manual refresh at the top)";
+  b.onclick=async e=>{e.stopPropagation();b.disabled=true;b.textContent="scanning…";await $("refresh").onclick();b.textContent="⟳ Refresh";b.disabled=false;
+   const tb=m.dataset.addon;if(tb=="bcast")bcLoad();if(tb=="thread")arcsLoad();if(tb=="maps")mpList();if(m.id=="tab-jets")loadJets()};
+  const hw=h.querySelector(".hw-i");hw?h.insertBefore(b,hw):h.appendChild(b)})})();
+// ---- User votes: compact 0-10 selector on items across tabs + Ranked by Users tab (votes.db; never touches bot scoring) ----
+const VT={voter:localStorage.getItem("bn_voter")||(()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);const v=[...a].map(x=>x.toString(16).padStart(2,"0")).join("");localStorage.setItem("bn_voter",v);return v})(),pend:0};
+function vtTargets(){const T=[];
+ document.querySelectorAll(".card[data-cid],.tl-card[data-cid]").forEach(el=>T.push([el,"cluster",el.dataset.cid,el,null]));
+ document.querySelectorAll("#tab-bcast a.clip[data-bid]").forEach(el=>T.push([el,"bcast",el.dataset.bid,null,el]));
+ document.querySelectorAll(".st-seg[data-sid]").forEach(el=>T.push([el,"stream",el.dataset.sid,el,null]));
+ document.querySelectorAll("#arcs .arc .arc-hd[data-tog]").forEach(el=>T.push([el,"arc",el.dataset.tog,el.parentElement,null]));
+ const P=$("th_panel");if(P&&P.style.display!="none"&&TH.sel)T.push([P,"arc",TH.sel,P.querySelector("h3"),null]);return T}
+function vtTitle(typ,el){if(typ=="arc"){const a=ARCS&&ARCS.arcs.find(x=>x.id==(el.dataset.tog||TH.sel));return a?[a.title,""]:["",""]}
+ const b=el.querySelector("b");const a=el.tagName=="A"?el:el.querySelector("a[href^=http]");return[(window.BNTR?BNTR.orig(b||el):(b?b.textContent:el.textContent)).slice(0,280),a?a.href:""]}
+function vtApply(){const need={};vtTargets().forEach(([el,typ,id,host,after])=>{const key=typ+"|"+id;let w=(after?after.nextElementSibling:host.querySelector(":scope > .vt"));
+ if(!(w&&w.classList&&w.classList.contains("vt")&&w.dataset.k==key)){w=document.createElement("div");w.className="vt";w.dataset.k=key;w.innerHTML=`<span title="Your threat level for this item (0 = none, 10 = extreme). Never changes the bot's rank.">⚖ rate</span><input type=range min=0 max=10 step=1 value=5 aria-label="Your threat level 0 to 10"><span class=vt-l>—</span>`;
+  w.querySelector("input").addEventListener("click",e=>e.stopPropagation());w.addEventListener("click",e=>{e.stopPropagation();e.preventDefault()},true);
+  w.querySelector("input").onchange=e=>vtSend(typ,id,+e.target.value,w,el);if(after)after.after(w);else host.appendChild(w)}
+ (need[typ]=need[typ]||[]).push(id)});
+ Object.entries(need).forEach(async([typ,ids])=>{try{const j=await (await fetch(`api/votes?type=${typ}&voter=${VT.voter}&ids=${encodeURIComponent([...new Set(ids)].slice(0,300).join(","))}`)).json();
+  Object.entries(j.votes).forEach(([id,v])=>document.querySelectorAll(`.vt[data-k="${CSS.escape(typ+"|"+id)}"]`).forEach(w=>vtShow(w,v)))}catch(e){}})}
+function vtShow(w,v){w.classList.toggle("has",v.mine!=null);if(v.mine!=null)w.querySelector("input").value=v.mine;w.querySelector(".vt-l").innerHTML=(v.mine!=null?`you <b>${v.mine}</b> · `:"")+(v.n?`avg <b>${v.avg}</b> (${v.n})`:"no votes")}
+async function vtSend(typ,id,r,w,el){const[t,u]=vtTitle(typ,el);try{const res=await fetch("api/vote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({item_type:typ,item_id:id,rating:r,voter:VT.voter,title:t,url:u})});const j=await res.json();
+ if(!res.ok)throw j.error||res.status;vtShow(w,{mine:r,avg:j.avg,n:j.n});w.classList.remove("pulse");void w.offsetWidth;w.classList.add("pulse");if($("tab-ranked").style.display!="none")rkLoad()}catch(e){w.querySelector(".vt-l").textContent="✗ "+e}}
+let vtMo=0;new MutationObserver(m=>{if(m.some(r=>[...r.addedNodes].some(n=>n.nodeType==1&&!n.classList.contains("vt")&&!n.classList.contains("xt")))){clearTimeout(vtMo);vtMo=setTimeout(vtApply,400)}}).observe(document.body,{childList:true,subtree:true});
+// Ranked by Users tab
+const RK={pos:{}};
+async function rkLoad(){try{const q=new URLSearchParams({sort:$("rk_sort").value,window:$("rk_win").value,min:$("rk_min").value});const j=await (await fetch("api/user_ranked?"+q,{cache:"no-store"})).json();
+ $("rk_meta").textContent=`· ${j.items.length} rated item(s) · weighted average = (${j.prior_weight} × ${j.prior_mean} + sum of votes) ÷ (${j.prior_weight} + votes)`;
+ const L=$("rk_list"),old={};L.querySelectorAll(".rk-row").forEach(r=>old[r.dataset.k]=r.getBoundingClientRect().top);
+ const tl={cluster:"The Wire item",arc:"The Thread story",bcast:"Live Broadcasts clip",stream:"Live Streams segment"};
+ L.innerHTML=j.items.map((x,i)=>{const d=x.diff;const bd=d==null?`<span class="rk-badge eq">no bot rank</span>`:d>=1?`<span class="rk-badge up">crowd +${d} vs bot</span>`:d<=-1?`<span class="rk-badge dn">crowd ${d} vs bot</span>`:`<span class="rk-badge eq">crowd ≈ bot</span>`;
+  return `<div class=rk-row data-k="${esc(x.item_type+"|"+x.item_id)}"><div class=rk-pos>${i+1}</div><div><b>${x.url?`<a href="${esc(safeUrl(x.url))}" target=_blank rel="noopener noreferrer" style="color:var(--tx)">${esc(x.title||x.item_id)}</a>`:esc(x.title||x.item_id)}</b><div class=meta>${tl[x.item_type]}${x.category?" · "+esc(x.category):""} · last vote ${esc(fmt(x.last))}</div></div>
+  <div><span class=rk-big>${x.bayes}</span><div class=meta>weighted · raw ${x.avg}</div></div><div><b>${x.n}</b> vote${x.n==1?"":"s"}<div class=meta>bot: ${x.bot_rank!=null?`rank ${x.bot_rank}/10 · score ${x.bot_score}`:"n/a"}</div></div><div>${bd}</div></div>`}).join("")||"<div class=meta>No rated items in this window yet.</div>";
+ L.querySelectorAll(".rk-row").forEach(r=>{const o=old[r.dataset.k];if(o==null){r.classList.add("new");setTimeout(()=>r.classList.remove("new"),900);return}const dy=o-r.getBoundingClientRect().top;if(dy){r.style.transition="none";r.style.transform=`translateY(${dy}px)`;requestAnimationFrame(()=>{r.style.transition="";r.style.transform=""})}})}catch(e){$("rk_meta").textContent="unavailable: "+e}}
+const rkAgo=t=>{const s=(Date.now()-new Date(t))/1e3;return s<60?"just now":s<3600?Math.round(s/60)+" min ago":fmt(t)};
+async function rkTick(){try{const j=await (await fetch("api/votes/recent",{cache:"no-store"})).json();if(!j.items.length)return;
+ $("rk_tick_in").innerHTML=j.items.map(v=>`<span>🗳 <b>${v.rating}/10</b> threat vote on “${esc((v.title||v.item_id).slice(0,80))}” · ${rkAgo(v.ts)}</span>`).join("")}catch(e){}}
+$("rk_sort").onchange=rkLoad;$("rk_win").onchange=rkLoad;$("rk_min").onchange=rkLoad;
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="ranked"){rkLoad();rkTick()}});
+if(LV&&LV.es)LV.es.addEventListener("vote",()=>{rkTick();if($("tab-ranked").style.display!="none")rkLoad();vtApply()});
+setInterval(()=>{if($("tab-ranked").style.display!="none")rkTick()},30000);vtApply();
+// ---- Network Status tab (netstatus.py; official feeds + this box's probes) ----
+const NS={win:"24h",d:null};
+const nsCls=l=>l==null?"":"ns-l"+l, nsGroups=["Big cloud","DNS & CDN","Apps & social","Dev & cloud","ISPs (Downdetector)","Box probes: DNS resolvers","Box probes: HTTPS","Feed errors"];
+async function nsLoad(){try{const d=NS.d=await (await fetch("api/netstatus?window="+NS.win,{cache:"no-store"})).json();
+ $("ns_meta").textContent=d.polled?`· last checked ${fmt(d.polled)} · every ${d.poll_seconds/60} min · each history cell = ${d.bucket_minutes>=60?d.bucket_minutes/60+" h":d.bucket_minutes+" min"} (${d.polls_stored} polls stored)`:"· first poll running…";
+ const by={};d.sources.forEach(s=>(by[s.grp]=by[s.grp]||[]).push(s));
+ $("ns_list").innerHTML=[...nsGroups.filter(g=>by[g]),...Object.keys(by).filter(g=>!nsGroups.includes(g))].map(g=>`<h3>${esc(g)}</h3>`+by[g].sort((a,b)=>b.level-a.level).map(s=>`<div class=ns-row title="${esc(d.levels[s.level]||"")}"><span class="d ${nsCls(s.level)}"></span>
+  <span>${s.url?`<a href="${esc(safeUrl(s.url))}" target=_blank rel="noopener noreferrer">${esc(s.src)}</a>`:esc(s.src)}</span><span><span class=st>${esc(s.status)}</span>${s.detail?`<span class=dt title="${esc(s.detail)}">${esc(s.detail)}</span>`:""}</span>
+  <span class=ns-h>${s.hist.map(l=>`<i class="${nsCls(l)}"></i>`).join("")}</span></div>`).join("")).join("")||"<div class=meta>Waiting for the first poll…</div>";
+ const al=d.sources.filter(s=>d.alerts.includes(s.src));
+ $("ns_banner").style.display=al.length?"block":"none";$("ns_banner").innerHTML=al.length?`⚠ <b>${al.length} active network alert${al.length>1?"s":""}:</b> `+al.map(s=>`${esc(s.src)}: ${esc(s.status)}`).join(" · "):"";
+ const C=d.corroboration;$("ns_cor").innerHTML=(C.wire.map(w=>`<a href="#" data-goto="${esc(w.id)}">📡 <b>${esc(w.title)}</b><span class=meta> · The Wire · rank ${w.rank}/10 · ${esc(fmt(w.first_seen))}</span></a>`).join("")+
+  C.broadcasts.map(b=>`<a href="${esc(safeUrl(b.url))}" target=_blank rel="noopener noreferrer">📻 ${esc(b.title)}<span class=meta> · ${esc(b.source)} · ${esc(fmt(b.published))}</span></a>`).join(""))||"<div class=meta>Nothing outage-related in the last 24 hours.</div>";
+ $("ns_cor").querySelectorAll("[data-goto]").forEach(a=>a.onclick=e=>{e.preventDefault();document.querySelector('.tabs button[data-tab="threat"]').click();setTimeout(()=>{const el=document.querySelector(`[data-cid="${CSS.escape(a.dataset.goto)}"]`);if(el){el.scrollIntoView({block:"center"});el.style.outline="2px solid var(--hi)";setTimeout(()=>el.style.outline="",2500)}},300)});
+ nsBadge({count:al.length,alerts:al.map(s=>s.src)})}catch(e){$("ns_meta").textContent="unavailable: "+e}}
+function nsBadge(a){a={count:a.count||0,alerts:(a.alerts||[]).map(x=>typeof x=="string"?x:(x.src+(x.status?": "+x.status:"")))};const b=document.querySelector('.tabs button[data-tab="net"]');let s=b.querySelector(".ns-badge");if(!a.count){s&&s.remove();$("ns_gbanner").style.display="none";return}
+ if(!s){s=document.createElement("span");s.className="ns-badge";b.appendChild(s)}s.textContent=a.count;
+ const key=a.alerts.join("|");if(sessionStorage.getItem("ns_dismiss")!==key){$("ns_gbanner").innerHTML=`🌐 <b>Network alert:</b> ${a.alerts.map(esc).join(", ")}. <span class=meta>Click to open Network Status.</span> <button class=ns-x title="Dismiss until the alerts change" style="float:right;background:none;border:0;color:#ffccc7;cursor:pointer">✕</button>`;$("ns_gbanner").style.display="block";$("ns_gbanner").dataset.k=key}}
+async function nsAlerts(){try{nsBadge(await (await fetch("api/netstatus/alerts",{cache:"no-store"})).json())}catch(e){}}
+$("ns_gbanner").onclick=e=>{if(e.target.closest(".ns-x")){sessionStorage.setItem("ns_dismiss",$("ns_gbanner").dataset.k);$("ns_gbanner").style.display="none";return}document.querySelector('.tabs button[data-tab="net"]').click()};
+$("ns_win").onchange=e=>{NS.win=e.target.value;nsLoad()};
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="net"){nsLoad();sessionStorage.setItem("ns_dismiss",$("ns_gbanner").dataset.k||"");$("ns_gbanner").style.display="none"}});
+if(LV&&LV.es)LV.es.addEventListener("netstatus",e=>{try{nsBadge(JSON.parse(e.data))}catch(_){}if($("tab-net").style.display!="none")nsLoad()});
+setInterval(()=>{nsAlerts();if($("tab-net").style.display!="none")nsLoad()},300000);nsAlerts();
+(function(){const nav=document.querySelector(".tabs"),B=t=>nav.querySelector(`button[data-tab="${t}"]`);
+ const groups=[["Monitor",["threat","thread","bcast","streams","radio","net","solar_seismic","jets"]],["Community",["ranked"]],["Reference",["res","maps","bush","med"]],["",["tips"]]];
+ const frag=document.createDocumentFragment();groups.forEach(([g,ts],i)=>{if(i){const s=document.createElement("span");s.className="tab-sep";frag.appendChild(s)}
+  if(g){const l=document.createElement("span");l.className="tab-grp";l.textContent=g;frag.appendChild(l)}ts.forEach(t=>B(t)&&frag.appendChild(B(t)))});
+ [...nav.querySelectorAll("button[data-tab]")].forEach(b=>frag.appendChild(b));nav.appendChild(frag);
+ // clicks on a tab's icon, badge or thumbnail count as clicks on the tab itself
+ nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b&&e.target!==b){e.stopImmediatePropagation();e.preventDefault();b.click()}},true);
+ nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(!b)return;const h=TABHASH[b.dataset.tab];if(!h)return;
+  if(b.dataset.tab=="thread"&&location.hash.startsWith("#thread/"))return;if(location.hash!="#"+h)history.replaceState(null,"","#"+h)});
+ function go(){const h=location.hash.slice(1);if(h.startsWith("thread/"))return;const t=HASHTAB[h];if(t&&B(t)&&!B(t).classList.contains("on"))B(t).click()}
+ addEventListener("hashchange",go);setTimeout(go,300)})();
+
+</script>
+<footer id="site_foot" style="margin:24px 12px 14px;padding-top:10px;border-top:1px solid #2a2f3a;color:#8a93a6;font-size:12px;text-align:center">Research-only data · blackout.network scanner · <a href="scoring" style="color:var(--ac);text-decoration:none">How we score</a> · <a href="newsletter" style="color:var(--ac);text-decoration:none">✉ Newsletter</a> · <a href="sources" style="color:var(--ac);text-decoration:none">📚 Sources</a> · <span id="foot_range">Data range: loading…</span></footer>
+<script>
+// "How we score" (/scoring): a link under the Reference tab group, and a link inside the scoring-related (i) notes. Read-only, no scoring changes.
+(function(){const nav=document.querySelector(".tabs");if(nav&&!document.getElementById("tab_howscore")){const a=document.createElement("a");a.id="tab_howscore";a.href="scoring";a.textContent="📐 How we score";
+ a.title="How the 0–100 score and 0–10 rank work (opens the scoring page)";a.style.cssText="background:#1d232b;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:14px";
+ const place=()=>{const m=nav.querySelector('button[data-tab="med"]');if(m)m.after(a);else nav.appendChild(a)};place();setTimeout(place,400)}
+ document.addEventListener("click",e=>{const b=e.target.closest(".hw-i");if(!b)return;setTimeout(()=>{const p=document.getElementById(b.getAttribute("aria-controls"));
+  if(!p||p.hidden||!/^(wire|watch|notify|trend|heat)$/.test(p.dataset.key||"")||p.querySelector(".hs-more"))return;const t=p.querySelector(".hw-t")||p;
+  t.insertAdjacentHTML("beforeend",' <a class="hs-more" href="scoring">How we score: every rank 0–10 explained →</a>')},0)},true)})();
+</script>
+<script>
+// Footer data range (future forecast times excluded): earliest–latest time across the alerts currently loaded (main + watchlist), shown in America/New_York with EDT/EST.
+function fmtET(d,withDate){const o={timeZone:"America/New_York",hour:"numeric",minute:"2-digit",timeZoneName:"short"};if(withDate){o.month="short";o.day="numeric";o.year="numeric"}
+ const p=new Intl.DateTimeFormat("en-US",o).formatToParts(d),g=t=>(p.find(x=>x.type==t)||{}).value||"";
+ return (withDate?`${g("month")} ${g("day")}, ${g("year")} `:"")+`${g("hour")}:${g("minute")} ${g("dayPeriod")} ${g("timeZoneName")}`}
+function dataRange(items){let lo=Infinity,hi=-Infinity;(items||[]).forEach(x=>[x.event_time,x.first_seen,x.updated].forEach(t=>{const v=t?Date.parse(t):NaN;if(!isNaN(v)&&v<=Date.now()+6e5){if(v<lo)lo=v;if(v>hi)hi=v}}));
+ if(!isFinite(lo))return "Data range: no items loaded";const a=new Date(lo),b=new Date(hi),dk=d=>d.toLocaleDateString("en-US",{timeZone:"America/New_York"});
+ return `Data range: ${fmtET(a,true)} – ${dk(a)==dk(b)?fmtET(b,false):fmtET(b,true)}`}
+function fdr(){const el=document.getElementById("foot_range");if(el&&typeof S!="undefined"&&S)el.textContent=dataRange([...(S.main||[]),...(S.watchlist||[])])}
+fdr();
+</script>
+<link rel="stylesheet" href="api/solar_seismic/app.css"><script src="api/solar_seismic/app.js"></script>
+<link rel="stylesheet" href="api/heatmap/app.css"><script>if(typeof L!="undefined"&&!L.heatLayer)document.write('<script src="api/heatmap/leaflet-heat.js"><\/script>');if(typeof L!="undefined"&&!L.markerClusterGroup)document.write('<link rel="stylesheet" href="api/heatmap/MarkerCluster.css"><link rel="stylesheet" href="api/heatmap/MarkerCluster.Default.css"><script src="api/heatmap/leaflet.markercluster.js"><\/script>')</script><script src="api/heatmap/app.js"></script>
+<link rel="stylesheet" href="api/politics/app.css"><script src="api/politics/app.js"></script>
+<link rel="stylesheet" href="api/weather/app.css"><script src="api/weather/app.js"></script>
+<link rel="stylesheet" href="api/games/app.css"><script src="api/games/app.js"></script>
+<link rel="stylesheet" href="api/trends/app.css"><script src="api/trends/app.js"></script>
+<link rel="stylesheet" href="/vsubs/vsubs.css"><script src="/vsubs/vsubs.js" defer></script>
+<link rel="stylesheet" href="api/translate/app.css"><script src="api/translate/app.js"></script>
+<script src="api/search/app.js"></script>
+<link rel="stylesheet" href="api/newsletter/app.css"><script src="api/newsletter/app.js"></script>
+<link rel="stylesheet" href="api/sources/app.css"><script src="api/sources/app.js"></script>
+<link rel="stylesheet" href="api/geo/geo.css"><script src="api/geo/geo.js"></script>
+<link rel="stylesheet" href="api/radio/app.css"><script src="api/radio/app.js"></script>
+<script>/* shared location picker on Local Resources: no default place; the visitor picks */(function(){const f=()=>{if(!window.BNGeo)return setTimeout(f,300);BNGeo.picker(document.getElementById("rs_geo"));BNGeo.on(l=>{if(l&&typeof rsSearch=="function"&&document.getElementById("tab-res").style.display!="none")rsSearch(l.resources_q||l.label)})};f()})()</script>
+<link rel="stylesheet" href="api/live_archive/app.css"><script src="api/live_archive/app.js"></script>
+<link rel="stylesheet" href="api/spacex/app.css"><script src="api/spacex/app.js"></script><link rel="stylesheet" href="api/elon/app.css"><script src="api/elon/app.js"></script><link rel="stylesheet" href="api/finance/app.css"><script src="api/finance/app.js"></script>
+<link rel="stylesheet" href="api/preppers/app.css"><script src="api/preppers/app.js"></script>
+</body></html>

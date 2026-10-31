@@ -1,0 +1,41 @@
+/* Weather tab (weather.py). Uses the shared palette in theme.css. */
+#tab-weather .wx-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 12px}
+#tab-weather .wx-search{position:relative;flex:1 1 320px;max-width:520px}
+#tab-weather .wx-search input{width:100%;box-sizing:border-box;padding:7px 10px;background:var(--pn2);border:1px solid var(--bd2);border-radius:8px;color:var(--tx);font-size:14px}
+#tab-weather .wx-search input:focus{outline:none;border-color:var(--ac)}
+#tab-weather .wx-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--pn2);border:1px solid var(--bd2);border-radius:8px;box-shadow:var(--shadow);z-index:50;max-height:320px;overflow:auto;padding:4px 0}
+#tab-weather .wx-list [role=option]{padding:6px 10px;cursor:pointer;font-size:13px}
+#tab-weather .wx-list [role=option][aria-selected=true],#tab-weather .wx-list [role=option]:hover{background:#22303f}
+#tab-weather .wx-list .meta{margin-left:6px}
+#tab-weather .wx-seg{display:inline-flex;border:1px solid var(--bd2);border-radius:8px;overflow:hidden}
+#tab-weather .wx-seg button{border:0;border-radius:0;padding:5px 10px;background:transparent;color:var(--mu)}
+#tab-weather .wx-seg button.on{background:var(--ac);color:#000;font-weight:600}
+#tab-weather .wx-loc{font-size:16px;font-weight:700}
+#tab-weather .wx-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(0,2fr);gap:14px}
+@media(max-width:900px){#tab-weather .wx-grid{grid-template-columns:1fr}}
+#tab-weather .wx-card{background:var(--pn2);border:1px solid var(--bd);border-radius:var(--radius);padding:12px 14px}
+#tab-weather .wx-card h3{font-size:13px;margin:0 0 8px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+#tab-weather .wx-now{display:flex;gap:14px;align-items:center}
+#tab-weather .wx-now .ic{font-size:54px;line-height:1}
+#tab-weather .wx-now .t{font-size:52px;font-weight:800;line-height:1;color:var(--tx)}
+#tab-weather .wx-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 14px;margin-top:10px;font-size:13px}
+#tab-weather .wx-kv span{color:var(--mu)}
+#tab-weather .wx-al{border-left:4px solid var(--mu);background:#181d23;border-radius:6px;padding:8px 10px;margin:8px 0}
+#tab-weather .wx-al.ex{border-color:#ff4d4f;background:#2a1416}#tab-weather .wx-al.sv{border-color:#fa8c16;background:#2a1d10}
+#tab-weather .wx-al.md{border-color:#fadb14}#tab-weather .wx-al.mi{border-color:#4aa3ff}
+#tab-weather .wx-al .sev{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;margin-right:6px;color:#000;background:var(--mu)}
+#tab-weather .wx-al.ex .sev{background:#ff4d4f}#tab-weather .wx-al.sv .sev{background:#fa8c16}#tab-weather .wx-al.md .sev{background:#fadb14}#tab-weather .wx-al.mi .sev{background:#4aa3ff}
+#tab-weather .wx-al details{margin-top:6px}#tab-weather .wx-al summary{cursor:pointer;color:var(--ac);font-size:12px}
+#tab-weather .wx-al pre{white-space:pre-wrap;font-family:inherit;font-size:12.5px;background:#0f1317;padding:8px;border-radius:6px;margin:6px 0 0}
+#tab-weather .wx-ok{color:var(--lo)}#tab-weather .wx-bad{color:var(--hi)}
+#tab-weather .wx-chart{width:100%;height:auto;display:block}
+#tab-weather .wx-chart text{fill:var(--mu);font-size:11px}
+#tab-weather .wx-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+@media(max-width:900px){#tab-weather .wx-days{grid-template-columns:repeat(4,minmax(0,1fr))}}
+#tab-weather .wx-day{background:#0f1317;border:1px solid var(--bd);border-radius:8px;padding:8px;text-align:center;font-size:12px}
+#tab-weather .wx-day .ic{font-size:26px;margin:2px 0}#tab-weather .wx-day b{font-size:15px}
+#tab-weather .wx-day .lo{color:var(--mu)}#tab-weather .wx-day .pp{color:var(--ac)}
+#tab-weather .wx-nws{font-size:12.5px}#tab-weather .wx-nws div{padding:5px 0;border-top:1px solid var(--bd)}
+#tab-weather .wx-src{font-size:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:4px 16px}
+#tab-weather .wx-src a{color:var(--tx)}
+#tab-weather .wx-full{grid-column:1/-1}

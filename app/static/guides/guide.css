@@ -1,0 +1,22 @@
+/* shared style for static guide tabs (Bushcraft, Medical) */
+.gd{display:grid;grid-template-columns:250px minmax(0,1fr);gap:20px;font-size:18px;line-height:1.6;color:#f2f4f7}
+.gd .toc{position:sticky;top:76px;align-self:start;max-height:calc(100vh - 96px);overflow:auto;background:var(--pn);border:1px solid var(--bd2);border-radius:10px;padding:10px 12px}
+.gd .toc summary{font-weight:800;font-size:17px;cursor:pointer;list-style:none}.gd .toc summary::-webkit-details-marker{display:none}
+.gd .toc a{display:block;color:#dce6f2;text-decoration:none;padding:5px 6px;border-radius:6px;font-size:16px}.gd .toc a:hover{background:#1f2630;color:#fff}
+.gd .toc .sub{padding-left:18px;font-size:15px;color:#aab6c4}
+.gd .body{min-width:0}.gd section{background:var(--pn);border:1px solid var(--bd2);border-radius:10px;padding:16px 20px;margin:0 0 18px;scroll-margin-top:80px}
+.gd h2{font-size:26px;margin:0 0 8px;color:#fff}.gd h3{font-size:20px;margin:16px 0 6px;color:#ffd666}
+.gd p{margin:6px 0}.gd ol,.gd ul{margin:6px 0 10px;padding-left:28px}.gd li{margin:5px 0}
+.gd b,.gd strong{color:#fff}.gd a{color:#7cc4ff}
+.gd .warnbox{background:#3a1416;border:2px solid #ff4d4f;border-radius:8px;padding:10px 14px;margin:10px 0;color:#ffe3e3}
+.gd .tip{background:#10263a;border-left:5px solid #4aa3ff;border-radius:6px;padding:8px 12px;margin:10px 0}
+.gd .fl{background:#2a2410;border-left:5px solid #faad14;border-radius:6px;padding:8px 12px;margin:10px 0}
+.gd .check li{list-style:none;margin-left:-22px}.gd .check li:before{content:"☐ ";font-size:20px}
+.gd .r3{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0}.gd .r3 div{background:#1b2129;border:1px solid var(--bd2);border-radius:8px;padding:10px;text-align:center}
+.gd .r3 b{display:block;font-size:24px;color:#ff7875}
+.gd .disc{font-size:16px;color:#c9d1db;background:#1b2129;border:1px dashed #5a6472;border-radius:8px;padding:10px 14px}
+.gd .src{font-size:16px}.gd .printbtn{float:right}
+@media(max-width:900px){.gd{grid-template-columns:1fr}.gd .toc{position:static;max-height:none}}
+@media print{body.gd-print header,body.gd-print nav,body.gd-print main:not(.gd-printing),body.gd-print .toc,body.gd-print .printbtn{display:none!important}
+ body.gd-print{background:#fff;color:#000}body.gd-print .gd{display:block;color:#000;font-size:12pt}body.gd-print .gd section{border:1px solid #999;background:#fff;break-inside:avoid-page}
+ body.gd-print .gd h2,body.gd-print .gd h3,body.gd-print .gd b{color:#000}body.gd-print .gd .warnbox,body.gd-print .gd .tip,body.gd-print .gd .fl,body.gd-print .gd .disc,body.gd-print .gd .r3 div{background:#fff;color:#000;border-color:#666}}

@@ -1,0 +1,25 @@
+/* Blackout Network: shared theme. One palette for every tab, the guides and the add-ons.
+   Category colors match keywords.json (Live Broadcasts / Live Streams keyword key) and The Thread's string key. */
+:root{
+ --bg:#0b0d10;--pn:#14181d;--pn2:#181d23;--bd:#252b33;--bd2:#2f3742;--tx:#e6e9ee;--mu:#8b95a3;
+ --hi:#ff4d4f;--md:#faad14;--lo:#52c41a;--ac:#4aa3ff;
+ --c-violence:#ff4d4f;--c-disease:#fa8c16;--c-infra:#fadb14;--c-cyber:#4aa3ff;--c-unrest:#b37feb;--c-nuclear:#36cfc9;
+ --c-link:#c8141b;--c-link-hl:#ff3b3b;--c-neutral:#8a5a5a;
+ --radius:10px;--shadow:0 6px 18px rgba(0,0,0,.35)}
+/* shared red-string component: The Thread board strings and the cross-page "follow the thread" strings */
+.redstring{fill:none;stroke:var(--c-link);stroke-linecap:round;opacity:.85;filter:drop-shadow(1px 2px 1px rgba(0,0,0,.6))}
+.redstring.hl,.xt:hover .redstring{stroke:var(--c-link-hl);opacity:1}
+/* one tab bar */
+.tabs{flex-wrap:wrap;row-gap:6px;align-items:center}
+.tabs .tab-sep{width:1px;align-self:stretch;background:var(--bd2);margin:2px 6px}
+.tabs .tab-grp{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu);margin-right:-2px}
+.tabs button img,.tabs button span{pointer-events:none}
+/* ---- phone layout fixes (Trends/mobile pass): scoped to narrow screens only ---- */
+@media(max-width:700px){
+ header{position:static}                                   /* sticky 3-line header ate ~15% of a phone screen and Leaflet controls slid over it */
+ #tab-threat{grid-template-columns:minmax(0,1fr)}           /* The Wire: let the timeline shrink instead of widening the page */
+ #tl{min-width:0;overflow:hidden}#tl_hist{gap:0}
+ .ns-row{grid-template-columns:12px minmax(0,1fr);row-gap:3px}  /* Network Status: name, status and history stack instead of squeezing */
+ .ns-row>span:nth-child(n+3){grid-column:2}
+ #tab-heatmap span.hm-cov{display:flex;flex-wrap:wrap;max-width:100%}#tab-heatmap .hm-cov .hm-covbar{width:70px}  /* Heat Map: geocoding-coverage bar stayed inside its panel */
+}

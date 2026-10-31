@@ -1,0 +1,16 @@
+{
+ "maps": [
+  {
+   "file": "florida_statewide_overview.pdf",
+   "title": "Florida — statewide overview",
+   "desc": "All 67 counties, interstates/trunk/primary highways, FDEM designated evacuation routes, every mapped hospital, fire station and shelter, major cities.",
+   "tags": [
+    "Tabloid 11×17 landscape",
+    "300 dpi",
+    "1 page"
+   ]
+  }
+ ],
+ "built_et": "Oct 30, 2026 10:47 PM ET",
+ "attribution": "Map data © OpenStreetMap contributors (ODbL) · Counties: US Census Bureau · Evacuation routes: Florida Division of Emergency Management (SERT) · Topo quads: USGS The National Map (public domain). Each PDF has a scale bar, north arrow, legend, attribution and date."
+}

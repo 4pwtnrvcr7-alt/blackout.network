@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+"""Blackout Network dashboard + scheduler (stdlib HTTP server)."""
+import json, os, re, time, threading, secrets, hmac, sqlite3, traceback
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+from datetime import datetime, timezone, timedelta
+import scanner
+import push
+import jets
+
+BASE = scanner.BASE
+CONFIG = f"{BASE}/config.json"
+NOTIFY = f"{BASE}/notify_settings.json"
+PASSFILE = f"{BASE}/ADMIN_PASSCODE.txt"
+PORT = int(os.environ.get("BLACKOUT_PORT", "8787"))
+ALLOWED = [5, 15, 30, 60, 120, 180, 360]
+REFRESH_COOLDOWN = 60
+wake = threading.Event()
+jet_wake = threading.Event()
+jet_state = {"running": False, "last": None}
+state = {"last_scan": None, "last_result": None, "next_scan": None, "last_manual": 0, "scanning": False}
+fails = {}   # ip -> [timestamps] of bad passcodes
+
+def load_json(p, default):
+    try:
+        with open(p) as f: return {**default, **json.load(f)}
+    except Exception: return dict(default)
+def save_json(p, d, mode=0o644):
+    tmp = p + ".tmp"
+    with open(tmp, "w") as f: json.dump(d, f, indent=1)
+    os.chmod(tmp, mode); os.replace(tmp, p)
+def cfg(): return load_json(CONFIG, {"interval_minutes": 60, "push_min_rank": 7, "push_min_sources": 2})
+NOTIFY_DEFAULT = {"phone": "", "channels": {"sms": False, "email": True, "app": True}, "updated": None}
+def notify(): 
+    d = load_json(NOTIFY, NOTIFY_DEFAULT); d["channels"] = {**NOTIFY_DEFAULT["channels"], **(d.get("channels") or {})}; return d
+def passcode():
+    if not os.path.exists(PASSFILE):
+        fd = os.open(PASSFILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as f: f.write(secrets.token_urlsafe(12) + "\n")
+    os.chmod(PASSFILE, 0o600)
+    return open(PASSFILE).read().strip()
+def mask(phone): return f"***-***-{phone[-4:]}" if phone and len(phone) == 10 else ""
+def norm_phone(s):
+    d = re.sub(r"[\s().\-]", "", s or "")
+    if d.startswith("+1"): d = d[2:]
+    elif d.startswith("1") and len(d) == 11: d = d[1:]
+    if not re.fullmatch(r"[2-9]\d{2}[2-9]\d{6}", d): return None
+    return d
+def public_settings():
+    n = notify()
+    return {"phone_masked": mask(n.get("phone")), "phone_saved": bool(n.get("phone")), "channels": n["channels"], "updated": n.get("updated"),
+            "delivery_status": {"app": "active: delivered as a message in the Grok Bot chat by the hourly check",
+                                "email": "not yet deliverable: no email sending mechanism configured",
+                                "sms": "not yet deliverable: no SMS gateway configured"}}
+
+def run_scan(trigger):
+    state["scanning"] = True
+    try:
+        r = scanner.scan(trigger)
+        if r.get("status") != "busy":
+            state["last_scan"] = time.time(); state["last_result"] = r
+            try: r["push"] = push.push_new()          # push hook runs after every completed scan
+            except Exception as ex: r["push"] = {"status": "error", "error": str(ex)[:200]}
+        return r
+    finally:
+        state["scanning"] = False
+
+def scheduler():
+    # first scan at startup if stale
+    c = scanner.db(); last = c.execute("SELECT finished FROM scans ORDER BY id DESC LIMIT 1").fetchone(); c.close()
+    if last:
+        state["last_scan"] = scanner.parse_t(last[0]).timestamp()
+    while True:
+        iv = cfg()["interval_minutes"] * 60
+        due = (state["last_scan"] or 0) + iv
+        state["next_scan"] = due
+        if time.time() >= due:
+            try: run_scan("scheduled")
+            except Exception: traceback.print_exc()
+            continue
+        wake.wait(timeout=min(60, max(1, due - time.time())))   # re-check config at least every 60s
+        wake.clear()
+
+def jet_loop():
+    """Jet sampler: every min(jet_sample_minutes [default 5], interval_minutes). Writes only jets.db; never touches threat scoring."""
+    while True:
+        c = cfg(); st = jets.settings(c)
+        jet_state["running"] = True
+        try: jet_state["last"] = jets.run_pass(c)
+        except Exception: traceback.print_exc()
+        finally: jet_state["running"] = False
+        jet_wake.wait(timeout=st["sample_minutes"] * 60); jet_wake.clear()
+
+def q(sql, args=()):
+    c = scanner.db()
+    try: return [dict(r) for r in c.execute(sql, args)]
+    finally: c.close()
+
+def clusters_out(rows):
+    for r in rows:
+        r["families"] = json.loads(r["families"] or "[]"); r["links"] = json.loads(r["links"] or "[]")
+    return rows
+
+def api_state():
+    cut = scanner.iso(scanner.now() - timedelta(days=7))
+    main = clusters_out(q("SELECT * FROM clusters WHERE watchlist=0 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (cut,)))
+    watch = clusters_out(q("SELECT * FROM clusters WHERE watchlist=1 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (cut,)))
+    nwatch = q("SELECT COUNT(*) n FROM clusters WHERE watchlist=1")[0]["n"]
+    vol = q("""SELECT substr(COALESCE(event_time, first_seen),1,10) d, category, COUNT(*) n FROM clusters
+               WHERE COALESCE(event_time, first_seen)>=? GROUP BY d, category ORDER BY d""", (cut,))
+    trend = q("""SELECT substr(COALESCE(event_time, first_seen),1,10) d, MAX(score) mx, ROUND(AVG(score),1) avg,
+               SUM(score>=?) high FROM clusters WHERE COALESCE(event_time, first_seen)>=? AND watchlist=0 GROUP BY d ORDER BY d""", (scanner.HIGH, cut))
+    geo = q("SELECT lat, lon, score, title, category, watchlist FROM clusters WHERE lat IS NOT NULL AND COALESCE(event_time, first_seen)>=?", (cut,))
+    health = q("SELECT * FROM source_health ORDER BY ok DESC, name")
+    scans = q("SELECT * FROM scans ORDER BY id DESC LIMIT 10")
+    pub = ""
+    try: pub = open(f"{BASE}/PUBLIC_URL.txt").read().strip()
+    except Exception: pass
+    return {"generated": scanner.iso(scanner.now()), "high_threshold": scanner.HIGH, "main": main, "watchlist": watch, "watchlist_count": nwatch,
+            "volume": vol, "trend": trend, "geo": geo, "sources": health, "scans": scans,
+            "interval_minutes": cfg()["interval_minutes"], "allowed_intervals": ALLOWED,
+            "next_scan": scanner.iso(datetime.fromtimestamp(state["next_scan"], timezone.utc)) if state["next_scan"] else None,
+            "scanning": state["scanning"], "settings": public_settings(), "public_url": pub}
+
+# ---- add-on modules (Story Arcs, ...): separate files listed in addons.py, hot-reloaded on change ----
+import importlib
+_addon_mods = {}
+_addon_lock = threading.Lock()
+def _addon_mod(name):
+    mt = os.path.getmtime(f"{BASE}/{name}.py")
+    with _addon_lock:
+        m = _addon_mods.get(name)
+        if m is None or m[0] != mt:
+            mod = importlib.reload(m[1]) if m else importlib.import_module(name)
+            _addon_mods[name] = (mt, mod)
+        return _addon_mods[name][1]
+def addon_for(path):
+    try: routes = _addon_mod("addons").ROUTES
+    except Exception: traceback.print_exc(); return None
+    for pre, name in routes.items():
+        if path == pre or path.startswith(pre + "/"): return _addon_mod(name)
+    return None
+
+class H(BaseHTTPRequestHandler):
+    server_version = "Blackout/1.0"
+    def log_message(self, fmt, *a): pass
+    def ip(self): return self.headers.get("CF-Connecting-IP") or self.client_address[0]
+    def send(self, code, body, ctype="application/json"):
+        b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
+        self.send_response(code); self.send_header("Content-Type", ctype + "; charset=utf-8")
+        self.send_header("Cache-Control", "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    def body(self):
+        n = min(int(self.headers.get("Content-Length") or 0), 10000)
+        self._raw = self.rfile.read(n)   # kept for add-ons that accept form posts (newsletter: no-JS forms, RFC 8058 one-click unsubscribe)
+        try: return json.loads(self._raw or b"{}")
+        except Exception: return {}
+    def authed(self, d):
+        ip = self.ip(); t = time.time()
+        fails[ip] = [x for x in fails.get(ip, []) if t - x < 600]
+        if len(fails[ip]) >= 5: return "locked"
+        given = str(d.get("passcode") or self.headers.get("X-Admin-Passcode") or "")
+        if given and hmac.compare_digest(given.encode(), passcode().encode()): return "ok"
+        fails[ip].append(t); return "bad"
+
+    def do_GET(self):
+        u = urlparse(self.path); qs = parse_qs(u.query)
+        try:
+            if u.path in ("/", "/index.html"):
+                return self.send(200, open(f"{BASE}/dashboard.html", "rb").read(), "text/html")
+            if u.path == "/api/state": return self.send(200, api_state())
+            if u.path == "/api/health":
+                return self.send(200, {"ok": True, "scanning": state["scanning"], "last_scan": state["last_scan"], "interval_minutes": cfg()["interval_minutes"]})
+            if u.path == "/api/settings": return self.send(200, public_settings())
+            if u.path == "/api/config": return self.send(200, {"interval_minutes": cfg()["interval_minutes"], "allowed": ALLOWED})
+            if u.path == "/api/jets": return self.send(200, {**jets.api_state(cfg()), "sampler": jet_state})
+            if u.path in ("/api/jet_spikes/new", "/api/jet_spikes"):
+                since = (qs.get("since") or [None])[0]
+                sd = scanner.parse_t(since) if since else scanner.now() - timedelta(hours=1 if u.path.endswith("new") else 24 * 30)
+                if not sd: return self.send(400, {"error": "since must be ISO-8601, e.g. 2026-10-29T04:00:00Z"})
+                items = jets.new_spikes(sd)
+                return self.send(200, {"since": scanner.iso(sd), "now": scanner.iso(scanner.now()), "count": len(items), "items": items,
+                                       "note": "Informational only. Jet spikes never change threat ranks/scores."})
+            if u.path == "/api/new_high":
+                since = (qs.get("since") or [None])[0]
+                mn = int((qs.get("min") or [scanner.HIGH])[0])
+                mode = (qs.get("mode") or ["alert"])[0]
+                sd = scanner.parse_t(since) if since else scanner.now() - timedelta(hours=1)
+                if not sd: return self.send(400, {"error": "since must be ISO-8601, e.g. 2026-10-29T04:00:00Z"})
+                if mode == "alert":   # push hook: rank >= push_min_rank AND confirmed by >= push_min_sources independent source families
+                    cf = cfg(); pr = int(cf.get("push_min_rank", 7)); ps = int(cf.get("push_min_sources", 2))
+                    rows = clusters_out(q("""SELECT * FROM clusters WHERE watchlist=0 AND high_at>=? AND rank>=? AND eff_families>=?
+                                             ORDER BY rank DESC, score DESC""", (scanner.iso(sd), pr, ps)))
+                else:                 # mode=all: every main-feed item with score>=min or rank>=7
+                    rows = clusters_out(q("SELECT * FROM clusters WHERE watchlist=0 AND high_at>=? AND (score>=? OR rank>=7) ORDER BY rank DESC, score DESC",
+                                          (scanner.iso(sd), mn)))
+                return self.send(200, {"since": scanner.iso(sd), "min_score": mn, "mode": mode,
+                                       "push_rule": {"push_min_rank": int(cfg().get("push_min_rank", 7)), "push_min_sources": int(cfg().get("push_min_sources", 2))} if mode == "alert" else None, "count": len(rows), "now": scanner.iso(scanner.now()),
+                                       "items": [{k: r[k] for k in ("cluster_id", "score", "confidence", "category", "title", "location", "lat", "lon",
+                                                                     "event_time", "high_at", "families", "links", "brief", "rank", "rising", "eff_families")} for r in rows]})
+            m = addon_for(u.path)
+            if m and hasattr(m, "handle_stream"): return m.handle_stream(u.path, qs, self)   # long-lived add-on responses (SSE /api/stream)
+            if m: return self.send(*m.handle_get(u.path, qs))
+            return self.send(404, {"error": "not found"})
+        except (BrokenPipeError, ConnectionResetError): return
+        except Exception as ex:
+            traceback.print_exc(); return self.send(500, {"error": str(ex)})
+
+    def do_POST(self):
+        u = urlparse(self.path); d = self.body()
+        try:
+            if u.path == "/api/refresh":
+                left = REFRESH_COOLDOWN - (time.time() - state["last_manual"])
+                if left > 0: return self.send(429, {"status": "rate_limited", "retry_after_s": int(left) + 1})
+                if state["scanning"]: return self.send(409, {"status": "busy"})
+                state["last_manual"] = time.time()
+                r = run_scan("manual")
+                wake.set()
+                return self.send(200, r)
+            if u.path == "/api/interval":
+                a = self.authed(d)
+                if a != "ok": return self.send(429 if a == "locked" else 403, {"error": "too many attempts, wait 10 min" if a == "locked" else "admin passcode required"})
+                try: m = int(d.get("minutes"))
+                except Exception: m = None
+                if m not in ALLOWED: return self.send(400, {"error": f"minutes must be one of {ALLOWED}"})
+                c = cfg(); c["interval_minutes"] = m; save_json(CONFIG, c); wake.set()
+                return self.send(200, {"status": "ok", "interval_minutes": m})
+            if u.path == "/api/jets/settings":
+                a = self.authed(d)
+                if a != "ok": return self.send(429 if a == "locked" else 403, {"error": "too many attempts, wait 10 min" if a == "locked" else "admin passcode required"})
+                c = cfg()
+                if "k" in d:
+                    try: k = round(float(d["k"]), 2)
+                    except Exception: k = None
+                    if k is None or not (jets.K_MIN <= k <= jets.K_MAX): return self.send(400, {"error": f"k must be between {jets.K_MIN} and {jets.K_MAX}"})
+                    c["jet_spike_k"] = k
+                if "enabled" in d: c["jet_spike_alerts_enabled"] = bool(d["enabled"])
+                save_json(CONFIG, c)
+                return self.send(200, {"status": "ok", "jet_spike_k": c.get("jet_spike_k", 2.0), "jet_spike_alerts_enabled": c.get("jet_spike_alerts_enabled", True)})
+            if u.path == "/api/settings":
+                a = self.authed(d)
+                if a != "ok": return self.send(429 if a == "locked" else 403, {"error": "too many attempts, wait 10 min" if a == "locked" else "admin passcode required"})
+                n = notify()
+                if "phone" in d and str(d["phone"]).strip() != "":
+                    p = norm_phone(str(d["phone"]))
+                    if not p: return self.send(400, {"error": "Phone must be a valid US 10-digit number, e.g. (555) 555-0100"})
+                    n["phone"] = p
+                if d.get("clear_phone"): n["phone"] = ""
+                ch = d.get("channels") or {}
+                for k in ("sms", "email", "app"):
+                    if k in ch: n["channels"][k] = bool(ch[k])
+                if n["channels"]["sms"] and not n["phone"]:
+                    return self.send(400, {"error": "Save a valid phone number before enabling SMS"})
+                n["updated"] = scanner.iso(scanner.now())
+                save_json(NOTIFY, n, 0o600)
+                return self.send(200, {"status": "saved", **public_settings()})
+            m = addon_for(u.path)
+            if m and hasattr(m, "handle_post"):
+                import inspect
+                sig = inspect.signature(m.handle_post).parameters
+                if "headers" in sig:   # newsletter: same-origin check, query-string token, raw form body
+                    return self.send(*m.handle_post(u.path, d if isinstance(d, dict) else {}, ip=self.ip(), qs=parse_qs(u.query),
+                                                    headers={k.lower(): v for k, v in self.headers.items()}, raw=getattr(self, "_raw", b"")))
+                if "ip" in sig: return self.send(*m.handle_post(u.path, d, ip=self.ip()))   # in-memory rate limiting only
+                return self.send(*m.handle_post(u.path, d))
+            return self.send(404, {"error": "not found"})
+        except Exception as ex:
+            traceback.print_exc(); return self.send(500, {"error": str(ex)})
+
+if __name__ == "__main__":
+    passcode()
+    if not os.path.exists(CONFIG): save_json(CONFIG, {"interval_minutes": 60})
+    if not os.path.exists(NOTIFY): save_json(NOTIFY, NOTIFY_DEFAULT, 0o600)
+    threading.Thread(target=scheduler, daemon=True).start()
+    threading.Thread(target=jet_loop, daemon=True).start()
+    try: import newsletter; newsletter.ensure_worker(force=True)   # newsletter scheduler: separate light process (newsletter_worker.py)
+    except Exception: traceback.print_exc()
+    print(f"Blackout dashboard on http://127.0.0.1:{PORT}", flush=True)
+    ThreadingHTTPServer.daemon_threads = True
+    ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()

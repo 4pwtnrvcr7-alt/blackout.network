@@ -1,0 +1,173 @@
+{
+ "note": "Public YouTube channel RSS feeds polled by youtube_watch.py. Every channel_id was verified on 2026-10-31 to return a feed whose <title> matches the name.",
+ "channels": [
+  {
+   "channel_id": "UChqUTb7kYRX8-EiaN3XFrSQ",
+   "name": "Reuters",
+   "kind": "wire service",
+   "url": "https://www.youtube.com/channel/UChqUTb7kYRX8-EiaN3XFrSQ"
+  },
+  {
+   "channel_id": "UC52X5wxOL_s5yw0dQk7NtgA",
+   "name": "Associated Press",
+   "kind": "wire service",
+   "url": "https://www.youtube.com/channel/UC52X5wxOL_s5yw0dQk7NtgA"
+  },
+  {
+   "channel_id": "UC16niRr50-MSBwiO3YDb3RA",
+   "name": "BBC News",
+   "kind": "public broadcaster",
+   "url": "https://www.youtube.com/channel/UC16niRr50-MSBwiO3YDb3RA"
+  },
+  {
+   "channel_id": "UCNye-wNBqNL5ZzHSJj3l8Bg",
+   "name": "Al Jazeera English",
+   "kind": "international broadcaster",
+   "url": "https://www.youtube.com/channel/UCNye-wNBqNL5ZzHSJj3l8Bg"
+  },
+  {
+   "channel_id": "UCknLrEdhRCp1aegoMqRaCZg",
+   "name": "DW News",
+   "kind": "public broadcaster",
+   "url": "https://www.youtube.com/channel/UCknLrEdhRCp1aegoMqRaCZg"
+  },
+  {
+   "channel_id": "UCQfwfsi5VrQ8yKZ-UWmAEFg",
+   "name": "FRANCE 24 English",
+   "kind": "public broadcaster",
+   "url": "https://www.youtube.com/channel/UCQfwfsi5VrQ8yKZ-UWmAEFg"
+  },
+  {
+   "channel_id": "UCSPEjw8F2nQDtmUKPFNF7_A",
+   "name": "NHK WORLD-JAPAN",
+   "kind": "public broadcaster",
+   "url": "https://www.youtube.com/channel/UCSPEjw8F2nQDtmUKPFNF7_A"
+  },
+  {
+   "channel_id": "UC_gUM8rL-Lrg6O3adPW9K1g",
+   "name": "WION",
+   "kind": "international broadcaster",
+   "url": "https://www.youtube.com/channel/UC_gUM8rL-Lrg6O3adPW9K1g"
+  },
+  {
+   "channel_id": "UC83jt4dlz1Gjl58fzQrrKZg",
+   "name": "CNA",
+   "kind": "public broadcaster",
+   "url": "https://www.youtube.com/channel/UC83jt4dlz1Gjl58fzQrrKZg"
+  },
+  {
+   "channel_id": "UCoMdktPbSTixAyNGwb-UYkQ",
+   "name": "Sky News",
+   "kind": "broadcaster",
+   "url": "https://www.youtube.com/channel/UCoMdktPbSTixAyNGwb-UYkQ"
+  },
+  {
+   "channel_id": "UC6ZFN9Tx6xh-skXCuRHCDpQ",
+   "name": "PBS NewsHour",
+   "kind": "public broadcaster",
+   "url": "https://www.youtube.com/channel/UC6ZFN9Tx6xh-skXCuRHCDpQ"
+  },
+  {
+   "channel_id": "UCSrZ3UV4jOidv8ppoVuvW9Q",
+   "name": "euronews",
+   "kind": "broadcaster",
+   "url": "https://www.youtube.com/channel/UCSrZ3UV4jOidv8ppoVuvW9Q"
+  },
+  {
+   "channel_id": "UCeXH8GZyV3sVqAr45AvupOA",
+   "name": "USGS",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCeXH8GZyV3sVqAr45AvupOA"
+  },
+  {
+   "channel_id": "UCe9IxQeBttZIYl5c43ycf9g",
+   "name": "NOAA",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCe9IxQeBttZIYl5c43ycf9g"
+  },
+  {
+   "channel_id": "UCv0qlvvLtEuCxAoEitAuoFg",
+   "name": "National Hurricane Center",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCv0qlvvLtEuCxAoEitAuoFg"
+  },
+  {
+   "channel_id": "UCLA_DiR1FfKNvjuUpBHmylQ",
+   "name": "NASA",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCLA_DiR1FfKNvjuUpBHmylQ"
+  },
+  {
+   "channel_id": "UCxyq9roe-npgzrVwbpoAy0A",
+   "name": "CISA",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCxyq9roe-npgzrVwbpoAy0A"
+  },
+  {
+   "channel_id": "UC07-dOwgza1IguKA86jqxNA",
+   "name": "WHO",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UC07-dOwgza1IguKA86jqxNA"
+  },
+  {
+   "channel_id": "UCiMg06DjcUk5FRiM3g5sqoQ",
+   "name": "CDC",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCiMg06DjcUk5FRiM3g5sqoQ"
+  },
+  {
+   "channel_id": "UCVrYey5SZMid_VZk9D8tYmA",
+   "name": "FEMA",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCVrYey5SZMid_VZk9D8tYmA"
+  },
+  {
+   "channel_id": "UCbuA65064_5-v7HXXGk-Bvw",
+   "name": "UN News",
+   "kind": "agency",
+   "url": "https://www.youtube.com/channel/UCbuA65064_5-v7HXXGk-Bvw"
+  },
+  {
+   "channel_id": "UCr5jq6MC_VCe1c5ciIZtk_w",
+   "name": "Center for Strategic & International Studies",
+   "kind": "analysis",
+   "url": "https://www.youtube.com/channel/UCr5jq6MC_VCe1c5ciIZtk_w"
+  },
+  {
+   "channel_id": "UCj015l-Gu66iB80-X_sr9tw",
+   "name": "International Crisis Group",
+   "kind": "analysis",
+   "url": "https://www.youtube.com/channel/UCj015l-Gu66iB80-X_sr9tw"
+  },
+  {
+   "channel_id": "UCkPv5___jXTEGQ6VE0a1gdA",
+   "name": "RUSI",
+   "kind": "analysis",
+   "url": "https://www.youtube.com/channel/UCkPv5___jXTEGQ6VE0a1gdA"
+  },
+  {
+   "channel_id": "UCC3ehuUksTyQ7bbjGntmx3Q",
+   "name": "Perun",
+   "kind": "OSINT / analysis",
+   "url": "https://www.youtube.com/channel/UCC3ehuUksTyQ7bbjGntmx3Q"
+  },
+  {
+   "channel_id": "UCwnKziETDbHJtx78nIkfYug",
+   "name": "CaspianReport",
+   "kind": "OSINT / analysis",
+   "url": "https://www.youtube.com/channel/UCwnKziETDbHJtx78nIkfYug"
+  },
+  {
+   "channel_id": "UCJHAT3Uvv-g3I8H3GhHWV7w",
+   "name": "Ryan Hall, Y'all",
+   "kind": "weather",
+   "url": "https://www.youtube.com/channel/UCJHAT3Uvv-g3I8H3GhHWV7w"
+  },
+  {
+   "channel_id": "UC_hHNZrFDHzKWLM5VexuQdw",
+   "name": "SpaceWeatherNews",
+   "kind": "space weather",
+   "url": "https://www.youtube.com/channel/UC_hHNZrFDHzKWLM5VexuQdw"
+  }
+ ]
+}

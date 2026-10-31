@@ -1,0 +1,34 @@
+/* Games tab (games.py). Chrome uses the shared palette in theme.css; the 8-bit look stays inside the canvases. */
+#tab-games .gm-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 12px}
+#tab-games #gm_q{flex:1 1 280px;max-width:420px;padding:7px 10px;background:var(--pn2);border:1px solid var(--bd2);border-radius:8px;color:var(--tx);font-size:14px}
+#tab-games #gm_q:focus{outline:none;border-color:var(--ac)}
+#tab-games .gm-chips{display:flex;flex-wrap:wrap;gap:6px}
+#tab-games .gm-chip{padding:4px 11px;border-radius:999px;border:1px solid var(--bd2);background:transparent;color:var(--mu);font-size:12.5px;cursor:pointer}
+#tab-games .gm-chip.on{background:var(--ac);border-color:var(--ac);color:#000;font-weight:600}
+#tab-games .gm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+#tab-games .gm-card{display:flex;flex-direction:column;gap:5px;text-align:left;background:var(--pn2);border:1px solid var(--bd);border-radius:var(--radius);padding:8px;color:var(--tx);cursor:pointer;font:inherit}
+#tab-games .gm-card:hover,#tab-games .gm-card:focus-visible{border-color:var(--ac);outline:none;box-shadow:var(--shadow)}
+#tab-games .gm-th{background:#000;border-radius:6px;overflow:hidden;aspect-ratio:8/7;display:flex;align-items:center;justify-content:center;border:1px solid var(--bd2)}
+#tab-games .gm-th canvas{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;image-rendering:crisp-edges;display:block}
+#tab-games .gm-ci{display:flex;justify-content:space-between;align-items:baseline;gap:6px;flex-wrap:wrap}
+#tab-games .gm-ci b{font-size:14.5px}
+#tab-games .gm-cats i{font-style:normal;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--mu);border:1px solid var(--bd2);border-radius:4px;padding:0 4px;margin-left:3px}
+#tab-games .gm-insp{font-size:11.5px;color:var(--ac)}
+#tab-games .gm-d{font-size:12px;color:#c9d0d9;line-height:1.35}
+#tab-games .gm-hi{font-size:11px;color:var(--mu);margin-top:auto}
+#tab-games .gm-pbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 10px}
+#tab-games .gm-pbar button{padding:5px 10px;border-radius:8px;border:1px solid var(--bd2);background:var(--pn2);color:var(--tx);cursor:pointer;font-size:13px}
+#tab-games .gm-pbar button:hover{border-color:var(--ac)}
+#tab-games .gm-pbar button:disabled{opacity:.45;cursor:default}
+#tab-games .gm-ptitle{font-size:16px}
+#tab-games .gm-pinsp{font-size:12px;color:var(--mu)}
+#tab-games .gm-sp{flex:1}
+#tab-games .gm-score,#tab-games .gm-best{font-variant-numeric:tabular-nums;font-size:13px;padding:3px 8px;border-radius:6px;background:#0f1317;border:1px solid var(--bd)}
+#tab-games .gm-best{color:var(--mu)}
+#tab-games .gm-stage{display:flex;justify-content:center;align-items:center;background:#000;border:1px solid var(--bd2);border-radius:var(--radius);padding:4px;outline:none;min-height:260px}
+#tab-games .gm-stage:focus{border-color:var(--ac)}
+#tab-games .gm-cv{image-rendering:pixelated;image-rendering:crisp-edges;display:block;cursor:pointer;touch-action:none}
+#tab-games .gm-ctl{margin-top:8px;font-size:13px;color:#c9d0d9}
+#tab-games .gm-desc{margin-top:4px}
+.tabs button[data-tab="games"]{white-space:nowrap}
+#tab-games [hidden]{display:none!important}

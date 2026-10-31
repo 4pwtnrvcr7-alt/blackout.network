@@ -1,0 +1,27 @@
+/* Trends tab (trends.py). Uses the shared palette in theme.css and the dashboard's existing Chart.js. */
+#tab-trends .tr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:2px 0 10px}
+#tab-trends .tr-seg{display:inline-flex;border:1px solid var(--bd2);border-radius:8px;overflow:hidden}
+#tab-trends .tr-seg button{border:0;border-radius:0;padding:5px 11px;background:transparent;color:var(--mu);font-size:12.5px}
+#tab-trends .tr-seg button.on{background:var(--ac);color:#000;font-weight:600}
+#tab-trends .tr-lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}
+#tab-trends .tr-cov{font-size:12.5px;color:#c9d0d9;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--md);border-radius:6px;padding:6px 10px;margin:0 0 10px}
+#tab-trends .tr-cov.full{border-left-color:var(--lo)}
+#tab-trends .tr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin:0 0 12px}
+#tab-trends .tr-kpi{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+#tab-trends .tr-kpi b{display:block;font-size:22px;line-height:1.1;color:var(--tx)}
+#tab-trends .tr-kpi span{font-size:11.5px;color:var(--mu)}
+#tab-trends .tr-kpi.hi b{color:var(--hi)}
+#tab-trends .tr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media(max-width:1000px){#tab-trends .tr-grid{grid-template-columns:1fr}}
+#tab-trends .tr-card{background:var(--pn2);border:1px solid var(--bd);border-radius:var(--radius);padding:12px 14px;min-width:0}
+#tab-trends .tr-card.wide{grid-column:1/-1}
+#tab-trends .tr-card h3{font-size:13px;margin:0 0 4px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;font-weight:600;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#tab-trends .tr-card h3 .tr-seg{margin-left:auto;text-transform:none;letter-spacing:0}
+#tab-trends .tr-sub{font-size:12px;color:var(--mu);margin:0 0 8px}
+#tab-trends .tr-cv{position:relative;height:270px}
+#tab-trends .tr-tot{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:12px;color:#c9d0d9}
+#tab-trends .tr-tot i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#tab-trends .tr-tot b{color:var(--tx)}
+#tab-trends .tr-err{color:var(--hi);font-size:13px}
+#tab-trends label.sw{font-size:12.5px;color:var(--mu)}
+@media(max-width:600px){#tab-trends .tr-cv{height:230px}#tab-trends .tr-kpi b{font-size:18px}#tab-trends .tr-card{padding:10px}#tab-trends .tr-card h3 .tr-seg{margin-left:0}}

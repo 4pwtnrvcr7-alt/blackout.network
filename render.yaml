@@ -1,0 +1,17 @@
+# Render Blueprint for blackout.network (free plan, Docker runtime).
+services:
+  - type: web
+    name: blackout-network
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: BN_SYNC_SECRET      # set in the Render dashboard (never commit it)
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"

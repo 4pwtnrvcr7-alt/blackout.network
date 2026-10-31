@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80" role="img" aria-label="Army Publishing Directorate emblem">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(79,55%,32%)"/><stop offset="1" stop-color="hsl(117,60%,14%)"/></linearGradient>
+<clipPath id="c"><rect x="3" y="3" width="74" height="74" rx="16"/></clipPath></defs>
+<rect x="3" y="3" width="74" height="74" rx="16" fill="url(#g)"/>
+<g clip-path="url(#c)" opacity=".16" transform="rotate(0 40 40)"><path d="M-4 10 10 1 24 10 38 1 52 10 66 1 80 10 94 1" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/><path d="M-4 24 10 15 24 24 38 15 52 24 66 15 80 24 94 15" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/><path d="M-4 38 10 29 24 38 38 29 52 38 66 29 80 38 94 29" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/><path d="M-4 52 10 43 24 52 38 43 52 52 66 43 80 52 94 43" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/><path d="M-4 66 10 57 24 66 38 57 52 66 66 57 80 66 94 57" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/><path d="M-4 80 10 71 24 80 38 71 52 80 66 71 80 80 94 71" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/><path d="M-4 94 10 85 24 94 38 85 52 94 66 85 80 94 94 85" fill="none" stroke="hsl(79,80%,80%)" stroke-width="3"/></g>
+<rect x="3" y="3" width="74" height="74" rx="16" fill="none" stroke="#58a6ff" stroke-width="3"/>
+<g transform="translate(8 8) scale(.85)" fill="none" stroke="hsl(79,90%,85%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4ZM20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6Z"/></g>
+<text x="40" y="60" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-weight="800" font-size="30" fill="#fff" letter-spacing=".5">AP</text>
+<circle cx="64" cy="16" r="9" fill="#0b0d10" stroke="#58a6ff" stroke-width="2"/><text x="64" y="20" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="11" fill="#58a6ff">10</text>
+</svg>

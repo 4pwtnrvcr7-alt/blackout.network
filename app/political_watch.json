@@ -1,0 +1,858 @@
+{
+ "purpose": "Read-only monitoring of public statements and inter-party exchanges by senior US officials, people close to President Trump, congressional leaders of both parties and party organizations, ahead of the Nov 3, 2026 midterms. Nothing is ever posted, replied to, liked or commented from this list.",
+ "verified": "Each handle was looked up on X (read-only user lookup) on 2026-10-31 and resolved to the named person or office. verified_type is X's label at lookup time. Several officials changed jobs in 2026 (e.g. Leavitt left as press secretary, Noem left DHS, Mullin now leads DHS); re-check roles monthly.",
+ "framing": "Neutral. Inclusion is about public role, not endorsement. Party is the person's own affiliation.",
+ "updated": "2026-10-31",
+ "accounts": [
+  {
+   "handle": "realDonaldTrump",
+   "name": "Donald J. Trump",
+   "role": "President of the United States (personal account)",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/realDonaldTrump",
+   "verified_type": "government",
+   "followers_at_lookup": 111875193
+  },
+  {
+   "handle": "POTUS",
+   "name": "President Donald J. Trump",
+   "role": "President of the United States (official account)",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/POTUS",
+   "verified_type": "government",
+   "followers_at_lookup": 4271205
+  },
+  {
+   "handle": "WhiteHouse",
+   "name": "The White House",
+   "role": "Official White House account",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/WhiteHouse",
+   "verified_type": "government",
+   "followers_at_lookup": 5338131
+  },
+  {
+   "handle": "PressSec",
+   "name": "White House Press Office",
+   "role": "Official White House Press Office account",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/PressSec",
+   "verified_type": "government",
+   "followers_at_lookup": 1945717
+  },
+  {
+   "handle": "VP",
+   "name": "Vice President JD Vance",
+   "role": "Vice President (official account)",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/VP",
+   "verified_type": "government",
+   "followers_at_lookup": 1318479
+  },
+  {
+   "handle": "JDVance",
+   "name": "JD Vance",
+   "role": "Vice President (personal account)",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/JDVance",
+   "verified_type": "government",
+   "followers_at_lookup": 5544089
+  },
+  {
+   "handle": "StephenM",
+   "name": "Stephen Miller",
+   "role": "White House Deputy Chief of Staff for Policy and Homeland Security Adviser",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/StephenM",
+   "verified_type": "blue",
+   "followers_at_lookup": 1758644
+  },
+  {
+   "handle": "StevenCheung47",
+   "name": "Steven Cheung",
+   "role": "White House Director of Communications",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/StevenCheung47",
+   "verified_type": "government",
+   "followers_at_lookup": 194993
+  },
+  {
+   "handle": "Scavino47",
+   "name": "Dan Scavino",
+   "role": "White House Deputy Chief of Staff (official account)",
+   "party": "Republican",
+   "group": "White House",
+   "url": "https://x.com/Scavino47",
+   "verified_type": "government",
+   "followers_at_lookup": 401772
+  },
+  {
+   "handle": "SecRubio",
+   "name": "Secretary Marco Rubio",
+   "role": "Secretary of State (official account)",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecRubio",
+   "verified_type": "government",
+   "followers_at_lookup": 2172258
+  },
+  {
+   "handle": "SecScottBessent",
+   "name": "Scott Bessent",
+   "role": "Secretary of the Treasury",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecScottBessent",
+   "verified_type": "government",
+   "followers_at_lookup": 1003819
+  },
+  {
+   "handle": "SecWar",
+   "name": "Pete Hegseth",
+   "role": "Secretary of War / Defense (official account)",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecWar",
+   "verified_type": "government",
+   "followers_at_lookup": 1797074
+  },
+  {
+   "handle": "PeteHegseth",
+   "name": "Pete Hegseth",
+   "role": "Secretary of War / Defense (personal account)",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/PeteHegseth",
+   "verified_type": "government",
+   "followers_at_lookup": 2006239
+  },
+  {
+   "handle": "AGPamBondi",
+   "name": "Pam Bondi",
+   "role": "Attorney General",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/AGPamBondi",
+   "verified_type": "government",
+   "followers_at_lookup": 1137034
+  },
+  {
+   "handle": "SecMullinDHS",
+   "name": "Markwayne Mullin",
+   "role": "Secretary of Homeland Security",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecMullinDHS",
+   "verified_type": "government",
+   "followers_at_lookup": 185333
+  },
+  {
+   "handle": "FBIDirectorKash",
+   "name": "Kash Patel",
+   "role": "FBI Director",
+   "party": "Republican",
+   "group": "Cabinet-level / agency head",
+   "url": "https://x.com/FBIDirectorKash",
+   "verified_type": "government",
+   "followers_at_lookup": 2021559
+  },
+  {
+   "handle": "CIADirector",
+   "name": "John Ratcliffe",
+   "role": "CIA Director",
+   "party": "Republican",
+   "group": "Cabinet-level / agency head",
+   "url": "https://x.com/CIADirector",
+   "verified_type": "government",
+   "followers_at_lookup": 699809
+  },
+  {
+   "handle": "ODNIgov",
+   "name": "Office of the DNI",
+   "role": "Office of the Director of National Intelligence",
+   "party": "Nonpartisan office",
+   "group": "Agency",
+   "url": "https://x.com/ODNIgov",
+   "verified_type": "government",
+   "followers_at_lookup": 370599
+  },
+  {
+   "handle": "SecKennedy",
+   "name": "Robert F. Kennedy Jr.",
+   "role": "Secretary of Health and Human Services",
+   "party": "Independent (serving in Republican administration)",
+   "group": "Cabinet",
+   "url": "https://x.com/SecKennedy",
+   "verified_type": "government",
+   "followers_at_lookup": 1226475
+  },
+  {
+   "handle": "howardlutnick",
+   "name": "Howard Lutnick",
+   "role": "Secretary of Commerce",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/howardlutnick",
+   "verified_type": "government",
+   "followers_at_lookup": 341435
+  },
+  {
+   "handle": "SecretaryWright",
+   "name": "Chris Wright",
+   "role": "Secretary of Energy",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecretaryWright",
+   "verified_type": "government",
+   "followers_at_lookup": 127917
+  },
+  {
+   "handle": "SecretaryBurgum",
+   "name": "Doug Burgum",
+   "role": "Secretary of the Interior",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecretaryBurgum",
+   "verified_type": "government",
+   "followers_at_lookup": 137995
+  },
+  {
+   "handle": "SecRollins",
+   "name": "Brooke Rollins",
+   "role": "Secretary of Agriculture",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecRollins",
+   "verified_type": "government",
+   "followers_at_lookup": 212509
+  },
+  {
+   "handle": "SecDuffy",
+   "name": "Sean Duffy",
+   "role": "Secretary of Transportation",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecDuffy",
+   "verified_type": "government",
+   "followers_at_lookup": 455953
+  },
+  {
+   "handle": "EDSecMcMahon",
+   "name": "Linda McMahon",
+   "role": "Secretary of Education",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/EDSecMcMahon",
+   "verified_type": "government",
+   "followers_at_lookup": 136270
+  },
+  {
+   "handle": "SecVetAffairs",
+   "name": "Doug Collins",
+   "role": "Secretary of Veterans Affairs",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecVetAffairs",
+   "verified_type": "government",
+   "followers_at_lookup": 149477
+  },
+  {
+   "handle": "SecretaryTurner",
+   "name": "Scott Turner",
+   "role": "Secretary of Housing and Urban Development",
+   "party": "Republican",
+   "group": "Cabinet",
+   "url": "https://x.com/SecretaryTurner",
+   "verified_type": "government",
+   "followers_at_lookup": 155556
+  },
+  {
+   "handle": "epaleezeldin",
+   "name": "Lee Zeldin",
+   "role": "EPA Administrator",
+   "party": "Republican",
+   "group": "Cabinet-level / agency head",
+   "url": "https://x.com/epaleezeldin",
+   "verified_type": "government",
+   "followers_at_lookup": 299282
+  },
+  {
+   "handle": "russvought",
+   "name": "Russ Vought",
+   "role": "OMB Director",
+   "party": "Republican",
+   "group": "Cabinet-level / agency head",
+   "url": "https://x.com/russvought",
+   "verified_type": "blue",
+   "followers_at_lookup": 191211
+  },
+  {
+   "handle": "USTradeRep",
+   "name": "Office of the USTR",
+   "role": "US Trade Representative (office account)",
+   "party": "Executive branch",
+   "group": "Agency",
+   "url": "https://x.com/USTradeRep",
+   "verified_type": "government",
+   "followers_at_lookup": 119617
+  },
+  {
+   "handle": "SteveWitkoff",
+   "name": "Steve Witkoff",
+   "role": "Special Envoy to the Middle East",
+   "party": "Republican",
+   "group": "Envoy",
+   "url": "https://x.com/SteveWitkoff",
+   "verified_type": "none",
+   "followers_at_lookup": 144639
+  },
+  {
+   "handle": "StateDept",
+   "name": "Department of State",
+   "role": "Official department account",
+   "party": "Executive branch",
+   "group": "Agency",
+   "url": "https://x.com/StateDept",
+   "verified_type": "government",
+   "followers_at_lookup": 6784039
+  },
+  {
+   "handle": "DeptofWar",
+   "name": "Department of War",
+   "role": "Official department account",
+   "party": "Executive branch",
+   "group": "Agency",
+   "url": "https://x.com/DeptofWar",
+   "verified_type": "government",
+   "followers_at_lookup": 7554369
+  },
+  {
+   "handle": "DHSgov",
+   "name": "Department of Homeland Security",
+   "role": "Official department account",
+   "party": "Executive branch",
+   "group": "Agency",
+   "url": "https://x.com/DHSgov",
+   "verified_type": "government",
+   "followers_at_lookup": 3018170
+  },
+  {
+   "handle": "TheJusticeDept",
+   "name": "Department of Justice",
+   "role": "Official department account",
+   "party": "Executive branch",
+   "group": "Agency",
+   "url": "https://x.com/TheJusticeDept",
+   "verified_type": "government",
+   "followers_at_lookup": 2401149
+  },
+  {
+   "handle": "USDOL",
+   "name": "Department of Labor",
+   "role": "Official department account",
+   "party": "Executive branch",
+   "group": "Agency",
+   "url": "https://x.com/USDOL",
+   "verified_type": "government",
+   "followers_at_lookup": 661405
+  },
+  {
+   "handle": "DonaldJTrumpJr",
+   "name": "Donald Trump Jr.",
+   "role": "President's son; prominent campaign surrogate",
+   "party": "Republican",
+   "group": "Family / close associates",
+   "url": "https://x.com/DonaldJTrumpJr",
+   "verified_type": "blue",
+   "followers_at_lookup": 16163389
+  },
+  {
+   "handle": "EricTrump",
+   "name": "Eric Trump",
+   "role": "President's son; Trump Organization EVP",
+   "party": "Republican",
+   "group": "Family / close associates",
+   "url": "https://x.com/EricTrump",
+   "verified_type": "blue",
+   "followers_at_lookup": 6011774
+  },
+  {
+   "handle": "LaraLeaTrump",
+   "name": "Lara Trump",
+   "role": "Former RNC co-chair; family member",
+   "party": "Republican",
+   "group": "Family / close associates",
+   "url": "https://x.com/LaraLeaTrump",
+   "verified_type": "blue",
+   "followers_at_lookup": 2193315
+  },
+  {
+   "handle": "elonmusk",
+   "name": "Elon Musk",
+   "role": "Former senior adviser (DOGE); owner of X",
+   "party": "Unaffiliated",
+   "group": "Family / close associates",
+   "url": "https://x.com/elonmusk",
+   "verified_type": "blue",
+   "followers_at_lookup": 241504130
+  },
+  {
+   "handle": "ChrisLaCivita",
+   "name": "Chris LaCivita",
+   "role": "Trump 2024 co-campaign manager; GOP strategist",
+   "party": "Republican",
+   "group": "Campaign figures",
+   "url": "https://x.com/ChrisLaCivita",
+   "verified_type": "blue",
+   "followers_at_lookup": 76255
+  },
+  {
+   "handle": "karolineleavitt",
+   "name": "Karoline Leavitt",
+   "role": "Former White House Press Secretary",
+   "party": "Republican",
+   "group": "Campaign figures",
+   "url": "https://x.com/karolineleavitt",
+   "verified_type": "blue",
+   "followers_at_lookup": 978751
+  },
+  {
+   "handle": "ByronDonalds",
+   "name": "Byron Donalds",
+   "role": "US Representative (FL-19); Trump-endorsed FL governor candidate",
+   "party": "Republican",
+   "group": "Campaign figures",
+   "url": "https://x.com/ByronDonalds",
+   "verified_type": "blue",
+   "followers_at_lookup": 1176315
+  },
+  {
+   "handle": "SpeakerJohnson",
+   "name": "Mike Johnson",
+   "role": "Speaker of the House",
+   "party": "Republican",
+   "group": "Congress leadership",
+   "url": "https://x.com/SpeakerJohnson",
+   "verified_type": "government",
+   "followers_at_lookup": 1246562
+  },
+  {
+   "handle": "SteveScalise",
+   "name": "Steve Scalise",
+   "role": "House Majority Leader",
+   "party": "Republican",
+   "group": "Congress leadership",
+   "url": "https://x.com/SteveScalise",
+   "verified_type": "government",
+   "followers_at_lookup": 701142
+  },
+  {
+   "handle": "GOPMajorityWhip",
+   "name": "Tom Emmer",
+   "role": "House Majority Whip",
+   "party": "Republican",
+   "group": "Congress leadership",
+   "url": "https://x.com/GOPMajorityWhip",
+   "verified_type": "government",
+   "followers_at_lookup": 135399
+  },
+  {
+   "handle": "RepJeffries",
+   "name": "Hakeem Jeffries",
+   "role": "House Democratic Leader",
+   "party": "Democrat",
+   "group": "Congress leadership",
+   "url": "https://x.com/RepJeffries",
+   "verified_type": "government",
+   "followers_at_lookup": 1047313
+  },
+  {
+   "handle": "WhipKClark",
+   "name": "Katherine Clark",
+   "role": "House Democratic Whip",
+   "party": "Democrat",
+   "group": "Congress leadership",
+   "url": "https://x.com/WhipKClark",
+   "verified_type": "government",
+   "followers_at_lookup": 150885
+  },
+  {
+   "handle": "LeaderJohnThune",
+   "name": "John Thune",
+   "role": "Senate Majority Leader",
+   "party": "Republican",
+   "group": "Congress leadership",
+   "url": "https://x.com/LeaderJohnThune",
+   "verified_type": "government",
+   "followers_at_lookup": 370657
+  },
+  {
+   "handle": "SenJohnBarrasso",
+   "name": "John Barrasso",
+   "role": "Senate Majority Whip",
+   "party": "Republican",
+   "group": "Congress leadership",
+   "url": "https://x.com/SenJohnBarrasso",
+   "verified_type": "government",
+   "followers_at_lookup": 179099
+  },
+  {
+   "handle": "SenTomCotton",
+   "name": "Tom Cotton",
+   "role": "Senate Republican Conference Chair",
+   "party": "Republican",
+   "group": "Congress leadership",
+   "url": "https://x.com/SenTomCotton",
+   "verified_type": "government",
+   "followers_at_lookup": 817424
+  },
+  {
+   "handle": "SenSchumer",
+   "name": "Chuck Schumer",
+   "role": "Senate Democratic Leader",
+   "party": "Democrat",
+   "group": "Congress leadership",
+   "url": "https://x.com/SenSchumer",
+   "verified_type": "government",
+   "followers_at_lookup": 3681878
+  },
+  {
+   "handle": "SenatorDurbin",
+   "name": "Dick Durbin",
+   "role": "Senate Democratic Whip",
+   "party": "Democrat",
+   "group": "Congress leadership",
+   "url": "https://x.com/SenatorDurbin",
+   "verified_type": "government",
+   "followers_at_lookup": 682734
+  },
+  {
+   "handle": "Jim_Jordan",
+   "name": "Jim Jordan",
+   "role": "Chair, House Judiciary Committee",
+   "party": "Republican",
+   "group": "Congress",
+   "url": "https://x.com/Jim_Jordan",
+   "verified_type": "government",
+   "followers_at_lookup": 6828914
+  },
+  {
+   "handle": "RepRaskin",
+   "name": "Jamie Raskin",
+   "role": "Ranking Member, House Judiciary Committee",
+   "party": "Democrat",
+   "group": "Congress",
+   "url": "https://x.com/RepRaskin",
+   "verified_type": "government",
+   "followers_at_lookup": 946029
+  },
+  {
+   "handle": "RepJamesComer",
+   "name": "James Comer",
+   "role": "Chair, House Oversight Committee",
+   "party": "Republican",
+   "group": "Congress",
+   "url": "https://x.com/RepJamesComer",
+   "verified_type": "government",
+   "followers_at_lookup": 280187
+  },
+  {
+   "handle": "SenTedCruz",
+   "name": "Ted Cruz",
+   "role": "US Senator (TX)",
+   "party": "Republican",
+   "group": "Congress",
+   "url": "https://x.com/SenTedCruz",
+   "verified_type": "government",
+   "followers_at_lookup": 4164814
+  },
+  {
+   "handle": "RandPaul",
+   "name": "Rand Paul",
+   "role": "US Senator (KY)",
+   "party": "Republican",
+   "group": "Congress",
+   "url": "https://x.com/RandPaul",
+   "verified_type": "government",
+   "followers_at_lookup": 5953647
+  },
+  {
+   "handle": "SenRickScott",
+   "name": "Rick Scott",
+   "role": "US Senator (FL)",
+   "party": "Republican",
+   "group": "Congress",
+   "url": "https://x.com/SenRickScott",
+   "verified_type": "government",
+   "followers_at_lookup": 739166
+  },
+  {
+   "handle": "SenJohnKennedy",
+   "name": "John Kennedy",
+   "role": "US Senator (LA)",
+   "party": "Republican",
+   "group": "Congress",
+   "url": "https://x.com/SenJohnKennedy",
+   "verified_type": "government",
+   "followers_at_lookup": 1746282
+  },
+  {
+   "handle": "SenSanders",
+   "name": "Bernie Sanders",
+   "role": "US Senator (VT); caucuses with Democrats",
+   "party": "Independent",
+   "group": "Congress",
+   "url": "https://x.com/SenSanders",
+   "verified_type": "government",
+   "followers_at_lookup": 11550003
+  },
+  {
+   "handle": "SenWarren",
+   "name": "Elizabeth Warren",
+   "role": "US Senator (MA)",
+   "party": "Democrat",
+   "group": "Congress",
+   "url": "https://x.com/SenWarren",
+   "verified_type": "government",
+   "followers_at_lookup": 6756480
+  },
+  {
+   "handle": "ChrisMurphyCT",
+   "name": "Chris Murphy",
+   "role": "US Senator (CT)",
+   "party": "Democrat",
+   "group": "Congress",
+   "url": "https://x.com/ChrisMurphyCT",
+   "verified_type": "government",
+   "followers_at_lookup": 1118697
+  },
+  {
+   "handle": "AOC",
+   "name": "Alexandria Ocasio-Cortez",
+   "role": "US Representative (NY-14)",
+   "party": "Democrat",
+   "group": "Congress",
+   "url": "https://x.com/AOC",
+   "verified_type": "government",
+   "followers_at_lookup": 12654400
+  },
+  {
+   "handle": "SpeakerPelosi",
+   "name": "Nancy Pelosi",
+   "role": "US Representative (CA-11); former Speaker",
+   "party": "Democrat",
+   "group": "Congress",
+   "url": "https://x.com/SpeakerPelosi",
+   "verified_type": "government",
+   "followers_at_lookup": 8179365
+  },
+  {
+   "handle": "RepMaxwellFrost",
+   "name": "Maxwell Frost",
+   "role": "US Representative (FL-10, Orlando)",
+   "party": "Democrat",
+   "group": "Congress",
+   "url": "https://x.com/RepMaxwellFrost",
+   "verified_type": "government",
+   "followers_at_lookup": 68462
+  },
+  {
+   "handle": "HouseGOP",
+   "name": "House Republicans",
+   "role": "House Republican Conference",
+   "party": "Republican",
+   "group": "Party organizations",
+   "url": "https://x.com/HouseGOP",
+   "verified_type": "government",
+   "followers_at_lookup": 1774190
+  },
+  {
+   "handle": "HouseDemocrats",
+   "name": "House Democrats",
+   "role": "House Democratic Caucus",
+   "party": "Democrat",
+   "group": "Party organizations",
+   "url": "https://x.com/HouseDemocrats",
+   "verified_type": "government",
+   "followers_at_lookup": 1236971
+  },
+  {
+   "handle": "SenateGOP",
+   "name": "Senate Republicans",
+   "role": "Senate Republican Conference",
+   "party": "Republican",
+   "group": "Party organizations",
+   "url": "https://x.com/SenateGOP",
+   "verified_type": "government",
+   "followers_at_lookup": 1677563
+  },
+  {
+   "handle": "SenateDems",
+   "name": "Senate Democrats",
+   "role": "Senate Democratic Caucus",
+   "party": "Democrat",
+   "group": "Party organizations",
+   "url": "https://x.com/SenateDems",
+   "verified_type": "government",
+   "followers_at_lookup": 1203860
+  },
+  {
+   "handle": "GOP",
+   "name": "GOP / RNC",
+   "role": "Republican National Committee (official account; @RNC points here)",
+   "party": "Republican",
+   "group": "Party organizations",
+   "url": "https://x.com/GOP",
+   "verified_type": "blue",
+   "followers_at_lookup": 4954
+  },
+  {
+   "handle": "JoeGruters",
+   "name": "Joe Gruters",
+   "role": "RNC Chairman",
+   "party": "Republican",
+   "group": "Party organizations",
+   "url": "https://x.com/JoeGruters",
+   "verified_type": "blue",
+   "followers_at_lookup": 29192
+  },
+  {
+   "handle": "TheDemocrats",
+   "name": "Democrats / DNC",
+   "role": "Democratic National Committee",
+   "party": "Democrat",
+   "group": "Party organizations",
+   "url": "https://x.com/TheDemocrats",
+   "verified_type": "blue",
+   "followers_at_lookup": 2420282
+  },
+  {
+   "handle": "kenmartin73",
+   "name": "Ken Martin",
+   "role": "DNC Chair",
+   "party": "Democrat",
+   "group": "Party organizations",
+   "url": "https://x.com/kenmartin73",
+   "verified_type": "blue",
+   "followers_at_lookup": 68873
+  },
+  {
+   "handle": "NRSC",
+   "name": "NRSC",
+   "role": "National Republican Senatorial Committee",
+   "party": "Republican",
+   "group": "Party organizations",
+   "url": "https://x.com/NRSC",
+   "verified_type": "government",
+   "followers_at_lookup": 175212
+  },
+  {
+   "handle": "NRCC",
+   "name": "NRCC",
+   "role": "National Republican Congressional Committee",
+   "party": "Republican",
+   "group": "Party organizations",
+   "url": "https://x.com/NRCC",
+   "verified_type": "blue",
+   "followers_at_lookup": 109805
+  },
+  {
+   "handle": "dscc",
+   "name": "DSCC",
+   "role": "Democratic Senatorial Campaign Committee",
+   "party": "Democrat",
+   "group": "Party organizations",
+   "url": "https://x.com/dscc",
+   "verified_type": "blue",
+   "followers_at_lookup": 132687
+  },
+  {
+   "handle": "dccc",
+   "name": "DCCC",
+   "role": "Democratic Congressional Campaign Committee",
+   "party": "Democrat",
+   "group": "Party organizations",
+   "url": "https://x.com/dccc",
+   "verified_type": "blue",
+   "followers_at_lookup": 214927
+  },
+  {
+   "handle": "GovRonDeSantis",
+   "name": "Ron DeSantis",
+   "role": "Governor of Florida",
+   "party": "Republican",
+   "group": "Governors",
+   "url": "https://x.com/GovRonDeSantis",
+   "verified_type": "government",
+   "followers_at_lookup": 5998716
+  },
+  {
+   "handle": "GavinNewsom",
+   "name": "Gavin Newsom",
+   "role": "Governor of California",
+   "party": "Democrat",
+   "group": "Governors",
+   "url": "https://x.com/GavinNewsom",
+   "verified_type": "blue",
+   "followers_at_lookup": 3151893
+  },
+  {
+   "handle": "GovPritzker",
+   "name": "JB Pritzker",
+   "role": "Governor of Illinois",
+   "party": "Democrat",
+   "group": "Governors",
+   "url": "https://x.com/GovPritzker",
+   "verified_type": "government",
+   "followers_at_lookup": 371827
+  },
+  {
+   "handle": "GovernorShapiro",
+   "name": "Josh Shapiro",
+   "role": "Governor of Pennsylvania",
+   "party": "Democrat",
+   "group": "Governors",
+   "url": "https://x.com/GovernorShapiro",
+   "verified_type": "government",
+   "followers_at_lookup": 368534
+  },
+  {
+   "handle": "GovKathyHochul",
+   "name": "Kathy Hochul",
+   "role": "Governor of New York",
+   "party": "Democrat",
+   "group": "Governors",
+   "url": "https://x.com/GovKathyHochul",
+   "verified_type": "government",
+   "followers_at_lookup": 641698
+  },
+  {
+   "handle": "KamalaHarris",
+   "name": "Kamala Harris",
+   "role": "Former Vice President",
+   "party": "Democrat",
+   "group": "Former officials",
+   "url": "https://x.com/KamalaHarris",
+   "verified_type": "blue",
+   "followers_at_lookup": 20951803
+  },
+  {
+   "handle": "BarackObama",
+   "name": "Barack Obama",
+   "role": "Former President",
+   "party": "Democrat",
+   "group": "Former officials",
+   "url": "https://x.com/BarackObama",
+   "verified_type": "blue",
+   "followers_at_lookup": 118811733
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "base_url": "https://blackout.network",
+ "from_name": "blackout.network",
+ "from_email": "newsletter@blackout.network",
+ "reply_to": "",
+ "mailing_address": "",
+ "slots": {
+  "morning": "07:00",
+  "evening": "19:00"
+ },
+ "global_frequency": "per_subscriber",
+ "paused": false,
+ "catchup_hours": 2,
+ "dedupe_hours": 12,
+ "max_window_hours": 24,
+ "main_min_rank": null,
+ "main_min_sources": null,
+ "notable_min_rank": 5,
+ "min_main_items": 3,
+ "max_main_items": 10,
+ "max_notable_items": 3,
+ "max_watchlist": 5,
+ "confirm_ttl_hours": 48,
+ "link_ttl_days": 400,
+ "rate_limit": {
+  "ip_per_hour": 5,
+  "email_per_day": 3
+ },
+ "mx_check": false,
+ "live_sending_approved": false,
+ "outbox_retention_days": 30,
+ "retry_backoff_minutes": [
+  2,
+  10,
+  30
+ ],
+ "editorial_ttl_hours": 24
+}

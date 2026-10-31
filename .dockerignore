@@ -1,0 +1,10 @@
+.git
+**/__pycache__
+**/*.pyc
+**/*.db-wal
+**/*.db-shm
+**/*.env
+**/ADMIN_PASSCODE*
+**/notify_settings.json
+**/render_sync.env
+*.md

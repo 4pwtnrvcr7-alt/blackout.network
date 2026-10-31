@@ -1,0 +1,32 @@
+# live data and databases (arrive via sync, never committed)
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+page_data.json
+archive/
+snapshots/
+app/logs/*
+!app/logs/.keep
+render_mirror/
+newsletter_outbox/
+video_subs/
+# secrets
+*.env
+.env*
+*secret*
+*credential*
+*.pem
+*.key
+ADMIN_PASSCODE*
+notify_settings.json*
+push.env*
+render_sync.env*
+private_*
+# build/runtime junk
+__pycache__/
+*.pyc
+*_backup*
+*.bak*

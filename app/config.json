@@ -1,0 +1,11 @@
+{
+ "interval_minutes": 60,
+ "push_min_rank": 7,
+ "push_min_sources": 2,
+ "brief_name": "blackout.network Daily Brief",
+ "jet_spike_k": 2.0,
+ "jet_spike_alerts_enabled": true,
+ "jet_sample_minutes": 5,
+ "scope": "global",
+ "local_boost": 0
+}

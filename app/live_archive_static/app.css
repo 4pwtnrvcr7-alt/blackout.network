@@ -1,0 +1,8 @@
+/* Live Archive panels (live_archive.py) */
+.la-box{margin-top:14px;grid-column:1/-1}.la-box summary{cursor:pointer;font-size:14px}
+.la-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0;font-size:13px}
+.la-bar input[type=search]{flex:1;min-width:160px;background:#0f1317;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:5px 8px}
+.la-bar input[type=date]{background:#0f1317;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:3px 6px;color-scheme:dark}
+.la-tab{width:100%;border-collapse:collapse;font-size:12.5px}.la-tab th{text-align:left;color:var(--mu);font-weight:500;border-bottom:1px solid var(--bd);padding:4px 6px}
+.la-tab td{border-bottom:1px solid #1a2029;padding:5px 6px;vertical-align:top}.la-tab a{color:var(--ac);text-decoration:none}.la-now{color:#52c41a}
+.la-list{max-height:480px;overflow:auto}

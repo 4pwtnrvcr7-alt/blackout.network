@@ -1,0 +1,89 @@
+{
+ "about": "Who's behind each data source shown on the Politics tab. Plain facts only, each with a citation and an 'as of' date. Items marked 'reported' come from news reports and were not confirmed by the company or a filing. Edit this file to update; the tab reloads it on every view.",
+ "updated": "2026-10-31",
+ "orgs": [
+  {"id": "polymarket", "name": "Polymarket", "kind": "Prediction market (data source on this tab)", "always": true, "as_of": "2026-10-31",
+   "match": ["(?i)\\bpolymarket\\b"],
+   "summary": "Private company founded in 2020 by Shayne Coplan; investors include Intercontinental Exchange (NYSE's parent), 1789 Capital and Founders Fund; U.S. exchange arm is CFTC-designated.",
+   "sections": [
+    {"h": "Legal entity", "facts": [
+     {"t": "Blockratize, Inc., a Delaware corporation headquartered in New York, owns and operates polymarket.com and does business as \"Polymarket\" (per a 2022 CFTC order).", "s": "confirmed", "cite": [{"title": "CFTC order, In re Blockratize, Inc. (Jan 3, 2022)", "url": "https://www.cftc.gov/media/6891/enfblockratizeorder010322/download", "date": "2022-01-03"}]},
+     {"t": "QCX LLC operates under the assumed name \"Polymarket US\" and is listed by the CFTC as a Designated Contract Market (designated July 9, 2025).", "s": "confirmed", "cite": [{"title": "CFTC DCM filing 49571: QCX LLC d/b/a Polymarket US", "url": "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/49571", "date": "2025-07-09"}]}]},
+    {"h": "Ownership structure", "facts": [
+     {"t": "Privately held, venture- and strategically-funded company; founded by Shayne Coplan in 2020, who is Founder and CEO.", "s": "confirmed", "cite": [{"title": "ICE press release (Oct 7, 2025)", "url": "https://ir.theice.com/press/news-details/2025/ICE-Announces-Strategic-Investment-in-Polymarket/", "date": "2025-10-07"}, {"title": "Polymarket press release on QCEX (Jul 21, 2025)", "url": "https://www.prnewswire.com/news-releases/polymarket-acquires-cftc-licensed-exchange-and-clearinghouse-qcex-for-112-million-302509626.html", "date": "2025-07-21"}]},
+     {"t": "Acquired the holding company of QCX, LLC (exchange) and QC Clearing LLC (clearinghouse), together \"QCEX\", for $112 million.", "s": "confirmed", "cite": [{"title": "Polymarket press release (Jul 21, 2025)", "url": "https://www.prnewswire.com/news-releases/polymarket-acquires-cftc-licensed-exchange-and-clearinghouse-qcex-for-112-million-302509626.html", "date": "2025-07-21"}]}]},
+    {"h": "Major investors and funding rounds", "facts": [
+     {"t": "May 2024: $45M Series B led by Founders Fund, with 1confirmation, ParaFi, Vitalik Buterin and Dragonfly; a prior $25M Series A was led by General Catalyst ($70M total announced).", "s": "confirmed", "cite": [{"title": "Business Wire (May 13, 2024)", "url": "https://www.businesswire.com/news/home/20240513090515/en/Polymarket-Raises-%2470m-From-Thiels-Founders-Fund-General-Catalyst-Vitalik-Buterin-to-Scale-Global-Prediction-Market", "date": "2024-05-13"}]},
+     {"t": "Aug 2025: strategic investment from 1789 Capital; Donald Trump Jr. joined Polymarket's advisory board. Amount not disclosed by the company.", "s": "confirmed", "cite": [{"title": "Polymarket press release (Aug 26, 2025)", "url": "https://www.prnewswire.com/news-releases/polymarket-receives-strategic-investment-from-1789-capital-and-welcomes-donald-trump-jr-to-advisory-board-302538997.html", "date": "2025-08-26"}, {"title": "Reuters (Aug 26, 2025)", "url": "https://www.reuters.com/business/polymarket-secures-investment-trump-jr-backed-1789-capital-2025-08-26/", "date": "2025-08-26"}]},
+     {"t": "Oct 2025: Intercontinental Exchange (ICE) agreed to invest up to $2 billion at about an $8 billion pre-investment valuation; ICE also became a distributor of Polymarket data.", "s": "confirmed", "cite": [{"title": "ICE press release (Oct 7, 2025)", "url": "https://ir.theice.com/press/news-details/2025/ICE-Announces-Strategic-Investment-in-Polymarket/", "date": "2025-10-07"}]},
+     {"t": "Mar 2026: ICE completed a further $600 million direct cash investment and expected to buy up to $40 million of securities from existing holders, completing its obligations ($1 billion initial investment in Oct 2025).", "s": "confirmed", "cite": [{"title": "ICE press release (Mar 27, 2026)", "url": "https://ir.theice.com/press/news-details/2026/Intercontinental-Exchange-Announces-New-600-Million-Investment-in-Polymarket/default.aspx", "date": "2026-03-27"}]},
+     {"t": "Aug 2026: $1 billion round led by 1789 Capital (about $300 million) at a $21 billion post-money valuation; other participants not identified.", "s": "reported", "cite": [{"title": "Bloomberg (Aug 31, 2026)", "url": "https://www.bloomberg.com/news/articles/2026-08-31/polymarket-funding-round-led-by-1789-values-firm-at-21-billion", "date": "2026-08-31"}, {"title": "The New York Times (Aug 31, 2026)", "url": "https://www.nytimes.com/2026/08/31/business/polymarket-funding-trump.html", "date": "2026-08-31"}]},
+     {"t": "An earlier 2026 round included new investment from D.E. Shaw & Co.", "s": "reported", "cite": [{"title": "Bloomberg (Aug 4, 2026)", "url": "https://www.bloomberg.com/news/articles/2026-08-04/polymarket-seeks-more-than-20-billion-valuation-in-funding-round", "date": "2026-08-04"}]}]},
+    {"h": "Funding model", "facts": [
+     {"t": "Users buy and sell outcome shares; trades on the international platform are matched peer-to-peer through smart contracts. Revenue comes from the exchange business; ICE distributes Polymarket data to institutional clients.", "s": "confirmed", "cite": [{"title": "ICE press release (Oct 7, 2025)", "url": "https://ir.theice.com/press/news-details/2025/ICE-Announces-Strategic-Investment-in-Polymarket/", "date": "2025-10-07"}]}]},
+    {"h": "Regulators and licenses", "facts": [
+     {"t": "Jan 2022: CFTC settled charges that Blockratize operated an unregistered event-market facility; $1.4 million civil penalty and wind-down of non-compliant markets.", "s": "confirmed", "cite": [{"title": "CFTC press release 8478-22", "url": "https://www.cftc.gov/PressRoom/PressReleases/8478-22", "date": "2022-01-03"}]},
+     {"t": "Nov 2025: CFTC amended Polymarket US's order of designation to permit intermediated trading through futures commission merchants.", "s": "confirmed", "cite": [{"title": "CFTC Amended Order of Designation (Nov 24, 2025)", "url": "https://www.cftc.gov/media/12806/Polymarket%20US%20Amended%20Order%20of%20Designation/download", "date": "2025-11-24"}]}]},
+    {"h": "Notable affiliations", "facts": [
+     {"t": "Described by ICE as the Official Prediction Market Partner of X and of Stocktwits.", "s": "confirmed", "cite": [{"title": "ICE press release (Oct 7, 2025)", "url": "https://ir.theice.com/press/news-details/2025/ICE-Announces-Strategic-Investment-in-Polymarket/", "date": "2025-10-07"}]},
+     {"t": "Donald Trump Jr. is a partner at 1789 Capital and an adviser to Polymarket.", "s": "confirmed", "cite": [{"title": "Polymarket press release (Aug 26, 2025)", "url": "https://www.prnewswire.com/news-releases/polymarket-receives-strategic-investment-from-1789-capital-and-welcomes-donald-trump-jr-to-advisory-board-302538997.html", "date": "2025-08-26"}, {"title": "Forbes (Sep 1, 2026)", "url": "https://www.forbes.com/sites/siladityaray/2026/09/01/trump-jrs-venture-fund-will-invest-300-million-in-polymarkets-latest-funding-round/", "date": "2026-09-01"}]}]}
+   ]},
+  {"id": "kalshi", "name": "Kalshi", "kind": "Prediction market (data source on this tab)", "always": true, "as_of": "2026-10-31",
+   "match": ["(?i)\\bkalshi\\b"],
+   "summary": "Private company founded in 2018 by Tarek Mansour and Luana Lopes Lara; KalshiEX LLC is a CFTC-designated contract market; investors include Sequoia, Paradigm, Coatue, Wellington and Andreessen Horowitz.",
+   "sections": [
+    {"h": "Legal entity", "facts": [
+     {"t": "KalshiEX LLC, designated by the CFTC as a contract market in November 2020.", "s": "confirmed", "cite": [{"title": "CFTC press release 8302-20", "url": "https://www.cftc.gov/PressRoom/PressReleases/8302-20", "date": "2020-11-04"}, {"title": "CFTC Order of Designation, KalshiEX LLC", "url": "https://www.cftc.gov/filings/documents/2020/orgkexkalshidesignation201103.pdf", "date": "2020-11-03"}]},
+     {"t": "Kalshi Klear LLC, an affiliate, is registered with the CFTC as a derivatives clearing organization (Aug 2024).", "s": "confirmed", "cite": [{"title": "CFTC press release 8957-24", "url": "https://www.cftc.gov/PressRoom/PressReleases/8957-24", "date": "2024-08-28"}]}]},
+    {"h": "Ownership structure", "facts": [
+     {"t": "Privately held, venture-funded; co-founded in 2018 by Tarek Mansour (CEO) and Luana Lopes Lara; a Y Combinator company.", "s": "confirmed", "cite": [{"title": "Kalshi Series A announcement (Feb 2021)", "url": "https://news.kalshi.com/p/kalshi-raises-30-million-in-series-a-funding-led-by-sequoia", "date": "2021-02-17"}, {"title": "Y Combinator company page", "url": "https://www.ycombinator.com/companies/kalshi", "date": "2026-10-31"}]}]},
+    {"h": "Major investors and funding rounds", "facts": [
+     {"t": "Feb 2021: $30M Series A led by Sequoia.", "s": "confirmed", "cite": [{"title": "Business Wire (Feb 17, 2021)", "url": "https://www.businesswire.com/news/home/20210217005285/en/Kalshi-Raises-%2430-Million-in-Series-A-Funding-Led-by-Sequoia", "date": "2021-02-17"}]},
+     {"t": "Dec 2025: $1B Series E at an $11B valuation led by Paradigm, with Sequoia, Andreessen Horowitz, Meritech, IVP, ARK Invest, Anthos, CapitalG and Y Combinator.", "s": "confirmed", "cite": [{"title": "Kalshi News (Dec 2, 2025)", "url": "https://news.kalshi.com/p/kalshi-11-billion-valuation-series-e", "date": "2025-12-02"}, {"title": "Crunchbase News", "url": "https://news.crunchbase.com/fintech/kalshi-raises-funding-predictions-market-paradigm/", "date": "2025-12-02"}]},
+     {"t": "May 2026: $1B Series F at a $22B valuation led by Coatue, with Sequoia, Andreessen Horowitz, IVP, Paradigm, Morgan Stanley and ARK Invest.", "s": "confirmed", "cite": [{"title": "Kalshi News (May 7, 2026)", "url": "https://news.kalshi.com/p/kalshi-raises-1-billion-22-billion-valuation-institutional-demand-surges", "date": "2026-05-07"}]},
+     {"t": "Oct 2026: $1B Series G at a $40B post-money valuation co-led by Wellington and Sequoia, with Baillie Gifford, Stripes, Andreessen Horowitz, Coatue, Layer Global, Morgan Stanley Investment Management, Sequoia Global Equities, CapitalG, Hudson River Trading and Balyasny.", "s": "confirmed", "cite": [{"title": "Kalshi News (Oct 29, 2026)", "url": "https://news.kalshi.com/p/kalshi-series-g-40-billion-valuation", "date": "2026-10-29"}]},
+     {"t": "CNBC has a commercial relationship with Kalshi that includes customer acquisition and a minority investment, per CNBC's own disclosure.", "s": "reported", "cite": [{"title": "RG.org summary of CNBC report (Oct 30, 2026)", "url": "https://rg.org/news/prediction-markets/kalshi-series-g-1-billion-40-billion-valuation-wellington-sequoia", "date": "2026-10-30"}]}]},
+    {"h": "Funding model", "facts": [
+     {"t": "Exchange revenue from trading fees; Kalshi's series data lists a fee type per series (e.g. 'quadratic').", "s": "confirmed", "cite": [{"title": "Kalshi public API, /series (fee_type field)", "url": "https://api.elections.kalshi.com/trade-api/v2/series?category=Elections", "date": "2026-10-31"}]}]},
+    {"h": "Regulators and licenses", "facts": [
+     {"t": "Regulated by the CFTC as a designated contract market (KalshiEX LLC) with an affiliated registered clearinghouse (Kalshi Klear LLC).", "s": "confirmed", "cite": [{"title": "CFTC DCM filing 42993", "url": "https://www.cftc.gov/IndustryOversight/IndustryFilings/TradingOrganizations/42993", "date": "2026-10-31"}]},
+     {"t": "May 2025: the CFTC moved to drop its appeal in KalshiEX LLC v. CFTC, the case over Kalshi's election-outcome contracts.", "s": "confirmed", "cite": [{"title": "Reuters (May 5, 2025)", "url": "https://www.reuters.com/markets/commodities/cftc-moves-drop-appeal-kalshis-event-contracts-case-2025-05-05/", "date": "2025-05-05"}, {"title": "CourtListener docket 24-5205", "url": "https://www.courtlistener.com/docket/69156289/kalshiex-llc-v-cftc/", "date": "2025-05-07"}]}]},
+    {"h": "Notable affiliations", "facts": [
+     {"t": "Named Donald Trump Jr. a strategic adviser in January 2025.", "s": "confirmed", "cite": [{"title": "CNBC (Jan 13, 2025)", "url": "https://www.cnbc.com/2025/01/13/kalshi-names-donald-trump-jr-as-strategic-advisor-to-prediction-market-firm.html", "date": "2025-01-13"}, {"title": "Axios (Jan 13, 2025)", "url": "https://www.axios.com/2025/01/13/donald-trump-jr-kalshi", "date": "2025-01-13"}]}]}
+   ]},
+  {"id": "ap", "name": "The Associated Press", "kind": "Resolution source named in market rules (not a pollster)", "always": false, "as_of": "2026-10-31",
+   "match": ["\\bAssociated Press\\b", "\\bAP\\b (?:call|calls|declares|race call)"],
+   "summary": "Independent not-for-profit news cooperative; many election markets on this tab name its race calls as the resolution source.",
+   "sections": [
+    {"h": "Legal entity and ownership", "facts": [
+     {"t": "Independent, not-for-profit news cooperative, historically owned by its member newspapers and broadcasters; no outside shareholders.", "s": "confirmed", "cite": [{"title": "AP: Our Purpose", "url": "https://apnews.com/purpose/", "date": "2026-10-31"}, {"title": "AP FAQ (archived)", "url": "https://web.archive.org/web/20141209162324/ap.org/company/FAQs", "date": "2014-12-09"}]}]},
+    {"h": "Funding model", "facts": [
+     {"t": "Content licensing to news organizations was about 82% of 2023 revenue; other income includes services, software, broadcast facilities, advertising, data/AI licensing, reader donations and philanthropy.", "s": "reported", "cite": [{"title": "Press Gazette", "url": "https://pressgazette.co.uk/publishers/wires_and_agencies/advertising-philanthropy-and-ai-how-the-ap-is-diversifying-its-revenue-streams/", "date": "2024-06-01"}]},
+     {"t": "Created the AP Fund for Journalism, a separate 501(c)(3) nonprofit, to raise philanthropic support for local and state news.", "s": "confirmed", "cite": [{"title": "AP Fund for Journalism", "url": "https://www.apfj.org/", "date": "2026-10-31"}, {"title": "AP News", "url": "https://apnews.com/article/reporters-local-ap-foundations-c2c3fced7b46e7f0a6e0ebe6773fde4a", "date": "2024-01-01"}]}]},
+    {"h": "Role on this tab", "facts": [
+     {"t": "Named as the resolution source in the rules of election markets shown here (e.g. Polymarket's state Senate and Governor winner markets); the AP is not a party to those markets.", "s": "confirmed", "cite": [{"title": "Example market rules: Polymarket Montana Senate Election Winner", "url": "https://polymarket.com/event/montana-senate-election-winner", "date": "2026-10-31"}]}]}
+   ]}
+ ],
+ "watch": [
+  {"id": "quinnipiac", "name": "Quinnipiac University Poll", "match": ["\\bQuinnipiac\\b"]},
+  {"id": "emerson", "name": "Emerson College Polling", "match": ["\\bEmerson College\\b", "\\bEmerson poll"]},
+  {"id": "yougov", "name": "YouGov", "match": ["\\bYouGov\\b"]},
+  {"id": "ipsos", "name": "Ipsos", "match": ["\\bIpsos\\b"]},
+  {"id": "marist", "name": "Marist Poll", "match": ["\\bMarist\\b"]},
+  {"id": "siena", "name": "Siena College / NYT", "match": ["\\bSiena\\b"]},
+  {"id": "rasmussen", "name": "Rasmussen Reports", "match": ["\\bRasmussen\\b"]},
+  {"id": "trafalgar", "name": "Trafalgar Group", "match": ["\\bTrafalgar Group\\b", "\\bTrafalgar poll"]},
+  {"id": "atlasintel", "name": "AtlasIntel", "match": ["\\bAtlas ?Intel\\b"]},
+  {"id": "morningconsult", "name": "Morning Consult", "match": ["\\bMorning Consult\\b"]},
+  {"id": "gallup", "name": "Gallup", "match": ["\\bGallup\\b"]},
+  {"id": "pew", "name": "Pew Research Center", "match": ["\\bPew Research\\b"]},
+  {"id": "monmouth", "name": "Monmouth University Poll", "match": ["\\bMonmouth (?:University|poll)"]},
+  {"id": "harrispoll", "name": "The Harris Poll / HarrisX", "match": ["\\bHarris Poll\\b", "\\bHarrisX\\b"]},
+  {"id": "rcp", "name": "RealClearPolitics / RealClearPolling", "match": ["\\bRealClear(?:Politics|Polling)\\b", "\\bRCP\\b"]},
+  {"id": "silverbulletin", "name": "Silver Bulletin", "match": ["\\bSilver Bulletin\\b"]},
+  {"id": "ddhq", "name": "Decision Desk HQ", "match": ["\\bDecision Desk\\b"]},
+  {"id": "selzer", "name": "Selzer & Co.", "match": ["\\bSelzer\\b"]},
+  {"id": "cygnal", "name": "Cygnal", "match": ["\\bCygnal\\b"]},
+  {"id": "dfp", "name": "Data for Progress", "match": ["\\bData for Progress\\b"]}
+ ]
+}

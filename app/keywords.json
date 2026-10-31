@@ -1,0 +1,83 @@
+{
+ "categories": [
+  {
+   "id": "violence",
+   "label": "Violence / attack",
+   "color": "#ff4d4f",
+   "words": [
+    "war",
+    "attack",
+    "strike",
+    "explosion",
+    "missile",
+    "shooting",
+    "bombing",
+    "invasion"
+   ]
+  },
+  {
+   "id": "disease",
+   "label": "Disease / outbreak",
+   "color": "#fa8c16",
+   "words": [
+    "outbreak",
+    "pandemic",
+    "quarantine",
+    "ebola",
+    "virus",
+    "epidemic"
+   ]
+  },
+  {
+   "id": "infrastructure",
+   "label": "Infrastructure / grid",
+   "color": "#fadb14",
+   "words": [
+    "grid",
+    "blackout",
+    "power outage",
+    "EMP",
+    "dam",
+    "pipeline"
+   ]
+  },
+  {
+   "id": "cyber",
+   "label": "Cyber",
+   "color": "#4aa3ff",
+   "words": [
+    "cyber",
+    "hack",
+    "ransomware",
+    "breach",
+    "malware"
+   ]
+  },
+  {
+   "id": "unrest",
+   "label": "Civil unrest",
+   "color": "#b37feb",
+   "words": [
+    "martial law",
+    "riot",
+    "coup",
+    "curfew",
+    "protest",
+    "unrest"
+   ]
+  },
+  {
+   "id": "nuclear",
+   "label": "Nuclear / other",
+   "color": "#36cfc9",
+   "words": [
+    "nuclear",
+    "radiation",
+    "evacuation",
+    "state of emergency",
+    "hurricane",
+    "tornado"
+   ]
+  }
+ ]
+}

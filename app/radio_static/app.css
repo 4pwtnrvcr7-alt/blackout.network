@@ -1,0 +1,32 @@
+/* Radio tab (radio.py). Shared palette from theme.css. */
+#tab-radio .rd-sum{font-size:13px;color:#c9d0d9;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--lo);border-radius:6px;padding:7px 10px;margin:2px 0 10px}
+#tab-radio .rd-h{font-size:15px;margin:16px 0 8px}
+#tab-radio .rd-grp{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);margin:10px 0 6px}
+#tab-radio .rd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px}
+#tab-radio .rd-card{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:5px}
+#tab-radio .rd-card.relay{border-left:3px solid var(--hi)}
+#tab-radio .rd-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+#tab-radio .rd-badge{font-size:10.5px;border:1px solid var(--bd2,#3a4250);border-radius:10px;padding:1px 7px;color:var(--mu);white-space:nowrap}
+#tab-radio .rd-st{font-size:12.5px}
+#tab-radio .rd-f{font-size:12.5px;color:var(--ac)}
+#tab-radio .rd-d{font-size:12.5px;color:#c9d0d9;line-height:1.4}
+#tab-radio .rd-l{font-size:12px;color:var(--mu)}
+#tab-radio .rd-l a,#tab-radio .rd-tab a,#tab-radio .rd-links a,#tab-radio .rd-attr a{color:var(--ac);text-decoration:none}
+#tab-radio audio{width:100%;height:36px}
+#tab-radio .rd-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px;vertical-align:middle;background:#8a93a6}
+#tab-radio .rd-dot.on{background:#52c41a;box-shadow:0 0 6px #52c41a}
+#tab-radio .rd-dot.off{background:#ff4d4f}
+#tab-radio .rd-rec{color:#ff4d4f;font-weight:600}
+#tab-radio .rd-tab{width:100%;border-collapse:collapse;font-size:12.5px;margin:4px 0}
+#tab-radio .rd-tab th{text-align:left;color:var(--mu);font-weight:500;border-bottom:1px solid var(--bd);padding:4px 6px}
+#tab-radio .rd-tab td{border-bottom:1px solid #1a2029;padding:5px 6px;vertical-align:top}
+#tab-radio .rd-det{margin:8px 0}#tab-radio .rd-det summary{cursor:pointer;color:var(--ac);font-size:13px}
+#tab-radio .rd-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:6px 18px;font-size:13px}
+#tab-radio .rd-links ul{margin:0;padding-left:18px}#tab-radio .rd-links li{margin:3px 0}
+#tab-radio .rd-arcbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;margin-bottom:6px}
+#tab-radio .rd-arcbar select{max-width:100%}
+#tab-radio .rd-arcplayer{margin:4px 0}
+#tab-radio .rd-attr{margin-top:14px;font-size:11.5px;line-height:1.5}
+@media(max-width:600px){#tab-radio .rd-tab{font-size:11.5px}#tab-radio .rd-grid{grid-template-columns:1fr}}
+#tab-radio .rd-card.mini{gap:4px;padding:8px 10px}#tab-radio .rd-card.mini b{font-size:13px}
+#tab-radio .rd-locnote{background:#0f1317;border:1px dashed var(--bd);border-radius:6px;padding:7px 10px;margin:0 0 6px}

@@ -1,0 +1,31 @@
+/* Video subtitles (English auto-translation) — uses theme.css palette only; neutral info styling, no alarm colors. */
+.vs-btn{font:600 10px/1 system-ui,sans-serif;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);background:var(--pn2,#181d23);color:var(--mu,#8b95a3);border-radius:6px;padding:3px 6px;margin-left:5px;cursor:pointer;vertical-align:1px}
+.vs-btn:hover,.vs-btn.on{color:var(--tx,#e6e9ee);border-color:var(--ac,#4aa3ff)}
+.vs-panel{margin:8px 0 4px;border:1px solid var(--bd,#252b33);border-radius:var(--radius,10px);background:var(--pn,#14181d);padding:10px;max-width:100%;box-sizing:border-box;overflow:hidden}
+.vs-player{position:relative;width:100%;max-width:640px;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+.vs-player iframe,.vs-player video{width:100%;height:100%;border:0;display:block;background:#000}
+.vs-capbar{max-width:640px;min-height:1.6em;margin-top:6px;padding:6px 10px;border-radius:6px;background:var(--bg,#0b0d10);color:var(--tx,#e6e9ee);font-size:14px;line-height:1.4}
+.vs-capbar:empty{display:none}
+.vs-capbar .o{display:block;color:var(--mu,#8b95a3);font-size:12px;margin-top:2px}
+.vs-label{font-size:12px;color:var(--mu,#8b95a3);margin:8px 0 6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.vs-label b{color:var(--tx,#e6e9ee);font-weight:600}
+.vs-tog{display:inline-flex;border:1px solid var(--bd2,#2f3742);border-radius:6px;overflow:hidden}
+.vs-tog button{background:transparent;border:0;color:var(--mu,#8b95a3);font-size:11px;padding:4px 9px;cursor:pointer}
+.vs-tog button.on{background:var(--pn2,#181d23);color:var(--tx,#e6e9ee);box-shadow:inset 0 -2px 0 var(--ac,#4aa3ff)}
+.vs-chip{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--mu,#8b95a3);border:1px solid var(--bd2,#2f3742);border-radius:12px;padding:3px 10px;margin-top:8px}
+.vs-chip:before{content:"";width:8px;height:8px;border-radius:50%;border:2px solid var(--ac,#4aa3ff);border-right-color:transparent;animation:vsspin 1s linear infinite}
+@keyframes vsspin{to{transform:rotate(360deg)}}
+.vs-tx{max-height:260px;overflow:auto;border-top:1px solid var(--bd,#252b33);margin-top:6px;padding-top:4px;font-size:13px;line-height:1.45}
+.vs-cue{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;padding:3px 4px;border-radius:4px;cursor:pointer}
+.vs-tx.both .vs-cue{grid-template-columns:52px minmax(0,1fr) minmax(0,1fr)}
+.vs-cue:hover{background:var(--pn2,#181d23)}.vs-cue.cur{background:var(--pn2,#181d23);box-shadow:inset 3px 0 0 var(--ac,#4aa3ff)}
+.vs-cue .t{color:var(--ac,#4aa3ff);font-variant-numeric:tabular-nums;font-size:11px;padding-top:2px}
+.vs-cue .o{color:var(--mu,#8b95a3)}
+.vs-notice{display:flex;gap:10px;align-items:flex-start;max-width:640px;margin-top:8px;padding:10px 12px;border:1px solid var(--bd2,#2f3742);border-left:3px solid var(--mu,#8b95a3);border-radius:8px;background:var(--pn2,#181d23);color:var(--tx,#e6e9ee);font-size:13px;line-height:1.45}
+.vs-notice .i{flex:0 0 auto;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--mu,#8b95a3);color:var(--mu,#8b95a3);font:700 11px/15px Georgia,serif;text-align:center;font-style:italic}
+.vs-notice .h{font-weight:600}.vs-notice .w{color:var(--mu,#8b95a3);margin:2px 0 4px}
+.vs-notice a{color:var(--ac,#4aa3ff)}
+.vs-notice.ok{border-left-color:var(--ac,#4aa3ff)}
+.vs-note{font-size:11px;color:var(--mu,#8b95a3);margin-top:6px}
+.vs-retry{font-size:11px;margin-left:8px;background:none;border:1px solid var(--bd2,#2f3742);color:var(--mu,#8b95a3);border-radius:5px;cursor:pointer;padding:2px 7px}
+@media(max-width:700px){.vs-tx.both .vs-cue{grid-template-columns:44px minmax(0,1fr)}.vs-tx.both .vs-cue .o{grid-column:2}}

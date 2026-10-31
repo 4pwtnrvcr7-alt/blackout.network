@@ -1,0 +1,18 @@
+/* ---- 👤 Elon Musk tab (elon.py) ---- */
+#tab-elon{align-content:start}
+#tab-elon .em-note{font-size:12px;color:var(--mu);margin:-2px 0 10px}#tab-elon .em-err{color:var(--md)}#tab-elon a{color:var(--ac)}
+#tab-elon .em-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:0 0 12px}
+#tab-elon .em-kpi{all:unset;box-sizing:border-box;display:block;background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:10px 12px;font-size:13px}
+#tab-elon .em-kpi b{font-size:20px}#tab-elon .em-tsla{cursor:pointer}#tab-elon .em-tsla:hover{border-color:var(--ac)}
+#tab-elon .em-sp{width:100%;height:28px;display:block;margin:4px 0}
+#tab-elon .em-ch{font-weight:600}#tab-elon .em-ch.up{color:#3fb950}#tab-elon .em-ch.dn{color:#f85149}
+#tab-elon .em-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}
+@media(max-width:1000px){#tab-elon .em-grid{grid-template-columns:1fr}}
+#tab-elon .em-col{background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:10px 12px;margin:0 0 12px;min-width:0}
+#tab-elon h3{font-size:14px;margin:0 0 8px}#tab-elon h3 .meta{font-weight:400}
+#tab-elon .em-ul{list-style:none;margin:0;padding:0;font-size:12.5px}#tab-elon .em-ul li{padding:5px 0;border-bottom:1px solid #1b2128}
+#tab-elon .em-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+#tab-elon .em-chip{all:unset;cursor:pointer;border:1px solid var(--bd);border-radius:14px;padding:2px 9px;background:#10151b;color:var(--mu);font-size:12px}
+#tab-elon .em-chip.on{background:#24303c;color:var(--tx);font-weight:600}#tab-elon .em-chip span{opacity:.7;margin-left:3px}
+#tab-elon .em-pill{font-size:11px;border:1px solid var(--bd);border-radius:8px;padding:0 7px;color:var(--mu)}#tab-elon .em-pill.air{color:#3fb950;border-color:#23552f}
+#tab-elon .em-src{font-size:11.5px;color:var(--mu)}
