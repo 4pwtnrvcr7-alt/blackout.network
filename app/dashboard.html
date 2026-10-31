@@ -170,7 +170,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 .ns-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--mu);margin:6px 0}.ns-leg span{display:inline-flex;align-items:center;gap:4px}.ns-leg i{width:10px;height:10px;border-radius:2px;display:inline-block}
 .ns-cor a{display:block;color:var(--tx);font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--bd);text-decoration:none}.ns-cor a:hover{color:#fff}
 </style>
-<link rel="stylesheet" href="theme.css"><link rel="icon" href="favicon.ico" sizes="any"></head><body>
+<link rel="stylesheet" href="theme.css"><link rel="icon" href="favicon.ico" sizes="any"><script>/* THREAD_ENABLED: single switch for The Thread tab, its #thread deep links and the red "follow the thread" pins/strings. Set to true to restore (2026-10-31: parked, hidden from the public site; code, routes and data unchanged). */window.THREAD_ENABLED=false;if(!window.THREAD_ENABLED)document.documentElement.classList.add("bn-no-thread")</script><style>.bn-no-thread .tabs button[data-tab="thread"],.bn-no-thread #tab-thread,.bn-no-thread .xt,.bn-no-thread .bn-thread-only{display:none!important}</style></head><body>
 <header><h1>BLACKOUT.<b>NETWORK</b> · Early-Warning Threat Monitor <span id="scope_badge" title="Scan scope: worldwide. Items are ranked by global relevance; no region gets extra weight." style="font-size:11px;font-weight:600;letter-spacing:.4px;border:1px solid var(--ac);color:var(--ac);border-radius:10px;padding:2px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap">🌐 Scope: Global</span><a id="howscore_link" href="scoring" title="How the 0–100 score and 0–10 rank are computed" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">ⓘ How we score</a><a id="nl_head_link" href="newsletter" title="Get the morning/evening brief by email (double opt-in, unsubscribe anytime)" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">✉ Newsletter</a><a id="sc_head_link" href="sources" title="Every source we use, with a 0–10 confidence rating" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">📚 Sources</a><span id="brand_tagline" style="display:block;font-size:12px;font-weight:400;letter-spacing:.2px;color:var(--mu);margin-top:4px">Know first. Be ready.</span></h1>
 <div class="ctl"><span id="status">loading…</span>
 <button class="pri" id="refresh">⟳ Manual refresh</button>
@@ -296,7 +296,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 </section></main>
 <main id="tab-ranked" data-addon="ranked" style="display:none;grid-template-columns:minmax(0,1fr)">
 <section class="pn"><h2>🗳 Ranked by Users — the crowd's threat level vs. the bot's <span class="meta" id="rk_meta"></span></h2>
- <div class="tick" id="rk_tick"><div class="tick-in" id="rk_tick_in"><span class="meta">No votes yet: rate any item 0–10 with the small slider under it on The Wire, Watchlist, Timeline, The Thread, Live Broadcasts or Live Streams.</span></div></div>
+ <div class="tick" id="rk_tick"><div class="tick-in" id="rk_tick_in"><span class="meta">No votes yet: rate any item 0–10 with the small slider under it on The Wire, Watchlist, Timeline, <span class="bn-thread-only">The Thread, </span>Live Broadcasts or Live Streams.</span></div></div>
  <div class="row" style="margin-top:8px"><label>Sort <select id="rk_sort"><option value="bayes">Weighted average (small-sample guard)</option><option value="avg">Raw average</option><option value="votes">Most votes</option></select></label>
  <label>Window <select id="rk_win"><option value="24h">24 hours</option><option value="7d" selected>7 days</option><option value="30d">30 days</option><option value="all">All time</option></select></label>
  <label>Min votes <select id="rk_min"><option>1</option><option>2</option><option>3</option><option>5</option><option>10</option></select></label></div>
@@ -684,7 +684,7 @@ setInterval(()=>{if($("tab-streams").style.display!="none")stLoad()},45000);
 // ---- Cross-page red threads: any item (data-cid = cluster id) that belongs to a multi-update or connected story on The Thread gets a red
 // push-pin with a red string running off the right edge of the page; clicking it opens #thread/<arc_id>. Map refreshed every 5 min (7-day window). ----
 const XT={map:{},arcs:{},t:0};
-async function xtLoad(){try{const j=await (await fetch("api/arcs?window=7d",{cache:"no-store"})).json();const m={},A={};
+async function xtLoad(){if(!window.THREAD_ENABLED)return;try{const j=await (await fetch("api/arcs?window=7d",{cache:"no-store"})).json();const m={},A={};
  j.arcs.forEach(a=>{if(a.n_updates<2&&!(a.connections||[]).length)return;A[a.id]=a;a.updates.forEach(u=>{if(u.cluster_id)m[u.cluster_id]=a.id})});XT.map=m;XT.arcs=A;xtApply(true)}catch(e){}}
 function xtPath(i,w){const sag=26+(i%4)*14,dy=-(i%3)*10;return redStringD(0,30,w,30+dy-8,sag,0)}
 function xtApply(all){const vw=document.documentElement.clientWidth;let i=0;
@@ -697,7 +697,7 @@ function xtApply(all){const vw=document.documentElement.clientWidth;let i=0;
 let xtMo=0;new MutationObserver(m=>{if(m.some(r=>[...r.addedNodes].some(n=>n.nodeType==1&&!(n.classList&&n.classList.contains("xt")))) ){clearTimeout(xtMo);xtMo=setTimeout(()=>xtApply(false),250)}}).observe(document.body,{childList:true,subtree:true});
 addEventListener("resize",()=>{clearTimeout(XT.t);XT.t=setTimeout(()=>xtApply(true),300)});
 document.querySelector(".tabs").addEventListener("click",()=>setTimeout(()=>xtApply(true),120));
-async function xtOpen(){const m=location.hash.match(/^#thread\/(arc_[\w-]+)/);if(!m)return;const id=m[1];
+async function xtOpen(){if(!window.THREAD_ENABLED)return;const m=location.hash.match(/^#thread\/(arc_[\w-]+)/);if(!m)return;const id=m[1];
  document.querySelector('.tabs button[data-tab="thread"]').click();
  const tryFocus=()=>ARCS&&ARCS.arcs.some(a=>a.id==id);
  if(!tryFocus()){$("arcs_window").value="7d";await arcsLoad()}
@@ -809,7 +809,7 @@ function hwAttach(h2,key,txt){if(!h2||h2.querySelector(".hw-i"))return;const id=
  const p=document.createElement("div");p.className="hw-p";p.id=id;p.hidden=true;p.dataset.key=key;
  b.onclick=e=>{e.stopPropagation();p.hidden=!p.hidden;b.setAttribute("aria-expanded",String(!p.hidden));if(!p.hidden)p.innerHTML=`<div class="hw-t"><b>How this works.</b> ${esc(txt())} <i>${esc(HW_TAIL)}</i></div>${HW_ICONS[key]||HW_ICONS[key.split("_")[0]]||""}`};
  h2.appendChild(b);h2.insertAdjacentElement("afterend",p)}
-function hwInit(){HW_NOTES.forEach(([key,mid,pre,txt])=>{const m=$(mid);if(!m)return;let h2;
+function hwInit(){HW_NOTES.forEach(([key,mid,pre,txt])=>{if(!window.THREAD_ENABLED&&mid=="tab-thread")return;const m=$(mid);if(!m)return;let h2;
  if(pre===null){h2=m.querySelector(":scope > .hw-head h2");if(!h2){const d=document.createElement("div");d.className="hw-head";d.innerHTML=`<h2>${key=="bush"?"🏕 Bushcraft — grid-down survival guide":"⛑ Medical — grid-down first aid"}</h2>`;m.prepend(d);h2=d.querySelector("h2")}}
  else h2=[...m.querySelectorAll("h2")].find(h=>h.textContent.trim().replace(/^[^A-Za-z]+/,"").startsWith(pre.replace(/^[^A-Za-z]+/,"")));
  hwAttach(h2,key,txt)})}
@@ -865,7 +865,7 @@ async function rkLoad(){try{const q=new URLSearchParams({sort:$("rk_sort").value
  $("rk_meta").textContent=`· ${j.items.length} rated item(s) · weighted average = (${j.prior_weight} × ${j.prior_mean} + sum of votes) ÷ (${j.prior_weight} + votes)`;
  const L=$("rk_list"),old={};L.querySelectorAll(".rk-row").forEach(r=>old[r.dataset.k]=r.getBoundingClientRect().top);
  const tl={cluster:"The Wire item",arc:"The Thread story",bcast:"Live Broadcasts clip",stream:"Live Streams segment"};
- L.innerHTML=j.items.map((x,i)=>{const d=x.diff;const bd=d==null?`<span class="rk-badge eq">no bot rank</span>`:d>=1?`<span class="rk-badge up">crowd +${d} vs bot</span>`:d<=-1?`<span class="rk-badge dn">crowd ${d} vs bot</span>`:`<span class="rk-badge eq">crowd ≈ bot</span>`;
+ L.innerHTML=j.items.filter(x=>window.THREAD_ENABLED||x.item_type!="arc").map((x,i)=>{const d=x.diff;const bd=d==null?`<span class="rk-badge eq">no bot rank</span>`:d>=1?`<span class="rk-badge up">crowd +${d} vs bot</span>`:d<=-1?`<span class="rk-badge dn">crowd ${d} vs bot</span>`:`<span class="rk-badge eq">crowd ≈ bot</span>`;
   return `<div class=rk-row data-k="${esc(x.item_type+"|"+x.item_id)}"><div class=rk-pos>${i+1}</div><div><b>${x.url?`<a href="${esc(safeUrl(x.url))}" target=_blank rel="noopener noreferrer" style="color:var(--tx)">${esc(x.title||x.item_id)}</a>`:esc(x.title||x.item_id)}</b><div class=meta>${tl[x.item_type]}${x.category?" · "+esc(x.category):""} · last vote ${esc(fmt(x.last))}</div></div>
   <div><span class=rk-big>${x.bayes}</span><div class=meta>weighted · raw ${x.avg}</div></div><div><b>${x.n}</b> vote${x.n==1?"":"s"}<div class=meta>bot: ${x.bot_rank!=null?`rank ${x.bot_rank}/10 · score ${x.bot_score}`:"n/a"}</div></div><div>${bd}</div></div>`}).join("")||"<div class=meta>No rated items in this window yet.</div>";
  L.querySelectorAll(".rk-row").forEach(r=>{const o=old[r.dataset.k];if(o==null){r.classList.add("new");setTimeout(()=>r.classList.remove("new"),900);return}const dy=o-r.getBoundingClientRect().top;if(dy){r.style.transition="none";r.style.transform=`translateY(${dy}px)`;requestAnimationFrame(()=>{r.style.transition="";r.style.transform=""})}})}catch(e){$("rk_meta").textContent="unavailable: "+e}}
@@ -909,7 +909,7 @@ setInterval(()=>{nsAlerts();if($("tab-net").style.display!="none")nsLoad()},3000
  nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b&&e.target!==b){e.stopImmediatePropagation();e.preventDefault();b.click()}},true);
  nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(!b)return;const h=TABHASH[b.dataset.tab];if(!h)return;
   if(b.dataset.tab=="thread"&&location.hash.startsWith("#thread/"))return;if(location.hash!="#"+h)history.replaceState(null,"","#"+h)});
- function go(){const h=location.hash.slice(1);if(h.startsWith("thread/"))return;const t=HASHTAB[h];if(t&&B(t)&&!B(t).classList.contains("on"))B(t).click()}
+ function go(){const h=location.hash.slice(1);if(!window.THREAD_ENABLED&&/^thread(\/|$)/.test(h)){history.replaceState(null,"","#wire");if(B("threat")&&!B("threat").classList.contains("on"))B("threat").click();return}if(h.startsWith("thread/"))return;const t=HASHTAB[h];if(t&&B(t)&&!B(t).classList.contains("on"))B(t).click()}
  addEventListener("hashchange",go);setTimeout(go,300)})();
 
 </script>
@@ -949,7 +949,7 @@ fdr();
 <link rel="stylesheet" href="api/radio/app.css"><script src="api/radio/app.js"></script>
 <script>/* shared location picker on Local Resources: no default place; the visitor picks */(function(){const f=()=>{if(!window.BNGeo)return setTimeout(f,300);BNGeo.picker(document.getElementById("rs_geo"));BNGeo.on(l=>{if(l&&typeof rsSearch=="function"&&document.getElementById("tab-res").style.display!="none")rsSearch(l.resources_q||l.label)})};f()})()</script>
 <link rel="stylesheet" href="api/live_archive/app.css"><script src="api/live_archive/app.js"></script>
-<link rel="stylesheet" href="api/spacex/app.css"><script src="api/spacex/app.js"></script><link rel="stylesheet" href="api/elon/app.css"><script src="api/elon/app.js"></script><link rel="stylesheet" href="api/finance/app.css"><script src="api/finance/app.js"></script>
+<link rel="stylesheet" href="api/spacex/app.css"><script src="api/spacex/app.js"></script><link rel="stylesheet" href="api/elon/app.css"><script src="api/elon/app.js"></script><link rel="stylesheet" href="api/finance/app.css"><script src="api/finance/app.js"></script><link rel="stylesheet" href="api/intel/app.css"><script src="api/intel/app.js"></script>
 <link rel="stylesheet" href="api/preppers/app.css"><script src="api/preppers/app.js"></script>
 <link rel="stylesheet" href="/api/report/app.css"><script src="/api/report/app.js"></script>
 </body></html>
