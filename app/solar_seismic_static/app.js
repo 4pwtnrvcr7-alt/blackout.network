@@ -304,7 +304,7 @@ function selBin(i){const b=SS.d.bins[i];if(!b)return;keepRoom();SS.sel=SS.sel===
  $("ss_binx").onclick=()=>selBin(i)}
 function renderMap(){if(!SS.shown||typeof L=="undefined"||!SS.d)return;
  if(!SS.map){SS.map=L.map("ss_map",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1}).setView([20,10],2);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:12,className:"ss-dark"}).addTo(SS.map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',subdomains:"abcd",maxZoom:12,className:"ss-dark"}).addTo(SS.map);
   SS.lay=L.layerGroup().addTo(SS.map);SS.map.on("click",()=>SS.map.scrollWheelZoom.enable());SS.map.on("mouseout",()=>SS.map.scrollWheelZoom.disable())}
  SS.lay.clearLayers();let Q=SS.d.map.slice();if(SS.hist)Q=SS.d.map_hist.map(q=>({...q,t_et:etF(q.t),old:1})).concat(Q);if(SS.m45)Q=Q.filter(q=>q.mag>=4.5);
  Q.sort((a,b)=>(a.storm-b.storm)||(a.mag-b.mag));

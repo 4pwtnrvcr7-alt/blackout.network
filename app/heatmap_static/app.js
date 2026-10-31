@@ -75,7 +75,7 @@ function catbar(c,n){return `<div class=hm-catbar>${GR.map(([g])=>c[g]?`<i style
 // ---------- map ----------
 function initMap(){if(H.map||typeof L=="undefined")return;
  H.map=L.map("hm_map",{worldCopyJump:true,minZoom:2,maxZoom:12,zoomSnap:.5,scrollWheelZoom:false,preferCanvas:false}).setView([24,12],2);
- L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · boundaries © Natural Earth · places © GeoNames',maxZoom:12,className:"hm-dark"}).addTo(H.map);
+ L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a> · boundaries © Natural Earth · places © GeoNames',subdomains:"abcd",maxZoom:12,className:"hm-dark"}).addTo(H.map);
  H.map.createPane("hmReg");H.map.getPane("hmReg").style.zIndex=350;H.map.createPane("hmHeat");H.map.getPane("hmHeat").style.zIndex=420;H.map.getPane("hmHeat").style.pointerEvents="none";
  H.rend0=L.canvas({pane:"hmReg",padding:.4});H.rend1=L.canvas({pane:"hmReg",padding:.4});
  H.map.on("click",()=>H.map.scrollWheelZoom.enable());H.map.on("mouseout",()=>H.map.scrollWheelZoom.disable());

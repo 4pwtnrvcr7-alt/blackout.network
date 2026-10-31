@@ -370,7 +370,7 @@ function render(){
  $("wcount").textContent=S.watchlist_count;$("watch").innerHTML=S.watchlist.map(card).join("")||"<div class=meta>Empty.</div>";
  $("sources").innerHTML="<table><tr><th>Source</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+S.sources.map(s=>`<tr><td><a href="${esc(safeUrl(s.url))}" target=_blank rel="noopener noreferrer">${esc(s.name)}</a>${s.error?`<div class=meta>${esc(s.error)}</div>`:""}</td><td class="${s.ok==1?"ok":s.ok==0?"bad":"dis"}">${s.ok==1?"OK":s.ok==0?"FAIL":"disabled"}</td><td>${s.items}</td><td>${fmt(s.last_checked)}</td></tr>`).join("")+"</table>";
  // map
- if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap contributors",maxZoom:10}).addTo(map);markers=L.layerGroup().addTo(map)}
+ if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',subdomains:"abcd",maxZoom:10}).addTo(map);markers=L.layerGroup().addTo(map)}
  heatDirty=true;if($("map").offsetWidth)drawHeat();
  markers.clearLayers();S.geo.filter(g=>g.score>=35).forEach(g=>L.circleMarker([g.lat,g.lon],{radius:4+g.score/12,color:COL[g.category],weight:1,fillOpacity:.6}).bindPopup(`<b>${g.score}</b> ${esc(g.title)}`).addTo(markers));
  // charts
@@ -615,7 +615,7 @@ function mpDraw(){if(!MP.cl||!MP.pois)return;MP.cl.clearLayers();const ms=[];
  MP.cl.addLayers(ms);$("mp_msg").textContent=`${ms.length.toLocaleString()} emergency points shown`}
 async function mpInit(){if(MP.map){setTimeout(()=>MP.map.invalidateSize(),60);return}
  MP.map=L.map("mp_map",{maxZoom:19,minZoom:2,zoomSnap:.5,worldCopyJump:true});{const g=window.BNGeo&&BNGeo.get();g&&g.lat!=null?MP.map.setView([g.lat,g.lon],11):MP.map.setView([20,0],2)}
- L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(MP.map);
+ L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(MP.map);
  L.control.scale({imperial:true,metric:true}).addTo(MP.map);
  MP.cl=L.markerClusterGroup?L.markerClusterGroup({disableClusteringAtZoom:16,maxClusterRadius:50,chunkedLoading:true}):L.layerGroup();MP.cl.addTo(MP.map);
  try{const j=await (await fetch("api/maps/pois")).json();MP.pois=j;MP.cats=j.cats;
