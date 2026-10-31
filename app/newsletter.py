@@ -48,7 +48,7 @@ SENDER_MODES = ("preview", "smtp", "resend", "brevo", "sendgrid")
 DEFAULTS = {
     "base_url": "https://blackout.network",
     "from_name": "blackout.network",
-    "from_email": "newsletter@blackout.network",
+    "from_email": "hello@blackout.network",
     "reply_to": "",
     "mailing_address": "",
     "slots": {"morning": "07:00", "evening": "19:00"},
