@@ -70,7 +70,16 @@ def save(img, path, meta):
     ex[0x0131] = "blackout.network snapshot worker"  # Software
     ex[0x0132] = meta["captured_dt"].strftime("%Y:%m:%d %H:%M:%S")  # DateTime (UTC)
     ex[0x8298] = "Screenshot of " + meta["url"][:900]  # Copyright field used for the source link
-    img.save(path, "JPEG", quality=82, optimize=True, progressive=True, exif=ex.tobytes(), xmp=xmp(meta))
+    kw = {"comment": img.info["bn_comment"]} if img.info.get("bn_comment") else {}
+    img.save(path, "JPEG", quality=82, optimize=True, progressive=True, exif=ex.tobytes(), xmp=xmp(meta), **kw)
+def brand(img):
+    """QR branding standard (brand_assets.py / BRANDING.md): footer band with a QR to the Wire, 'view more at' and 'blackout.network'.
+    Never blocks a snapshot: on any error the unbranded image is saved (re-brand later with brand_assets.py)."""
+    try:
+        import brand_assets as BA
+        out = BA.brand_pil(img, BA.PAGE["wire"]); out.info["bn_comment"] = (BA.MARK + BA.PAGE["wire"]).encode(); return out
+    except Exception:
+        traceback.print_exc(); return img
 def fmt_et(iso):
     try: return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(ET).strftime("%b %-d, %Y %-I:%M %p ET")
     except Exception: return "n/a"
@@ -116,7 +125,7 @@ def main():
                     meta["summary"] = (f"{meta['title']} | Rank {meta['rank']}/10, score {meta['score']}/100, {meta['category']} | Sources: {', '.join(meta['sources'])} | "
                                        f"Source URL: {url} | Page shown: {final} | Captured {meta['captured_et']} ({meta['captured_utc']}) | blackout.network snapshot")
                     fn = f"{r['cluster_id']}_{dt.strftime('%Y%m%dT%H%M%SZ')}.jpg"
-                    save(burn(png, meta), os.path.join(SNAP, fn), meta)
+                    save(brand(burn(png, meta)), os.path.join(SNAP, fn), meta)
                     c.execute("INSERT OR REPLACE INTO snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?)", (r["cluster_id"], "ok", fn, url, meta["captured_utc_iso"], att + 1, err, os.path.getsize(os.path.join(SNAP, fn)), r["title"], r["rank"], r["score"]))
                 else:
                     c.execute("INSERT OR REPLACE INTO snapshots(cluster_id,status,url,attempts,error,title,rank,score) VALUES(?,?,?,?,?,?,?,?)", (r["cluster_id"], "failed", url, att + 1, err, r["title"], r["rank"], r["score"]))
