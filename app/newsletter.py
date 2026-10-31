@@ -547,7 +547,7 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
              '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#14181d;border:1px solid #252b33;border-radius:10px;'
              'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><tr><td style="padding:20px">'
              '<div style="font-size:18px;font-weight:800;color:#e6e9ee">BLACKOUT.<span style="color:#ff4d4f">NETWORK</span></div>'
-             f'<div style="font-size:12px;color:#8b95a3;margin:4px 0 14px 0">{E(TAGLINE)}</div><h1 style="font-size:17px;color:#e6e9ee;margin:0 0 10px 0">{E(title)}</h1>'
+             '<div style="font-size:12px;color:#8b95a3;margin:4px 0 14px 0">Know first. Be ready.</div>' f'<h1 style="font-size:17px;color:#e6e9ee;margin:0 0 10px 0">{E(title)}</h1>'
              + body + btn + xl + foot + '</td></tr></table></td></tr></table></body></html>')
     text = "\n\n".join([f"BLACKOUT.NETWORK — {title}", *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
                        + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, f"{BRAND} · {addr or 'https://blackout.network'}"])
