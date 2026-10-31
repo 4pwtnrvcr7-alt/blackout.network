@@ -24,6 +24,22 @@ Until the first push arrives, the site shows a short "Syncing" page.
 - `PORT` is provided by the host.
 - The public node is read-only: scan controls, alert settings and admin functions are not available here.
 
+## Reporting a problem
+
+Every page has a **Report a problem** button (bottom left), and each alert card has a small flag that pre-fills the item.
+Before sending, the visitor sees exactly what will be sent: their category and description, the page address without any
+query string, the dashboard tab, time, browser user agent, window size, language, time zone, site build, the last scan time
+on screen and up to 10 recent script error messages. No cookies, form contents or IP addresses are stored (only a
+daily-rotating anonymous hash used for rate limiting).
+
+- `POST /api/report` stores the report in a small queue on this node; the scanner node collects it within about a minute
+  over the signed channel (`/api/reports/pull`, `/api/reports/ack`) and pushes back each report's public status
+  (`/api/reports/status`). The host's disk is ephemeral, so a report sent seconds before a restart can be lost.
+- `/report-status` (and `/report-status/<ID>`) shows one report by its unguessable reference ID: what was sent, queue
+  position, status, the published response and a timeline. There is no listing or search; lookups are rate-limited.
+- Review, triage and replies happen on the scanner node, not here. Public replies are published only after a second
+  person reviews them.
+
 ## Repository layout
 
 ```
@@ -31,4 +47,5 @@ Dockerfile        container build for the public node
 render.yaml       Render blueprint (free web service)
 requirements.txt  Python dependencies
 app/              web server, add-on modules, dashboard and static assets
+                  (reports.py + reports_static/: problem-report widget and status page; usage_stats.py: aggregate traffic counts)
 ```

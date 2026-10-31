@@ -47,4 +47,7 @@ ROUTES = {
     "/api/elon": "elon",
     "/api/finance": "finance",
     "/api/preppers": "preppers",
+    "/api/report": "reports",
+    "/api/reports": "reports",
+    "/report-status": "reports",
 }

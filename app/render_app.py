@@ -215,7 +215,8 @@ def _addon_mod(name):
     return m
 server._addon_mod = _addon_mod
 
-POST_ALLOW = ["/api/vote", "/api/newsletter", "/newsletter", "/api/translate", "/api/search", "/api/sources", "/sources"] + \
+POST_ALLOW = ["/api/vote", "/api/newsletter", "/newsletter", "/api/translate", "/api/search", "/api/sources", "/sources",
+              "/api/report", "/api/reports"] + \
              [x for x in os.environ.get("BN_PUBLIC_POST_ALLOW", "").split(",") if x]
 OWNED_WRITERS = ["/api/vote", "/api/newsletter", "/newsletter"]
 BOX_ONLY = {"/api/refresh": "Scans run on the blackout.network scanner node; this page updates automatically every few minutes.",
@@ -228,6 +229,11 @@ WARMING = b"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=re
 
 class RH(server.H):
     server_version = "Blackout/1.0"
+    def send_response(self, code, message=None):
+        try:   # privacy-safe aggregate traffic counters (usage_stats.py); pulled by the box over the signed reports sync
+            import usage_stats; usage_stats.record(self.path, code, self.command, self.ip(), self.headers.get("User-Agent", ""))
+        except Exception: pass
+        return super().send_response(code, message)
     def ip(self):
         return self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or self.client_address[0]
     def do_GET(self):

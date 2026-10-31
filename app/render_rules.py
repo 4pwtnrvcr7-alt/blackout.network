@@ -72,3 +72,12 @@ def sync_kind(rel):
     if "/" not in rel and rel.endswith(".py"): return "code"
     if any(fnmatch.fnmatch(rel, p) for p in CODE_GLOBS) and rel.count("/") <= 2: return "code"
     return None
+
+# ---------------------------------------------------------------- visitor problem reports (2026-10-31, reports.py)
+# Box-only parts (the report store with every visitor's captured context, the admin/agent view, CLI, sync, stats, impact reports,
+# usage log) are treated like secrets: never packaged, never pushed, never accepted by Render. The public node only runs reports.py,
+# usage_stats.py and reports_static/ from the scrubbed GitHub repo; its queue lives in BN_STATE_DIR, outside BASE.
+REPORTS_BOX_ONLY = ["reports.db*", "reports_admin*", "reports_box*", "reports_cli*", "reports_sync*", "reports_stats*", "reports_config*",
+                    "reports_impact", "reports_queue*", "report_queue*", "e2e_reports*", "usage_log*"]
+SECRET_PATTERNS += [p for p in REPORTS_BOX_ONLY if p not in SECRET_PATTERNS]
+if "NO_PUSH" in globals(): NO_PUSH |= {"reports.db"}

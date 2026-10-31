@@ -141,17 +141,27 @@ def addon_for(path):
         if path == pre or path.startswith(pre + "/"): return _addon_mod(name)
     return None
 
+# "Report a problem" widget (reports.py): added to every HTML page that doesn't already load it (dashboard.html loads it itself).
+_RW = b'<link rel="stylesheet" href="/api/report/app.css"><script src="/api/report/app.js" defer></script>'
+def report_widget(b):
+    try:
+        i = b.rfind(b"</body>")
+        if i < 0 or b"/api/report/app.js" in b or b"data-bn-noreport" in b or b"http-equiv=refresh" in b[:600]: return b
+        return b[:i] + _RW + b[i:]
+    except Exception: return b
+
 class H(BaseHTTPRequestHandler):
     server_version = "Blackout/1.0"
     def log_message(self, fmt, *a): pass
     def ip(self): return self.headers.get("CF-Connecting-IP") or self.client_address[0]
     def send(self, code, body, ctype="application/json"):
         b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
+        if ctype == "text/html": b = report_widget(b)
         self.send_response(code); self.send_header("Content-Type", ctype + "; charset=utf-8")
         self.send_header("Cache-Control", "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def body(self):
-        n = min(int(self.headers.get("Content-Length") or 0), 10000)
+        n = min(int(self.headers.get("Content-Length") or 0), 2_000_000 if self.path.startswith("/api/reports/") else 16000 if self.path.startswith("/api/report") else 10000)
         self._raw = self.rfile.read(n)   # kept for add-ons that accept form posts (newsletter: no-JS forms, RFC 8058 one-click unsubscribe)
         try: return json.loads(self._raw or b"{}")
         except Exception: return {}

@@ -1,5 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>blackout.network — Threat Monitor</title>
+<script>/* early error capture for "Report a problem" (messages only, max 10; see /api/report/app.js) */window.__bnErr=[];window.__bnErrHooked=1;(function(){function u(s){return String(s||"").split(/[?#]/)[0]}function c(s){return String(s||"").replace(/[A-Za-z0-9_\-]{32,}/g,"[redacted]").slice(0,300)}function p(o){__bnErr.push(o);if(__bnErr.length>10)__bnErr.shift()}addEventListener("error",function(e){var t=e.target;if(t&&t!==window&&t.tagName){p({kind:"resource",msg:"Failed to load "+t.tagName.toLowerCase(),src:u(t.src||t.href),t:new Date().toISOString()});return}p({kind:"error",msg:c(e.message),src:u(e.filename),line:e.lineno||null,t:new Date().toISOString()})},true);addEventListener("unhandledrejection",function(e){var r=e.reason;p({kind:"unhandledrejection",msg:c(r&&r.message?r.message:r),t:new Date().toISOString()})})})()</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
@@ -940,4 +941,5 @@ fdr();
 <link rel="stylesheet" href="api/live_archive/app.css"><script src="api/live_archive/app.js"></script>
 <link rel="stylesheet" href="api/spacex/app.css"><script src="api/spacex/app.js"></script><link rel="stylesheet" href="api/elon/app.css"><script src="api/elon/app.js"></script><link rel="stylesheet" href="api/finance/app.css"><script src="api/finance/app.js"></script>
 <link rel="stylesheet" href="api/preppers/app.css"><script src="api/preppers/app.js"></script>
+<link rel="stylesheet" href="/api/report/app.css"><script src="/api/report/app.js"></script>
 </body></html>
