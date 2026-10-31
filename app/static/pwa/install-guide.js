@@ -111,7 +111,8 @@
   var deferred = null, D = null, el = null;
   window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; if (el && D) render(); });
   window.addEventListener("appinstalled", function () { ls(KEY, String(Date.now() + 365 * 864e5)); hide(); });
-  function hide() { if (!el) return; el.classList.remove("bnig-on"); var x = el; setTimeout(function () { x.hidden = true; }, 260); }
+  function pad(on) { try { document.body.style.paddingBottom = on && el ? (el.offsetHeight + 24) + "px" : ""; } catch (e) {} }   // never leave page content stuck under the banner
+  function hide() { if (!el) return; pad(false); el.classList.remove("bnig-on"); var x = el; setTimeout(function () { x.hidden = true; }, 260); }
   function dismiss() { ls(KEY, String(Date.now() + DAYS * 864e5)); hide(); }
   function render() {
     var s = steps(D, !!deferred), h = "";
@@ -137,7 +138,8 @@
       if (b.dataset.a === "install" && deferred) { var p = deferred; deferred = null; p.prompt(); (p.userChoice || Promise.resolve({})).then(function (r) { if (r && r.outcome === "accepted") dismiss(); else render(); }); }
     });
     el.addEventListener("keydown", function (e) { if (e.key === "Escape") dismiss(); });
-    void el.offsetWidth; setTimeout(function () { el.classList.add("bnig-on"); }, 30);
+    void el.offsetWidth; pad(true); setTimeout(function () { el.classList.add("bnig-on"); }, 30);
+    window.addEventListener("resize", function () { if (el && !el.hidden && el.classList.contains("bnig-on")) pad(true); });
   }
   function start() {
     var force = /[?&]bnig=1\b/.test(location.search);                         // ?bnig=1 shows it for testing regardless of dismissal/session
