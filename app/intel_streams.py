@@ -129,16 +129,16 @@ def gnews(q, limit=25):
 # ------------------------------------------------------------------ keyword filters
 RESEARCH_TOPICS = [
     ("Cyber", r"\b(cyber ?attack|cyber ?security|ransomware|malware|botnet|phishing|zero[- ]day|vulnerabilit|exploit|intrusion detection|apt\b|ddos|supply[- ]chain attack|jailbreak|adversarial attack|backdoor|side[- ]channel|scada|industrial control)"),
-    ("Disease", r"\b(outbreak|pandemic|epidemic|pathogen|avian influenza|h5n1|h5n5|influenza a|mpox|ebola|marburg|nipah|cholera|dengue|measles|antimicrobial resistance|zoonotic|emerging infectious|bioterror|biosecurity|biological weapon|sars-cov-2|covid-19 variant)"),
+    ("Disease", r"\b(outbreak|pandemic|epidemic|pathogen|avian influenza|h5n1|h5n5|influenza a|mpox|ebola|marburg|nipah|cholera|dengue|measles|antimicrobial resistance|zoonotic|emerging infectious|bioterror|biosecurity|biological weapon|(sars-cov-2|covid-19) variant|novel coronavirus|novel virus)"),
     ("Infrastructure", r"\b(critical infrastructure|power grid|blackout|outage|cascading failure|grid resilience|water supply|undersea cable|submarine cable|pipeline|supply chain disruption|gnss|gps spoofing|gps jamming|satellite)"),
     ("Space weather", r"\b(space weather|geomagnetic storm|solar flare|coronal mass ejection|cme\b|solar energetic particle|ionospheric|substorm)"),
-    ("Security", r"\b(terroris|armed conflict|missile|drone strike|uav swarm|nuclear weapon|nuclear security|radiological|chemical weapon|hybrid warfare|disinformation|deepfake|surveillance|border security|extremis)"),
+    ("Security", r"\b(terroris|armed conflict|missile|drone strike|uav swarm|nuclear weapon|nuclear security|radiological|chemical weapon|hybrid warfare|disinformation|deepfake|mass surveillance|border security|extremis)"),
     ("Technology", r"\b(ai safety|frontier ai|large language model.{0,40}(risk|misuse|attack|safety)|autonomous weapon|quantum (cryptanalysis|computing.{0,20}(threat|break))|post-quantum)"),
     ("Hazards", r"\b(earthquake early warning|tsunami|volcan|wildfire|hurricane|tropical cyclone|flood forecast|extreme heat|landslide)"),
 ]
 RX_TOPICS = [(n, re.compile(p, re.I)) for n, p in RESEARCH_TOPICS]
 RX_RETRO = re.compile(r"\b(during|after|amid|in) (the )?covid(-19)?( pandemic)?|post[- ]covid|pandemic era|covid-19 pandemic|students|nurses|education", re.I)
-RX_JUNK = re.compile(r"^(review \d|reply|response to|comment on|erratum|correction|retraction)|youtube|blueprint|narrative & production", re.I)
+RX_JUNK = re.compile(r"^(review \d|reply|response to|comment on|erratum|correction|retraction)|youtube|blueprint|narrative & production|\bv\d+(\.\d+)? [—-]", re.I)
 JUNK_VENUES = {"zenodo", "figshare", "researchgate", "qeios", "osf preprints", "authorea", "preprints.org", "ssrn electronic journal"}
 def research_tags(text):
     if not text or RX_JUNK.search(text): return []
@@ -286,7 +286,7 @@ def research(R):
                 t = w.get("display_name") or ""; tags = research_tags(t)
                 if not tags: continue
                 loc = w.get("primary_location") or {}; src = ((loc.get("source") or {}).get("display_name")) or ""
-                if not src or src.lower() in JUNK_VENUES or len(t) > 240: continue      # self-deposits without a journal/preprint venue are skipped
+                if not src or any(j in src.lower() for j in JUNK_VENUES) or len(t) > 240: continue      # self-deposits without a journal/preprint venue are skipped
                 url = w.get("doi") or loc.get("landing_page_url") or w.get("id")
                 au = ", ".join((a.get("author") or {}).get("display_name", "") for a in (w.get("authorships") or [])[:3])
                 R.add("research", "OpenAlex API", t, url, (w.get("publication_date") or "") + "T00:00:00Z", f"{src}{' · ' if src and au else ''}{au}", tags,
@@ -397,7 +397,8 @@ def patents(R, budget=700, workers=3):
                 tm = re.search(r"<B541>en</B541>\s*<B542>(.*?)</B542>", x, re.S)
                 return pn, appl, clean(tm.group(1)) if tm else "", None
             with cf.ThreadPoolExecutor(workers) as ex:
-                for pn, appl, title, err in ex.map(one, todo):
+                for k, (pn, appl, title, err) in enumerate(ex.map(one, todo)):
+                    if k % 100 == 0: sset(c, "epo_progress", {"week": wk, "processed": len(seen) + k, "total": len(pns), "ts": iso()}); c.commit()
                     if err: continue
                     hit = [n for n, rx in RX_APPL if appl and rx.search(appl)]
                     c.execute("INSERT OR REPLACE INTO epo_seen VALUES(?,?,?,?,?,?)", (pn, wk, appl, title, ",".join(hit), iso())); c.commit()
