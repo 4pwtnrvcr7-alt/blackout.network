@@ -23,7 +23,7 @@
   var kv=el("dl",{"class":"rs-kv"});function row(k,v){if(!v)return;kv.appendChild(el("dt",{text:k}));kv.appendChild(el("dd",{text:v}))}
   row("What you reported",r.category_label);row("Your description",r.description||"(none)");row("About the item",r.item_title);row("Page",r.page);row("Sent",et(r.submitted_at));row("Last update",et(r.updated_at));
   c.appendChild(kv);
-  c.appendChild(el("h2",{text:"Response from Blackout Network"}));
+  c.appendChild(el("h2",{text:"Response from blackout.network"}));
   if(r.responses&&r.responses.length)r.responses.forEach(function(x){c.appendChild(el("div",{"class":"rs-resp"},[x.text,el("div",{"class":"rs-hint",text:"Published "+et(x.published_at)})]))});
   else c.appendChild(el("p",{"class":"rs-hint",text:"No written response yet. Status changes appear here as soon as they happen."}));
   c.appendChild(el("h2",{text:"Timeline"}));var tl=el("ol",{"class":"rs-tl"});(r.timeline||[]).forEach(function(t){tl.appendChild(el("li",null,[el("b",{text:t.label}),el("div",{"class":"rs-hint",text:et(t.t)})]))});c.appendChild(tl);

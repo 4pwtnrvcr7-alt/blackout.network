@@ -30,7 +30,7 @@
  function head(t){dlg.innerHTML="";var x=el("button",{"class":"bnr-x",type:"button","aria-label":"Close"},["×"]);x.onclick=close;dlg.appendChild(x);dlg.appendChild(el("h2",{id:"bnr_title",text:t}))}
  function show(){if(!back.parentNode)document.body.appendChild(back);back.hidden=false;document.addEventListener("keydown",onKey,true);setTimeout(function(){var f=dlg.querySelector("select,textarea,button.pri");f&&f.focus()},30)}
  function form(prev){head("Report a problem");
-  dlg.appendChild(el("p",{"class":"bnr-meta",text:"Tell us what went wrong. Reports go to the Blackout Network review queue; you'll get a reference ID to check on it."}));
+  dlg.appendChild(el("p",{"class":"bnr-meta",text:"Tell us what went wrong. Reports go to the blackout.network review queue; you'll get a reference ID to check on it."}));
   var f=el("form",{novalidate:""}),cat=el("select",{id:"bnr_cat",required:""});cat.appendChild(el("option",{value:"",text:"Choose one…"}));
   CFG.categories.forEach(function(c){cat.appendChild(el("option",{value:c.id,text:c.label}))});
   f.appendChild(el("label",{"for":"bnr_cat",text:"What kind of problem?"}));f.appendChild(cat);

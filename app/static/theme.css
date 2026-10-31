@@ -1,4 +1,4 @@
-/* Blackout Network: shared theme. One palette for every tab, the guides and the add-ons.
+/* blackout.network: shared theme. One palette for every tab, the guides and the add-ons.
    Category colors match keywords.json (Live Broadcasts / Live Streams keyword key) and The Thread's string key. */
 :root{
  --bg:#0b0d10;--pn:#14181d;--pn2:#181d23;--bd:#252b33;--bd2:#2f3742;--tx:#e6e9ee;--mu:#8b95a3;

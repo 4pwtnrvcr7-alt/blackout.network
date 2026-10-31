@@ -1,4 +1,4 @@
-// Blackout Network: Games tab engine. Original code; HTML5 Canvas + WebAudio only, no external assets, no emulators.
+// blackout.network: Games tab engine. Original code; HTML5 Canvas + WebAudio only, no external assets, no emulators.
 // Each game registers {id,name,inspired,cats,desc,controls,w,h,init,update,draw,key,keyup,click,modes,best}.
 (()=>{"use strict";
 const PAL=["#000000","#1d2b53","#7e2553","#008751","#ab5236","#5f574f","#c2c3c7","#fff1e8","#ff004d","#ffa300","#ffec27","#00e436","#29adff","#83769c","#ff77a8","#ffccaa"];

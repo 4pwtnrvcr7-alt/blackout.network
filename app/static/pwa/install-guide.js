@@ -95,7 +95,7 @@
     box.value = url; box.focus(); box.select(); try { box.setSelectionRange(0, url.length); } catch (e) {}
   }
   function share(host) {
-    var url = location.origin + "/", title = "Blackout Network: Know first. Be ready.";
+    var url = location.origin + "/", title = "blackout.network: Know first. Be ready.";
     if (navigator.share) return navigator.share({ title: title, url: url }).catch(function (e) { if (e && e.name !== "AbortError") copy(url, host); });
     copy(url, host);
   }

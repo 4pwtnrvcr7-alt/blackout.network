@@ -1,4 +1,4 @@
-# Blackout Network illustration style
+# blackout.network illustration style
 
 One style for every illustration on blackout.network. It extends the site's existing
 "How it works" line icons (`hwI()` in dashboard.html), so new art sits beside them cleanly.
@@ -22,10 +22,10 @@ One style for every illustration on blackout.network. It extends the site's exis
 ```html
 <figure class="bc-ill bc-ill-NAME">
   <svg viewBox="0 0 200 110" role="img" aria-label="What it shows" translate="no" ...><title>What it shows</title>…</svg>
-  <figcaption>Illustration by Blackout Network</figcaption>
+  <figcaption>Illustration by blackout.network</figcaption>
 </figure>
 ```
-- Every illustration carries the caption **exactly** "Illustration by Blackout Network" (small, muted, translatable).
+- Every illustration carries the caption **exactly** "Illustration by blackout.network" (small, muted, translatable).
 - `aria-label` + `<title>` describe what is drawn and what it teaches.
 - Inline the SVG in the page (the static route serves flat files only). The files in this folder are the masters, so keep them in sync with the inline copies.
 

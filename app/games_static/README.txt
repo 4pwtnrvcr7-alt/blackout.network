@@ -1,4 +1,4 @@
-Blackout Network: Games tab (served by ../games.py at /api/games/*)
+blackout.network: Games tab (served by ../games.py at /api/games/*)
 
 All 26 games, the engine, the pixel art and the sound effects in this folder were written from scratch for this
 dashboard (Oct 31, 2026). No third-party code, sprites, fonts, music, ROMs or emulators are used, and nothing
