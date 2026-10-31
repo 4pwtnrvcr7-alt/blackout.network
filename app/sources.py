@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 BASE = os.path.dirname(os.path.abspath(__file__))
 if BASE not in sys.path: sys.path.insert(0, BASE)
 import sources_catalog as SC
+import sources_directory as SD, importlib as _il
+SD = _il.reload(SD)   # hot-reload servers: pick up a changed sources_directory.py together with this file
 
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 BRAND = "blackout.network"
@@ -232,6 +234,15 @@ def band(r):
     if r is None: return "na"
     return "red" if r <= 3 else "amber" if r <= 6 else "green" if r <= 8 else "blue"
 
+def monitor_label(d):
+    """Monitored catalog vs directory-only: how the system actually uses this source."""
+    st = (d.get("status") or "").lower()
+    if st.startswith("disabled"): return "Catalog · feed disabled"
+    if d.get("origin") == "scanner config": return "Monitored · scanner feed"
+    if d.get("origin") == "political": return "Monitored · political watch list"
+    if d.get("origin") == "youtube watch": return "Monitored · YouTube watch"
+    return "Monitored · seen in scanned items"
+
 def catalog(qs):
     g = lambda k, dflt="": ((qs.get(k) or [dflt])[0] or dflt)
     where, args = [], []
@@ -266,7 +277,12 @@ def catalog(qs):
     items = []
     for r in rows:
         d = dict(r); d["categories"] = json.loads(d["categories"] or "{}"); d["reason"] = json.loads(d["rating_reason"] or "[]"); del d["rating_reason"]
-        d["band"] = band(d["rating"]); items.append(d)
+        d["band"] = band(d["rating"]); d["sid"] = SD.catalog_sid(d["key"]); d["monitor"] = monitor_label(d); items.append(d)
+    try:
+        V = SD.votes_mod()
+        voter = g("voter"); gr = V.source_grades([i["sid"] for i in items], voter if re.fullmatch(r"[a-f0-9]{32}", voter or "") else None)
+        for i in items: i["grade"] = gr.get(i["sid"])
+    except Exception as ex: print("source grades unavailable:", ex)
     return {"total": total, "page": page, "per": per, "items": items, "types": types, "categories": CATS, "refreshed": meta.get("refreshed")}
 
 def summary():
@@ -332,6 +348,55 @@ def form_html():
             '<p class="sc-sm mu">Every suggestion is reviewed by a person before it is used. Adult, gambling, crypto-promotion, link-shortener and off-topic '
             'submissions are discarded. Limit: 3 per hour.</p></form>')
 
+def dir_intro_html(monitored):
+    d = SD.summary()
+    if not d.get("ready"):
+        return '<p class="sc-sm mu">The global reference directory is loading and will appear below shortly.</p>'
+    return (f'<p class="sc-total"><b>{monitored + d["total"]:,}</b> sources listed: <b>{monitored:,}</b> monitored by the system and '
+            f'<b>{d["total"]:,}</b> reference sources worldwide in the <a href="#directory">global directory</a>, each from a published registry.</p>')
+
+def directory_html():
+    d = SD.summary()
+    if not d.get("ready"):
+        return ('<section class="sc-card" id="directory" aria-labelledby="h-d"><h2 id="h-d">Global directory</h2>'
+                '<p class="sc-sm mu" id="sd_count">The directory is being prepared. Reload in a minute.</p><div id="sd_list"></div></section>')
+    cats = "".join(f'<option value="{E(c)}">{E(c)} ({n:,})</option>' for c, n in d["by_category"])
+    regs = "".join(f'<option value="{E(r)}">{E(r)} ({n:,})</option>' for r, n in d["by_registry"])
+    ccs = json.dumps(d["countries"])
+    chips = "".join(f'<li><button type="button" data-cat="{E(c)}" title="Show only {E(c)}"><b>{n:,}</b> {E(c)}</button></li>' for c, n in d["by_category"])
+    return ('<section class="sc-card" id="directory" aria-labelledby="h-d"><h2 id="h-d">Global directory</h2>'
+            f'<p class="sc-sm">{d["total"]:,} real reference sources from around the world: security teams, police and emergency agencies, radar and weather '
+            'stations, seismic networks, satellites, river gauges, government data feeds, news outlets, research institutions and public scanner audio. '
+            'Every entry comes from a published registry and links to the real page. <b>These are reference entries, not live monitor inputs</b>: '
+            'the scanner does not read them, and they never change an alert\'s score or rank.</p>'
+            f'<ul class="sd-cats">{chips}</ul>'
+            '<form class="sc-filters" id="sd_filters" role="search" onsubmit="return false">'
+            '<label class="sc-q"><span class="sr">Search the directory</span><input id="sd_q" type="search" placeholder="Search name, link, type or place…" maxlength="80"></label>'
+            f'<label><span class="sr">Category</span><select id="sd_cat"><option value="">All categories</option>{cats}</select></label>'
+            f'<label><span class="sr">Country</span><select id="sd_cc" data-cc=\'{E(ccs)}\'><option value="">All countries</option></select></label>'
+            f'<label><span class="sr">Registry</span><select id="sd_reg"><option value="">All registries</option>{regs}</select></label>'
+            '<label class="sc-chk"><input type="checkbox" id="sd_rated"> Rated by visitors</label></form>'
+            '<p class="sc-sm mu" id="sd_count" aria-live="polite">Loading…</p><div id="sd_list" class="sc-list"></div>'
+            '<nav class="sd-pager" id="sd_pager" aria-label="Directory pages"></nav>'
+            f'<p class="sc-sm mu">Registries: ' + ", ".join(f'<a href="{E(v.get("url", ""))}" target="_blank" rel="noopener noreferrer">{E(k)}</a>'
+                                                       + (f' ({E(v["licence"])})' if v.get("licence") else "") for k, v in d["registries"].items()) +
+            (f'. Links spot-checked {E(d["checked"].get("date", ""))}: {d["checked"].get("checked", 0)} sampled, {d["checked"].get("dead", 0)} dead removed.' if d.get("checked") else "") +
+            '</p></section>')
+
+def grades_html():
+    V = SD.votes_mod()
+    cuts = ", ".join(f"<b>{g}</b> {c}+" for c, g in V.GRADE_CUTS[:-1]) + f", <b>F</b> below {V.GRADE_CUTS[-2][0]}"
+    return ('<section class="sc-card" id="grades" aria-labelledby="h-g"><h2 id="h-g">How the reliability grade works</h2>'
+            '<p class="sc-sm">Every source, monitored or directory, has a <b>reliability grade from visitors</b>. Tap 1 to 5 stars on any source to rate how '
+            'accurate and dependable it has been for you.</p><ul class="sc-rules">'
+            f'<li><b>Fair start.</b> Each source begins from a neutral starting point based on its type (official observing networks start higher than unverified streams). '
+            f'That starting point counts as {V.GRADE_C} votes, so a few ratings can\'t swing a grade to an extreme.</li>'
+            '<li><b>Score.</b> (starting point × 5 + the sum of visitor stars) ÷ (5 + number of votes), shown from 0 to 100.</li>'
+            f'<li><b>Letter.</b> {cuts}. A grade appears after {V.GRADE_MIN} votes; before that the source shows “Not yet rated”.</li>'
+            '<li><b>One vote per browser per source.</b> Rating again replaces your earlier rating. Each connection has a rate limit; no accounts and no personal data are kept.</li>'
+            '<li><b>Separate from alerts.</b> Grades never change an alert\'s score, rank or The Wire. The 0–10 confidence rating on monitored sources is a separate, fixed rule (below).</li>'
+            '</ul></section>')
+
 def page_html():
     s = summary()
     b = s["bands"]
@@ -341,14 +406,16 @@ def page_html():
       '<p>This catalog lists every source the monitor has drawn on: official agencies, news outlets, social accounts and channels, the scanner\'s own feeds, '
       'the YouTube channels it watches and the public accounts on the political watch list. Each entry shows how many items it produced, when, what kind, '
       'and a <b>confidence rating from 0 to 10</b> computed by the fixed rule below. Select a rating to see exactly why.</p>'
-      f'<div class="sc-stats"><div><b>{s["sources"]:,}</b><span>sources</span></div><div><b>{s["items"]:,}</b><span>items stored</span></div>'
+      + dir_intro_html(s["sources"]) +
+      f'<div class="sc-stats"><div><b>{s["sources"]:,}</b><span>monitored sources</span></div><div><b>{s["items"]:,}</b><span>items stored</span></div>'
       f'<div><b>{b["blue"] + b["green"]:,}</b><span>rated 7+</span></div><div><b>{s["profiles"]:,}</b><span>written profiles</span></div>'
       f'<div><b>{s["political"]}</b><span>political watch accounts</span></div><div><b>{s["youtube"]}</b><span>YouTube channels</span></div></div>'
       f'<p class="sc-sm mu" id="sc_range" data-first="{E(s["first"])}" data-last="{E(s["last"])}">Data range: {E(et(s["first"]))} – {E(et(s["last"]))} · '
       f'catalog refreshed {E(et(s["refreshed"]))}</p>' + legend_html() +
-      '<nav class="sc-toc" aria-label="On this page"><a href="#catalog">Catalog</a><a href="#method">How ratings work</a><a href="#candidates">Candidate sources</a>'
+      '<nav class="sc-toc" aria-label="On this page"><a href="#catalog">Monitored catalog</a><a href="#directory">Global directory</a><a href="#grades">Reliability grades</a><a href="#method">How ratings work</a><a href="#candidates">Candidate sources</a>'
       '<a href="#queue">Review queue</a><a href="#submit">Submit a source</a></nav></section>')
-    a('<section class="sc-card" id="catalog" aria-labelledby="h-cat"><h2 id="h-cat">Catalog</h2>'
+    a('<section class="sc-card" id="catalog" aria-labelledby="h-cat"><h2 id="h-cat">Monitored catalog</h2>'
+      '<p class="sc-sm mu">Sources the monitor actually uses: the scanner\'s feeds, outlets seen in scanned items, and the watch lists.</p>'
       '<form class="sc-filters" id="sc_filters" role="search" onsubmit="return false">'
       '<label class="sc-q"><span class="sr">Search sources</span><input id="sc_q" type="search" placeholder="Search name, profile, handle or role…" maxlength="80"></label>'
       '<label><span class="sr">Type</span><select id="sc_type"><option value="">All types</option></select></label>'
@@ -363,6 +430,7 @@ def page_html():
       '<p class="sc-sm mu" id="sc_count" aria-live="polite">Loading…</p><div id="sc_list" class="sc-list"></div>'
       '<div class="sc-more"><button type="button" id="sc_more" hidden>Show more</button></div>'
       '<noscript><p>The catalog needs JavaScript. The raw data is at <a href="/api/sources/catalog?per=100">/api/sources/catalog</a>.</p></noscript></section>')
+    a(directory_html()); a(grades_html())
     a('<section class="sc-card" id="method" aria-labelledby="h-m"><h2 id="h-m">How the confidence rating works</h2>'
       '<p class="sc-sm">The rating estimates how far you can trust a source <i>before</i> anyone else confirms it. It is computed the same way for every source, '
       'and the steps for each one are shown when you select its rating. It never changes a story\'s score or rank: those come from the scanner\'s own rules '
@@ -393,7 +461,9 @@ def card_html():
     s = summary(); b = s["bands"]
     rows = "".join(f'<li><span class="sc-r b-{band(t["rating"])}">{t["rating"]}</span> <a href="{E(t["link"])}" target="_blank" rel="noopener noreferrer">{E(t["name"])}</a>'
                    f'<span class="mu"> · {E(t["type"])} · {t["n_items"]:,} items</span></li>' for t in s["top"])
-    return (f'<div class="sc-cardin"><p>{s["sources"]:,} sources, {s["items"]:,} stored items, each with a 0–10 confidence rating. '
+    dsum = SD.summary(); dtot = dsum.get("total", 0) if dsum.get("ready") else 0
+    return (f'<div class="sc-cardin"><p>{s["sources"]:,} monitored sources, {s["items"]:,} stored items, each with a 0–10 confidence rating'
+            + (f', plus {dtot:,} reference sources worldwide in the global directory' if dtot else '') + '. '
             f'<b>{b["blue"]}</b> official or fully trusted, <b>{b["green"]}</b> reliable, <b>{b["amber"]}</b> mixed, <b>{b["red"]}</b> low trust.</p>'
             + legend_html() + f'<h3>Most-used trusted sources</h3><ul class="sc-top">{rows}</ul>'
             f'<p><a class="sc-pri" href="sources">Open the full catalog →</a> <a class="sc-ghost" href="sources#submit">Submit a source</a> '
@@ -414,12 +484,14 @@ def handle_get(path, qs):
             with open(os.path.join(STATIC, name), "rb") as f: return 200, f.read(), ("application/javascript" if name.endswith(".js") else "text/css")
         maybe_refresh()
         if name == "catalog": return 200, catalog(qs)
+        if name == "directory": return SD.query(qs)
+        if name == "directory_summary": return 200, SD.summary()
         if name == "summary": return 200, summary()
         if name == "card": return 200, card_html(), "text/html"
         if name == "meta":
             csrf, ft = csrf_and_form(); return 200, {"csrf": csrf, "ft": ft, "types": TYPES, "categories": CATS}
         return 404, {"error": "not found"}
-    if path == "/api/sources": return 200, {"ok": True, "pages": ["/sources"], "api": ["catalog", "summary", "card", "meta"]}
+    if path == "/api/sources": return 200, {"ok": True, "pages": ["/sources"], "api": ["catalog", "directory", "directory_summary", "summary", "card", "meta"]}
     if path.rstrip("/") == "/sources": maybe_refresh(); return 200, page_html(), "text/html"
     if path == "/sources/admin": return 200, admin_page(), "text/html"
     return 404, {"error": "not found"}

@@ -6,6 +6,8 @@ WORKDIR /workspace/blackout
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 COPY app/ /workspace/blackout/
+# Global Sources directory: build the SQLite/FTS index from the committed gzipped NDJSON shards (no network needed at build time)
+RUN cd /workspace/blackout && python3 sources_directory.py --build
 RUN mkdir -p logs snapshots static/vsubs video_subs newsletter_outbox && chown -R bn:bn /workspace
 USER bn
 EXPOSE 10000

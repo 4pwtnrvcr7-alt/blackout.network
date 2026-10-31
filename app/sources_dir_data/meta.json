@@ -1,0 +1,67 @@
+{
+ "registries": {
+  "ROR": {
+   "url": "https://ror.org/",
+   "licence": "CC0"
+  },
+  "Wikidata": {
+   "url": "https://www.wikidata.org/",
+   "licence": "CC0"
+  },
+  "FIRST.org": {
+   "url": "https://www.first.org/members/teams/",
+   "licence": ""
+  },
+  "CelesTrak SATCAT": {
+   "url": "https://celestrak.org/satcat/",
+   "licence": ""
+  },
+  "NOAA NCEI HOMR (NEXRAD/TDWR)": {
+   "url": "https://www.ncei.noaa.gov/access/homr/",
+   "licence": "public domain"
+  },
+  "NOAA NDBC": {
+   "url": "https://www.ndbc.noaa.gov/",
+   "licence": "public domain"
+  },
+  "WMO OSCAR/Surface": {
+   "url": "https://oscar.wmo.int/surface/",
+   "licence": ""
+  },
+  "USGS Water Services": {
+   "url": "https://waterservices.usgs.gov/",
+   "licence": "public domain"
+  },
+  "Radio Browser": {
+   "url": "https://www.radio-browser.info/",
+   "licence": "free/open"
+  },
+  "data.europa.eu": {
+   "url": "https://data.europa.eu/",
+   "licence": ""
+  },
+  "RIPE Atlas": {
+   "url": "https://atlas.ripe.net/",
+   "licence": ""
+  },
+  "NOAA CO-OPS": {
+   "url": "https://tidesandcurrents.noaa.gov/",
+   "licence": "public domain"
+  },
+  "EUMETNET OPERA": {
+   "url": "https://www.eumetnet.eu/activities/observations-programme/current-activities/opera/",
+   "licence": ""
+  },
+  "FDSN station services": {
+   "url": "https://www.fdsn.org/webservices/",
+   "licence": ""
+  }
+ },
+ "fetched": "2026-10-31",
+ "liveness": {
+  "date": "2026-10-31",
+  "checked": 454,
+  "dead": 4,
+  "unreachable_not_removed": 11
+ }
+}

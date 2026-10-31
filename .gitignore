@@ -30,3 +30,4 @@ __pycache__/
 *.pyc
 *_backup*
 *.bak*
+app/sources_dir/

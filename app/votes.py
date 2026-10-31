@@ -31,6 +31,7 @@ def agg(c, typ, ids, voter=None):
         out[i] = {"n": r["n"], "avg": round(r["a"], 1) if r["a"] is not None else None, "mine": m["rating"] if m else None}
     return out
 def handle_post(path, d, ip=None):
+    if path == "/api/vote/source": return source_vote(d, ip)
     if path != "/api/vote": return 404, {"error": "not found"}
     typ = d.get("item_type"); iid = str(d.get("item_id") or ""); voter = str(d.get("voter") or "")
     try: rating = int(d.get("rating"))
@@ -78,6 +79,10 @@ def ranked(qs):
     return {"window": win, "min_votes": mn, "sort": sort, "prior_mean": round(m, 2), "prior_weight": C_PRIOR, "items": rows[:200],
             "note": "User ratings never change the bot's scores, ranks or The Wire's ordering."}
 def handle_get(path, qs):
+    if path == "/api/votes/source":
+        ids = [i for i in (qs.get("ids") or [""])[0].split(",") if SID_RE.fullmatch(i)][:200]
+        voter = (qs.get("voter") or [""])[0]
+        return 200, {"grades": source_grades(ids, voter if re.fullmatch(r"[a-f0-9]{32}", voter) else None), "rules": GRADE_RULES}
     if path == "/api/user_ranked": return 200, ranked(qs)
     if path == "/api/votes/recent":
         c = db()
@@ -92,3 +97,85 @@ def handle_get(path, qs):
         try: return 200, {"type": typ, "votes": agg(c, typ, ids, voter if re.fullmatch(r"[a-f0-9]{32}", voter) else None)}
         finally: c.close()
     return 404, {"error": "not found"}
+
+
+# ---------------------------------------------------------------- source reliability grades (2026-10-31, Sources page)
+# Visitors rate a SOURCE 1-5 stars. Stored in votes.db table source_votes (same Render-owned DB as alert votes, so it survives
+# redeploys the same way: the box mirrors votes.db and restores it after a restart). Never read by the scanner: no effect on
+# alert scores, ranks or The Wire. No personal data: the voter id is a random per-browser token; the per-IP limiter keeps only a
+# salted SHA-256 hash in memory (never written to disk or logs).
+import hashlib, secrets as _secrets
+SID_RE = re.compile(r"[cd]:[A-Za-z0-9_:.@\-]{1,180}")
+GRADE_C = 5            # prior weight, in votes
+GRADE_MIN = 3          # votes needed before a letter grade is shown
+GRADE_CUTS = [(80, "A"), (65, "B"), (50, "C"), (35, "D"), (0, "F")]
+SRC_LIMITS = {"ip_min": 20, "ip_day": 300, "voter_day": 300, "all_day": 20000}
+_salt = _secrets.token_hex(16); _srl = {}
+GRADE_RULES = {"scale": "1-5 stars", "prior_weight": GRADE_C, "min_votes": GRADE_MIN, "cuts": GRADE_CUTS,
+               "formula": "score = (prior_weight x prior + sum of stars) / (prior_weight + votes); shown as 0-100 = (score - 1) / 4 x 100"}
+def _sdb():
+    c = db()
+    c.execute("""CREATE TABLE IF NOT EXISTS source_votes(sid TEXT, voter TEXT, stars INTEGER, ts TEXT, PRIMARY KEY(sid, voter))""")
+    c.execute("CREATE INDEX IF NOT EXISTS ix_sv_ts ON source_votes(ts)"); c.execute("CREATE INDEX IF NOT EXISTS ix_sv_voter ON source_votes(voter, ts)")
+    return c
+def _src_limited(ip):
+    k = hashlib.sha256((_salt + (ip or "?")).encode()).hexdigest()[:24]; t = time.time()
+    with _lock:
+        h = [x for x in _srl.get(k, []) if t - x < 86400]; _srl[k] = h
+        if len(_srl) > 50000:
+            for kk in list(_srl)[:10000]: _srl.pop(kk, None)
+        if sum(1 for x in h if t - x < 60) >= SRC_LIMITS["ip_min"] or len(h) >= SRC_LIMITS["ip_day"]: return True
+        h.append(t); return False
+def source_prior(sid):
+    """Prior mean (1-5) from the source's registry/type, so unrated sources start neutral-to-official, not extreme."""
+    try:
+        if sid.startswith("c:"):
+            import sources_directory as SD; r = SD.catalog_rating(sid)
+            return round(1 + 0.4 * r, 2) if r is not None else 3.5
+        import sources_directory as SD; return SD.prior_for(sid)
+    except Exception: return 3.5
+def grade_of(n, s, prior):
+    score = (GRADE_C * prior + s) / (GRADE_C + n); pct = round((score - 1) / 4 * 100)
+    letter = next(g for cut, g in GRADE_CUTS if pct >= cut)
+    return {"n": n, "avg": round(s / n, 2) if n else None, "score": pct, "prior": round((prior - 1) / 4 * 100),
+            "grade": letter if n >= GRADE_MIN else None, "label": f"{letter} ({pct}/100, {n} vote{'s' if n != 1 else ''})" if n >= GRADE_MIN else
+            ("Not yet rated" if n == 0 else f"Not yet rated ({n} of {GRADE_MIN} votes)")}
+def source_grades(ids, voter=None):
+    out = {}
+    if not ids: return out
+    c = _sdb()
+    try:
+        q = ",".join("?" * len(ids))
+        agg_ = {r["sid"]: (r["n"], r["s"]) for r in c.execute(f"SELECT sid, COUNT(*) n, SUM(stars) s FROM source_votes WHERE sid IN ({q}) GROUP BY sid", ids)}
+        mine = {r["sid"]: r["stars"] for r in c.execute(f"SELECT sid, stars FROM source_votes WHERE voter=? AND sid IN ({q})", [voter] + ids)} if voter else {}
+    finally: c.close()
+    for i in ids:
+        n, s = agg_.get(i, (0, 0)); g = grade_of(n, s or 0, source_prior(i)); g["mine"] = mine.get(i); out[i] = g
+    return out
+def rated_ids(min_votes=GRADE_MIN, limit=2000):
+    c = _sdb()
+    try: return [(r["sid"], r["n"], r["s"]) for r in c.execute("SELECT sid, COUNT(*) n, SUM(stars) s FROM source_votes GROUP BY sid HAVING n>=? ORDER BY n DESC LIMIT ?", (min_votes, limit))]
+    finally: c.close()
+def source_vote(d, ip):
+    sid = str(d.get("sid") or ""); voter = str(d.get("voter") or "")
+    try: stars = int(d.get("stars"))
+    except Exception: stars = None
+    if not SID_RE.fullmatch(sid): return 400, {"error": "bad source id"}
+    if not re.fullmatch(r"[a-f0-9]{32}", voter): return 400, {"error": "bad voter id"}
+    if stars is None or not 1 <= stars <= 5: return 400, {"error": "stars must be an integer 1-5"}
+    try:
+        import sources_directory as SD
+        if not SD.source_exists(sid): return 404, {"error": "unknown source"}
+    except Exception as ex: return 503, {"error": "source list is loading, try again shortly"}
+    if _src_limited(ip): return 429, {"error": "Too many ratings from this connection. Please slow down."}
+    c = _sdb()
+    try:
+        day = iso(datetime.now(timezone.utc) - timedelta(days=1))
+        if c.execute("SELECT COUNT(*) FROM source_votes WHERE voter=? AND ts>=?", (voter, day)).fetchone()[0] >= SRC_LIMITS["voter_day"] or \
+           c.execute("SELECT COUNT(*) FROM source_votes WHERE ts>=?", (day,)).fetchone()[0] >= SRC_LIMITS["all_day"]:
+            return 429, {"error": "Daily rating limit reached. Please try again tomorrow."}
+        c.execute("INSERT INTO source_votes VALUES(?,?,?,?) ON CONFLICT(sid,voter) DO UPDATE SET stars=excluded.stars, ts=excluded.ts", (sid, voter, stars, iso()))
+        c.commit()
+    finally: c.close()
+    g = source_grades([sid], voter)[sid]
+    return 200, {"status": "ok", "sid": sid, **g}
