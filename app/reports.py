@@ -360,7 +360,7 @@ def status_page(rid=""):
 <p class="rs-hint">Saved only in this browser (just the IDs). <button type="button" id="rs_forget" class="rs-link">Forget all saved IDs</button></p></section>
 <noscript><p class="rs-err">This page needs JavaScript to look up a report.</p></noscript>
 <p class="rs-foot">Found a new problem? Use the <b>Report a problem</b> button on any page. Report IDs are private: anyone with the ID can see that report's description and status, so share it only with people you trust.</p>
-</main><script src="/api/report/status.js"></script></body></html>"""
+</main><script src="/api/report/status.js"></script><link rel="stylesheet" href="/api/report/app.css"><script src="/api/report/app.js" defer></script></body></html>"""
 
 def handle_stream(path, qs, h):
     """All GETs for this module (needs the request handler for the IP hash and extra headers)."""

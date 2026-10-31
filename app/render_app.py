@@ -255,7 +255,8 @@ class RH(server.H):
             return self.send(200, data, "application/gzip")
         if not has_data():
             if path in ("/", "/index.html"): return self.send(503, WARMING, "text/html")
-            if path.startswith("/api/"): return self.send(503, {"error": "warming up: waiting for the first data sync"})
+            if path.startswith("/api/") and not path.startswith(("/api/report/", "/api/reports/")):   # problem reports work without synced data
+                return self.send(503, {"error": "warming up: waiting for the first data sync"})
         return super().do_GET()
     def do_POST(self):
         path = self.path.split("?", 1)[0]
