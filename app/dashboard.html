@@ -136,7 +136,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 .tip-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 6px}.tip-lab{width:100%;font-size:13px;color:var(--mu)}
 .tip-in{display:flex;align-items:center;gap:4px;background:#1d232b;border:1px solid var(--bd);border-radius:6px;padding:0 8px}.tip-in span{color:var(--mu);font-size:16px}
 .tip-in input{border:0;background:transparent;font-size:18px;width:120px;padding:8px 2px}.tip-in input:focus{outline:none}.tip-in:focus-within{border-color:var(--ac)}
-#tip_btn{font-size:15px;padding:9px 16px}
+#tip_btn{font-size:15px;padding:9px 16px}a#tip_btn{display:inline-block;background:var(--ac);border:1px solid var(--ac);border-radius:6px;color:#000;font:inherit;font-size:15px;font-weight:600;line-height:inherit;text-decoration:none;cursor:pointer}a#tip_btn[aria-disabled="true"]{opacity:.5;cursor:default;pointer-events:none}
 #th_pepe{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 4px}.pepe-ic{width:30px;height:30px;border-radius:7px;object-fit:cover;display:block;border:1px solid #5a1a1a}
 /* ---- The Thread string colours + legend ---- */
 #th_svg .str2{stroke-dasharray:7 7;opacity:.95}
@@ -281,7 +281,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
  <p>If it's useful to you, you're welcome to leave a tip. It goes toward keeping the work going. It's a tip, not a donation, and it never unlocks anything: everything here stays free.</p>
  <form id="tip_form" class="tip-row" autocomplete="off"><label for="tip_amt" class="tip-lab">Amount (USD)</label>
   <div class="tip-in"><span>$</span><input id="tip_amt" type="text" inputmode="decimal" placeholder="5" maxlength="9" aria-describedby="tip_msg"></div>
-  <button class="pri" type="submit" id="tip_btn" disabled>Tip with PayPal</button></form>
+  <a class="pri" id="tip_btn" role="button" target="_blank" rel="noopener noreferrer" aria-disabled="true" tabindex="-1">Tip with PayPal</a></form>
  <div class="meta" id="tip_msg">Opens PayPal in a new tab. No login or account here, and nothing you type is stored.</div>
 </section></main>
 <main id="tab-net" data-addon="net" style="display:none;grid-template-columns:minmax(0,1fr)">
@@ -706,12 +706,21 @@ addEventListener("hashchange",xtOpen);if(location.hash.startsWith("#thread/"))se
 xtLoad();setInterval(xtLoad,300000);
 
 // ---- Tips tab: builds https://www.paypal.me/<handle>/<amount>USD from tips.json; disabled until a handle is set ----
-const TIP={h:""};
+const TIP={h:"",st:"loading",n:0,t:0};
 const tipAmt=()=>{const v=$("tip_amt").value.trim().replace(/^\$/,"");return /^\d{1,5}(\.\d{1,2})?$/.test(v)&&+v>=1?(+v).toFixed(2).replace(/\.00$/,""):null};
-function tipUpd(){const a=tipAmt();$("tip_btn").disabled=!TIP.h||!a;$("tip_msg").textContent=!TIP.h?"Tip link not set up yet":$("tip_amt").value.trim()&&!a?"Enter an amount of $1 or more (up to 2 decimals).":"Opens PayPal in a new tab. No login or account here, and nothing you type is stored."}
-async function tipInit(){try{const j=await (await fetch("api/tips",{cache:"no-store"})).json();TIP.h=j.configured?j.paypal_me:""}catch(e){TIP.h=""}tipUpd()}
+// A real <a target=_blank> (not window.open) so popup blockers, iOS home-screen mode and in-app browsers follow it; href tracks the amount live.
+function tipUpd(){const a=tipAmt(),b=$("tip_btn"),ok=!!(TIP.h&&a);
+ if(ok)b.href=`https://www.paypal.me/${encodeURIComponent(TIP.h)}/${a}USD`;else b.removeAttribute("href");
+ b.setAttribute("aria-disabled",ok?"false":"true");b.tabIndex=ok?0:-1;
+ $("tip_msg").textContent=!TIP.h?(TIP.st=="loading"?"Loading the tip link…":TIP.st=="error"?"Couldn't reach the server for the tip link. Retrying…":"Tip link not set up yet"):$("tip_amt").value.trim()&&!a?"Enter an amount of $1 or more (up to 2 decimals).":"Opens PayPal in a new tab. No login or account here, and nothing you type is stored."}
+// /api/tips can fail during a Render restart or the Syncing period: retry after 2 s, 5 s and 15 s, and again whenever the Tips tab is opened.
+async function tipInit(){if(TIP.h||TIP.busy)return;TIP.busy=1;clearTimeout(TIP.t);
+ try{const r=await fetch("api/tips",{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);const j=await r.json();TIP.h=j.configured&&j.paypal_me?String(j.paypal_me):"";TIP.st=TIP.h?"ok":"unset"}
+ catch(e){TIP.st="error";const d=[2000,5000,15000][TIP.n++];if(d)TIP.t=setTimeout(tipInit,d)}
+ TIP.busy=0;tipUpd()}
 $("tip_amt").oninput=tipUpd;
-$("tip_form").onsubmit=e=>{e.preventDefault();const a=tipAmt();if(!TIP.h||!a)return;window.open(`https://www.paypal.me/${encodeURIComponent(TIP.h)}/${a}USD`,"_blank","noopener,noreferrer")};
+$("tip_form").onsubmit=e=>{e.preventDefault();const b=$("tip_btn");if(b.getAttribute("aria-disabled")!="true"&&b.href)b.click()};
+document.querySelector('.tabs button[data-tab="tips"]').addEventListener("click",()=>{if(!TIP.h){TIP.n=0;tipInit()}});
 tipInit();
 
 // ---- The Thread: string colour = connection type (keywords.json palette, shared with Live Broadcasts); pins unchanged ----
