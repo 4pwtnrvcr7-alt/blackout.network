@@ -1,0 +1,21 @@
+/* ---- 🗂 Intel Streams tab (intel_streams.py) ---- */
+#tab-intel{align-content:start}#tab-intel a{color:var(--ac)}
+#tab-intel .is-note{font-size:12px;color:var(--mu);margin:-2px 0 10px;max-width:980px}
+#tab-intel .is-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;align-items:center}
+#tab-intel .is-chip{border:1px solid var(--bd);background:#10151b;color:inherit;border-radius:16px;padding:5px 11px;font-size:12.5px;cursor:pointer}
+#tab-intel .is-chip.on{border-color:var(--ac);color:var(--ac)}#tab-intel .is-chip b{opacity:.8;margin-left:2px}
+#tab-intel #is_q{margin-left:auto;background:#0d1217;border:1px solid var(--bd);color:inherit;border-radius:7px;padding:5px 9px;min-width:160px;font-size:16px}
+@media(max-width:700px){#tab-intel #is_q{margin-left:0;width:100%}}
+#tab-intel .is-wl,#tab-intel .is-epo{background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:8px 12px;margin:0 0 10px;font-size:12.5px}
+#tab-intel .is-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media(max-width:1100px){#tab-intel .is-list{grid-template-columns:1fr}}
+#tab-intel .is-it{background:#11161b;border:1px solid var(--bd);border-left:3px solid #6e7681;border-radius:9px;padding:9px 12px;min-width:0}
+#tab-intel .is-research{border-left-color:#58a6ff}#tab-intel .is-leaks{border-left-color:#d29922}#tab-intel .is-patents{border-left-color:#a371f7}
+#tab-intel .is-mna{border-left-color:#3fb950}#tab-intel .is-markets{border-left-color:#f85149}
+#tab-intel .is-top{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 4px}
+#tab-intel .is-b,#tab-intel .is-tag{font-size:11px;border:1px solid var(--bd);border-radius:10px;padding:1px 7px;color:var(--mu)}
+#tab-intel .is-b{color:inherit;font-weight:700}#tab-intel .is-new{color:#f85149;border-color:#f85149;font-weight:700}
+#tab-intel .is-t{display:block;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+#tab-intel .is-sum{font-size:12.5px;color:var(--mu);margin-top:4px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#tab-intel .is-foot{margin-top:14px;display:grid;gap:6px}#tab-intel .is-src{background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:6px 12px;font-size:12.5px}
+#tab-intel .is-src summary{cursor:pointer}#tab-intel .is-src ul{margin:6px 0 2px;padding-left:18px}#tab-intel .is-err{color:var(--md,#d29922)}

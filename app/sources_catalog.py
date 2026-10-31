@@ -320,6 +320,12 @@ def gather():
         r = recs.get(key) or dict(key=key, name=key, type="YouTube channel", n=0, cats={}, status="watched (RSS)")
         r.update(link=ch["url"], origin=r.get("origin") if r.get("n") else "youtube watch", yt_kind=ch.get("kind"), status="watched (RSS)")
         recs[key] = r
+    # Intel Streams sources (intel_streams.py: Research, Leaks, Patents, M&A, Markets). Each record carries 'fixed' (editorial start rating 0-10),
+    # 'grade_key' and 'grade_seed' so the visitor-rating grade system can pick them up by key. Informational only: never affect threat scores.
+    try:
+        import importlib, intel_streams as IS
+        for r in importlib.reload(IS).catalog_records(): recs.setdefault(r["key"], r)
+    except Exception as ex: print("sources_catalog: intel streams skipped:", ex)
     return recs
 
 YT_KIND = {"wire service": "a global wire service", "public broadcaster": "a public broadcaster", "international broadcaster": "an international broadcaster",

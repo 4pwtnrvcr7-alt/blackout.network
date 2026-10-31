@@ -46,6 +46,7 @@ ROUTES = {
     "/api/spacex": "spacex",
     "/api/elon": "elon",
     "/api/finance": "finance",
+    "/api/intel": "intel_streams",
     "/api/preppers": "preppers",
     "/api/report": "reports",
     "/api/reports": "reports",
