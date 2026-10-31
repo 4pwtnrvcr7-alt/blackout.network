@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Dump current Blackout data as compact JSON for regenerating the
-'Blackout Network Threat Dashboard' Page.  Usage: python3 export_page_data.py [--scan] [-o page_data.json]"""
+'blackout.network Threat Dashboard' Page.  Usage: python3 export_page_data.py [--scan] [-o page_data.json]"""
 import json, sys, sqlite3
 from datetime import timedelta
 from zoneinfo import ZoneInfo

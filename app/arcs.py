@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Story Arcs for Blackout Network (read-only view layer).
+"""Story Arcs for blackout.network (read-only view layer).
 
 Groups scanner clusters into story threads ("arcs") and finds connections between arcs.
 - Reads blackout.db READ-ONLY (file:...?mode=ro). Never writes scanner tables, never changes scores.

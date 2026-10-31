@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blackout Network snapshot worker (runs under /workspace/.shotenv python; started by timeline.py).
+"""blackout.network snapshot worker (runs under /workspace/.shotenv python; started by timeline.py).
 Captures a screenshot of each eligible alert's source page (rank >= 4 or confirmed by 2+ source families), then burns a
 black metadata bar BELOW the capture (never over it) and embeds the same metadata as EXIF + XMP.
 Reads blackout.db READ-ONLY; writes only timeline.db and snapshots/. Rate-capped, 3 GB disk cap. Never touches scoring."""

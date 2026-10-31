@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blackout Network - global "Aviation" section (research/display only; never posts anything).
+"""blackout.network - global "Aviation" section (research/display only; never posts anything).
 
 Replaces the hourly report's private-jets line with: military snapshot (count by type/region), notable watchlist
 aircraft (Air Force One airframes, E-4B, E-6B, VIP/head-of-state jets, billionaire jets), emergency squawks, and

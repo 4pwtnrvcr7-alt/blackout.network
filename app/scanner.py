@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blackout Network early-warning scanner.
+"""blackout.network early-warning scanner.
 Pulls public machine-readable sources, normalizes, clusters (fuzzy cross-source),
 scores severity 0-100, separates watchlist, writes SQLite. Research only."""
 import json, os, re, sqlite3, time, math, html, hashlib, traceback, threading

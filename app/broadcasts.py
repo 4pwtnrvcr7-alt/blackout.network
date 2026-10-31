@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live Broadcasts add-on for Blackout Network.
+"""Live Broadcasts add-on for blackout.network.
 
 Separate collector (own daemon threads, own broadcasts.db). It is NOT part of scanner.py and never feeds scoring.
 - Text: RSS feeds polled every TEXT_POLL_MIN with HTTP timeouts.

@@ -1,5 +1,5 @@
 {
-  "_about": "Blackout Network aviation watchlist. Hex = ICAO 24-bit address (lowercase). Hex values were resolved from registrations/serials via the public wiedehopf tar1090-db (aviationdata/aircraft.csv.gz, built from FAA and community data) on 2026-10-31. Owner attributions for private jets are as PUBLICLY REPORTED (FAA registry LLCs / press); owners may move to LADD/PIA privacy hexes, sell, or re-register, so absence never proves anything. Edit freely; categories: gov_vip, military_strategic, head_of_state, billionaire, corporate.",
+  "_about": "blackout.network aviation watchlist. Hex = ICAO 24-bit address (lowercase). Hex values were resolved from registrations/serials via the public wiedehopf tar1090-db (aviationdata/aircraft.csv.gz, built from FAA and community data) on 2026-10-31. Owner attributions for private jets are as PUBLICLY REPORTED (FAA registry LLCs / press); owners may move to LADD/PIA privacy hexes, sell, or re-register, so absence never proves anything. Edit freely; categories: gov_vip, military_strategic, head_of_state, billionaire, corporate.",
   "aircraft": [
     {"hex": "adfdf8", "reg": "82-8000", "label": "Air Force One airframe (VC-25A 82-8000)", "category": "gov_vip", "key": "af1"},
     {"hex": "adfdf9", "reg": "92-9000", "label": "Air Force One airframe (VC-25A 92-9000)", "category": "gov_vip", "key": "af1"},

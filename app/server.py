@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blackout Network dashboard + scheduler (stdlib HTTP server)."""
+"""blackout.network dashboard + scheduler (stdlib HTTP server)."""
 import json, os, re, time, threading, secrets, hmac, sqlite3, traceback
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs

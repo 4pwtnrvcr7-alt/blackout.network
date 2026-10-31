@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Blackout Network - private/business jet tracker + takeoff spike detector (research/display only).
+"""blackout.network - private/business jet tracker + takeoff spike detector (research/display only).
 
 Jets are informational: nothing here reads or writes threat ranks/scores. This module writes ONLY to jets.db
 and reads blackout.db read-only (to list coinciding threat clusters in spike alerts).
