@@ -563,6 +563,24 @@ def _history(sid, at, c):
     finally: k.close()
     return out, titles
 
+COLLISION_MINUTES = 60
+def breaking_collisions(sid, at, c=None):
+    """Same-story rule (CoS Nov 1): at most one email per story per subscriber within collision_minutes (default 60), and a breaking alert wins.
+    Story key = blackout.db clusters.cluster_id (the id sent_items, breaking_seen and breaking_runs already use).
+    -> cluster ids this subscriber got in a breaking alert in the window (sent_items kind='breaking') or is being sent right now
+    (a 'sending' row for a breaking run). build_issue leaves these out of every section, UPDATE and followed stories included."""
+    if not sid: return set()
+    cut = iso(at - timedelta(minutes=float((c or cfg()).get("collision_minutes") or COLLISION_MINUTES)))
+    k = db()
+    try:
+        ids = {x[0] for x in k.execute("SELECT cluster_id FROM sent_items WHERE subscriber_id=? AND kind='breaking' AND sent_at>=?", (sid, cut))}
+        for (cj,) in k.execute("""SELECT r.cluster_ids FROM breaking_runs r JOIN sends s ON s.slot_key='breaking:'||r.id
+                                  WHERE s.subscriber_id=? AND s.status='sending' AND r.ts>=?""", (sid, cut)):
+            try: ids |= {x for x in json.loads(cj or "[]") if not str(x).startswith("trend:")}
+            except ValueError: pass
+    finally: k.close()
+    return ids
+
 def _breaking_ids():
     try:
         k = db(); ids = {x[0] for x in k.execute("SELECT cluster_id FROM breaking_seen")}; k.close(); return ids
@@ -585,6 +603,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     allcats = "all" in ints or not ints
     follows = set((sub or {}).get("follows") or [])
     hist, sent_titles = _history(sub.get("id") if sub else None, at, c)
+    collide = breaking_collisions(sub.get("id") if sub else None, at, c)   # breaking alert in the last 60 min wins over the brief
     s0, s1 = iso(start), iso(at)
     ed_ids = []
     try:
@@ -614,6 +633,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     follow_u, updates = [], []
     for r in trows:
         cid = r["cluster_id"]; followed = cid in follows; h0 = hist.get(cid)
+        if cid in collide: continue
         if not followed:
             if not h0 or r["watchlist"] or int(r["rank"] or 0) < int(c["notable_min_rank"]): continue
             if not allcats and (r["category"] or "other") not in ints: continue
@@ -627,7 +647,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     updates = sorted(updates, key=keyf)[:int(c.get("max_update_items") or 5)]
     picked_titles = [x["title_norm"] for x in follow_u + updates]; used = {x["cluster_id"] for x in follow_u + updates}
     def take(r):
-        if r["cluster_id"] in hist or r["cluster_id"] in used: return False
+        if r["cluster_id"] in hist or r["cluster_id"] in used or r["cluster_id"] in collide: return False
         if not allcats and (r["category"] or "other") not in ints and r["cluster_id"] not in follows: return False
         tn = norm_title(r["title"])
         if any(similar(tn, x) for x in sent_titles + picked_titles): return False
@@ -1842,9 +1862,11 @@ def run_due(at=None):
     """Called every ~30 s by newsletter_worker.py. Idempotent per slot: the slot_runs row is written before anything is sent and each
     (subscriber, slot) pair is UNIQUE in sends, so restarts never double-send. Catch-up: a slot missed while the box was down is sent
     once if we're within catchup_hours (2 h) of it, otherwise recorded as skipped. Failed sends retry with backoff (2, 10, 30 min).
-    Then checks the breaking-alert trigger (run_breaking)."""
+    The breaking-alert trigger (run_breaking) runs first, so an alert takes precedence over a brief due in the same tick."""
     c = cfg(); at = at or now(); res = []
     with _LOCK:
+        try: res += run_breaking(at, c)   # CoS Nov 1: breaking runs BEFORE the brief slots, so it takes precedence (see breaking_collisions)
+        except Exception as ex: traceback.print_exc(); log(f"breaking check failed: {ex}", "error")
         d0 = at.astimezone(ET).date()
         k = db(); fresh = k.execute("SELECT COUNT(*) FROM slot_runs").fetchone()[0] == 0; k.close()
         for day in (d0 - timedelta(days=1), d0):
@@ -1870,8 +1892,6 @@ def run_due(at=None):
                     k.close()
                 st, agg = run_slot(key, s, at if r is None else max(parse_t(r["started"]) or at, t), c)
                 res.append((key, st))
-        try: res += run_breaking(at, c)
-        except Exception as ex: traceback.print_exc(); log(f"breaking check failed: {ex}", "error")
         try: res += [("crime_alert", x[1]) for x in run_crime_alerts(at, c)]   # t392: gated off unless crime_alerts.enabled
         except Exception as ex: traceback.print_exc(); log(f"crime alert check failed: {ex}", "error")
     return res
