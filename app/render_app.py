@@ -11,6 +11,10 @@ Env vars (set in the Render dashboard; never baked into the image):
   BN_ADMIN_PASSCODE  optional: admin passcode; otherwise the box pushes it over the sync channel; otherwise a random one (admin unusable)
   NEWSLETTER_SECRET  optional: otherwise pushed by the box (keeps confirm/unsubscribe links valid on both sides)
   BN_PUBLIC_POST_ALLOW optional: extra comma-separated POST path prefixes the public may call
+  BN_HANDOFF_URL     optional: where a freshly deployed instance pulls data from the still-running old instance
+                     (default: RENDER_EXTERNAL_URL, set by Render; unset locally = handoff off, old behaviour)
+  BN_HANDOFF_WAIT_S / BN_HANDOFF_NOPEER_TRIES / BN_HANDOFF_FREEZE_S  optional tuning (defaults 420 / 3 / 120)
+Zero-downtime deploys (2026-11-01): see the "deploy handoff" section below.
 Newsletter live sending stays locked here: NEWSLETTER_SENDER is forced to preview and no worker runs."""
 import os, sys, io, json, time, hmac, hashlib, tarfile, tempfile, threading, subprocess, sqlite3, secrets, traceback, gzip, shutil
 
@@ -31,6 +35,7 @@ BOOT_ID = secrets.token_hex(8)
 BOOTED = time.time()
 MANIFEST_F = os.path.join(STATE, "manifest.json")
 SYNC = {"last_push": None, "pushes": 0, "files": 0, "bytes": 0, "restored": False, "last_error": None}
+FREEZE = {"until": 0.0}          # set on the OLD instance after it hands its Render-owned DBs to a new deploy (see handoff section)
 _mlock = threading.Lock()
 
 # ---------- web-only guards: block background loops and subprocesses started by add-ons ----------
@@ -97,6 +102,7 @@ def _nl_tick():
         time.sleep(45)
         try:
             if not SYNC.get("restored") and SYNC_SECRET: continue          # wait until newsletter.db is restored from the mirror
+            if FREEZE["until"] > time.time(): continue                      # handing newsletter.db to a new deploy: it runs the next slot
             import newsletter as NL
             if not NL.cfg().get("render_scheduler"): continue
             with open(os.path.join(STATE, "newsletter_sched.lock"), "w") as lk:
@@ -158,6 +164,30 @@ def _install(rel, tmp_path, kind):
             try: os.unlink(dest + suf)       # stale WAL/SHM from the previous file must never be applied to the new one
             except FileNotFoundError: pass
 
+PUSHED_SINCE_BOOT = set()     # files the box pushed to THIS instance; a deploy handoff never overwrites them (box data is newer)
+def _apply_tar(tmp, source="push"):
+    """Install a signed tar.gz (box push or deploy handoff). Returns (installed, refused, meta)."""
+    done, refused, meta = [], [], {}
+    with tarfile.open(tmp, "r:gz") as tf:
+        for m in tf:
+            if m.name == "__meta__.json" and m.isfile():
+                meta = json.load(tf.extractfile(m)); continue
+            kind = R.sync_kind(m.name)
+            if not m.isfile() or kind is None or (kind == "owned" and m.name not in (meta.get("restore") or [])):
+                refused.append(m.name); continue
+            if source == "handoff" and m.name in PUSHED_SINCE_BOOT:
+                refused.append(m.name); continue
+            src = tf.extractfile(m)
+            dfd, dtmp = tempfile.mkstemp(dir=os.path.dirname(os.path.join(BASE, m.name)) if os.path.isdir(os.path.dirname(os.path.join(BASE, m.name))) else BASE, prefix=".bnsync_")
+            with os.fdopen(dfd, "wb") as out: shutil.copyfileobj(src, out)
+            _install(m.name, dtmp, kind)
+            with _mlock: MAN[m.name] = (meta.get("hashes") or {}).get(m.name) or _sha(os.path.join(BASE, m.name))
+            if source == "push": PUSHED_SINCE_BOOT.add(m.name)
+            done.append(m.name); SYNC["bytes"] += m.size
+    if meta.get("secrets"): apply_secrets(meta["secrets"])
+    with _mlock: _save_manifest()
+    return done, refused, meta
+
 def handle_push(h):
     n = int(h.headers.get("Content-Length") or 0)
     if n <= 0 or n > MAX_PUSH: return 413, {"error": f"push must be 1..{MAX_PUSH} bytes"}
@@ -171,24 +201,8 @@ def handle_push(h):
         if left: return 400, {"error": "short body"}
         ok, why = verify(h, "POST", "/internal/sync/push", hsh.hexdigest())
         if not ok: return 403, {"error": why}
-        done, refused = [], []
-        with tarfile.open(tmp, "r:gz") as tf:
-            meta = {}
-            for m in tf:
-                if m.name == "__meta__.json" and m.isfile():
-                    meta = json.load(tf.extractfile(m)); continue
-                kind = R.sync_kind(m.name)
-                if not m.isfile() or kind is None or (kind == "owned" and m.name not in (meta.get("restore") or [])):
-                    refused.append(m.name); continue
-                src = tf.extractfile(m)
-                dfd, dtmp = tempfile.mkstemp(dir=os.path.dirname(os.path.join(BASE, m.name)) if os.path.isdir(os.path.dirname(os.path.join(BASE, m.name))) else BASE, prefix=".bnsync_")
-                with os.fdopen(dfd, "wb") as out: shutil.copyfileobj(src, out)
-                _install(m.name, dtmp, kind)
-                with _mlock: MAN[m.name] = (meta.get("hashes") or {}).get(m.name) or _sha(os.path.join(BASE, m.name))
-                done.append(m.name); SYNC["bytes"] += m.size
-        if meta.get("secrets"): apply_secrets(meta["secrets"])
+        done, refused, meta = _apply_tar(tmp, "push")
         if meta.get("restore_done"): SYNC["restored"] = True
-        with _mlock: _save_manifest()
         SYNC.update(last_push=time.time(), pushes=SYNC["pushes"] + 1, files=SYNC["files"] + len(done))
         _refresh_state()
         return 200, {"status": "ok", "installed": len(done), "refused": refused[:50], "boot_id": BOOT_ID}
@@ -233,6 +247,7 @@ def public_status():
             "last_sync": _iso(lp), "last_sync_age_s": age, "sync_healthy": bool(lp) and age < 900,
             "pushes_since_boot": SYNC["pushes"], "files_installed_since_boot": SYNC["files"], "owned_restored": SYNC["restored"],
             "last_scan": _iso(ls), "last_scan_age_s": round(time.time() - ls) if ls else None, "now": _iso(time.time()),
+            "deploy_handoff": {k: HANDOFF[k] for k in ("state", "files", "bytes", "seconds")}, "writes_paused": FREEZE["until"] > time.time(),
             "memory": {**_mem(), "limit_mb": 512, "malloc_arena_max": os.environ.get("MALLOC_ARENA_MAX")}}
 
 # ---------- keep "last scan / next scan" meaningful from synced data ----------
@@ -246,6 +261,124 @@ def _refresh_state():
             t = server.scanner.parse_t(r[0]).timestamp()
             server.state["last_scan"] = t; server.state["next_scan"] = t + server.cfg()["interval_minutes"] * 60
     except Exception: traceback.print_exc()
+
+# ---------- deploy handoff (2026-11-01, zero-downtime rule) ----------
+# Root cause of the 2-minute 503 after each deploy: Render's disk starts empty, /healthz said 200 at once, so Render moved traffic
+# to the new instance before any data was there, and the box only refilled it on its next sync cycle (up to 60 s + ~25 s upload).
+# Now a new instance with no data:
+#   1. asks the still-live OLD instance (public RENDER_EXTERNAL_URL: during a deploy Render keeps routing it to the old one)
+#      for a signed export of everything the box pushed ("bulk"), then of the Render-owned DBs ("owned"), and installs both;
+#   2. answers /healthz with 503 until that is done, so Render keeps serving the old instance meanwhile;
+#   3. gives up (=> /healthz 200, the old behaviour; the box sync fills it) when there is no live old instance (cold start
+#      or crash) or after BN_HANDOFF_WAIT_S, well inside Render's 15-minute deploy health-check limit.
+# The OLD instance pauses public writes to the owned DBs (newsletter/votes/push signups get "try again in a minute") and its
+# newsletter scheduler for BN_HANDOFF_FREEZE_S after the owned export, so nothing written in the switch-over gap is lost.
+# Same HMAC (BN_SYNC_SECRET) as the box sync; no new credential, no paid service.
+import urllib.request, urllib.error
+HANDOFF_URL = (os.environ.get("BN_HANDOFF_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "").rstrip("/")
+if os.environ.get("BN_HANDOFF", "1") == "0": HANDOFF_URL = ""          # kill switch: BN_HANDOFF=0 restores the old behaviour
+HANDOFF_WAIT_S = int(os.environ.get("BN_HANDOFF_WAIT_S", "420"))
+HANDOFF_NOPEER_TRIES = int(os.environ.get("BN_HANDOFF_NOPEER_TRIES", "3"))
+HANDOFF_FREEZE_S = int(os.environ.get("BN_HANDOFF_FREEZE_S", "120"))
+HANDOFF = {"state": "off", "detail": None, "files": 0, "bytes": 0, "seconds": None, "peer_boot": None}
+_export_lock = threading.Lock()
+
+def ready():
+    """Render health: serve traffic only with data, unless the handoff is off, finished or gave up."""
+    if HANDOFF["state"] == "pending" and time.time() - BOOTED > HANDOFF_WAIT_S + 60: HANDOFF["state"] = "gave_up"   # belt and braces
+    return HANDOFF["state"] != "pending"
+
+def _sign_get(path):
+    ts = str(int(time.time()))
+    sig = hmac.new(SYNC_SECRET.encode(), f"{ts}\nGET\n{path}\n{hashlib.sha256(b'').hexdigest()}".encode(), hashlib.sha256).hexdigest()
+    return {"X-BN-Ts": ts, "X-BN-Sig": sig, "User-Agent": "blackout-handoff/1.0"}
+
+def _peer_get(path, timeout, to_file=None):
+    """GET from the peer (old) instance. Returns (status, bytes|None); with to_file the body is streamed to disk."""
+    req = urllib.request.Request(HANDOFF_URL + path, headers=_sign_get(path))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            if to_file is None: return r.status, r.read(1 << 20)
+            with open(to_file, "wb") as f: shutil.copyfileobj(r, f, 1 << 20)
+            return r.status, None
+    except urllib.error.HTTPError as e: return e.code, e.read(4096)
+
+def export_tar(part, out):
+    """OLD instance side: write a tar.gz of the box-pushed files (bulk) or the Render-owned DBs (owned) to out."""
+    meta = {"boot_id": BOOT_ID, "part": part, "hashes": {}, "restore": []}
+    items = []                                            # (rel, path, is_temp)
+    try:
+        if part == "bulk":
+            with _mlock: files = dict(MAN)
+            for rel, h in sorted(files.items()):
+                p = os.path.join(BASE, rel); kind = R.sync_kind(rel)
+                if rel in R.RENDER_OWNED or kind in (None, "owned") or not os.path.exists(p): continue
+                items.append((rel, _db_snapshot(rel), True) if kind == "db" else (rel, p, False)); meta["hashes"][rel] = h
+        else:
+            for rel in R.RENDER_OWNED:
+                if os.path.exists(os.path.join(BASE, rel)):
+                    sp = _db_snapshot(rel); items.append((rel, sp, True)); meta["restore"].append(rel); meta["hashes"][rel] = _sha(sp)
+            meta["restored"] = bool(SYNC["restored"])
+            if not os.environ.get("NEWSLETTER_SECRET"):
+                try:
+                    for line in open(os.environ["NEWSLETTER_ENV"]):
+                        if line.startswith("NEWSLETTER_SECRET="): meta["secrets"] = {"newsletter_secret": line.split("=", 1)[1].strip()}
+                except Exception: pass
+            FREEZE["until"] = time.time() + HANDOFF_FREEZE_S   # from here on, owned writes would be lost in the switch-over
+        with tarfile.open(out, "w:gz", compresslevel=3) as tf:
+            mb = json.dumps(meta).encode(); ti = tarfile.TarInfo("__meta__.json"); ti.size = len(mb); ti.mtime = int(time.time())
+            tf.addfile(ti, io.BytesIO(mb))
+            for rel, p, _ in items:
+                ti = tf.gettarinfo(p, arcname=rel); ti.uid = ti.gid = 0; ti.uname = ti.gname = ""; ti.mode = 0o644
+                with open(p, "rb") as fh: tf.addfile(ti, fh)
+    finally:
+        for _, p, tmp in items:
+            if tmp:
+                try: os.unlink(p)
+                except FileNotFoundError: pass
+    return len(items)
+
+def _handoff():
+    t0 = time.time(); misses = 0
+    def _done(state, detail):
+        HANDOFF.update(state=state, detail=detail, seconds=round(time.time() - t0, 1))
+        print(f"deploy handoff: {state} ({detail}) after {HANDOFF['seconds']} s", flush=True)
+    while time.time() - t0 < HANDOFF_WAIT_S:
+        if SYNC["pushes"] and has_data(): return _done("superseded", "the box sync filled this instance first")
+        try:
+            code, body = _peer_get("/healthz", 10)
+            try: info = json.loads(body or b"{}")
+            except Exception: info = {}
+            if info.get("boot_id") and info["boot_id"] != BOOT_ID and info.get("has_data"):
+                HANDOFF["peer_boot"] = info["boot_id"]
+                got = 0
+                for part, tmo in (("bulk", 300), ("owned", 120)):
+                    fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".handoff.tgz"); os.close(fd)
+                    try:
+                        c, b = _peer_get(f"/internal/sync/export?part={part}", tmo, to_file=tmp)
+                        if c != 200: raise RuntimeError(f"export {part} -> HTTP {c}: {(b or b'')[:120]!r}")
+                        HANDOFF["bytes"] += os.path.getsize(tmp)
+                        done, refused, meta = _apply_tar(tmp, "handoff")
+                        if meta.get("boot_id") != HANDOFF["peer_boot"]: raise RuntimeError("export came from an unexpected instance")
+                        got += len(done)
+                        if part == "owned" and meta.get("restored"): SYNC["restored"] = True
+                    finally:
+                        try: os.unlink(tmp)
+                        except FileNotFoundError: pass
+                HANDOFF["files"] = got; _refresh_state()
+                if has_data(): return _done("done", f"{got} files from instance {HANDOFF['peer_boot']}")
+                raise RuntimeError("export had no blackout.db")
+            misses += 1; HANDOFF["detail"] = f"no live peer with data (HTTP {code})"
+        except Exception as ex:
+            misses += 1; HANDOFF["detail"] = str(ex)[:200]; print(f"deploy handoff: attempt {misses} failed: {HANDOFF['detail']}", flush=True)
+        if misses >= HANDOFF_NOPEER_TRIES: return _done("gave_up", HANDOFF["detail"])
+        time.sleep(10)
+    _done("gave_up", "timeout: " + str(HANDOFF["detail"]))
+
+def start_handoff():
+    if has_data() or not HANDOFF_URL or len(SYNC_SECRET) < 32: return
+    HANDOFF["state"] = "pending"
+    threading.Thread(target=_handoff, name="deploy-handoff", daemon=True).start()
 
 # ---------- translation: no Argos on Render -> serve cached translations; language list pushed by the box ----------
 _orig_addon_mod = server._addon_mod
@@ -282,7 +415,29 @@ class RH(server.H):
         return self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or self.client_address[0]
     def do_GET(self):
         path = self.path.split("?", 1)[0]
-        if path == "/healthz": return self.send(200, {"ok": True, "has_data": has_data(), "boot_id": BOOT_ID})
+        if path == "/healthz":
+            r = ready()
+            return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"]})
+        if path == "/internal/sync/export":
+            ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
+            if not ok: return self.send(403, {"error": why})
+            part = "owned" if "part=owned" in self.path else "bulk"
+            if not has_data(): return self.send(409, {"error": "no data to hand off"})
+            if not _export_lock.acquire(timeout=120): return self.send(429, {"error": "export busy"})
+            fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".export.tgz"); os.close(fd)
+            try:
+                n = export_tar(part, tmp); size = os.path.getsize(tmp)
+                print(f"deploy handoff: exported {part} ({n} files, {size} bytes)", flush=True)
+                self.send_response(200); self.send_header("Content-Type", "application/gzip"); self.send_header("Content-Length", str(size))
+                self.send_header("Cache-Control", "no-store"); self.end_headers()
+                with open(tmp, "rb") as f: shutil.copyfileobj(f, self.wfile, 1 << 20)
+                return
+            except Exception as ex:
+                traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
+            finally:
+                _export_lock.release()
+                try: os.unlink(tmp)
+                except FileNotFoundError: pass
         if path in ("/api/status", "/api/sync_status"): return self.send(200, public_status())
         if path == "/internal/sync/manifest":
             ok, why = verify(self, "GET", path, hashlib.sha256(b"").hexdigest())
@@ -322,6 +477,8 @@ class RH(server.H):
             self.body(); return self.send(503 if path == "/api/refresh" else 403, {"status": "unavailable", "error": BOX_ONLY[path]})
         if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in POST_ALLOW):
             self.body(); return self.send(403, {"error": "read-only public node"})
+        if any(path == p or path.startswith(p + "/") for p in OWNED_WRITERS) and FREEZE["until"] > time.time():
+            self.body(); return self.send(503, {"error": "The site is updating. Please try again in a minute."})
         if any(path == p or path.startswith(p + "/") for p in OWNED_WRITERS) and SYNC_SECRET and not SYNC["restored"] and time.time() - BOOTED < 900:
             self.body(); return self.send(503, {"error": "The site just restarted and is syncing. Please try again in a minute."})
         return super().do_POST()
@@ -338,6 +495,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
     if not SYNC_SECRET: print("WARNING: BN_SYNC_SECRET not set; the box cannot push data", flush=True)
     t = threading.Thread(target=_render_bg, daemon=True); t.start()
+    start_handoff()
+    print(f"deploy handoff: {HANDOFF['state']} (peer url set: {bool(HANDOFF_URL)})", flush=True)
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True
     server.ThreadingHTTPServer.request_queue_size = 256   # t338: the default listen backlog (5) overflowed on page loads (~40 parallel requests) -> Render 502s
