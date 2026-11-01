@@ -276,6 +276,41 @@ def report(lat, lon, cc, names, force=False):
     d = dict(d); d["cached"] = hit
     return d
 
+# ---------------- t244: live radar frame lists (tiles themselves load straight from the providers in the browser) ----------------
+RV_JSON = "https://api.rainviewer.com/public/weather-maps.json"   # RainViewer public Weather Maps API: free, no key, personal/educational/small community use, credit required
+NOAA_WMS = "https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows"   # NOAA/NWS NCEP MRMS QC base reflectivity (CONUS), public domain, no fees/constraints
+NOAA_LAYER = "conus_bref_qcd"
+
+def _noaa_times():
+    t0 = time.time()
+    req = urllib.request.Request(NOAA_WMS + "?service=WMS&request=GetCapabilities&version=1.3.0", headers={"User-Agent": UA, "Accept": "text/xml"})
+    with urllib.request.urlopen(req, timeout=15) as r: xml = r.read(2_000_000).decode("utf-8", "replace")
+    m = re.search(r'<Dimension[^>]*name="time"[^>]*>([^<]+)</Dimension>', xml)
+    if not m: raise ValueError("no time dimension in NOAA WMS capabilities")
+    ts = sorted(t.strip() for t in m.group(1).split(",") if t.strip())
+    # ~2-minute scans over the last 2 h -> one frame about every 10 min, newest always included
+    out, last = [], None
+    for t in reversed(ts):
+        d = datetime.strptime(t[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+        if last is None or (last - d).total_seconds() >= 570: out.append(t); last = d
+        if len(out) >= 12: break
+    return list(reversed(out)), round(time.time() - t0, 2)
+
+def _rv_frames():
+    d, secs = fetch(RV_JSON)
+    fr = [{"time": f["time"], "path": f["path"]} for f in ((d.get("radar") or {}).get("past") or []) if f.get("path")]
+    return {"host": d.get("host") or "https://tilecache.rainviewer.com", "frames": fr[-12:], "generated": d.get("generated")}, secs
+
+def radar():
+    """Frame timelines for both radar sources, cached 2 min so visitors don't each hit the upstreams."""
+    def go():
+        with ThreadPoolExecutor(2) as ex:
+            a = ex.submit(src, "NOAA/NWS MRMS radar (WMS)", NOAA_WMS + "?service=WMS&request=GetCapabilities", _noaa_times)
+            b = ex.submit(src, "RainViewer radar", RV_JSON, _rv_frames)
+            return {"noaa": a.result(), "rainviewer": b.result()}
+    r, hit = cached(("radar",), 120, go)
+    return 200, dict(r, generated=iso(), cached=hit, noaa_wms=NOAA_WMS, noaa_layer=NOAA_LAYER)
+
 def _f(qs, k, default=None):
     v = (qs.get(k) or [default])[0]
     return v
@@ -286,6 +321,7 @@ def handle_get(path, qs):
         if name in FILES:
             with open(os.path.join(STATIC, name), "rb") as fh: return 200, fh.read(), FILES[name]
         if name == "geocode": return geocode(_f(qs, "q", ""))
+        if name == "radar": return radar()
         if name == "reverse":
             try: lat, lon = float(_f(qs, "lat")), float(_f(qs, "lon"))
             except Exception: return 400, {"error": "lat and lon required"}
