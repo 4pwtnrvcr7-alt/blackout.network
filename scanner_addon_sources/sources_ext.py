@@ -794,6 +794,65 @@ T414_SOURCES = [
     ("HKCERT security bulletins RSS", "https://www.hkcert.org/getrss/security-bulletin", f_hkcert),
 ]
 
+# ---- t414b (2026-11-01 2:26 PM ET): second approved batch (SPC, CDC travel notices, Copernicus EMS, WOAH, InciWeb) ----
+def f_spc():
+    _polite("spc")
+    out = []
+    for it in S.rss_generic("NOAA SPC products", "NOAA-SPC", "https://www.spc.noaa.gov/products/spcrss.xml", "natural disaster", 10, True, maxage_d=2,
+                            force_cat=True, kwboost=r"tornado watch|high risk|moderate risk|PDS|particularly dangerous"):
+        if re.search(r"Watch|Outlook|Mesoscale|Fire Weather", it["title"], re.I) and not re.search(r"No watches are valid", it["title"], re.I):
+            it["location"] = it.get("location") or "United States"; out.append(it)
+    return out
+def f_cdctravel():
+    _polite("cdc")
+    return S.rss_generic("CDC travel health notices", "CDC", "https://wwwnc.cdc.gov/travel/rss/notices.xml", "disease", 15, True, maxage_d=30,
+                         force_cat=True, kwboost=r"level 3|level 4|avoid nonessential|outbreak|ebola|marburg")
+def f_cems():
+    """Copernicus EMS rapid mapping activations (open or updated in the last 7 days)."""
+    _polite("cems")
+    j = S.get("https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=20", headers=T248_UA, timeout=30).json()
+    out = []
+    for a in j.get("results", []):
+        t = S.parse_t((a.get("eventTime") or a.get("activationTime") or "") + "Z"); lu = S.parse_t((a.get("lastUpdate") or "")[:19] + "Z")
+        if (lu or t) and (lu or t) < S.now() - timedelta(days=S.HISTORY_D): continue
+        m = re.search(r"POINT \((-?[\d.]+) (-?[\d.]+)\)", a.get("centroid") or ""); lon, lat = (float(m.group(1)), float(m.group(2))) if m else (None, None)
+        cat = "natural disaster" if re.search(r"flood|fire|storm|earthquake|volcan|landslide|cyclone|drought|tsunami|wind", a.get("category") or a.get("name") or "", re.I) else S.classify(a.get("name", ""), "natural disaster")
+        out.append(S.item("Copernicus EMS", "CEMS", a["code"], f"Copernicus EMS {a['code']}: {a.get('name')}" + (" (closed)" if a.get("closed") else ""), cat,
+                          f"https://rapidmapping.emergency.copernicus.eu/{a['code']}/", t, lat, lon, ", ".join(a.get("countries") or []),
+                          20 if not a.get("closed") else 10, extra={"activation": a.get("activationTime"), "category": a.get("category")}))
+    return out
+def f_woah():
+    _polite("woah")
+    out = []
+    for it in S.rss_generic("WOAH (World Organisation for Animal Health)", "WOAH", "https://www.woah.org/en/feed/", "disease", 10, True, maxage_d=14,
+                            force_cat=True, kwboost=r"avian influenza|H5N1|outbreak|african swine fever|foot and mouth|rabies|emergency"):
+        if re.search(r"influenza|outbreak|disease|fever|virus|epidemic|zoonos|H5N|rabies|swine|anthrax|alert|emergency", it["title"] + " " + json.loads(it["extra"] or "{}").get("desc", "") if isinstance(it.get("extra"), str) else it["title"], re.I):
+            out.append(it)
+    return out
+def f_inciweb():
+    """InciWeb incidents RSS, wildfires only: keep items whose text says 'type of incident is Wildfire'; prescribed burns / Rx units dropped."""
+    _polite("inciweb")
+    raw = S.get("https://inciweb.wildfire.gov/incidents/rss.xml", headers=T248_UA, timeout=30).content
+    out = []
+    for e in S.rss_items(raw):
+        t = S.parse_t(e.get("pubDate"))
+        if t and t < S.now() - timedelta(days=7): continue
+        title = S.strip(e.get("title")); desc = S.strip(e.get("description"))
+        if not re.search(r"type of incident is Wildfire", desc, re.I) or re.search(r"prescribed|\bRx\b|pile burn", title, re.I): continue
+        b = 15 + (20 if re.search(r"evacuat|red flag|0% contain", desc, re.I) else 0)
+        st = re.search(r"\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Florida|Georgia|Hawaii|Idaho|Kansas|Montana|Nebraska|Nevada|New Mexico|North Carolina|Oklahoma|Oregon|South Dakota|Tennessee|Texas|Utah|Virginia|Washington|Wyoming|Minnesota|Michigan|Kentucky|Missouri)\b", desc)
+        out.append(S.item("InciWeb wildfires", "InciWeb", e.get("guid") or e.get("link") or title, f"InciWeb: {title} wildfire", "natural disaster",
+                          e.get("link") or "https://inciweb.wildfire.gov/", t, None, None, (st.group(1) + ", US") if st else "United States", b,
+                          extra={"desc": desc[:400]}))
+    return out
+T414B_SOURCES = [
+    ("NOAA SPC watches/outlooks RSS", "https://www.spc.noaa.gov/products/spcrss.xml", f_spc),
+    ("CDC travel health notices RSS", "https://wwwnc.cdc.gov/travel/notices", f_cdctravel),
+    ("Copernicus EMS rapid mapping activations", "https://rapidmapping.emergency.copernicus.eu/", f_cems),
+    ("WOAH news feed (animal disease)", "https://www.woah.org/en/feed/", f_woah),
+    ("InciWeb wildfires RSS (prescribed burns excluded)", "https://inciweb.wildfire.gov/incidents/rss.xml", f_inciweb),
+]
+
 EXT_SOURCES = [
     ("Reddit public RSS (multireddit: " + ", ".join(SUBS) + ")", "https://www.reddit.com/r/worldnews+news/new/.rss", f_reddit),
     ("Bluesky public search API", "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts", f_bluesky),
@@ -822,7 +881,7 @@ EXT_SOURCES = [
     ("IODA internet outages (country + region, filtered)", "https://api.ioda.inetintel.cc.gatech.edu/v2/outages/events", f_ioda),
     ("MeteoAlarm warnings (EUMETNET CAP, Severe/Extreme only)", "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-{country}", f_meteoalarm),
 ]
-EXT_SOURCES += T414_SOURCES
+EXT_SOURCES += T414_SOURCES + T414B_SOURCES
 EXT_FAILED = [
     ("ReliefWeb API v2", "https://apidoc.reliefweb.int/", "2026-11-01 t414: HTTP 403 'not using an approved appname' (v1 is 410 decommissioned); needs an appname request to ReliefWeb (form, not done). ReliefWeb still covered by the Disasters RSS in scanner.py"),
     ("Africa CDC site-wide RSS", "https://africacdc.org/feed/", "HTTP 200 but empty (no items) - news-item and disease-outbreak feeds used instead"),
