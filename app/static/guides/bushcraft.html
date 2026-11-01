@@ -1,189 +1,486 @@
+<style>
+/* bushcraft v2 (visual) — scoped to #gd-bush; illustration style: guides/illustrations/STYLE.md */
+#gd-bush .bc-ill{float:none;width:100%;max-width:none;margin:0}
+#gd-bush section{display:block}
+#gd-bush section>.bc-ill{max-width:460px;margin:10px auto}
+#gd-bush .bv-tile,#gd-bush .bv-end,#gd-bush .bv-card,#gd-bush .bv-step,#gd-bush .bv-q{color:#f2f4f7}
+#gd-bush .bv-lead{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:center;margin:6px 0 12px}
+@media(min-width:760px){#gd-bush .bv-lead{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}}
+#gd-bush .bv-rule{font-size:22px;line-height:1.3;font-weight:800;color:#fff;background:#1b2129;border-left:6px solid #ff4d4f;border-radius:8px;padding:12px 14px}
+#gd-bush .bv-rule small{display:block;font-size:15px;font-weight:500;color:#aab6c4;margin-top:4px}
+#gd-bush h3{margin-top:20px}
+#gd-bush .bv-fig{margin:10px 0;padding:12px;background:#0f1317;border:1px solid var(--bd);border-radius:10px}
+#gd-bush .bv-fig>figcaption,#gd-bush .bv-cr{display:block;margin-top:6px;font-size:11px;line-height:1.3;color:var(--mu);letter-spacing:.02em;text-align:right}
+#gd-bush .bv-grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+#gd-bush .bv-grid.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+#gd-bush .bv-grid.g4{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+#gd-bush .bv-tile{background:#1b2129;border:1px solid var(--bd2);border-radius:10px;padding:10px;text-align:center;font-size:16px;line-height:1.35}
+#gd-bush .bv-tile .i{display:block;font-size:34px;line-height:1.2}
+#gd-bush .bv-tile .i+b{display:block;font-size:17px;margin:2px 0}
+#gd-bush .bv-tile.bad{border-color:#ff4d4f;background:#2a1215}
+#gd-bush .bv-tile.ok{border-color:#52c41a;background:#13220f}
+#gd-bush .bv-tile.warn{border-color:#faad14;background:#2a2410}
+/* numbered step panels */
+#gd-bush .bv-steps{counter-reset:bvs;display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+#gd-bush .bv-step{position:relative;background:#0f1317;border:1px solid var(--bd);border-radius:10px;padding:10px 10px 8px;font-size:16px;line-height:1.35}
+#gd-bush .bv-step:before{counter-increment:bvs;content:counter(bvs);position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:50%;background:#ff4d4f;color:#fff;font-weight:800;display:grid;place-items:center;font-size:16px;z-index:1}
+#gd-bush .bv-step .bc-ill{border:0;padding:0;background:none}
+#gd-bush .bv-step .bc-ill figcaption{text-align:right}
+#gd-bush .bv-step p{margin:6px 0 0;text-align:center}
+/* priority flow */
+#gd-bush .bv-pri{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;margin:8px 0;list-style:none;padding:0}
+#gd-bush .bv-pri li{display:flex;flex-direction:column;align-items:center;width:88px;margin:0;font-size:14px;font-weight:700;text-align:center;line-height:1.2}
+#gd-bush .bv-pri li span{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:#1b2129;border:2px solid #4aa3ff;font-size:28px;margin-bottom:4px}
+#gd-bush .bv-pri li.first span{border-color:#ff4d4f}
+#gd-bush .bv-pri .ar{width:auto;color:#8b95a3;font-size:22px;font-weight:400}
+/* bar charts */
+#gd-bush .bv-bars{display:grid;gap:8px}
+#gd-bush .bv-bar{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;align-items:center;font-size:15px}
+#gd-bush .bv-bar>span:first-child{text-align:right;color:#dce6f2;line-height:1.2}
+#gd-bush .bv-track{background:#1b2129;border-radius:6px;height:30px;position:relative;overflow:hidden}
+#gd-bush .bv-fill{height:100%;width:var(--w);border-radius:6px;background:var(--c,#4aa3ff);display:flex;align-items:center;justify-content:flex-end;padding:0 8px;box-sizing:border-box;color:#0b0d10;font-weight:800;white-space:nowrap;transform-origin:left center;animation:bvGrow 1.4s ease-out both}
+#gd-bush .bv-note{font-size:14px;color:#aab6c4;margin:6px 0 0}
+@media(max-width:520px){#gd-bush .bv-bar{grid-template-columns:86px minmax(0,1fr);font-size:13px}}
+/* flowchart */
+#gd-bush .bv-flow{display:flex;flex-direction:column;align-items:center;gap:0;font-size:16px;line-height:1.3}
+#gd-bush .bv-q{background:#1b2129;border:2px solid #4aa3ff;border-radius:12px;padding:8px 14px;font-weight:800;text-align:center;max-width:460px}
+#gd-bush .bv-down{width:2px;height:22px;background:#8b95a3;position:relative;margin:0 auto}
+#gd-bush .bv-down:after{content:"";position:absolute;bottom:-2px;left:-5px;border:6px solid transparent;border-top-color:#8b95a3;border-bottom:0}
+#gd-bush .bv-down.pulse{animation:bvPulse 2s ease-in-out infinite}
+#gd-bush .bv-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:640px}
+#gd-bush .bv-br{display:flex;flex-direction:column;align-items:center;text-align:center}
+#gd-bush .bv-yn{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:20px;padding:2px 10px;margin:4px 0}
+#gd-bush .bv-yn.y{background:#52c41a;color:#0b0d10}#gd-bush .bv-yn.n{background:#ff4d4f;color:#fff}
+#gd-bush .bv-end{border-radius:10px;padding:8px 12px;font-weight:700;width:100%;box-sizing:border-box}
+#gd-bush .bv-end.ok{background:#13220f;border:2px solid #52c41a}
+#gd-bush .bv-end.stop{background:#2a1215;border:2px solid #ff4d4f}
+#gd-bush .bv-end.do{background:#10263a;border:2px solid #4aa3ff}
+#gd-bush .bv-end small{display:block;font-weight:500;color:#c9d1db;font-size:14px;margin-top:2px}
+/* comparison tables */
+#gd-bush .bv-tw{overflow-x:auto}
+#gd-bush table.bv-cmp{border-collapse:separate;border-spacing:0;width:100%;font-size:15px;min-width:420px}
+#gd-bush .bv-cmp th,#gd-bush .bv-cmp td{padding:7px 8px;border-bottom:1px solid var(--bd2);text-align:center;vertical-align:middle}
+#gd-bush .bv-cmp th{color:#aab6c4;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+#gd-bush .bv-cmp td:first-child,#gd-bush .bv-cmp th:first-child{text-align:left;color:#fff;font-weight:700}
+#gd-bush .bv-cmp .y{color:#52c41a;font-size:20px;font-weight:800}
+#gd-bush .bv-cmp .p{color:#faad14;font-size:20px;font-weight:800}
+#gd-bush .bv-cmp .n{color:#ff4d4f;font-size:20px;font-weight:800}
+#gd-bush .bv-cmp tr.best td{background:#13220f}
+#gd-bush .bv-legend{font-size:13px;color:#aab6c4;margin-top:6px}
+/* bleach drops */
+#gd-bush .bv-drops{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:700;text-align:center}
+#gd-bush .bv-drops .d{display:inline-block;width:14px;height:18px;background:#4aa3ff;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;animation:bvDrip 2.4s ease-in infinite}
+#gd-bush .bv-drops .eq{color:#8b95a3;font-size:22px}
+#gd-bush .bv-jugs{display:flex;gap:4px;align-items:flex-end}
+#gd-bush .bv-jug{width:22px;height:30px;color:#4aa3ff}
+/* cards (plants) */
+#gd-bush .bv-cards{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+#gd-bush .bv-card{background:#1b2129;border:1px solid var(--bd2);border-radius:10px;padding:10px 12px;font-size:15px;line-height:1.4}
+#gd-bush .bv-card h4{margin:0 0 4px;font-size:18px;color:#fff}
+#gd-bush .bv-card h4 i{font-weight:400;color:#aab6c4;font-size:14px}
+#gd-bush .bv-card p{margin:4px 0}
+#gd-bush .bv-card .w{color:#ffccc7}
+#gd-bush .bv-card.tox{border-color:#ff4d4f}
+#gd-bush .bv-card.rash{border-color:#faad14}
+#gd-bush .bv-tag{display:inline-block;font-size:12px;font-weight:800;border-radius:12px;padding:1px 8px;margin-left:4px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em}
+#gd-bush .bv-tag.k{background:#ff4d4f;color:#fff}#gd-bush .bv-tag.r{background:#faad14;color:#0b0d10}
+#gd-bush .bv-sev{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px;font-size:14px}
+@media(max-width:520px){#gd-bush .bv-flow{font-size:14px}#gd-bush .bv-q{padding:6px 10px}#gd-bush .bv-end{padding:6px 8px}#gd-bush .bv-split{gap:6px}#gd-bush .bv-rule{font-size:19px}#gd-bush .bv-fig{padding:8px}}
+#gd-bush details.bv-id{margin:4px 0;font-size:14px;color:#c9d1db}#gd-bush details.bv-id summary{cursor:pointer;color:#7cc4ff;font-weight:700}
+@media(max-width:520px){#gd-bush .bv-grid:not(.g2){grid-template-columns:1fr 1fr}#gd-bush .bv-tile{font-size:14px;padding:8px}#gd-bush .bv-tile .i{font-size:28px}#gd-bush .bv-tile .i+b{font-size:15px}#gd-bush section{padding:12px}}
+/* collapsible detail */
+#gd-bush details.bv-more{margin:8px 0;background:#141a21;border:1px solid var(--bd2);border-radius:8px;padding:6px 12px;font-size:16px}
+#gd-bush details.bv-more summary{cursor:pointer;font-weight:700;color:#7cc4ff}
+#gd-bush details.bv-more[open] summary{margin-bottom:4px}
+#gd-bush .bv-big{display:block;font-size:28px;font-weight:900;color:#fff;line-height:1.1}
+#gd-bush .bv-k{color:#ffd666}
+/* motion: transform/opacity only; off under reduced motion and in print */
+#gd-bush .bv-sun{transform-box:view-box;transform-origin:100px 92px;animation:bvSun 9s ease-in-out infinite}
+#gd-bush .bv-heat{animation:bvHeat 1.8s ease-in infinite}
+#gd-bush .bv-heat.d2{animation-delay:.6s}#gd-bush .bv-heat.d3{animation-delay:1.2s}
+#gd-bush .bv-seq{animation:bvSeq 4s ease-in-out infinite}
+#gd-bush .bv-walk{animation:bvWalk 4s ease-in-out infinite}
+@keyframes bvGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes bvPulse{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes bvDrip{0%{transform:translateY(-8px);opacity:0}25%{opacity:1}70%,100%{transform:translateY(0);opacity:1}}
+@keyframes bvSun{0%,100%{transform:rotate(-68deg)}50%{transform:rotate(68deg)}}
+@keyframes bvHeat{0%{transform:translateY(-4px);opacity:0}30%{opacity:1}100%{transform:translateY(8px);opacity:0}}
+@keyframes bvSeq{0%,15%{opacity:.25}35%,85%{opacity:1}100%{opacity:.25}}
+@keyframes bvWalk{0%{transform:translate(0,0)}60%,100%{transform:translate(-60px,0)}}
+@media(prefers-reduced-motion:reduce){#gd-bush *{animation:none!important}}
+@media print{body.gd-print #gd-bush *{animation:none!important}body.gd-print #gd-bush details.bv-more{display:block}body.gd-print #gd-bush .bv-fig,body.gd-print #gd-bush .bv-tile,body.gd-print #gd-bush .bv-card,body.gd-print #gd-bush .bv-step,body.gd-print #gd-bush .bv-rule,body.gd-print #gd-bush .bv-q,body.gd-print #gd-bush .bv-end{background:#fff;color:#000;border-color:#666}body.gd-print #gd-bush .bc-ill svg{color:#111}body.gd-print #gd-bush .bv-rule,body.gd-print #gd-bush .bv-tile b,body.gd-print #gd-bush .bv-card h4{color:#000}}
+</style>
 <div class="gd" id="gd-bush">
 <nav class="toc"><details open id="bush-tocd"><summary>📑 Contents</summary>
-<a href="#bc-72">⏱ First 72 hours</a><a href="#bc-water">💧 Water</a><a href="#bc-shelter">⛺ Shelter</a><a href="#bc-fire">🔥 Fire</a><a href="#bc-food">🍲 Food</a>
+<a href="#bc-start">🚦 Start here</a><a href="#bc-72">⏱ First 72 hours</a><a href="#bc-water">💧 Water</a><a href="#bc-shelter">⛺ Shelter</a><a href="#bc-fire">🔥 Fire</a><a href="#bc-food">🍲 Food</a>
 <a href="#bc-aid">🩹 First aid</a><a href="#bc-nav">🧭 Navigation</a><a href="#bc-signal">📣 Signaling</a><a href="#bc-sec">🛡 Security &amp; awareness</a><a href="#bc-plants">🌿 Plants</a><a class="sub" href="#bc-plants-med">🌱 Medicinal (traditional)</a><a class="sub" href="#bc-plants-tox">☠️ Toxic plants</a><a href="#bc-src">📚 Sources &amp; disclaimer</a>
 </details></nav>
 <div class="body">
-<div class="disc">⚠️ <b>Educational guide only.</b> Beginner-level, conservative summary of widely published guidance (Ready.gov/FEMA, CDC, EPA, American Red Cross, US Army survival manual principles). It is not professional, medical or legal advice. <b>In an emergency call 911.</b> Follow local officials and evacuation orders first. <button class="printbtn" data-print="bush">🖨 Print guide</button></div>
+<div class="disc">⚠️ <b>Educational guide only</b>, based on Ready.gov/FEMA, CDC, EPA, Red Cross and US Army survival manual principles. Not medical or legal advice. <b>In an emergency call 911</b> and follow local officials and evacuation orders first. <button class="printbtn" data-print="bush">🖨 Print guide</button></div>
 
-<section id="bc-72"><h2>⏱ First 72 hours — do these in order</h2>
-<figure class="bc-ill bc-ill-first72"><svg viewBox="0 0 200 110" role="img" aria-label="A packed go-bag next to a clock: the first 72 hours, done in order" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>A packed go-bag next to a clock: the first 72 hours, done in order</title><rect x="30" y="30" width="58" height="68" rx="12"/><path d="M48 30 Q59 14 70 30"/><path d="M36 48 Q59 38 82 48"/><rect x="41" y="62" width="36" height="24" rx="5"/><path d="M52 70 h14" stroke="#8b95a3"/><path d="M108 92 c-5 0 -7 -4 -5 -8 l5 -9 l5 9 c2 4 0 8 -5 8Z" stroke="#4aa3ff"/><circle cx="152" cy="56" r="34" stroke="#ff4d4f"/><path d="M152 26 v6 M152 80 v6 M122 56 h6 M176 56 h6"/><path class="bc-hand" d="M152 56 V36"/><path d="M152 56 L166 64"/><circle cx="152" cy="56" r="2.5" fill="currentColor"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>1. 🦺 Safety first</h3>
-<ol><li>Get away from immediate danger: fire, flood water, downed power lines, gas smell, damaged buildings.</li>
-<li>Check people for injuries; call 911 if lines work. Treat life threats first (see 🩹 First aid).</li>
-<li>Smell gas? Leave, don't flip switches, and call the gas company or 911 from outside.</li>
-<li>Never use a generator, grill or camp stove indoors, in a garage or near windows (carbon monoxide kills).</li>
-<li>Stay out of flood water: it can hide holes and live wires and is often contaminated.</li></ol>
-<h3>2. 3️⃣ The Rule of 3s (rough guide to priorities)</h3>
-<div class="r3"><div><b>3 minutes</b>without air, or with severe bleeding</div><div><b>3 hours</b>without shelter in harsh heat or cold</div><div><b>3 days</b>without water</div><div><b>3 weeks</b>without food</div></div>
-<p>These are rough rules of thumb, not exact limits. In hot, humid heat you can get into trouble without water <b>much</b> faster.</p>
-<h3>3. 💧 Water</h3>
-<ol><li>Store or secure at least <b>1 gallon per person per day</b> (more in heat, for kids, nursing mothers and the sick). Plan at least 3 days; Ready.gov suggests 2 weeks at home if you can.</li>
-<li>Fill clean containers and bathtubs before a storm hits. Don't ration water you have — drink what you need today.</li>
-<li>If the water system is under a boil-water notice, treat all drinking/cooking water (see 💧 Water).</li></ol>
-<h3>4. ⛺ Shelter &amp; warmth (or cooling)</h3>
-<ol><li>Stay in a safe, structurally sound building if you can; go to a public shelter if told to evacuate.</li>
-<li>In hot, humid heat: shade, airflow, wet cloth on the skin, rest in the hottest hours. In cold snaps: layers, blankets, one warm room.</li></ol>
-<h3>5. 📻 Communication &amp; information</h3>
-<ol><li>Battery or hand-crank <b>NOAA Weather Radio</b> and AM/FM radio for official info.</li>
-<li>Text instead of calling (texts get through congested networks more often). Save phone battery: low-power mode, dim screen.</li>
-<li>Agree on an out-of-area contact and a family meeting place.</li></ol>
-<h3>6. 🍲 Food (last — you have time)</h3>
-<ol><li>Eat perishable food from the fridge first, then freezer, then shelf-stable food.</li>
-<li>A closed fridge keeps food cold about 4 hours; a full closed freezer about 48 hours (24 if half full). When in doubt, throw it out.</li></ol>
-<h3>7. 🎒 Go-bag check</h3>
-<ul class="check"><li>Water (1 gal/person/day) and water treatment (filter, tablets, unscented bleach + dropper)</li><li>3 days of non-perishable food + manual can opener</li>
-<li>Flashlight/headlamp, spare batteries, NOAA weather radio</li><li>First-aid kit, prescription meds (7-day supply if possible), glasses</li>
-<li>Copies of IDs, insurance, medical info in a waterproof bag; some cash</li><li>Phone charger + power bank; paper map of the area</li>
-<li>Whistle, dust masks, work gloves, duct tape, multi-tool</li><li>Rain gear, change of clothes, sturdy shoes, bug spray, sunscreen</li>
-<li>Hygiene items, wipes, garbage bags; pet food and carrier</li><li>Lighter/matches in a waterproof container, emergency blanket</li></ul>
+<section id="bc-start"><h2>🚦 Start here: what matters first</h2>
+<figure class="bv-fig" aria-label="Survival priorities in order">
+<ol class="bv-pri">
+<li class="first"><span>🦺</span>Safety</li><li class="ar" aria-hidden="true">→</li>
+<li class="first"><span>🩹</span>Bleeding &amp; breathing</li><li class="ar" aria-hidden="true">→</li>
+<li><span>⛺</span>Shelter</li><li class="ar" aria-hidden="true">→</li>
+<li><span>💧</span>Water</li><li class="ar" aria-hidden="true">→</li>
+<li><span>📻</span>Info &amp; contact</li><li class="ar" aria-hidden="true">→</li>
+<li><span>🍲</span>Food</li>
+</ol>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>3️⃣ The Rule of 3s: how long you can go without…</h3>
+<figure class="bv-fig" role="img" aria-label="Bar chart, Rule of 3s: about 3 minutes without air or with severe bleeding, 3 hours without shelter in harsh heat or cold, 3 days without water, 3 weeks without food">
+<div class="bv-bars">
+<div class="bv-bar"><span>🫁 Air / severe bleeding</span><div class="bv-track"><div class="bv-fill" style="--w:14%;--c:#ff4d4f">3 min</div></div></div>
+<div class="bv-bar"><span>⛺ Shelter in harsh heat/cold</span><div class="bv-track"><div class="bv-fill" style="--w:50%;--c:#faad14;animation-delay:.2s">3 hours</div></div></div>
+<div class="bv-bar"><span>💧 Water</span><div class="bv-track"><div class="bv-fill" style="--w:81%;--c:#4aa3ff;animation-delay:.4s">3 days</div></div></div>
+<div class="bv-bar"><span>🍲 Food</span><div class="bv-track"><div class="bv-fill" style="--w:100%;--c:#52c41a;animation-delay:.6s">3 weeks</div></div></div>
+</div>
+<p class="bv-note">Log scale. Rough rules of thumb, not exact limits: in hot, humid heat you get into trouble without water <b>much</b> faster.</p>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+</section>
+
+<section id="bc-72"><h2>⏱ First 72 hours: do these in order</h2>
+<div class="bv-lead"><figure class="bc-ill bc-ill-first72"><svg viewBox="0 0 200 110" role="img" aria-label="A packed go-bag next to a clock: the first 72 hours, done in order" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>A packed go-bag next to a clock: the first 72 hours, done in order</title><rect x="30" y="30" width="58" height="68" rx="12"/><path d="M48 30 Q59 14 70 30"/><path d="M36 48 Q59 38 82 48"/><rect x="41" y="62" width="36" height="24" rx="5"/><path d="M52 70 h14" stroke="#8b95a3"/><path d="M108 92 c-5 0 -7 -4 -5 -8 l5 -9 l5 9 c2 4 0 8 -5 8Z" stroke="#4aa3ff"/><circle cx="152" cy="56" r="34" stroke="#ff4d4f"/><path d="M152 26 v6 M152 80 v6 M122 56 h6 M176 56 h6"/><path class="bc-hand" d="M152 56 V36"/><path d="M152 56 L166 64"/><circle cx="152" cy="56" r="2.5" fill="currentColor"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">Do it in order.<small>Food comes last. You have time.</small></div></div>
+<h3>1. 🦺 Get away from danger</h3>
+<div class="bv-grid g4">
+<div class="bv-tile bad"><span class="i">🔥</span><b>Fire, damaged buildings</b>Move away</div>
+<div class="bv-tile bad"><span class="i">⚡</span><b>Downed power lines</b>Stay far back</div>
+<div class="bv-tile bad"><span class="i">🌊</span><b>Flood water</b>Stay out: holes, live wires, sewage</div>
+<div class="bv-tile bad"><span class="i">👃</span><b>Gas smell</b>Leave. No switches. Call from outside</div>
+<div class="bv-tile bad"><span class="i">☠️</span><b>Generator, grill or stove indoors</b>Never: carbon monoxide kills</div>
+<div class="bv-tile ok"><span class="i">🩹</span><b>Check people</b>Call 911. Life threats first</div>
+</div>
+<h3>2. 💧 Water: 1 gallon per person per day</h3>
+<figure class="bv-fig" role="img" aria-label="One person for three days needs three one-gallon jugs of water">
+<div class="bv-drops"><span>🧍 1 person</span><span class="eq">×</span><span>📅 3 days</span><span class="eq">=</span>
+<span class="bv-jugs" aria-hidden="true"><svg class="bv-jug" viewBox="0 0 20 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 2h6v4l4 4v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10l4-4Z"/><path d="M4 16h12" stroke-width="1.4"/></svg><svg class="bv-jug" viewBox="0 0 20 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 2h6v4l4 4v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10l4-4Z"/><path d="M4 16h12" stroke-width="1.4"/></svg><svg class="bv-jug" viewBox="0 0 20 28" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 2h6v4l4 4v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10l4-4Z"/><path d="M4 16h12" stroke-width="1.4"/></svg></span><span>3 gallons</span></div>
+<p class="bv-note" style="text-align:center">More in heat, for kids, nursing mothers and the sick. Aim for 2 weeks at home (Ready.gov).</p>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🛁</span>Fill containers and tubs <b>before</b> the storm</div>
+<div class="bv-tile"><span class="i">🥤</span>Don't ration: drink what you need today</div>
+<div class="bv-tile warn"><span class="i">♨️</span>Boil-water notice? Treat all drinking water</div>
+</div>
+<h3>3. ⛺ Shelter, warmth or cooling</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🏠</span>Sound building, or a public shelter if told to evacuate</div>
+<div class="bv-tile warn"><span class="i">☀️</span><b>Heat</b>Shade, airflow, wet cloth on skin, rest in the hottest hours</div>
+<div class="bv-tile"><span class="i">❄️</span><b>Cold</b>Layers, blankets, one warm room</div>
+</div>
+<h3>4. 📻 Information &amp; contact</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">📻</span>Battery or hand-crank <b>NOAA Weather Radio</b> + AM/FM</div>
+<div class="bv-tile"><span class="i">💬</span><b>Text, don't call</b>Texts get through busy networks</div>
+<div class="bv-tile"><span class="i">🔋</span>Save battery: low-power mode, dim screen</div>
+<div class="bv-tile"><span class="i">📍</span>Out-of-area contact + meeting place</div>
+</div>
+<h3>5. 🍲 Food: eat in this order</h3>
+<figure class="bv-fig" role="img" aria-label="Bar chart: a closed fridge keeps food cold about 4 hours, a half-full closed freezer about 24 hours, a full closed freezer about 48 hours">
+<div class="bv-bars">
+<div class="bv-bar"><span>1. 🧊 Fridge (closed)</span><div class="bv-track"><div class="bv-fill" style="--w:9%;--c:#ff4d4f">4 h</div></div></div>
+<div class="bv-bar"><span>2. ❄️ Freezer, half full</span><div class="bv-track"><div class="bv-fill" style="--w:50%;--c:#faad14;animation-delay:.2s">24 h</div></div></div>
+<div class="bv-bar"><span>2. ❄️ Freezer, full</span><div class="bv-track"><div class="bv-fill" style="--w:100%;--c:#4aa3ff;animation-delay:.4s">48 h</div></div></div>
+<div class="bv-bar"><span>3. 🥫 Shelf-stable</span><div class="bv-track"><div class="bv-fill" style="--w:100%;--c:#52c41a;animation-delay:.6s">last</div></div></div>
+</div>
+<p class="bv-note">Keep doors closed. <b>When in doubt, throw it out.</b></p>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>6. 🎒 Go-bag check</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">💧</span>Water + treatment (filter, tablets, unscented bleach + dropper)</div>
+<div class="bv-tile"><span class="i">🥫</span>3 days of food + manual can opener</div>
+<div class="bv-tile"><span class="i">🔦</span>Flashlight, spare batteries, NOAA radio</div>
+<div class="bv-tile"><span class="i">🩹</span>First-aid kit, meds (7 days), glasses</div>
+<div class="bv-tile"><span class="i">📄</span>ID, insurance, medical info in a waterproof bag; cash</div>
+<div class="bv-tile"><span class="i">🔌</span>Charger, power bank, paper map</div>
+<div class="bv-tile"><span class="i">📯</span>Whistle, dust masks, gloves, duct tape, multi-tool</div>
+<div class="bv-tile"><span class="i">🧥</span>Rain gear, clothes, sturdy shoes, bug spray, sunscreen</div>
+<div class="bv-tile"><span class="i">🧻</span>Hygiene, wipes, garbage bags; pet food &amp; carrier</div>
+<div class="bv-tile"><span class="i">🔥</span>Lighter/matches (waterproof case), emergency blanket</div>
+</div>
 </section>
 
 <section id="bc-water"><h2>💧 Water</h2>
-<figure class="bc-ill bc-ill-water"><svg viewBox="0 0 200 110" role="img" aria-label="Three ways to make water safe: settle and pour through a cloth filter, bring it to a rolling boil, or add unscented bleach drops and wait 30 minutes" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Three ways to make water safe: settle and pour through a cloth filter, bring it to a rolling boil, or add unscented bleach drops and wait 30 minutes</title><path d="M34 14 v30" stroke="#4aa3ff" stroke-dasharray="4 5" class="bc-pour"/><path d="M18 52 V92 q0 6 6 6 h24 q6 0 6 -6 V52"/><path d="M12 50 Q36 66 60 50" stroke="#8b95a3"/><path d="M12 50 l-2 9 M60 50 l2 9" stroke="#8b95a3"/><path d="M21 80 h30" stroke="#4aa3ff"/><path d="M64 66 h9 m-4 -4 l4 4 l-4 4" stroke="#8b95a3"/><path d="M82 50 h44 v38 q0 6 -6 6 h-32 q-6 0 -6 -6Z"/><path d="M82 57 h-6 M126 57 h6"/><path d="M86 62 h36" stroke="#4aa3ff"/><circle class="bc-bub" cx="94" cy="80" r="3" stroke="#4aa3ff"/><circle class="bc-bub d2" cx="105" cy="84" r="2.5" stroke="#4aa3ff"/><circle class="bc-bub d3" cx="115" cy="78" r="3" stroke="#4aa3ff"/><path class="bc-steam" d="M96 42 q-4 -6 0 -12 q4 -6 0 -12 M112 42 q-4 -6 0 -12 q4 -6 0 -12" stroke="#8b95a3"/><path class="bc-flame" stroke="#faad14" d="M95 107 c-3.85 0 -4.95 -3.85 -2.75 -7.15 c0.55 1.65 1.65 1.65 1.65 0.55 c0 -2.2 1.1 -4.4 2.75 -6.6 c0.55 3.3 3.85 5.5 3.3 9.35 c-0.55 2.75 -2.2 3.85 -4.95 3.85Z"/><path class="bc-flame" stroke="#faad14" d="M105 107 c-4.55 0 -5.85 -4.55 -3.25 -8.45 c0.65 1.95 1.95 1.95 1.95 0.65 c0 -2.6 1.3 -5.2 3.25 -7.8 c0.65 3.9 4.55 6.5 3.9 11.05 c-0.65 3.25 -2.6 4.55 -5.85 4.55Z"/><path class="bc-flame" stroke="#faad14" d="M115 107 c-3.85 0 -4.95 -3.85 -2.75 -7.15 c0.55 1.65 1.65 1.65 1.65 0.55 c0 -2.2 1.1 -4.4 2.75 -6.6 c0.55 3.3 3.85 5.5 3.3 9.35 c-0.55 2.75 -2.2 3.85 -4.95 3.85Z"/><path d="M136 66 h9 m-4 -4 l4 4 l-4 4" stroke="#8b95a3"/><path d="M152 58 h36 v36 q0 4 -4 4 h-28 q-4 0 -4 -4Z"/><path d="M162 58 v-6 h16 v6"/><path d="M155 74 h30" stroke="#4aa3ff"/><ellipse cx="170" cy="13" rx="5" ry="6" stroke="#ff4d4f"/><path d="M167 19 h6 v12 l-3 5 l-3 -5Z"/><circle class="bc-drop" cx="170" cy="42" r="1.8" fill="#4aa3ff" stroke="none"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>🔎 Finding water</h3>
-<ol><li><b>Inside your home first:</b> stored water, water heater tank (turn off power/gas first, drain from the bottom valve), ice cubes, toilet <i>tank</i> (not bowl; not if it has chemical cleaners).</li>
-<li><b>Outside:</b> rain water collected in clean containers, springs, streams, lakes. Moving, clear water is better than stagnant, but <b>all outdoor water must be treated</b>.</li>
-<li>Avoid water with a chemical smell, oily sheen, dead animals nearby, or that may be flood water or near farm/industrial runoff — boiling doesn't remove chemicals.</li></ol>
-<h3>🧹 Filter</h3>
-<ol><li>Let cloudy water settle, then pour it through a clean cloth, paper towel or coffee filter.</li>
-<li>A commercial backpacking filter removes bacteria and protozoa; most don't remove viruses — boil or disinfect too if unsure.</li></ol>
-<h3>♨️ Boil (best method)</h3>
-<ol><li>Bring clear water to a <b>rolling boil for 1 minute</b>.</li><li>Above <b>6,500 ft</b> elevation, boil for <b>3 minutes</b> (CDC).</li><li>Let it cool; store covered in clean containers. Pour between containers to improve taste.</li></ol>
-<h3>🧴 Disinfect with household bleach (if you can't boil)</h3>
-<ol><li>Use only <b>regular, unscented</b> chlorine bleach (no color-safe, scented or added cleaners).</li>
-<li>For <b>6% bleach: 8 drops (about 1/8 teaspoon) per gallon</b> of clear water. (8.25% bleach: 6 drops per gallon.) Double the dose if water is cloudy or very cold after filtering.</li>
-<li>Stir, wait <b>at least 30 minutes</b>. It should have a slight chlorine smell; if not, repeat the dose and wait another 15 minutes.</li></ol>
-<div class="tip">💊 <b>Tablets:</b> follow the package directions exactly (contact times vary, often 30 minutes to 4 hours). Chlorine dioxide tablets work against more organisms than chlorine alone.</div>
+<div class="bv-lead"><figure class="bc-ill bc-ill-water"><svg viewBox="0 0 200 110" role="img" aria-label="Three ways to make water safe: settle and pour through a cloth filter, bring it to a rolling boil, or add unscented bleach drops and wait 30 minutes" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Three ways to make water safe: settle and pour through a cloth filter, bring it to a rolling boil, or add unscented bleach drops and wait 30 minutes</title><path d="M34 14 v30" stroke="#4aa3ff" stroke-dasharray="4 5" class="bc-pour"/><path d="M18 52 V92 q0 6 6 6 h24 q6 0 6 -6 V52"/><path d="M12 50 Q36 66 60 50" stroke="#8b95a3"/><path d="M12 50 l-2 9 M60 50 l2 9" stroke="#8b95a3"/><path d="M21 80 h30" stroke="#4aa3ff"/><path d="M64 66 h9 m-4 -4 l4 4 l-4 4" stroke="#8b95a3"/><path d="M82 50 h44 v38 q0 6 -6 6 h-32 q-6 0 -6 -6Z"/><path d="M82 57 h-6 M126 57 h6"/><path d="M86 62 h36" stroke="#4aa3ff"/><circle class="bc-bub" cx="94" cy="80" r="3" stroke="#4aa3ff"/><circle class="bc-bub d2" cx="105" cy="84" r="2.5" stroke="#4aa3ff"/><circle class="bc-bub d3" cx="115" cy="78" r="3" stroke="#4aa3ff"/><path class="bc-steam" d="M96 42 q-4 -6 0 -12 q4 -6 0 -12 M112 42 q-4 -6 0 -12 q4 -6 0 -12" stroke="#8b95a3"/><path class="bc-flame" stroke="#faad14" d="M95 107 c-3.85 0 -4.95 -3.85 -2.75 -7.15 c0.55 1.65 1.65 1.65 1.65 0.55 c0 -2.2 1.1 -4.4 2.75 -6.6 c0.55 3.3 3.85 5.5 3.3 9.35 c-0.55 2.75 -2.2 3.85 -4.95 3.85Z"/><path class="bc-flame" stroke="#faad14" d="M105 107 c-4.55 0 -5.85 -4.55 -3.25 -8.45 c0.65 1.95 1.95 1.95 1.95 0.65 c0 -2.6 1.3 -5.2 3.25 -7.8 c0.65 3.9 4.55 6.5 3.9 11.05 c-0.65 3.25 -2.6 4.55 -5.85 4.55Z"/><path class="bc-flame" stroke="#faad14" d="M115 107 c-3.85 0 -4.95 -3.85 -2.75 -7.15 c0.55 1.65 1.65 1.65 1.65 0.55 c0 -2.2 1.1 -4.4 2.75 -6.6 c0.55 3.3 3.85 5.5 3.3 9.35 c-0.55 2.75 -2.2 3.85 -4.95 3.85Z"/><path d="M136 66 h9 m-4 -4 l4 4 l-4 4" stroke="#8b95a3"/><path d="M152 58 h36 v36 q0 4 -4 4 h-28 q-4 0 -4 -4Z"/><path d="M162 58 v-6 h16 v6"/><path d="M155 74 h30" stroke="#4aa3ff"/><ellipse cx="170" cy="13" rx="5" ry="6" stroke="#ff4d4f"/><path d="M167 19 h6 v12 l-3 5 l-3 -5Z"/><circle class="bc-drop" cx="170" cy="42" r="1.8" fill="#4aa3ff" stroke="none"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">All outdoor water must be treated.<small>Boil if you can. Bleach or tablets if you can't. Filter cloudy water first.</small></div></div>
+<h3>🔀 Is this water safe to drink?</h3>
+<figure class="bv-fig bv-flow" aria-label="Flowchart for making water safe to drink">
+<div class="bv-q">Chemical smell, oily sheen, dead animals nearby, flood water, or farm/industrial runoff?</div>
+<div class="bv-split">
+<div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-end stop">🚫 Don't drink it. Find another source.<small>Boiling doesn't remove chemicals.</small></div></div>
+<div class="bv-br"><span class="bv-yn n">No</span><div class="bv-down pulse"></div></div>
+</div>
+<div class="bv-q">Cloudy?</div>
+<div class="bv-split">
+<div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-end do">🧹 Let it settle, then pour through a clean cloth, paper towel or coffee filter</div></div>
+<div class="bv-br"><span class="bv-yn n">No</span><div class="bv-down pulse"></div></div>
+</div>
+<div class="bv-down pulse"></div>
+<div class="bv-q">Can you boil it?</div>
+<div class="bv-split">
+<div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-end ok">♨️ <b>Rolling boil 1 minute</b><small>3 minutes above 6,500 ft (CDC). Cool, store covered.</small></div></div>
+<div class="bv-br"><span class="bv-yn n">No</span><div class="bv-end ok">🧴 <b>Unscented bleach</b> or tablets<small>See the dose below. Wait 30+ minutes.</small></div></div>
+</div>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>🧴 Bleach dose (if you can't boil)</h3>
+<figure class="bv-fig" role="img" aria-label="8 drops of 6 percent unscented bleach per gallon of clear water, stir, wait at least 30 minutes">
+<div class="bv-drops"><span aria-hidden="true"><i class="d"></i> <i class="d" style="animation-delay:.15s"></i> <i class="d" style="animation-delay:.3s"></i> <i class="d" style="animation-delay:.45s"></i> <i class="d" style="animation-delay:.6s"></i> <i class="d" style="animation-delay:.75s"></i> <i class="d" style="animation-delay:.9s"></i> <i class="d" style="animation-delay:1.05s"></i></span><span><span class="bv-big">8 drops</span>6% bleach</span><span class="eq">+</span><span><span class="bv-big">1 gal</span>clear water</span><span class="eq">→</span><span><span class="bv-big">30 min</span>stir &amp; wait</span></div>
+<p class="bv-note" style="text-align:center">≈ 1/8 tsp. <b>8.25% bleach: 6 drops.</b> Cloudy or very cold: double it. No faint chlorine smell? Repeat, wait 15 more min. <b>Plain unscented</b> bleach only (not color-safe or scented).</p>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>📊 Which method kills what?</h3>
+<figure class="bv-fig" aria-label="Comparison chart of water treatment methods">
+<div class="bv-tw"><table class="bv-cmp">
+<thead><tr><th>Method</th><th>Bacteria</th><th>Viruses</th><th>Parasites (protozoa)</th><th>Chemicals</th><th>Wait</th></tr></thead>
+<tbody>
+<tr class="best"><td>♨️ Boil (best)</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="n">✗</td><td>1 min boil + cool</td></tr>
+<tr><td>🧴 Bleach</td><td class="y">✓</td><td class="y">✓</td><td class="p">◐</td><td class="n">✗</td><td>30 min</td></tr>
+<tr><td>💊 Chlorine dioxide tablets</td><td class="y">✓</td><td class="y">✓</td><td class="p">◐</td><td class="n">✗</td><td>Per package (30 min–4 h)</td></tr>
+<tr><td>🧪 Backpacking filter</td><td class="y">✓</td><td class="n">✗</td><td class="y">✓</td><td class="n">✗</td><td>None</td></tr>
+</tbody></table></div>
+<p class="bv-legend"><span style="color:#52c41a">✓</span> works · <span style="color:#faad14">◐</span> partly (some parasites survive chlorine; chlorine dioxide covers more) · <span style="color:#ff4d4f">✗</span> no. Follow tablet directions exactly.</p>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>🔎 Where to find water</h3>
+<div class="bv-grid g2">
+<div class="bv-tile ok"><span class="i">🏠</span><b>Inside first</b>Stored water · water heater tank (power/gas off first, drain from the bottom valve) · ice cubes · toilet <i>tank</i> (not the bowl; not with chemical cleaners)</div>
+<div class="bv-tile warn"><span class="i">🌧</span><b>Outside: treat it all</b>Rain in clean containers · springs · streams · lakes. Moving, clear water beats stagnant.</div>
+</div>
 </section>
 
 <section id="bc-shelter"><h2>⛺ Shelter</h2>
-<figure class="bc-ill bc-ill-shelter"><svg viewBox="0 0 200 110" role="img" aria-label="Tarp lean-to, side view: the high edge tied to a ridge line between trees, the low edge staked to the ground facing the wind and rain, with a thick insulating bed underneath" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Tarp lean-to, side view: the high edge tied to a ridge line between trees, the low edge staked to the ground facing the wind and rain, with a thick insulating bed underneath</title><path d="M8 98 h184" stroke="#8b95a3"/><path d="M40 98 V12 M40 34 l-12 -10 M40 54 l12 -9 M40 22 l10 -8"/><circle cx="40" cy="38" r="3.2" fill="#ff4d4f" stroke="#ff4d4f"/><path d="M40 38 L140 92" stroke="#ff4d4f" stroke-width="3.4"/><path d="M140 92 l8 6 M148 98 v-2 l3 -8" stroke="#8b95a3"/><rect x="50" y="88" width="64" height="8" rx="4" stroke="#8b95a3"/><path d="M58 92 h4 M70 91 h5 M84 93 h4 M96 91 h6" stroke="#8b95a3"/><g class="bc-wind" stroke="#8b95a3"><path d="M196 44 h-30 m5 -4 l-5 4 l5 4"/><path d="M192 62 h-24 m5 -4 l-5 4 l5 4"/></g><g class="bc-rain" stroke="#4aa3ff"><path d="M98 22 l-3 8 M116 30 l-3 8 M134 40 l-3 8"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>📍 Site selection</h3>
-<ol><li>High, well-drained ground — not in a dry wash, ditch or flood zone.</li><li>Look up: avoid dead trees and hanging branches ("widowmakers").</li>
-<li>Away from ant mounds, wasp nests, animal trails and standing water (mosquitoes).</li><li>Near (but not right next to) water, with shelter from wind and storms.</li></ol>
+<div class="bv-lead"><figure class="bc-ill bc-ill-shelter"><svg viewBox="0 0 200 110" role="img" aria-label="Tarp lean-to, side view: the high edge tied to a ridge line between trees, the low edge staked to the ground facing the wind and rain, with a thick insulating bed underneath" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Tarp lean-to, side view: the high edge tied to a ridge line between trees, the low edge staked to the ground facing the wind and rain, with a thick insulating bed underneath</title><path d="M8 98 h184" stroke="#8b95a3"/><path d="M40 98 V12 M40 34 l-12 -10 M40 54 l12 -9 M40 22 l10 -8"/><circle cx="40" cy="38" r="3.2" fill="#ff4d4f" stroke="#ff4d4f"/><path d="M40 38 L140 92" stroke="#ff4d4f" stroke-width="3.4"/><path d="M140 92 l8 6 M148 98 v-2 l3 -8" stroke="#8b95a3"/><rect x="50" y="88" width="64" height="8" rx="4" stroke="#8b95a3"/><path d="M58 92 h4 M70 91 h5 M84 93 h4 M96 91 h6" stroke="#8b95a3"/><g class="bc-wind" stroke="#8b95a3"><path d="M196 44 h-30 m5 -4 l-5 4 l5 4"/><path d="M192 62 h-24 m5 -4 l-5 4 l5 4"/></g><g class="bc-rain" stroke="#4aa3ff"><path d="M98 22 l-3 8 M116 30 l-3 8 M134 40 l-3 8"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">High, dry, nothing overhead, off the ground.<small>The ground steals body heat fast, even in mild weather.</small></div></div>
+<h3>📍 Pick the spot</h3>
+<figure class="bc-ill bc-ill-site"><svg viewBox="0 0 200 110" role="img" aria-label="Shelter site choice: a tent on high, well-drained ground is good; a low dry wash that floods and a dead tree with hanging branches overhead are bad" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Shelter site choice: a tent on high, well-drained ground is good; a low dry wash that floods and a dead tree with hanging branches overhead are bad</title><path d="M6 98 Q40 52 86 58 Q104 60 112 78 Q122 98 140 98 H194" stroke="#8b95a3"/><path d="M120 92 q6 -3 12 0 t12 0" stroke="#4aa3ff" class="bc-ripple"/><path d="M30 72 L48 50 L66 72 Z"/><path d="M48 50 V72" stroke="#8b95a3" stroke-width="1.4"/><path d="M40 32 l6 7 l12 -14" stroke="#52c41a" stroke-width="3.2"/><path d="M176 98 V40 l-6 -12 M176 58 l14 -10 M176 72 l-12 -6" stroke="#8b95a3"/><path d="M168 44 l-20 14" stroke="#8b95a3" stroke-dasharray="3 4"/><path d="M118 30 l16 16 M134 30 l-16 16" stroke="#ff4d4f" stroke-width="3.2"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
+<div class="bv-grid g4">
+<div class="bv-tile ok"><span class="i">⛰️</span>High, well-drained ground</div>
+<div class="bv-tile bad"><span class="i">🌊</span>Not a dry wash, ditch or flood zone</div>
+<div class="bv-tile bad"><span class="i">🌳</span>Look up: no dead trees or hanging branches</div>
+<div class="bv-tile bad"><span class="i">🐜</span>No ant mounds, nests, animal trails, standing water</div>
+<div class="bv-tile ok"><span class="i">💧</span>Near (not next to) water, out of the wind</div>
+</div>
 <h3>🛏 Insulate from the ground</h3>
-<p>The ground pulls heat out of you fast, even in mild weather. Sleep on a pad, cardboard, or a thick (15+ cm / 6+ in) bed of dry leaves, pine straw or palm fronds.</p>
-<h3>🍂 Debris hut basics</h3>
-<ol><li>Prop a long ridge pole on a stump or forked stick, about hip height, angled to the ground.</li><li>Lean sticks along both sides like ribs.</li>
-<li>Pile dry leaves/debris <b>very</b> thick (an arm's length) over the frame; stuff the inside with dry leaves.</li><li>Keep it small — just big enough for your body — so it holds warmth.</li></ol>
-<h3>🟦 Tarp basics</h3>
-<ol><li>Tie a ridge line between two trees; drape the tarp over it (A-frame) or tie one edge low to the ground (lean-to) facing away from wind and rain.</li>
-<li>Stake corners tight; keep a slope so rain runs off.</li></ol>
-<div class="fl">🌴 <b>Hot-humid climate notes (e.g. Florida, the Gulf Coast, the tropics):</b> shade and airflow matter more than warmth most of the year. Pitch the tarp high with open sides for ventilation, keep off the wet ground, use a bug net, long sleeves and repellent (mosquitoes carry disease), check for ticks and fire ants, and watch for snakes when moving debris. Lightning is common in summer afternoons — avoid lone tall trees and open high ground.</div>
+<figure class="bc-ill bc-ill-insul"><svg viewBox="0 0 200 110" role="img" aria-label="Ground insulation: lying on bare ground, body heat flows down into the soil; lying on a thick bed of dry leaves at least 6 inches deep, the heat stays with you" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Ground insulation: lying on bare ground, body heat flows down into the soil; lying on a thick bed of dry leaves at least 6 inches deep, the heat stays with you</title><path d="M100 10 V100" stroke="#8b95a3" stroke-width="1.2" stroke-dasharray="3 5"/><path d="M8 70 H92" stroke="#8b95a3"/><path d="M14 78 h8 M34 84 h10 M60 78 h8 M76 86 h8" stroke="#8b95a3" stroke-width="1.2"/><circle cx="80" cy="60" r="6"/><path d="M22 66 Q22 56 34 56 H72 Q74 66 72 66 Z"/><g stroke="#ff4d4f"><path class="bv-heat" d="M34 74 v12 m-4 -4 l4 4 l4 -4"/><path class="bv-heat d2" d="M50 74 v12 m-4 -4 l4 4 l4 -4"/><path class="bv-heat d3" d="M66 74 v12 m-4 -4 l4 4 l4 -4"/></g><path d="M36 20 l14 14 M50 20 l-14 14" stroke="#ff4d4f" stroke-width="3"/><path d="M108 92 H192" stroke="#8b95a3"/><rect x="112" y="70" width="76" height="20" rx="8" stroke="#8b95a3"/><path d="M120 80 q4 -4 8 0 M136 78 q4 -4 8 0 M152 82 q4 -4 8 0 M168 78 q4 -4 8 0 M126 86 q4 -3 8 0 M160 86 q4 -3 8 0" stroke="#8b95a3" stroke-width="1.2"/><circle cx="174" cy="58" r="6"/><path d="M116 64 Q116 54 128 54 H166 Q168 64 166 64 Z"/><g class="bc-glow" stroke="#faad14"><path d="M130 46 q3 -5 0 -10 M146 46 q3 -5 0 -10"/></g><path d="M140 24 l6 7 l12 -14" stroke="#52c41a" stroke-width="3.2"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
+<p>Use a pad, cardboard, or a <b>15+ cm (6+ in)</b> bed of dry leaves, pine straw or palm fronds.</p>
+<h3>🍂 Build a debris hut in 4 steps</h3>
+<div class="bv-steps">
+<div class="bv-step"><figure class="bc-ill bc-ill-hut1"><svg viewBox="0 0 200 110" role="img" aria-label="Debris hut step 1: a long ridge pole propped on a forked stick at about hip height, angled down to the ground" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Debris hut step 1: a long ridge pole propped on a forked stick at about hip height, angled down to the ground</title><path d="M8 98 H192" stroke="#8b95a3"/><path d="M156 98 V64 M156 64 l-8 -12 M156 64 l8 -12"/><path d="M158 56 L18 98" stroke="#ff4d4f" stroke-width="3.4"/><path d="M180 98 V56 m-4 4 l4 -4 l4 4 m-8 34 l4 4 l4 -4" stroke="#8b95a3" stroke-width="1.4"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><p>Ridge pole on a forked stick, <b>hip height</b>, sloping to the ground</p></div>
+<div class="bv-step"><figure class="bc-ill bc-ill-hut2"><svg viewBox="0 0 200 110" role="img" aria-label="Debris hut step 2: sticks leaned along both sides of the ridge pole like ribs" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Debris hut step 2: sticks leaned along both sides of the ridge pole like ribs</title><path d="M8 98 H192" stroke="#8b95a3"/><path d="M156 98 V64 M156 64 l-8 -12 M156 64 l8 -12"/><path d="M158 56 L18 98"/><g stroke="#ff4d4f"><path class="bv-seq" d="M44 90 L50 98 M44 90 L38 98"/><path class="bv-seq" style="animation-delay:.3s" d="M70 82 L80 98 M70 82 L60 98"/><path class="bv-seq" style="animation-delay:.6s" d="M96 75 L108 98 M96 75 L84 98"/><path class="bv-seq" style="animation-delay:.9s" d="M122 67 L136 98 M122 67 L108 98"/><path class="bv-seq" style="animation-delay:1.2s" d="M146 60 L164 98 M146 60 L132 98"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><p>Lean sticks along <b>both sides</b> like ribs</p></div>
+<div class="bv-step"><figure class="bc-ill bc-ill-hut3"><svg viewBox="0 0 200 110" role="img" aria-label="Debris hut step 3: dry leaves and debris piled very thick, about an arm&#x27;s length, over the whole frame" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Debris hut step 3: dry leaves and debris piled very thick, about an arm&#x27;s length, over the whole frame</title><path d="M8 98 H192" stroke="#8b95a3"/><path d="M10 98 Q16 74 70 62 Q130 40 166 46 Q186 56 186 98" stroke="#8b95a3"/><path d="M158 56 L18 98" stroke-width="1.6" stroke-dasharray="3 4"/><path d="M40 84 q4 -4 8 0 M64 74 q4 -4 8 0 M92 66 q4 -4 8 0 M120 58 q4 -4 8 0 M150 56 q4 -4 8 0 M168 72 q4 -4 8 0 M80 86 q4 -4 8 0 M120 82 q4 -4 8 0 M150 84 q4 -4 8 0" stroke="#8b95a3" stroke-width="1.4"/><path d="M128 10 V40 m-5 -5 l5 5 l5 -5 m-10 -25 l5 -5 l5 5" stroke="#ff4d4f"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><p>Pile dry leaves <b>very thick</b> (an arm's length); stuff the inside too</p></div>
+<div class="bv-step"><figure class="bc-ill bc-ill-hut4"><svg viewBox="0 0 200 110" role="img" aria-label="Debris hut step 4: keep it small, just big enough for your body, so it holds your warmth" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Debris hut step 4: keep it small, just big enough for your body, so it holds your warmth</title><path d="M8 98 H192" stroke="#8b95a3"/><path d="M10 98 Q16 74 70 62 Q130 40 166 46 Q186 56 186 98" stroke="#8b95a3"/><g stroke="#ff4d4f" stroke-dasharray="4 4"><circle cx="150" cy="86" r="7"/><path d="M40 92 Q40 80 54 80 H140 Q142 92 140 92 Z"/></g><g class="bc-glow" stroke="#faad14"><path d="M70 72 q3 -5 0 -10 M100 66 q3 -5 0 -10 M130 60 q3 -5 0 -10"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><p>Keep it <b>small</b>: just big enough for your body</p></div>
+</div>
+<h3>🟦 Tarp: lean-to or A-frame</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🪢</span>Tie a ridge line between two trees</div>
+<div class="bv-tile"><span class="i">⛺</span>Drape over (A-frame) or tie one edge low (lean-to) into the wind</div>
+<div class="bv-tile"><span class="i">📌</span>Stake tight; slope so rain runs off</div>
+</div>
+<details class="bv-more"><summary>🌴 Hot-humid climates (Florida, Gulf Coast, tropics)</summary>
+Shade and airflow matter more than warmth most of the year. Pitch the tarp high with open sides, keep off wet ground, use a bug net, long sleeves and repellent (mosquitoes carry disease). Check for ticks and fire ants; watch for snakes when moving debris. Summer afternoon lightning: avoid lone tall trees and open high ground.</details>
 </section>
 
 <section id="bc-fire"><h2>🔥 Fire</h2>
-<figure class="bc-ill bc-ill-fire"><svg viewBox="0 0 200 110" role="img" aria-label="Teepee fire lay in a ring of stones: a tinder bundle in the middle, pencil-thin kindling leaned over it, and wrist-thick fuel logs set aside, gathered before lighting" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Teepee fire lay in a ring of stones: a tinder bundle in the middle, pencil-thin kindling leaned over it, and wrist-thick fuel logs set aside, gathered before lighting</title><path d="M10 98 l26 -3 M12 92 l26 -3 M14 86 l26 -3" stroke="#8b95a3"/><path d="M24 76 q-4 -6 2 -8 q6 -2 6 4 q2 6 -4 6" stroke="#8b95a3" stroke-width="1.6"/><g stroke="#8b95a3"><ellipse cx="58" cy="98" rx="10" ry="6"/><ellipse cx="78" cy="101" rx="10" ry="6"/><ellipse cx="100" cy="102" rx="11" ry="6"/><ellipse cx="122" cy="101" rx="10" ry="6"/><ellipse cx="142" cy="98" rx="10" ry="6"/></g><path d="M74 92 L101 28 M126 92 L99 28 M86 94 L100 30 M114 94 L100 30 M66 90 L100 34 M134 90 L100 34"/><path d="M88 88 q12 -10 24 0 q-12 6 -24 0Z M92 87 q4 -4 8 0 q4 -4 8 0" stroke="#8b95a3"/><path class="bc-flame" stroke="#faad14" d="M100 86 c-8.05 0 -10.35 -8.05 -5.75 -14.95 c1.15 3.45 3.45 3.45 3.45 1.15 c0 -4.6 2.3 -9.2 5.75 -13.8 c1.15 6.9 8.05 11.5 6.9 19.55 c-1.15 5.75 -4.6 8.05 -10.35 8.05Z"/><path class="bc-flame f2" stroke="#ff4d4f" d="M100 84 c-3 0 -4 -3 -2 -6 c1 2 2 2 2 0 c0 -2 1 -3 2 -4 c1 3 3 4 2 7 c0 2 -2 3 -4 3Z"/><circle cx="168" cy="94" r="7"/><circle cx="184" cy="94" r="7"/><circle cx="176" cy="81" r="7"/><circle cx="168" cy="94" r="2" stroke="#8b95a3"/><circle cx="184" cy="94" r="2" stroke="#8b95a3"/><circle cx="176" cy="81" r="2" stroke="#8b95a3"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>🔺 The fire triangle</h3><p>Fire needs <b>heat + fuel + oxygen</b>. Remove any one and it goes out.</p>
-<h3>🪵 Build it in stages</h3>
-<ol><li><b>Tinder</b> (catches a spark): dry grass, cattail fluff, birch bark, dry pine needles, cotton balls with petroleum jelly, dryer lint.</li>
-<li><b>Kindling</b> (pencil-thick dry sticks): add gently once tinder flames.</li><li><b>Fuel</b> (wrist-thick and bigger): add gradually; don't smother it.</li>
-<li>Gather all three <b>before</b> you strike. Dead branches still on trees are usually drier than ground wood.</li></ol>
-<h3>🔦 Ignition</h3>
-<ul><li><b>Lighter</b> — easiest; carry two.</li><li><b>Matches</b> — keep waterproof/stormproof ones in a sealed container.</li>
-<li><b>Ferro rod</b> — scrape the striker firmly down the rod into fluffy tinder; works wet. Practice before you need it.</li></ul>
-<h3>🧯 Safety</h3>
-<ol><li>Clear a 3 m (10 ft) circle down to bare soil; use an existing fire ring if there is one. Check for local burn bans (your forestry or fire agency).</li>
-<li>Never leave it unattended; keep water/sand nearby. Drown, stir and feel for heat before leaving.</li>
-<li>☠️ <b>Never run generators, grills, charcoal or camp stoves indoors, in garages or tents.</b> Carbon monoxide is invisible and odorless. Keep generators at least 20 ft from doors and windows and use battery CO alarms.</li></ol>
+<div class="bv-lead"><figure class="bc-ill bc-ill-fire"><svg viewBox="0 0 200 110" role="img" aria-label="Teepee fire lay in a ring of stones: a tinder bundle in the middle, pencil-thin kindling leaned over it, and wrist-thick fuel logs set aside, gathered before lighting" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Teepee fire lay in a ring of stones: a tinder bundle in the middle, pencil-thin kindling leaned over it, and wrist-thick fuel logs set aside, gathered before lighting</title><path d="M10 98 l26 -3 M12 92 l26 -3 M14 86 l26 -3" stroke="#8b95a3"/><path d="M24 76 q-4 -6 2 -8 q6 -2 6 4 q2 6 -4 6" stroke="#8b95a3" stroke-width="1.6"/><g stroke="#8b95a3"><ellipse cx="58" cy="98" rx="10" ry="6"/><ellipse cx="78" cy="101" rx="10" ry="6"/><ellipse cx="100" cy="102" rx="11" ry="6"/><ellipse cx="122" cy="101" rx="10" ry="6"/><ellipse cx="142" cy="98" rx="10" ry="6"/></g><path d="M74 92 L101 28 M126 92 L99 28 M86 94 L100 30 M114 94 L100 30 M66 90 L100 34 M134 90 L100 34"/><path d="M88 88 q12 -10 24 0 q-12 6 -24 0Z M92 87 q4 -4 8 0 q4 -4 8 0" stroke="#8b95a3"/><path class="bc-flame" stroke="#faad14" d="M100 86 c-8.05 0 -10.35 -8.05 -5.75 -14.95 c1.15 3.45 3.45 3.45 3.45 1.15 c0 -4.6 2.3 -9.2 5.75 -13.8 c1.15 6.9 8.05 11.5 6.9 19.55 c-1.15 5.75 -4.6 8.05 -10.35 8.05Z"/><path class="bc-flame f2" stroke="#ff4d4f" d="M100 84 c-3 0 -4 -3 -2 -6 c1 2 2 2 2 0 c0 -2 1 -3 2 -4 c1 3 3 4 2 7 c0 2 -2 3 -4 3Z"/><circle cx="168" cy="94" r="7"/><circle cx="184" cy="94" r="7"/><circle cx="176" cy="81" r="7"/><circle cx="168" cy="94" r="2" stroke="#8b95a3"/><circle cx="184" cy="94" r="2" stroke="#8b95a3"/><circle cx="176" cy="81" r="2" stroke="#8b95a3"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">Gather everything <b>before</b> you strike.<small>Tinder → kindling → fuel. Dead branches still on trees are usually drier than ground wood.</small></div></div>
+<div class="bv-grid g2">
+<div><figure class="bc-ill bc-ill-firetri"><svg viewBox="0 0 200 110" role="img" aria-label="The fire triangle: heat, fuel and oxygen. Remove any one side and the fire goes out" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>The fire triangle: heat, fuel and oxygen. Remove any one side and the fire goes out</title><path d="M100 30 L52 100 H148 Z" stroke="#ff4d4f" stroke-width="3"/><path class="bc-flame" stroke="#faad14" d="M100 94 c-9.1 0 -11.7 -9.1 -6.5 -16.9 c1.3 3.9 3.9 3.9 3.9 1.3 c0 -5.2 2.6 -10.4 6.5 -15.6 c1.3 7.8 9.1 13 7.8 22.1 c-1.3 6.5 -5.2 9.1 -11.7 9.1Z"/><circle cx="100" cy="16" r="5" stroke="#faad14"/><path d="M100 4 v3 M100 25 v3 M88 16 h3 M109 16 h3 M91 7 l2 2 M107 23 l2 2 M109 7 l-2 2 M91 25 l2 -2" stroke="#faad14" stroke-width="1.6"/><rect x="14" y="88" width="30" height="12" rx="6"/><ellipse cx="44" cy="94" rx="3" ry="6" stroke="#8b95a3"/><g class="bc-wind" stroke="#4aa3ff"><path d="M156 86 h22 q6 0 6 -5 t-6 -4"/><path d="M160 96 h26 q6 0 6 5 t-6 4"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><p style="text-align:center"><b class="bv-k">☀️ Heat + 🪵 Fuel + 💨 Oxygen</b><br>Take one away and it goes out.</p></div>
+<div><figure class="bc-ill bc-ill-firestages"><svg viewBox="0 0 200 110" role="img" aria-label="Build in stages: a tinder bundle that catches a spark, then pencil-thick kindling, then wrist-thick fuel" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Build in stages: a tinder bundle that catches a spark, then pencil-thick kindling, then wrist-thick fuel</title><path d="M10 92 q10 -16 24 -10 q14 6 6 14 q-14 6 -30 -4Z" stroke="#8b95a3"/><path d="M16 88 q6 -6 14 -2 M20 92 q8 -4 14 0" stroke="#8b95a3" stroke-width="1.2"/><path class="bc-flame" stroke="#faad14" d="M26 84 c-4.9 0 -6.3 -4.9 -3.5 -9.1 c0.7 2.1 2.1 2.1 2.1 0.7 c0 -2.8 1.4 -5.6 3.5 -8.4 c0.7 4.2 4.9 7 4.2 11.9 c-0.7 3.5 -2.8 4.9 -6.3 4.9Z"/><path d="M52 80 h10 m-4 -4 l4 4 l-4 4" stroke="#8b95a3"/><path d="M72 98 L116 66 M78 98 L122 70 M70 90 L112 62 M84 98 L124 76" stroke-width="1.6"/><path d="M128 80 h10 m-4 -4 l4 4 l-4 4" stroke="#8b95a3"/><circle cx="158" cy="90" r="9"/><circle cx="180" cy="90" r="9"/><circle cx="169" cy="72" r="9"/><circle cx="158" cy="90" r="3" stroke="#8b95a3"/><circle cx="180" cy="90" r="3" stroke="#8b95a3"/><circle cx="169" cy="72" r="3" stroke="#8b95a3"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><p style="text-align:center"><b>Tinder</b> → <b>kindling</b> (pencil-thick) → <b>fuel</b> (wrist-thick+). Add gently; don't smother it.</p></div>
+</div>
+<details class="bv-more"><summary>🌾 Good tinder</summary>Dry grass, cattail fluff, birch bark, dry pine needles, cotton balls with petroleum jelly, dryer lint.</details>
+<h3>🔦 Ways to light it</h3>
+<figure class="bv-fig" aria-label="Comparison chart of fire-starting methods">
+<div class="bv-tw"><table class="bv-cmp">
+<thead><tr><th>Tool</th><th>Ease</th><th>Wet weather</th><th>Tip</th></tr></thead>
+<tbody>
+<tr class="best"><td>🔥 Lighter</td><td>★★★</td><td class="p">◐</td><td>Easiest. Carry two.</td></tr>
+<tr><td>🧨 Matches</td><td>★★</td><td class="y">✓</td><td>Stormproof ones, sealed container</td></tr>
+<tr><td>✨ Ferro rod</td><td>★</td><td class="y">✓</td><td>Scrape firmly into fluffy tinder. Practice first.</td></tr>
+</tbody></table></div>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>🧯 Fire safety</h3>
+<div class="bv-grid g2">
+<div><figure class="bc-ill bc-ill-firering"><svg viewBox="0 0 200 110" role="img" aria-label="Fire safety: clear a 3 metre (10 foot) circle down to bare soil around the fire ring, and keep water or sand ready" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Fire safety: clear a 3 metre (10 foot) circle down to bare soil around the fire ring, and keep water or sand ready</title><circle cx="70" cy="56" r="44" stroke="#ff4d4f" stroke-dasharray="6 6"/><g stroke="#8b95a3"><circle cx="70" cy="40" r="5"/><circle cx="84" cy="48" r="5"/><circle cx="84" cy="64" r="5"/><circle cx="70" cy="72" r="5"/><circle cx="56" cy="64" r="5"/><circle cx="56" cy="48" r="5"/></g><path class="bc-flame" stroke="#faad14" d="M70 64 c-6.3 0 -8.1 -6.3 -4.5 -11.7 c0.9 2.7 2.7 2.7 2.7 0.9 c0 -3.6 1.8 -7.2 4.5 -10.8 c0.9 5.4 6.3 9 5.4 15.3 c-0.9 4.5 -3.6 6.3 -8.1 6.3Z"/><path d="M70 56 H112 m-5 -4 l5 4 l-5 4" stroke="#8b95a3" stroke-width="1.4"/><path d="M140 50 h34 l-4 44 h-26 Z"/><path d="M144 62 h26" stroke="#4aa3ff"/><path d="M146 50 q11 -14 22 0" stroke-width="1.6"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><p style="text-align:center">Clear <b>3 m (10 ft)</b> to bare soil · use an existing fire ring · check burn bans</p></div>
+<div class="bv-grid">
+<div class="bv-tile"><span class="i">👀</span><b>Never leave it</b>Keep water or sand nearby</div>
+<div class="bv-tile ok"><span class="i">💧</span><b>Put it out</b>Drown → stir → feel for heat</div>
+</div>
+</div>
+<div class="warnbox">☠️ <b>Never run generators, grills, charcoal or camp stoves indoors, in garages or tents.</b> Carbon monoxide is invisible and odorless.</div>
+<figure class="bc-ill bc-ill-cogen"><svg viewBox="0 0 200 110" role="img" aria-label="Carbon monoxide safety: run a generator outside, at least 20 feet from doors and windows, with a battery CO alarm inside the home" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Carbon monoxide safety: run a generator outside, at least 20 feet from doors and windows, with a battery CO alarm inside the home</title><path d="M8 98 H192" stroke="#8b95a3"/><path d="M12 56 L46 28 L80 56"/><path d="M18 50 V98 H74 V50"/><rect x="28" y="66" width="14" height="12"/><rect x="50" y="70" width="14" height="28"/><circle cx="34" cy="56" r="3" stroke="#52c41a"/><path d="M80 80 H140 M86 74 l-6 6 l6 6 M134 74 l6 6 l-6 6" stroke="#ff4d4f" stroke-width="3"/><rect x="148" y="72" width="40" height="26" rx="3"/><circle cx="160" cy="85" r="5" stroke="#8b95a3"/><path d="M172 80 h10 M172 88 h10" stroke="#8b95a3" stroke-width="1.4"/><g class="bc-steam" stroke="#8b95a3"><path d="M184 66 q-4 -6 0 -12 q4 -6 0 -12"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure>
+<p style="text-align:center">Generator <b>outside, 20+ ft</b> from doors and windows · battery <b>CO alarms</b> inside</p>
 </section>
 
 <section id="bc-food"><h2>🍲 Food</h2>
-<figure class="bc-ill bc-ill-food"><svg viewBox="0 0 200 110" role="img" aria-label="Simple fishing kit in use: rod and line, a red-and-white bobber floating on the surface, a sinker and a small baited hook below, with a fish nearby" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Simple fishing kit in use: rod and line, a red-and-white bobber floating on the surface, a sinker and a small baited hook below, with a fish nearby</title><path d="M8 36 L104 8"/><path d="M104 8 L140 42" stroke="#8b95a3" stroke-width="1.4"/><path d="M8 50 q10 -5 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0" stroke="#4aa3ff"/><ellipse class="bc-ripple" cx="140" cy="50" rx="12" ry="2.5" stroke="#4aa3ff"/><circle cx="140" cy="46" r="7"/><path d="M133 46 a7 7 0 0 1 14 0Z" fill="#ff4d4f" stroke="#ff4d4f"/><path d="M140 53 V78" stroke="#8b95a3" stroke-width="1.4"/><circle cx="140" cy="80" r="3" fill="#8b95a3" stroke="#8b95a3"/><path d="M140 83 v12 a5 5 0 0 1 -10 0 l3 -3"/><path d="M133 96 q3 -4 6 0 q3 4 6 0" stroke="#ff4d4f"/><path d="M36 84 Q56 70 76 84 Q56 98 36 84Z"/><path d="M36 84 l-10 -8 v16Z"/><circle cx="66" cy="82" r="1.6" fill="currentColor"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>🥫 Stored food first</h3><ol><li>Eat perishables first, then frozen, then canned/dry goods. Keep 3 days (ideally 2 weeks) of food that needs no cooking.</li><li>Discard food touched by flood water, and anything above 40°F (4°C) for over 2 hours.</li></ol>
-<h3>🎣 Fishing basics</h3><ol><li>Simple kit: line, small hooks, sinkers, bobber; bait with worms, insects or bread.</li><li>Fish early morning and evening near cover (logs, docks, weed edges).</li>
-<li>Most places require fishing licenses for adults (in Florida: FWC); follow size/bag limits. Cook fish thoroughly.</li></ol>
-<h3>🪤 Trapping (only where legal)</h3><p>Trapping is tightly regulated in most places (in Florida: FWC). In a true survival emergency, simple snares or fish traps are a last resort; know the law first and never trap protected species.</p>
-<h3>🌿 Foraging — "if in doubt, don't"</h3>
-<div class="warnbox">⚠️ Many deadly plants look like edible ones. Only eat plants you can identify with <b>certainty</b> from multiple reliable sources or an expert. The Army "universal edibility test" is slow, risky and not a shortcut — it does not protect you from the most dangerous poisonous plants or mushrooms. <b>Never eat wild mushrooms</b> unless an expert identifies them.</div>
-<h3>🧂 Preserving</h3><ul><li><b>Drying:</b> thin strips in sun/wind or low heat until brittle; keep insects off.</li><li><b>Salting:</b> pack in plenty of salt to draw out moisture; rinse/soak before cooking.</li>
-<li><b>Smoking:</b> slow, low smoke over hardwood for many hours; hot-smoke to a safe internal temperature.</li></ul>
-<div class="fl">🌴 <b>Hot-humid climate notes:</b> heat and humidity spoil food fast — preserve or eat it quickly. Coconuts, citrus and saw palmetto berries are known foods, but only harvest where legal and with permission. Shellfish can carry red-tide toxins; check FWC/health advisories.</div>
+<div class="bv-lead"><figure class="bc-ill bc-ill-food"><svg viewBox="0 0 200 110" role="img" aria-label="Simple fishing kit in use: rod and line, a red-and-white bobber floating on the surface, a sinker and a small baited hook below, with a fish nearby" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Simple fishing kit in use: rod and line, a red-and-white bobber floating on the surface, a sinker and a small baited hook below, with a fish nearby</title><path d="M8 36 L104 8"/><path d="M104 8 L140 42" stroke="#8b95a3" stroke-width="1.4"/><path d="M8 50 q10 -5 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0" stroke="#4aa3ff"/><ellipse class="bc-ripple" cx="140" cy="50" rx="12" ry="2.5" stroke="#4aa3ff"/><circle cx="140" cy="46" r="7"/><path d="M133 46 a7 7 0 0 1 14 0Z" fill="#ff4d4f" stroke="#ff4d4f"/><path d="M140 53 V78" stroke="#8b95a3" stroke-width="1.4"/><circle cx="140" cy="80" r="3" fill="#8b95a3" stroke="#8b95a3"/><path d="M140 83 v12 a5 5 0 0 1 -10 0 l3 -3"/><path d="M133 96 q3 -4 6 0 q3 4 6 0" stroke="#ff4d4f"/><path d="M36 84 Q56 70 76 84 Q56 98 36 84Z"/><path d="M36 84 l-10 -8 v16Z"/><circle cx="66" cy="82" r="1.6" fill="currentColor"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">Stored food first. Wild food last.<small>Keep 3 days (ideally 2 weeks) of food that needs no cooking.</small></div></div>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🧊➡️❄️➡️🥫</span>Perishables → frozen → canned/dry</div>
+<div class="bv-tile bad"><span class="i">🌊</span><b>Throw out</b>Food touched by flood water</div>
+<div class="bv-tile bad"><span class="i">🌡️</span><b>Throw out</b>Anything above 40°F (4°C) for 2+ hours</div>
+</div>
+<h3>🎣 Fishing</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🪝</span>Line, small hooks, sinkers, bobber</div>
+<div class="bv-tile"><span class="i">🪱</span>Bait: worms, insects, bread</div>
+<div class="bv-tile"><span class="i">🌅</span>Early morning &amp; evening, near logs, docks, weed edges</div>
+<div class="bv-tile warn"><span class="i">📋</span>License + limits (Florida: FWC). Cook fish thoroughly</div>
+</div>
+<p>🪤 <b>Trapping:</b> tightly regulated (Florida: FWC). In a true emergency, snares or fish traps are a last resort: know the law first and never trap protected species.</p>
+<div class="warnbox">⚠️ <b>Foraging: if in doubt, don't.</b> Many deadly plants look like edible ones. Only eat plants you can identify with <b>certainty</b> from multiple reliable sources or an expert. The Army "universal edibility test" is slow, risky and no shortcut: it doesn't protect you from the most dangerous plants or mushrooms. <b>Never eat wild mushrooms</b> unless an expert identifies them.</div>
+<h3>🧂 Preserve it</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">☀️</span><b>Dry</b>Thin strips, sun or low heat, until brittle</div>
+<div class="bv-tile"><span class="i">🧂</span><b>Salt</b>Pack in plenty of salt; rinse/soak before cooking</div>
+<div class="bv-tile"><span class="i">💨</span><b>Smoke</b>Low hardwood smoke for hours; hot-smoke to a safe internal temp</div>
+</div>
+<details class="bv-more"><summary>🌴 Hot-humid climates</summary>Heat and humidity spoil food fast: preserve or eat it quickly. Coconuts, citrus and saw palmetto berries are known foods, but harvest only where legal and with permission. Shellfish can carry red-tide toxins: check FWC/health advisories.</details>
 </section>
 
 <section id="bc-aid"><h2>🩹 First aid</h2>
-<figure class="bc-ill bc-ill-aid"><svg viewBox="0 0 200 110" role="img" aria-label="Stop the bleed: firm, direct pressure with gauze on a wound, and a basic first-aid kit" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Stop the bleed: firm, direct pressure with gauze on a wound, and a basic first-aid kit</title><path d="M10 70 h100 a12 12 0 0 1 0 24 h-100" /><rect x="46" y="58" width="36" height="14" rx="2" stroke="#8b95a3"/><path d="M52 62 h24 M52 67 h24" stroke="#8b95a3" stroke-width="1.4"/><g class="bc-press" stroke="#ff4d4f"><path d="M56 16 v30 m-6 -6 l6 6 l6 -6"/><path d="M72 16 v30 m-6 -6 l6 6 l6 -6"/></g><rect x="134" y="44" width="56" height="46" rx="6"/><path d="M152 44 v-8 h20 v8"/><path d="M162 56 v22 M151 67 h22"/><path d="M134 54 h56" stroke="#8b95a3"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>🚨 Order of priorities</h3><ol><li><b>Scene safe?</b> Don't become a second victim.</li><li><b>Call 911</b> (or send someone).</li><li><b>Severe bleeding</b> — stop it now.</li>
-<li><b>Airway &amp; breathing</b> — not breathing normally? Start CPR (push hard and fast in the center of the chest).</li><li><b>Shock</b> — keep warm, lying down; then treat other injuries.</li></ol>
-<h3>🩸 Stop the bleed</h3><ol><li>Apply firm, direct pressure with a cloth or gauze; don't lift to check.</li><li>For deep wounds on arms/legs/junctions, <b>pack</b> the wound tightly with gauze or clean cloth and keep pressing hard.</li>
-<li>Life-threatening limb bleeding that pressure won't stop: apply a <b>tourniquet</b> 2–3 inches above the wound (not on a joint), tighten until bleeding stops, note the time. Take a Stop the Bleed class.</li></ol>
-<h3>🧼 Wound cleaning</h3><ol><li>Wash hands; rinse the wound with clean (treated) water for several minutes.</li><li>Cover with a clean dressing; change daily.</li><li>Watch for infection: spreading redness, warmth, swelling, pus, red streaks or fever → seek care.</li></ol>
-<h3>🔥 Burns</h3><ol><li>Cool with cool running water for about 20 minutes. No ice, butter or creams.</li><li>Cover loosely with clean, non-stick dressing. Large, deep, face/hand/genital or electrical burns → 911/medical care.</li></ol>
-<div class="fl">🌡 <b>Heat illness (critical in hot climates):</b> <b>Heat exhaustion</b> (heavy sweating, cramps, weakness, nausea): move to shade/AC, loosen clothing, cool wet cloths, sip water. <b>Heat stroke</b> (confusion, very high body temp, may stop sweating, collapse): <b>call 911</b> and cool the person immediately with water and fanning, ice packs to neck/armpits/groin.</div>
-<h3>🧰 Basic med kit</h3><ul class="check"><li>Gauze pads &amp; rolls, adhesive bandages, medical tape, elastic bandage</li><li>Tourniquet (commercial, e.g. CAT/SOF-T) and pressure bandage</li>
-<li>Gloves, trauma shears, tweezers, thermometer</li><li>Antiseptic wipes, saline/clean water for rinsing</li><li>Oral rehydration salts, emergency blanket, instant cold packs</li>
-<li>Over-the-counter pain/fever, antihistamine, anti-diarrheal — use only per label</li><li>Your prescriptions, list of meds and allergies</li></ul>
-<div class="tip">💊 Take prescriptions exactly as directed by your doctor/pharmacist and over-the-counter medicines only as the label says. This guide gives no dosing advice.</div>
+<h3>🚨 What to do, in order</h3>
+<figure class="bv-fig bv-flow" aria-label="First aid priority flowchart">
+<div class="bv-q">1. Is the scene safe?</div>
+<div class="bv-split"><div class="bv-br"><span class="bv-yn n">No</span><div class="bv-end stop">Stay back. Don't become a second victim.</div></div><div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-down pulse"></div></div></div>
+<div class="bv-q">2. 📞 Call 911 (or send someone)</div><div class="bv-down pulse"></div>
+<div class="bv-q">3. Severe bleeding?</div>
+<div class="bv-split"><div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-end stop">🩸 Stop it now (below)</div></div><div class="bv-br"><span class="bv-yn n">No</span><div class="bv-down pulse"></div></div></div>
+<div class="bv-q">4. Breathing normally?</div>
+<div class="bv-split"><div class="bv-br"><span class="bv-yn n">No</span><div class="bv-end stop">❤️ Start CPR<small>Push hard and fast in the center of the chest.</small></div></div><div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-down pulse"></div></div></div>
+<div class="bv-end do" style="max-width:460px;text-align:center">5. 🛌 Shock: keep them warm and lying down. Then treat other injuries.</div>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>🩸 Stop the bleed: escalate until it stops</h3>
+<div class="bv-steps">
+<div class="bv-step"><figure class="bc-ill bc-ill-aid"><svg viewBox="0 0 200 110" role="img" aria-label="Stop the bleed: firm, direct pressure with gauze on a wound, and a basic first-aid kit" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Stop the bleed: firm, direct pressure with gauze on a wound, and a basic first-aid kit</title><path d="M10 70 h100 a12 12 0 0 1 0 24 h-100" /><rect x="46" y="58" width="36" height="14" rx="2" stroke="#8b95a3"/><path d="M52 62 h24 M52 67 h24" stroke="#8b95a3" stroke-width="1.4"/><g class="bc-press" stroke="#ff4d4f"><path d="M56 16 v30 m-6 -6 l6 6 l6 -6"/><path d="M72 16 v30 m-6 -6 l6 6 l6 -6"/></g><rect x="134" y="44" width="56" height="46" rx="6"/><path d="M152 44 v-8 h20 v8"/><path d="M162 56 v22 M151 67 h22"/><path d="M134 54 h56" stroke="#8b95a3"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><p><b>Press</b> hard with cloth or gauze. Don't lift to check.</p></div>
+<div class="bv-step"><figure class="bc-ill bc-ill-bleedpack"><svg viewBox="0 0 200 110" role="img" aria-label="Packing a deep wound: gauze or clean cloth pushed tightly into the wound, then firm pressure" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Packing a deep wound: gauze or clean cloth pushed tightly into the wound, then firm pressure</title><path d="M10 52 H190 M10 92 H190" /><path d="M84 52 Q100 78 116 52" stroke="#8b95a3"/><path d="M100 8 C100 24 92 26 96 36 C100 46 104 40 100 62" stroke="#8b95a3" stroke-width="3" stroke-dasharray="1 5"/><path d="M100 10 C100 24 92 26 96 36 C100 46 104 40 100 60" stroke="#e6e9ee" stroke-width="1.4"/><g class="bc-press" stroke="#ff4d4f"><path d="M128 14 v26 m-6 -6 l6 6 l6 -6"/><path d="M144 14 v26 m-6 -6 l6 6 l6 -6"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><p>Deep wound on an arm, leg or junction? <b>Pack</b> it tight and keep pressing.</p></div>
+<div class="bv-step"><figure class="bc-ill bc-ill-tourniquet"><svg viewBox="0 0 200 110" role="img" aria-label="Tourniquet on a limb: the band goes 2 to 3 inches above the wound, not on a joint; tighten until bleeding stops and note the time" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Tourniquet on a limb: the band goes 2 to 3 inches above the wound, not on a joint; tighten until bleeding stops and note the time</title><path d="M8 50 H178 a20 20 0 0 1 0 40 H8"/><path d="M132 64 l8 8 M140 64 l-8 8" stroke="#8b95a3"/><rect x="84" y="44" width="16" height="52" rx="3" stroke="#ff4d4f" stroke-width="3"/><path d="M92 44 V26 M84 26 h16" stroke="#ff4d4f" stroke-width="3"/><path d="M104 104 H130 M108 100 l-4 4 l4 4 M126 100 l4 4 l-4 4" stroke="#8b95a3" stroke-width="1.4"/><circle cx="160" cy="22" r="13"/><path d="M160 22 V14 M160 22 l6 4" stroke-width="1.8"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><p>Pressure won't stop limb bleeding? <b>Tourniquet</b> 2–3 in above the wound (not on a joint). Tighten until it stops. <b>Note the time.</b></p></div>
+</div>
+<p class="bv-note">Take a <a href="https://www.stopthebleed.org/" target="_blank" rel="noopener">Stop the Bleed</a> class.</p>
+<h3>🌡 Heat illness: know the difference</h3>
+<figure class="bv-fig" aria-label="Comparison of heat exhaustion and heat stroke">
+<div class="bv-grid g2">
+<div class="bv-tile warn" style="text-align:left"><span class="i">😓</span><b>Heat exhaustion</b>Heavy sweating, cramps, weakness, nausea<br>➡️ Shade/AC, loosen clothing, cool wet cloths, sip water</div>
+<div class="bv-tile bad" style="text-align:left"><span class="i">🚨</span><b>Heat stroke: call 911</b>Confusion, very high body temp, may stop sweating, collapse<br>➡️ Cool them <b>now</b>: water + fanning, ice packs on neck, armpits, groin</div>
+</div>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<h3>🧼 Wounds &amp; 🔥 burns</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🧼</span><b>Clean</b>Wash hands; rinse with treated water for several minutes</div>
+<div class="bv-tile"><span class="i">🩹</span><b>Cover</b>Clean dressing, change daily</div>
+<div class="bv-tile bad"><span class="i">🔴</span><b>Infection → get care</b>Spreading redness, warmth, swelling, pus, red streaks, fever</div>
+<div class="bv-tile"><span class="i">🚿</span><b>Burn: cool 20 min</b>Cool running water. No ice, butter or creams. Cover loosely, non-stick</div>
+<div class="bv-tile bad"><span class="i">🚑</span><b>Burn → 911</b>Large, deep, face/hands/genitals, or electrical</div>
+</div>
+<h3>🧰 Med kit</h3>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🩹</span>Gauze pads &amp; rolls, bandages, tape, elastic bandage</div>
+<div class="bv-tile"><span class="i">🎗️</span>Tourniquet (CAT/SOF-T) + pressure bandage</div>
+<div class="bv-tile"><span class="i">🧤</span>Gloves, trauma shears, tweezers, thermometer</div>
+<div class="bv-tile"><span class="i">🧴</span>Antiseptic wipes, saline/clean water</div>
+<div class="bv-tile"><span class="i">🥤</span>Oral rehydration salts, emergency blanket, cold packs</div>
+<div class="bv-tile"><span class="i">💊</span>OTC pain/fever, antihistamine, anti-diarrheal (label only)</div>
+<div class="bv-tile"><span class="i">📋</span>Your prescriptions + list of meds &amp; allergies</div>
+</div>
+<div class="tip">💊 Take prescriptions exactly as your doctor/pharmacist directs and OTC medicines only as the label says. This guide gives no dosing advice.</div>
 </section>
 
 <section id="bc-nav"><h2>🧭 Navigation</h2>
-<figure class="bc-ill bc-ill-nav"><svg viewBox="0 0 200 110" role="img" aria-label="Orienting a map: a baseplate compass laid along a north-south grid line with the needle pointing to map north, and the Big Dipper's two pointer stars leading to the North Star" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Orienting a map: a baseplate compass laid along a north-south grid line with the needle pointing to map north, and the Big Dipper's two pointer stars leading to the North Star</title><rect x="10" y="12" width="124" height="88" rx="3"/><path d="M42 12 v88 M74 12 v88 M106 12 v88" stroke="#8b95a3" stroke-width="1.4"/><path d="M16 86 q14 -14 30 -6 t30 -4 M18 74 q12 -10 24 -4 t22 -4 M112 30 q10 6 16 0" stroke="#8b95a3" stroke-width="1.6"/><path d="M20 34 v-14 m-4 5 l4 -5 l4 5" stroke="#ff4d4f"/><rect x="74" y="30" width="34" height="62" rx="4"/><path d="M91 46 v-10 m-4 4 l4 -4 l4 4"/><circle cx="91" cy="68" r="13"/><g class="bc-needle"><path d="M87.5 68 L91 55 L94.5 68Z" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.4"/><path d="M87.5 68 L91 81 L94.5 68Z" stroke-width="1.4"/></g><g fill="currentColor" stroke="none"><circle cx="186" cy="96" r="2"/><circle cx="186" cy="80" r="2"/><circle cx="170" cy="82" r="1.8"/><circle cx="170" cy="95" r="1.8"/><circle cx="160" cy="78" r="1.8"/><circle cx="152" cy="80" r="1.8"/><circle cx="145" cy="88" r="1.8"/></g><path d="M186 96 L186 80 L170 82 L170 95Z M170 82 L160 78 L152 80 L145 88" stroke="#8b95a3" stroke-width="1.2"/><path d="M186 76 V30" stroke="#8b95a3" stroke-width="1.4" stroke-dasharray="3 5"/><path class="bc-star" d="M186 14 l2.4 6 l6 2.4 l-6 2.4 l-2.4 6 l-2.4 -6 l-6 -2.4 l6 -2.4Z" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.2"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<h3>🗺 Map &amp; compass basics</h3><ol><li>Carry a paper map of your area (download the PDFs in the Maps tab ahead of time).</li><li>Learn the map legend: roads, water, contour lines (land shape), scale.</li>
-<li>Hold the compass flat, away from metal and phones.</li></ol>
-<h3>🧭 Orient the map</h3><ol><li>Lay the compass edge along a north–south grid line of the map.</li><li>Turn map and compass together until the needle points to map north (adjust for <b>declination</b>: it varies by place — check the current NOAA value for your location).</li><li>Now features on the map line up with the real world.</li></ol>
-<h3>🏞 Terrain association</h3><p>Match what you see (roads, lakes, rivers, power lines, towers, bridges) to the map. Tick off landmarks as you pass them; know your "catching feature" (a road or river that stops you if you overshoot).</p>
-<h3>☀️ Sun &amp; ⭐ stars</h3><ul><li>The sun rises roughly in the east and sets roughly in the west; around midday it is roughly due south in the Northern Hemisphere (due north in the Southern Hemisphere).</li>
-<li>At night find the <b>North Star (Polaris)</b>: follow the two "pointer" stars at the end of the Big Dipper's cup. Its height above the horizon roughly equals your latitude.</li></ul>
+<div class="bv-lead"><figure class="bc-ill bc-ill-nav"><svg viewBox="0 0 200 110" role="img" aria-label="Orienting a map: a baseplate compass laid along a north-south grid line with the needle pointing to map north, and the Big Dipper's two pointer stars leading to the North Star" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Orienting a map: a baseplate compass laid along a north-south grid line with the needle pointing to map north, and the Big Dipper's two pointer stars leading to the North Star</title><rect x="10" y="12" width="124" height="88" rx="3"/><path d="M42 12 v88 M74 12 v88 M106 12 v88" stroke="#8b95a3" stroke-width="1.4"/><path d="M16 86 q14 -14 30 -6 t30 -4 M18 74 q12 -10 24 -4 t22 -4 M112 30 q10 6 16 0" stroke="#8b95a3" stroke-width="1.6"/><path d="M20 34 v-14 m-4 5 l4 -5 l4 5" stroke="#ff4d4f"/><rect x="74" y="30" width="34" height="62" rx="4"/><path d="M91 46 v-10 m-4 4 l4 -4 l4 4"/><circle cx="91" cy="68" r="13"/><g class="bc-needle"><path d="M87.5 68 L91 55 L94.5 68Z" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.4"/><path d="M87.5 68 L91 81 L94.5 68Z" stroke-width="1.4"/></g><g fill="currentColor" stroke="none"><circle cx="186" cy="96" r="2"/><circle cx="186" cy="80" r="2"/><circle cx="170" cy="82" r="1.8"/><circle cx="170" cy="95" r="1.8"/><circle cx="160" cy="78" r="1.8"/><circle cx="152" cy="80" r="1.8"/><circle cx="145" cy="88" r="1.8"/></g><path d="M186 96 L186 80 L170 82 L170 95Z M170 82 L160 78 L152 80 L145 88" stroke="#8b95a3" stroke-width="1.2"/><path d="M186 76 V30" stroke="#8b95a3" stroke-width="1.4" stroke-dasharray="3 5"/><path class="bc-star" d="M186 14 l2.4 6 l6 2.4 l-6 2.4 l-2.4 6 l-2.4 -6 l-6 -2.4 l6 -2.4Z" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.2"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">Carry a paper map. Know your "catching feature".<small>A road or river that stops you if you overshoot. Download area map PDFs in the Maps tab ahead of time.</small></div></div>
+<h3>😮‍💨 Lost? S.T.O.P.</h3>
+<div class="bv-grid g4">
+<div class="bv-tile bad"><span class="i">✋</span><b>Stop</b>Stay put. Don't wander.</div>
+<div class="bv-tile"><span class="i">🧠</span><b>Think</b>How did you get here?</div>
+<div class="bv-tile"><span class="i">👀</span><b>Observe</b>Landmarks, map, compass, sun</div>
+<div class="bv-tile ok"><span class="i">🗺</span><b>Plan</b>Move only with a plan, or stay and signal</div>
+</div>
+<h3>🧭 Orient the map in 3 steps</h3>
+<div class="bv-steps">
+<div class="bv-step"><p style="margin-top:30px"><span class="i" style="font-size:34px">📐</span><br>Compass <b>flat</b>, away from metal and phones. Edge along a north–south grid line.</p></div>
+<div class="bv-step"><p style="margin-top:30px"><span class="i" style="font-size:34px">🔄</span><br>Turn map + compass together until the needle points to map north. Adjust for <b>declination</b> (check NOAA's value for your location).</p></div>
+<div class="bv-step"><p style="margin-top:30px"><span class="i" style="font-size:34px">🏞</span><br>Match roads, lakes, power lines and towers to the map. Tick off landmarks as you pass.</p></div>
+</div>
+<details class="bv-more"><summary>🗺 Reading the map</summary>Learn the legend: roads, water, contour lines (land shape) and scale.</details>
+<h3>☀️ Sun &amp; ⭐ stars</h3>
+<div class="bv-grid g2">
+<div><figure class="bc-ill bc-ill-sunpath"><svg viewBox="0 0 200 110" role="img" aria-label="The sun rises roughly in the east, is roughly due south around midday in the Northern Hemisphere, and sets roughly in the west" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>The sun rises roughly in the east, is roughly due south around midday in the Northern Hemisphere, and sets roughly in the west</title><path d="M6 92 H194" stroke="#8b95a3"/><path d="M24 92 A76 76 0 0 1 176 92" stroke="#8b95a3" stroke-width="1.4" stroke-dasharray="3 6"/><path d="M100 96 l-6 10 h12 Z" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.4"/><path d="M24 96 v8 M176 96 v8" stroke="#8b95a3"/><g class="bv-sun"><circle cx="100" cy="16" r="8" stroke="#faad14"/><path d="M100 2 v4 M100 26 v4 M86 16 h4 M110 16 h4" stroke="#faad14" stroke-width="1.6"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><p style="text-align:center"><b>East</b> (rise) → <b>South</b> at midday → <b>West</b> (set)<br><small>Northern Hemisphere. Midday sun is due north in the Southern Hemisphere.</small></p></div>
+<div class="bv-tile" style="text-align:left"><span class="i">⭐</span><b>North Star (Polaris)</b>Follow the Big Dipper's two "pointer" stars (map illustration above). Its height above the horizon ≈ your latitude.</div>
+</div>
 </section>
 
 <section id="bc-signal"><h2>📣 Signaling</h2>
-<figure class="bc-ill bc-ill-signal"><svg viewBox="0 0 200 110" role="img" aria-label="Distress signals in threes: three whistle blasts, and three fires set in a triangle" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Distress signals in threes: three whistle blasts, and three fires set in a triangle</title><rect x="10" y="48" width="34" height="13" rx="3"/><circle cx="54" cy="62" r="16"/><path d="M30 48 v-4 h8 v4"/><circle cx="54" cy="62" r="4" stroke="#8b95a3"/><g stroke="#ff4d4f"><path class="bc-blast" d="M78 46 q8 16 0 32"/><path class="bc-blast d2" d="M88 40 q12 22 0 44"/><path class="bc-blast d3" d="M98 34 q16 28 0 56"/></g><path d="M118 100 l22 0 M164 100 l22 0 M141 64 l22 0" stroke="#8b95a3"/><path d="M134 100 L162 64 M170 100 L142 64" stroke="#8b95a3" stroke-dasharray="2 6" stroke-width="1.4"/><path class="bc-flame" stroke="#faad14" d="M129 98 c-5.95 0 -7.65 -5.95 -4.25 -11.05 c0.85 2.55 2.55 2.55 2.55 0.85 c0 -3.4 1.7 -6.8 4.25 -10.2 c0.85 5.1 5.95 8.5 5.1 14.45 c-0.85 4.25 -3.4 5.95 -7.65 5.95Z"/><path class="bc-flame f2" stroke="#faad14" d="M175 98 c-5.95 0 -7.65 -5.95 -4.25 -11.05 c0.85 2.55 2.55 2.55 2.55 0.85 c0 -3.4 1.7 -6.8 4.25 -10.2 c0.85 5.1 5.95 8.5 5.1 14.45 c-0.85 4.25 -3.4 5.95 -7.65 5.95Z"/><path class="bc-flame f3" stroke="#faad14" d="M152 62 c-5.95 0 -7.65 -5.95 -4.25 -11.05 c0.85 2.55 2.55 2.55 2.55 0.85 c0 -3.4 1.7 -6.8 4.25 -10.2 c0.85 5.1 5.95 8.5 5.1 14.45 c-0.85 4.25 -3.4 5.95 -7.65 5.95Z"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<ol><li><b>3 of anything = distress:</b> 3 whistle blasts, 3 fires in a triangle, 3 rock piles, 3 flashes.</li><li><b>Whistle:</b> carries far and saves your voice — 3 blasts, pause, repeat.</li>
-<li><b>Signal mirror:</b> aim the reflected flash at aircraft/ships using your fingers as a sight; sweep the horizon even if you see no one.</li>
-<li><b>Smoke:</b> in daylight add green leaves to a fire for white smoke (visible over dark terrain) — only where safe.</li><li><b>Ground signals:</b> large contrasting "SOS" or "X" in open areas.</li></ol>
-<h3>📻 Radio</h3><ul><li><b>NOAA Weather Radio:</b> official alerts 24/7; get one with battery/crank power and SAME alerting.</li>
-<li><b>FRS</b> walkie-talkies: no license, short range — good for family/neighbors. <b>GMRS</b>: more power and repeaters; needs an FCC license (no exam).</li>
-<li><b>Ham (amateur) radio:</b> long range and emergency nets; requires an FCC license exam. Local ARES/RACES groups help in disasters.</li>
-<li><b>Meshtastic:</b> cheap LoRa radios that relay short text messages off-grid between nearby users — no license or cell service needed.</li></ul>
+<div class="bv-lead"><figure class="bc-ill bc-ill-signal"><svg viewBox="0 0 200 110" role="img" aria-label="Distress signals in threes: three whistle blasts, and three fires set in a triangle" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Distress signals in threes: three whistle blasts, and three fires set in a triangle</title><rect x="10" y="48" width="34" height="13" rx="3"/><circle cx="54" cy="62" r="16"/><path d="M30 48 v-4 h8 v4"/><circle cx="54" cy="62" r="4" stroke="#8b95a3"/><g stroke="#ff4d4f"><path class="bc-blast" d="M78 46 q8 16 0 32"/><path class="bc-blast d2" d="M88 40 q12 22 0 44"/><path class="bc-blast d3" d="M98 34 q16 28 0 56"/></g><path d="M118 100 l22 0 M164 100 l22 0 M141 64 l22 0" stroke="#8b95a3"/><path d="M134 100 L162 64 M170 100 L142 64" stroke="#8b95a3" stroke-dasharray="2 6" stroke-width="1.4"/><path class="bc-flame" stroke="#faad14" d="M129 98 c-5.95 0 -7.65 -5.95 -4.25 -11.05 c0.85 2.55 2.55 2.55 2.55 0.85 c0 -3.4 1.7 -6.8 4.25 -10.2 c0.85 5.1 5.95 8.5 5.1 14.45 c-0.85 4.25 -3.4 5.95 -7.65 5.95Z"/><path class="bc-flame f2" stroke="#faad14" d="M175 98 c-5.95 0 -7.65 -5.95 -4.25 -11.05 c0.85 2.55 2.55 2.55 2.55 0.85 c0 -3.4 1.7 -6.8 4.25 -10.2 c0.85 5.1 5.95 8.5 5.1 14.45 c-0.85 4.25 -3.4 5.95 -7.65 5.95Z"/><path class="bc-flame f3" stroke="#faad14" d="M152 62 c-5.95 0 -7.65 -5.95 -4.25 -11.05 c0.85 2.55 2.55 2.55 2.55 0.85 c0 -3.4 1.7 -6.8 4.25 -10.2 c0.85 5.1 5.95 8.5 5.1 14.45 c-0.85 4.25 -3.4 5.95 -7.65 5.95Z"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule"><span class="bv-big">3</span> of anything = distress.<small>3 whistle blasts · 3 fires in a triangle · 3 rock piles · 3 flashes.</small></div></div>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">📯</span><b>Whistle</b>Carries far, saves your voice. 3 blasts, pause, repeat</div>
+<div class="bv-tile"><span class="i">🪞</span><b>Signal mirror</b>Aim the flash over your fingers; sweep the horizon anyway</div>
+<div class="bv-tile"><span class="i">💨</span><b>Smoke</b>Daytime: green leaves on a fire = white smoke (only where safe)</div>
+<div class="bv-tile"><span class="i">✖️</span><b>Ground signal</b>Big contrasting "SOS" or "X" in the open</div>
+</div>
+<h3>📻 Which radio?</h3>
+<figure class="bv-fig" aria-label="Comparison chart of emergency radio options">
+<div class="bv-tw"><table class="bv-cmp">
+<thead><tr><th>Radio</th><th>Talk back?</th><th>License</th><th>Best for</th></tr></thead>
+<tbody>
+<tr class="best"><td>📻 NOAA Weather Radio</td><td class="n">✗</td><td class="y">None</td><td>Official alerts 24/7. Get battery/crank + SAME alerting</td></tr>
+<tr><td>📟 FRS walkie-talkie</td><td class="y">✓</td><td class="y">None</td><td>Family &amp; neighbors, short range</td></tr>
+<tr><td>📡 GMRS</td><td class="y">✓</td><td class="p">FCC, no exam</td><td>More power + repeaters</td></tr>
+<tr><td>🎙 Ham (amateur)</td><td class="y">✓</td><td class="n">FCC exam</td><td>Long range, emergency nets (local ARES/RACES)</td></tr>
+<tr><td>💬 Meshtastic</td><td class="y">Text</td><td class="y">None</td><td>Cheap LoRa radios relay short texts off-grid, no cell service</td></tr>
+</tbody></table></div>
+<figcaption>Illustration by blackout.network</figcaption></figure>
 </section>
 
 <section id="bc-sec"><h2>🛡 Security &amp; situational awareness</h2>
-<figure class="bc-ill bc-ill-sec"><svg viewBox="0 0 200 110" role="img" aria-label="Security basics: a solid door with a deadbolt, shuttered windows and a motion light, and neighbors who look out for each other" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Security basics: a solid door with a deadbolt, shuttered windows and a motion light, and neighbors who look out for each other</title><path d="M14 58 L64 20 L114 58"/><path d="M24 50 V100 H104 V50"/><path d="M8 100 h184" stroke="#8b95a3"/><rect x="54" y="66" width="22" height="34" rx="1"/><rect x="69" y="80" width="5" height="4" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.2"/><rect x="32" y="64" width="16" height="14"/><path d="M32 68 h16 M32 72 h16 M32 76 h16" stroke="#8b95a3" stroke-width="1.2"/><rect x="82" y="64" width="16" height="14"/><path d="M82 68 h16 M82 72 h16 M82 76 h16" stroke="#8b95a3" stroke-width="1.2"/><path d="M104 52 h8 v6 h-8" /><g class="bc-glow" stroke="#faad14"><path d="M116 62 l8 6 M118 56 l10 0 M116 50 l8 -6"/></g><g><circle cx="146" cy="62" r="7"/><path d="M134 92 q0 -18 12 -18 q12 0 12 18"/><circle cx="168" cy="58" r="7"/><path d="M156 88 q0 -18 12 -18 q12 0 12 18"/><circle cx="188" cy="64" r="6" stroke="#8b95a3"/><path d="M178 94 q0 -16 10 -16 q10 0 10 16" stroke="#8b95a3"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<ol><li><b>Low profile:</b> don't advertise supplies, generators or fuel. Keep lights and noise modest at night.</li>
-<li><b>OPSEC:</b> don't post your location, stockpiles or travel plans online.</li>
-<li><b>Stay in groups</b> and check on neighbors — community is the best security.</li>
-<li><b>Avoid crowds, protests and unrest.</b> If caught in one, move to the edges and away; know two exits.</li>
-<li><b>Home hardening basics:</b> solid doors with good deadbolts and long strike-plate screws, window locks, motion lights, storm shutters (also helps in hurricanes), a fire extinguisher and smoke/CO alarms.</li>
-<li><b>De-escalation:</b> stay calm, keep distance, speak slowly, don't argue, give people a way out, and leave if you can. Call 911 when there's a threat.</li></ol>
+<div class="bv-lead"><figure class="bc-ill bc-ill-sec"><svg viewBox="0 0 200 110" role="img" aria-label="Security basics: a solid door with a deadbolt, shuttered windows and a motion light, and neighbors who look out for each other" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Security basics: a solid door with a deadbolt, shuttered windows and a motion light, and neighbors who look out for each other</title><path d="M14 58 L64 20 L114 58"/><path d="M24 50 V100 H104 V50"/><path d="M8 100 h184" stroke="#8b95a3"/><rect x="54" y="66" width="22" height="34" rx="1"/><rect x="69" y="80" width="5" height="4" fill="#ff4d4f" stroke="#ff4d4f" stroke-width="1.2"/><rect x="32" y="64" width="16" height="14"/><path d="M32 68 h16 M32 72 h16 M32 76 h16" stroke="#8b95a3" stroke-width="1.2"/><rect x="82" y="64" width="16" height="14"/><path d="M82 68 h16 M82 72 h16 M82 76 h16" stroke="#8b95a3" stroke-width="1.2"/><path d="M104 52 h8 v6 h-8" /><g class="bc-glow" stroke="#faad14"><path d="M116 62 l8 6 M118 56 l10 0 M116 50 l8 -6"/></g><g><circle cx="146" cy="62" r="7"/><path d="M134 92 q0 -18 12 -18 q12 0 12 18"/><circle cx="168" cy="58" r="7"/><path d="M156 88 q0 -18 12 -18 q12 0 12 18"/><circle cx="188" cy="64" r="6" stroke="#8b95a3"/><path d="M178 94 q0 -16 10 -16 q10 0 10 16" stroke="#8b95a3"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">Low profile. Strong community.<small>Neighbors who check on each other are the best security.</small></div></div>
+<div class="bv-grid g4">
+<div class="bv-tile"><span class="i">🤫</span><b>Low profile</b>Don't advertise supplies or fuel. Keep lights and noise low at night</div>
+<div class="bv-tile"><span class="i">📵</span><b>OPSEC</b>Don't post location, stockpiles or travel plans online</div>
+<div class="bv-tile ok"><span class="i">🤝</span><b>Stay in groups</b>Check on neighbors</div>
+<div class="bv-tile"><span class="i">🔒</span><b>Harden home</b>Solid doors, deadbolts with long strike-plate screws, window locks, motion lights, shutters, extinguisher, smoke/CO alarms</div>
+<div class="bv-tile"><span class="i">🕊</span><b>De-escalate</b>Stay calm, keep distance, speak slowly, don't argue, give a way out, leave. Threat? Call 911</div>
+</div>
+<h3>🚷 Avoid crowds, protests and unrest</h3>
+<figure class="bc-ill bc-ill-crowd"><svg viewBox="0 0 200 110" role="img" aria-label="Caught in a crowd: move to the edge, away from the center, toward one of at least two exits you already know" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Caught in a crowd: move to the edge, away from the center, toward one of at least two exits you already know</title><path d="M10 40 V16 q0 -6 6 -6 H184 q6 0 6 6 V40 M190 70 V94 q0 6 -6 6 H16 q-6 0 -6 -6 V70" stroke="#8b95a3"/><g class="bc-glow" stroke="#52c41a"><path d="M4 48 v14"/><path d="M196 48 v14"/></g><g fill="#8b95a3" stroke="none"><circle cx="90" cy="40" r="3"/><circle cx="100" cy="34" r="3"/><circle cx="110" cy="42" r="3"/><circle cx="96" cy="50" r="3"/><circle cx="106" cy="56" r="3"/><circle cx="118" cy="52" r="3"/><circle cx="86" cy="60" r="3"/><circle cx="98" cy="66" r="3"/><circle cx="112" cy="68" r="3"/><circle cx="124" cy="62" r="3"/><circle cx="80" cy="48" r="3"/><circle cx="122" cy="38" r="3"/><circle cx="92" cy="76" r="3"/><circle cx="108" cy="80" r="3"/><circle cx="130" cy="72" r="3"/><circle cx="76" cy="70" r="3"/></g><path d="M140 55 H70 Q40 55 20 55" stroke="#ff4d4f" stroke-dasharray="4 5"/><path d="M28 49 l-8 6 l8 6" stroke="#ff4d4f"/><g class="bv-walk"><circle cx="146" cy="55" r="5" fill="currentColor"/></g></svg><figcaption>Illustration by blackout.network</figcaption></figure>
+<p style="text-align:center">Move to the <b>edges</b> and away · always know <b>two exits</b></p>
 </section>
 
 <section id="bc-plants"><h2>🌿 Plants</h2>
-<figure class="bc-ill bc-ill-plants"><svg viewBox="0 0 200 110" role="img" aria-label="Identify before you touch: a leaf under a magnifying glass, checked against more than one reliable source, and a warning sign: if in doubt, don't" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Identify before you touch: a leaf under a magnifying glass, checked against more than one reliable source, and a warning sign: if in doubt, don't</title><path d="M18 96 C18 56 48 26 92 20 C88 62 60 92 18 96Z"/><path d="M18 96 Q52 62 92 20" stroke="#8b95a3"/><path d="M38 74 l-4 -14 M52 60 l-2 -16 M66 46 l0 -14 M44 70 l14 2 M58 56 l14 2 M72 42 l12 2" stroke="#8b95a3" stroke-width="1.4"/><circle cx="80" cy="58" r="20"/><path d="M95 72 L112 89" stroke-width="5"/><rect x="128" y="60" width="54" height="14" rx="2"/><rect x="132" y="80" width="54" height="14" rx="2"/><path d="M138 67 h30 M142 87 h30" stroke="#8b95a3" stroke-width="1.4"/><path d="M172 64 l3 4 l6 -8 M176 84 l3 4 l6 -8" stroke="#52c41a"/><path d="M155 14 l18 30 h-36Z" stroke="#ff4d4f"/><path d="M155 25 v9" stroke="#ff4d4f"/><circle cx="155" cy="39" r="1.4" fill="#ff4d4f" stroke="#ff4d4f"/></svg><figcaption>Illustration by blackout.network</figcaption></figure>
-<div class="warnbox">⚠️ <b>Read first:</b> Plant ID mistakes can kill. <b>Confirm every identification with multiple reliable sources or a local expert</b> (UF/IFAS Extension, a botanist) before touching or using any plant. This is educational, <b>not medical advice</b> — "traditionally used for" means historical/folk use, not proven treatment. Don't use plants if pregnant, nursing, on medications, or for children without a doctor's advice. Suspected poisoning: call <b>Poison Control <a href="tel:+18002221222" style="color:#fff">1-800-222-1222</a></b> (24/7, free) or 911 if the person is unconscious, having seizures or trouble breathing.</div>
+<div class="bv-lead"><figure class="bc-ill bc-ill-plants"><svg viewBox="0 0 200 110" role="img" aria-label="Identify before you touch: a leaf under a magnifying glass, checked against more than one reliable source, and a warning sign: if in doubt, don't" translate="no" fill="none" stroke="currentColor" color="#e6e9ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><title>Identify before you touch: a leaf under a magnifying glass, checked against more than one reliable source, and a warning sign: if in doubt, don't</title><path d="M18 96 C18 56 48 26 92 20 C88 62 60 92 18 96Z"/><path d="M18 96 Q52 62 92 20" stroke="#8b95a3"/><path d="M38 74 l-4 -14 M52 60 l-2 -16 M66 46 l0 -14 M44 70 l14 2 M58 56 l14 2 M72 42 l12 2" stroke="#8b95a3" stroke-width="1.4"/><circle cx="80" cy="58" r="20"/><path d="M95 72 L112 89" stroke-width="5"/><rect x="128" y="60" width="54" height="14" rx="2"/><rect x="132" y="80" width="54" height="14" rx="2"/><path d="M138 67 h30 M142 87 h30" stroke="#8b95a3" stroke-width="1.4"/><path d="M172 64 l3 4 l6 -8 M176 84 l3 4 l6 -8" stroke="#52c41a"/><path d="M155 14 l18 30 h-36Z" stroke="#ff4d4f"/><path d="M155 25 v9" stroke="#ff4d4f"/><circle cx="155" cy="39" r="1.4" fill="#ff4d4f" stroke="#ff4d4f"/></svg><figcaption>Illustration by blackout.network</figcaption></figure><div class="bv-rule">Never touch, eat or use a plant you can't identify with 100% certainty.<small>Confirm with multiple reliable sources or a local expert (UF/IFAS Extension, a botanist).</small></div></div>
+<figure class="bv-fig bv-flow" aria-label="Plant decision flowchart">
+<div class="bv-q">100% sure what it is, confirmed by multiple reliable sources or an expert?</div>
+<div class="bv-split"><div class="bv-br"><span class="bv-yn n">No / not sure</span><div class="bv-end stop">🚫 Don't touch it, eat it or use it</div></div><div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-down pulse"></div></div></div>
+<div class="bv-q">Pregnant, nursing, on medications, or for a child?</div>
+<div class="bv-split"><div class="bv-br"><span class="bv-yn y">Yes</span><div class="bv-end stop">👩‍⚕️ Ask a doctor first</div></div><div class="bv-br"><span class="bv-yn n">No</span><div class="bv-end do">Use only as described below, and read every ⚠️</div></div></div>
+<figcaption>Illustration by blackout.network</figcaption></figure>
+<div class="warnbox">⚠️ Plant ID mistakes can kill. This is education, <b>not medical advice</b>: "traditionally used for" means historical/folk use, not proven treatment. Suspected poisoning: <b>Poison Control <a href="tel:+18002221222" style="color:#fff">1-800-222-1222</a></b> (24/7, free), or 911 if unconscious, seizing or struggling to breathe.</div>
 <h3 id="bc-plants-med">🌱 Beginner medicinal plants (traditionally used for…)</h3>
-<ul>
-<li>🍃 <b>Broadleaf plantain</b> (<i>Plantago major</i>) — common lawn "weed": low rosette of oval leaves with strong parallel veins (stringy when torn), pencil-like seed spikes. <b>Traditionally used for</b> soothing insect bites, stings and minor skin irritation as a crushed-leaf poultice.</li>
-<li>🌼 <b>Yarrow</b> (<i>Achillea millefolium</i>) — feathery, finely divided fern-like leaves; flat-topped clusters of small white flowers. <b>Traditionally used for</b> minor cuts (as a styptic). ⚠️ Look-alikes in the carrot family (e.g. water hemlock) are deadly — never confuse feathery leaves with umbrella-shaped flower clusters on hollow, purple-blotched stems. Can cause skin reactions in people allergic to ragweed/daisies.</li>
-<li>🌳 <b>Willow bark</b> (<i>Salix</i> spp.) — long narrow leaves, often near water. Inner bark contains salicin, an aspirin-like compound; <b>traditionally used for</b> pain and fever. ⚠️ <b>Same cautions as aspirin:</b> not for children or teens (Reye's syndrome risk), not for anyone allergic to aspirin, with bleeding disorders, ulcers, or on blood thinners, and not in pregnancy.</li>
-<li>🫐 <b>Elderberry</b> (<i>Sambucus nigra</i> ssp. <i>canadensis</i>) — shrub with compound leaves (5–11 toothed leaflets), flat clusters of tiny white flowers, then dark purple-black berries. <b>Traditionally used for</b> colds and flu as a cooked syrup. ⚠️ <b>Only fully ripe berries, and only cooked.</b> Raw berries, unripe berries, leaves, stems, bark and roots contain toxic compounds that cause nausea, vomiting and worse.</li>
-<li>🌻 <b>Dandelion</b> (<i>Taraxacum officinale</i>) — toothed leaves in a rosette, single yellow flower per hollow stem with milky sap. Leaves, flowers and roots are edible; <b>traditionally used</b> as a mild diuretic and digestive bitter. Avoid plants from sprayed lawns or roadsides; may interact with some medications.</li>
-<li>🪴 <b>Aloe vera</b> — thick, spiky-edged succulent leaves with clear gel. <b>Traditionally used for</b> minor burns and sunburn (gel on skin only). Don't eat it — the yellow latex under the skin is a strong laxative.</li>
-<li>💜 <b>American beautyberry</b> (<i>Callicarpa americana</i>) — Florida native shrub with clusters of bright purple berries hugging the stems in fall. Crushed leaves were <b>traditionally used</b> as an insect repellent rubbed on skin (test a small area first). Berries are not a good food raw.</li>
-</ul>
-<h3 id="bc-plants-tox">☠️ Toxic plants — know these (examples from the southeastern US)</h3>
-<ul>
-<li>🍂 <b>Poison ivy</b> — "leaves of three, let it be": three leaflets, the middle one on a longer stalk; vine with hairy rootlets or a shrub. Urushiol oil causes blistering rash. Wash skin with soap and cool water within minutes; wash clothes and tools. Never burn it (smoke harms lungs).</li>
-<li>🍁 <b>Atlantic poison oak</b> — low shrub, three leaflets lobed like oak leaves, fuzzy undersides; sandy pinelands. Same urushiol rash as poison ivy.</li>
-<li>🌿 <b>Poison sumac</b> — shrub/small tree in swamps and wet areas; 7–13 smooth-edged leaflets on red stems, drooping white/gray berries. Very strong urushiol rash.</li>
-<li>🌸 <b>Oleander</b> — common Florida landscape shrub: long narrow leathery leaves, pink/white/red flowers. <b>All parts are highly toxic</b> to people and pets (heart poison) — never use the wood for cooking skewers or burn it.</li>
-<li>🌱 <b>Castor bean</b> — large star-shaped (palmate) leaves often reddish, spiny seed pods; mottled bean-like seeds contain ricin. <b>Seeds are deadly if chewed.</b></li>
-<li>☂️ <b>Water hemlock</b> — wet ditches and marshes: umbrella-shaped clusters of small white flowers, hollow stems often purple-streaked, chambered root. <b>One of the most toxic plants in North America</b> — even a small bite can cause fatal seizures. Avoid all carrot-family look-alikes.</li>
-<li>🔴 <b>Rosary pea</b> — invasive vine with feathery compound leaves; shiny <b>red seeds with a black spot</b>. Contains abrin; <b>a chewed seed can be fatal.</b> Never use the seeds for jewelry.</li>
-<li>🟠 <b>Lantana</b> — common shrub with clusters of small multicolored flowers (yellow/orange/pink); <b>green (unripe) berries are toxic</b> and leaves are toxic to livestock and pets. Don't eat the berries.</li>
-<li>🍏 <b>Manchineel</b> — rare, coastal South Florida/Keys tree with small green apple-like fruit; often marked with warning signs. <b>Extremely toxic</b>: the fruit, the milky sap, and even rainwater dripping off it burn skin and eyes. Never shelter under it or burn it.</li>
-<li>🌶 <b>Brazilian pepper</b> — invasive shrub/tree everywhere in Central/South Florida: compound leaves with 3–13 leaflets and a peppery smell when crushed, clusters of bright red berries in winter. Related to poison ivy — sap and blooms cause rash and breathing irritation for many people.</li>
-<li>🌺 <b>Coral bean</b> (<i>Erythrina herbacea</i>) — native shrub with tall spikes of red tubular flowers and pods with <b>bright red seeds</b>; seeds are poisonous.</li>
-<li>🌙 <b>Jimsonweed</b> (<i>Datura</i>) — large trumpet-shaped white/purple flowers, foul-smelling leaves, spiny seed pods. <b>All parts are toxic</b> (hallucinations, high heart rate, death).</li>
-</ul>
-<div class="tip">📞 Poison Control: <a href="tel:+18002221222"><b>1-800-222-1222</b></a> — save it in your phone. Take a photo of the plant (or bring a sample in a bag) to help responders. Learn more from <a href="https://edis.ifas.ufl.edu/" target="_blank" rel="noopener">UF/IFAS Extension (EDIS)</a>.</div>
+<div class="bv-cards">
+<div class="bv-card"><h4>🍃 Broadleaf plantain <i>Plantago major</i></h4><details class="bv-id"><summary>👁 How to spot it</summary>lawn "weed"; low rosette of oval leaves, strong parallel veins (stringy when torn), pencil-like seed spikes.</details><p><b>Traditional use:</b> crushed-leaf poultice for bites, stings, minor skin irritation.</p></div>
+<div class="bv-card rash"><h4>🌼 Yarrow <i>Achillea millefolium</i></h4><details class="bv-id"><summary>👁 How to spot it</summary>feathery, finely divided fern-like leaves; flat-topped clusters of small white flowers.</details><p><b>Traditional use:</b> minor cuts (styptic).</p><p class="w">⚠️ Deadly carrot-family look-alikes (water hemlock): umbrella-shaped flower clusters on hollow, purple-blotched stems. Skin reactions if allergic to ragweed/daisies.</p></div>
+<div class="bv-card rash"><h4>🌳 Willow bark <i>Salix</i> spp.</h4><details class="bv-id"><summary>👁 How to spot it</summary>long narrow leaves, often near water. Inner bark has salicin (aspirin-like).</details><p><b>Traditional use:</b> pain, fever.</p><p class="w">⚠️ Same cautions as aspirin: not for children or teens (Reye's syndrome), aspirin allergy, bleeding disorders, ulcers, blood thinners, or pregnancy.</p></div>
+<div class="bv-card rash"><h4>🫐 Elderberry <i>Sambucus nigra</i> ssp. <i>canadensis</i></h4><details class="bv-id"><summary>👁 How to spot it</summary>shrub, compound leaves (5–11 toothed leaflets), flat clusters of tiny white flowers, then purple-black berries.</details><p><b>Traditional use:</b> colds/flu as a cooked syrup.</p><p class="w">⚠️ <b>Only fully ripe berries, only cooked.</b> Raw/unripe berries, leaves, stems, bark and roots are toxic.</p></div>
+<div class="bv-card"><h4>🌻 Dandelion <i>Taraxacum officinale</i></h4><details class="bv-id"><summary>👁 How to spot it</summary>toothed leaves in a rosette; one yellow flower per hollow stem; milky sap.</details><p><b>Use:</b> leaves, flowers, roots edible; traditionally a mild diuretic and digestive bitter.</p><p class="w">⚠️ Avoid sprayed lawns/roadsides. May interact with some medications.</p></div>
+<div class="bv-card"><h4>🪴 Aloe vera</h4><details class="bv-id"><summary>👁 How to spot it</summary>thick, spiky-edged succulent leaves with clear gel.</details><p><b>Traditional use:</b> gel on skin for minor burns and sunburn.</p><p class="w">⚠️ Don't eat it: the yellow latex under the skin is a strong laxative.</p></div>
+<div class="bv-card"><h4>💜 American beautyberry <i>Callicarpa americana</i></h4><details class="bv-id"><summary>👁 How to spot it</summary>Florida native shrub; bright purple berry clusters hugging the stems in fall.</details><p><b>Traditional use:</b> crushed leaves rubbed on skin as insect repellent (test a small area first).</p><p class="w">⚠️ Berries are not a good food raw.</p></div>
+</div>
+<h3 id="bc-plants-tox">☠️ Toxic plants: know these (southeastern US examples)</h3>
+<div class="bv-sev"><span class="bv-tag k">Deadly / highly toxic</span><span class="bv-tag r">Rash / irritant</span></div>
+<div class="bv-cards">
+<div class="bv-card tox"><h4>☂️ Water hemlock <span class="bv-tag k">Deadly</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>wet ditches/marshes; umbrella-shaped white flower clusters; hollow, often purple-streaked stems; chambered root.</details><p class="w">A small bite can cause fatal seizures. Avoid all carrot-family look-alikes.</p></div>
+<div class="bv-card tox"><h4>🌸 Oleander <span class="bv-tag k">Deadly</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>landscape shrub; long narrow leathery leaves; pink/white/red flowers.</details><p class="w">All parts highly toxic to people and pets (heart poison). Never use for skewers or burn it.</p></div>
+<div class="bv-card tox"><h4>🌱 Castor bean <span class="bv-tag k">Deadly</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>large star-shaped, often reddish leaves; spiny pods; mottled bean-like seeds.</details><p class="w">Seeds contain ricin: <b>deadly if chewed</b>.</p></div>
+<div class="bv-card tox"><h4>🔴 Rosary pea <span class="bv-tag k">Deadly</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>invasive vine, feathery compound leaves; shiny <b>red seeds with a black spot</b>.</details><p class="w">Contains abrin: a chewed seed can be fatal. Never use for jewelry.</p></div>
+<div class="bv-card tox"><h4>🍏 Manchineel <span class="bv-tag k">Deadly</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>rare coastal South Florida/Keys tree; small green apple-like fruit; often signposted.</details><p class="w">Fruit, sap, even rain dripping off it burn skin and eyes. Never shelter under or burn it.</p></div>
+<div class="bv-card tox"><h4>🌙 Jimsonweed <i>Datura</i> <span class="bv-tag k">Deadly</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>large white/purple trumpet flowers; foul-smelling leaves; spiny pods.</details><p class="w">All parts toxic: hallucinations, racing heart, death.</p></div>
+<div class="bv-card tox"><h4>🌺 Coral bean <i>Erythrina herbacea</i> <span class="bv-tag k">Toxic</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>native shrub; tall spikes of red tubular flowers; pods with bright red seeds.</details><p class="w">Seeds are poisonous.</p></div>
+<div class="bv-card tox"><h4>🟠 Lantana <span class="bv-tag k">Toxic</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>shrub; clusters of small yellow/orange/pink flowers.</details><p class="w">Green (unripe) berries toxic; leaves toxic to livestock and pets. Don't eat the berries.</p></div>
+<div class="bv-card rash"><h4>🍂 Poison ivy <span class="bv-tag r">Rash</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>"leaves of three, let it be"; middle leaflet on a longer stalk; hairy-rootlet vine or shrub.</details><p class="w">Urushiol rash. Wash with soap + cool water within minutes; wash clothes and tools. Never burn it.</p></div>
+<div class="bv-card rash"><h4>🍁 Atlantic poison oak <span class="bv-tag r">Rash</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>low shrub; three oak-like lobed leaflets, fuzzy undersides; sandy pinelands.</details><p class="w">Same urushiol rash as poison ivy.</p></div>
+<div class="bv-card rash"><h4>🌿 Poison sumac <span class="bv-tag r">Rash</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>swamps/wet areas; 7–13 smooth leaflets on red stems; drooping white/gray berries.</details><p class="w">Very strong urushiol rash.</p></div>
+<div class="bv-card rash"><h4>🌶 Brazilian pepper <span class="bv-tag r">Irritant</span></h4><details class="bv-id"><summary>👁 How to spot it</summary>invasive across Central/South Florida; 3–13 leaflets, peppery smell crushed; red berry clusters in winter.</details><p class="w">Poison-ivy relative: sap and blooms cause rash and breathing irritation.</p></div>
+</div>
+<div class="tip">📞 Save Poison Control: <a href="tel:+18002221222"><b>1-800-222-1222</b></a>. Photo the plant (or bag a sample) for responders. More: <a href="https://edis.ifas.ufl.edu/" target="_blank" rel="noopener">UF/IFAS Extension (EDIS)</a>.</div>
 </section>
 
 <section id="bc-src"><h2>📚 Sources &amp; disclaimer</h2>
 <p class="src">Based on public guidance from: <a href="https://www.ready.gov/kit" target="_blank" rel="noopener">Ready.gov — Build a Kit</a> · <a href="https://www.ready.gov/water" target="_blank" rel="noopener">Ready.gov — Water</a> ·
 <a href="https://www.cdc.gov/water-emergency/about/index.html" target="_blank" rel="noopener">CDC — Water in emergencies</a> · <a href="https://www.epa.gov/ground-water-and-drinking-water/emergency-disinfection-drinking-water" target="_blank" rel="noopener">EPA — Emergency disinfection of drinking water</a> ·
 <a href="https://www.cdc.gov/carbon-monoxide/" target="_blank" rel="noopener">CDC — Carbon monoxide</a> · <a href="https://www.redcross.org/get-help/how-to-prepare-for-emergencies.html" target="_blank" rel="noopener">American Red Cross — Prepare</a> ·
-<a href="https://www.stopthebleed.org/" target="_blank" rel="noopener">Stop the Bleed</a> · <a href="https://myfwc.com/" target="_blank" rel="noopener">Florida FWC</a> · <a href="https://edis.ifas.ufl.edu/" target="_blank" rel="noopener">UF/IFAS Extension</a> · <a href="https://www.poison.org/" target="_blank" rel="noopener">Poison Control</a> · US Army survival field manual principles (FM 21-76 / ATP 3-50.21).</p>
+<a href="https://www.stopthebleed.org/" target="_blank" rel="noopener">Stop the Bleed</a> · <a href="https://myfwc.com/" target="_blank" rel="noopener">Florida FWC</a> · <a href="https://edis.ifas.ufl.edu/" target="_blank" rel="noopener">UF/IFAS Extension</a> · <a href="https://www.poison.org/" target="_blank" rel="noopener">Poison Control</a> · US Forest Service (S.T.O.P.) · US Army survival field manual principles (FM 21-76 / ATP 3-50.21).</p>
 <div class="disc">This guide is for general education and preparedness. It is not a substitute for training, professional medical care or official instructions. Laws on fires, fishing, trapping and foraging vary — follow your state/country and local rules. Verify everything locally. In an emergency call 911.</div>
 </section>
 </div></div>
