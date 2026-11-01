@@ -616,7 +616,7 @@ PAL_LIGHT = {"bg": "#F6F7F9", "surf": "#FFFFFF", "surf2": "#EEF0F3", "line": "#D
              "sev": ("#16884B", "#C77700", "#D92D30"), "empty": "#DDE1E6", "body": "#2A313B"}
 FH = "Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif"                   # headlines, kickers, numerals
 FB = "Inter,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"   # body
-LOGO_ALT = "BN"
+LOGO_ALT = "BLACKOUT.NETWORK"
 def logo_url(theme="dark", c=None):
     """Hosted master logo (t333u): the BN square tile with the green/amber/red meter underneath, solid background. Served by social.py /social/thumb/."""
     return f'{(c or cfg())["base_url"].rstrip("/")}/social/thumb/brand_tile_{theme}_168.png'
@@ -738,23 +738,23 @@ _ROWTD = f'class="bnl" style="padding:20px;border-top:1px solid {PAL["line"]}"'
 _NLF = {"t": 0, "d": {}}
 def _nl_figures():
     if time.time() - _NLF["t"] > 600:
-        try: _NLF["d"] = json.load(open(os.path.join(BASE, "static", "img", "nl_figures.json")))
+        try: _NLF["d"] = json.load(open(os.path.join(BASE, "static", "social", "nl_figures.json")))
         except Exception: _NLF["d"] = {}
         _NLF["t"] = time.time()
     return _NLF["d"]
 def _visuals_html(it, url, c):
     """t373: per-item visuals (absolute blackout.network URLs, alt text): locator map, headshots of named people, video thumbnail."""
     base = c["base_url"].rstrip("/"); cid = it["cluster_id"]; out = []
-    if os.path.exists(os.path.join(BASE, "static", "img", f"nl_{cid}.jpg")):
+    if os.path.exists(os.path.join(BASE, "static", "social", f"nl_{cid}.jpg")):
         loc = it.get("where") or "the event location"
-        out.append(f'<a href="{E(url)}"><img src="{base}/img/nl_{E(cid)}.jpg" width="600" alt="Map showing {E(loc)}" '
+        out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/nl_{E(cid)}.jpg" width="600" alt="Map showing {E(loc)}" '
                    f'style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:6px;margin:0 0 10px 0"></a>')
     text = f"{it.get('title') or ''} {it.get('brief') or ''}"
     faces = [(k, v) for k, v in _nl_figures().items() if v["name"].split()[-1] in text][:4]
     if faces:
         out.append('<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0"><tr>' + "".join(
             f'<td style="padding:0 10px 0 0;vertical-align:top;text-align:center;font:400 11px/1.3 {FB};color:{PAL["mu"]}">'
-            f'<a href="{base}/#figures"><img src="{base}/img/nlf_{E(k)}.jpg" width="56" height="56" alt="{E(v["name"])}" style="display:block;width:56px;height:56px;border-radius:28px;border:0;margin:0 auto 4px auto"></a>{E(v["name"].split()[-1])}</td>'
+            f'<a href="{base}/#figures"><img src="{base}/social/thumb/nlf_{E(k)}.jpg" width="56" height="56" alt="{E(v["name"])}" style="display:block;width:56px;height:56px;border-radius:28px;border:0;margin:0 auto 4px auto"></a>{E(v["name"].split()[-1])}</td>'
             for k, v in faces) + '</tr></table>')
     vid = next((s_ for s_ in load_stories() if cid in (s_.get("cluster_ids") or []) and s_.get("youtube_id")), None)
     if vid:
