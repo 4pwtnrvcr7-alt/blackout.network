@@ -161,6 +161,7 @@ PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple
             b'<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="mask-icon" href="/img/safari-pinned-tab.svg" color="#0B0D10">'   # BN master tile icon set (t333)
             b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png">'
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
+ALERTS_HEAD = b'<link rel="stylesheet" href="/alerts.css"><script src="/alerts.js" defer></script>'   # Alerts bell + panel (webpush.py, t341)
 _OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
                  b"The world&#39;s threats, scored and sourced, before cable news catches up."]
 _DASH_FALLBACK = (b'<header class="bn-top" id="bn_topbar"><div class="bn-tbar"><a class="bn-logo" href="/">BLACKOUT.<b>NETWORK</b></a></div>'
@@ -181,6 +182,8 @@ def pwa_head(b):
         h = b[:4000].lower().find(b"<head>")
         if h >= 0 and b"<html" in b[:4000].lower() and b"bn_theme" not in b[:30000]:   # light/dark theme before first paint (t323)
             b = b[:h + 6] + THEME_HEAD + b[h + 6:]
+        al = b[:120000].lower(); j = al.find(b"</head>")   # Alerts bell + Web Push (webpush.py, t341)
+        if j >= 0 and b"<html" in al[:4000] and b"/alerts.js" not in al[:j]: b = b[:j] + ALERTS_HEAD + b[j:]
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]

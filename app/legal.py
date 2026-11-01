@@ -112,6 +112,13 @@ succeeded; and, if you choose to give one, your reason for unsubscribing. Signup
 the confirmation link we email you. Every newsletter includes an unsubscribe link, and you can also unsubscribe by contacting us.</p>
 <p>Confirmation emails and newsletters are delivered through a third-party email delivery provider (such as Resend), which processes your
 email address and the message content on our behalf in order to send the email.</p>
+<h3>Alerts (push notifications)</h3>
+<p>If you tap the bell and turn on alerts, your browser asks your permission and then gives us a push subscription: a web address at your
+browser's push service (for example Google, Apple, Mozilla or Microsoft) plus two public encryption keys. We store that subscription, the
+alert level and categories you chose, your browser family (for example "Chrome on Android"), the dates you turned alerts on or changed them,
+and a record of which alerts were sent to it, so nobody gets the same alert twice. We do not store your IP address, name or email for alerts.
+Alerts are encrypted and delivered through your browser's push service. You can turn alerts off at any time with the bell (Turn off alerts)
+or in your browser or phone settings; when you do, or when your browser tells us the subscription has ended, we delete it.</p>
 <h3>Problem reports</h3>
 <p>If you use the "Report a problem" feature, we receive what is shown in its preview: the category and description you enter, the page
 address (without any query string), the dashboard tab, the time, your browser's user agent, window size, language and time zone, the site
