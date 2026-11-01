@@ -23,6 +23,7 @@ ROUTES = {
     "/api/votes": "votes",
     "/api/user_ranked": "votes",
     "/api/solar_seismic": "solar_seismic",
+    "/api/solar_quake": "solar_quake",   # Solar–Earthquake Correlation Lab (t242), precomputed by tools/solar_quake_build.py
     "/api/heatmap": "heatmap",
     "/api/weather": "weather",
     "/api/trends": "trends",

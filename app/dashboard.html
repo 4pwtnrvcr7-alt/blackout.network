@@ -344,7 +344,8 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
  <div id="pol_app"><div class="meta">Loading Politics…</div></div></section></main>
 <main id="tab-solar" data-addon="solar_seismic" style="display:none;grid-template-columns:minmax(0,1fr)">
 <section class="pn" id="ss_top"><h2><span class="ss-sun">☀</span> Solar &amp; Seismic <span class="meta">— the Sun, Earth's magnetic shield and the planet's earthquakes, side by side</span><button type="button" class="tab-ref" id="ss_ref" title="Run a scan and re-check NOAA / USGS (upstream data is cached for 5 minutes)">⟳ Refresh</button></h2>
- <div id="ss_app"><div class="meta">Loading Solar &amp; Seismic…</div></div></section></main>
+ <div id="ss_app"><div class="meta">Loading Solar &amp; Seismic…</div></div></section>
+<section class="pn" id="sq_top"><div id="sq_app"><div class="meta">Loading the Solar–Earthquake Correlation Lab…</div></div></section></main>
 <main id="tab-weather" data-addon="weather" style="display:none;grid-template-columns:minmax(0,1fr)">
 <section class="pn" id="wx_top"><h2><span class="wx-ic">🌦</span> Weather <span class="meta">— current conditions, official alerts and the forecast for a place you choose</span><button type="button" class="tab-ref" id="wx_ref" title="Re-check the weather sources now (upstream data is cached for 10 minutes; a forced re-check is allowed once a minute)">⟳ Refresh</button></h2>
  <div id="wx_app"><div class="meta">Loading Weather…</div></div></section></main>
@@ -1023,6 +1024,7 @@ function fdr(){const el=document.getElementById("foot_range");if(el&&typeof S!="
 fdr();
 </script>
 <link rel="stylesheet" href="api/solar_seismic/app.css"><script src="api/solar_seismic/app.js"></script>
+<link rel="stylesheet" href="api/solar_quake/app.css"><script src="api/solar_quake/app.js"></script>
 <link rel="stylesheet" href="api/heatmap/app.css"><script>if(typeof L!="undefined"&&!L.heatLayer)document.write('<script src="api/heatmap/leaflet-heat.js"><\/script>');if(typeof L!="undefined"&&!L.markerClusterGroup)document.write('<link rel="stylesheet" href="api/heatmap/MarkerCluster.css"><link rel="stylesheet" href="api/heatmap/MarkerCluster.Default.css"><script src="api/heatmap/leaflet.markercluster.js"><\/script>')</script><script src="api/heatmap/app.js"></script>
 <link rel="stylesheet" href="api/politics/app.css"><script src="api/politics/app.js"></script>
 <link rel="stylesheet" href="api/weather/app.css"><script src="api/weather/app.js"></script>
