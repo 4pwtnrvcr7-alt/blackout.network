@@ -233,7 +233,7 @@ def render():
     today, week = s.get("today") or {}, s.get("week") or {}
     hero = (f'<section class="st-hero"><div class="row">{TILE}<div style="min-width:0;flex:1 1 260px"><div class="st-live"><i></i>Live stats</div>'
             '<h1>BLACKOUT.NETWORK <em>by the numbers</em></h1>'
-            '<p>Open, aggregate numbers for our site, our YouTube channel and our X account. Totals only: no cookies, no IP addresses, nothing that identifies a reader.</p></div></div>'
+            '<p>Open, aggregate numbers for our site, our YouTube channel and our X account. Our own counts are totals only: no cookies, no IP addresses, nothing that identifies a reader.</p></div></div>'
             f'<div class="st-chips"><span class="st-chip">Updated <b>{E(when(d.get("generated")))}</b></span>'
             f'<span class="st-chip">Site counting since <b>{E(since_txt)}</b></span><span class="st-chip">Refreshes every <b>10 min</b> (social hourly)</span></div></section>')
     k = ['<div class="st-kpis">',
@@ -322,13 +322,13 @@ def render():
              (bars(bys, "source", "signups", unit="signups") if bys else '<div class="st-empty">Each signup source appears here once it passes 5 confirmed readers.</div>') + "</div>")
     how = ('<div class="st-card st-how"><h3>How we count (and what we never collect)</h3><ul>'
            '<li>Counted on our own server: page views per page and per day, and an estimate of unique visitors made with a keyed hash that changes every day and lives only in memory. We never store IP addresses or browser details.</li>'
-           '<li>No cookies, no third-party analytics, no ad trackers. Browsers that send Do Not Track or Global Privacy Control are not counted.</li>'
+           '<li>Our own counts use no cookies and no ad trackers. Separately, we use Google Analytics 4 to see which pages are read, with advertising features and Google Signals off; it sets first-party cookies (see our <a href="/cookies">Cookie Policy</a>). In the EEA, the UK and Switzerland it runs only if you choose Accept analytics in our cookie banner (change it any time with Cookie settings in the footer). It never loads for browsers that send Do Not Track or Global Privacy Control, or if you opt out on <a href="/privacy-choices">Your Privacy Choices</a>. See our <a href="/privacy#analytics">Privacy Policy</a>.</li>'
            '<li>Referrers are reduced to the site name (for example google.com). Countries are totals only. Any number under 5 is hidden or shown as &lt;5.</li>'
            '<li>Visitor estimates restart if our server restarts, so a returning reader can be counted twice in a day; treat them as approximate. Known bots and crawlers are excluded.</li>'
            '<li>YouTube and X numbers are the public counts from each platform, refreshed hourly. Full details: <a href="/privacy#usage">Privacy Policy</a>. Raw numbers: <a href="/api/stats">/api/stats</a>.</li></ul></div>')
     body = f'<main class="st" id="main">{hero}{"".join(k)}{site_html}{yt_html}{x_html}{cta}{nlsrc}{how}</main>'
     foot = ('<footer class="st-foot">Research only: BLACKOUT.NETWORK is not an official warning service. · <a href="/">The Wire</a> · <a href="/social">Videos &amp; posts</a> · '
-            '<a href="/newsletter">Newsletter</a> · <a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · blackout.network (no .com)</footer>')
+            '<a href="/newsletter">Newsletter</a> · <a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · BLACKOUT.NETWORK</footer>')
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "WebPage", "@id": f"{SITE}/stats#page", "url": f"{SITE}/stats", "name": TITLE, "description": DESC, "inLanguage": "en-US",
          "isPartOf": {"@type": "WebSite", "@id": f"{SITE}/#website", "url": SITE, "name": BRAND}, "dateModified": d.get("generated"),

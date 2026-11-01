@@ -975,7 +975,7 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
             f'<a href="{E(links["scoring"])}" class="bnt" style="{_L}">How we score</a> · <a href="{E(links["site"])}" class="bnt" style="{_L}">Open the live dashboard</a></p>'
             f'<p style="margin:0 0 8px 0">{E(why_line)}</p>'
-            f'<p style="margin:0 0 8px 0">Visit <a href="https://blackout.network" class="bnt" style="{_L}">blackout.network</a> (no .com) to see the whole picture. '
+            f'<p style="margin:0 0 8px 0">Visit <a href="https://blackout.network" class="bnt" style="{_L}">blackout.network</a> to see the whole picture. '
             f'Follow: <a href="https://www.youtube.com/@blkoutntw" class="bnt" style="{_L}">YouTube @blkoutntw</a> · <a href="https://x.com/BlkoutNtw" class="bnt" style="{_L}">X @BlkoutNtw</a></p>'
             f'<p style="margin:0 0 8px 0">Know someone who should get this? <a href="{FORWARD_URL}" class="bnt" style="{_L}">Forward to a friend: blackout.network/newsletter</a></p>'
             f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>'
@@ -1105,7 +1105,7 @@ def render(issue, links, c=None):
         for it in issue["watchlist"]:
             T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])}) {wire_url(it['cluster_id'], c=c)}")
         T.append("")
-    T += [f"Forward to a friend: {FORWARD_URL}", "See the whole picture: https://blackout.network (no .com)", "YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
+    T += [f"Forward to a friend: {FORWARD_URL}", "See the whole picture: https://blackout.network", "YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
     T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}", why,
           f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
     T += footer_buttons_text(links)
@@ -1179,7 +1179,7 @@ def render_trending(t, links, at, c=None):
     pre = f"One of our posts is taking off: {_cut(t.get('title') or '', 120)}"
     why = f"You get breaking alerts because you subscribed to the {BRAND} newsletter. Turn them off with the link below or under Manage."
     html_ = _shell(subj, pre, _head_html("TRENDING", PAL["ac"], fmt_et(at), f"As of {fmt_et(at)}"), [_bluf_html(pre), _trend_row(t)], links, c, why)
-    text = "\n".join([subj, "", pre, f"Watch: {t['url']}", "", "See the whole picture: https://blackout.network (no .com)", "--",
+    text = "\n".join([subj, "", pre, f"Watch: {t['url']}", "", "See the whole picture: https://blackout.network", "--",
                       f"{BRAND} · {addr}", *footer_buttons_text(links)])
     html_, text = utm_tag(html_, text, f"trending-{at.astimezone(ET).strftime('%Y-%m-%d')}")
     return subj, html_, text
@@ -2139,7 +2139,15 @@ def form_html(mode="page"):
             f'<details class="nl-cats-d"><summary>Categories: all (optional: pick only some)</summary><div class="nl-cats">{cats}</div></details>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
-            f'<p class="nl-sm nl-priv">🔒 {E(PRIVACY)} Double opt-in: nothing is sent until you confirm. {E(DISCLAIMER)}</p></form>')
+            f'<p class="nl-sm nl-priv">🔒 {consent_line()} {E(DISCLAIMER)}</p></form>')
+
+def consent_line():
+    """Signup consent wording (Compliance global-legal-gap K, CASL-grade): names the sender and its contact details and says consent can be withdrawn.
+    The Subscribe button itself is the express action; no pre-ticked box."""
+    c = cfg(); frm = E(c.get("from_email") or "hello@blackout.network"); addr = E((c.get("mailing_address") or DEFAULTS["mailing_address"]).strip())
+    return (f'By tapping <b>Subscribe</b>, you agree to get the BLACKOUT.NETWORK brief and, if you choose, breaking alerts by email from BLACKOUT.NETWORK '
+            f'({frm}, {addr}). We\'ll send a confirmation email first, and nothing else arrives until you confirm. You can withdraw consent and '
+            'unsubscribe at any time with the link in every email. See our <a href="/privacy">Privacy Policy</a> and <a href="/tos">Terms</a>.')
 
 def signup_page():
     rmin, smin = main_rule()

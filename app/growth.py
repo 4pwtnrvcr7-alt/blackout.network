@@ -60,16 +60,17 @@ def _ro():
     c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=10); c.row_factory = sqlite3.Row; return c
 
 STATIC_PAGES = [("/", "hourly", "1.0"), ("/newsletter", "daily", "0.9"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
-                ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/midterms", "hourly", "0.7"), ("/crime", "hourly", "0.8"), ("/network", "hourly", "0.8"),
+                ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/crime", "hourly", "0.8"), ("/network", "hourly", "0.8"),
                 ("/network/aws", "hourly", "0.7"), ("/network/azure", "hourly", "0.7"), ("/network/m365", "hourly", "0.7"), ("/network/gcp", "hourly", "0.7"),
                 ("/network/workspace", "hourly", "0.7"), ("/network/cloudflare", "hourly", "0.7"), ("/network/akamai", "hourly", "0.7"), ("/newsletter/sample", "daily", "0.5"),
-                ("/guides/bushcraft.html", "monthly", "0.5"), ("/guides/medical.html", "monthly", "0.5"),
+                ("/cookies", "yearly", "0.2"), ("/privacy-choices", "yearly", "0.2"),
                 ("/privacy", "yearly", "0.2"), ("/tos", "yearly", "0.2")]
+# seo/batch-1: /midterms (meta-refresh stub to /#midterms) and /guides/*.html (HTML fragments, no <head>) removed until they are real pages
 
 def sitemap():
     def build():
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        pages = STATIC_PAGES + ([("/stats", "daily", "0.4")] if os.path.exists(os.path.join(BASE, "stats.py")) else [])
+        pages = STATIC_PAGES   # seo/batch-1: /stats was listed twice
         u = [(SITE + p, now if f in ("hourly", "daily") else None, f, pr) for p, f, pr in pages]
         try:
             import social
@@ -93,17 +94,80 @@ def sitemap():
     if b"/wire/" not in v and _C.get("sm") and _C["sm"][0] > time.time() - 30: _C["sm"] = (time.time() - 570, v)   # data not synced yet: retry in ~30 s
     return v
 
-ROBOTS = f"""User-agent: *
-Allow: /
-Disallow: /internal/
-Disallow: /api/reports/
-Disallow: /newsletter/confirm
-Disallow: /newsletter/manage
-Disallow: /newsletter/unsubscribe
-Disallow: /report-status
-Disallow: /alerts/
+def news_sitemap():
+    """seo/batch-1: Google News sitemap: indexable /wire stories (same rule as sitemap) and public /story pages from the last 48 h."""
+    def build():
+        cut = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 48 * 3600)); u = []
+        try:
+            import social
+            for s in social.stories(public_only=True):
+                if s.get("slug") and (s.get("publish_at") or "") >= cut: u.append((f"{SITE}/story/{s['slug']}", s["publish_at"], s.get("title") or ""))
+        except Exception: pass
+        try:
+            c = _ro()
+            try: rows = c.execute("SELECT cluster_id, first_seen, title FROM clusters WHERE watchlist=0 AND COALESCE(rank,0)>=3 AND first_seen>=? "
+                                  "ORDER BY first_seen DESC LIMIT 1000", (cut,)).fetchall()
+            finally: c.close()
+            try: import site_page as S; ct = S.clean_title
+            except Exception: ct = lambda t: t or ""
+            for r in rows: u.append((f"{SITE}/wire/{r['cluster_id']}", r["first_seen"], ct(r["title"])))
+        except Exception: pass
+        x = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">']
+        for loc, pub, title in u[:1000]:
+            x.append(f"<url><loc>{E(loc)}</loc><news:news><news:publication><news:name>{BRAND}</news:name><news:language>en</news:language></news:publication>"
+                     f"<news:publication_date>{E(pub)}</news:publication_date><news:title>{E(title[:200])}</news:title></news:news></url>")
+        x.append("</urlset>")
+        return "\n".join(x).encode()
+    return _cached("nsm", 300, build)
 
-Sitemap: {SITE}/sitemap.xml
+# seo/batch-1: every crawler is allowed, including AI search and training crawlers named explicitly. A crawler that matches a
+# named group ignores the "*" group, so each group repeats the same private-path disallows.
+_PRIVATE = ["/internal/", "/api/reports/", "/newsletter/confirm", "/newsletter/manage", "/newsletter/unsubscribe", "/report-status", "/alerts/"]
+_BOTS = ["*", "Googlebot", "Bingbot", "GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended",
+         "Applebot-Extended", "CCBot"]
+ROBOTS = ("# BLACKOUT.NETWORK crawl rules. All crawlers are welcome, including AI search and training crawlers.\n"
+          "# Site summary for AI tools: " + SITE + "/llms.txt\n\n"
+          + "\n".join("User-agent: " + b + "\nAllow: /\n" + "".join("Disallow: " + d + "\n" for d in _PRIVATE) for b in _BOTS)
+          + f"\nSitemap: {SITE}/sitemap.xml\nSitemap: {SITE}/news-sitemap.xml\n")
+
+# seo/batch-1: /llms.txt (llmstxt.org format): a short, factual summary of the site for AI tools, in the organization's voice.
+LLMS = f"""# {BRAND}
+
+> {BRAND} is a free early-warning threat monitor. We track outbreaks, earthquakes, space weather, severe weather, cyber attacks,
+> infrastructure outages and conflict, rank every story 0-10 with published rules, and link every report to its original source.
+
+Ranks are produced by published scoring rules and are confirmed by counting independent source families. The data is for research
+and situational awareness only; it is not an official warning service. Follow official agencies for instructions in an emergency.
+
+## Key sections
+
+- [The Wire]({SITE}/#wire): the live, ranked threat feed
+- [Story pages]({SITE}/sitemap.xml): one page per ranked story at /wire/<id>, with a timeline and every source linked
+- [How we score]({SITE}/scoring): the 0-100 severity score and the 0-10 rank, explained factor by factor
+- [Sources]({SITE}/sources): every source we use, with item counts and a 0-10 confidence rating
+- [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
+- [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
+- [Videos & posts]({SITE}/social): our YouTube and X updates, each with a sourced story page
+- [Public stats]({SITE}/stats): our open traffic and audience numbers
+
+## Dashboard tabs
+
+- [Network Status]({SITE}/network), [Energy Grid]({SITE}/#grid), [Solar & Seismic]({SITE}/#solar), [Weather]({SITE}/#weather)
+- [Midterms 2026]({SITE}/#midterms), [Government]({SITE}/#government), [Politics]({SITE}/#politics)
+- [Preppers]({SITE}/#preppers), [Bushcraft]({SITE}/#bushcraft), [Medical]({SITE}/#medical), [Maps]({SITE}/#maps)
+
+## Policies
+
+- [Privacy Policy]({SITE}/privacy)
+- [Cookie Policy]({SITE}/cookies)
+- [Your Privacy Choices]({SITE}/privacy-choices)
+- [Terms of Service]({SITE}/tos)
+
+## Contact and channels
+
+- Email: hello@blackout.network
+- X: {X_URL}
+- YouTube: {YT_URL}
 """
 
 # ---------- server-rendered extras for /wire/<cluster_id> story pages (story.py) ----------
@@ -133,7 +197,7 @@ def short_html(cid, title):
     s = shorts().get(cid)
     if not s or not re.match(r"^[\w-]{11}$", s.get("yt") or ""): return "", None
     y = s["yt"]
-    h = (f'<section class="card"><h2>Watch the 60-second Short</h2><div class="vid bng-short"><img src="https://i.ytimg.com/vi/{y}/hqdefault.jpg" alt="{E(title)}: BLACKOUT.NETWORK Short" loading="lazy">'
+    h = (f'<section class="card"><h2>Watch the 60-second Short</h2><div class="vid bng-short"><img src="https://i.ytimg.com/vi/{y}/hqdefault.jpg" alt="{E(title)}: BLACKOUT.NETWORK Short" width="480" height="360" fetchpriority="high">'
          f'<button type="button" data-yt="{y}" aria-label="Play: {E(title)}"><span class="play"></span></button><span class="note">YouTube · @blkoutntw</span></div>'
          f'<div class="btns"><a class="btn p" href="https://www.youtube.com/shorts/{y}" target="_blank" rel="noopener">Watch on YouTube</a>'
          + (f'<a class="btn" href="{E(s["x"])}" target="_blank" rel="noopener">See it on X</a>' if (s.get("x") or "").startswith("https://x.com/") else "")
@@ -141,15 +205,15 @@ def short_html(cid, title):
     return h, f"https://i.ytimg.com/vi/{y}/hqdefault.jpg"
 
 def follow_html():
-    return ('<section class="card bng-follow-card" id="bng_follow"><h2>Follow BLACKOUT.NETWORK</h2><p>Ranked, sourced alerts as they happen. The full address is '
-            '<b>blackout.network</b> (no .com).</p><div class="btns">'
+    return ('<section class="card bng-follow-card" id="bng_follow"><h2>Follow BLACKOUT.NETWORK</h2><p>Ranked, sourced alerts as they happen, from BLACKOUT.NETWORK '
+            'at <b>blackout.network</b>.</p><div class="btns">'
             f'<a class="btn p" href="/newsletter">Get the free brief</a><a class="btn" href="{X_URL}" target="_blank" rel="noopener">Follow @BlkoutNtw on X</a>'
             f'<a class="btn" href="{YT_SUB}" target="_blank" rel="noopener">Subscribe on YouTube</a></div></section>')
 
 def org_ld():
-    return {"@type": "NewsMediaOrganization", "@id": SITE + "/#org", "name": BRAND, "alternateName": ["Blackout Network", "blackout.network"], "url": SITE + "/",
+    return {"@type": ["Organization", "NewsMediaOrganization"], "@id": SITE + "/#org", "name": BRAND, "alternateName": ["Blackout Network", "blackout.network"], "url": SITE + "/",
             "logo": {"@type": "ImageObject", "url": SITE + "/icons/icon-512.png", "width": 512, "height": 512},
-            "image": SITE + "/icons/icon-og-v2-1200x630.png", "slogan": "Signal over noise.", "email": "hello@blackout.network",
+            "image": SITE + "/icons/icon-og-v2-1200x630.png", "slogan": "Signal over noise.", "email": "hello@blackout.network", "publishingPrinciples": SITE + "/scoring",
             "sameAs": [X_URL, YT_URL], "address": {"@type": "PostalAddress", "postOfficeBoxNumber": "1228", "addressLocality": "Lake Mary",
             "addressRegion": "FL", "postalCode": "32746", "addressCountry": "US"}}
 
@@ -168,7 +232,9 @@ def _file(name, ctype):
 
 def handle_get(path, qs):
     if path == "/robots.txt": return 200, ROBOTS.encode(), "text/plain; charset=utf-8"
+    if path == "/llms.txt": return 200, LLMS.encode(), "text/plain; charset=utf-8"
     if path == "/sitemap.xml": return 200, sitemap(), "application/xml; charset=utf-8"
+    if path == "/news-sitemap.xml": return 200, news_sitemap(), "application/xml; charset=utf-8"
     if path == "/api/growth/app.js": return _file("app.js", "application/javascript; charset=utf-8")
     if path == "/api/growth/app.css": return _file("app.css", "text/css; charset=utf-8")
     if path == "/api/growth/world.webp": return _file("world.webp", "image/webp")

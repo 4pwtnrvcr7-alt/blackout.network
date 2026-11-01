@@ -65,7 +65,7 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
             f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'
             f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">'
             '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
-    if noindex: head += '<meta name="robots" content="noindex,nofollow">'
+    head += '<meta name="robots" content="noindex,nofollow">' if noindex else '<meta name="robots" content="index,follow,max-image-preview:large">'   # seo/batch-1
     if jsonld: head += '<script type="application/ld+json">' + json.dumps(jsonld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
     top = ""
     if sitenav is not None:

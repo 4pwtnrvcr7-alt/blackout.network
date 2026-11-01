@@ -23,11 +23,13 @@ self.addEventListener("push", function (e) {
 self.addEventListener("notificationclick", function (e) {
   e.notification.close();
   var url = safeUrl(e.notification.data && e.notification.data.url);
+  var tagged = url;   // seo/batch-1: tag the landing for GA4 attribution (alert_view); the open-tab match below still uses the plain URL
+  try { var t = new URL(url); if (!t.searchParams.has("utm_source")) { t.searchParams.set("utm_source", "push"); t.searchParams.set("utm_medium", "alert"); t.searchParams.set("utm_campaign", "web_push"); } tagged = t.href; } catch (err) {}
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (cs) {
     for (var i = 0; i < cs.length; i++) { if (cs[i].url === url && "focus" in cs[i]) return cs[i].focus(); }
     var w = cs.filter(function (c) { return "navigate" in c && "focus" in c; })[0];   // t399: reuse the open app window (Home Screen app) when there is one
-    if (w) return w.focus().then(function (c) { return (c || w).navigate(url); }).catch(function () { return self.clients.openWindow(url); });
-    return self.clients.openWindow(url);
+    if (w) return w.focus().then(function (c) { return (c || w).navigate(tagged); }).catch(function () { return self.clients.openWindow(tagged); });
+    return self.clients.openWindow(tagged);
   }));
 });
 self.addEventListener("pushsubscriptionchange", function (e) {

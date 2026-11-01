@@ -185,6 +185,172 @@ def dashboard_page():
     except Exception: traceback.print_exc()
     return b
 
+# GA4 (seo/batch-1; Compliance 2026-11-01_privacy-ga4.md + 2026-11-01_global-legal-gap.md): Google Analytics 4 (G-KND6CPBB1X), opt-out model.
+# gtag.js is never loaded for: visitors in the EEA/UK/CH (CF-IPCountry, read here and not stored; no consent banner); visitors whose country is
+# unknown when the browser time zone starts with "Europe/"; GPC or DNT; or a /privacy-choices opt-out (localStorage bn_analytics=denied).
+# Consent Mode v2 defaults keep all ad signals denied. Google signals and ad personalization off, 13-month cookie expiry, tokens/emails stripped
+# from page_location. Every full HTML page also gets "Cookie Policy" and "Your Privacy Choices" footer links. Inserted once; fragments untouched.
+GA4_ID = b"G-KND6CPBB1X"
+EU_REGION = set("AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH".split())
+GA_JS = r"""(function(){
+window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLayer.push(arguments);};var gtag=window.gtag;
+var BN_GA_ID='G-KND6CPBB1X',PV=window.BN_POLICY_V||'',BV=1,MAXAGE=183*864e5;
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null;}}
+function tz(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){return '';}}
+/* seo/batch-1 consent (Matt, Nov 1 2:50 PM ET; Compliance banner spec A): EEA/UK/CH by CF-IPCountry; header missing -> browser
+   timezone (Europe/* = consent region); timezone unknown too -> consent region. There GA loads only after "Accept analytics". */
+var R=window.BN_GA_REGION,Z=tz();
+var CR=R==='eu'||(R!=='ok'&&(Z===''||Z.indexOf('Europe/')===0));
+var gpc=navigator.globalPrivacyControl===true, dnt=navigator.doNotTrack==='1'||window.doNotTrack==='1'||navigator.msDoNotTrack==='1';
+function consent(){try{var c=JSON.parse(ls('bn_consent')||'null');if(!c||(c.choice!=='granted'&&c.choice!=='denied'))return null;
+if(c.policy_version!==PV||c.banner_version!==BV||!(Date.now()-Date.parse(c.timestamp)<MAXAGE))return null;return c;}catch(e){return null;}}
+function logConsent(choice){var c={choice:choice,timestamp:new Date().toISOString(),policy_version:PV,banner_version:BV,region:CR?'consent':'other'};ls('bn_consent',JSON.stringify(c));return c;}
+function why(){if(gpc)return 'gpc';if(dnt)return 'dnt';if(ls('bn_analytics')==='denied')return 'optout';
+if(CR){var c=consent();if(!c)return 'consent_pending';if(c.choice!=='granted')return 'consent_denied';}return '';}
+var skip=why();window.BN_GA_SKIP=skip;window.BN_CONSENT_REGION=CR;
+gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:(CR||skip)?'denied':'granted',functionality_storage:'granted',security_storage:'granted'});
+function bnCleanUrl(u){try{var url=new URL(u);['token','email','e','zip','q_email'].forEach(function(k){url.searchParams.delete(k);});
+if(/^\/newsletter\/(confirm|unsubscribe|manage|breaking_off|follow|unfollow)/.test(url.pathname))url.search='';return url.toString();}catch(e){return location.origin+location.pathname;}}
+/* content_group (seo/batch-1): one of Home, Wire, Midterms, Solar, Weather, Preppers, Bushcraft, Network, Gov, Alerts, Stats, Legal */
+var TABG={threat:'Wire',wire:'Wire',noise:'Wire',thread:'Wire',bcast:'Wire',broadcasts:'Wire',streams:'Wire',radio:'Wire',ai:'Wire',heatmap:'Wire',trends:'Wire',
+finance:'Wire',jets:'Wire',spacex:'Wire',intel:'Wire',ranked:'Wire',figures:'Wire',sources:'Wire',net:'Network',network:'Network',grid:'Network',
+solar_seismic:'Solar',solar:'Solar',weather:'Weather',midterms:'Midterms',politics:'Gov',gunlaws:'Gov',gov:'Gov',government:'Gov',
+preppers:'Preppers',res:'Preppers',resources:'Preppers',med:'Preppers',medical:'Preppers',maps:'Preppers',bush:'Bushcraft',bushcraft:'Bushcraft'};
+function tabKey(){var h=(location.hash||'').slice(1).split(/[\/=?&]/)[0].toLowerCase();return TABG[h]?h:'';}
+function bnGroup(k){var p=location.pathname.toLowerCase();
+if(/^\/(wire|story)(\/|$)/.test(p))return 'Wire';if(/^\/(midterms|elections?)\/?$/.test(p))return 'Midterms';
+if(/^\/(privacy|cookies|cookie-policy|privacy-choices|do-not-sell|tos|terms)\/?$/.test(p))return 'Legal';
+if(/^\/(stats|report-status)\/?$/.test(p))return 'Stats';if(/^\/(alerts|crime)(\/|$)/.test(p))return 'Alerts';
+if(p==='/'||p===''){k=k||tabKey();return k?TABG[k]:'Home';}
+var s=p.split('/')[1];return TABG[s]||'Home';}
+window.bnContentGroup=bnGroup;
+function bnLoadGA(){if(window.bnGALoaded||window.BN_GA_SKIP)return;window.bnGALoaded=true;var s=document.createElement('script');s.async=true;
+s.src='https://www.googletagmanager.com/gtag/js?id='+BN_GA_ID;document.head.appendChild(s);gtag('js',new Date());
+gtag('config',BN_GA_ID,{allow_google_signals:false,allow_ad_personalization_signals:false,cookie_expires:34128000,page_location:bnCleanUrl(location.href),content_group:bnGroup()});}
+/* Events (seo/batch-1, spec in ga4-events.md): sent only when GA is loaded and allowed. Nothing is queued while GA is skipped
+   (EEA/UK/CH, Europe/ timezone, GPC, DNT, opt-out), and nothing that looks like an email or phone number is ever sent. */
+var PII=/@|%40|\d{3}[\s.\-]?\d{3}[\s.\-]?\d{4}/;
+window.bnTrack=function(name,p){if(!window.bnGALoaded||window.BN_GA_SKIP)return false;var o={};p=p||{};
+for(var k in p){if(!Object.prototype.hasOwnProperty.call(p,k))continue;var v=p[k];if(v==null||v==='')continue;
+if(typeof v==='string'){if(PII.test(v))continue;v=v.slice(0,100);}else if(typeof v!=='number'&&typeof v!=='boolean')continue;o[k]=v;}
+o.content_group=o.content_group||bnGroup();gtag('event',name,o);return true;};
+var T=window.bnTrack;
+function killGA(){window['ga-disable-'+BN_GA_ID]=true;gtag('consent','update',{analytics_storage:'denied'});
+document.cookie.split(';').forEach(function(c){var n=c.split('=')[0].trim();if(n==='_ga'||n.indexOf('_ga_')===0){document.cookie=n+'=; Max-Age=0; path=/; domain=.blackout.network';document.cookie=n+'=; Max-Age=0; path=/';document.cookie=n+'=; Max-Age=0; path=/; domain='+location.hostname;}});}
+window.bnSetAnalytics=function(choice){
+if(choice==='denied'){if(CR)logConsent('denied');else ls('bn_analytics','denied');window.BN_GA_SKIP=why()||'optout';killGA();}
+else{ls('bn_analytics',null);if(CR)logConsent('granted');window.BN_GA_SKIP=why();if(!window.BN_GA_SKIP){window['ga-disable-'+BN_GA_ID]=false;gtag('consent','update',{analytics_storage:'granted'});bnLoadGA();}}
+if(window.bnConsentUI)window.bnConsentUI.sync();};
+window.bnConsent=function(){return {region:CR?'consent':'other',skip:window.BN_GA_SKIP,record:consent(),gpc:gpc,dnt:dnt};};
+bnLoadGA();
+/* hooks are always installed; bnTrack drops everything until GA has loaded with consent, so nothing is queued */
+function cat(){var s=document.getElementById('bn_story');if(s)return s.getAttribute('data-cat')||'';var b=document.querySelector('.tabs button.on[data-tab]');return tabKey()||(b&&b.getAttribute('data-tab'))||bnGroup().toLowerCase();}
+function platform(){var ua=navigator.userAgent||'';var ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+var sa=false;try{sa=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch(e){}
+return (ios?'ios':/Android/i.test(ua)?'android':'desktop')+(sa?'_app':'_web');}
+var lastTab='';
+window.addEventListener('hashchange',function(){gtag('set',{content_group:bnGroup()});},true);
+window.addEventListener('popstate',function(){gtag('set',{content_group:bnGroup()});},true);
+document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;
+var b=t.closest('.tabs button[data-tab]');if(b){var k=b.getAttribute('data-tab');if(k&&k!==lastTab){lastTab=k;var g=bnGroup(TABG[k]?k:'');gtag('set',{content_group:g});T('tab_view',{content_category:k,content_group:g});}return;}
+if(t.closest('.tab-ref,#refresh,[data-bn-refresh]')){T('refresh_click',{});return;}
+var a=t.closest('a[href]');
+if(a&&(a.hasAttribute('data-affiliate')||/(^|\s)sponsored(\s|$)/.test(a.getAttribute('rel')||''))){var h='';try{h=new URL(a.href).hostname.replace(/^www\./,'');}catch(x){}T('affiliate_click',{partner:a.getAttribute('data-affiliate')||h});return;}
+var sh=t.closest('.bng-share .bng-copy,.bng-share .bng-native,.bng-share a[href*="/intent/"]');
+if(sh){T('share',{method:sh.classList.contains('bng-copy')?'copy_link':sh.classList.contains('bng-native')?'native':'x',content_category:cat()});return;}
+if(t.closest('.bn-theme-bar,.bn-theme-row,[data-bn-theme]')){setTimeout(function(){T('settings_change',{setting:'theme',value:document.documentElement.getAttribute('data-theme')||'toggle'});},0);}
+},true);
+document.addEventListener('change',function(e){var el=e.target;if(!el||!el.closest)return;
+if(el.classList&&el.classList.contains('bntr-sel')){T('translate_language',{language_code:el.value});return;}
+if(!el.closest('#bn_settings'))return;var ty=(el.type||'').toLowerCase();if(/^(text|email|tel|password|search|hidden|url)$/.test(ty)||el.tagName==='TEXTAREA')return;
+T('settings_change',{setting:el.id||el.name||'setting',value:ty==='checkbox'?(el.checked?'on':'off'):String(el.value)});},true);
+var played=[];document.addEventListener('play',function(e){var m=e.target;if(!m||!/^(AUDIO|VIDEO)$/.test(m.tagName)||played.indexOf(m)>=0)return;played.push(m);
+var c=m.closest&&m.closest('[data-station],.rd-card,.bnp,.card,section');var n=(m.getAttribute('data-station')||(c&&(c.getAttribute('data-station')||((c.querySelector('b,h3,h2')||{}).textContent)))||m.getAttribute('aria-label')||'').trim();
+T('broadcast_play',{station:n||'unknown'});},true);
+try{if(window.PushManager&&PushManager.prototype.subscribe&&!PushManager.prototype.subscribe.bnWrapped){var ps=PushManager.prototype.subscribe;
+PushManager.prototype.subscribe=function(){return ps.apply(this,arguments).then(function(s){T('push_subscribe',{platform:platform()});return s;});};PushManager.prototype.subscribe.bnWrapped=1;}}catch(e){}
+try{var f0=window.fetch;if(f0&&!f0.bnWrapped){window.fetch=function(input,init){var u=typeof input==='string'?input:(input&&input.url)||'';var r=f0.apply(this,arguments);
+if(/\/api\/newsletter\/subscribe(\?|$)/.test(u)&&init&&String(init.method||'').toUpperCase()==='POST'){var src='form';try{src=String(JSON.parse(init.body).source||'form');}catch(x){}
+r.then(function(res){if(res&&res.ok){var loc=location.pathname==='/'?'home'+(tabKey()?'_'+tabKey():''):location.pathname.replace(/^\/+|\/+$/g,'').replace(/\/[0-9a-f]{16}$/,'').replace(/\//g,'_');
+var p={signup_source:src,form_location:loc||'home'};T('newsletter_signup',p);T('generate_lead',p);}},function(){});}
+return r;};window.fetch.bnWrapped=1;}}catch(e){}
+function onReady(){var p=location.pathname,st=document.getElementById('bn_story');
+var ok=document.querySelector('.nl-result.ok h2');if(/^\/newsletter\/confirm\/?$/.test(p)&&ok&&/Subscription confirmed/.test(ok.textContent))T('newsletter_confirm',{});
+if(st&&/^\/wire\/[0-9a-f]{16}\/?$/.test(p)){var rk=parseInt(st.getAttribute('data-rank'),10),c=st.getAttribute('data-cat')||'';T('story_view',{content_category:c,story_rank:isNaN(rk)?0:rk});
+if(/[?&]utm_(source=push|medium=alert)/.test(location.search))T('alert_view',{alert_severity:st.getAttribute('data-tier')||'',content_category:c});}
+if(window.bnShare&&!window.bnShare.bnWrapped){var s0=window.bnShare;window.bnShare=function(){T('share',{method:navigator.share?'native':'copy_link',content_category:cat()});return s0.apply(this,arguments);};window.bnShare.bnWrapped=1;}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',onReady);else onReady();
+/* ---- cookie consent banner (consent region; reopened anywhere by footer "Cookie settings" or [data-bn-cookie-settings]) ---- */
+var CSS='#bn_cb{position:fixed;left:0;right:0;bottom:0;z-index:4950;box-sizing:border-box;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#0b0d10;color:#e6e9ee;border-top:2px solid #c8102e;font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 -6px 24px rgba(0,0,0,.35)}'
++'#bn_cb .bn-cb-in{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:10px}'
++'#bn_cb p{margin:0}#bn_cb b.bn-cb-h{font:700 14px/1.3 Montserrat,Inter,system-ui,sans-serif;color:#fff;display:block;margin-bottom:2px}'
++'#bn_cb .bn-cb-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}'
++'#bn_cb .bn-cb-btn{flex:1 1 0;min-width:0;min-height:44px;padding:0 14px;border-radius:8px;border:2px solid #c8102e;background:#c8102e;color:#fff;font:700 14px/1 Montserrat,Inter,system-ui,sans-serif;cursor:pointer}'
++'#bn_cb .bn-cb-btn:focus-visible{outline:3px solid #fff;outline-offset:2px}#bn_cb .bn-cb-btn[disabled]{opacity:.45;cursor:not-allowed}'
++'#bn_cb a{color:#ff8a9a}#bn_cb .bn-cb-lk{flex:0 0 100%;text-align:center;font-size:12.5px}#bn_cb .bn-cb-st{font-size:12px;color:#aab3bf}'
++'#bn_cb .bn-cb-x{position:absolute;top:4px;right:6px;width:36px;height:36px;border:0;background:none;color:#aab3bf;font-size:20px;cursor:pointer}'
++'@media(min-width:760px){#bn_cb{padding:12px 20px}#bn_cb .bn-cb-in{flex-direction:row;align-items:center;gap:18px}#bn_cb .bn-cb-tx{flex:1}#bn_cb .bn-cb-row{flex:0 0 auto;flex-wrap:nowrap}#bn_cb .bn-cb-btn{flex:0 0 150px}#bn_cb .bn-cb-lk{flex:0 0 auto}}'
++'html.bn-cb-on body{padding-bottom:var(--bn-cb-h,140px)}html.bn-cb-on #toasts,html.bn-cb-on .bnr-fab,html.bn-cb-on .bnig-toast{bottom:calc(var(--bn-cb-h,140px) + 12px)!important}'
++'html.bn-cb-on .bng-bar,html.bn-cb-on .bng-prompt{display:none!important}'
++'[data-theme=light] #bn_cb{background:#fff;color:#1b2129;box-shadow:0 -6px 24px rgba(0,0,0,.12)}[data-theme=light] #bn_cb b.bn-cb-h{color:#0b0d10}[data-theme=light] #bn_cb a{color:#c8102e}[data-theme=light] #bn_cb .bn-cb-st{color:#5b6573}';
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fmtD(iso){try{return new Date(iso).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});}catch(e){return iso;}}
+var UI={el:null,ro:null,
+status:function(){var c=consent();if(gpc||dnt)return 'Your browser sends a '+(gpc?'Global Privacy Control':'Do Not Track')+' signal, so analytics stays off.';
+ if(CR){return c?('Current choice: '+(c.choice==='granted'?'analytics accepted':'analytics rejected')+' on '+fmtD(c.timestamp)+'.'):'';}
+ return ls('bn_analytics')==='denied'?'Current choice: analytics off in this browser.':'Current choice: analytics on (you can turn it off).';},
+open:function(reopen){if(!document.body)return;if(!document.getElementById('bn_cb_css')){var st=document.createElement('style');st.id='bn_cb_css';st.textContent=CSS;document.head.appendChild(st);}
+ var d=this.el;if(!d){d=document.createElement('div');d.id='bn_cb';d.setAttribute('role','region');d.setAttribute('aria-label','Cookie consent');this.el=d;}
+ var off=gpc||dnt;
+ d.innerHTML='<div class="bn-cb-in"><div class="bn-cb-tx"><p><b class="bn-cb-h">Can we count your visit?</b> We\'d like to use Google Analytics to see which pages are useful. It sets cookies on your device and sends usage data to Google. It\'s off unless you say yes, and the site works the same either way.</p>'
+  +'<p class="bn-cb-st" aria-live="polite">'+esc(this.status())+'</p></div>'
+  +'<div class="bn-cb-row"><button type="button" class="bn-cb-btn" data-cb="granted"'+(off?' disabled':'')+'>Accept analytics</button><button type="button" class="bn-cb-btn" data-cb="denied"'+(off?' disabled':'')+'>Reject</button>'
+  +'<span class="bn-cb-lk"><a href="/cookies">Cookie Policy</a></span></div></div>'+(reopen||off?'<button type="button" class="bn-cb-x" aria-label="Close cookie settings">×</button>':'');
+ if(!d.parentNode)document.body.appendChild(d);document.documentElement.classList.add('bn-cb-on');this.size();
+ var me=this;if(window.ResizeObserver&&!this.ro){this.ro=new ResizeObserver(function(){me.size();});this.ro.observe(d);}
+ if(reopen){var b=d.querySelector('.bn-cb-btn:not([disabled])')||d.querySelector('.bn-cb-x');if(b)try{b.focus({preventScroll:true});}catch(e){}}},
+size:function(){if(this.el)document.documentElement.style.setProperty('--bn-cb-h',this.el.offsetHeight+'px');},
+close:function(){if(this.el&&this.el.parentNode)this.el.parentNode.removeChild(this.el);document.documentElement.classList.remove('bn-cb-on');},
+sync:function(){if(this.el&&this.el.parentNode){var s=this.el.querySelector('.bn-cb-st');if(s)s.textContent=this.status();}}};
+window.bnConsentUI=UI;window.bnCookieSettings=function(){UI.open(true);};
+document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;
+ var k=t.closest('[data-bn-cookie-settings],a[href="/cookies#settings"]');if(k){e.preventDefault();UI.open(true);return;}
+ var b=t.closest('#bn_cb .bn-cb-btn');if(b&&!b.disabled){var ch=b.getAttribute('data-cb');if(!CR&&ch==='granted')ls('bn_analytics',null);window.bnSetAnalytics(ch);UI.close();return;}
+ if(t.closest('#bn_cb .bn-cb-x'))UI.close();});
+function boot(){if(CR&&!gpc&&!dnt&&!consent())UI.open(false);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();"""
+LEGAL_LINKS = (b'<span class="bn-legal-links"> \xc2\xb7 <a href="/cookies">Cookie Policy</a> \xc2\xb7 <a href="/cookies#settings" data-bn-cookie-settings>Cookie settings</a>'
+               b' \xc2\xb7 <a href="/privacy-choices">Your Privacy Choices</a></span>')
+# Consent policy version: stored with every banner choice (localStorage bn_consent). Bump it when /privacy or /cookies change in a
+# material way and every visitor in the consent region is asked again. Choices also expire after 6 months (GA_JS MAXAGE).
+CONSENT_POLICY_VERSION = "2026-11-01"
+def ga_region(country):
+    c = (country or "").strip().upper()
+    if c in EU_REGION: return "eu"
+    return "ok" if len(c) == 2 and c.isalpha() and c not in ("XX", "T1") else "unknown"
+# seo/batch-1 kill switches (Render env vars; a restart applies them, no code deploy): BN_GA_OFF=1 stops the GA4 loader, the consent banner and all
+# GA4 events on every page (no gtag request at all); BN_LEGAL_FOOTER_OFF=1 stops the injected Cookie Policy / Your Privacy Choices footer links.
+def _flag(name): return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+def ga_head(b, country=None, ga=True):
+    try:
+        lo = b[:6000].lower(); h = lo.find(b"<head>")
+        if h < 0 or b"<html" not in lo: return b
+        if ga and not _flag("BN_GA_OFF") and b"BN_GA_REGION" not in b[:60000]:
+            tag = ("<script>window.BN_GA_REGION=" + json.dumps(ga_region(country)) + ";window.BN_POLICY_V=" + json.dumps(CONSENT_POLICY_VERSION) + ";" + GA_JS + "</script>").encode("utf-8")
+            m = re.search(rb"<meta charset=[^>]*>", b[:60000], re.I); i = m.end() if m and m.start() < b.lower().find(b"</head>") else h + 6   # after <meta charset>, else right after <head>
+            b = b[:i] + tag + b[i:]
+        lo = b.lower(); j = lo.rfind(b"</footer>"); fs = lo.rfind(b"<footer", 0, j) if j >= 0 else -1
+        if not _flag("BN_LEGAL_FOOTER_OFF") and b'href="/privacy-choices"' not in (b[fs:j] if j >= 0 else b'') and b"bn-legal-ft" not in b:   # footer links on every full page (last </footer>, else a small footer before </body>)
+            if j >= 0: b = b[:j] + LEGAL_LINKS + b[j:]
+            else:
+                k = b.lower().rfind(b"</body>")
+                if k >= 0: b = (b[:k] + b'<footer class="bn-legal-ft" style="text-align:center;font:12px/1.6 Inter,system-ui,sans-serif;color:#8b95a3;padding:14px 12px 24px">'
+                                b'<a href="/privacy" style="color:inherit">Privacy</a> \xc2\xb7 <a href="/tos" style="color:inherit">Terms</a>' + LEGAL_LINKS + b'</footer>' + b[k:])
+    except Exception: pass
+    return b
+
 def pwa_head(b):
     try:
         h = b[:4000].lower().find(b"<head>")
@@ -256,6 +422,7 @@ class H(BaseHTTPRequestHandler):
             try: b = display_links.rewrite_json(b.decode("utf-8")).encode("utf-8")
             except Exception: pass
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
+        if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
         self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "public, max-age=31536000, immutable" if versioned else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
@@ -312,7 +479,8 @@ class H(BaseHTTPRequestHandler):
         seg = path.strip("/").lower()
         if seg == "elon": seg = "figures"   # t353: the old Elon Musk tab is now Key Figures
         if seg in self.TAB_PATHS:
-            self.send_response(302); self.send_header("Location", "/#" + seg); self.send_header("Content-Length", "0")
+            q = urlparse(self.path).query   # seo/batch-1: keep ?utm_* (and any other query) through the tab redirect
+            self.send_response(302); self.send_header("Location", "/" + ("?" + q if q else "") + "#" + seg); self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); return True
         try:
             import bn_extras; self.send(404, bn_extras.page_404(path), "text/html"); return True

@@ -52,7 +52,7 @@
 .bng-nlbox .nl-row{display:flex;gap:8px;flex-wrap:wrap}.bng-nlbox input[type=email],.bng-nlbox input[type=text]:not([name=website]),.bng-nlbox select{flex:1 1 200px;min-width:0;min-height:42px;font-size:16px;padding:8px 12px;border-radius:9px;border:1px solid var(--bd2,#2f3742);background:var(--bg,#0b0d10);color:var(--tx,#e6e9ee);box-sizing:border-box}
 .bng-nlbox form button[type=submit]{min-height:42px;padding:0 16px;border-radius:9px;border:0;background:#c8102e!important;border-color:#c8102e!important;color:#fff!important;font:700 14px/1 Inter,system-ui,sans-serif;cursor:pointer;flex:0 0 auto}
 .bng-nlbox .nl-priv{font-size:11px;line-height:1.4;color:var(--mu,#8a94a3);margin:8px 0 0}.bng-nlbox .nl-msg{margin:6px 0 0;font-size:13px}.bng-nlbox .nl-msg.ok{color:#33c17a}.bng-nlbox .nl-msg.err{color:#ff6b6b}
-.bng-nlbox .nl-msg:empty{display:none}.bng-prompt .nl-priv{display:none}.bng-fine{font-size:11.5px;color:var(--mu,#8a94a3);margin:8px 0 0!important}.bng-fine a{color:inherit}
+.bng-nlbox .nl-msg:empty{display:none}.bng-prompt .nl-priv{display:block}.bng-fine{font-size:11.5px;color:var(--mu,#8a94a3);margin:8px 0 0!important}.bng-fine a{color:inherit}
 .bng-nlbox .nl-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 .bng-inline{border-color:rgba(200,16,46,.55)!important;background:linear-gradient(135deg,rgba(200,16,46,.13),transparent 60%),var(--pn,#12161b)!important}
 .bng-inline p{margin:6px 0 0;color:var(--bn-text-2,#c9d1db);font-size:14px}

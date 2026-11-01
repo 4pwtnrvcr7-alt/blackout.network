@@ -35,6 +35,13 @@ def _what(brief, title):
     m = re.search(r"WHAT:\s*(.*?)\s*(?:WHERE:|WHEN:|CONFIDENCE:|$)", brief or "", re.S)
     return S.clean_title((m.group(1) if m else title or "").rstrip(". "))
 
+def _short(t, n=65):
+    """seo/batch-1: <title> text cut at a word boundary (was title[:90], which cut mid-word); the full headline stays in the H1."""
+    t = re.sub(r"\s+", " ", t or "").strip()
+    if len(t) <= n: return t
+    c = t[:n].rsplit(" ", 1)[0].rstrip(" ,;:-–(") or t[:n]
+    return c + "…"
+
 def load(cid):
     c = _ro()
     try:
@@ -95,7 +102,8 @@ def render(cid, since=""):
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
     loc = r.get("location") or ""
-    body = (f'<p class="crumb"><a href="/#wire">The Wire</a> › Story</p>'
+    body = (f'<span id="bn_story" hidden data-rank="{rank}" data-tier="{S.E(tname.lower())}" data-cat="{S.E((r.get("category") or "").lower())}"></span>'   # seo/batch-1: GA4 story_view params
+            f'<p class="crumb"><a href="/#wire">The Wire</a> › Story</p>'
             f'<div><span class="pill" style="color:{col};border-color:{col}">RANK {rank}/10 · {tname.upper()}</span>'
             f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill" style="color:#f5a524">WATCHLIST</span>' if watch == 1 else "") + '</div>'
             f'<h1 class="t">{S.E(title)}</h1>'
@@ -124,7 +132,7 @@ def render(cid, since=""):
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "The Wire", "item": f"{S.SITE}/#wire"},
                                                           {"@type": "ListItem", "position": 2, "name": title[:110], "item": f"{S.SITE}/wire/{cid}"}]}]}
     noindex = watch != 0 or rank < 3
-    return 200, S.page(title[:90], desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
+    return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
 def handle_get(path, qs):
     m = re.match(r"^/wire/([0-9a-f]{16})/?$", path)

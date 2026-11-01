@@ -7,7 +7,7 @@ import html
 import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 EFFECTIVE = "October 31, 2026"
-UPDATED = {"privacy": "November 1, 2026"}   # t385: public /stats page, DNT/GPC, referrer-site and country totals
+UPDATED = {"privacy": "November 1, 2026"}   # seo/batch-1: set to the GA4 go-live date at publish (Compliance rewrite, Google Analytics 4)
 CONTACT = "hello@blackout.network"
 MAIL = f'<a href="mailto:{CONTACT}">{CONTACT}</a>'
 
@@ -28,6 +28,7 @@ nav.toc{background:var(--pn);border:1px solid var(--bd);border-radius:var(--radi
 nav.toc b{display:block;font-size:12px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 nav.toc ol{margin:0;padding-left:22px;columns:2;column-gap:28px}nav.toc li{font-size:13.5px;margin:2px 0;break-inside:avoid}
 nav.toc a{text-decoration:none}nav.toc a:hover{text-decoration:underline}
+table.ck{width:100%;border-collapse:collapse;margin:8px 0 12px;font-size:14px}table.ck th,table.ck td{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top}
 section{background:var(--pn);border:1px solid var(--bd);border-radius:var(--radius);padding:16px 18px;margin:0 0 14px;scroll-margin-top:12px}
 h2{font-size:17px;margin:0 0 8px}h3{font-size:13px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 4px}
 p{margin:0 0 10px}ul{margin:0 0 10px;padding-left:22px}li{margin:3px 0}
@@ -63,25 +64,22 @@ def _build(slug, title, desc, intro, parts):
     return _page(slug, title, desc, toc, secs, intro)
 
 # ------------------------------------------------------------------ Privacy Policy
+# Compliance rewrite (review/compliance/2026-11-01_privacy-ga4.md), generated for seo/batch-1: Google Analytics 4 with consent (#analytics)
 PRIVACY_PARTS = [
-("scope", "Who we are and what this policy covers", f"""
-<p>blackout.network (the "Site") is operated by the operator of blackout.network ("we," "us," or "our"). This Privacy Policy explains what
-information the Site displays, what information we collect when you visit or use it, how that information is used and shared, and the
-choices you have. It applies to the Site at blackout.network and its pages, its email newsletter, and any related features that link to
-this policy.</p>
-<p>By using the Site you acknowledge this Privacy Policy. Your use of the Site is also governed by our <a href="/tos">Terms of Service</a>.
-If you do not agree, please do not use the Site.</p>"""),
-("glance", "Summary", """
+("scope", 'Who we are and what this policy covers', """
+<p>blackout.network (the "Site") is published by <b>BLACKOUT.NETWORK</b>, an independent publisher based in Florida, USA. BLACKOUT.NETWORK is the data controller for the personal information described in this policy. Contact: <b><a href="mailto:hello@blackout.network">hello@blackout.network</a></b>, or by post: BLACKOUT.NETWORK, PO Box 1228, Lake Mary, FL 32746. We haven't appointed a data protection officer; privacy questions go to the same address.</p>
+<p>This Privacy Policy explains what information the Site displays, what we collect when you visit or use it, how that information is used and shared, and the choices you have ("BLACKOUT.NETWORK," "we," "us," or "our"). It applies to the Site at blackout.network and its pages, its email newsletter, and any related features that link to this policy.</p>
+<p>By using the Site you acknowledge this Privacy Policy. Your use of the Site is also governed by our <a href="/tos">Terms of Service</a>. If you do not agree, please do not use the Site.</p>"""),
+("glance", 'Summary', """
 <ul>
-<li>The Site has <b>no user accounts</b>, shows <b>no advertising</b>, and uses <b>no advertising or third-party analytics trackers</b>.</li>
-<li>Visitors <b>never sign in with Google</b>. The only Google account connected to the Site is its own @BlkoutNtw YouTube channel; see
-<a href="#youtube">YouTube and Google user data</a>.</li>
-<li>We <b>do not sell or rent</b> personal information, and we do not share it for cross-context behavioral advertising.</li>
+<li>The Site has no user accounts and shows no advertising.</li>
+<li>We use Google Analytics 4 to see which pages people read and how the Site performs. It sets first-party cookies and runs with Google's advertising features and Google Signals turned off. In the EEA, the UK and Switzerland it stays off unless you choose <b>Accept analytics</b> in our cookie banner; you can change your mind any time with <b>Cookie settings</b> in the footer. Everywhere else it's on by default and you can turn it off with one click on <a href="/privacy-choices">Your Privacy Choices</a>, and we treat a Global Privacy Control or Do Not Track signal as "off". See <a href="#analytics">Google Analytics</a> and our <a href="/cookies">Cookie Policy</a>.</li>
+<li>Visitors never sign in with Google. The only Google account connected to the Site is our own @BlkoutNtw YouTube channel; see <a href="#youtube">YouTube and Google user data</a>.</li>
+<li>We do not sell personal information, and we do not share it for cross-context behavioral advertising.</li>
 <li>Most of what you see is publicly available information collected from third-party sources.</li>
-<li>Personal information is collected only when you choose to provide it (for example, a newsletter email address) and in limited
-technical form needed to run, secure and improve the Site (for example, standard server logs and anti-spam hashes).</li>
+<li>We collect personal information only when you choose to provide it (a newsletter email address, for example), plus the limited technical data needed to run, secure, measure and improve the Site.</li>
 </ul>"""),
-("shown", "Information shown on the Site", """
+("shown", 'Information shown on the Site', """
 <p>The Site aggregates, scores and displays information that is publicly available from third parties, including:</p>
 <ul>
 <li>Public health and outbreak reporting, such as ProMED and the World Health Organization (WHO);</li>
@@ -91,221 +89,189 @@ technical form needed to run, secure and improve the Site (for example, standard
 <li>News and RSS feeds, and posts from public Telegram, Discord and Mastodon channels and similar public sources;</li>
 <li>Publicly broadcast aviation data (for example, aircraft position and registration data).</li>
 </ul>
-<p>This content belongs to its respective owners and is shown for informational purposes. It may occasionally include names or
-statements of public figures, organizations or public accounts as they appear in the original public source. We do not use this
-content to build profiles of private individuals. If you believe content on the Site concerns you and should be removed or corrected,
-contact us using the details below.</p>"""),
-("collect", "Information we collect from visitors", """
+<p>This content belongs to its respective owners and is shown for informational purposes. It may occasionally include names or statements of public figures, organizations or public accounts as they appear in the original public source. We do not use this content to build profiles of private individuals. If you believe content on the Site concerns you and should be removed or corrected, contact us using the details below.</p>"""),
+("collect", 'Information we collect from visitors', """
 <h3>Server, hosting and network logs</h3>
-<p>Like virtually every website, the Site is served through infrastructure providers (currently Render for hosting and Cloudflare for
-content delivery and security). When your browser requests a page, these providers automatically process technical information such
-as your IP address, browser user agent, the page or resource requested, the referring page, and the date and time of the request, and
-may keep it in their logs under their own policies. Our own application does not write per-request access logs containing IP
-addresses.</p>
-<h3 id="usage">Aggregate usage counts (our public stats page)</h3>
-<p>Our own server keeps aggregate, daily counts of page views per page (including individual story pages), requests per section of the
-Site, response status (error) rates, and an approximate count of unique visitors. Unique visitors are estimated with a keyed hash of the
-connecting address and the date; the key is random, changes every day, is held only in server memory and is discarded at the end of the
-day, so the hash cannot be linked across days or reversed. We do not store IP addresses, user agents, cookies or any per-visitor records
-for these counts. We also count, as totals only, the site name of the page that linked to us (for example google.com, never the full
-address), campaign tags in our own links (utm_source), and, when our network provider (Cloudflare) supplies it, the visitor's country
-code; we never look up locations from IP addresses ourselves. Known bots and crawlers are excluded. Browsers that send a Do Not Track
-(DNT) or Global Privacy Control (GPC) signal are not included in these counts at all.</p>
-<p>A summary of these totals, together with the public follower and view counts of our YouTube and X accounts, is published for anyone at
-<a href="/stats">blackout.network/stats</a>. Any number under 5 is hidden or shown as "&lt;5" so that no individual visit can be singled out.</p>
+<p>Like virtually every website, the Site is served through infrastructure providers (currently Render for hosting and Cloudflare for content delivery and security). When your browser requests a page, these providers automatically process technical information such as your IP address, browser user agent, the page or resource requested, the referring page, and the date and time of the request, and may keep it in their logs under their own policies. Our own application does not write per-request access logs containing IP addresses.</p>
+<h3>Aggregate usage counts (our public stats page)</h3>
+<p>Our own server keeps aggregate, daily counts of page views per page (including individual story pages), requests per section of the Site, response status (error) rates, and an approximate count of unique visitors. Unique visitors are estimated with a keyed hash of the connecting address and the date; the key is random, changes every day, is held only in server memory and is discarded at the end of the day, so the hash cannot be linked across days or reversed. We do not store IP addresses, user agents, cookies or any per-visitor records for these counts. We also count, as totals only, the site name of the page that linked to us (for example google.com, never the full address), campaign tags in our own links (utm_source), and, when our network provider (Cloudflare) supplies it, the visitor's country code; we never look up locations from IP addresses ourselves. Known bots and crawlers are excluded. Browsers that send a Do Not Track (DNT) or Global Privacy Control (GPC) signal are not included in these counts at all.</p>
+<p>These first-party counts are separate from Google Analytics, which is described in section 5.</p>
+<p>A summary of these totals, together with the public follower and view counts of our YouTube and X accounts, is published for anyone at <a href="/stats">blackout.network/stats</a>. Any number under 5 is hidden or shown as "&lt;5" so that no individual visit can be singled out.</p>
 <h3>Newsletter</h3>
-<p>If you sign up for the newsletter, we collect and store your email address; your chosen frequency and categories; the dates and times you
-signed up, confirmed, changed settings or unsubscribed; where on the Site you signed up; a hashed (not plain-text) form of the IP address
-used to sign up, kept as a consent record and to prevent abuse; a record of which issues and items were sent to you and whether delivery
-succeeded; and, if you choose to give one, your reason for unsubscribing. Signup uses double opt-in: you are not subscribed until you click
-the confirmation link we email you. Every newsletter includes an unsubscribe link, and you can also unsubscribe by contacting us.</p>
-<p><b>Optional location for local news.</b> If you choose to give an area (a US ZIP code, a city or a country) when you sign up or on your
-preferences page, we store only the place name you chose (for example "Sanford, FL 32771") and a rough centre point for it, rounded to about
-10 km. We look it up on our own server from bundled public datasets (US Census ZIP centroids, GeoNames); it is never sent to a third party,
-and we never ask for or store a street address. It is used only to add a "Near you" section and local breaking alerts to your emails. You can
-change or remove it at any time from the preferences link in every email. Your email address, area and topic choices are never shown on any
-public page or shared; our public statistics show subscriber totals only.</p>
-<p>Confirmation emails and newsletters are delivered through a third-party email delivery provider (such as Resend), which processes your
-email address and the message content on our behalf in order to send the email.</p>
+<p>If you sign up for the newsletter, we collect and store your email address; your chosen frequency and categories; the dates and times you signed up, confirmed, changed settings or unsubscribed; where on the Site you signed up; a hashed (not plain-text) form of the IP address used to sign up, kept as a consent record and to prevent abuse; a record of which issues and items were sent to you and whether delivery succeeded; and, if you choose to give one, your reason for unsubscribing. Signup uses double opt-in: you are not subscribed until you click the confirmation link we email you. Every newsletter includes an unsubscribe link, and you can also unsubscribe by contacting us. Your email address is never sent to Google Analytics.</p>
+<p>Optional location for local news. If you choose to give an area (a US ZIP code, a city or a country) when you sign up or on your preferences page, we store only the place name you chose (for example "Sanford, FL 32771") and a rough centre point for it, rounded to about 10 km. We look it up on our own server from bundled public datasets (US Census ZIP centroids, GeoNames); it is never sent to a third party, and we never ask for or store a street address. It is used only to add a "Near you" section and local breaking alerts to your emails. You can change or remove it at any time from the preferences link in every email. Your email address, area and topic choices are never shown on any public page or shared; our public statistics show subscriber totals only.</p>
+<p>Confirmation emails and newsletters are delivered through a third-party email delivery provider (such as Resend), which processes your email address and the message content on our behalf in order to send the email.</p>
 <h3>Alerts (push notifications)</h3>
-<p>If you tap the bell and turn on alerts, your browser asks your permission and then gives us a push subscription: a web address at your
-browser's push service (for example Google, Apple, Mozilla or Microsoft) plus two public encryption keys. We store that subscription, the
-alert level and categories you chose, your browser family (for example "Chrome on Android"), the dates you turned alerts on or changed them,
-and a record of which alerts were sent to it, so nobody gets the same alert twice. We do not store your IP address, name or email for alerts.
-Alerts are encrypted and delivered through your browser's push service. You can turn alerts off at any time with the bell (Turn off alerts)
-or in your browser or phone settings; when you do, or when your browser tells us the subscription has ended, we delete it.</p>
+<p>If you tap the bell and turn on alerts, your browser asks your permission and then gives us a push subscription: a web address at your browser's push service (for example Google, Apple, Mozilla or Microsoft) plus two public encryption keys. We store that subscription, the alert level and categories you chose, your browser family (for example "Chrome on Android"), the dates you turned alerts on or changed them, and a record of which alerts were sent to it, so nobody gets the same alert twice. We do not store your IP address, name or email for alerts. Alerts are encrypted and delivered through your browser's push service. You can turn alerts off at any time with the bell (Turn off alerts) or in your browser or phone settings; when you do, or when your browser tells us the subscription has ended, we delete it.</p>
 <h3>Problem reports</h3>
-<p>If you use the "Report a problem" feature, we receive what is shown in its preview: the category and description you enter, the page
-address (without any query string), the dashboard tab, the time, your browser's user agent, window size, language and time zone, the site
-build, the last scan time on screen and up to 10 recent script error messages from the page. We do not store your IP address; we keep only
-a daily-rotating, anonymous hash to limit spam. You receive a reference ID that is the only way to look up the report.</p>
+<p>If you use the "Report a problem" feature, we receive what is shown in its preview: the category and description you enter, the page address (without any query string), the dashboard tab, the time, your browser's user agent, window size, language and time zone, the site build, the last scan time on screen and up to 10 recent script error messages from the page. We do not store your IP address; we keep only a daily-rotating, anonymous hash to limit spam. You receive a reference ID that is the only way to look up the report.</p>
 <h3>Source suggestions</h3>
-<p>If you suggest a source, we collect the source name, link, category and your reason, and, only if you provide it, your email address so
-we can follow up. Submitter email addresses are never shown publicly. A hashed form of your IP address is used to limit spam.</p>
+<p>If you suggest a source, we collect the source name, link, category and your reason, and, only if you provide it, your email address so we can follow up. Submitter email addresses are never shown publicly. A hashed form of your IP address is used to limit spam.</p>
 <h3>Ratings and votes</h3>
-<p>If you rate a threat or a source, your browser generates a random, anonymous voter ID (stored in your browser) that is sent with your
-rating so that each browser counts once. IP addresses are used only in memory for rate limiting and are not written to disk.</p>
+<p>If you rate a threat or a source, your browser generates a random, anonymous voter ID (stored in your browser) that is sent with your rating so that each browser counts once. IP addresses are used only in memory for rate limiting and are not written to disk.</p>
 <h3>Site search</h3>
-<p>Search terms you enter are processed to return results and may be logged, without your IP address, to measure and improve search
-performance.</p>
+<p>Search terms you enter are processed to return results. We may log them, without your IP address, for up to 30 days to measure and improve search. If Google Analytics is on for you, the search term is also recorded there as a site-search event, so please don't type personal details into the search box.</p>
 <h3>Location and weather features</h3>
-<p>The Site has no default location. If you choose a location, type a place name, or allow your browser to share your location for the
-weather and nearby-alert features, your choice is saved in your own browser. To look up a place or forecast, the place name or rounded
-coordinates are sent to our server, which queries third-party geocoding and weather services (such as Open-Meteo, OpenStreetMap Nominatim
-and NOAA/National Weather Service) on your behalf. We do not store these lookups on our server. Your browser will ask your permission
-before sharing your precise location, and you can decline.</p>
+<p>The Site has no default location. If you choose a location, type a place name, or allow your browser to share your location for the weather and nearby-alert features, your choice is saved in your own browser. To look up a place or forecast, the place name or rounded coordinates are sent to our server, which queries third-party geocoding and weather services (such as Open-Meteo, OpenStreetMap Nominatim and NOAA/National Weather Service) on your behalf. We do not store these lookups on our server, and they are not sent to Google Analytics. Your browser will ask your permission before sharing your precise location, and you can decline.</p>
 <h3>Tips</h3>
-<p>The Site may link to a PayPal page for optional tips. We do not process payments or receive your payment card details; any payment is
-handled by PayPal under its own terms and privacy policy.</p>
+<p>The Site may link to a PayPal page for optional tips. We do not process payments or receive your payment card details; any payment is handled by PayPal under its own terms and privacy policy.</p>
 <h3>Information you send us</h3>
 <p>If you email us, we receive your email address and whatever you choose to include in your message.</p>"""),
-("cookies", "Cookies and browser storage", """
-<p>We do not use advertising cookies or third-party analytics cookies. The Site uses a small number of first-party cookies and your
-browser's local storage only to remember your choices and make features work, for example: your selected language; your saved weather
-location and units; your anonymous voter ID; map, chart and view preferences; audio volume; and the reference IDs of problem reports you
-submitted. This information stays in your browser unless a feature sends it to our server as described above. You can clear cookies and
-site data at any time in your browser settings; some features will then reset to their defaults.</p>"""),
-("thirdparty", "Third-party content and embedded services", """
-<p>To show maps, imagery, video, audio and other media, some pages load content directly from third-party servers. When that happens,
-your browser connects to those providers, which can see your IP address and browser information and may set their own cookies or keep
-their own logs. Depending on the page, these can include: map tile providers (such as OpenFreeMap, VersaTiles and NASA GIBS); weather
-radar (such as RainViewer and NOAA); YouTube (using its privacy-enhanced mode where available); NASA solar imagery (such as SDO and SOHO);
-live radio streams from broadcasters (such as NPR, BBC, CBC, RFI, Al Jazeera, ABC, RNZ, Radio France and Deutschlandfunk); images hosted
-on Wikimedia Commons; and code libraries delivered by content-delivery networks (such as unpkg and jsDelivr).</p>
-<p>We do not control these providers and are not responsible for their privacy practices. Their use of information is governed by their
-own privacy policies.</p>"""),
-("youtube", "YouTube and Google user data", f"""
-<p>blackout.network runs a YouTube channel, <b>@BlkoutNtw</b>, and uses Google's YouTube API Services (the YouTube Data API v3 and the
-YouTube Analytics API) through a Google OAuth client to manage that channel. This section explains exactly what Google user data that
-connection accesses and how it is handled.</p>
-<h3>Whose Google account is connected</h3>
-<p>The only Google account ever connected to blackout.network is the Site's own @BlkoutNtw YouTube channel, which is owned and authorized by
-the operator of blackout.network. <b>Visitors never sign in with Google</b>, and the Site does not request, receive or store any visitor's
-Google or YouTube account data.</p>
-<h3>Data accessed</h3>
-<p>With the operator's permission (OAuth scopes <code>youtube</code>, <code>youtube.upload</code> and <code>yt-analytics.readonly</code>),
-blackout.network accesses the following data about its own @BlkoutNtw channel only:</p>
+("cookies", 'Cookies, analytics and browser storage', """
+<p>We do not use advertising cookies. The Site uses:</p>
 <ul>
-<li><b>Channel information:</b> channel title, description, channel and playlist IDs, and branding settings (such as banner, profile picture
-and watermark);</li>
-<li><b>Video metadata:</b> titles, descriptions, tags, categories, privacy status (public, unlisted or private), publish times and
-thumbnails;</li>
-<li><b>Uploads:</b> the video files we upload and their upload and processing status;</li>
-<li><b>Playlists:</b> the channel's playlists and the videos in them;</li>
-<li><b>Comments:</b> comments posted on the channel's own videos, including the commenter's public display name as YouTube shows it, so that
-we can read, reply to and moderate them; and</li>
-<li><b>Analytics (read-only):</b> aggregate channel and video performance, such as views, watch time and subscriber counts.</li>
+<li><b>Preference storage (first-party, always on).</b> A small number of first-party cookies and your browser's local storage remember your choices and make features work: your selected language, saved weather location and units, anonymous voter ID, map, chart and view preferences, audio volume, your analytics choice and cookie-banner choice (<code>bn_consent</code>: the choice, its date and the policy version), and the reference IDs of problem reports you submitted. This information stays in your browser unless a feature sends it to our server as described above. If you pick a language other than English, a <code>googtrans</code> cookie tells Google's website translator which language to show, and the page text is sent to Google to be translated.</li>
+<li><b>Google Analytics cookies (first-party, set by Google's script, only when analytics is on).</b> Full list: <a href="/cookies">Cookie Policy</a>.</li>
 </ul>
+<table class="ck"><thead><tr><th>Cookie</th><th>What it does</th><th>How long it lasts</th></tr></thead><tbody><tr><td><code>_ga</code></td><td>Holds a random ID so Google Analytics can tell one browser from another and count returning visits</td><td>Up to 13 months after your last visit</td></tr><tr><td><code>_ga_KND6CPBB1X</code></td><td>Keeps track of the current visit (session) for our Google Analytics property</td><td>Up to 13 months after your last visit</td></tr></tbody></table>
+<p>You can clear cookies and site data at any time in your browser settings; some features will then reset to their defaults, and Google Analytics will treat your next visit as a new browser.</p>
+<h3 id="analytics">Google Analytics</h3>
+<p>We use Google Analytics 4, a web analytics service from Google, to understand which stories and tools people use, where visitors come from, and where the Site is slow or broken. It helps us decide what to cover and what to fix. We don't use it to identify anyone.</p>
+<p><b>What it collects.</b> When analytics is on, Google's script records:</p>
+<ul>
+<li>the pages you view, including their address and title, and the page that sent you to us;</li>
+<li>events on those pages, such as scrolling, clicks on links to other sites, file downloads (for example our printable maps), site searches, video plays, and whether a newsletter signup form was submitted (never the email address you typed);</li>
+<li>device and browser information, such as device type, operating system, browser, screen size and language;</li>
+<li>approximate location (country, region and city) that Google works out from your IP address when the data arrives;</li>
+<li>the date and time of each visit and roughly how long it lasted.</li>
+</ul>
+<p><b>IP addresses.</b> Google Analytics 4 does not log or store IP addresses. Google uses the address briefly to estimate your general location and then discards it. We never receive your IP address from Google Analytics.</p>
+<p><b>Who processes it.</b> Google acts as our processor (service provider) for this data, under Google's data processing terms. We have turned off the settings that let Google use our Analytics data for its own products and services. Google may process the data in the United States and other countries. You can read how Google handles data in the <a href="https://policies.google.com/privacy">Google Privacy Policy</a> and in <a href="https://policies.google.com/technologies/partner-sites">How Google uses information from sites or apps that use our services</a>.</p>
+<p><b>No advertising features.</b> Google Signals, advertising features, ad personalization and links to Google advertising products are turned off for our property. We will update this policy before we turn any of them on.</p>
+<p><b>How long it's kept.</b> We set Google Analytics to keep visit-level data for 2 months, the shortest setting Google offers. After that, only aggregate reports remain, such as total page views per day, and they can't be traced to a browser.</p>
+<p><b>Your choice.</b></p>
+<ul>
+<li>In the European Economic Area, the United Kingdom and Switzerland, we ask first. A banner offers <b>Accept analytics</b> and <b>Reject</b>, with equal weight. Until you accept, Google Analytics doesn't load: no analytics cookies are set and no analytics data is sent to Google. We use the country our network provider (Cloudflare) reports for each request, without storing it. If no country is reported, we show the banner when your browser's time zone is in Europe, or when we can't tell where you are.</li>
+<li>We record your choice in your own browser only (local storage <code>bn_consent</code>: the choice, the date and time, and the policy version), and we don't send it to our servers. We ask again after 6 months, or sooner if this policy or our Cookie Policy changes in a material way. To withdraw or change your choice, use <b>Cookie settings</b> in the footer of every page; rejecting after accepting turns Google Analytics off and deletes its cookies.</li>
+<li>Outside those countries it's on by default. You can turn it off at any time on <a href="/privacy-choices">Your Privacy Choices</a>, linked in the footer of every page.</li>
+<li>If your browser sends a Global Privacy Control or Do Not Track signal, we treat it as "off" and don't load Google Analytics.</li>
+<li>You can also install Google's <a href="https://tools.google.com/dlpage/gaoptout">Google Analytics Opt-out Browser Add-on</a>, which blocks Google Analytics on every site.</li>
+</ul>
+<p>Turning analytics off doesn't change how the Site works.</p>"""),
+("thirdparty", 'Third-party content and embedded services', """
+<p>To show maps, imagery, video, audio and other media, and to measure site use, some pages load content directly from third-party servers. When that happens, your browser connects to those providers, which can see your IP address and browser information and may set their own cookies or keep their own logs. Depending on the page, these can include: Google Analytics (only when analytics is on; see section 5); map tile providers (such as OpenFreeMap, VersaTiles and NASA GIBS); weather radar (such as RainViewer and NOAA); YouTube (using its privacy-enhanced mode where available) and YouTube video thumbnails (i.ytimg.com), which load when a page lists videos; NASA solar imagery (such as SDO and SOHO); live radio streams from broadcasters (such as NPR, BBC, CBC, RFI, Al Jazeera, ABC, RNZ, Radio France and Deutschlandfunk); images hosted on Wikimedia Commons; and code libraries delivered by content-delivery networks (such as unpkg and jsDelivr).</p>
+<p>We do not control these providers and are not responsible for their privacy practices. Their use of information is governed by their own privacy policies.</p>"""),
+("youtube", 'YouTube and Google user data', """
+<p>BLACKOUT.NETWORK runs a YouTube channel, @BlkoutNtw, and uses Google's YouTube API Services (the YouTube Data API v3 and the YouTube Analytics API) through a Google OAuth client to manage that channel. This section explains exactly what Google user data that connection accesses and how it is handled. (Google Analytics, described in section 5, is a separate service and doesn't use this connection.)</p>
+<h3>Whose Google account is connected</h3>
+<p>The only Google account ever connected to blackout.network is the Site's own @BlkoutNtw YouTube channel, which is owned and authorized by BLACKOUT.NETWORK. Visitors never sign in with Google, and the Site does not request, receive or store any visitor's Google or YouTube account data.</p>
+<h3>Data accessed</h3>
+<p>With the channel owner's permission (OAuth scopes <code>youtube</code>, <code>youtube.upload</code>, <code>youtube.force-ssl</code> and <code>yt-analytics.readonly</code>), blackout.network accesses the following data about its own @BlkoutNtw channel only:</p>
+<ul>
+<li>Channel information: channel title, description, channel and playlist IDs, and branding settings (such as banner, profile picture and watermark);</li>
+<li>Video metadata: titles, descriptions, tags, categories, privacy status (public, unlisted or private), publish times and thumbnails;</li>
+<li>Uploads: the video files we upload and their upload and processing status;</li>
+<li>Captions: the caption tracks we upload for our own videos;</li>
+<li>Playlists: the channel's playlists and the videos in them;</li>
+<li>Comments: comments posted on the channel's own videos, including the commenter's public display name as YouTube shows it, so that we can read, reply to, pin and moderate them; and</li>
+<li>Analytics (read-only): aggregate channel and video performance, such as views, watch time and subscriber counts.</li>
+</ul>
+<p>We use the <code>youtube.force-ssl</code> scope only to upload captions to our own videos and to post, pin and moderate comments on our own videos.</p>
 <h3>How the data is used</h3>
-<p>This data is used <b>only</b> to publish and manage blackout.network's own videos, playlists, channel details and comments, and to read
-the channel's own performance. We do not use Google user data for advertising, we do not sell, rent or share it with anyone, we do not use
-it to build profiles of any person, and we do not use it to develop, improve or train artificial-intelligence or machine-learning models.
-No person reads this data except the operator, for the purposes above.</p>
+<p>This data is used only to publish and manage BLACKOUT.NETWORK's own videos, playlists, captions, channel details and comments, and to read the channel's own performance. We do not use Google user data for advertising, we do not sell, rent or share it with anyone, we do not use it to build profiles of any person, and we do not use it to develop, improve or train artificial-intelligence or machine-learning models. No person reads this data except BLACKOUT.NETWORK's editors, for the purposes above.</p>
 <h3>Storage and protection</h3>
 <ul>
-<li>The OAuth client credentials and the OAuth access and refresh tokens are kept in <b>restricted-access environment variables</b> on
-blackout.network's private, access-controlled operations server, which is separate from the public website. They are never placed in
-source code, in the code repository, or on any public page, and they are never sent to visitors' browsers.</li>
+<li>The OAuth client credentials and the OAuth access and refresh tokens are kept in restricted-access environment variables on BLACKOUT.NETWORK's private, access-controlled operations server, which is separate from the public website. They are never placed in source code, in the code repository, or on any public page, and they are never sent to visitors' browsers.</li>
 <li>All communication with Google and YouTube uses encrypted HTTPS (TLS) connections only.</li>
-<li>No Google account password is ever requested, received or stored; access works only through Google's OAuth consent, which the channel
-owner can revoke at any time.</li>
+<li>No Google account password is ever requested, received or stored; access works only through Google's OAuth consent, which the channel owner can revoke at any time.</li>
 </ul>
 <h3>Retention and deletion</h3>
 <ul>
-<li><b>OAuth tokens</b> are kept only until access is revoked or the YouTube integration is discontinued, and are deleted from our server
-within 30 days after that.</li>
-<li><b>YouTube Analytics data</b> is read on demand and is <b>not stored</b> by blackout.network.</li>
-<li><b>Comments</b> are read on demand to reply to and moderate them and are not copied into any blackout.network database.</li>
-<li><b>Video metadata and uploads</b> are our own published content; any copies we keep are only the working files we created for the
-channel.</li>
+<li>OAuth tokens are kept only while the channel owner's authorization is active. We check at least every 30 days that it is still valid. If access is revoked or the YouTube integration is discontinued, we delete the tokens and any stored YouTube API data within 7 days.</li>
+<li>YouTube Analytics data is read on demand and is not stored by blackout.network.</li>
+<li>Comments are read on demand to reply to and moderate them and are not copied into any blackout.network database.</li>
+<li>Video metadata and uploads are our own published content; any copies we keep are only the working files we created for the channel.</li>
 </ul>
-<p><b>To revoke access</b>, the owner of the connected Google account can remove blackout.network at any time at
-<a href="https://myaccount.google.com/permissions">https://myaccount.google.com/permissions</a>. To ask us to delete any data described in
-this section, email {MAIL}; we will complete deletion requests within 30 days.</p>
+<p><b>Revoking access and asking for deletion.</b> In addition to our own deletion process, the owner of the connected Google account can revoke blackout.network's access at any time on Google's security settings page: <a href="https://security.google.com/settings/security/permissions">https://security.google.com/settings/security/permissions</a>. To ask us to delete any data described in this section, email <a href="mailto:hello@blackout.network">hello@blackout.network</a>. We will complete the deletion within 7 calendar days. Deleting data held by BLACKOUT.NETWORK does not delete anything stored by YouTube; to remove data from YouTube itself, use YouTube or YouTube Studio.</p>
 <h3>Google and YouTube policies</h3>
 <ul>
-<li>Our use of YouTube API Services is subject to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>, and Google's
-handling of data is described in the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
-<li><b>blackout.network's use and transfer of information received from Google APIs adheres to the
-<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the
-Limited Use requirements.</b></li>
+<li>Our use of YouTube API Services is subject to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>, and Google's handling of data is described in the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
+<li>blackout.network's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</li>
 </ul>
-<p>Questions about this section can be sent to {MAIL}.</p>"""),
-("use", "How we use information", """
+<p>Questions about this section can be sent to <a href="mailto:hello@blackout.network">hello@blackout.network</a>.</p>"""),
+("use", 'How we use information', """
 <ul>
 <li>To operate, maintain, secure and improve the Site and its features;</li>
 <li>To send the newsletter you requested and related service messages (such as confirmation emails);</li>
 <li>To review and respond to problem reports, source suggestions and messages;</li>
 <li>To detect, prevent and respond to spam, abuse, fraud, security incidents and violations of our <a href="/tos">Terms of Service</a>;</li>
-<li>To understand aggregate usage and fix errors;</li>
+<li>To understand aggregate usage, measure which pages and features are used (including through Google Analytics, where it is on), and fix errors;</li>
 <li>To comply with law and to establish, exercise or defend legal claims.</li>
-</ul>"""),
-("share", "How we share information", """
-<p>We do not sell or rent personal information, and we do not share it for advertising. We share information only:</p>
+</ul>
+<h3 id="legal-bases">Why we're allowed to use your information</h3>
+<table class="ck"><thead><tr><th>Purpose</th><th>Data</th><th>Legal basis (GDPR / UK GDPR)</th></tr></thead><tbody>
+<tr><td>Google Analytics</td><td>Pages, events, device/browser, approximate location, <code>_ga</code> cookies</td><td><b>Consent</b> (Art. 6(1)(a)); in the EEA, UK and CH it's off until you accept. Elsewhere it's on by default, with an opt-out on <a href="/privacy-choices">Your Privacy Choices</a></td></tr>
+<tr><td>Newsletter and breaking alerts by email</td><td>Email, preferences, optional area, consent record</td><td><b>Consent</b></td></tr>
+<tr><td>Web push alerts</td><td>Push subscription, alert settings</td><td><b>Consent</b> (your browser permission)</td></tr>
+<tr><td>Location and weather lookups</td><td>Place name or rounded coordinates</td><td><b>Consent</b> (you choose to share)</td></tr>
+<tr><td>Running and securing the Site: hosting logs, anti-spam hashes, rate limits, aggregate counts</td><td>Technical data</td><td><b>Legitimate interests</b> (Art. 6(1)(f)) in keeping a free public-safety resource online, fast and safe from abuse</td></tr>
+<tr><td>Problem reports, source suggestions, ratings, messages</td><td>What you send</td><td><b>Legitimate interests</b> in fixing and improving the Site and answering you</td></tr>
+<tr><td>Honoring unsubscribes, legal requests, defending claims</td><td>Minimal records</td><td><b>Legal obligation</b> (Art. 6(1)(c)) and legitimate interests</td></tr>
+<tr><td>YouTube channel management (section 7)</td><td>Our own channel's data</td><td>Not visitor data; it's processed with the channel owner's consent under Google's OAuth</td></tr>
+</tbody></table>
+<p>You can withdraw consent at any time; doing so doesn't affect processing that already happened. You can object to processing based on legitimate interests (see section 12).</p>"""),
+("share", 'How we share information', """
+<p>We share information only:</p>
 <ul>
-<li>With service providers that host, deliver, secure or email for the Site (such as our hosting, content-delivery and email delivery
-providers), who process it on our behalf;</li>
-<li>When we believe in good faith that disclosure is required by law, subpoena, court order or other legal process, or is necessary to
-protect the rights, property or safety of the Site, its operator, its users or the public;</li>
-<li>In connection with a merger, sale, transfer or reorganization of the Site or its assets, in which case information may be transferred
-as part of that transaction subject to this policy;</li>
+<li>With service providers that host, deliver, secure, measure or email for the Site (our hosting, content-delivery, analytics (Google Analytics) and email delivery providers), who process it on our behalf;</li>
+<li>When we believe in good faith that disclosure is required by law, subpoena, court order or other legal process, or is necessary to protect the rights, property or safety of the Site, BLACKOUT.NETWORK, its users or the public;</li>
+<li>In connection with a merger, sale, transfer or reorganization of the Site or its assets, in which case information may be transferred as part of that transaction subject to this policy;</li>
 <li>In aggregated or de-identified form that does not reasonably identify you; or</li>
 <li>With your consent or at your direction.</li>
-</ul>"""),
-("retention", "Data retention", """
-<p>We keep personal information only as long as reasonably necessary for the purposes described in this policy, unless a longer period is
-required or permitted by law. Newsletter records are kept while you are subscribed; after you unsubscribe we may keep your email address
-and unsubscribe record so that we honor your choice and can demonstrate compliance. Problem reports, source suggestions and messages are
-kept as long as needed to handle them and maintain the Site. Anti-spam hashes and rate-limit records are short-lived. Logs held by our
-infrastructure providers are retained according to their policies.</p>"""),
-("security", "Security", """
-<p>We use reasonable administrative, technical and physical measures designed to protect the information we hold, such as encrypted
-connections (HTTPS), hashing of IP addresses where we keep a record, and restricted access to stored data. No method of transmission
-over the internet or method of storage is completely secure, however, and we cannot guarantee absolute security.</p>"""),
-("choices", "Your choices and rights", f"""
+</ul>
+<p><b>We do not sell or share your personal information.</b> We do not sell personal information, and we do not share it for cross-context behavioral advertising (targeted ads based on your activity across other sites), as those terms are used in California and other U.S. state privacy laws. We have not done so in the past 12 months. We run Google Analytics with advertising features and Google Signals off, and we limit Google to acting as our processor. Even so, you can switch analytics off at any time on <a href="/privacy-choices">Your Privacy Choices</a>, and we honor Global Privacy Control signals automatically.</p>"""),
+("retention", 'Data retention', """
+<p>We keep personal information only as long as reasonably necessary for the purposes described in this policy, unless a longer period is required or permitted by law:</p>
 <ul>
+<li><b>Google Analytics:</b> visit-level data 2 months; cookies expire up to 13 months after your last visit; aggregate reports kept without identifiers.</li>
+<li><b>Your cookie-banner choice</b> (EEA, UK and Switzerland): kept only in your own browser for 6 months, then we ask again. We keep no copy on our servers.</li>
+<li><b>Newsletter:</b> while you're subscribed. After you unsubscribe we keep your email address and the unsubscribe record so we never email you again by mistake.</li>
+<li><b>Push subscriptions:</b> until you turn alerts off or your browser ends the subscription; then deleted.</li>
+<li><b>Search logs:</b> up to 30 days, no IP address.</li>
+<li><b>Problem reports, source suggestions, messages:</b> as long as needed to handle them, then deleted or kept as anonymous records.</li>
+<li><b>Anti-spam hashes and rate limits:</b> about a day.</li>
+<li><b>Hosting and network logs:</b> per Render's and Cloudflare's own policies.</li>
+<li><b>YouTube API data:</b> see section 7.</li>
+</ul>"""),
+("security", 'Security', """
+<p>We use reasonable administrative, technical and physical measures designed to protect the information we hold, such as encrypted connections (HTTPS), hashing of IP addresses where we keep a record, and restricted access to stored data. No method of transmission over the internet or method of storage is completely secure, however, and we cannot guarantee absolute security.</p>"""),
+("choices", 'Your choices and rights', """
+<ul>
+<li><b>Analytics:</b> turn Google Analytics off (or back on) on <a href="/privacy-choices">Your Privacy Choices</a> (linked in the footer), send a Global Privacy Control signal, or use Google's opt-out add-on. See section 5 and our <a href="/cookies">Cookie Policy</a>.</li>
 <li><b>Newsletter:</b> unsubscribe at any time using the link in any newsletter, or change your settings using the link in your emails.</li>
 <li><b>Browser data:</b> clear cookies and site data in your browser, and decline or revoke location permission in your browser settings.</li>
-<li><b>Access, correction and deletion:</b> you may ask us to access, correct or delete personal information we hold about you (for example,
-your newsletter record or a source suggestion you submitted) by emailing {MAIL}. We may need to verify your request, and we may keep
-information where we are required or permitted by law to do so.</li>
+<li><b>Your rights.</b> Wherever you live, you can ask us to see, correct or delete the personal information we hold about you. If you're in the EEA, the UK, Switzerland, Brazil, Canada or another place with similar laws, you also have the right to: get a copy in a portable format; restrict or object to how we use it (including anything based on our legitimate interests); and withdraw consent at any time.</li>
+<li><b>How:</b> email <b><a href="mailto:hello@blackout.network">hello@blackout.network</a></b> with "Privacy request" in the subject. Tell us what you want and the email address involved, if any. We may ask you to confirm the request from that address. We answer within one month (EEA/UK), or within the time your law sets, and we don't charge for it.</li>
+<li><b>Complaints:</b> we'd like the chance to fix things first, but you can complain to a data protection authority at any time: in the EU, the authority in your country (list at <a href="https://edpb.europa.eu">edpb.europa.eu</a>); in the UK, the Information Commissioner's Office (<a href="https://ico.org.uk">ico.org.uk</a>, 0303 123 1113); in Switzerland, the FDPIC; in Brazil, the ANPD; in Canada, the Office of the Privacy Commissioner.</li>
+<li><b>California and other U.S. states:</b> see <a href="/privacy-choices">Your Privacy Choices</a>. We don't discriminate against anyone for using their rights.</li>
 </ul>
-<p>Depending on where you live, you may have additional rights under applicable law. We will respond to requests as required by the law
-that applies to you.</p>"""),
-("children", "Children's privacy", f"""
-<p>The Site is not directed to children under 13, and we do not knowingly collect personal information from children under 13. If you
-believe a child under 13 has provided us personal information, contact us at {MAIL} and we will delete it.</p>"""),
-("intl", "Visitors outside the United States", """
-<p>The Site is operated from the United States. If you access it from elsewhere, you understand that your information will be processed
-in the United States and other countries where our service providers operate, whose data protection laws may differ from those of
-your country.</p>"""),
-("dnt", "Do Not Track", """
-<p>The Site does not track visitors across third-party websites or use advertising trackers. When your browser sends a "Do Not Track"
-(DNT) or Global Privacy Control (GPC) signal, we leave your visits out of our aggregate usage counts entirely (see
-<a href="#usage">Aggregate usage counts</a>).</p>"""),
-("advice", "Informational use only; not professional or emergency advice", """
-<p>The Site is provided for general informational and research purposes only. It is not medical, legal, financial, investment, safety or
-other professional advice, and it is not an official emergency alerting or warning service. <b>In an emergency, call 911 (or your local
-emergency number)</b> and follow instructions from official authorities. See our <a href="/tos">Terms of Service</a> for details.</p>"""),
-("links", "Third-party links", """
-<p>The Site contains links to third-party websites and sources. We are not responsible for the content, accuracy or privacy practices of
-those websites. Visiting them is at your own risk and subject to their terms and policies.</p>"""),
-("warranty", "No warranties; limitation of liability", """
-<p class="caps">The Site and all information on it are provided "as is" and "as available," without warranties of any kind, express or
-implied. To the maximum extent permitted by law, the operator of blackout.network will not be liable for any indirect, incidental, special,
-consequential, exemplary or punitive damages, or any loss of data, profits or goodwill, arising out of or relating to the Site or this
-Privacy Policy.</p>
-<p>The full disclaimers and limitations of liability in our <a href="/tos">Terms of Service</a> apply to this Privacy Policy.</p>"""),
-("law", "Governing law", """
-<p>This Privacy Policy is governed by the laws of the State of Florida, United States, without regard to its conflict-of-laws rules. Any
-dispute relating to it is subject to the exclusive jurisdiction and venue described in our <a href="/tos#law">Terms of Service</a>
-(the state and federal courts located in or for Seminole County, Florida).</p>"""),
-("changes", "Changes to this policy", """
-<p>We may update this Privacy Policy from time to time. When we do, we will change the "Last updated" date at the top of this page and,
-where the changes are material, we may provide additional notice (for example, on the Site or in the newsletter). Your continued use of
-the Site after an update takes effect means you accept the updated policy.</p>"""),
-("contact", "Contact us", f"""
-<p>Questions or requests about this Privacy Policy can be sent to the operator of blackout.network at {MAIL}, or by mail to BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746.</p>"""),
+<p>Depending on where you live, you may have additional rights under applicable law. We will respond to requests as required by the law that applies to you.</p>"""),
+("children", "Children's privacy", """
+<p><b>Children.</b> blackout.network is a general-audience news and safety site. It isn't directed to children under 13, and we don't knowingly collect personal information from them. If you think a child under 13 has given us personal information (for example, signed up for the newsletter), email <a href="mailto:hello@blackout.network">hello@blackout.network</a> and we'll delete it promptly.</p>"""),
+("intl", 'Visitors outside the United States', """
+<p>BLACKOUT.NETWORK is based in the United States, and so are the main providers that help us run the Site. If you visit from another country, your information is processed in the U.S. and wherever those providers operate. For personal information from the European Economic Area, the United Kingdom and Switzerland, each provider uses the following transfer mechanism:</p>
+<ul>
+<li><b>Google LLC</b> (Google Analytics) relies on the EU-U.S. Data Privacy Framework, the UK Extension and the Swiss-U.S. Data Privacy Framework.</li>
+<li><b>Render Services, Inc.</b> (hosting) relies on the EU-U.S. Data Privacy Framework (and UK Extension / Swiss-U.S. DPF where applicable) and/or Standard Contractual Clauses.</li>
+<li><b>Cloudflare, Inc.</b> (content delivery and security) relies on the EU-U.S. Data Privacy Framework (and UK Extension / Swiss-U.S. DPF where applicable) and/or Standard Contractual Clauses.</li>
+<li><b>Resend</b> (Plus Five Five, Inc.; newsletter delivery) relies on Standard Contractual Clauses, including the UK Addendum for UK data and a Swiss adaptation for Swiss data, and on the EU-U.S. Data Privacy Framework and its UK Extension.</li>
+</ul>
+<p>You can check a provider's Data Privacy Framework certification at <a href="https://www.dataprivacyframework.gov">dataprivacyframework.gov</a>. To ask for details of these safeguards, email <a href="mailto:hello@blackout.network">hello@blackout.network</a>.</p>
+<p><b>EEA, UK and Switzerland.</b> Google Analytics runs only if you accept it in our cookie banner (consent), and you can withdraw that consent any time with Cookie settings in the footer. We rely on consent for the newsletter, push alerts and location features, and on our legitimate interest in running and securing the Site for server logs, anti-spam hashes and aggregate counts (see <a href="#legal-bases">Why we're allowed to use your information</a>). Your rights, including the right to complain to a data protection authority, are in section 12.</p>"""),
+("dnt", 'Do Not Track and Global Privacy Control', """
+<p>The Site does not track visitors across third-party websites or use advertising trackers. When your browser sends a Do Not Track (DNT) or Global Privacy Control (GPC) signal, we leave your visits out of our own aggregate usage counts and we do not load Google Analytics. You can also turn analytics off on <a href="/privacy-choices">Your Privacy Choices</a>. For California residents, we treat GPC as a valid request to opt out of sale and sharing.</p>"""),
+("advice", 'Informational use only; not professional or emergency advice', """
+<p>The Site is provided for general informational and research purposes only. It is not medical, legal, financial, investment, safety or other professional advice, and it is not an official emergency alerting or warning service. In an emergency, call 911 (or your local emergency number) and follow instructions from official authorities. See our <a href="/tos">Terms of Service</a> for details.</p>"""),
+("links", 'Third-party links', """
+<p>The Site contains links to third-party websites and sources. We are not responsible for the content, accuracy or privacy practices of those websites. Visiting them is at your own risk and subject to their terms and policies.</p>"""),
+("warranty", 'No warranties; limitation of liability', """
+<p>The Site and all information on it are provided "as is" and "as available," without warranties of any kind, express or implied. To the maximum extent permitted by law, BLACKOUT.NETWORK will not be liable for any indirect, incidental, special, consequential, exemplary or punitive damages, or any loss of data, profits or goodwill, arising out of or relating to the Site or this Privacy Policy.</p>"""),
+("law", 'Governing law', """
+<p>This Privacy Policy is governed by the laws of the State of Florida, United States, without regard to its conflict-of-laws rules. Any dispute relating to it is subject to the exclusive jurisdiction and venue described in our <a href="/tos">Terms of Service</a> (the state and federal courts located in or for Seminole County, Florida).</p>"""),
+("changes", 'Changes to this policy', """
+<p>We may update this Privacy Policy from time to time. When we do, we will change the "Last updated" date at the top of this page and, where the changes are material, we may provide additional notice (for example, on the Site or in the newsletter). We will update this policy before we start any new kind of data collection, such as turning on Google advertising features. Your continued use of the Site after an update takes effect means you accept the updated policy.</p>"""),
+("contact", 'Contact us', """
+<p>Questions or requests about this Privacy Policy can be sent to BLACKOUT.NETWORK at <a href="mailto:hello@blackout.network">hello@blackout.network</a>, or by mail to BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746.</p>"""),
 ]
 
 # ------------------------------------------------------------------ Terms of Service
@@ -426,9 +392,87 @@ agreements on that subject. You may not assign these Terms; we may assign them w
 ]
 
 PRIVACY_INTRO = ('<p class="lead">This policy describes how blackout.network handles information: what it shows, what it collects from '
-                 'visitors, how it handles YouTube and Google user data, and the choices you have.</p>')
+                 'visitors, how it measures site use, how it handles YouTube and Google user data, and the choices you have.</p>')
 TOS_INTRO = ('<p class="lead">Please read these Terms carefully. blackout.network is an informational research tool, not an emergency '
              'alerting service. <b>In an emergency, call 911.</b></p>')
+
+
+# ------------------------------------------------------------------ Cookie Policy and Your Privacy Choices (seo/batch-1; Compliance global-legal-gap H and I)
+UPDATED["cookies"] = UPDATED["privacy"]; UPDATED["privacy-choices"] = UPDATED["privacy"]
+COOKIES_BODY = """
+<p class="lead">This page lists every cookie and similar storage blackout.network uses, what each does and how long it lasts. It's part of our <a href="/privacy">Privacy Policy</a>.</p>
+<section id="necessary"><h2>Strictly necessary and preferences (always on)</h2>
+<p>These make features you choose work. They stay in your browser and aren't used for tracking.</p>
+<div class="tw"><table class="ck"><thead><tr><th>Name</th><th>Type</th><th>Purpose</th><th>Duration</th></tr></thead><tbody>
+<tr><td><code>bn_consent</code></td><td>Local storage</td><td>Records your cookie-banner choice (accept or reject), when you made it and which policy version you saw, so we don't ask on every page. It stays in your browser and isn't sent to us</td><td>6 months, then we ask again (sooner if the policy changes)</td></tr>
+<tr><td><code>bn_analytics</code></td><td>Local storage</td><td>Remembers that you turned analytics off on Your Privacy Choices</td><td>Until you clear it</td></tr>
+<tr><td>Language, theme, weather location and units, map and chart views, audio volume</td><td>Local storage / first-party cookies</td><td>Remember your settings</td><td>Until you clear them</td></tr>
+<tr><td><code>bn_lang</code>, <code>googtrans</code></td><td>Local storage and first-party cookies</td><td>Only if you pick a language other than English: remember it and tell Google's website translator which language to show. When you pick a language, the page loads Google's translation service, which receives the page text to translate</td><td>1 year (cookies); removed when you switch back to English. <code>bn_lang</code> in local storage stays until you clear it</td></tr>
+<tr><td>Voter ID</td><td>Local storage</td><td>Counts each browser's rating once</td><td>Until you clear it</td></tr>
+<tr><td>Report IDs</td><td>Local storage</td><td>Lets you look up problem reports you sent</td><td>Until you clear them</td></tr>
+<tr><td>Push subscription</td><td>Browser push service</td><td>Delivers alerts you turned on</td><td>Until you turn alerts off</td></tr>
+</tbody></table></div></section>
+<section id="analytics"><h2>Analytics (only with your consent in the EEA, UK and Switzerland; on by default elsewhere, with an opt-out)</h2>
+<div class="tw"><table class="ck"><thead><tr><th>Name</th><th>Provider</th><th>Purpose</th><th>Duration</th></tr></thead><tbody>
+<tr><td><code>_ga</code></td><td>Google Analytics (first-party cookie)</td><td>Tells one browser from another to count visits</td><td>Up to 13 months after your last visit</td></tr>
+<tr><td><code>_ga_KND6CPBB1X</code></td><td>Google Analytics (first-party cookie)</td><td>Keeps track of the current visit</td><td>Up to 13 months after your last visit</td></tr>
+</tbody></table></div>
+<p>We don't use advertising cookies. Google Signals and ad features are off. In the European Economic Area, the United Kingdom and Switzerland these cookies are set only after you choose <b>Accept analytics</b> in the cookie banner.</p></section>
+<section id="embeds"><h2>Third-party embeds</h2>
+<p>Some pages load content from other services (YouTube in privacy-enhanced mode, map tiles, radio streams). YouTube videos load only when you press play; those services may set their own cookies then. See <a href="/privacy#thirdparty">section 6 of the Privacy Policy</a>.</p></section>
+<section id="choices"><h2 id="settings">Your choices</h2>
+<p>Change your analytics choice any time with <b>Cookie settings</b> in the footer (<a href="/cookies#settings" data-bn-cookie-settings>open Cookie settings</a>), or on <a href="/privacy-choices">Your Privacy Choices</a>; both are linked in the footer of every page. A Global Privacy Control or Do Not Track signal turns analytics off automatically. You can also block or delete cookies in your browser, or install <a href="https://tools.google.com/dlpage/gaoptout">Google's opt-out add-on</a>.</p>
+<p>Questions: <a href="mailto:hello@blackout.network">hello@blackout.network</a>.</p></section>"""
+
+CHOICES_BODY = """
+<section id="nosale"><h2>We don't sell or share your personal information</h2>
+<p>BLACKOUT.NETWORK doesn't sell personal information and doesn't share it for cross-context behavioral advertising, as California and other state laws define those terms. We haven't in the past 12 months. We run no ads.</p></section>
+<section id="analytics"><h2>Analytics</h2>
+<div class="pc-row"><label class="pc-sw" for="pc_toggle"><input type="checkbox" id="pc_toggle" role="switch" checked disabled><span class="pc-track" aria-hidden="true"></span>
+<span class="pc-lbl">Google Analytics: <b id="pc_state">checking…</b></span></label></div>
+<p id="pc_note" class="pc-note" hidden></p>
+<p>We use Google Analytics, with ad features and Google Signals off, to see which pages are useful. Turn it off here and we won't load it in this browser. In the EEA, the UK and Switzerland it's off until you accept it; you can also use <a href="/cookies#settings" data-bn-cookie-settings>Cookie settings</a>.</p>
+<noscript><p class="pc-note">This switch needs JavaScript. With JavaScript off, Google Analytics can't load either.</p></noscript></section>
+<section id="gpc"><h2>Global Privacy Control</h2>
+<p>If your browser sends a GPC signal, we treat it as an opt-out of sale and sharing and switch analytics off automatically. No form needed.</p></section>
+<section id="requests"><h2>Other requests</h2>
+<p>To see, correct or delete your data, email <a href="mailto:hello@blackout.network">hello@blackout.network</a> with "Privacy request" in the subject. You can use an authorized agent. We'll answer within 45 days and won't treat you differently for asking. More in our <a href="/privacy#choices">Privacy Policy</a>.</p></section>"""
+
+CHOICES_CSS = """
+.pc-row{margin:4px 0 12px}.pc-sw{display:flex;align-items:center;gap:12px;cursor:pointer;min-height:44px}
+.pc-sw input{position:absolute;opacity:0;width:1px;height:1px}
+.pc-track{flex:0 0 auto;width:52px;height:30px;border-radius:15px;background:var(--bd2);position:relative;transition:background .15s}
+.pc-track:after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:transform .15s}
+.pc-sw input:checked+.pc-track{background:var(--hi)}.pc-sw input:checked+.pc-track:after{transform:translateX(22px)}
+.pc-sw input:focus-visible+.pc-track{outline:2px solid var(--ac);outline-offset:2px}.pc-sw input:disabled+.pc-track{opacity:.55}
+.pc-lbl{font-family:var(--bn-font-ui,Montserrat,system-ui,sans-serif);font-size:15px}
+.pc-note{background:var(--pn2);border:1px solid var(--bd2);border-left:3px solid var(--hi);border-radius:8px;padding:10px 12px}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+"""
+CHOICES_JS = """<script>(function(){var t=document.getElementById('pc_toggle'),st=document.getElementById('pc_state'),nt=document.getElementById('pc_note');
+function get(){try{return localStorage.getItem('bn_analytics')}catch(e){return null}}
+function set(v){try{if(v)localStorage.setItem('bn_analytics',v);else localStorage.removeItem('bn_analytics')}catch(e){}}
+var gpc=navigator.globalPrivacyControl===true,dnt=navigator.doNotTrack==='1'||window.doNotTrack==='1';
+function draw(){var c=window.bnConsent?window.bnConsent():null,cr=c&&c.region==='consent',off=cr?!(c.record&&c.record.choice==='granted'):get()==='denied';
+ if(gpc||dnt){t.checked=false;t.disabled=true;st.textContent='Off';nt.hidden=false;nt.textContent=gpc?"Your browser's Global Privacy Control signal is on, so analytics is off.":"Your browser's Do Not Track signal is on, so analytics is off.";return}
+ t.disabled=false;t.checked=!off;st.textContent=off?'Off':'On';nt.hidden=!(off||cr);
+ nt.textContent=cr?(off?"You're in the EEA, the UK or Switzerland (or we couldn't tell), so analytics stays off unless you turn it on here or choose Accept analytics in Cookie settings.":"You accepted analytics. Turn it off here or in Cookie settings at any time."):(off?"Analytics is off in this browser. We won't load Google Analytics here until you turn it back on.":'')}
+t.addEventListener('change',function(){var v=t.checked?'granted':'denied';if(window.bnSetAnalytics)window.bnSetAnalytics(v);else set(v==='denied'?'denied':null);draw()});
+draw()})();</script>"""
+
+def _simple(slug, title, desc_slug, body, css="", js=""):
+    nav = "".join(f'<a href="{h}"{" class=on" if h == "/" + slug else ""}>{t}</a>' for h, t in
+                  (("/#wire", "← Dashboard"), ("/privacy", "Privacy"), ("/cookies", "Cookie Policy"), ("/privacy-choices", "Your Privacy Choices"), ("/tos", "Terms")))
+    return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+            sitenav.head_html(desc_slug) +
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
+            f'<style>{CSS}{css}</style></head><body><a class="skip" href="#main">Skip to content</a>'
+            + sitenav.site_top(desc_slug) +
+            f'<main class="wrap" id="main"><h2 class="title">{html.escape(title)}</h2>'
+            f'<p class="upd">Last updated: {UPDATED.get(slug, EFFECTIVE)}</p><nav class="site" aria-label="Privacy pages" style="margin:0 0 14px">{nav}</nav>{body}</main>'
+            '<footer>Research-only data · BLACKOUT.NETWORK · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · '
+            '<a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a>'
+            '<br>BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746</footer>' + js + '</body></html>')
 
 _CACHE = {}
 def _html(which):
@@ -445,4 +489,6 @@ def handle_get(path, qs):
     p = path.rstrip("/")
     if p in ("/privacy", "/privacy-policy"): return 200, _html("privacy"), "text/html"
     if p in ("/tos", "/terms", "/terms-of-service"): return 200, _html("tos"), "text/html"
+    if p in ("/cookies", "/cookie-policy"): return 200, _simple("cookies", "Cookie Policy", "cookies", COOKIES_BODY, CHOICES_CSS).encode(), "text/html"
+    if p in ("/privacy-choices", "/do-not-sell"): return 200, _simple("privacy-choices", "Your Privacy Choices", "privacy-choices", CHOICES_BODY, CHOICES_CSS, CHOICES_JS).encode(), "text/html"
     return 404, {"error": "not found"}

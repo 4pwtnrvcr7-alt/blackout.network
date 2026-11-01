@@ -56,6 +56,10 @@ ROUTES = {
     "/tos": "legal",                # Terms of Service (t270)
     "/terms": "legal",
     "/terms-of-service": "legal",
+    "/cookies": "legal",            # seo/batch-1: Cookie Policy
+    "/cookie-policy": "legal",
+    "/privacy-choices": "legal",    # seo/batch-1: Your Privacy Choices (analytics opt-out)
+    "/do-not-sell": "legal",
     "/api/video_subs": "video_subs",
     "/vsubs": "video_subs",
     "/api/search": "search",
@@ -102,5 +106,7 @@ ROUTES = {
     "/api/alerts": "webpush",
     "/robots.txt": "growth",        # growth/SEO add-on (Nov 1): crawl rules, sitemap, cross-promo enhancer, story visuals
     "/sitemap.xml": "growth",
+    "/llms.txt": "growth",           # seo/batch-1: site summary for AI tools
+    "/news-sitemap.xml": "growth",   # seo/batch-1: Google News sitemap
     "/api/growth": "growth",
 }

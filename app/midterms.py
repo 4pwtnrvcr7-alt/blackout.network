@@ -940,7 +940,8 @@ def handle_get(path, qs):
     if path == "/api/midterms": return summary()
     if path == "/api/midterms/live": return live()
     if path in ("/midterms", "/midterms/", "/election", "/elections"):
-        return 200, (b'<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/#midterms"><link rel="canonical" href="https://blackout.network/#midterms">'
+        return 200, (b'<!doctype html><meta charset="utf-8"><script>location.replace("/"+location.search+"#midterms")</script>'   # seo/batch-1: keeps ?utm_* (the meta refresh below is the no-JS fallback)
+                     b'<meta http-equiv="refresh" content="0;url=/#midterms"><link rel="canonical" href="https://blackout.network/#midterms">'
                      b'<title>Midterms 2026 | BLACKOUT.NETWORK</title><a href="/#midterms">Midterms 2026 on BLACKOUT.NETWORK</a>'), "text/html; charset=utf-8"
     return 404, {"error": "not found"}
 

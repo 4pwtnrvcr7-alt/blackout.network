@@ -333,6 +333,12 @@ def put_status(d):
 # ---------------------------------------------------------------- HTTP
 def _send(h, code, body, ctype="application/json", robots=False):
     b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
+    if ctype == "text/html":   # seo/batch-1: legal footer links on the status page too (no GA4 here: report IDs stay out of analytics)
+        try:
+            import sys   # the already-loaded server module (render_app imports it; on the box it is __main__); never a fresh import
+            srv = next((m for m in (sys.modules.get("server"), sys.modules.get("__main__")) if m is not None and hasattr(m, "ga_head")), None)
+            if srv: b = srv.ga_head(b, ga=False)
+        except Exception: pass
     h.send_response(code); h.send_header("Content-Type", ctype + "; charset=utf-8"); h.send_header("Cache-Control", "no-store")
     h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "no-referrer")
     if robots: h.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
