@@ -60,6 +60,12 @@ DEFAULTS = {
     "from_name": "BLACKOUT.NETWORK",
     "from_email": "hello@blackout.network",
     "reply_to": "",
+    # Tracked sending identity (email split, Compliance 2026-11-01 email-tracking review). Empty = every email goes from the untracked
+    # from_email (today's behaviour). Set to e.g. "hello@news.blackout.network" ONLY after that Resend domain is verified; then newsletter
+    # issues/alerts to subscribers for whom tracking_ok() is true go from it (Resend click/open tracking is per domain). Confirmation and
+    # other transactional emails, and EEA/UK/CH subscribers without opt-in, always stay on from_email.
+    "tracked_from_email": "",
+    "tracking_consent_version": "2026-11-02",
     "mailing_address": "PO Box 1228, Lake Mary, FL 32746",
     "slots": {"morning": "07:00", "evening": "19:00"},
     "global_frequency": "per_subscriber",
@@ -234,7 +240,10 @@ MIGRATE = [("sent_items", "rank", "INTEGER"), ("sent_items", "n_items", "INTEGER
            ("sent_items", "kind", "TEXT"), ("subscribers", "breaking", "INTEGER NOT NULL DEFAULT 1"),
            ("subscribers", "loc_label", "TEXT"), ("subscribers", "loc_lat", "REAL"), ("subscribers", "loc_lon", "REAL"), ("subscribers", "loc_cc", "TEXT"),
            ("subscribers", "loc_kind", "TEXT"),
-           ("subscribers", "crime_brief", "INTEGER NOT NULL DEFAULT 0"), ("subscribers", "crime_alerts", "INTEGER NOT NULL DEFAULT 0")]   # t392 opt-ins (default off)
+           ("subscribers", "crime_brief", "INTEGER NOT NULL DEFAULT 0"), ("subscribers", "crime_alerts", "INTEGER NOT NULL DEFAULT 0"),
+           ("subscribers", "signup_cc", "TEXT"),                                   # 2-letter CF-IPCountry at signup only (consent region)
+           ("subscribers", "tracking_consent", "INTEGER"),                         # NULL = no choice made, 0 = no, 1 = yes (open/click measurement)
+           ("subscribers", "tracking_consent_at", "TEXT"), ("subscribers", "tracking_consent_version", "TEXT")]   # consent record (when, which wording)
 _INIT = {}
 def db():
     c = sqlite3.connect(P["db"], timeout=15); c.row_factory = sqlite3.Row
@@ -296,6 +305,7 @@ def links_for(row, c=None):
             "categories": f"{base}/newsletter/manage?token={mt}",   # "Manage my subscription categories" button
             "sources": f"{base}/newsletter/sources?token={mt}",     # "Find new sources" button
             "confirm": f"{base}/newsletter/confirm?token={sub_token('confirm', row)}",
+            **({"stop_tracking": f"{base}/newsletter/stop_tracking?token={mt}"} if tracking_ok(row, c) else {}),
             "scoring": f"{base}/scoring", "site": f"{base}/#wire", "signup": f"{base}/newsletter"}
 
 # ------------------------------------------------------------------ t373: subscriber location (offline geocoder; coarse centroid only)
@@ -503,6 +513,31 @@ def wire_url(cid, since=None, c=None, anchor=""):
 def _row_get(r, k, d=None):
     try: return r[k]
     except (KeyError, IndexError): return d
+
+# ------------------------------------------------------------------ open/click measurement consent (email split)
+# EEA + UK + CH (same set as server.EU_REGION). Unknown country also needs consent.
+CONSENT_REGION = set("AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH".split())
+TRACK_CONSENT_LABEL = ("Let BLACKOUT.NETWORK count when I open its emails and which links I click, so it can tell which stories are useful "
+                       "and stop emailing inactive addresses. Optional. You can turn this off at any time from any email.")
+def _cc(v):
+    v = str(v or "").strip().upper()
+    return v if len(v) == 2 and v.isalpha() and v not in ("XX", "T1") else ""
+def consent_needed(r):
+    """True when open/click measurement needs a yes first: EEA/UK/CH by signup country or chosen area, or country unknown."""
+    cc = _cc(_row_get(r, "signup_cc")) or _cc(_row_get(r, "loc_cc"))
+    return (not cc) or cc in CONSENT_REGION or _cc(_row_get(r, "loc_cc")) in CONSENT_REGION
+def tracking_ok(r, c=None):
+    """May this subscriber's newsletter emails go from the tracked domain? Never when the tracked identity isn't configured."""
+    c = c or cfg()
+    if not (c.get("tracked_from_email") or "").strip() or r is None or _row_get(r, "status") != "active": return False
+    tc = _row_get(r, "tracking_consent")
+    return tc == 1 if consent_needed(r) else tc != 0
+def set_tracking(k, sid, on, how, c=None):
+    """Record a yes/no with time and wording version (consent record, GDPR Art. 7(1)). Caller commits."""
+    c = c or cfg(); t = iso(now())
+    k.execute("UPDATE subscribers SET tracking_consent=?, tracking_consent_at=?, tracking_consent_version=?, updated=? WHERE id=?",
+              (1 if on else 0, t, c.get("tracking_consent_version") or "", t, sid))
+    k.execute("INSERT INTO events(ts,kind,detail) VALUES(?,?,?)", (t, "consent", f"subscriber #{sid} open/click measurement {'on' if on else 'off'} ({how})"))
 
 _LEAD = re.compile(r"^[^\w(\"'“‘\[]+")
 _HYPE = re.compile(r"^(?:#?(?-i:BREAKING(?: NEWS)?|JUST IN)\b\s*[:!\-–—|]*\s*|(?:BREAKING(?: NEWS)?|JUST IN|URGENT|ALERT|FLASH|DEVELOPING)\s*[:!\-–—|]+\s*)+", re.I)
@@ -958,13 +993,16 @@ def footer_buttons_html(links):
     return (f'<tr><td class="bnl" style="padding:16px 20px 4px 20px;border-top:1px solid {PAL["line"]}">'
             f'{_btn("Manage my subscription categories", cat)}{_btn("Find new sources", srcs, primary=False)}</td></tr>'
             f'<tr><td align="left" style="padding:14px 20px 22px 20px;text-align:left;font:400 12px/1.5 {FB}">'
-            f'<a href="{E(links["unsubscribe"])}" class="bnm" style="color:{PAL["mu"]};text-decoration:underline">Unsubscribe</a>'
+            + (f'<a href="{E(links["stop_tracking"])}" class="bnm" style="color:{PAL["mu"]};text-decoration:underline">Stop tracking my opens and clicks</a>'
+               f'<span class="bnm" style="color:{PAL["mu"]}"> · </span>' if links.get("stop_tracking") else "")
+            + f'<a href="{E(links["unsubscribe"])}" class="bnm" style="color:{PAL["mu"]};text-decoration:underline">Unsubscribe</a>'
             f'<span class="bnm" style="color:{PAL["mu"]}"> (one click, no login)</span>'
             + (f' · <a href="{E(links["breaking_off"])}" class="bnm" style="color:{PAL["mu"]};text-decoration:underline">Stop breaking alerts (keep briefs)</a>' if links.get("breaking_off") else "")
             + '</td></tr>')
 def footer_buttons_text(links):
     return [f"Manage my subscription categories: {links.get('categories') or links.get('manage')}",
             f"Find new sources: {links.get('sources') or links.get('site')}", "",
+            *([f"Stop tracking my opens and clicks: {links['stop_tracking']}"] if links.get("stop_tracking") else []),
             f"Unsubscribe (one click): {links['unsubscribe']}"] + ([f"Stop breaking alerts, keep briefs: {links['breaking_off']}"] if links.get("breaking_off") else [])
 
 def _addr(c):
@@ -979,7 +1017,7 @@ def _sevbar():
             f'<td class="sa" width="30%" height="4" style="height:4px;background:{PAL["sev"][1]};font-size:0;line-height:0">&nbsp;</td>'
             f'<td class="sr" width="40%" height="4" style="height:4px;background:{PAL["sev"][2]};font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>')
 
-_UTM_SKIP = re.compile(r"/newsletter/(unsubscribe|manage|breaking_off|confirm|follow|unfollow|sources)\b|[?&]token=")
+_UTM_SKIP = re.compile(r"/newsletter/(unsubscribe|manage|breaking_off|stop_tracking|confirm|follow|unfollow|sources)\b|[?&]token=")
 def _utm_url(u, campaign):
     if not re.match(r"https?://(www\.)?blackout\.network(/|$)", u) or _UTM_SKIP.search(u) or "utm_source=" in u: return u
     frag = ""
@@ -1333,11 +1371,15 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
 
 # ------------------------------------------------------------------ MIME + pluggable senders
 _POLICY = _email_policy.default.clone(max_line_length=998)
-def build_mime(to, subject, html_, text, unsub_url=None, kind="issue", c=None):
+def build_mime(to, subject, html_, text, unsub_url=None, kind="issue", c=None, tracked=False):
+    """tracked=True (newsletter mail to a subscriber with tracking_ok) sends from tracked_from_email; replies still go to from_email."""
     c = c or cfg(); m = EmailMessage(policy=_POLICY)   # 998-char lines: keeps List-Unsubscribe a plain <URL> (no RFC 2047 encoding)
-    m["From"] = formataddr((c["from_name"], c["from_email"])); m["To"] = to; m["Subject"] = subject
-    m["Date"] = format_datetime(now()); m["Message-ID"] = make_msgid(domain=(c["from_email"].split("@")[-1] or "blackout.network"))
-    if c.get("reply_to"): m["Reply-To"] = c["reply_to"]
+    tf = (c.get("tracked_from_email") or "").strip() if tracked else ""
+    frm = tf or c["from_email"]
+    m["From"] = formataddr((c["from_name"], frm)); m["To"] = to; m["Subject"] = subject
+    m["Date"] = format_datetime(now()); m["Message-ID"] = make_msgid(domain=(frm.split("@")[-1] or "blackout.network"))
+    if c.get("reply_to") or tf: m["Reply-To"] = c.get("reply_to") or c["from_email"]
+    if tf: m["X-BN-Tracked"] = "1"
     if unsub_url:
         m["List-Unsubscribe"] = f"<{unsub_url}>"
         m["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
@@ -1398,7 +1440,7 @@ def deliver(msg, kind="issue", sid=None, force_preview=False):
                 S.login(e["SMTP_USER"], e["SMTP_PASS"]); S.send_message(msg)
         elif mode == "resend":
             p = {"from": str(msg["From"]), "to": [to], "subject": str(msg["Subject"]), "html": html_, "text": text, "headers": hdrs}
-            if c.get("reply_to"): p["reply_to"] = c["reply_to"]
+            if msg["Reply-To"] or c.get("reply_to"): p["reply_to"] = str(msg["Reply-To"] or c["reply_to"])
             idem = {"Idempotency-Key": str(msg["X-BN-Idem"])} if msg["X-BN-Idem"] else {}
             code, body = _http_json("https://api.resend.com/emails", p, {"Authorization": "Bearer " + e["RESEND_API_KEY"], **idem})
             if code >= 300: raise RuntimeError(f"resend HTTP {code}: {body[:200]}")
@@ -1491,6 +1533,11 @@ def subscribe(d, ip="", headers=None):
         if kind == "confirm" and loc: k.execute("UPDATE subscribers SET loc_label=?, loc_lat=?, loc_lon=?, loc_cc=?, loc_kind=? WHERE email=?", (loc["label"], loc["lat"], loc["lon"], loc["cc"], loc["kind"], email))
         if kind == "confirm":   # t392: crime opt-ins (default off; only meaningful with an area)
             k.execute("UPDATE subscribers SET crime_brief=?, crime_alerts=? WHERE email=?", (_flag(d.get("crime_brief")), _flag(d.get("crime_alerts")), email))
+        if kind == "confirm":   # open/click measurement: store only the 2-letter signup country; unticked box = no (EEA/UK/CH/unknown need a yes)
+            k.execute("UPDATE subscribers SET signup_cc=? WHERE email=?", (_cc((headers or {}).get("cf-ipcountry")) or None, email))
+            rr = k.execute("SELECT * FROM subscribers WHERE email=?", (email,)).fetchone(); yes = bool(_flag(d.get("track_consent")))
+            if yes or consent_needed(rr) or _flag(d.get("trk_shown")): set_tracking(k, rr["id"], yes, "signup", c)
+            else: k.execute("UPDATE subscribers SET tracking_consent=NULL, tracking_consent_at=NULL, tracking_consent_version=NULL WHERE id=?", (rr["id"],))
         k.commit(); row = k.execute("SELECT * FROM subscribers WHERE email=?", (email,)).fetchone()
     finally: k.close()
     send_transactional(row, kind)
@@ -1552,7 +1599,11 @@ def manage(tok, d):
     k = db()
     if loc != "keep": _set_loc(k, r["id"], loc)
     k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, crime_brief=?, crime_alerts=?, updated=? WHERE id=?",
-              (freq, json.dumps(ints), int(brk if brk is not None else 1), cb, ca, iso(now()), r["id"])); k.commit(); k.close()
+              (freq, json.dumps(ints), int(brk if brk is not None else 1), cb, ca, iso(now()), r["id"]))
+    if "trk_present" in d:   # "Count my opens and clicks" (absent checkbox = off); only a real change is logged
+        on = bool(_flag(d.get("track_consent"))); cur = tracking_effective(r)
+        if on != cur or _row_get(r, "tracking_consent") is None: set_tracking(k, r["id"], on, "preferences")
+    k.commit(); k.close()
     log(f"subscriber #{r['id']} changed preferences", "sub")
     has_loc = (loc not in (None, "keep")) or (loc == "keep" and _row_get(r, "loc_label"))
     crime_msg = (f", local crime summary {'on' if cb else 'off'}, crime alerts {'on' if ca else 'off'}" + (" (add your area to use them)" if (cb or ca) and not has_loc else ""))
@@ -1702,7 +1753,7 @@ def _send_one(k, srow, sub, key, slot, at, c):
     if issue["empty"]:   # never send an empty email
         k.execute("UPDATE sends SET status='skipped_empty', sent_at=? WHERE id=?", (iso(now()), srow["id"])); k.commit(); return "skipped"
     L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
-    msg = build_mime(sub["email"], subj, hb, tx, L["unsubscribe"], "issue", c)
+    msg = build_mime(sub["email"], subj, hb, tx, L["unsubscribe"], "issue", c, tracked="stop_tracking" in L)
     msg["X-BN-Idem"] = f"bn-{key}-{sub['id']}"   # Resend Idempotency-Key: a restored/stale DB can never double-send this slot
     ok, mode, f, err = deliver(msg, "issue", sub["id"])
     t = iso(now())
@@ -1830,7 +1881,7 @@ def run_breaking(at=None, c=None, dry_run=False):
                 k.execute("DELETE FROM sends WHERE id=?", (srow_id,)); k.commit(); k.close(); k = None
                 return [(key, _skip_run(run_id, trend))]
             subj, hb, tx = r_
-            bm = build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c); bm["X-BN-Idem"] = f"bn-{key}-{s['id']}-{iso(at)[:13]}"
+            bm = build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c, tracked="stop_tracking" in L); bm["X-BN-Idem"] = f"bn-{key}-{s['id']}-{iso(at)[:13]}"
             ok, mode, f, err = deliver(bm, "issue", s["id"])
             k.execute("UPDATE sends SET status=?, sent_at=?, mode=?, outbox_file=?, subject=?, n_main=?, error=?, attempts=1 WHERE id=?",
                       ("sent" if ok else "gave_up", iso(now()), mode, f, subj, len(mine), err, srow_id))
@@ -1894,7 +1945,7 @@ def run_crime_alerts(at=None, c=None, dry_run=False, only_email=None):
             if dry_run: out.append((mask_email(em), "dry_run", len(inc), subj, lines)); continue
             hb, tx = render_simple(subj, paras, ("See the map", url), c, ([("Police data source", inc[0]["src_url"])] if inc[0].get("src_url") else [])
                                    + [("Manage preferences", L["manage"]), ("Unsubscribe", L["unsubscribe"])])
-            msg = build_mime(em, subj, hb, tx, L["unsubscribe"], "issue", c); msg["X-BN-Idem"] = f"bn-crime-{s['id']}-{inc[0]['id']}"
+            msg = build_mime(em, subj, hb, tx, L["unsubscribe"], "issue", c, tracked="stop_tracking" in L); msg["X-BN-Idem"] = f"bn-crime-{s['id']}-{inc[0]['id']}"
             ok, mode, f, err = deliver(msg, "issue", s["id"])
             k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject,error) VALUES(?,?,?,?,?,?,?,?)",
                       (iso(now()), "crime_alert", s["id"], mode, "sent" if ok else "failed", f, subj, err))
@@ -2067,7 +2118,7 @@ def admin_action(d):
         sub = dict(r); at = now(); nxt = next_slots(at, 1, c)[0]
         issue = build_issue(sub, at=at, since=at - timedelta(hours=12), slot=nxt["slot"], c=c)
         L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
-        ok, mode, f, err = deliver(build_mime(sub["email"], "[TEST] " + subj, hb, tx, L["unsubscribe"], "issue", c), "test_live", sub["id"])
+        ok, mode, f, err = deliver(build_mime(sub["email"], "[TEST] " + subj, hb, tx, L["unsubscribe"], "issue", c, tracked="stop_tracking" in L), "test_live", sub["id"])
         k = db(); k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject,error) VALUES(?,?,?,?,?,?,?,?)",
                             (iso(now()), "test_live", sub["id"], mode, "sent" if ok else "failed", f, "[TEST] " + subj, err)); k.commit(); k.close()
         return 200, {"ok": ok, "mode": mode, "id": f, "error": err, "subject": "[TEST] " + subj, "sent_at_et": fmt_et(now()), "html": hb}
@@ -2217,6 +2268,7 @@ def form_html(mode="page"):
             '<div class="nl-crime"><label class="nl-chk"><input type="checkbox" name="crime_brief" value="1"> Include local crime summary in my briefs</label>'
             '<label class="nl-chk"><input type="checkbox" name="crime_alerts" value="1"> Real-time crime alerts for my area (cities with live police data)</label></div>'
             f'<details class="nl-cats-d"><summary>Categories: all (optional: pick only some)</summary><div class="nl-cats">{cats}</div></details>'
+            f'<div class="nl-trk" hidden><label class="nl-chk"><input type="checkbox" name="track_consent" value="1"> {E(TRACK_CONSENT_LABEL)}</label></div>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
             f'<p class="nl-sm nl-priv">🔒 {consent_line()} {E(DISCLAIMER)}</p></form>')
@@ -2258,6 +2310,18 @@ def result_page(title, msg, ok=True, extra=""):
     return page(title, f'<section class="nl-card nl-result {"ok" if ok else "warn"}"><h2>{"✓" if ok else "ⓘ"} {E(title)}</h2><p>{E(msg)}</p>{extra}'
                 '<p class="nl-sm"><a href="/#wire">Go to the dashboard</a> · <a href="/newsletter">Newsletter home</a></p></section>')
 
+def tracking_effective(r):
+    """What the preferences toggle shows: the subscriber's measurement setting, independent of whether the tracked domain is live yet."""
+    tc = _row_get(r, "tracking_consent")
+    return tc == 1 if consent_needed(r) else tc != 0
+
+def tracking_fieldset(r):
+    on = tracking_effective(r)
+    return ('<fieldset id="tracking"><legend>Open and click measurement</legend><input type="hidden" name="trk_present" value="1">'
+            f'<label class="nl-chk"><input type="checkbox" name="track_consent" value="1"{" checked" if on else ""}> Count my opens and clicks</label>'
+            f'<p class="nl-sm">{E(TRACK_CONSENT_LABEL)} Off means your emails come without the tracking image or tracked links. '
+            '<a href="/privacy#email-tracking">How it works</a>.</p></fieldset>')
+
 def prefs_form(tok, r):
     try: ints = json.loads(r["interests"] or '["all"]')
     except Exception: ints = ["all"]
@@ -2279,6 +2343,7 @@ def prefs_form(tok, r):
             '<p class="nl-sm">Uses your area above. The summary uses official FBI rates and, in 16 US cities, recent police reports. Alerts cover serious violent reports '
             '(homicide, shooting, robbery, aggravated assault, kidnapping) within about 5 km in cities with near-real-time police data, and count toward the same 3-a-day limit as breaking alerts. '
             '<a href="/crime">See the Crime page</a>.</p></fieldset>'
+            + tracking_fieldset(r) +
             '<button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')
 
@@ -2404,6 +2469,15 @@ def handle_get(path, qs):
         log(f"subscriber #{r['id']} turned breaking alerts off (footer link)", "sub")
         return 200, result_page("Breaking alerts off", "Done. You'll still get your Morning and Evening Briefs. Turn breaking alerts back on any time under Manage.", True,
                                 f'<p><a class="nl-btn" href="/newsletter/manage?token={E(tok)}">Manage preferences</a></p>'), "text/html"
+    if path == "/newsletter/stop_tracking":   # footer link in tracked emails; GET only shows a button (link scanners never switch it)
+        tok = q1("token"); st, r = token_sub(tok, "manage")
+        if st != "ok" or r is None:
+            return 400, result_page("Link not valid", "This link is invalid or expired. Use the link in your latest email, or your preferences page.", False), "text/html"
+        return 200, result_page("Stop tracking my opens and clicks?", "Your emails will then come without the tracking image or tracked links, from the next send. "
+                                "You keep getting the newsletter.", False,
+                                f'<form method="post" action="/newsletter/stop_tracking"><input type="hidden" name="token" value="{E(tok)}">'
+                                '<button type="submit" class="nl-btn">Stop tracking</button></form>'
+                                f'<p class="nl-sm"><a href="/newsletter/manage?token={E(tok)}#tracking">Manage preferences</a></p>'), "text/html"
     if path == "/newsletter/manage":
         tok = q1("token"); st, r = token_sub(tok, "manage")
         if st != "ok" or r is None:
@@ -2462,6 +2536,14 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
         return code, body
     if not origin_ok(headers): return 403, {"ok": False, "message": "Cross-site request blocked."}
     if path == "/newsletter/confirm": return _confirm_result((qs.get("token") or [""])[0] or d.get("token"))
+    if path == "/newsletter/stop_tracking":
+        tok = (qs.get("token") or [""])[0] or d.get("token"); st, r = token_sub(tok, "manage")
+        if st != "ok" or r is None:
+            return 400, result_page("Link not valid", "This link is invalid or expired. Use the link in your latest email.", False), "text/html"
+        k = db(); set_tracking(k, r["id"], False, "footer link"); k.commit(); k.close()
+        return 200, result_page("Tracking off", "Done. From the next send your emails come without the tracking image or tracked links. "
+                                "You can turn it back on any time under Manage preferences.", True,
+                                f'<p><a class="nl-btn" href="/newsletter/manage?token={E(tok)}#tracking">Manage preferences</a></p>'), "text/html"
     if path == "/api/newsletter/resubscribe":
         ok = resubscribe(d.get("token"))
         if html_mode:
