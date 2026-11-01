@@ -135,7 +135,7 @@ function ensureMap(){if(Q.map||typeof L==="undefined")return!!Q.map;const el=doc
  Q.layer=L.layerGroup().addTo(Q.map);return true}
 function drawMap(){if(!Q.m){if(!Q.mload){Q.mload=1;getJSON("api/solar_quake/map").then(m=>{Q.m=m;drawMap()}).catch(()=>{Q.mload=0;const n=document.getElementById("sq_mapnote");if(n)n.textContent="Map data couldn't load. Reload the page to try again."})}return}
  if(!ensureMap())return;Q.layer.clearLayers();const m=Q.m,ev=Q.ev===""?null:+Q.ev,decl=Q.set==="declustered";
- const pt=(p,col,inw)=>{const r=Math.max(2.5,(p[2]-4.5)*(ev==null?2.2:3.2));return L.circleMarker([p[0],p[1]],{radius:r,color:col,weight:1,fillColor:col,fillOpacity:inw?.75:.45,opacity:.9}).bindPopup(`<b>M${p[2].toFixed(1)}</b> · ${E(fmtET(p[5]))}<br>${inw?"Within 72 h of storm onset "+E(fmtD(m.events[p[3]].t)):"Outside storm impact windows"}${p[4]?"":"<br><i>flagged as fore/aftershock</i>"}`)};
+ const pt=(p,col,inw)=>{const r=Math.max(2.5,(p[2]-4.5)*(ev==null?2.2:3.2));return L.circleMarker([p[0],p[1]<-30?p[1]+360:p[1]],{radius:r,color:col,weight:1,fillColor:col,fillOpacity:inw?.75:.45,opacity:.9}).bindPopup(`<b>M${p[2].toFixed(1)}</b> · ${E(fmtET(p[5]))}<br>${inw?"Within 72 h of storm onset "+E(fmtD(m.events[p[3]].t)):"Outside storm impact windows"}${p[4]?"":"<br><i>flagged as fore/aftershock</i>"}`)};
  let nIn=0,nOut=0;
  const inPts=m.impact.filter(p=>(!decl||p[4])&&(ev==null?p[2]>=6:p[3]===ev));
  const outPts=ev==null?m.other_m6.filter(p=>!decl||p[4]):[];
@@ -147,6 +147,8 @@ function drawMap(){if(!Q.m){if(!Q.mload){Q.mload=1;getJSON("api/solar_quake/map"
   Q.map.setView([Math.max(-30,Math.min(30,e.ss_lat)),e.ss_lon],Q.map.getZoom(),{animate:false});
   if(note)note.textContent=`${nIn} M${Q.d.params.m_min}+ ${decl?"main shocks":"quakes"} in the 72 h after the ${fmtET(e.t)} onset`}
  else if(note)note.textContent=`${nIn.toLocaleString()} impact-window vs ${nOut.toLocaleString()} other-time M6+ ${decl?"main shocks":"quakes"}`;
+ // t308: Pacific-centred continuous longitudes (Americas shifted +360) and fit to data so Chile/Mexico stay on screen on phones
+ if(ev==null&&!Q.fitted){const b=L.latLngBounds([]);Q.layer.eachLayer(l=>{if(l.getLatLng)b.extend(l.getLatLng())});if(b.isValid()){Q.fitted=1;Q.map.invalidateSize();Q.map.fitBounds(b,{padding:[8,8],animate:false})}}
  setTimeout(()=>Q.map&&Q.map.invalidateSize(),60)}
 
 function renderAll(){document.getElementById("sq_cards").innerHTML=cards();chartTs();chartSea();chartLag();chartDn();chartLat();tables();segs();
