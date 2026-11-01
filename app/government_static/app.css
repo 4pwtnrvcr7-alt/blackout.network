@@ -8,7 +8,7 @@
 .gv .gv-bar i{display:block;height:100%}.gv .gv-bar i.g{background:var(--lo)}.gv .gv-bar i.m{background:var(--md)}.gv .gv-bar i.b{background:var(--hi)}
 .gv .gv-ovr{display:flex;gap:16px;align-items:center;margin:10px 0 12px;padding:12px 14px;background:var(--pn2);border:1px solid var(--bd);border-radius:var(--radius)}
 .gv .gv-big{font-size:42px;line-height:1}.gv .gv-big .gv-n{font-size:42px}.gv .gv-big .meta{font-size:14px;margin-left:4px}
-.gv .gv-br{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.gv .gv-br{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:10px}
 .gv .gv-card{background:var(--pn2);border:1px solid var(--bd);border-radius:var(--radius);padding:10px 12px}
 .gv .gv-card h3{margin:0 0 6px;font-size:16px;display:flex;gap:8px;align-items:baseline}
 .gv .gv-tb{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.gv .gv-tb ol{margin:4px 0 0;padding-left:20px;font-size:13px}.gv .gv-tb li{margin:3px 0;line-height:1.35}.gv .gv-tb li .gv-n{float:right;margin-left:8px}
@@ -69,4 +69,6 @@
  .gv-dbox .gv-img.big,.gv-dbox .gv-ph svg{width:120px;height:144px}.gv-f{grid-template-columns:96px 1fr}
  .gv .gv-tools label{flex:1 1 45%}.gv .gv-tools select{width:100%}
 }
+.gv .gv-src [data-el=srcs]>div,.gv .gv-cov,.gv .gv-comp .meta,.gv-dbox{overflow-wrap:anywhere}
+.gv .gv-card,.gv .pn{min-width:0}
 @media print{.gv-dlg{display:none}}
