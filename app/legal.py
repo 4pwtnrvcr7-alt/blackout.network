@@ -52,7 +52,8 @@ def _page(slug, title, desc, toc, sections, intro):
             f'<p class="upd">Effective date: {EFFECTIVE} · Last updated: {EFFECTIVE}</p>{intro}'
             f'<nav class="toc" aria-label="Contents"><b>Contents</b><ol>{toc_html}</ol></nav>{sections}</main>'
             '<footer>Research-only data · blackout.network · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · '
-            '<a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></footer>'
+            '<a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a>'
+            '<br>BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746</footer>'
             '</body></html>')
 
 def _build(slug, title, desc, intro, parts):
@@ -289,7 +290,7 @@ dispute relating to it is subject to the exclusive jurisdiction and venue descri
 where the changes are material, we may provide additional notice (for example, on the Site or in the newsletter). Your continued use of
 the Site after an update takes effect means you accept the updated policy.</p>"""),
 ("contact", "Contact us", f"""
-<p>Questions or requests about this Privacy Policy can be sent to the operator of blackout.network at {MAIL}.</p>"""),
+<p>Questions or requests about this Privacy Policy can be sent to the operator of blackout.network at {MAIL}, or by mail to BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746.</p>"""),
 ]
 
 # ------------------------------------------------------------------ Terms of Service
@@ -406,7 +407,7 @@ provisions will remain in full force and effect. Our failure to enforce any righ
 with our <a href="/privacy">Privacy Policy</a>, are the entire agreement between you and us regarding the Site and supersede any prior
 agreements on that subject. You may not assign these Terms; we may assign them without restriction. Headings are for convenience only.</p>"""),
 ("contact", "Contact", f"""
-<p>Questions about these Terms can be sent to the operator of blackout.network at {MAIL}.</p>"""),
+<p>Questions about these Terms can be sent to the operator of blackout.network at {MAIL}, or by mail to BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746.</p>"""),
 ]
 
 PRIVACY_INTRO = ('<p class="lead">This policy describes how blackout.network handles information: what it shows, what it collects from '

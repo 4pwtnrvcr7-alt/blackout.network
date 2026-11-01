@@ -54,7 +54,7 @@ DEFAULTS = {
     "from_name": "BLACKOUT.NETWORK",
     "from_email": "hello@blackout.network",
     "reply_to": "",
-    "mailing_address": "",
+    "mailing_address": "PO Box 1228, Lake Mary, FL 32746",
     "slots": {"morning": "07:00", "evening": "19:00"},
     "global_frequency": "per_subscriber",
     "paused": False,
@@ -578,6 +578,8 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
              "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics), "rule": {"rank": rmin, "sources": smin}}
     issue["videos"] = videos_for(issue, c)
     issue["empty"] = issue["empty"] and not issue["videos"]
+    if quiet and not any(int(i.get("rank") or 0) >= 4 for i in watch):   # quiet period: only send if something rank 4+ exists
+        issue["empty"] = True
     issue["bluf"] = bluf(issue)
     return issue
 
@@ -803,6 +805,8 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
             f'<a href="{E(links["scoring"])}" class="bnt" style="{_L}">How we score</a> · <a href="{E(links["site"])}" class="bnt" style="{_L}">Open the live dashboard</a></p>'
             f'<p style="margin:0 0 8px 0">{E(why_line)}</p>'
+            f'<p style="margin:0 0 8px 0">Visit <a href="https://blackout.network" class="bnt" style="{_L}">blackout.network</a> (no .com) to see the whole picture. '
+            f'Follow: <a href="https://www.youtube.com/@blkoutntw" class="bnt" style="{_L}">YouTube @blkoutntw</a> · <a href="https://x.com/BlkoutNtw" class="bnt" style="{_L}">X @BlkoutNtw</a></p>'
             f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>'
             + footer_buttons_html(links) + '</table></td></tr></table></body></html>')
 
@@ -912,6 +916,7 @@ def render(issue, links, c=None):
         for it in issue["watchlist"]:
             T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])}) {wire_url(it['cluster_id'], c=c)}")
         T.append("")
+    T += ["See the whole picture: https://blackout.network (no .com)", "YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
     T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}", why,
           f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
     T += footer_buttons_text(links)
@@ -1067,7 +1072,7 @@ def build_mime(to, subject, html_, text, unsub_url=None, kind="issue", c=None):
     return m
 
 RESERVED = re.compile(r"(@|\.)(example\.(com|net|org)|test|invalid|localhost|example)$")
-TRANSACTIONAL_KINDS = ("confirm", "already")
+TRANSACTIONAL_KINDS = ("confirm", "already", "test_live")   # test_live: admin one-off test issue to a confirmed subscriber
 def sender_status(kind="issue"):
     """Effective mode + why. Never returns secret values, only whether each required key is present.
     Transactional mail (confirm / already-subscribed) may go live with transactional_sending_approved alone; issues stay gated by
@@ -1120,6 +1125,8 @@ def deliver(msg, kind="issue", sid=None, force_preview=False):
             if c.get("reply_to"): p["reply_to"] = c["reply_to"]
             code, body = _http_json("https://api.resend.com/emails", p, {"Authorization": "Bearer " + e["RESEND_API_KEY"]})
             if code >= 300: raise RuntimeError(f"resend HTTP {code}: {body[:200]}")
+            try: return True, mode, "resend:" + str(json.loads(body).get("id") or ""), None
+            except Exception: pass
         elif mode == "brevo":
             p = {"sender": {"name": c["from_name"], "email": c["from_email"]}, "to": [{"email": to}], "subject": str(msg["Subject"]),
                  "htmlContent": html_, "textContent": text, "headers": hdrs}
@@ -1667,6 +1674,17 @@ def admin_action(d):
         k = db(); k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject) VALUES(?,?,?,?,?,?,?)", (iso(now()), "test", None, mode, "sent", f, "[TEST] " + subj)); k.commit(); k.close()
         log(f"admin test issue written to newsletter_outbox/{f}", "admin")
         return 200, {"ok": True, "file": f, "message": f"Written to newsletter_outbox/{f} (plus .eml). Nothing was sent."}
+    if a == "test_send":   # one real issue to ONE confirmed subscriber (not recorded as sent, so it never affects dedupe)
+        em = str(d.get("email") or "").strip().lower(); c = cfg()
+        k = db(); r = k.execute("SELECT * FROM subscribers WHERE email=? AND status='active' AND confirmed_at IS NOT NULL", (em,)).fetchone(); k.close()
+        if not r: return 404, {"ok": False, "message": "No confirmed, active subscriber with that address."}
+        sub = dict(r); at = now(); nxt = next_slots(at, 1, c)[0]
+        issue = build_issue(sub, at=at, since=at - timedelta(hours=12), slot=nxt["slot"], c=c)
+        L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
+        ok, mode, f, err = deliver(build_mime(sub["email"], "[TEST] " + subj, hb, tx, L["unsubscribe"], "issue", c), "test_live", sub["id"])
+        k = db(); k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject,error) VALUES(?,?,?,?,?,?,?,?)",
+                            (iso(now()), "test_live", sub["id"], mode, "sent" if ok else "failed", f, "[TEST] " + subj, err)); k.commit(); k.close()
+        return 200, {"ok": ok, "mode": mode, "id": f, "error": err, "subject": "[TEST] " + subj, "sent_at_et": fmt_et(now()), "html": hb}
     if a == "settings":
         c = cfg(); s = d.get("settings") or {}
         if "global_frequency" in s:
@@ -1791,7 +1809,7 @@ def page(title, body, robots="noindex"):
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="nl-page"><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top("newsletter") +
             f'<div class="nl-wrap" id="main" role="main">{body}</div>'
-            f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></footer>'
+            f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a><br>{BRAND} · PO Box 1228, Lake Mary, FL 32746</footer>'
             '<script src="/api/translate/app.js"></script><script src="/api/search/app.js"></script></body></html>')
 
 def form_html(mode="page"):

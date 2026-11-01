@@ -82,6 +82,24 @@ MAIL_ENV_KEYS = ("RESEND_API_KEY", "BREVO_API_KEY", "SENDGRID_API_KEY", "SMTP_HO
 if os.environ.get("BN_ADMIN_PASSCODE"): _write_secret(os.path.join(BASE, "ADMIN_PASSCODE.txt"), os.environ["BN_ADMIN_PASSCODE"].strip() + "\n")
 if os.environ.get("NEWSLETTER_SECRET"): apply_secrets({})
 
+# ---------- newsletter scheduler (t373): 07:00 / 19:00 America/New_York via newsletter.run_due() ----------
+# Runs only when newsletter_config.json (pushed by the box) has render_scheduler=true. run_due is idempotent per slot
+# (slot_runs + UNIQUE(subscriber, slot)); an flock keeps a second process/instance on this disk from running it at the same time.
+def _nl_tick():
+    import fcntl
+    while True:
+        time.sleep(45)
+        try:
+            if not SYNC.get("restored") and SYNC_SECRET: continue          # wait until newsletter.db is restored from the mirror
+            import newsletter as NL
+            if not NL.cfg().get("render_scheduler"): continue
+            with open(os.path.join(STATE, "newsletter_sched.lock"), "w") as lk:
+                try: fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except OSError: continue
+                for key, st in NL.run_due(): print(f"newsletter slot {key}: {st}", flush=True)
+        except Exception: traceback.print_exc()
+threading.Thread(target=_nl_tick, name="nl-sched", daemon=True).start()
+
 import server  # noqa: E402  (imports scanner/push/jets modules only; their loops are never started here)
 
 # ---------- manifest of what the box has pushed ----------
