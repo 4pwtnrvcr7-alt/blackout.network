@@ -45,7 +45,11 @@ TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime."
-QUIET_LINE = "No confirmed high-severity events in the last 24 hours."   # CoS Nov 1: the one neutral line of a quiet brief
+QUIET_LINE = "No confirmed high-severity events in the last 24 hours."   # CoS Nov 1: the one neutral line of a quiet brief (window >= 23 h)
+QUIET_LINE_SINCE = "No confirmed high-severity events since your last brief."   # same, when the window is shorter (twice-daily ~12 h)
+def quiet_line(issue):
+    """The neutral quiet line, true to the window this brief actually covers."""
+    return QUIET_LINE if (issue["end"] - issue["start"]) >= timedelta(hours=23) else QUIET_LINE_SINCE
 END_LINE = "BLACKOUT.NETWORK for more. Follow us on YouTube and X. Get the free newsletter at blackout.network."   # brand end line, exact wording (CHARTER §3)
 CATEGORIES = ["war/conflict", "political", "natural disaster", "disease", "cyber", "space weather", "financial", "ufo/uap", "spiritual/religious", "other"]
 FREQS = {"twice": "Twice daily (morning + evening)", "morning": "Once daily: morning", "evening": "Once daily: evening"}
@@ -720,7 +724,7 @@ def bluf(issue):
     """Bottom line up front: one or two sentences, built from the selected items only."""
     m, u, f, n = issue["main"], issue.get("updates", []), issue.get("follow", []), issue["notable"]
     rr = issue["rule"]; hrs = max(1, round((issue["end"] - issue["start"]).total_seconds() / 3600))
-    if issue.get("quiet"): return QUIET_LINE
+    if issue.get("quiet"): return quiet_line(issue)
     parts = []
     if m:
         top = m[0]
@@ -1083,7 +1087,7 @@ def render(issue, links, c=None):
         for it in issue["main"]: a(_item_html(it, links, c))
     elif not issue.get("quiet"):   # fully quiet: the BLUF already carries QUIET_LINE, so it is the only line
         a(f'<tr><td style="padding:16px 20px"><div class="bns2 bnx" style="background:{PAL["surf2"]};border-radius:6px;padding:12px 14px;font:400 15px/1.55 {FB};color:{PAL["body"]}">'
-          f'{E(QUIET_LINE)}</div></td></tr>')
+          f'{E(quiet_line(issue))}</div></td></tr>')
     if issue.get("politics"):
         a(_sec_html("Politics & Government", "Government actions, emergency declarations, sanctions and political crises, confirmed by 2+ independent sources."))
         for it in issue["politics"]: a(_item_html(it, links, c))
@@ -1125,7 +1129,7 @@ def render(issue, links, c=None):
         cr = issue["crime"]; T += [f"CRIME NEAR YOU — {cr['label'].upper()}"] + cr["lines"] + [f"Map and full numbers: {cr['url']}", ""]
     if issue.get("follow"): tsec("Stories you follow", issue["follow"])
     if issue["main"]: tsec("Top threats", issue["main"])
-    elif not issue.get("quiet"): T += [QUIET_LINE, ""]
+    elif not issue.get("quiet"): T += [quiet_line(issue), ""]
     if issue.get("politics"): tsec("Politics & Government", issue["politics"])
     if vids:
         T.extend(["WATCH: NEW ON BLACKOUT.NETWORK", "=" * 30])
