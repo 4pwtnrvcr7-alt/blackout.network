@@ -2281,6 +2281,20 @@ def _follows_card(r):
                  f'<a class="nl-sm" href="{E(follow_links(r, f["cluster_id"])["unfollow"])}">Unfollow</a></li>' for f in fs)
     return f'<section class="nl-card"><h3>Stories you follow ({len(fs)})</h3><ul class="nl-srclist">{li}</ul></section>'
 
+def _confirm_result(tok):
+    """Activate a pending subscription (POST only, see handle_get) and return the result page."""
+    st, r = confirm(tok)
+    if st == "ok":
+        return 200, result_page("Subscription confirmed", f"You're in. {r['email']} will get the {FREQS[r['frequency']].lower()} brief from the next scheduled send. "
+                                "Every email has a one-click unsubscribe link.", True,
+                                f'<p><a class="nl-btn" href="/newsletter/manage?token={E(sub_token("manage", r))}">Manage preferences</a></p>'), "text/html"
+    if st == "already": return 200, result_page("Already confirmed", "This subscription was already confirmed. Nothing changed.", True), "text/html"
+    if st == "expired":
+        return 410, result_page("Confirmation link expired", f"Confirmation links expire after {cfg()['confirm_ttl_hours']} hours. Sign up again to get a new one.", False,
+                                '<p><a class="nl-btn" href="/newsletter">Sign up again</a></p>'), "text/html"
+    return 400, result_page("Link not valid", "This confirmation link is invalid, was altered, or the address was unsubscribed since it was sent. Sign up again for a fresh link.", False,
+                            '<p><a class="nl-btn" href="/newsletter">Go to signup</a></p>'), "text/html"
+
 def handle_get(path, qs):
     if "/admin" in path: return 404, {"error": "not found"}   # admin is not part of the public node
     ensure_worker()
@@ -2303,18 +2317,13 @@ def handle_get(path, qs):
                f'the current data window. Subject line: <b style="color:{PAL["tx"]}">{E(subj)}</b> · <a style="{_L}" href="/newsletter">Subscribe</a> · '
                f'<a style="{_L}" href="/#wire">Dashboard</a></div>')
         return 200, re.sub(r'(<body [^>]*>)', lambda m: m.group(1) + bar, hb, count=1), "text/html"
-    if path == "/newsletter/confirm":
-        st, r = confirm(q1("token"))
-        if st == "ok":
-            return 200, result_page("Subscription confirmed", f"You're in. {r['email']} will get the {FREQS[r['frequency']].lower()} brief from the next scheduled send. "
-                                    "Every email has a one-click unsubscribe link.", True,
-                                    f'<p><a class="nl-btn" href="/newsletter/manage?token={E(sub_token("manage", r))}">Manage preferences</a></p>'), "text/html"
-        if st == "already": return 200, result_page("Already confirmed", "This subscription was already confirmed. Nothing changed.", True), "text/html"
-        if st == "expired":
-            return 410, result_page("Confirmation link expired", f"Confirmation links expire after {cfg()['confirm_ttl_hours']} hours. Sign up again to get a new one.", False,
-                                    '<p><a class="nl-btn" href="/newsletter">Sign up again</a></p>'), "text/html"
-        return 400, result_page("Link not valid", "This confirmation link is invalid, was altered, or the address was unsubscribed since it was sent. Sign up again for a fresh link.", False,
-                                '<p><a class="nl-btn" href="/newsletter">Go to signup</a></p>'), "text/html"
+    if path == "/newsletter/confirm":   # scanner-safe double opt-in: GET only shows a button; the POST below activates
+        tok = q1("token"); st, r = token_sub(tok, "confirm")
+        if st == "ok" and r is not None and r["status"] == "pending":
+            return 200, result_page("One more tap", f"Confirm that {r['email']} should get the {BRAND} brief.", False,
+                                    f'<form method="post" action="/newsletter/confirm"><input type="hidden" name="token" value="{E(tok)}">'
+                                    '<button type="submit" class="nl-btn">Yes, start my brief</button></form>'), "text/html"
+        return _confirm_result(tok)
     if path == "/newsletter/unsubscribe":
         tok = q1("token"); st, r = unsubscribe(tok, "link")
         if st == "ok":
@@ -2406,6 +2415,7 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
                                      "" if body.get("ok") else '<p><a class="nl-btn" href="/newsletter">Try again</a></p>'), "text/html"
         return code, body
     if not origin_ok(headers): return 403, {"ok": False, "message": "Cross-site request blocked."}
+    if path == "/newsletter/confirm": return _confirm_result((qs.get("token") or [""])[0] or d.get("token"))
     if path == "/api/newsletter/resubscribe":
         ok = resubscribe(d.get("token"))
         if html_mode:
