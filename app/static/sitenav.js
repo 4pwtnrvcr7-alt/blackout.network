@@ -33,7 +33,12 @@ function init(){
   if(!t&&k!=="threat"){title=b.textContent.replace(/^\W+/,"").trim()+" | "+D.brand}
   var line=(t&&t.desc)||D.home.desc;if(desc.textContent!==line)desc.textContent=line;
   if(title+d===last&&document.title===title)return;last=title+d;setMeta(title,d,url)}
- var tm=0;function soon(){clearTimeout(tm);tm=setTimeout(function(){if(!busy)order();upd()},60)}
+ // deep links to tabs whose add-on loads late (e.g. /#government): honor the first hash once its button appears
+ var pending=(location.hash||"").slice(1);setTimeout(function(){pending=""},30000);
+ nav.addEventListener("pointerdown",function(){pending=""},true);
+ function deep(){if(!pending)return;var t=byHash[pending];if(!t||t.hidden||t.key.charAt(0)==="@"){pending="";return}
+  var b=nav.querySelector('button[data-tab="'+t.key+'"]');if(!b)return;pending="";if(!b.classList.contains("on"))b.click()}
+ var tm=0;function soon(){clearTimeout(tm);tm=setTimeout(function(){if(!busy)order();deep();upd()},60)}
  new MutationObserver(soon).observe(nav,{childList:true,subtree:true,attributes:true,attributeFilter:["class"]});
- addEventListener("hashchange",soon);addEventListener("load",soon);order();upd();setTimeout(soon,500);setTimeout(soon,2500)}
+ addEventListener("hashchange",function(){pending=(location.hash||"").slice(1);soon()});addEventListener("load",soon);order();upd();setTimeout(soon,500);setTimeout(soon,2500)}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init()})();
