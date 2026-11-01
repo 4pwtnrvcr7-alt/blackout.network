@@ -37,3 +37,5 @@
 .bnr-chk{display:flex!important;gap:8px;align-items:center;font-weight:400!important}
 .bnr-chk input{width:auto}
 .bnr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* t347: on phones the 36px Report button (fixed bottom-left) sat on top of the footer language <select>; leave room under the page so the last row scrolls clear of it */
+@media(max-width:600px){html body{padding-bottom:calc(56px + env(safe-area-inset-bottom))!important}html body>footer,html body>#site_foot{margin-bottom:0}}
