@@ -7,6 +7,7 @@ import html
 import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 EFFECTIVE = "October 31, 2026"
+UPDATED = {"privacy": "November 1, 2026"}   # t385: public /stats page, DNT/GPC, referrer-site and country totals
 CONTACT = "hello@blackout.network"
 MAIL = f'<a href="mailto:{CONTACT}">{CONTACT}</a>'
 
@@ -49,7 +50,7 @@ def _page(slug, title, desc, toc, sections, intro):
             f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top(slug) +
             f'<main class="wrap" id="main"><h2 class="title">{html.escape(title)}</h2>'
-            f'<p class="upd">Effective date: {EFFECTIVE} · Last updated: {EFFECTIVE}</p>{intro}'
+            f'<p class="upd">Effective date: {EFFECTIVE} · Last updated: {UPDATED.get(slug, EFFECTIVE)}</p>{intro}'
             f'<nav class="toc" aria-label="Contents"><b>Contents</b><ol>{toc_html}</ol></nav>{sections}</main>'
             '<footer>Research-only data · blackout.network · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · '
             '<a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a>'
@@ -101,10 +102,17 @@ content delivery and security). When your browser requests a page, these provide
 as your IP address, browser user agent, the page or resource requested, the referring page, and the date and time of the request, and
 may keep it in their logs under their own policies. Our own application does not write per-request access logs containing IP
 addresses.</p>
-<h3>Aggregate usage counts</h3>
-<p>We keep aggregate, daily counts of page views, requests per section of the Site, response status (error) rates, and an approximate
-count of unique visitors. Unique visitors are estimated using a keyed hash that rotates daily and is held only in server memory; we do not
-store IP addresses, user agents or per-visitor records for these counts.</p>
+<h3 id="usage">Aggregate usage counts (our public stats page)</h3>
+<p>Our own server keeps aggregate, daily counts of page views per page (including individual story pages), requests per section of the
+Site, response status (error) rates, and an approximate count of unique visitors. Unique visitors are estimated with a keyed hash of the
+connecting address and the date; the key is random, changes every day, is held only in server memory and is discarded at the end of the
+day, so the hash cannot be linked across days or reversed. We do not store IP addresses, user agents, cookies or any per-visitor records
+for these counts. We also count, as totals only, the site name of the page that linked to us (for example google.com, never the full
+address), campaign tags in our own links (utm_source), and, when our network provider (Cloudflare) supplies it, the visitor's country
+code; we never look up locations from IP addresses ourselves. Known bots and crawlers are excluded. Browsers that send a Do Not Track
+(DNT) or Global Privacy Control (GPC) signal are not included in these counts at all.</p>
+<p>A summary of these totals, together with the public follower and view counts of our YouTube and X accounts, is published for anyone at
+<a href="/stats">blackout.network/stats</a>. Any number under 5 is hidden or shown as "&lt;5" so that no individual visit can be singled out.</p>
 <h3>Newsletter</h3>
 <p>If you sign up for the newsletter, we collect and store your email address; your chosen frequency and categories; the dates and times you
 signed up, confirmed, changed settings or unsubscribed; where on the Site you signed up; a hashed (not plain-text) form of the IP address
@@ -266,8 +274,9 @@ believe a child under 13 has provided us personal information, contact us at {MA
 in the United States and other countries where our service providers operate, whose data protection laws may differ from those of
 your country.</p>"""),
 ("dnt", "Do Not Track", """
-<p>Because the Site does not track visitors across third-party websites or use advertising trackers, it does not change its behavior in
-response to browser "Do Not Track" signals.</p>"""),
+<p>The Site does not track visitors across third-party websites or use advertising trackers. When your browser sends a "Do Not Track"
+(DNT) or Global Privacy Control (GPC) signal, we leave your visits out of our aggregate usage counts entirely (see
+<a href="#usage">Aggregate usage counts</a>).</p>"""),
 ("advice", "Informational use only; not professional or emergency advice", """
 <p>The Site is provided for general informational and research purposes only. It is not medical, legal, financial, investment, safety or
 other professional advice, and it is not an official emergency alerting or warning service. <b>In an emergency, call 911 (or your local

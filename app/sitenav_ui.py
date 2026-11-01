@@ -38,7 +38,7 @@ MENU = [
  ("Live", ["threat", "noise", "thread", "bcast", "streams", "radio", "trends", "heatmap"]),
  ("Threat categories", ["net", "grid", "ai", "solar_seismic", "weather", "finance", "jets", "spacex", "intel"]),
  ("Politics & Government", ["politics", "gov"]),
- ("Community", ["ranked", "@social", "newsletter"]),
+ ("Community", ["ranked", "@social", "@stats", "newsletter"]),
  ("Reference", ["res", "maps", "bush", "med", "preppers", "figures"]),
  ("Play", ["games"]),
  ("About", ["@scoring", "sources", "tips"]),
@@ -115,7 +115,7 @@ def drawer(sn, active=""):
     out.append(f'<div class="bn-dfollow">{follow_links(sn, "bn-follow bn-follow-row")}</div>')
     out.append('<div class="bn-dtools">' + theme_btn("bn-js-only bn-theme-row") +
                '<button type="button" class="bn-mrow bn-js-only bn-gear-row" aria-controls="bn_settings">' + I_GEAR + '<span>Settings &amp; scan status</span></button></div>'
-               '<p class="bn-dfoot"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/report-status">Report status</a></p>'
+               '<p class="bn-dfoot"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/stats">Stats</a><a href="/report-status">Report status</a></p>'
                '</nav></div>')
     return "".join(out)
 

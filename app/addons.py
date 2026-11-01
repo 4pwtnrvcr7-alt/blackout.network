@@ -81,6 +81,8 @@ ROUTES = {
     "/api/report": "reports",
     "/api/reports": "reports",
     "/report-status": "reports",
+    "/stats": "stats",              # Public stats page (t385): aggregate site traffic + YouTube/X numbers (social_public_stats.json from the box)
+    "/api/stats": "stats",
     "/manifest.webmanifest": "pwa",
     "/manifest.json": "pwa",
     "/site.webmanifest": "pwa",

@@ -275,7 +275,7 @@ class RH(server.H):
     server_version = "Blackout/1.0"
     def send_response(self, code, message=None):
         try:   # privacy-safe aggregate traffic counters (usage_stats.py); pulled by the box over the signed reports sync
-            import usage_stats; usage_stats.record(self.path, code, self.command, self.ip(), self.headers.get("User-Agent", ""), self.headers.get("Referer", ""))
+            import usage_stats; usage_stats.record(self.path, code, self.command, self.ip(), self.headers.get("User-Agent", ""), self.headers.get("Referer", ""), self.headers)
         except Exception: pass
         return super().send_response(code, message)
     def ip(self):
