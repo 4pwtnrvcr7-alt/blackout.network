@@ -68,10 +68,10 @@ OFFICIAL_LINKS = {  # each state's official election-results page (secretary of 
  "AZ": "https://results.arizona.vote/", "AR": "https://www.sos.arkansas.gov/elections/research/election-results",
  "CA": "https://electionresults.sos.ca.gov/", "CO": "https://www.sos.state.co.us/pubs/elections/Results/", "CT": "https://electionhistory.ct.gov/",
  "DE": "https://elections.delaware.gov/results/", "FL": "https://results.elections.myflorida.com/", "GA": "https://results.sos.ga.gov/results/public/Georgia",
- "HI": "https://elections.hawaii.gov/election-results/", "ID": "https://sos.idaho.gov/elections-division/election-results/",
+ "HI": "https://elections.hawaii.gov/election-results/", "ID": "https://voteidaho.gov/election-results/",
  "IL": "https://www.elections.il.gov/electionoperations/ElectionVoteTotals.aspx", "IN": "https://enr.indianavoters.in.gov/",
  "IA": "https://sos.iowa.gov/elections/results/", "KS": "https://sos.ks.gov/elections/election-results.html", "KY": "https://elect.ky.gov/results/",
- "LA": "https://voterportal.sos.la.gov/graphical", "ME": "https://www.maine.gov/sos/cec/elec/results/", "MD": "https://elections.maryland.gov/elections/results_data/",
+ "LA": "https://voterportal.sos.la.gov/graphical", "ME": "https://www.maine.gov/sos/elections-voting/election-results-data", "MD": "https://elections.maryland.gov/elections/2026/index.html",
  "MA": "https://electionstats.state.ma.us/", "MI": "https://mielections.us/election/results/", "MN": "https://electionresults.sos.mn.gov/",
  "MS": "https://www.sos.ms.gov/elections-voting/election-results", "MO": "https://enr.sos.mo.gov/", "MT": "https://electionresults.mt.gov/",
  "NE": "https://electionresults.nebraska.gov/", "NV": "https://silverstateelection.nv.gov/", "NH": "https://www.sos.nh.gov/elections/election-results",
@@ -81,8 +81,8 @@ OFFICIAL_LINKS = {  # each state's official election-results page (secretary of 
  "RI": "https://www.ri.gov/election/results/", "SC": "https://www.scvotes.gov/election-results", "SD": "https://electionresults.sd.gov/",
  "TN": "https://sos.tn.gov/elections/results", "TX": "https://results.texas-election.com/", "UT": "https://electionresults.utah.gov/",
  "VT": "https://electionarchive.vermont.gov/", "VA": "https://enr.elections.virginia.gov/", "WA": "https://results.vote.wa.gov/",
- "WV": "https://sos.wv.gov/elections/Pages/ElectionResults.aspx", "WI": "https://elections.wi.gov/elections/election-results",
- "WY": "https://sos.wyo.gov/Elections/State/Results.aspx"}
+ "WV": "https://sos.wv.gov/elections/election-data/historical-election-results-and-turnout", "WI": "https://elections.wi.gov/elections/election-results",
+ "WY": "https://sos.wyo.gov/Elections/ElectionResults.aspx"}
 
 def now(): return datetime.now(timezone.utc)
 def iso(d=None): return (d or now()).strftime("%Y-%m-%dT%H:%M:%SZ")

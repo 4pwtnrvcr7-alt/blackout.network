@@ -18,9 +18,9 @@ Katadyn|https://katadyn.com/collections/filter|water|filters,purification,tablet
 MSR water treatment (Cascade Designs)|https://cascadedesigns.com/collections/water-treatment|water|filters,purification,gravity|US · Global|$$|22122|Guardian purifier and gravity filters from Cascade Designs; field-serviceable.
 Platypus GravityWorks|https://www.platy.com|water|filters,gravity,storage|US · Global|$$|21122|Hands-free gravity filter kits and collapsible water reservoirs.
 Grayl|https://grayl.com|water|purification,bottle|US · Global|$$|12122|Press-style purifier bottle claimed to remove viruses as well as bacteria; good for travel bags.
-Berkey (Big Berkey)|https://www.berkeyfilters.com|water|filters,gravity,countertop|US|$$$|11111|Popular countertop gravity filter; regulatory and stock issues in recent years, so check current availability and certifications.
+Berkey (Big Berkey)|https://www.berkeywater.com/|water|filters,gravity,countertop|US|$$$|11111|Popular countertop gravity filter; regulatory and stock issues in recent years, so check current availability and certifications.
 Aquatabs|https://www.aquatabs.com|water|purification,tablets|Global|$|22212|Chlorine (NaDCC) purification tablets used by relief agencies; tiny and long-lasting.
-Potable Aqua|https://potableaquatablets.com/index.html|water|purification,tablets|US · Global|$|21212|Iodine and chlorine dioxide tablets; compact backup treatment for go-bags.
+Potable Aqua|https://pharmacalway.com/potableaqua/|water|purification,tablets|US · Global|$|21212|Iodine and chlorine dioxide tablets; compact backup treatment for go-bags.
 WaterBrick|https://waterbrick.org|water|storage,containers|US · Global|$$|21111|Stackable 3.5 gal food-grade containers that fit under beds and in closets.
 Reliance Aqua-Tainer|https://www.relianceproducts.com|water|storage,containers,sanitation|US · CA|$|21222|7 gal Aqua-Tainer jugs and Luggable Loo bucket toilets; cheap, sold at big-box stores.
 Scepter containers|https://www.scepter.com|water|storage,fuel cans,containers|US · CA · Global|$|21112|Military-style water and fuel containers.
@@ -55,7 +55,7 @@ Adventure Medical Kits|https://www.adventuremedicalkits.com|medical|kits,first a
 Stop the Bleed|https://www.stopthebleed.org|medical|training,bleeding control|Free · US · Global|Free|22222|Free/low-cost bleeding-control classes; the single most useful trauma skill.
 Red Cross first aid classes|https://www.redcross.org/take-a-class/first-aid|medical|training,CPR,first aid|US|$|22222|First aid, CPR and AED classes in person and online.
 American Heart Association CPR|https://cpr.heart.org/en/courses|medical|training,CPR|US · Global|$|22222|CPR and BLS courses with a class finder.
-St John Ambulance (UK)|https://www.sja.org.uk/courses|medical|training,first aid|UK|$|22222|UK first-aid courses for individuals and workplaces.
+St John Ambulance (UK)|https://shop.sja.org.uk/collections/first-aid-courses|medical|training,first aid|UK|$|22222|UK first-aid courses for individuals and workplaces.
 St John Ambulance Canada|https://www.sja.ca|medical|training,first aid|CA|$|22222|Canadian first-aid and CPR training.
 St John Ambulance Australia|https://www.stjohn.org.au|medical|training,first aid,kits|AU|$|22222|Australian first-aid training and kits.
 Wilderness Medical Associates|https://www.wildmed.com|medical|training,wilderness|US · CA · Global|$$|22122|WFA/WFR courses for when help is hours or days away.
@@ -63,7 +63,7 @@ NOLS Wilderness Medicine|https://www.nols.edu/en/wilderness-medicine|medical|tra
 FDA: potassium iodide (KI) FAQ|https://www.fda.gov/drugs/bioterrorism-and-drug-preparedness/frequently-asked-questions-potassium-iodide-ki|medical|nuclear,guide|Free · US guidance|Free|22222|When KI helps (and doesn't) after a radiation release.
 Jackery|https://www.jackery.com|power|power station,solar|US · Global|$$$|21112|Portable power stations and folding panels for phones, CPAPs and small appliances.
 EcoFlow|https://us.ecoflow.com|power|power station,solar,home backup|US · Global|$$$|22112|Power stations from small to whole-home backup; fast AC charging.
-Anker SOLIX|https://www.anker.com/solix|power|power station,solar|US · Global|$$$|22112|Anker's power-station line; LiFePO4 models with long warranties.
+Anker SOLIX|https://www.ankersolix.com/collections/power-stations|power|power station,solar|US · Global|$$$|22112|Anker's power-station line; LiFePO4 models with long warranties.
 Bluetti|https://www.bluettipower.com|power|power station,solar|US · Global|$$$|12112|LiFePO4 power stations and expansion batteries.
 Goal Zero|https://www.goalzero.com|power|power station,solar,small|US · Global|$$|21111|Early leader in portable solar; small power banks and Yeti stations.
 Renogy|https://www.renogy.com|power|solar,batteries,DIY|US · Global|$$|21212|Panels, charge controllers and batteries for DIY solar.
