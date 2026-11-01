@@ -68,6 +68,9 @@ var NLRE=/^[^\s@"<>(),;:\\[\]]{1,64}@[^\s@"<>(),;:\\[\]]+\.[A-Za-z]{2,63}$/;
 function mountForm(box,src,cb){getForm().then(function(h){box.innerHTML=h;var f=box.querySelector("form[data-nl-form]");if(!f)throw 0;f.dataset.nlReady=1;
  var si=f.querySelector("input[name=source]");if(si)si.value=src;var em=f.querySelector("input[name=email]"),msg=f.querySelector(".nl-msg"),btn=f.querySelector("button[type=submit]");
  if(btn)btn.textContent="Get the brief";
+ var ll=f.querySelector(".nl-loc-l"),li=f.querySelector(".nl-loc"),row=f.querySelector(".nl-row");
+ if(ll&&li&&row&&btn){var w=document.createElement("div");w.className="bng-locrow";w.appendChild(ll);w.appendChild(li);row.after(w);w.after(btn);btn.classList.add("bng-submit");var hint=w.nextElementSibling&&w.nextElementSibling.nextElementSibling;
+  li.placeholder="ZIP, city or country (optional)";var nh=f.querySelector(".nl-loc ~ .nl-sm, .bng-locrow + button + .nl-sm");if(nh)nh.classList.add("bng-lochint")}
  f.querySelectorAll("[id]").forEach(function(el){var o=el.id,n=o+"_"+src;el.id=n;var l=f.querySelector('label[for="'+o+'"]');if(l)l.htmlFor=n;f.querySelectorAll('[aria-describedby="'+o+'"]').forEach(function(x){x.setAttribute("aria-describedby",n)})});
  var say=function(t,ok){if(msg){msg.textContent=t;msg.className="nl-msg "+(ok?"ok":"err")}};
  f.addEventListener("submit",function(e){e.preventDefault();var v=(em.value||"").trim();if(!NLRE.test(v)||v.length>254){say("Enter a valid email address.");em.focus();return}
