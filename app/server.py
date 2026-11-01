@@ -195,6 +195,40 @@ def pwa_head(b):
         return b
     except Exception: return b
 
+# t338/t343: Render's free tier drops some of a page's ~40 parallel requests (502/503). (1) every same-origin JS/CSS URL in a page gets
+# ?v=<build> so Cloudflare and browsers can cache it for a year (Cache-Control immutable below) and the origin rarely sees asset requests;
+# (2) BN_RETRY_HEAD retries a failed script/stylesheet (twice, with backoff) and same-origin GET fetches that come back 502/503/504.
+_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
+_ASSET_V = {"t": 0, "v": b"0"}
+def asset_version():
+    now = time.time()
+    if now - _ASSET_V["t"] > 20:
+        h = 0
+        try:
+            for d in [BASE, f"{BASE}/static"] + [e.path for e in os.scandir(BASE) if e.is_dir() and e.name.endswith("_static")]:
+                for e in os.scandir(d):
+                    if e.name.endswith((".js", ".css", ".html")): h = (h * 31 + int(e.stat().st_mtime) + len(e.name)) % 0xFFFFFFFFFF
+        except Exception: pass
+        _ASSET_V.update(t=now, v=format(h, "x").encode())
+    return _ASSET_V["v"]
+def version_assets(b):
+    try:
+        v = asset_version(); lo = b[:6000].lower(); h = lo.find(b"<head>")
+        if h >= 0 and b"<html" in lo and b"bnRetry" not in b[:40000]: b = b[:h + 6] + BN_RETRY_HEAD + b[h + 6:]
+        j = b.rfind(b"</body>")   # dead-link guard + easter eggs (bn_extras.py) on every full page
+        if j > 0 and b"<html" in lo and b"/linkguard.js" not in b: b = b[:j] + b'<script src="/linkguard.js" defer></script><script src="/bn-eggs.js" defer></script>' + b[j:]
+        return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
+    except Exception: return b
+BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;window.__bnRetry=1;var o=location.origin;'
+  b'addEventListener("error",function(e){var t=e.target;if(!t||t===window||!t.tagName)return;var tag=t.tagName,u=tag=="SCRIPT"?t.src:tag=="LINK"&&t.rel=="stylesheet"?t.href:"";'
+  b'if(!u||u.indexOf(o)!==0)return;var n=+(t.getAttribute("data-bn-retry")||0);if(n>=2)return;setTimeout(function(){var c=document.createElement(tag);'
+  b'if(tag=="SCRIPT"){c.src=u+(u.indexOf("?")<0?"?":"&")+"r="+(n+1);c.async=false}else{c.rel="stylesheet";c.href=u+(u.indexOf("?")<0?"?":"&")+"r="+(n+1)}'
+  b'c.setAttribute("data-bn-retry",n+1);(t.parentNode||document.head).insertBefore(c,t.nextSibling)},700*(n+1)*(n+1))},true);'
+  b'var F=window.fetch;if(!F)return;window.fetch=function(i,init){var m=((init&&init.method)||(i&&i.method)||"GET").toUpperCase(),u=typeof i=="string"?i:(i&&i.url)||"";'
+  b'var same=u.indexOf("://")<0||u.indexOf(o)===0;if(m!="GET"||!same||/\\/api\\/stream/.test(u))return F.apply(this,arguments);var a=arguments,s=this,k=0;'
+  b'return new Promise(function(res,rej){(function go(){F.apply(s,a).then(function(r){if((r.status==502||r.status==503||r.status==504)&&k<3){k++;setTimeout(go,500*k*k)}else res(r)},'
+  b'function(err){if(k<2&&!(init&&init.signal&&init.signal.aborted)){k++;setTimeout(go,600*k)}else rej(err)})})()})}})()</script>')
+
 def report_widget(b):
     try:
         i = b.rfind(b"</body>")
@@ -208,9 +242,10 @@ class H(BaseHTTPRequestHandler):
     def ip(self): return self.headers.get("CF-Connecting-IP") or self.client_address[0]
     def send(self, code, body, ctype="application/json"):
         b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
-        if ctype == "text/html": b = report_widget(pwa_head(b))
+        if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
-        self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
+        versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
+        self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "public, max-age=31536000, immutable" if versioned else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def body(self):
         n = min(int(self.headers.get("Content-Length") or 0), 2_000_000 if self.path.startswith("/api/reports/") else 16000 if self.path.startswith("/api/report") else 10000)
@@ -263,6 +298,10 @@ class H(BaseHTTPRequestHandler):
             m = addon_for(u.path)
             if m and hasattr(m, "handle_stream"): return m.handle_stream(u.path, qs, self)   # long-lived add-on responses (SSE /api/stream)
             if m: return self.send(*m.handle_get(u.path, qs))
+            if "text/html" in (self.headers.get("Accept") or "") and not u.path.startswith(("/api/", "/internal/")):   # people get a page (t347)
+                try:
+                    import bn_extras; return self.send(404, bn_extras.page_404(u.path), "text/html")
+                except Exception: pass
             return self.send(404, {"error": "not found"})
         except (BrokenPipeError, ConnectionResetError): return
         except Exception as ex:

@@ -39,6 +39,9 @@ ROUTES = {
     "/theme.css": "static_files",
     "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
     "/sitenav.css": "sitenav",
+    "/linkguard.js": "bn_extras",   # hides links the nightly link checker flagged dead (t338)
+    "/bn-eggs.js": "bn_extras",     # discreet easter eggs (t347)
+    "/api/linkcheck": "bn_extras",  # /api/linkcheck/dead: flagged URLs (tools/linkcheck.py nightly)
     "/fonts": "sitenav",            # self-hosted Montserrat + Inter woff2 (OFL), t323
     "/scoring": "scoring",
     "/about/scoring": "scoring",

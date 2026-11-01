@@ -82,3 +82,6 @@ REPORTS_BOX_ONLY = ["reports.db*", "reports_admin*", "reports_box*", "reports_cl
                     "reports_impact", "reports_queue*", "report_queue*", "e2e_reports*", "usage_log*"]
 SECRET_PATTERNS += [p for p in REPORTS_BOX_ONLY if p not in SECRET_PATTERNS]
 if "NO_PUSH" in globals(): NO_PUSH |= {"reports.db"}
+
+# t338: nightly link-checker flags (tools/linkcheck.py -> linkcheck_dead.json) ride the normal data sync; the site hides those links
+SYNC_JSON += ["linkcheck_dead.json"]

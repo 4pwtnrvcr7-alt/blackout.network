@@ -49,3 +49,24 @@ requirements.txt  Python dependencies
 app/              web server, add-on modules, dashboard and static assets
                   (reports.py + reports_static/: problem-report widget and status page; usage_stats.py: aggregate traffic counts)
 ```
+
+## Link checks (required before every push)
+
+Every link on the site must work **and** go where its label says. Two tools enforce it:
+
+- **Pre-publish gate:** run `tools/prepublish.sh` before pushing to `main` (or install it as a hook:
+  `ln -sf ../../tools/prepublish.sh .git/hooks/pre-push`). It compiles the Python and runs `tools/linkcheck.py gate`, which
+  checks every URL added or changed by the commits being pushed (plus staged/unstaged edits). It **fails** on a dead link
+  (404/410, a host that does not exist, a redirect loop) or a soft 404 (redirected to a homepage or error page, or a title/heading
+  that says "not found"), and on any URL already flagged dead. Bot-blocked links (401/403/429/999, challenge pages) are rechecked
+  in a real headless Chromium and reported as *unverified*; landing pages whose title/host share nothing with the link's label
+  are reported as *mismatch*. Both are warnings; `--strict` makes them failures.
+- **Full crawl / nightly:** `tools/linkcheck.py collect --base <site>` renders every page and every dashboard tab with
+  Playwright (accordions opened, lists scrolled, "show more" pressed) and collects every rendered link plus every URL in the JSON
+  the pages load (sources, preppers, broadcasts, government, gun laws, midterms, ...) and a rotating sample of the global Sources
+  directory; `tools/linkcheck.py check --inv inventory.json` checks them (real browser User-Agent, GET, redirects followed).
+  The scanner node runs `tools/linkcheck.py nightly` at about 3:30 AM ET: it writes `linkcheck_report.json` and
+  `linkcheck_dead.json`. A link that is dead two runs in a row gets a data-level `dead` flag (never deleted); the flags sync to
+  the site, `/api/linkcheck/dead` serves them and `/linkguard.js` hides those links on every page (a row that is only the link is
+  hidden, a link inside text becomes plain text). The flag clears as soon as a run finds the link working.
+- Quick check of specific URLs: `tools/linkcheck.py url https://example.org/a https://example.org/b`.

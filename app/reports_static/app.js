@@ -13,7 +13,7 @@
   addEventListener("unhandledrejection",function(e){var r=e.reason;pushErr({kind:"unhandledrejection",msg:scrub(r&&r.message?r.message:String(r)),t:new Date().toISOString()})})}
  function errs(){return ERR.slice(-MAXE).map(function(e){return{kind:e.kind||"error",msg:scrub(e.msg),src:String(e.src||"").split(/[?#]/)[0],line:e.line||null,t:e.t||null}})}
  function el(t,a,k){var e=document.createElement(t);if(a)for(var x in a){if(x=="text")e.textContent=a[x];else if(x=="html")e.innerHTML=a[x];else e.setAttribute(x,a[x])}(k||[]).forEach(function(c){c&&e.appendChild(typeof c=="string"?document.createTextNode(c):c)});return e}
- var FLAG='<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1h1.5v14H3zM5 2h8l-2 3.5L13 9H5z"/></svg>';
+ var FLAG='<svg viewBox="0 0 16 16" width="14" height="14" style="width:14px;height:14px;flex:none" aria-hidden="true"><path d="M3 1h1.5v14H3zM5 2h8l-2 3.5L13 9H5z"/></svg>';
  function ids(){try{return JSON.parse(localStorage.getItem(KEY)||"[]").filter(function(x){return/^BN-[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(x.id||"")})}catch(e){return[]}}
  function remember(id,cat){var l=ids().filter(function(x){return x.id!==id});l.unshift({id:id,cat:cat,t:new Date().toISOString()});try{localStorage.setItem(KEY,JSON.stringify(l.slice(0,50)))}catch(e){}}
  function activeTab(){var b=document.querySelector(".tabs button.on");return b?(b.getAttribute("data-tab")||""):""}
@@ -80,7 +80,8 @@
  function open(it,from){trig=from||document.activeElement;item=it||null;opened=Date.now();
   loadCfg().then(function(){form(null)}).catch(function(){head("Report a problem");dlg.appendChild(el("p",{text:"The report form could not load. Please try again in a moment."}));show()})}
  // ---------- floating button
- function fab(){if(document.querySelector(".bnr-fab"))return;var b=el("button",{type:"button","class":"bnr-fab","aria-haspopup":"dialog",title:"Report a problem with this page"});
+ function fab(){if(document.querySelector(".bnr-fab"))return;var b=el("button",{type:"button","class":"bnr-fab","aria-haspopup":"dialog",title:"Report a problem with this page",
+   style:"position:fixed;left:12px;bottom:12px;z-index:4900;display:inline-flex;align-items:center;gap:6px;max-width:220px;font:500 12px/1.2 Inter,system-ui,sans-serif"});   /* t347: inline basics so it stays small even if app.css fails to load */
   b.innerHTML=FLAG+'<span class="bnr-fab-t">Report a problem</span><span class="bnr-sr"> with this page</span>';b.onclick=function(){open(null,b)};document.body.appendChild(b)}
  // ---------- flag control on alert cards (The Wire, Watchlist, Timeline)
  function itemFor(card){var cid=card.getAttribute("data-cid")||"",d=null,kind="card";

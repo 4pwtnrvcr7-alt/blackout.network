@@ -473,7 +473,7 @@ $("save").onclick=async()=>{
   else $("smsg").innerHTML='<span class=bad>✗ '+esc(j.error||r.status)+'</span>'}catch(e){$("smsg").innerHTML='<span class=bad>✗ '+esc(e)+'</span>'}
  $("save").disabled=false};
 $("filters").onclick=e=>{if(e.target.dataset.c){filter=e.target.dataset.c;render()}};
-async function load(){try{const r=await fetch("api/state",{cache:"no-store"});S=await r.json();render();try{fdr()}catch(_){}}catch(e){$("status").textContent="dashboard offline: "+e}}
+async function load(){try{S=await bnJSON("api/state");render();try{fdr()}catch(_){}}catch(e){$("status").textContent="reconnecting…";clearTimeout(window.__bnLoadRt);window.__bnLoadRt=setTimeout(load,10000)}}
 /* t225: the public node never triggers scans or changes settings (POST /api/refresh and /api/interval are refused server-side by render_app.py BOX_ONLY).
    Here Manual refresh only reloads the latest synced data; scans run on the scanner node on its own schedule. */
 $("refresh").textContent="⟳ Reload data";$("refresh").title="Reload the latest data. Scans run automatically on the scanner node.";
@@ -788,16 +788,17 @@ document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.cl
 // ---- Timeline slider: hourly histogram since the first scan + items/snapshots for the chosen window. Polls every 60 s (live push may also call tlRefresh). ----
 const TL={hours:[],idx:0,live:true,play:0,ov:null,req:0};
 const tlEt=t=>new Date(t).toLocaleString("en-US",{timeZone:"America/New_York",weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET";
-async function tlRefresh(){try{const j=await (await fetch("api/timeline",{cache:"no-store"})).json();TL.ov=j;const by={};j.hours.forEach(h=>by[h.h]=h);
+async function bnJSON(u){const r=await fetch(u,{cache:"no-store"});const ct=r.headers.get("content-type")||"";if(!r.ok||ct.indexOf("json")<0)throw new Error("busy");return r.json()}
+async function tlRefresh(){try{const j=await bnJSON("api/timeline");TL.ov=j;const by={};j.hours.forEach(h=>by[h.h]=h);
  const s=new Date(j.start);s.setUTCMinutes(0,0,0);const e=new Date(j.now);const H=[];for(let t=s.getTime();t<=e.getTime();t+=36e5){const k=new Date(t).toISOString().slice(0,13)+":00:00Z";H.push(by[k]||{h:k,n:0,high:0,max:0,main:0})}
  TL.hours=H;const r=$("tl_rng");r.max=H.length-1;if(TL.live)TL.idx=H.length-1;r.value=TL.idx;
  const mx=Math.max(1,...H.map(h=>Math.sqrt(h.n)));$("tl_hist").innerHTML=H.map((h,i)=>`<i data-i="${i}" class="${h.high?"h":""}" style="height:${Math.max(2,Math.round(44*Math.sqrt(h.n)/mx))}px" title="${esc(tlEt(h.h))}: ${h.n} item(s), ${h.high} high"></i>`).join("");
  const sn=j.snapshots;$("tl_meta").textContent=`· ${j.total.toLocaleString()} items since ${tlEt(j.start)} · ${sn.ok} source snapshots`;
  $("tl_snapinfo").textContent=`Snapshots: ${sn.ok} captured, ${sn.failed} unavailable · ${(sn.bytes/1e6).toFixed(1)} MB of ${(sn.cap_bytes/1073741824).toFixed(0)} GB cap · worker ${sn.worker_running?"running":"stopped"} · rule: ${sn.rule}. Each image has a black bar below the page with the headline, rank/score, sources, full source link and capture time (ET and UTC), and the same details embedded in the file.`;
- tlShow()}catch(e){$("tl_meta").textContent="timeline unavailable: "+e}}
+ tlShow()}catch(e){$("tl_meta").textContent="· reloading the timeline…";clearTimeout(TL.rt);TL.rt=setTimeout(tlRefresh,15000)}}
 async function tlShow(){if(!TL.hours.length)return;const w=+$("tl_win").value,i=TL.idx,end=new Date(new Date(TL.hours[i].h).getTime()+36e5),st=new Date(end.getTime()-w*36e5);
  $("tl_hist").querySelectorAll("i").forEach((b,k)=>b.classList.toggle("sel",k>i-w&&k<=i));$("tl_at").textContent=`${tlEt(st)} → ${tlEt(end)}`;$("tl_live").classList.toggle("on",TL.live);
- const q=++TL.req;try{const j=await (await fetch(`api/timeline/items?from=${st.toISOString().slice(0,19)}Z&to=${end.toISOString().slice(0,19)}Z`,{cache:"no-store"})).json();if(q!=TL.req)return;
+ const q=++TL.req;try{const j=await bnJSON(`api/timeline/items?from=${st.toISOString().slice(0,19)}Z&to=${end.toISOString().slice(0,19)}Z`);if(q!=TL.req)return;
   let it=j.items;if($("tl_snaponly").checked)it=it.filter(x=>x.snapshot&&x.snapshot.file);if($("tl_main").checked)it=it.filter(x=>!x.watchlist);
   $("tl_cnt").textContent=` · ${it.length} item(s)${j.items.length>=400?" (first 400)":""}`;
   $("tl_items").innerHTML=it.map(x=>`<div class="tl-card ${lv(x.score)}" data-cid="${esc(x.cluster_id)}"><div class=meta>${esc(tlEt(x.first_seen))} · <span class="sc ${lv(x.score)}">${x.score}</span>rank ${x.rank}/10 ${x.watchlist?'<span class=wl>Watchlist</span>':""}</div>
@@ -1051,9 +1052,10 @@ async function nsLoad(){try{const d=NS.d=await (await fetch("api/netstatus?windo
   C.broadcasts.map(b=>`<a href="${esc(safeUrl(b.url))}" target=_blank rel="noopener noreferrer">📻 ${esc(b.title)}<span class=meta> · ${esc(b.source)} · ${esc(fmt(b.published))}</span></a>`).join(""))||"<div class=meta>Nothing outage-related in the last 24 hours.</div>";
  $("ns_cor").querySelectorAll("[data-goto]").forEach(a=>a.onclick=e=>{e.preventDefault();document.querySelector('.tabs button[data-tab="threat"]').click();setTimeout(()=>{const el=document.querySelector(`[data-cid="${CSS.escape(a.dataset.goto)}"]`);if(el){el.scrollIntoView({block:"center"});el.style.outline="2px solid var(--hi)";setTimeout(()=>el.style.outline="",2500)}},300)});
  nsBadge({count:al.length,alerts:al.map(s=>s.src)})}catch(e){$("ns_meta").textContent="unavailable: "+e}}
-function nsBadge(a){a={count:a.count||0,alerts:(a.alerts||[]).map(x=>typeof x=="string"?x:(x.src+(x.status?": "+x.status:"")))};const b=document.querySelector('.tabs button[data-tab="net"]');let s=b.querySelector(".ns-badge");if(!a.count){s&&s.remove();$("ns_gbanner").style.display="none";return}
+function nsTxt(v){return v==null?"":typeof v=="string"||typeof v=="number"?String(v):Array.isArray(v)?v.map(nsTxt).filter(Boolean).join(", "):typeof v=="object"?nsTxt(v.src||v.name||v.label||v.title||v.status||""):""}
+function nsBadge(a){if(a&&a.data&&a.count==null)a=a.data;a=a||{};a={count:+a.count||0,alerts:(Array.isArray(a.alerts)?a.alerts:[]).map(x=>typeof x=="object"&&x?[nsTxt(x.src),typeof x.status=="string"?x.status:""].filter(Boolean).join(": "):nsTxt(x)).filter(Boolean)};if(!a.alerts.length)a.count=0;const b=document.querySelector('.tabs button[data-tab="net"]');let s=b.querySelector(".ns-badge");if(!a.count){s&&s.remove();$("ns_gbanner").style.display="none";return}
  if(!s){s=document.createElement("span");s.className="ns-badge";b.appendChild(s)}s.textContent=a.count;
- const key=a.alerts.join("|");if(sessionStorage.getItem("ns_dismiss")!==key){$("ns_gbanner").innerHTML=`🌐 <b>Network alert:</b> ${a.alerts.map(esc).join(", ")}. <span class=meta>Click to open Network Status.</span> <button class=ns-x title="Dismiss until the alerts change" style="float:right;background:none;border:0;color:#ffccc7;cursor:pointer">✕</button>`;$("ns_gbanner").style.display="block";$("ns_gbanner").dataset.k=key}}
+ const key=a.alerts.join("|");if(sessionStorage.getItem("ns_dismiss")!==key){$("ns_gbanner").innerHTML=`<span class=ns-txt>🌐 <b>Network alert:</b> ${a.alerts.map(esc).join("; ")}. <span class=meta>Tap to open Network Status.</span></span><button class=ns-x type=button aria-label="Dismiss until the alerts change" title="Dismiss until the alerts change" style="background:none;border:0;color:#ffccc7;cursor:pointer">✕</button>`;$("ns_gbanner").style.display="flex";$("ns_gbanner").dataset.k=key}}
 async function nsAlerts(){try{nsBadge(await (await fetch("api/netstatus/alerts",{cache:"no-store"})).json())}catch(e){}}
 $("ns_gbanner").onclick=e=>{if(e.target.closest(".ns-x")){sessionStorage.setItem("ns_dismiss",$("ns_gbanner").dataset.k);$("ns_gbanner").style.display="none";return}document.querySelector('.tabs button[data-tab="net"]').click()};
 $("ns_win").onchange=e=>{NS.win=e.target.value;nsLoad()};

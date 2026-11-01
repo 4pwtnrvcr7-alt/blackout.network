@@ -284,4 +284,5 @@ if __name__ == "__main__":
     t = threading.Thread(target=_render_bg, daemon=True); t.start()
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True
+    server.ThreadingHTTPServer.request_queue_size = 256   # t338: the default listen backlog (5) overflowed on page loads (~40 parallel requests) -> Render 502s
     server.ThreadingHTTPServer(("0.0.0.0", port), RH).serve_forever()

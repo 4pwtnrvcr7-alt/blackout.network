@@ -1,10 +1,10 @@
 /* blackout.network "Report a problem" widget (reports.py). Uses the dashboard palette; falls back to its own values elsewhere. */
-.bnr-fab{position:fixed;left:14px;bottom:14px;z-index:4900;display:inline-flex;align-items:center;gap:6px;background:var(--bn-surface-2,#1d232b);color:var(--tx,#e6e9ee);
- border:1px solid var(--bd,#252b33);border-radius:20px;padding:7px 13px;font:600 13px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;cursor:pointer;
- box-shadow:0 4px 14px rgba(0,0,0,.45);opacity:.92}
-.bnr-fab:hover,.bnr-fab:focus-visible{opacity:1;border-color:var(--ac,#4aa3ff);color:var(--ac,#4aa3ff)}
+.bnr-fab{position:fixed;left:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:4900;display:inline-flex;align-items:center;gap:6px;background:var(--bn-surface,#14181D);color:var(--bn-muted,#8B95A3);
+ border:1px solid var(--bn-line,#252B33);border-radius:8px;padding:6px 10px;font:500 12px/1.2 var(--bn-font-body,"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);text-align:left;cursor:pointer;
+ box-shadow:0 2px 8px rgba(0,0,0,.25);opacity:.9;min-height:32px;max-width:220px}   /* t347: modest Signal-style footer control (Inter 12 px, muted) */
+.bnr-fab:hover,.bnr-fab:focus-visible{opacity:1;border-color:var(--bn-line-2,#2f3742);color:var(--bn-text,#E6E9EE)}
 .bnr-fab svg,.bnr-flag svg{width:14px;height:14px;fill:currentColor;flex:none}
-@media(max-width:600px){.bnr-fab .bnr-fab-t{display:none}.bnr-fab{padding:10px;border-radius:50%;left:10px;bottom:10px}}
+@media(max-width:600px){.bnr-fab .bnr-fab-t{display:none}.bnr-fab{padding:0;width:36px;height:36px;justify-content:center;border-radius:8px;left:10px;bottom:max(10px,env(safe-area-inset-bottom))}}
 @media print{.bnr-fab,.bnr-flag{display:none!important}}
 .bnr-flag{position:absolute;top:6px;right:6px;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;
  background:transparent;border:1px solid transparent;border-radius:6px;color:var(--mu,#8b95a3);cursor:pointer;opacity:.55}
