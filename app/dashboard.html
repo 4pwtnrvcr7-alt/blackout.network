@@ -4,6 +4,12 @@
 <script>/* early error capture for "Report a problem" (messages only, max 10; see /api/report/app.js) */window.__bnErr=[];window.__bnErrHooked=1;(function(){function u(s){return String(s||"").split(/[?#]/)[0]}function c(s){return String(s||"").replace(/[A-Za-z0-9_\-]{32,}/g,"[redacted]").slice(0,300)}function p(o){__bnErr.push(o);if(__bnErr.length>10)__bnErr.shift()}addEventListener("error",function(e){var t=e.target;if(t&&t!==window&&t.tagName){p({kind:"resource",msg:"Failed to load "+t.tagName.toLowerCase(),src:u(t.src||t.href),t:new Date().toISOString()});return}p({kind:"error",msg:c(e.message),src:u(e.filename),line:e.lineno||null,t:new Date().toISOString()})},true);addEventListener("unhandledrejection",function(e){var r=e.reason;p({kind:"unhandledrejection",msg:c(r&&r.message?r.message:r),t:new Date().toISOString()})})})()</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>/* t230: keyless basemap. CARTO basemaps now return "API KEY REQUIRED" tiles, so every map uses OpenStreetMap's standard tiles (no key, no account), darkened with a CSS filter; falls back to the OSM France HOT tiles if OSM tiles keep failing. */
+window.bnBaseLayer=function(map,o){o=o||{};const OSM='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
+ const S=[{u:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",a:OSM,mz:19},{u:"https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",s:"abc",a:OSM+', tiles <a href="https://www.hotosm.org/" target="_blank" rel="noopener">HOT</a> / <a href="https://www.openstreetmap.fr/" target="_blank" rel="noopener">OSM France</a>',mz:19}];
+ let i=0,lay=null,bad=0,ok=0;const add=()=>{const s=S[i];bad=ok=0;lay=L.tileLayer(s.u,{subdomains:s.s||"abc",maxZoom:Math.min(o.maxZoom||19,s.mz),attribution:s.a+(o.extra?" · "+o.extra:""),className:"bn-tiles"});
+  lay.on("tileload",()=>ok++);lay.on("tileerror",()=>{if(++bad>=6&&bad>ok*2&&i<S.length-1){map.removeLayer(lay);i++;add()}});lay.addTo(map);lay.bringToBack()};add();return lay};
+</script><style>.leaflet-container .bn-tiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.55)}.leaflet-container{background:#1b1f24}</style>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -107,7 +113,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 #toasts{position:fixed;right:14px;bottom:14px;z-index:5000;display:flex;flex-direction:column;gap:8px;max-width:360px;width:calc(100% - 28px)}
 .toast{background:#14181df5;border:1px solid var(--bd);border-left:4px solid var(--mu);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.5);animation:tin .25s ease-out}
 .toast.h{border-left-color:var(--hi)}.toast.m{border-left-color:var(--md)}.toast .x{float:right;cursor:pointer;color:var(--mu)}.toast img{width:100%;max-height:150px;object-fit:cover;object-position:top;border-radius:5px;margin-top:6px;display:block}
-.toast .wait{font-size:11px;color:var(--mu);margin-top:4px}@keyframes tin{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.toast.lk{cursor:pointer}.toast.lk:hover{border-color:var(--ac)}.toast.lk:focus-visible,.toast a:focus-visible{outline:2px solid var(--ac);outline-offset:2px}.toast .tl{color:var(--tx);text-decoration:none}.toast .tl:hover,.toast.lk:hover .tl{text-decoration:underline}.toast .src{font-size:11px;color:var(--ac);margin-top:3px}.toast .wait{font-size:11px;color:var(--mu);margin-top:4px}@keyframes tin{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
 .tab-ref{font-size:12px;padding:2px 9px;margin-left:10px;vertical-align:1px}
 /* ---- Live Streams ---- */
 .st-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-top:10px}
@@ -177,7 +183,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 <label title="Set on the scanner node">Scans every <select id="interval"></select></label>
 <span id="msg"></span></div></header>
 <nav class="tabs"><button class="on" data-tab="threat">📡 The Wire</button><button data-tab="jets">✈ Private jets</button><button data-tab="thread">🧵 The Thread</button><button data-tab="bcast">📻 Live Broadcasts</button><button data-tab="streams">📺 Live Streams</button><button data-tab="radio">📻 Radio</button><button data-tab="res">📍 Local Resources</button><button data-tab="bush">🏕 Bushcraft</button><button data-tab="med">⛑ Medical</button><button data-tab="maps">🗺 Maps</button><button data-tab="net">🌐 Network Status</button><button data-tab="solar_seismic">☀ Solar &amp; Seismic</button><button data-tab="heatmap">🔥 Heat Map</button><button data-tab="ranked">🗳 Ranked by Users</button><button data-tab="tips">☕ Tips</button></nav>
-<div id="ns_gbanner" role="alert"></div>
+<div id="ns_gbanner" role="alert" tabindex="0" title="Open Network Status" onkeydown="if(event.key=='Enter'||event.key==' '){event.preventDefault();this.click()}"></div>
 <main id="tab-threat">
 <section class="pn" id="tl" style="grid-column:1/-1"><h2>⏱ Timeline — scrub through everything cataloged <span class="meta" id="tl_meta"></span></h2>
  <div id="tl_hist" title="Items per hour (red = high severity)"></div>
@@ -373,7 +379,7 @@ function render(){
  $("wcount").textContent=S.watchlist_count;$("watch").innerHTML=S.watchlist.map(card).join("")||"<div class=meta>Empty.</div>";
  $("sources").innerHTML="<table><tr><th>Source</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+S.sources.map(s=>`<tr><td><a href="${esc(safeUrl(s.url))}" target=_blank rel="noopener noreferrer">${esc(s.name)}</a>${s.error?`<div class=meta>${esc(s.error)}</div>`:""}</td><td class="${s.ok==1?"ok":s.ok==0?"bad":"dis"}">${s.ok==1?"OK":s.ok==0?"FAIL":"disabled"}</td><td>${s.items}</td><td>${fmt(s.last_checked)}</td></tr>`).join("")+"</table>";
  // map
- if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',subdomains:"abcd",maxZoom:10}).addTo(map);markers=L.layerGroup().addTo(map)}
+ if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);bnBaseLayer(map,{maxZoom:10});markers=L.layerGroup().addTo(map)}
  heatDirty=true;if($("map").offsetWidth)drawHeat();
  markers.clearLayers();S.geo.filter(g=>g.score>=35).forEach(g=>L.circleMarker([g.lat,g.lon],{radius:4+g.score/12,color:COL[g.category],weight:1,fillOpacity:.6}).bindPopup(`<b>${g.score}</b> ${esc(g.title)}`).addTo(markers));
  // charts
@@ -620,7 +626,7 @@ function mpDraw(){if(!MP.cl||!MP.pois)return;MP.cl.clearLayers();const ms=[];
  MP.cl.addLayers(ms);$("mp_msg").textContent=`${ms.length.toLocaleString()} emergency points shown`}
 async function mpInit(){if(MP.map){setTimeout(()=>MP.map.invalidateSize(),60);return}
  MP.map=L.map("mp_map",{maxZoom:19,minZoom:2,zoomSnap:.5,worldCopyJump:true});{const g=window.BNGeo&&BNGeo.get();g&&g.lat!=null?MP.map.setView([g.lat,g.lon],11):MP.map.setView([20,0],2)}
- L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(MP.map);
+ bnBaseLayer(MP.map,{maxZoom:19});
  L.control.scale({imperial:true,metric:true}).addTo(MP.map);
  MP.cl=L.markerClusterGroup?L.markerClusterGroup({disableClusteringAtZoom:16,maxClusterRadius:50,chunkedLoading:true}):L.layerGroup();MP.cl.addTo(MP.map);
  try{const j=await (await fetch("api/maps/pois")).json();MP.pois=j;MP.cats=j.cats;
@@ -823,11 +829,14 @@ hwInit();
 const LV={es:null,n:0};
 function lvToast(a){if(a.watchlist!=0&&!(a.rank>=4||a.high))return;const box=$("toasts");const d=document.createElement("div");d.className="toast "+(a.high?"h":lv(a.score));d.dataset.cid=a.cluster_id;
  const u=(a.links&&a.links[0])?safeUrl(a.links[0].url):"#";
- d.innerHTML=`<span class=x title="Dismiss">✕</span><div class=meta>${a.high?"🚨 HIGH · ":"New · "}rank ${a.rank}/10 · score ${a.score} · ${esc(a.category)}${a.watchlist?" · Watchlist":" · The Wire"}</div><b><a href="${esc(u)}" target=_blank rel="noopener noreferrer" style="color:var(--tx);text-decoration:none">${esc(a.title)}</a></b>
+ d.innerHTML=`<span class=x title="Dismiss">✕</span><div class=meta>${a.high?"🚨 HIGH · ":"New · "}rank ${a.rank}/10 · score ${a.score} · ${esc(a.category)}${a.watchlist?" · Watchlist":" · The Wire"}</div><b><a class=tl href="${esc(u)}" target=_blank rel="noopener noreferrer">${esc(a.title)}</a></b>${u!="#"?`<div class=src>Open source ↗ ${esc(a.links[0].source||(()=>{try{return new URL(u).hostname}catch(e){return""}})())}</div>`:""}
  ${a.snapshot&&a.snapshot.file?`<a href="${esc(a.snapshot.file)}" target=_blank rel=noopener><img src="${esc(a.snapshot.file)}" alt="Source snapshot"></a>`:a.snapshot_pending?`<div class=wait>📸 snapshot still capturing — it will appear here</div>`:""}`;
- d.querySelector(".x").onclick=()=>d.remove();box.prepend(d);while(box.children.length>4)box.lastChild.remove();setTimeout(()=>d.remove(),a.high?60000:20000)}
+ d.querySelector(".x").onclick=e=>{e.stopPropagation();d.remove()};lvLink(d,u);box.prepend(d);while(box.children.length>4)box.lastChild.remove();setTimeout(()=>d.remove(),a.high?60000:20000)}
+/* t228: the whole notification is clickable and keyboard-accessible; it opens the alert's primary verification link (same URL as the headline) in a new tab */
+function lvLink(d,u,fn){if(u=="#"&&!fn)return;d.classList.add("lk");d.tabIndex=0;d.setAttribute("role","link");const go=()=>fn?fn():window.open(u,"_blank","noopener,noreferrer");
+ d.addEventListener("click",e=>{if(e.target.closest("a,.x,button"))return;go()});d.addEventListener("keydown",e=>{if((e.key=="Enter"||e.key==" ")&&e.target==d){e.preventDefault();go()}})}
 const LVB={w:0,l:0,t:0};function lvBatch(a){a.watchlist==0?LVB.w++:LVB.l++;clearTimeout(LVB.t);LVB.t=setTimeout(()=>{const d=document.createElement("div");d.className="toast";
- d.innerHTML=`<span class=x title="Dismiss">✕</span><b>📡 ${LVB.w+LVB.l} new item(s) just landed</b><div class=meta>${LVB.w} on The Wire · ${LVB.l} on the Watchlist · pushed live, no refresh needed</div>`;d.querySelector(".x").onclick=()=>d.remove();
+ d.innerHTML=`<span class=x title="Dismiss">✕</span><b>📡 ${LVB.w+LVB.l} new item(s) just landed</b><div class=meta>${LVB.w} on The Wire · ${LVB.l} on the Watchlist · pushed live, no refresh needed</div>`;d.querySelector(".x").onclick=e=>{e.stopPropagation();d.remove()};d.title="Open The Wire";lvLink(d,"#",()=>{const b=document.querySelector('.tabs button[data-tab="threat"]');b&&b.click();const f=$("feed");f&&f.scrollIntoView({behavior:"smooth",block:"start"})});
  $("toasts").prepend(d);while($("toasts").children.length>4)$("toasts").lastChild.remove();setTimeout(()=>d.remove(),20000);LVB.w=LVB.l=0},2500)}
 let lvT=0;function lvReload(){clearTimeout(lvT);lvT=setTimeout(()=>{load();if(typeof tlRefresh=="function")tlRefresh()},1500)}
 function lvConnect(){if(!window.EventSource)return;const es=new EventSource("api/stream");LV.es=es;const ind=$("live_ind");
