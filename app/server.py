@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 import scanner
 import push
 import jets
+import display_links
 
 BASE = scanner.BASE
 CONFIG = f"{BASE}/config.json"
@@ -242,6 +243,9 @@ class H(BaseHTTPRequestHandler):
     def ip(self): return self.headers.get("CF-Connecting-IP") or self.client_address[0]
     def send(self, code, body, ctype="application/json"):
         b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
+        if ctype == "application/json" and b"://" in b:   # t347: show people the human page, not the raw API/RSS endpoint (display only)
+            try: b = display_links.rewrite_json(b.decode("utf-8")).encode("utf-8")
+            except Exception: pass
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
@@ -259,6 +263,20 @@ class H(BaseHTTPRequestHandler):
         given = str(d.get("passcode") or self.headers.get("X-Admin-Passcode") or "")
         if given and hmac.compare_digest(given.encode(), passcode().encode()): return "ok"
         fails[ip].append(t); return "bad"
+
+    TAB_PATHS = set("wire noise thread broadcasts streams radio network grid ai solar heatmap midterms spacex elon preppers tips weather trends "
+                    "politics gunlaws finance jets medical resources bushcraft intel ranked games government maps".split())
+    def not_found_page(self, path):
+        """t347: a dashboard tab name typed as a path (/maps) -> 302 to /#maps; any other unknown non-API path -> the HTML 404 page.
+        API / internal paths keep their JSON 404. Returns True if a response was sent."""
+        if path.startswith(("/api/", "/internal/")): return False
+        seg = path.strip("/").lower()
+        if seg in self.TAB_PATHS:
+            self.send_response(302); self.send_header("Location", "/#" + seg); self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store"); self.end_headers(); return True
+        try:
+            import bn_extras; self.send(404, bn_extras.page_404(path), "text/html"); return True
+        except Exception: return False
 
     def do_GET(self):
         u = urlparse(self.path); qs = parse_qs(u.query)
@@ -297,11 +315,11 @@ class H(BaseHTTPRequestHandler):
                                                                      "event_time", "high_at", "families", "links", "brief", "rank", "rising", "eff_families")} for r in rows]})
             m = addon_for(u.path)
             if m and hasattr(m, "handle_stream"): return m.handle_stream(u.path, qs, self)   # long-lived add-on responses (SSE /api/stream)
-            if m: return self.send(*m.handle_get(u.path, qs))
-            if "text/html" in (self.headers.get("Accept") or "") and not u.path.startswith(("/api/", "/internal/")):   # people get a page (t347)
-                try:
-                    import bn_extras; return self.send(404, bn_extras.page_404(u.path), "text/html")
-                except Exception: pass
+            if m:
+                r = m.handle_get(u.path, qs)
+                if not (r and r[0] == 404 and self.not_found_page(u.path)): return self.send(*r)
+                return
+            if self.not_found_page(u.path): return
             return self.send(404, {"error": "not found"})
         except (BrokenPipeError, ConnectionResetError): return
         except Exception as ex:
