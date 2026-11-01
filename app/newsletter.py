@@ -222,13 +222,15 @@ MIGRATE = [("sent_items", "rank", "INTEGER"), ("sent_items", "n_items", "INTEGER
 _INIT = {}
 def db():
     c = sqlite3.connect(P["db"], timeout=15); c.row_factory = sqlite3.Row
-    if _INIT.get(P["db"]) is None:
+    try: ik = (P["db"], os.stat(P["db"]).st_ino)   # a restored/replaced DB file (new inode) gets the migrations again
+    except OSError: ik = (P["db"], 0)
+    if _INIT.get(ik) is None:
         c.execute("PRAGMA journal_mode=WAL"); c.executescript(SCHEMA)
         for t, col, decl in MIGRATE:   # additive, idempotent column migrations (t303)
             if col not in {x[1] for x in c.execute(f"PRAGMA table_info({t})")}:
                 try: c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {decl}")
                 except sqlite3.OperationalError: pass
-        c.commit(); _INIT[P["db"]] = True
+        c.commit(); _INIT[ik] = True
     return c
 
 def src():
@@ -935,6 +937,23 @@ def _sevbar():
             f'<td class="sa" width="30%" height="4" style="height:4px;background:{PAL["sev"][1]};font-size:0;line-height:0">&nbsp;</td>'
             f'<td class="sr" width="40%" height="4" style="height:4px;background:{PAL["sev"][2]};font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>')
 
+_UTM_SKIP = re.compile(r"/newsletter/(unsubscribe|manage|breaking_off|confirm|follow|unfollow|sources)\b|[?&]token=")
+def _utm_url(u, campaign):
+    if not re.match(r"https?://(www\.)?blackout\.network(/|$)", u) or _UTM_SKIP.search(u) or "utm_source=" in u: return u
+    frag = ""
+    if "#" in u: u, frag = u.split("#", 1); frag = "#" + frag
+    return u + ("&" if "?" in u else "?") + f"utm_source=newsletter&utm_medium=email&utm_campaign={urllib.parse.quote(campaign)}" + frag
+def utm_tag(html_, text, campaign):
+    """UTM-tag every link back to blackout.network (never token links: unsubscribe/manage/confirm/follow stay clean)."""
+    h_ = re.sub(r'href="(https?://[^"]+)"', lambda m: 'href="' + _utm_url(html.unescape(m.group(1)), campaign).replace("&", "&amp;") + '"', html_)
+    t_ = re.sub(r"https?://(?:www\.)?blackout\.network[^\s)]*", lambda m: _utm_url(m.group(0), campaign), text)
+    return h_, t_
+FORWARD_URL = "https://blackout.network/newsletter?utm_source=email&utm_medium=forward"
+def _follow_bar():
+    b = lambda lab, u: (f'<a href="{u}" class="bnt" style="display:inline-block;margin:0 8px 6px 0;padding:6px 12px;border:1px solid {PAL["line"]};'
+                        f'border-radius:999px;font:700 12px/1.2 {FH};color:{PAL["tx"]};text-decoration:none">{lab}</a>')
+    return (f'<tr><td class="bnl" style="padding:2px 20px 8px 20px;text-align:left">'
+            + b("Follow on X @BlkoutNtw", "https://x.com/BlkoutNtw") + b("▶ YouTube @blkoutntw", "https://www.youtube.com/@blkoutntw") + '</td></tr>')
 def _shell(title, pre, head_html, body_rows, links, c, why_line):
     """Common email frame: single column, 100% wide up to 640 px (phones get full width), table layout + inline CSS, left-aligned text."""
     addr, addr_html = _addr(c); mu = PAL["mu"]
@@ -943,7 +962,7 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             f'<table role="presentation" class="bnb" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAL["bg"]}"><tr><td align="center" style="padding:0">'
             f'<table role="presentation" class="bnb" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:{PAL["bg"]};'
             f'font-family:{FB};color:{PAL["tx"]};text-align:left">'
-            + _sevbar() + head_html + "".join(body_rows) +
+            + _sevbar() + head_html + _follow_bar() + "".join(body_rows) +
             f'<tr><td class="bnl" style="padding:22px 20px 8px 20px;border-top:1px solid {PAL["line"]};text-align:left">{_logo_html(c, 32)}</td></tr>'
             f'<tr><td class="bnm" style="padding:8px 20px 4px 20px;font:400 12px/1.6 {FB};color:{mu};text-align:left">'
             f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
@@ -951,6 +970,7 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             f'<p style="margin:0 0 8px 0">{E(why_line)}</p>'
             f'<p style="margin:0 0 8px 0">Visit <a href="https://blackout.network" class="bnt" style="{_L}">blackout.network</a> (no .com) to see the whole picture. '
             f'Follow: <a href="https://www.youtube.com/@blkoutntw" class="bnt" style="{_L}">YouTube @blkoutntw</a> · <a href="https://x.com/BlkoutNtw" class="bnt" style="{_L}">X @BlkoutNtw</a></p>'
+            f'<p style="margin:0 0 8px 0">Know someone who should get this? <a href="{FORWARD_URL}" class="bnt" style="{_L}">Forward to a friend: blackout.network/newsletter</a></p>'
             f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>'
             + footer_buttons_html(links) + '</table></td></tr></table></body></html>')
 
@@ -1002,6 +1022,9 @@ def render(issue, links, c=None):
     if issue.get("label"): day = issue["label"]
     B = []; a = B.append
     a(_bluf_html(issue["bluf"]))
+    _tv = next((v for v in (issue.get("videos") or []) if v.get("youtube_id")), None)
+    if _tv:
+        a(f'<tr><td class="bnl" style="padding:0 20px 12px 20px;font:700 15px/1.4 {FH}"><a href="https://www.youtube.com/shorts/{E(_tv["youtube_id"])}" class="bnt" style="{_L}">▶ Watch today\'s top story</a></td></tr>')
     if issue.get("near"):
         a(_sec_html(f"Near you — {issue.get('loc_label') or 'your area'}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country), highest rank first.", "green"))
         for it in issue["near"]: a(_item_html(it, links, c))
@@ -1068,11 +1091,12 @@ def render(issue, links, c=None):
         for it in issue["watchlist"]:
             T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])}) {wire_url(it['cluster_id'], c=c)}")
         T.append("")
-    T += ["See the whole picture: https://blackout.network (no .com)", "YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
+    T += [f"Forward to a friend: {FORWARD_URL}", "See the whole picture: https://blackout.network (no .com)", "YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
     T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}", why,
           f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
     T += footer_buttons_text(links)
-    return subj, html_, "\n".join(T)
+    html_, txt_ = utm_tag(html_, "\n".join(T), f"{issue.get('slot') or 'brief'}-{issue['end'].astimezone(ET).strftime('%Y-%m-%d')}")
+    return subj, html_, txt_
 
 
 # ------------------------------------------------------------------ breaking / emergency alerts
@@ -1143,6 +1167,7 @@ def render_trending(t, links, at, c=None):
     html_ = _shell(subj, pre, _head_html("TRENDING", PAL["ac"], fmt_et(at), f"As of {fmt_et(at)}"), [_bluf_html(pre), _trend_row(t)], links, c, why)
     text = "\n".join([subj, "", pre, f"Watch: {t['url']}", "", "See the whole picture: https://blackout.network (no .com)", "--",
                       f"{BRAND} · {addr}", *footer_buttons_text(links)])
+    html_, text = utm_tag(html_, text, f"trending-{at.astimezone(ET).strftime('%Y-%m-%d')}")
     return subj, html_, text
 
 def render_breaking(items, links, at, c=None, trend=None):
@@ -1168,7 +1193,8 @@ def render_breaking(items, links, at, c=None, trend=None):
         T.append(f"   Follow this story: {follow_links(links.get('_row'), it['cluster_id'], c)['follow']}"); T.append("")
     T += [f"Why you got this: it met the breaking-alert bar ({rules}).", "--", DISCLAIMER, why,
           f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""] + footer_buttons_text(links)
-    return subj, html_, "\n".join(T)
+    html_, txt_ = utm_tag(html_, "\n".join(T), f"breaking-{at.astimezone(ET).strftime('%Y-%m-%d')}")
+    return subj, html_, txt_
 
 # ------------------------------------------------------------------ launch / video stories (social_stories.json, built by tools/build_social_stories.py)
 def load_stories():
