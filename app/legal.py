@@ -1,5 +1,6 @@
 """Legal pages add-on (t270): GET /privacy (Privacy Policy) and GET /tos (Terms of Service; alias /terms).
-Static, self-contained HTML (no scripts, no data reads), so both pages are served even while the public node warms up.
+t285: Privacy adds 'YouTube and Google user data' (Google OAuth consent screen / API Services User Data Policy, Limited Use);
+Terms adds 'YouTube content'. Static, self-contained HTML (no scripts, no data reads), so both pages are served even while the public node warms up.
 Styled like /scoring: shared /theme.css palette plus a small inline stylesheet. Never touches scanner.py, scoring,
 push.py, jets.py, aviation_watch.py or config.json."""
 import html
@@ -72,6 +73,8 @@ If you do not agree, please do not use the Site.</p>"""),
 ("glance", "Summary", """
 <ul>
 <li>The Site has <b>no user accounts</b>, shows <b>no advertising</b>, and uses <b>no advertising or third-party analytics trackers</b>.</li>
+<li>Visitors <b>never sign in with Google</b>. The only Google account connected to the Site is its own @BlkoutNtw YouTube channel; see
+<a href="#youtube">YouTube and Google user data</a>.</li>
 <li>We <b>do not sell or rent</b> personal information, and we do not share it for cross-context behavioral advertising.</li>
 <li>Most of what you see is publicly available information collected from third-party sources.</li>
 <li>Personal information is collected only when you choose to provide it (for example, a newsletter email address) and in limited
@@ -150,6 +153,63 @@ live radio streams from broadcasters (such as NPR, BBC, CBC, RFI, Al Jazeera, AB
 on Wikimedia Commons; and code libraries delivered by content-delivery networks (such as unpkg and jsDelivr).</p>
 <p>We do not control these providers and are not responsible for their privacy practices. Their use of information is governed by their
 own privacy policies.</p>"""),
+("youtube", "YouTube and Google user data", f"""
+<p>blackout.network runs a YouTube channel, <b>@BlkoutNtw</b>, and uses Google's YouTube API Services (the YouTube Data API v3 and the
+YouTube Analytics API) through a Google OAuth client to manage that channel. This section explains exactly what Google user data that
+connection accesses and how it is handled.</p>
+<h3>Whose Google account is connected</h3>
+<p>The only Google account ever connected to blackout.network is the Site's own @BlkoutNtw YouTube channel, which is owned and authorized by
+the operator of blackout.network. <b>Visitors never sign in with Google</b>, and the Site does not request, receive or store any visitor's
+Google or YouTube account data.</p>
+<h3>Data accessed</h3>
+<p>With the operator's permission (OAuth scopes <code>youtube</code>, <code>youtube.upload</code> and <code>yt-analytics.readonly</code>),
+blackout.network accesses the following data about its own @BlkoutNtw channel only:</p>
+<ul>
+<li><b>Channel information:</b> channel title, description, channel and playlist IDs, and branding settings (such as banner, profile picture
+and watermark);</li>
+<li><b>Video metadata:</b> titles, descriptions, tags, categories, privacy status (public, unlisted or private), publish times and
+thumbnails;</li>
+<li><b>Uploads:</b> the video files we upload and their upload and processing status;</li>
+<li><b>Playlists:</b> the channel's playlists and the videos in them;</li>
+<li><b>Comments:</b> comments posted on the channel's own videos, including the commenter's public display name as YouTube shows it, so that
+we can read, reply to and moderate them; and</li>
+<li><b>Analytics (read-only):</b> aggregate channel and video performance, such as views, watch time and subscriber counts.</li>
+</ul>
+<h3>How the data is used</h3>
+<p>This data is used <b>only</b> to publish and manage blackout.network's own videos, playlists, channel details and comments, and to read
+the channel's own performance. We do not use Google user data for advertising, we do not sell, rent or share it with anyone, we do not use
+it to build profiles of any person, and we do not use it to develop, improve or train artificial-intelligence or machine-learning models.
+No person reads this data except the operator, for the purposes above.</p>
+<h3>Storage and protection</h3>
+<ul>
+<li>The OAuth client credentials and the OAuth access and refresh tokens are kept in <b>restricted-access environment variables</b> on
+blackout.network's private, access-controlled operations server, which is separate from the public website. They are never placed in
+source code, in the code repository, or on any public page, and they are never sent to visitors' browsers.</li>
+<li>All communication with Google and YouTube uses encrypted HTTPS (TLS) connections only.</li>
+<li>No Google account password is ever requested, received or stored; access works only through Google's OAuth consent, which the channel
+owner can revoke at any time.</li>
+</ul>
+<h3>Retention and deletion</h3>
+<ul>
+<li><b>OAuth tokens</b> are kept only until access is revoked or the YouTube integration is discontinued, and are deleted from our server
+within 30 days after that.</li>
+<li><b>YouTube Analytics data</b> is read on demand and is <b>not stored</b> by blackout.network.</li>
+<li><b>Comments</b> are read on demand to reply to and moderate them and are not copied into any blackout.network database.</li>
+<li><b>Video metadata and uploads</b> are our own published content; any copies we keep are only the working files we created for the
+channel.</li>
+</ul>
+<p><b>To revoke access</b>, the owner of the connected Google account can remove blackout.network at any time at
+<a href="https://myaccount.google.com/permissions">https://myaccount.google.com/permissions</a>. To ask us to delete any data described in
+this section, email {MAIL}; we will complete deletion requests within 30 days.</p>
+<h3>Google and YouTube policies</h3>
+<ul>
+<li>Our use of YouTube API Services is subject to the <a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>, and Google's
+handling of data is described in the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</li>
+<li><b>blackout.network's use and transfer of information received from Google APIs adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the
+Limited Use requirements.</b></li>
+</ul>
+<p>Questions about this section can be sent to {MAIL}.</p>"""),
 ("use", "How we use information", """
 <ul>
 <li>To operate, maintain, secure and improve the Site and its features;</li>
@@ -266,6 +326,11 @@ exploit the Site or its content except as permitted by law or with our written p
 <p>If you believe content on the Site infringes your copyright or other rights, email {MAIL} with a description of the work, its location on
 the Site, your contact information and a statement that you have a good-faith belief the use is not authorized. We will review and, where
 appropriate, remove or disable access to it.</p>"""),
+("youtube", "YouTube content", """
+<p>The Site and its @BlkoutNtw YouTube channel use YouTube API Services. YouTube videos, embeds and channel content are subject to the
+<a href="https://www.youtube.com/t/terms">YouTube Terms of Service</a>, and by viewing or interacting with YouTube content through the Site
+or the channel you agree to be bound by them. Google's handling of data is described in the
+<a href="https://policies.google.com/privacy">Google Privacy Policy</a>.</p>"""),
 ("use", "Acceptable use", """
 <p>You agree not to, and not to attempt to:</p>
 <ul>
@@ -339,7 +404,7 @@ agreements on that subject. You may not assign these Terms; we may assign them w
 ]
 
 PRIVACY_INTRO = ('<p class="lead">This policy describes how blackout.network handles information: what it shows, what it collects from '
-                 'visitors, and the choices you have.</p>')
+                 'visitors, how it handles YouTube and Google user data, and the choices you have.</p>')
 TOS_INTRO = ('<p class="lead">Please read these Terms carefully. blackout.network is an informational research tool, not an emergency '
              'alerting service. <b>In an emergency, call 911.</b></p>')
 
