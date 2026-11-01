@@ -264,13 +264,14 @@ class H(BaseHTTPRequestHandler):
         if given and hmac.compare_digest(given.encode(), passcode().encode()): return "ok"
         fails[ip].append(t); return "bad"
 
-    TAB_PATHS = set("wire noise thread broadcasts streams radio network grid ai solar heatmap midterms spacex elon preppers tips weather trends "
+    TAB_PATHS = set("wire noise thread broadcasts streams radio network grid ai solar heatmap midterms spacex figures preppers tips weather trends "
                     "politics gunlaws finance jets medical resources bushcraft intel ranked games government maps".split())
     def not_found_page(self, path):
         """t347: a dashboard tab name typed as a path (/maps) -> 302 to /#maps; any other unknown non-API path -> the HTML 404 page.
         API / internal paths keep their JSON 404. Returns True if a response was sent."""
         if path.startswith(("/api/", "/internal/")): return False
         seg = path.strip("/").lower()
+        if seg == "elon": seg = "figures"   # t353: the old Elon Musk tab is now Key Figures
         if seg in self.TAB_PATHS:
             self.send_response(302); self.send_header("Location", "/#" + seg); self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); return True

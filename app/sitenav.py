@@ -63,8 +63,6 @@ NAV = [
    "SpaceX on BLACKOUT.NETWORK: next-launch countdown, the full launch schedule, Starship and Starlink updates, recent news and related prediction markets."),
   ("intel", "intel", "🗂 Intel Streams", "Intel Streams: research, leaks, patents",
    "BLACKOUT.NETWORK's Intel Streams: new research papers, leak releases, patents, mergers and market shocks, each linked to its source, with an RSS feed."),
-  ("elon", "elon", "👤 Elon Musk", "Elon Musk: news, companies and markets",
-   "Elon Musk news on BLACKOUT.NETWORK, sorted by company and topic, alongside his estimated net worth, the Tesla stock price and related prediction markets."),
  ]),
  ("Community", [
   ("ranked", "ranked", "🗳 Ranked by Users", "Ranked by Users: the crowd's threat level",
@@ -86,6 +84,8 @@ NAV = [
    "BLACKOUT.NETWORK's grid-down first-aid guide: bleeding control, burns, fractures, CPR, choking, allergic reactions and heat illness. Not medical advice."),
   ("preppers", "preppers", "🎒 Preppers", "Preppers: suppliers, guidance and kits",
    "Rated prepper suppliers, free official preparedness guidance, a supply planner and ready-made kit lists for every threat type, on BLACKOUT.NETWORK."),
+  ("figures", "figures", "👥 Key Figures", "Key Figures: people in the news",
+   "A neutral reference to the people named in the stories BLACKOUT.NETWORK follows: their current role, why they are in the news and the latest headlines."),
   ("@scoring", "/scoring", "📐 How we score", None, None),
   ("sources", "sources", "📚 Sources", "Sources: every source, rated 0–10",
    "Every source BLACKOUT.NETWORK uses, with item counts, profiles and a transparent 0–10 confidence rating, plus a global directory you can search."),

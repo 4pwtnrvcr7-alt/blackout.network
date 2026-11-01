@@ -132,7 +132,7 @@ def collect(base, tabs=None, dir_sample=1500, quick=False):
                 print("collect error", where, str(e)[:120], file=sys.stderr)
             for ju, data in jsons:
                 found = []; walk_json(data, found)
-                feed = bool(re.search(r"/api/(state|timeline|wire_history|noise|stream|search|broadcasts|live_archive|intel|elon|spacex|politics|trends|netstatus|streams|tabfeeds|ai|finance|solar|weather)", ju))
+                feed = bool(re.search(r"/api/(state|timeline|wire_history|noise|stream|search|broadcasts|live_archive|intel|elon|figures|spacex|politics|trends|netstatus|streams|tabfeeds|ai|finance|solar|weather)", ju))
                 for u, lab in found: add(u, lab, where, "feed" if feed else "data")
             pg.close()
         br.close()

@@ -62,7 +62,8 @@ ROUTES = {
     "/api/social": "social",
     "/story": "social",             # /story/<slug>: one page per launch video (article + nocookie embed), hidden until publish_at (t311)
     "/api/spacex": "spacex",
-    "/api/elon": "elon",
+    "/api/elon": "elon",            # old Elon Musk tab API (tab retired t353; #elon now redirects to #figures)
+    "/api/figures": "figures",      # Key Figures tab #figures (t353): neutral people-in-the-news cards
     "/api/finance": "finance",
     "/api/intel": "intel_streams",
     "/api/ai": "aithreats",          # tab #ai (t231; in the nav since t233)

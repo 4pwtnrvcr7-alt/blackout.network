@@ -1,0 +1,28 @@
+/* ---- 👥 Key Figures tab (figures.py, t353). Direction A "Signal": Montserrat headings, Inter body, near-black + red, left-aligned, mobile-first. ---- */
+#tab-figures{align-content:start;min-width:0}
+#tab-figures .kf{min-width:0;max-width:100%;box-sizing:border-box;text-align:left}
+#tab-figures .kf-h{font-family:var(--bn-font-ui,"Montserrat",system-ui,sans-serif);font-weight:800;font-size:clamp(20px,5vw,28px);letter-spacing:-.01em;line-height:1.15;margin:0 0 4px;padding:0 0 8px;border-bottom:var(--bn-rule-h,3px) solid var(--bn-brand,#FF4D4F);display:block}
+#tab-figures .kf-sub{font-family:var(--bn-font-body,"Inter",system-ui,sans-serif);color:var(--bn-muted,#8B95A3);font-size:14px;margin:8px 0 12px;max-width:72ch}
+#tab-figures .kf-tools{margin:0 0 14px}
+#tab-figures .kf-q{display:block;max-width:420px}
+#tab-figures .kf-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#tab-figures .kf-q input{box-sizing:border-box;width:100%;font:15px var(--bn-font-body,"Inter",system-ui,sans-serif);color:inherit;background:var(--bn-raised,#1B2027);border:1px solid var(--bn-line,#252B33);border-radius:var(--bn-radius-sm,8px);padding:10px 12px}
+#tab-figures .kf-q input:focus{outline:2px solid var(--bn-brand,#FF4D4F);outline-offset:1px}
+#tab-figures .kf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:var(--bn-gap,14px);width:100%}
+#tab-figures .kf-card{box-sizing:border-box;min-width:0;display:flex;flex-direction:column;gap:8px;background:var(--bn-raised,#1B2027);border:1px solid var(--bn-line,#252B33);border-left:3px solid var(--bn-brand,#FF4D4F);border-radius:var(--bn-radius,12px);padding:14px 14px 12px;font-family:var(--bn-font-body,"Inter",system-ui,sans-serif)}
+#tab-figures .kf-hd{display:flex;gap:12px;align-items:center;min-width:0}
+#tab-figures .kf-ini{flex:0 0 48px;width:48px;height:48px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bn-bg,#0B0D10);color:var(--bn-brand,#FF4D4F);border:1px solid var(--bn-line-2,#2f3742);font:800 17px var(--bn-font-ui,"Montserrat",system-ui,sans-serif);letter-spacing:.02em}
+#tab-figures .kf-id{min-width:0}
+#tab-figures .kf-id h3{font-family:var(--bn-font-ui,"Montserrat",system-ui,sans-serif);font-weight:700;font-size:17px;line-height:1.2;margin:0;overflow-wrap:anywhere}
+#tab-figures .kf-role{font-size:13.5px;line-height:1.3;margin-top:2px;overflow-wrap:anywhere}
+#tab-figures .kf-ctry{font-size:12px;color:var(--bn-muted,#8B95A3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+#tab-figures .kf-why{margin:0;font-size:14px;line-height:1.45;overflow-wrap:anywhere}
+#tab-figures .kf-cnt{font-size:12.5px;color:var(--bn-muted,#8B95A3)}
+#tab-figures .kf-ul{list-style:none;margin:0;padding:0;font-size:13.5px;line-height:1.35;border-top:1px solid var(--bn-line,#252B33)}
+#tab-figures .kf-ul li{padding:7px 0;border-bottom:1px solid var(--bn-line,#252B33);min-width:0;overflow-wrap:anywhere}
+#tab-figures .kf-ul a{color:inherit;text-decoration:none}#tab-figures .kf-ul a:hover{text-decoration:underline;color:var(--bn-brand,#FF4D4F)}
+#tab-figures .kf-m{font-size:12px;color:var(--bn-muted,#8B95A3);margin-top:2px;overflow-wrap:anywhere}
+#tab-figures .kf-m a{color:var(--bn-link,#4aa3ff)!important}
+#tab-figures .kf-lk{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:auto;padding-top:4px;font-size:13px}
+#tab-figures .kf-lk a{color:var(--bn-link,#4aa3ff);text-decoration:none;font-weight:600}#tab-figures .kf-lk a:hover{text-decoration:underline}
+#tab-figures .kf-note{font-size:12px;color:var(--bn-muted,#8B95A3);margin:14px 0 0;max-width:90ch;line-height:1.45}
