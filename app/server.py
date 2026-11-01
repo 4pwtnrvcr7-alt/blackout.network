@@ -260,6 +260,36 @@ class H(BaseHTTPRequestHandler):
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
         self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "public, max-age=31536000, immutable" if versioned else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+    # Security headers (Security Officer baseline 2026-11-01). Added to EVERY response (send(), redirects, add-on raw replies)
+    # at end_headers(); headers already set by the handler (send() sets nosniff + Referrer-Policy) are never duplicated.
+    # HSTS: 6 months, no includeSubDomains (M365/Resend CNAMEs like autodiscover/sip/email are not verified HTTPS sites), no preload.
+    # CSP is Report-Only for now; frame-ancestors is ignored in Report-Only mode, so X-Frame-Options does the real anti-framing.
+    CSP_REPORT_ONLY = "; ".join([
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://translate.google.com https://translate.googleapis.com https://www.gstatic.com https://www.googletagmanager.com",
+        "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://translate.googleapis.com https://www.gstatic.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "media-src 'self' blob: https:",
+        "connect-src 'self' https://api.rainviewer.com https://tilecache.rainviewer.com https://tiles.openfreemap.org https://tiles.versatiles.org https://services.swpc.noaa.gov https://unpkg.com https://cdn.jsdelivr.net https://translate.googleapis.com https://translate-pa.googleapis.com https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com",
+        "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://rumble.com https://t.me https://translate.google.com",
+        "worker-src 'self' blob:",
+        "manifest-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'self'",
+    ])
+    SECURITY_HEADERS = (("Strict-Transport-Security", "max-age=15552000"), ("X-Frame-Options", "SAMEORIGIN"),
+                        ("X-Content-Type-Options", "nosniff"), ("Referrer-Policy", "strict-origin-when-cross-origin"),
+                        ("Content-Security-Policy-Report-Only", CSP_REPORT_ONLY))
+    def end_headers(self):
+        try:
+            sent = b"".join(getattr(self, "_headers_buffer", []) or []).lower()
+            for k, v in self.SECURITY_HEADERS:
+                if (k.lower() + ":").encode() not in sent: self.send_header(k, v)
+        except Exception: pass
+        return super().end_headers()
     def body(self):
         n = min(int(self.headers.get("Content-Length") or 0), 2_000_000 if self.path.startswith("/api/reports/") else 16000 if self.path.startswith("/api/report") else 10000)
         self._raw = self.rfile.read(n)   # kept for add-ons that accept form posts (newsletter: no-JS forms, RFC 8058 one-click unsubscribe)

@@ -132,6 +132,8 @@ def handle_get(path, qs):
 def handle_post(path, d, ip=None, qs=None, headers=None, raw=b""):
     if not _same_origin(headers): return 403, {"error": "cross-site request refused"}
     if _limited(ip): return 429, {"error": "Too many requests. Please wait a few minutes."}
+    if path in ("/api/alerts/subscribe", "/api/alerts/resubscribe") and _limited("sub|" + (ip or "?"), n=10, win=3600):
+        return 429, {"error": "Too many sign-up attempts. Please try again in an hour."}   # Security baseline 2026-11-01: 10 subscribe writes/IP/hour
     d = d if isinstance(d, dict) else {}
     if path == "/api/alerts/subscribe":
         p = _parse_sub(d.get("sub"))
