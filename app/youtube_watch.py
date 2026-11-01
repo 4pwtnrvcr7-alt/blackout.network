@@ -44,6 +44,53 @@ def fetch(cid, tries=2):
         time.sleep(1.5)
     return None, last
 
+PAGE_UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36", "Accept-Language": "en"}
+AGO_RX = re.compile(r"(\d+)\s*(second|sec|s|minute|min|m|hour|hr|h|day|d|week|wk|w|month|mo|year|yr|y)s?\b", re.I)
+AGO_SEC = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "mo": 2592000, "y": 31536000}
+
+def ago_to_iso(txt):
+    """'9h ago' / '9 hours ago' / 'Streamed 2 days ago' -> ISO time (upper bound of the age, so never newer than reality)."""
+    m = AGO_RX.search(txt or "")
+    if not m: return None
+    u = m.group(2).lower()
+    key = "mo" if u.startswith("mo") else "m" if u.startswith("mi") or u == "m" else u[0]
+    sec = (int(m.group(1)) + 1) * AGO_SEC[key] - 1 if key in ("s", "m", "h") else int(m.group(1)) * AGO_SEC[key]
+    return (datetime.now(timezone.utc) - timedelta(seconds=sec)).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+def fetch_page(cid):
+    """Fallback when the RSS feed server is down (it periodically answers 404/500 for every channel for hours):
+    read the public channel /videos page and pull id, title and relative age from ytInitialData. -> (vids, err)"""
+    try:
+        r = requests.get(f"https://www.youtube.com/channel/{cid}/videos", headers=PAGE_UA, cookies={"CONSENT": "YES+1"}, timeout=20)
+        if r.status_code != 200: return None, f"page HTTP {r.status_code}"
+        m = re.search(r"var ytInitialData = (\{.*?\});</script>", r.text)
+        if not m: return None, "page: no ytInitialData"
+        data = json.loads(m.group(1))
+    except Exception as ex: return None, "page " + type(ex).__name__
+    out, seen = [], set()
+    def walk(o):
+        if isinstance(o, dict):
+            lv = o.get("lockupViewModel")
+            if isinstance(lv, dict) and lv.get("contentId") and lv["contentId"] not in seen:
+                md = (lv.get("metadata") or {}).get("lockupMetadataViewModel") or {}
+                title = ((md.get("title") or {}).get("content") or "").strip()
+                parts = [p.get("text", {}).get("content", "") for row in ((md.get("metadata") or {}).get("contentMetadataViewModel") or {}).get("metadataRows", [])
+                         for p in row.get("metadataParts", [])]
+                pub = next((ago_to_iso(t) for t in parts if "ago" in t), None)
+                if title and pub: seen.add(lv["contentId"]); out.append({"id": lv["contentId"], "title": title, "published": pub, "desc": ""})
+            vr = o.get("videoRenderer")
+            if isinstance(vr, dict) and vr.get("videoId") and vr["videoId"] not in seen:
+                title = "".join(x.get("text", "") for x in (vr.get("title") or {}).get("runs", [])).strip()
+                pub = ago_to_iso((vr.get("publishedTimeText") or {}).get("simpleText", ""))
+                if title and pub: seen.add(vr["videoId"]); out.append({"id": vr["videoId"], "title": title, "published": pub, "desc": ""})
+            for v in o.values(): walk(v)
+        elif isinstance(o, list):
+            for x in o: walk(x)
+    walk(data)
+    if out: return out, None
+    # a real channel page with no public uploads listed (RSS for such channels is an empty feed) -> ok, 0 videos
+    return ([], None) if "channelMetadataRenderer" in m.group(1) else (None, "page: no videos parsed")
+
 def parse(xml):
     root = ET.fromstring(xml); out = []
     for e in root.findall("a:entry", NS):
@@ -72,10 +119,17 @@ def main(argv=None):
     batch, report = [], []
     for ch in chans:
         xml, err = fetch(ch["channel_id"])
-        rec = {"name": ch["name"], "ok": bool(xml), "error": err, "recent": 0, "relevant": 0, "new": 0}
+        rec = {"name": ch["name"], "ok": bool(xml), "error": err, "recent": 0, "relevant": 0, "new": 0, "via": "rss"}
+        vids = None
         if xml:
             try: vids = parse(xml)
-            except Exception as ex: vids = []; rec.update(ok=False, error="parse: " + type(ex).__name__)
+            except Exception as ex: vids = None; rec.update(ok=False, error="parse: " + type(ex).__name__)
+        if vids is None:  # RSS down or unparsable -> channel page fallback
+            pv, perr = fetch_page(ch["channel_id"])
+            if pv is not None: vids = pv; rec.update(ok=True, via="page", error=None, rss_error=rec["error"])
+            else: rec["error"] = f"{rec['error']}; {perr}"
+        err = rec["error"]
+        if vids is not None:
             for v in vids:
                 t = S.parse_t(v["published"])
                 if not t or t < since: continue
@@ -99,16 +153,17 @@ def main(argv=None):
         except Exception: res = {"raw": p.stdout[-400:]}
         for b in batch: st["seen"][b["_id"]] = time.time()
     if not a.dry_run: save_state(st)
-    ok = sum(r["ok"] for r in report)
-    summ = {"ok": True, "dry_run": a.dry_run, "channels": len(chans), "feeds_ok": ok, "feeds_failed": [r["name"] + f" ({r['error']})" for r in report if not r["ok"]],
+    ok = sum(r["ok"] for r in report); via_page = sum(r["via"] == "page" for r in report)
+    summ = {"ok": True, "dry_run": a.dry_run, "channels": len(chans), "feeds_ok": ok, "via_page_fallback": via_page, "feeds_failed": [r["name"] + f" ({r['error']})" for r in report if not r["ok"]],
             "recent_videos": sum(r["recent"] for r in report), "relevant": sum(r["relevant"] for r in report), "sent": len(batch),
             "ingest": {k: res.get(k) for k in ("received", "accepted", "new", "skipped")} if isinstance(res, dict) else None,
             "high": (res or {}).get("high") if isinstance(res, dict) else None,
             "items": [{"source": b["source"], "title": b["title"], "url": b["url"], "category": b["_cat"]} for b in batch]}
-    log(f"channels={len(chans)} ok={ok} recent={summ['recent_videos']} relevant={summ['relevant']} sent={len(batch)} dry={a.dry_run} ingest={summ['ingest']}")
+    log(f"channels={len(chans)} ok={ok} page_fallback={via_page} recent={summ['recent_videos']} relevant={summ['relevant']} sent={len(batch)} dry={a.dry_run} ingest={summ['ingest']}")
     if a.json: print(json.dumps(summ, indent=1))
     else:
-        print(f"YouTube watch: {ok}/{len(chans)} feeds OK, {summ['recent_videos']} videos in the last {a.hours:g} h, {summ['relevant']} threat-relevant, {len(batch)} new sent"
+        print(f"YouTube watch: {ok}/{len(chans)} feeds OK ({via_page} via channel-page fallback, RSS down), " if via_page else f"YouTube watch: {ok}/{len(chans)} feeds OK, ", end="")
+        print(f"{summ['recent_videos']} videos in the last {a.hours:g} h, {summ['relevant']} threat-relevant, {len(batch)} new sent"
               + (f"; ingest accepted {summ['ingest']['accepted']}, new {summ['ingest']['new']}" if summ["ingest"] else "") + (" (dry run)" if a.dry_run else ""))
         for f in summ["feeds_failed"]: print("  feed failed:", f)
         for it in summ["items"][:40]: print(f"  [{it['category']}] {it['source']}: {it['title'][:110]}")
