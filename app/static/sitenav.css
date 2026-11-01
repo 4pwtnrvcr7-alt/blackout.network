@@ -208,3 +208,5 @@ body .bn-logo svg.bn-icon{width:var(--bn-icon)!important;height:var(--bn-icon)!i
 /* left alignment everywhere (brand A): footers and empty states were centered */
 #site_foot,footer.ft,.tips-box{text-align:left!important}
 .tips-box{margin-left:0!important}
+/* t333: caps domain (BLACKOUT.NETWORK, small caps) is wider than the old lower-case word: cap it on phones so it never clips */
+.bn-logo .bn-word{font-size:min(var(--bn-logo-size),3.4vw)}
