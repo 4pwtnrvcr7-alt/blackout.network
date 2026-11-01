@@ -1,9 +1,10 @@
 """blackout.network newsletter add-on (hot-reloaded by server.py via addons.py).
 
 Pages:  GET /newsletter (signup) · /newsletter/confirm?token= · /newsletter/unsubscribe?token= · /newsletter/manage?token=
+        /newsletter/sources?token= (personalized source suggestions; same signed "manage" token as the categories page)
         /newsletter/admin (admin passcode) · /newsletter/sample (live sample issue)
 API:    GET  /api/newsletter/meta · /api/newsletter/app.js|app.css|admin.js
-        POST /api/newsletter/subscribe · /api/newsletter/manage · /api/newsletter/resubscribe · /api/newsletter/unsubscribe
+        POST /api/newsletter/subscribe · /api/newsletter/manage · /api/newsletter/add_category · /api/newsletter/resubscribe · /api/newsletter/unsubscribe
         POST /newsletter/unsubscribe?token=  (RFC 8058 one-click, used by mail clients)
         POST /api/newsletter/admin/login · /api/newsletter/admin  (session token from login)
 Data:   reads blackout.db ONLY via file:blackout.db?mode=ro; writes only newsletter.db, newsletter_outbox/, logs/newsletter.log,
@@ -35,6 +36,8 @@ P = {  # every path is overridable by env var for tests (NEWSLETTER_DB, NEWSLETT
     "disposable": os.path.join(BASE, "newsletter_disposable.txt"),
     "worker": os.path.join(BASE, "newsletter_worker.py"),
     "pid": os.path.join(BASE, "logs", "newsletter_worker.pid"),
+    "sources_db": os.environ.get("NEWSLETTER_SOURCES_DB", os.path.join(BASE, "sources.db")),            # Sources catalog (read-only here)
+    "dir_db": os.environ.get("NEWSLETTER_DIR_DB", os.path.join(BASE, "sources_dir", "directory.db")),  # global directory (read-only here)
 }
 BRAND = "blackout.network"
 TAGLINE = "The world's threats, scored and sourced, before cable news catches up."
@@ -247,9 +250,11 @@ def token_sub(tok, purpose, t=None):
     return "ok", r
 
 def links_for(row, c=None):
-    base = (c or cfg())["base_url"].rstrip("/")
+    base = (c or cfg())["base_url"].rstrip("/"); mt = sub_token('manage', row)
     return {"unsubscribe": f"{base}/newsletter/unsubscribe?token={sub_token('unsub', row)}",
-            "manage": f"{base}/newsletter/manage?token={sub_token('manage', row)}",
+            "manage": f"{base}/newsletter/manage?token={mt}",
+            "categories": f"{base}/newsletter/manage?token={mt}",   # "Manage my subscription categories" button
+            "sources": f"{base}/newsletter/sources?token={mt}",     # "Find new sources" button
             "confirm": f"{base}/newsletter/confirm?token={sub_token('confirm', row)}",
             "scoring": f"{base}/scoring", "site": f"{base}/#wire", "signup": f"{base}/newsletter"}
 
@@ -462,6 +467,24 @@ def _item_html(it):
             f'<b style="color:#e6e9ee">Confidence:</b> <span style="color:{conf_col}">{E(it["confidence"])}</span>; rank {it["rank"]}/10, score {it["score"]}/100. '
             f'<b style="color:#e6e9ee">Verify:</b> {links}</p></td></tr>')
 
+# Issue footer: three distinct buttons. Inline styles only (email clients strip <style>); dark theme like render_simple's button.
+BTN_PRIMARY = ("display:inline-block;background:#4aa3ff;color:#0b0d10;font-weight:700;font-size:14px;line-height:1.3;text-decoration:none;"
+               "border-radius:6px;padding:10px 18px;margin:0 8px 8px 0;border:1px solid #4aa3ff")
+BTN_SECONDARY = ("display:inline-block;background:#1c232c;color:#e6e9ee;font-weight:700;font-size:14px;line-height:1.3;text-decoration:none;"
+                 "border-radius:6px;padding:10px 18px;margin:0 8px 8px 0;border:1px solid #4aa3ff")
+def footer_buttons_html(links):
+    cat = links.get("categories") or links.get("manage"); srcs = links.get("sources") or links.get("site")
+    return (f'<tr><td style="padding:16px 16px 6px 16px;border-top:1px solid #252b33">'
+            f'<a href="{E(cat)}" style="{BTN_PRIMARY}">Manage my subscription categories</a>'
+            f'<a href="{E(srcs)}" style="{BTN_SECONDARY}">Find new sources</a></td></tr>'
+            f'<tr><td align="center" style="padding:14px 16px 16px 16px">'
+            f'<a href="{E(links["unsubscribe"])}" style="color:#8b95a3;font-size:11px;text-decoration:underline">Unsubscribe</a>'
+            f'<span style="color:#8b95a3;font-size:11px"> (one click, no login)</span></td></tr>')
+def footer_buttons_text(links):
+    return [f"Manage my subscription categories: {links.get('categories') or links.get('manage')}",
+            f"Find new sources: {links.get('sources') or links.get('site')}", "",
+            f"Unsubscribe (one click): {links['unsubscribe']}"]
+
 def render(issue, links, c=None):
     """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site."""
     c = c or cfg(); subj = subject_for(issue)
@@ -507,10 +530,10 @@ def render(issue, links, c=None):
     a(f'<tr><td style="padding:16px;border-top:1px solid #252b33;font-size:12px;line-height:1.6;color:#8b95a3">'
       f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} <a href="{E(links["scoring"])}" style="color:#4aa3ff">How we score</a> · '
       f'<a href="{E(links["site"])}" style="color:#4aa3ff">Open the live dashboard</a></p>'
-      f'<p style="margin:0 0 8px 0">You get this because you confirmed a subscription to the {BRAND} newsletter. '
-      f'<a href="{E(links["manage"])}" style="color:#4aa3ff">Manage preferences</a> · '
-      f'<a href="{E(links["unsubscribe"])}" style="color:#4aa3ff">Unsubscribe</a> (one click, no login).</p>'
-      f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr></table></td></tr></table></body></html>')
+      f'<p style="margin:0 0 8px 0">You get this because you confirmed a subscription to the {BRAND} newsletter.</p>'
+      f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>')
+    a(footer_buttons_html(links))
+    a('</table></td></tr></table></body></html>')
     T = [f"BLACKOUT.NETWORK — {slot_label(issue['slot'])} Brief", TAGLINE, rng, ""]
     def tsec(title, items):
         T.extend([title.upper(), "=" * len(title)])
@@ -528,8 +551,8 @@ def render(issue, links, c=None):
             T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])})" + (f" {it['links'][0]['url']}" if it["links"] else ""))
         T.append("")
     T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}",
-          f"Manage preferences: {links['manage']}", f"Unsubscribe (one click): {links['unsubscribe']}",
-          f"{BRAND} · {addr or '[Mailing address not set: required by CAN-SPAM before live sending]'}"]
+          f"{BRAND} · {addr or '[Mailing address not set: required by CAN-SPAM before live sending]'}", ""]
+    T += footer_buttons_text(links)
     return subj, "".join(H), "\n".join(T)
 
 def render_simple(title, paras, button=None, c=None, extra_links=None):
@@ -752,6 +775,82 @@ def manage(tok, d):
     log(f"subscriber #{r['id']} changed preferences", "sub")
     return 200, {"ok": True, "message": f"Saved: {FREQS[freq].lower()}, {'all categories' if ints == ['all'] else ', '.join(ints)}."}
 
+def add_category(tok, cat):
+    """'Add this category' on the Find new sources page. Same signed manage token; frequency is left alone."""
+    st, r = token_sub(tok, "manage")
+    if st != "ok" or r is None: return 400, {"ok": False, "message": "This link is invalid or expired. Use the link in your latest email."}
+    if r["status"] != "active": return 400, {"ok": False, "message": "This address isn't subscribed right now. Sign up again to restart the brief."}
+    if cat not in CATEGORIES: return 400, {"ok": False, "message": "Unknown category."}
+    try: cur = json.loads(r["interests"] or '["all"]')
+    except Exception: cur = ["all"]
+    if "all" in cur or cat in cur: return 200, {"ok": True, "message": f"You already get {cat}.", "interests": _clean_ints(cur)}
+    ints = _clean_ints(cur + [cat])
+    k = db(); k.execute("UPDATE subscribers SET interests=?, updated=? WHERE id=?", (json.dumps(ints), iso(now()), r["id"])); k.commit(); k.close()
+    log(f"subscriber #{r['id']} added category {cat}", "sub")
+    return 200, {"ok": True, "message": f"Added {cat}. It applies from the next send.", "interests": ints}
+
+# ------------------------------------------------------------------ personalized source suggestions (real Sources catalog + global directory only)
+# Newsletter category -> global-directory categories (the published registries behind /sources). Empty: no matching directory section.
+DIR_MAP = {"war/conflict": ["News & media", "Government & public agencies"], "political": ["Government & public agencies", "Local government"],
+           "natural disaster": ["Emergency management", "Seismic, volcanic & geophysical", "Weather, radar & ocean", "Hydrology & flood gauges"],
+           "disease": ["Health & medical institutions"], "cyber": ["Security & cyber", "Internet outage sensors"], "space weather": ["Satellites & space"],
+           "financial": [], "ufo/uap": [], "spiritual/religious": [], "other": ["Police & law enforcement", "Scanner & public-safety audio"]}
+_URL_OK = re.compile(r"^https?://[^\s<>\"']+$")
+def _ro(path):
+    if not os.path.exists(path): return None
+    c = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5); c.row_factory = sqlite3.Row; return c
+def catalog_picks(cat, n=5, skip=()):
+    """Top-rated sources in the Sources catalog that mainly report on this category (rating 7+/10, its top category or 30%+ of its items, live link)."""
+    c = None
+    try:
+        c = _ro(P["sources_db"])
+        if c is None: return []
+        jp = '$."' + cat.replace('"', "") + '"'
+        rows = c.execute("""SELECT key,name,type,link,rating,n_items,origin FROM sources WHERE link LIKE 'http%' AND rating>=7
+                            AND COALESCE(status,'') NOT LIKE 'disabled%' AND COALESCE(json_extract(categories, ?),0)>0
+                            AND (top_category=? OR 1.0 * json_extract(categories, ?) / MAX(n_items, 1) >= 0.3)
+                            ORDER BY rating DESC, json_extract(categories, ?) DESC, n_items DESC LIMIT ?""", (jp, cat, jp, jp, n + len(skip) + 5)).fetchall()
+    except Exception: return []
+    finally:
+        if c: c.close()
+    out = []
+    for r in rows:
+        if r["key"] in skip or not _URL_OK.match(r["link"] or ""): continue
+        out.append({"key": r["key"], "name": r["name"], "type": r["type"], "url": r["link"], "rating": r["rating"], "n": r["n_items"] or 0})
+        if len(out) >= n: break
+    return out
+def directory_picks(dcat, n=3, day=None):
+    """A few entries from the global directory for one directory category: link-checked entries first, then a daily rotation."""
+    c = None
+    try:
+        c = _ro(P["dir_db"])
+        if c is None: return []
+        day = day if day is not None else int(time.time() // 86400)
+        rows = c.execute("""SELECT name,url,kind,cc,reg FROM d WHERE cat=? AND url LIKE 'http%'
+                            ORDER BY checked IS NULL, (id * 7919 + ?) % 100003 LIMIT ?""", (dcat, day, n)).fetchall()
+        return [dict(r) for r in rows if _URL_OK.match(r["url"] or "")]
+    except Exception: return []
+    finally:
+        if c: c.close()
+def suggestions(row):
+    """-> {'mine': [(cat, [catalog picks], [(dircat, [dir picks])])], 'more': [(cat, [catalog picks])], 'all': bool, 'have': [cats]}"""
+    try: ints = json.loads(row["interests"] or '["all"]')
+    except Exception: ints = ["all"]
+    allc = "all" in ints or not ints
+    have = list(CATEGORIES) if allc else [x for x in CATEGORIES if x in ints]
+    per = 4 if allc else 6; seen = set(); mine = []
+    for cat in have:
+        picks = catalog_picks(cat, per, seen); seen.update(p["key"] for p in picks)
+        dirs = [(d, directory_picks(d, 2 if allc else 3)) for d in DIR_MAP.get(cat, [])[:2]]
+        dirs = [(d, x) for d, x in dirs if x]
+        if picks or dirs: mine.append((cat, picks, dirs))
+    more = []
+    if not allc:
+        for cat in CATEGORIES:
+            if cat in have: continue
+            more.append((cat, catalog_picks(cat, 3, seen)))
+    return {"mine": mine, "more": more, "all": allc, "have": have}
+
 # ------------------------------------------------------------------ schedule (slots, idempotency, catch-up, retry)
 def slot_time(day, name, c=None):
     c = c or cfg(); hh, mm = map(int, c["slots"][name].split(":"))
@@ -922,7 +1021,8 @@ def preview_issue(at=None, c=None):
     since = max(parse_t(last) or at - timedelta(hours=12), at - timedelta(hours=float(c["max_window_hours"])))
     issue = build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=at, since=since, slot=nxt["slot"], c=c)
     base = c["base_url"].rstrip("/")
-    L = {"unsubscribe": f"{base}/newsletter", "manage": f"{base}/newsletter", "scoring": f"{base}/scoring", "site": f"{base}/#wire"}
+    L = {"unsubscribe": f"{base}/newsletter", "manage": f"{base}/newsletter", "categories": f"{base}/newsletter", "sources": f"{base}/sources",
+         "scoring": f"{base}/scoring", "site": f"{base}/#wire"}
     subj, hb, tx = render(issue, L, c)
     return issue, subj, hb, tx, nxt
 
@@ -1114,6 +1214,43 @@ def prefs_form(tok, r):
             '</div><p class="nl-sm">Leave all ticked (or none) to get every category.</p></fieldset><button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')
 
+def _src_li(p):
+    meta = " · ".join(x for x in (E(p["type"]), f'rated {int(p["rating"])}/10' if p.get("rating") is not None else "",
+                                   f'{p["n"]:,} items seen' if p.get("n") else "") if x)
+    return (f'<li><a href="{E(p["url"])}" target="_blank" rel="noopener nofollow">{E(p["name"])}</a> '
+            f'<span class="nl-sm">{meta}</span></li>')
+def _dir_li(p):
+    meta = " · ".join(E(x) for x in (p.get("kind"), p.get("cc"), ("from " + p["reg"]) if p.get("reg") else "") if x)
+    return f'<li><a href="{E(p["url"])}" target="_blank" rel="noopener nofollow">{E(p["name"])}</a> <span class="nl-sm">{meta}</span></li>'
+def sources_body(tok, r):
+    S = suggestions(r); mt = E(tok)
+    head = ('<section class="nl-card"><h2>Find new sources</h2>'
+            f'<p>Picked for <b>{E(mask_email(r["email"]))}</b> from the categories you get: <b>{"all categories" if S["all"] else E(", ".join(S["have"]))}</b>. '
+            'Every suggestion links to the real source. They come from the blackout.network <a href="/sources">Sources catalog</a> (rated 7/10 or higher) '
+            'and its global directory of published registries.</p>'
+            f'<p><a class="nl-btn" href="/newsletter/manage?token={mt}">Manage my subscription categories</a></p></section>')
+    out = [head]
+    if not S["mine"]:
+        out.append('<section class="nl-card"><p>Source suggestions are still loading. Try again in a few minutes, or <a href="/sources">browse all sources</a>.</p></section>')
+    for cat, picks, dirs in S["mine"]:
+        blk = [f'<section class="nl-card nl-src"><h3>Because you get {E(cat)}</h3>']
+        if picks: blk.append('<p class="nl-sm">Top-rated sources in the catalog for this category:</p><ul class="nl-srclist">' + "".join(_src_li(p) for p in picks) + '</ul>')
+        for d, xs in dirs:
+            blk.append(f'<p class="nl-sm">From the directory: {E(d)}</p><ul class="nl-srclist">' + "".join(_dir_li(p) for p in xs) + '</ul>')
+        blk.append('</section>'); out.append("".join(blk))
+    if S["more"]:
+        out.append('<section class="nl-card"><h2>Categories you don\'t get yet</h2><p class="nl-sm">Add one to start getting it in your brief. Each shows a few of the sources behind it.</p>')
+        for cat, picks in S["more"]:
+            out.append(f'<div class="nl-more"><form class="nl-addcat" method="post" action="/api/newsletter/add_category" data-nl-addcat>'
+                       f'<input type="hidden" name="token" value="{mt}"><input type="hidden" name="category" value="{E(cat)}">'
+                       f'<b>{E(cat)}</b> <button class="pri nl-btn" type="submit">Add this category</button> <span class="nl-msg" role="status" aria-live="polite"></span></form>'
+                       + (('<ul class="nl-srclist">' + "".join(_src_li(p) for p in picks) + '</ul>') if picks else '<p class="nl-sm">No catalog sources rated 7+ for this category yet.</p>')
+                       + '</div>')
+        out.append('</section>')
+    out.append('<p class="nl-sm"><a href="/sources">Browse all sources</a> · <a href="/sources#sources">Search the global directory</a></p>'
+               '<script src="/api/newsletter/app.js"></script>')
+    return "".join(out)
+
 def handle_get(path, qs):
     if "/admin" in path: return 404, {"error": "not found"}   # admin is not part of the public node
     ensure_worker()
@@ -1162,10 +1299,23 @@ def handle_get(path, qs):
         if r["status"] != "active":
             return 200, result_page("Not currently subscribed", "This address isn't receiving the newsletter. Sign up again to restart it.", False,
                                     '<p><a class="nl-btn" href="/newsletter">Sign up</a></p>'), "text/html"
-        body = (f'<section class="nl-card"><h2>Manage your newsletter</h2><p>Subscribed: <b>{E(mask_email(r["email"]))}</b>. Changes apply from the next send.</p>'
-                + prefs_form(tok, r) + f'<p class="nl-sm"><a href="/newsletter/unsubscribe?token={E(sub_token("unsub", r))}">Unsubscribe instead</a></p></section>'
+        body = (f'<section class="nl-card" id="categories"><h2>Manage my subscription categories</h2><p>Subscribed: <b>{E(mask_email(r["email"]))}</b>. '
+                'Tick the threat categories you want in your brief and choose how often it arrives. Changes apply from the next send.</p>'
+                + prefs_form(tok, r) + '</section>'
+                f'<section class="nl-card"><h3>Find new sources</h3><p>See top-rated sources and registries for the categories you follow, plus categories you could add.</p>'
+                f'<p><a class="nl-btn" href="/newsletter/sources?token={E(tok)}">Find new sources</a></p>'
+                f'<p class="nl-sm"><a href="/newsletter/unsubscribe?token={E(sub_token("unsub", r))}">Unsubscribe instead</a></p></section>'
                 '<script src="/api/newsletter/app.js"></script>')
-        return 200, page("Manage newsletter", body), "text/html"
+        return 200, page("Subscription categories", body), "text/html"
+    if path == "/newsletter/sources":
+        tok = q1("token"); st, r = token_sub(tok, "manage")
+        if st != "ok" or r is None:
+            return 400, result_page("Link not valid", "This link is invalid, expired, or the subscription was erased. Use the Find new sources button in your latest email.", False,
+                                    '<p><a class="nl-btn" href="/sources">Browse all sources</a></p>'), "text/html"
+        if r["status"] != "active":
+            return 200, result_page("Not currently subscribed", "This address isn't receiving the newsletter. Sign up again to restart it.", False,
+                                    '<p><a class="nl-btn" href="/newsletter">Sign up</a></p>'), "text/html"
+        return 200, page("Find new sources", sources_body(tok, r)), "text/html"
     if path == "/newsletter/admin":
         body = ('<section class="nl-card" id="nla_login"><h2>Newsletter admin</h2><p>Enter the dashboard admin passcode (the same one that changes the scan interval).</p>'
                 '<form id="nla_form" class="nl-form" autocomplete="off"><label for="nla_pass">Admin passcode</label><div class="nl-row"><input type="password" id="nla_pass" autocomplete="current-password" required>'
@@ -1209,6 +1359,12 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
     if path == "/api/newsletter/manage":
         code, body = manage(d.get("token"), d)
         if html_mode: return code, result_page("Preferences saved" if body.get("ok") else "Couldn't save", body["message"], bool(body.get("ok"))), "text/html"
+        return code, body
+    if path == "/api/newsletter/add_category":
+        tok = d.get("token"); code, body = add_category(tok, str(d.get("category") or ""))
+        if html_mode:
+            back = f'<p><a class="nl-btn" href="/newsletter/sources?token={E(tok or "")}">Back to Find new sources</a></p>'
+            return code, result_page("Category added" if body.get("ok") else "Couldn't add", body["message"], bool(body.get("ok")), back), "text/html"
         return code, body
     if path == "/api/newsletter/admin/login": return admin_login(d, ip or "")
     if path == "/api/newsletter/admin":

@@ -40,6 +40,10 @@
 .nl-priv{margin:0}
 .nl-result.ok h2{color:#95de64}.nl-result.warn h2{color:var(--md)}
 .nl-undo{margin:10px 0}
+/* Find new sources page */
+.nl-srclist{margin:4px 0 10px;padding-left:18px}.nl-srclist li{margin:0 0 5px;overflow-wrap:anywhere}
+.nl-more{border-top:1px solid var(--bd);padding:10px 0 2px}.nl-more:first-of-type{border-top:0}
+.nl-addcat{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.nl-addcat .nl-btn{padding:6px 12px;font-size:13px}.nl-addcat .nl-btn[disabled]{opacity:.75;cursor:default}
 /* dashboard Community card */
 #tab-newsletter .nl-card{max-width:760px}
 .nl-inline-link{font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none}
