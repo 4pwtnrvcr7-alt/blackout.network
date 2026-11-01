@@ -44,7 +44,7 @@ BRAND = "BLACKOUT.NETWORK"   # brand is always written in capitals in every emai
 TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line under the masthead domain and in the footer
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
-PRIVACY = "Email only used for this newsletter; unsubscribe anytime."
+PRIVACY = "Email only used for this newsletter; unsubscribe anytime. We count opens and clicks to improve it; in the EEA, UK and Switzerland only if you tick the box."
 QUIET_LINE = "No confirmed high-severity events in the last 24 hours."   # CoS Nov 1: the one neutral line of a quiet brief (window >= 23 h)
 QUIET_LINE_SINCE = "No confirmed high-severity events since your last brief."   # same, when the window is shorter (twice-daily ~12 h)
 def quiet_line(issue):
@@ -2283,7 +2283,8 @@ def consent_line():
     c = cfg(); frm = E(c.get("from_email") or "hello@blackout.network"); addr = E((c.get("mailing_address") or DEFAULTS["mailing_address"]).strip())
     return (f'By tapping <b>Subscribe</b>, you agree to get the BLACKOUT.NETWORK brief and, if you choose, breaking alerts by email from BLACKOUT.NETWORK '
             f'({frm}, {addr}). We\'ll send a confirmation email first, and nothing else arrives until you confirm. You can withdraw consent and '
-            'unsubscribe at any time with the link in every email. See our <a href="/privacy">Privacy Policy</a> and <a href="/tos">Terms</a>.')
+            'unsubscribe at any time with the link in every email. We count opens and clicks to improve the newsletter; in the EEA, UK and Switzerland '
+            'only if you tick the box. See our <a href="/privacy#email-tracking">Privacy Policy</a> and <a href="/tos">Terms</a>.')
 
 def signup_page():
     rmin, smin = main_rule()
