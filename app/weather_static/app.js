@@ -150,7 +150,7 @@ function render(){const d=W.d,l=W.loc,om=OK("open_meteo");
   tv.forEach((v,i)=>{if(v!=null)g+=`<circle cx=${X(i).toFixed(1)} cy=${Y(v).toFixed(1)} r=6 fill=transparent><title>${lt(H.time[i],{weekday:"short",hour:"numeric"})}: ${Math.round(v)}${TU()}, feels ${Math.round(fv[i])}°, ${H.precipitation_probability[i]??0}% precip, wind ${SP(H.wind_speed_10m[i])} gusts ${SP(H.wind_gusts_10m[i])}, humidity ${H.relative_humidity_2m[i]}%, UV ${H.uv_index[i]}</title></circle>`});
   g+=`</svg>`;
   const gmax=Math.max(...H.wind_gusts_10m.filter(v=>v!=null)),pmax=Math.max(...H.precipitation_probability.filter(v=>v!=null)),uvmax=Math.max(...H.uv_index.filter(v=>v!=null));
-  $w("wx_hourly").innerHTML=`<h3>Next 48 hours <span class=meta style="text-transform:none;letter-spacing:0">· local time · <span style="color:#ff4d4f">━ temperature</span> · <span style="color:#fa8c16">┅ feels like</span> · <span style="color:#4aa3ff">▮ chance of precipitation</span> · hover for details</span></h3>${g}
+  $w("wx_hourly").innerHTML=`<h3>Next 48 hours <span class=meta style="text-transform:none;letter-spacing:0">· local time · <span style="color:#ff4d4f">━ temperature</span> · <span style="color:#fa8c16">┅ feels like</span> · <span style="color:var(--bn-link,#4aa3ff)">▮ chance of precipitation</span> · hover for details</span></h3>${g}
   <div class=meta>Peak gust ${SP(gmax)} · highest precipitation chance ${pmax}% · max UV ${uvmax}</div>`}
  else $w("wx_hourly").innerHTML=`<h3>Next 48 hours</h3><div class=warn>Hourly forecast unavailable.</div>`;
  // daily

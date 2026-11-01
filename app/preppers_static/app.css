@@ -1,13 +1,13 @@
 /* ---- 🎒 Preppers tab (preppers.py) ---- */
 #tab-preppers{align-content:start}#tab-preppers a{color:var(--ac)}
 #tab-preppers h3{font-size:14px;margin:0 0 8px}#tab-preppers h3 .meta{font-weight:400}
-#tab-preppers .pp-disc{font-size:12px;color:var(--mu);background:#0f1317;border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin:0 0 10px}
-#tab-preppers .pp-jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}#tab-preppers .pp-jump a{font-size:12.5px;border:1px solid var(--bd);border-radius:14px;padding:3px 10px;background:#10151b;text-decoration:none;color:var(--tx)}
+#tab-preppers .pp-disc{font-size:12px;color:var(--mu);background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin:0 0 10px}
+#tab-preppers .pp-jump{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}#tab-preppers .pp-jump a{font-size:12.5px;border:1px solid var(--bd);border-radius:14px;padding:3px 10px;background:var(--bn-surface-0,#10151b);text-decoration:none;color:var(--tx)}
 #tab-preppers .pp-jump a:hover{border-color:var(--ac);color:var(--ac)}
 #tab-preppers .pp-top{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:12px;margin:0 0 14px}@media(max-width:900px){#tab-preppers .pp-top{grid-template-columns:1fr}}
-#tab-preppers .pp-card{background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:10px 12px;min-width:0}
+#tab-preppers .pp-card{background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;min-width:0}
 #tab-preppers .pp-72{border-left:4px solid #3fb950}#tab-preppers .pp-72 ol{margin:0 0 8px;padding-left:20px;font-size:13px}#tab-preppers .pp-72 li{margin:2px 0}#tab-preppers .pp-72 li a{font-size:12px;text-decoration:none}
-#tab-preppers .pp-st{display:flex;flex-wrap:wrap;gap:8px}#tab-preppers .pp-st span{border:1px solid var(--bd);border-radius:8px;padding:5px 10px;background:#10151b;font-size:12.5px}#tab-preppers .pp-st b{font-size:16px}
+#tab-preppers .pp-st{display:flex;flex-wrap:wrap;gap:8px}#tab-preppers .pp-st span{border:1px solid var(--bd);border-radius:8px;padding:5px 10px;background:var(--bn-surface-0,#10151b);font-size:12.5px}#tab-preppers .pp-st b{font-size:16px}
 #tab-preppers .pp-bands{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;font-size:12px;color:var(--mu)}#tab-preppers .pp-bands i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:5px;vertical-align:-1px}
 #tab-preppers .pp-rel{display:flex;flex-wrap:wrap;gap:6px}#tab-preppers .pp-rel button{font-size:12.5px;padding:4px 9px}
 #tab-preppers .pp-sec{margin:0 0 16px;padding-top:4px;scroll-margin-top:110px}
@@ -16,28 +16,28 @@
 #tab-preppers .pp-chips{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 10px}#tab-preppers .pp-chips button{font-size:12px;padding:3px 9px;border-radius:14px}
 #tab-preppers .pp-chips button span{color:var(--mu);font-size:11px;margin-left:2px}#tab-preppers .pp-chips button.on{border-color:var(--ac);color:var(--ac);background:#132233}
 #tab-preppers .pp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px}@media(max-width:700px){#tab-preppers .pp-grid{grid-template-columns:1fr}}
-#tab-preppers .pp-e{display:flex;gap:10px;background:#11161b;border:1px solid var(--bd);border-left:4px solid var(--c);border-radius:9px;padding:9px 10px;min-width:0}
+#tab-preppers .pp-e{display:flex;gap:10px;background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-left:4px solid var(--c);border-radius:9px;padding:9px 10px;min-width:0}
 #tab-preppers .pp-e img{width:56px;height:56px;flex:none;border-radius:12px}#tab-preppers .pp-eb{min-width:0;flex:1}
 #tab-preppers .pp-eh{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}#tab-preppers .pp-eh a{font-weight:700;text-decoration:none;color:var(--tx);font-size:13.5px}#tab-preppers .pp-eh a:hover{color:var(--ac)}
 #tab-preppers .pp-r{flex:none;font-weight:800;color:var(--c);border:1px solid var(--c);border-radius:8px;padding:0 7px;font-size:14px;cursor:help}#tab-preppers .pp-r small{font-weight:400;font-size:10px;opacity:.8}
 #tab-preppers .pp-em{font-size:11.5px;color:var(--mu);margin:2px 0}#tab-preppers .pp-en{font-size:12.5px;margin:3px 0}#tab-preppers .pp-ew{font-size:11.5px;color:var(--mu);cursor:help}
 #tab-preppers .pp-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}#tab-preppers .pp-tags span{font-size:10.5px;border:1px solid var(--bd);border-radius:9px;padding:0 6px;color:var(--mu);cursor:pointer}#tab-preppers .pp-tags span:hover{color:var(--ac);border-color:var(--ac)}
 #tab-preppers .pp-plan{display:grid;grid-template-columns:minmax(250px,330px) minmax(0,1fr);gap:12px}@media(max-width:900px){#tab-preppers .pp-plan{grid-template-columns:1fr}}
-#tab-preppers .pp-in{background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:13px;align-self:start}
+#tab-preppers .pp-in{background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;font-size:13px;align-self:start}
 #tab-preppers .pp-in>label{display:flex;justify-content:space-between;align-items:center;gap:8px}#tab-preppers .pp-in input[type=number]{width:76px}
 #tab-preppers .pp-days{display:flex;flex-wrap:wrap;gap:4px;align-items:center}#tab-preppers .pp-days button{padding:3px 8px;font-size:12px}#tab-preppers .pp-days button.on{border-color:var(--ac);color:var(--ac)}#tab-preppers .pp-days input{width:70px}
 #tab-preppers fieldset{border:1px solid var(--bd);border-radius:8px;padding:6px 9px;display:flex;flex-direction:column;gap:4px}#tab-preppers legend{color:var(--mu);font-size:12px}#tab-preppers fieldset label:last-child{display:flex;justify-content:space-between;align-items:center}
 #tab-preppers .pp-btns{display:flex;gap:6px;flex-wrap:wrap}
 #tab-preppers .pp-out{min-width:0}#tab-preppers .pp-oh{margin:0 0 6px}
-#tab-preppers .pp-li{display:flex;gap:9px;align-items:flex-start;background:#11161b;border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin:0 0 6px;font-size:13px;cursor:pointer}
+#tab-preppers .pp-li{display:flex;gap:9px;align-items:flex-start;background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin:0 0 6px;font-size:13px;cursor:pointer}
 #tab-preppers .pp-li input{margin-top:3px}#tab-preppers .pp-li.done{opacity:.55}#tab-preppers .pp-li.done b{text-decoration:line-through}#tab-preppers .pp-lk{font-size:12px;margin-top:2px}
 #tab-preppers .pp-scen{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start}#tab-preppers .pp-scen summary{cursor:pointer}#tab-preppers .pp-scen ul{margin:6px 0;padding-left:18px;font-size:12.5px}
 #tab-preppers .pp-bud{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media(max-width:900px){#tab-preppers .pp-bud{grid-template-columns:1fr}}
 #tab-preppers .pp-bud ul{margin:6px 0 0;padding-left:4px;list-style:none;font-size:12.5px}#tab-preppers .pp-bud li{margin:3px 0}#tab-preppers .pp-price{font:800 24px/1 system-ui;color:#3fb950;margin-bottom:3px}
 #tab-preppers .pp-rl{columns:2;column-gap:18px;font-size:13px;padding-left:18px}@media(max-width:700px){#tab-preppers .pp-rl{columns:1}}#tab-preppers .pp-rl li{break-inside:avoid;margin:3px 0}
-#tab-preppers .pp-note{font-size:12px;color:var(--mu);background:#0f1317;border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin-top:8px}
+#tab-preppers .pp-note{font-size:12px;color:var(--mu);background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin-top:8px}
 #tab-preppers .pp-warn{font-size:12.5px;background:#2a1d00;border:1px solid var(--md);color:#f3d18a;border-radius:8px;padding:7px 10px;margin:0 0 8px}
-#tab-preppers .pp-land{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}#tab-preppers .pp-lr{background:#11161b;border:1px solid var(--bd);border-left:4px solid #8b95a3;border-radius:8px;padding:7px 10px;font-size:12.5px}#tab-preppers .pp-lr a{font-weight:700}
+#tab-preppers .pp-land{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}#tab-preppers .pp-lr{background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-left:4px solid var(--bn-muted,#8b95a3);border-radius:8px;padding:7px 10px;font-size:12.5px}#tab-preppers .pp-lr a{font-weight:700}
 #tab-preppers .pp-tips{font-size:13px;padding-left:18px;columns:2;column-gap:20px}@media(max-width:800px){#tab-preppers .pp-tips{columns:1}}#tab-preppers .pp-tips li{break-inside:avoid;margin:0 0 5px}
 #tab-preppers .pp-rub{font-size:13px}#tab-preppers .pp-rub ul{margin:4px 0;padding-left:18px}
 #tab-preppers #pp_geo{margin:0 0 6px}

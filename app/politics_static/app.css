@@ -1,20 +1,20 @@
 /* ---- Politics tab (served by politics.py). Neutral styling: one accent for every outcome bar, no party colors. ---- */
 #tab-politics{align-content:start}
-#tab-politics .pol-ic{color:#c9d0d9}
+#tab-politics .pol-ic{color:var(--bn-text-2,#c9d0d9)}
 #tab-politics .pol-note{font-size:12px;color:var(--mu);margin:-2px 0 10px}
 #tab-politics .pol-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;align-items:start}
 @media(max-width:1100px){#tab-politics .pol-grid{grid-template-columns:1fr}}
-#tab-politics .pol-col{background:#11161b;border:1px solid var(--bd);border-radius:9px;padding:12px}
+#tab-politics .pol-col{background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:9px;padding:12px}
 #tab-politics h3{font-size:14px;margin:0 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 #tab-politics h3 .meta{font-weight:400}
 #tab-politics .pol-ctl{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin:0 0 8px;font-size:12.5px}
 #tab-politics .pol-seg{display:inline-flex;border:1px solid var(--bd);border-radius:7px;overflow:hidden}
-#tab-politics .pol-seg button{all:unset;cursor:pointer;padding:3px 10px;font-size:12px;color:var(--mu);background:#10151b}
-#tab-politics .pol-seg button.on{background:#24303c;color:var(--tx);font-weight:600}
+#tab-politics .pol-seg button{all:unset;cursor:pointer;padding:3px 10px;font-size:12px;color:var(--mu);background:var(--bn-surface-0,#10151b)}
+#tab-politics .pol-seg button.on{background:var(--bn-line,#24303c);color:var(--tx);font-weight:600}
 #tab-politics .pol-seg button+button{border-left:1px solid var(--bd)}
 #tab-politics .pol-seg button:focus-visible,#tab-politics .pol-chip:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
-#tab-politics .pol-chip{all:unset;cursor:pointer;border:1px solid var(--bd);border-radius:14px;padding:2px 9px;background:#10151b;color:var(--mu);font-size:12px}
-#tab-politics .pol-chip.on{color:var(--tx);border-color:var(--bd2);background:#24303c}
+#tab-politics .pol-chip{all:unset;cursor:pointer;border:1px solid var(--bd);border-radius:14px;padding:2px 9px;background:var(--bn-surface-0,#10151b);color:var(--mu);font-size:12px}
+#tab-politics .pol-chip.on{color:var(--tx);border-color:var(--bd2);background:var(--bn-line,#24303c)}
 #tab-politics .pol-chip small{color:var(--mu);margin-left:3px}
 #tab-politics .pol-cnt{font-size:12px;color:var(--mu)}#tab-politics .pol-cnt b{color:var(--tx)}
 #tab-politics .pol-list{max-height:1150px;overflow:auto;padding-right:4px}
@@ -27,12 +27,12 @@
 #tab-politics .pol-src b{color:var(--tx)}
 #tab-politics .pol-unav{background:#2a1215;border:1px solid #5c2223;color:#ffccc7;border-radius:6px;padding:6px 10px;font-size:12px;margin:0 0 8px}
 #tab-politics .pol-mk{max-height:1100px;overflow:auto;padding-right:4px;align-content:start;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
-#tab-politics .mk{background:#181d23;border:1px solid var(--bd);border-left:4px solid #3a4452;border-radius:6px;padding:8px 10px}
+#tab-politics .mk{background:var(--bn-raised,#181d23);border:1px solid var(--bd);border-left:4px solid #3a4452;border-radius:6px;padding:8px 10px}
 #tab-politics .mk .mt{font-weight:600;color:var(--tx);text-decoration:none;display:block;margin:2px 0 6px;line-height:1.3}
 #tab-politics .mk .mt:hover{text-decoration:underline}
 #tab-politics .mk .oc{display:grid;grid-template-columns:minmax(0,1fr) 92px 46px;gap:6px;align-items:center;font-size:12.5px;margin:3px 0}
 #tab-politics .mk .oc span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#tab-politics .mk .bar{height:7px;border-radius:4px;background:#2c3440;overflow:hidden}
+#tab-politics .mk .bar{height:7px;border-radius:4px;background:var(--bn-line,#2c3440);overflow:hidden}
 #tab-politics .mk .bar i{display:block;height:100%;background:var(--ac)}
 #tab-politics .mk .pc{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 #tab-politics .mk .meta{font-size:11.5px;margin-top:5px}
@@ -42,21 +42,21 @@
 #tab-politics details.pol-log td,#tab-politics details.pol-log th{padding:2px 8px;border-bottom:1px solid var(--bd);text-align:left}
 #tab-politics .pol-wide{margin-top:14px}
 #tab-politics .pol-sp{display:flex;align-items:center;gap:8px;margin:6px 0 2px;flex-wrap:wrap}
-#tab-politics .pol-sp svg{background:#10151b;border:1px solid var(--bd);border-radius:4px}
+#tab-politics .pol-sp svg{background:var(--bn-surface-0,#10151b);border:1px solid var(--bd);border-radius:4px}
 #tab-politics svg .ln{fill:none;stroke:var(--ac);stroke-width:1.6;vector-effect:non-scaling-stroke}
-#tab-politics svg .mid{stroke:#2c3440;stroke-dasharray:2 3;vector-effect:non-scaling-stroke}
-#tab-politics svg .gap{fill:url(#none);fill:#ffffff0d;stroke:#8b95a3;stroke-dasharray:2 3;stroke-width:.6;vector-effect:non-scaling-stroke}
-#tab-politics svg .grid{stroke:#232a33}
+#tab-politics svg .mid{stroke:var(--bn-line,#2c3440);stroke-dasharray:2 3;vector-effect:non-scaling-stroke}
+#tab-politics svg .gap{fill:url(#none);fill:#ffffff0d;stroke:var(--bn-muted,#8b95a3);stroke-dasharray:2 3;stroke-width:.6;vector-effect:non-scaling-stroke}
+#tab-politics svg .grid{stroke:var(--bn-line,#232a33)}
 #tab-politics svg .ax{fill:var(--mu);font-size:10px}
 #tab-politics svg .gapt{font-size:9px}
 #tab-politics .pol-hx{all:unset;cursor:pointer;font-size:11.5px;color:var(--ac);border:1px solid var(--bd);border-radius:5px;padding:1px 7px}
 #tab-politics .pol-hx:hover{border-color:var(--bd2)}
-#tab-politics .pol-ch{background:#10151b;border:1px solid var(--bd);border-radius:6px;padding:8px;margin:6px 0}
+#tab-politics .pol-ch{background:var(--bn-surface-0,#10151b);border:1px solid var(--bd);border-radius:6px;padding:8px;margin:6px 0}
 #tab-politics .pol-big{width:100%;height:auto;display:block}
 #tab-politics .pol-seg button[disabled]{opacity:.35;cursor:default}
 #tab-politics .pol-lg{display:inline-flex;flex-wrap:wrap;gap:4px 12px;font-size:12px}
 #tab-politics .pol-lg i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px;vertical-align:3px}
-#tab-politics .pol-tr{font-size:11.5px;color:#c9d0d9;background:#141a20;border:1px solid var(--bd);border-radius:5px;padding:4px 7px;margin-top:5px;line-height:1.4}
+#tab-politics .pol-tr{font-size:11.5px;color:var(--bn-text-2,#c9d0d9);background:#141a20;border:1px solid var(--bd);border-radius:5px;padding:4px 7px;margin-top:5px;line-height:1.4}
 #tab-politics .pol-tr span{color:var(--mu)}
 #tab-politics .pol-acc-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start}
 @media(max-width:1100px){#tab-politics .pol-acc-grid{grid-template-columns:1fr}}
@@ -67,12 +67,12 @@
 #tab-politics .pol-tb small,#tab-politics .mu{color:var(--mu)}
 #tab-politics .pol-tb a{color:var(--tx)}
 #tab-politics .pol-past td:nth-child(1){max-width:420px}
-#tab-politics .pol-method{font-size:12px;color:#c9d0d9;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--ac);border-radius:6px;padding:9px 11px;line-height:1.5}
+#tab-politics .pol-method{font-size:12px;color:var(--bn-text-2,#c9d0d9);background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-left:3px solid var(--ac);border-radius:6px;padding:9px 11px;line-height:1.5}
 #tab-politics .pol-more{margin-top:8px;font-size:12px}
 #tab-politics .pol-own{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:12px}
-#tab-politics .own{background:#181d23;border:1px solid var(--bd);border-radius:7px;padding:10px 12px}
+#tab-politics .own{background:var(--bn-raised,#181d23);border:1px solid var(--bd);border-radius:7px;padding:10px 12px}
 #tab-politics .own h4{margin:4px 0 4px;font-size:15px}
-#tab-politics .own .own-sum{font-size:12.5px;color:#c9d0d9;margin-bottom:6px}
+#tab-politics .own .own-sum{font-size:12.5px;color:var(--bn-text-2,#c9d0d9);margin-bottom:6px}
 #tab-politics .own .own-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);margin:8px 0 2px}
 #tab-politics .own ul{margin:0;padding-left:18px;font-size:12.5px}
 #tab-politics .own li{margin:3px 0}

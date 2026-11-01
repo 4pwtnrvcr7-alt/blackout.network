@@ -21,8 +21,9 @@
  box.innerHTML=`<button type="button" class="bns-ico" aria-label="Open search" title="Search (/)">🔍</button>
  <form role="search" autocomplete="off"><input id="bns_q" type="search" maxlength="${MAXQ}" placeholder="Search threats, places, sources…" aria-label="Search all sources" enterkeyhint="search"><kbd>/</kbd><button class="bns-go" type="submit" aria-label="Search">🔍</button></form>
  <div id="bns_pop" role="listbox"></div>`;
- function mount(){const h=document.querySelector("header");
-  if(h){const ctl=h.querySelector(".ctl");if(ctl)h.insertBefore(box,ctl);else h.appendChild(box)}
+ function mount(){const slot=document.getElementById("bn_dsearch");if(slot){slot.appendChild(box);return}   // sidebar menu (sitenav, t321)
+  const h=document.querySelector("header");
+  if(h){const ctl=h.querySelector(".ctl");if(ctl&&ctl.parentNode===h)h.insertBefore(box,ctl);else h.appendChild(box)}
   else{box.style.cssText="position:fixed;top:8px;right:10px;z-index:2400;width:300px";document.body.appendChild(box)}}
  mount();
  const inp=box.querySelector("#bns_q"),pop=box.querySelector("#bns_pop");

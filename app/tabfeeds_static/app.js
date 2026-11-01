@@ -38,7 +38,7 @@ function mk(k){const T=TABS[k];let M=document.getElementById("tab-"+k);if(M)retu
  let tq;q("q").addEventListener("input",e=>{clearTimeout(tq);tq=setTimeout(()=>{S.q=e.target.value.trim();reset(k)},300)});
  const h2=M.querySelector("h2");if(h2&&typeof hwAttach=="function")try{hwAttach(h2,k+"tab",()=>T.help)}catch(_){}
  return M}
-function badge(x){if(x.rank==null)return `<span class="tfx-rk un" title="Not scored by the scanner">unscored</span>`;return `<span class="tfx-rk ${RC(x.rank)}" title="rank ${x.rank} of 10 (scanner)">rank ${x.rank}/10</span>`}
+function badge(x){if(x.rank==null)return `<span class="tfx-rk un" title="Not scored by the scanner">unscored</span>`;return window.bnMeter?bnMeter(x.rank,"s"):`<span class="tfx-rk ${RC(x.rank)}" title="rank ${x.rank} of 10 (scanner)">rank ${x.rank}/10</span>`}
 function status(x){if(x.origin=="feed"&&x.rank==null)return x.official?`<span class="tfx-off" title="Official agency feed; not scored by the scanner">official feed</span>`:`<span class="unc">unconfirmed · single source</span>`;
  return x.list=="wire"?"":x.list=="watchlist"?`<span class="wl">Watchlist</span><span class="unc">unconfirmed</span>`:`<span class="unc" title="Low-signal item the scanner stores but keeps off The Wire and the Watchlist">off the Wire · unconfirmed</span>`}
 function row(k,x){const kinds=(ST[k].d||{}).kinds||{};const t=x.score!=null?LV(x.score):"l";

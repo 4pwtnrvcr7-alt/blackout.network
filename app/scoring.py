@@ -256,13 +256,13 @@ th{font-size:11.5px;color:var(--mu);text-transform:uppercase;letter-spacing:.05e
 tr:target td{background:#1d2530}
 .rk{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:7px;font-weight:800;font-size:17px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
 .chip{display:inline-block;font-size:11px;border-radius:10px;padding:1px 8px;margin:1px 3px 1px 0;white-space:nowrap}
-.c-wire{background:#0f2a3a;color:#69c0ff}.c-watch{background:#3a2a00;color:var(--md)}.c-push{background:#3a1010;color:#ff7875}.c-hid{background:#2c3440;color:var(--mu)}
+.c-wire{background:#0f2a3a;color:#69c0ff}.c-watch{background:#3a2a00;color:var(--md)}.c-push{background:#3a1010;color:#ff7875}.c-hid{background:var(--bn-line,#2c3440);color:var(--mu)}
 .ex{font-size:12.5px}.ex .t{color:var(--tx)}.ill{font-size:11px;border:1px dashed var(--bd2);border-radius:8px;padding:0 6px;color:var(--mu);margin-right:4px}
 .real{font-size:11px;border:1px solid #2f7d4f;color:#95de64;border-radius:8px;padding:0 6px;margin-right:4px}
 /* factors */
 .fx{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
 .fx article{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:12px}.fx h4{margin:0 0 6px;font-size:14.5px}
-.fx p,.fx ul{margin:6px 0;font-size:13px}.fx ul{padding-left:18px}.fx code,.code{font:12px ui-monospace,Menlo,Consolas,monospace;background:#0f1317;border:1px solid var(--bd);border-radius:4px;padding:0 4px}
+.fx p,.fx ul{margin:6px 0;font-size:13px}.fx ul{padding-left:18px}.fx code,.code{font:12px ui-monospace,Menlo,Consolas,monospace;background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:4px;padding:0 4px}
 .how{border-left:3px solid var(--ac);padding-left:8px}.means{border-left:3px solid var(--lo);padding-left:8px}
 .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);display:block}
 details{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;margin-top:10px}summary{cursor:pointer;font-weight:600}
@@ -270,8 +270,8 @@ details{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;paddi
 .steps{display:grid;gap:6px;margin:8px 0}.step{display:grid;grid-template-columns:minmax(150px,220px) 70px 1fr;gap:10px;align-items:baseline;background:var(--pn2);border-radius:6px;padding:7px 10px;font-size:13px}
 .step b:nth-child(2){font-variant-numeric:tabular-nums;text-align:right}.step.tot{border:1px solid var(--bd2)}
 .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}.rules div{background:var(--pn2);border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:13px}
-.disc{background:#0f1317;border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:12.5px;color:var(--mu)}
-footer{text-align:center;color:#8a93a6;font-size:12px;border-top:1px solid #2a2f3a;padding:12px;margin-top:10px}
+.disc{background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:12.5px;color:var(--mu)}
+footer{text-align:center;color:var(--bn-muted,#8a93a6);font-size:12px;border-top:1px solid var(--bn-line,#2a2f3a);padding:12px;margin-top:10px}
 @media(max-width:760px){
  header{padding:12px 14px}.wrap{padding:12px 12px 30px}section{padding:12px}
  .scale{grid-template-columns:repeat(6,minmax(0,1fr))}.scale a{min-height:54px;font-size:19px}.bands{display:none}
@@ -330,7 +330,7 @@ def _render():
     a(f'<div class="legend"><span><i></i>can trigger an instant alert (rank {pr}+ with {ps}+ independent sources)</span>'
       '<span>Single unconfirmed sources stop at 4</span><span>Media-only reports stop at 6, or 8 with 3+ outlets</span><span>9–10 need an official source</span></div>')
     # distribution bar
-    a('<h3>Last 7 days of stories by rank (live)</h3><div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#0f1317" role="img" aria-label="Distribution of visible stories by rank over the last 7 days">')
+    a('<h3>Last 7 days of stories by rank (live)</h3><div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--bn-surface-0,#0f1317)" role="img" aria-label="Distribution of visible stories by rank over the last 7 days">')
     for r in range(11):
         n = (dist.get(r) or {}).get("n", 0)
         if n: a(f'<div title="Rank {r}: {n} stories" style="flex:{n};background:{COLORS[r]}"></div>')

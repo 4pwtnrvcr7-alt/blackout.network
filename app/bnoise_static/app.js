@@ -25,7 +25,7 @@ app.innerHTML=`<div class="bn-bar"><span class="bn-lbl">Rank</span><div class="b
 const h2=M.querySelector("h2");
 if(h2&&typeof hwAttach=="function")hwAttach(h2,"noise",()=>"This tab lists every alert ranked 0 to 6 that blackout.network has stored, newest first. Anything in that range comes in automatically with no extra filtering, including Watchlist and other unconfirmed single-source items, which are labeled unconfirmed. Each row shows its 0–10 rank and 0–100 score, category, time in ET, place if known and links to the original sources. It refreshes with the rest of the dashboard.");
 
-function badge(r){return `<span class="bn-rk ${RL(r)}" title="rank ${r} of 10">rank ${r}/10</span>`}
+function badge(r){return window.bnMeter?bnMeter(r,"s"):`<span class="bn-rk ${RL(r)}" title="rank ${r} of 10">rank ${r}/10</span>`}
 function row(x){const t=LV2(x.score);const loc=x.location?` · ${E(x.location)}`:"";
  const fam=x.n_families?` · ${x.n_items} report(s) from ${x.n_families} source famil${x.n_families==1?"y":"ies"}`:"";
  const ev=x.event_time&&x.event_time!=x.first_seen?` · event ${E(ET(x.event_time))}`:"";

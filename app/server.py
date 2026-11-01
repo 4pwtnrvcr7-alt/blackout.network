@@ -146,6 +146,13 @@ _RW = b'<link rel="stylesheet" href="/api/report/app.css"><script src="/api/repo
 # PWA / home-screen support + site title (pwa.py, static/pwa/): every full HTML page served through send() gets the manifest, icons,
 # iOS/Android web-app meta tags and the install guide in its <head>, and the public title "Know first. Be ready." (2026-10-31).
 SITE_TITLE = b"Know first. Be ready."
+# Light/dark theme (t323): set data-theme on <html> before first paint (saved choice, else the OS setting) + preload the self-hosted fonts.
+THEME_HEAD = (b'<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
+              b'if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";'
+              b'd.setAttribute("data-theme",t);d.style.colorScheme=t;var m=document.querySelector(\'meta[name="theme-color"]\');if(m)m.content=t=="light"?"#f6f7f9":"#0b0d10"})()</script>'
+              b'<link rel="icon" type="image/svg+xml" href="/img/favicon.svg">'
+              b'<link rel="preload" href="/fonts/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>'
+              b'<link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>')
 _BRANDED = b"BLACKOUT.NETWORK"
 PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
             b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">'
@@ -154,8 +161,24 @@ PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
 _OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
                  b"The world&#39;s threats, scored and sourced, before cable news catches up."]
+_DASH_FALLBACK = (b'<header class="bn-top" id="bn_topbar"><div class="bn-tbar"><a class="bn-logo" href="/">BLACKOUT.<b>NETWORK</b></a></div>'
+                  b'<div class="bn-pop" id="bn_settings" hidden><div class="ctl"><span id="status">loading\xe2\x80\xa6</span><button class="pri" id="refresh">Manual refresh</button>'
+                  b'<label>Scans every <select id="interval"></select></label><span id="msg"></span></div></div></header>')
+def dashboard_page():
+    """dashboard.html with the shared top bar + sidebar (sitenav.py, t320/t321) in place of <!--BN_TOP-->."""
+    b = open(f"{BASE}/dashboard.html", "rb").read()
+    try:
+        import sitenav
+        top = sitenav.dashboard_top().encode("utf-8")
+    except Exception:
+        traceback.print_exc(); top = _DASH_FALLBACK
+    return b.replace(b"<!--BN_TOP-->", top, 1)
+
 def pwa_head(b):
     try:
+        h = b[:4000].lower().find(b"<head>")
+        if h >= 0 and b"<html" in b[:4000].lower() and b"bn_theme" not in b[:30000]:   # light/dark theme before first paint (t323)
+            b = b[:h + 6] + THEME_HEAD + b[h + 6:]
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]
@@ -182,7 +205,7 @@ class H(BaseHTTPRequestHandler):
         b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
         if ctype == "text/html": b = report_widget(pwa_head(b))
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
-        self.send_header("Cache-Control", "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def body(self):
         n = min(int(self.headers.get("Content-Length") or 0), 2_000_000 if self.path.startswith("/api/reports/") else 16000 if self.path.startswith("/api/report") else 10000)
@@ -201,7 +224,7 @@ class H(BaseHTTPRequestHandler):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
             if u.path in ("/", "/index.html"):
-                return self.send(200, open(f"{BASE}/dashboard.html", "rb").read(), "text/html")
+                return self.send(200, dashboard_page(), "text/html")
             if u.path == "/api/state": return self.send(200, api_state())
             if u.path == "/api/health":
                 return self.send(200, {"ok": True, "scanning": state["scanning"], "last_scan": state["last_scan"], "interval_minutes": cfg()["interval_minutes"]})

@@ -39,6 +39,7 @@ ROUTES = {
     "/theme.css": "static_files",
     "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
     "/sitenav.css": "sitenav",
+    "/fonts": "sitenav",            # self-hosted Montserrat + Inter woff2 (OFL), t323
     "/scoring": "scoring",
     "/about/scoring": "scoring",
     "/privacy": "legal",            # Privacy Policy (t270), static page, served during warm-up

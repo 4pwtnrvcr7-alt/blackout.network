@@ -9,7 +9,7 @@ server-side (works without JavaScript). The dashboard loads /sitenav.js, which i
 module's data embedded, so the dashboard's tab order, the per-tab title/description and the tab bar on every other
 page all come from NAV/TABS below. Add a new dashboard tab here once and it shows up everywhere.
 Served at /sitenav.js and /sitenav.css (routes in addons.py)."""
-import os, json, html
+import os, sys, json, html
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 SITE = "https://blackout.network"
@@ -144,41 +144,33 @@ def social_html():
                 f'{svg}<span>Follow us on {net} <b style="color:var(--ac,#4aa3ff)">{HANDLE}</b></span></a>')
     return a(YT_URL, YT_SVG, "YouTube") + a(X_URL, X_SVG, "X")
 
-_HP = ("font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;"
-       "padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none")
+import sitenav_ui as UI   # top bar + sidebar markup (t320/t321/t323)
 
-def header_html():
-    """The dashboard header (brand, scope badge, pills, Follow us, tagline) for standalone pages. Same markup as dashboard.html."""
-    return ('<header class="bn-hd"><h1>BLACKOUT.<b>NETWORK</b> · Early-Warning Threat Monitor '
-            '<span id="scope_badge" title="Scan scope: worldwide. Items are ranked by global relevance; no region gets extra weight." style="font-size:11px;font-weight:600;'
-            'letter-spacing:.4px;border:1px solid var(--ac);color:var(--ac);border-radius:10px;padding:2px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap">🌐 Scope: Global</span>'
-            f'<a id="howscore_link" href="/scoring" title="How the 0–100 score and 0–10 rank are computed" style="{_HP}">ⓘ How we score</a>'
-            f'<a id="nl_head_link" href="/newsletter" title="Get the morning/evening brief by email (double opt-in, unsubscribe anytime)" style="{_HP}">✉ Newsletter</a>'
-            f'<a id="sc_head_link" href="/sources" title="Every source we use, with a 0–10 confidence rating" style="{_HP}">📚 Sources</a>'
-            + social_html() +
-            f'<span id="brand_tagline" style="display:block;font-size:12px;font-weight:400;letter-spacing:.2px;color:var(--mu);margin-top:4px">{TAGLINE}</span></h1></header>')
+# Dashboard-only controls, shown in the top bar's settings popover (ids used by dashboard.html's script).
+DASH_CTL = ('<span id="status">loading…</span><button class="pri" id="refresh">⟳ Manual refresh</button>'
+            '<label title="Set on the scanner node">Scans every <select id="interval"></select></label><span id="msg"></span>')
+
+def header_html(active=""):
+    """The shared top bar (logo, The Wire / Sources / Newsletter, Follow us on YouTube / X, search, theme, menu) + the sidebar menu."""
+    return UI.topbar(sys.modules[__name__], active) + UI.drawer(sys.modules[__name__], active)
 
 def nav_html(active=""):
-    """The dashboard tab bar as links to /#hash, for standalone pages."""
-    out = ['<nav class="tabs bn-tabs" aria-label="Site sections">']
-    for i, (g, items) in enumerate(NAV):
-        if i: out.append('<span class="tab-sep"></span>')
-        if g: out.append(f'<span class="tab-grp">{html.escape(g)}</span>')
-        for it in items:
-            if len(it) > 5 and it[5]: continue
-            key, h, label = it[0], it[1], it[2]
-            href = h if h.startswith("/") else "/#" + h
-            on = ' class="on" aria-current="page"' if key == active else ""
-            out.append(f'<a href="{href}" data-tab="{html.escape(key)}"{on}>{html.escape(label)}</a>')
-    out.append('</nav>')
-    return "".join(out)
+    """Kept for callers of the old tab strip: the tab strip is gone (t321); the sidebar menu is part of header_html()."""
+    return ""
 
 def intro_html(page):
-    return f'<p class="bn-tabdesc" id="bn_tabdesc">{html.escape(PAGES[page][3])}</p>'
+    title = PAGES[page][1].split(" | ")[0]
+    if page == "home": title = "The Wire"
+    return UI.pagehead(title, PAGES[page][3])
 
 def site_top(page):
-    """Header + tab bar + one-line description, for the top of a standalone page's <body>."""
-    return header_html() + nav_html(PAGES[page][0]) + intro_html(page)
+    """Top bar + sidebar + page title and one-line description, for the top of a standalone page's <body>."""
+    return header_html(PAGES[page][0]) + intro_html(page)
+
+def dashboard_top():
+    """Top bar + sidebar + title block for dashboard.html (server.py replaces <!--BN_TOP--> with this)."""
+    m = sys.modules[__name__]
+    return UI.topbar(m, "threat", DASH_CTL) + UI.drawer(m, "threat") + UI.pagehead("The Wire", PAGES["home"][3])
 
 def head_html(page, path=None):
     """<title>, description, canonical, Open Graph and Twitter tags + the shared nav stylesheet, for a standalone page's <head>."""
@@ -189,18 +181,26 @@ def head_html(page, path=None):
             f'<meta property="og:type" content="website"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(title)}">'
             f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{SITE}/icons/icon-512.png">'
             f'<meta name="twitter:card" content="summary"><meta name="twitter:site" content="{HANDLE}"><meta name="twitter:title" content="{E(title)}">'
-            f'<meta name="twitter:description" content="{E(desc)}"><link rel="stylesheet" href="/sitenav.css">')
+            f'<meta name="twitter:description" content="{E(desc)}"><link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
 
 def data():
     t = []
     for g, it in tabs():
         t.append({"key": it[0], "hash": it[1], "label": it[2], "group": g, "title": it[3], "desc": it[4], "hidden": bool(len(it) > 5 and it[5])})
     return {"groups": [g for g, _ in NAV], "tabs": t, "brand": BRAND, "tagline": TAGLINE, "site": SITE,
-            "home": {"title": PAGES["home"][1], "desc": PAGES["home"][2]}, "social": social_html()}
+            "home": {"title": PAGES["home"][1], "desc": PAGES["home"][2]}, "social": social_html(),
+            "plain": {it[0]: UI.plain(it[2]) for g, it in tabs()}}
+
+FONTS = ("montserrat-latin-wght-normal.woff2", "inter-latin-wght-normal.woff2")
 
 def handle_get(path, qs):
     if path == "/sitenav.css":
         with open(os.path.join(BASE, "static", "sitenav.css"), "rb") as fh: return 200, fh.read(), "text/css"
+    if path.startswith("/fonts/"):
+        name = path[7:]
+        if name in FONTS:
+            with open(os.path.join(BASE, "static", "fonts", name), "rb") as fh: return 200, fh.read(), "font/woff2"
+        return 404, {"error": "not found"}
     if path == "/sitenav.js":
         with open(os.path.join(BASE, "static", "sitenav.js"), "r", encoding="utf-8") as fh: js = fh.read()
         js = js.replace("/*BN_SITENAV_DATA*/null", json.dumps(data(), ensure_ascii=False))

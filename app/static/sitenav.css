@@ -1,25 +1,210 @@
-/* BLACKOUT.NETWORK shared header + tab bar (t301/t302). Generated markup: sitenav.py. Same look as the dashboard header and tab bar.
-   Selectors start with "body" so they beat each standalone page's own header/h1 rules. */
-body header.bn-hd{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;margin:0;max-width:none;
- border-bottom:1px solid var(--bd,#252b33);position:sticky;top:0;background:var(--bg,#0b0d10);z-index:1000;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--tx,#e6e9ee);text-align:left}
-body header.bn-hd h1{font-size:18px;margin:0;letter-spacing:.5px;font-weight:700;line-height:1.45;color:var(--tx,#e6e9ee);text-transform:none}
-body header.bn-hd h1 b{color:var(--hi,#ff4d4f)}
-body header.bn-hd h1 small{display:none}
-body nav.bn-tabs{display:flex;flex-wrap:wrap;gap:6px;row-gap:6px;align-items:center;padding:10px 20px 0;margin:0;max-width:none;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:none;border:0}
-body nav.bn-tabs a{background:#1d232b;color:var(--tx,#e6e9ee);border:1px solid var(--bd,#252b33);border-radius:6px;padding:6px 10px;font:inherit;text-decoration:none;display:inline-block;margin:0;line-height:1.45}
-body nav.bn-tabs a:hover{border-color:var(--bd2,#2f3742)}
-body nav.bn-tabs a.on{border-color:var(--ac,#4aa3ff);color:var(--ac,#4aa3ff)}
-body nav.bn-tabs a:focus-visible,a.bn-follow:focus-visible{outline:2px solid var(--ac,#4aa3ff);outline-offset:2px}
-nav.tabs .tab-sep{width:1px;align-self:stretch;background:var(--bd2,#2f3742);margin:2px 6px}
-nav.tabs .tab-grp{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu,#8b95a3);margin-right:-2px}
-.bn-tabdesc{margin:8px 20px 0;color:var(--mu,#8b95a3);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:none}
-/* Follow us pills (header, every page) */
-a.bn-follow{-webkit-tap-highlight-color:rgba(74,163,255,.25)}
-a.bn-follow:hover{border-color:var(--ac,#4aa3ff)!important}
-a.bn-follow .bn-ico{flex:none;display:block}
-@media(max-width:700px){
- body header.bn-hd{position:static;padding:12px 14px}
- body nav.bn-tabs{padding:10px 14px 0}
- .bn-tabdesc{margin:8px 14px 0}
- a.bn-follow{font-size:13px!important;padding:6px 10px!important;margin:6px 6px 0 0!important}   /* bigger tap target on phones */
+/* BLACKOUT.NETWORK shared top bar + sidebar menu + theme (t320/t321/t323). Markup: sitenav_ui.py. Behaviour: sitenav.js.
+   MOBILE-FIRST: base rules are for phones (360-430 px); min-width queries add the tablet/desktop layout.
+   ======================================================================================================
+   DESIGN TOKENS: every color, font, size and radius of the bar and the sidebar is set here, once.
+   To apply a new brand: change the tokens below (and LOGO_HTML in sitenav_ui.py for a new logo element). */
+@font-face{font-family:"Montserrat";font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/montserrat-latin-wght-normal.woff2) format("woff2")}
+@font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/inter-latin-wght-normal.woff2) format("woff2")}
+:root{
+ /* type */
+ --bn-font-ui:"Montserrat",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;     /* headings, nav, buttons */
+ --bn-font-body:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;        /* running text */
+ --bn-logo-font:var(--bn-font-ui);--bn-logo-weight:800;--bn-logo-size:clamp(14px,4vw,19px);--bn-logo-tracking:-.02em;
+ --bn-nav-size:17px;--bn-small:13px;
+ /* layout */
+ --bn-tbar-h:60px;--bn-pad-x:16px;--bn-gap:6px;--bn-tap:44px;--bn-icon-w:36px;--bn-panel-w:86%;
+ --bn-radius:12px;--bn-radius-sm:8px;--bn-z-bar:1000;--bn-z-drawer:2600;--bn-z-pop:2700;--bn-speed:.22s;
+ /* palette: brand A "Signal", dark (default) */
+ --bn-bg:#0B0D10;--bn-tbar-bg:rgba(11,13,16,.97);--bn-surface-0:#0f1317;--bn-surface:#14181D;--bn-raised:#1B2027;--bn-surface-2:#1d232b;
+ --bn-line:#252B33;--bn-line-2:#2f3742;--bn-text:#E6E9EE;--bn-text-2:#c9d0d9;--bn-muted:#8B95A3;
+ --bn-brand:#FF4D4F;--bn-ink-on-brand:#0B0D10;--bn-accent:var(--bn-brand);--bn-link:#4aa3ff;--bn-mark-bg:#0B0D10;--bn-mark-fg:#FFFFFF;
+ --bn-hover:rgba(255,255,255,.06);--bn-active:rgba(255,77,79,.10);--bn-scrim:rgba(0,0,0,.62);--bn-shadow:0 12px 40px rgba(0,0,0,.5);
+ --bn-sev-lo:#2BB673;--bn-sev-md:#F5A524;--bn-sev-hi:#FF4D4F;--bn-seg-off:#252B33;
+ --bn-rule-h:3px;--bn-icon:30px;
 }
+/* palette: brand A "Signal", light (WCAG AA on #F6F7F9: text 18:1, muted 5.6:1, brand red 4.6:1, link 5.6:1) */
+:root[data-theme="light"]{
+ --bn-bg:#F6F7F9;--bn-tbar-bg:rgba(246,247,249,.97);--bn-surface-0:#EEF0F3;--bn-surface:#FFFFFF;--bn-raised:#FBFBFC;--bn-surface-2:#EEF0F3;
+ --bn-line:#DDE1E6;--bn-line-2:#C5CCD5;--bn-text:#0B0D10;--bn-text-2:#2C333C;--bn-muted:#5B6573;
+ --bn-brand:#D92D30;--bn-ink-on-brand:#FFFFFF;--bn-link:#0a5fc2;
+ --bn-hover:rgba(11,13,16,.05);--bn-active:rgba(217,45,48,.08);--bn-scrim:rgba(11,13,16,.38);--bn-shadow:0 12px 40px rgba(20,30,45,.18);
+ --bn-sev-lo:#16884B;--bn-sev-md:#C77700;--bn-sev-hi:#D92D30;--bn-seg-off:#DDE1E6;
+ /* the site's legacy palette names follow the tokens, so every tab and page switches with them */
+ --bg:var(--bn-bg);--pn:var(--bn-surface);--pn2:var(--bn-raised);--bd:var(--bn-line);--bd2:var(--bn-line-2);--tx:var(--bn-text);--mu:var(--bn-muted);
+ --hi:var(--bn-sev-hi);--md:var(--bn-sev-md);--lo:var(--bn-sev-lo);--ac:var(--bn-link);
+ --c-violence:#c8102e;--c-disease:#b4470b;--c-infra:#7a6200;--c-cyber:#0a5fc2;--c-unrest:#6d3fc9;--c-nuclear:#0b7270;
+ --c-link:#b3121a;--c-link-hl:#e0262d;--c-neutral:#7a4a4a;--shadow:0 6px 18px rgba(20,30,45,.12);
+ color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+
+/* ---- site type: Inter for text, Montserrat for headings and UI ---- */
+html body{font-family:var(--bn-font-body)}
+html body h1,html body h2,html body h3,html body h4,html body button,html body .tab-grp{font-family:var(--bn-font-ui)}
+html body h2,html body h3{letter-spacing:-.005em}
+
+/* ---- top bar ---- */
+body header.bn-top{position:sticky;top:0;z-index:var(--bn-z-bar);display:block;margin:0;padding:0;max-width:none;min-height:0;gap:0;flex-wrap:nowrap;
+ background:var(--bn-tbar-bg);border:0;color:var(--bn-text);font:14px/1.4 var(--bn-font-ui);text-align:left}
+body header.bn-top .bn-tbar{display:flex;align-items:center;gap:var(--bn-gap);height:var(--bn-tbar-h);margin:0 auto;
+ padding:0 max(calc(var(--bn-pad-x) - 8px),env(safe-area-inset-right)) 0 max(var(--bn-pad-x),env(safe-area-inset-left))}
+.bn-logo{display:inline-flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto;overflow:hidden;white-space:nowrap;line-height:1;color:var(--bn-text)!important;text-decoration:none!important;
+ font-family:var(--bn-logo-font);font-weight:var(--bn-logo-weight);font-size:var(--bn-logo-size);letter-spacing:var(--bn-logo-tracking)}
+.bn-logo .bn-word b{color:var(--bn-brand);font-weight:inherit}
+.bn-logo .bn-icon{flex:none;display:block;width:var(--bn-icon);height:var(--bn-icon);border-radius:calc(var(--bn-icon) * .19)}
+.bn-logo .bn-icon text{font-family:var(--bn-font-ui)}
+/* thin tri-color severity rule under the top bar (green / amber / red thirds) */
+body header.bn-top::after{content:"";display:block;height:var(--bn-rule-h);background:linear-gradient(90deg,var(--bn-sev-lo) 0 33.333%,var(--bn-sev-md) 33.333% 66.666%,var(--bn-sev-hi) 66.666% 100%)}
+.bn-primary{display:none}
+.bn-acts{margin-left:auto;display:flex;align-items:center;gap:0;flex:none}
+.bn-follows{display:flex;align-items:center}
+body .bn-ib{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--bn-icon-w);height:var(--bn-tap);padding:0;margin:0;border:0;border-radius:var(--bn-radius-sm);
+ background:transparent;color:var(--bn-text);cursor:pointer;text-decoration:none;font:inherit}
+body .bn-ib:hover{background:var(--bn-hover)}
+body header.bn-top a:focus-visible,body header.bn-top button:focus-visible,.bn-drawer a:focus-visible,.bn-drawer button:focus-visible,.bn-drawer summary:focus-visible{outline:2px solid var(--bn-accent);outline-offset:-2px}
+a.bn-follow{display:inline-flex;align-items:center;gap:8px;flex:none;min-width:var(--bn-icon-w);height:var(--bn-tap);padding:0 10px;justify-content:center;border-radius:var(--bn-radius-sm);
+ color:var(--bn-text)!important;text-decoration:none!important;font:600 14px/1.2 var(--bn-font-ui);white-space:nowrap;-webkit-tap-highlight-color:transparent}
+a.bn-follow:hover{background:var(--bn-hover)}
+a.bn-follow b{color:inherit;font-weight:700}
+a.bn-follow .bn-ico{flex:none;display:block}
+.bn-follows a.bn-follow{padding:0}
+.bn-follows .bn-fl,.bn-bl,.bn-ib .bn-tl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.bn-js-only{display:none!important}
+html.bn-js .bn-js-only{display:inline-flex!important}
+html.bn-js .bn-dsearch.bn-js-only{display:block!important}
+html.bn-js .bn-gear{display:none!important}                   /* phones: settings live in the sidebar */
+.bn-theme .bn-moon,:root[data-theme="light"] .bn-theme .bn-sun{display:none}
+:root[data-theme="light"] .bn-theme .bn-moon{display:block}
+.bn-theme svg,.bn-ib svg{display:block;flex:none}
+/* the old button-strip tab bar stays in the DOM (add-ons register their tab buttons there) but is never shown */
+body>nav.tabs{display:none!important}
+
+/* ---- page title + one-line description ---- */
+.bn-pagehead{padding:18px var(--bn-pad-x) 2px;text-align:left;max-width:none}
+body .bn-pagehead h1.bn-ptitle{margin:0;font:700 22px/1.2 var(--bn-font-ui);letter-spacing:-.01em;color:var(--bn-text);text-align:left;text-transform:none}
+body .bn-pagehead .bn-tabdesc{margin:6px 0 0;padding:0;max-width:72ch;font:400 14px/1.5 var(--bn-font-body);color:var(--bn-muted);text-align:left}
+
+/* ---- sidebar menu ---- */
+.bn-drawer{position:fixed;inset:0;z-index:var(--bn-z-drawer);visibility:hidden;pointer-events:none;transition:visibility 0s linear var(--bn-speed)}
+.bn-drawer:target,.bn-drawer.bn-open{visibility:visible;pointer-events:auto;transition:none}
+html.bn-js .bn-drawer:target:not(.bn-open){visibility:hidden;pointer-events:none}
+.bn-scrim{position:absolute;inset:0;background:var(--bn-scrim);opacity:0;transition:opacity var(--bn-speed)}
+.bn-drawer:target .bn-scrim,.bn-drawer.bn-open .bn-scrim{opacity:1}
+.bn-panel{position:absolute;top:0;right:0;bottom:0;width:var(--bn-panel-w);display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+ background:var(--bn-surface);color:var(--bn-text);border-left:1px solid var(--bn-line);box-shadow:var(--bn-shadow);transform:translateX(100%);transition:transform var(--bn-speed) ease;
+ font:var(--bn-nav-size)/1.35 var(--bn-font-ui);text-align:left;padding-bottom:env(safe-area-inset-bottom)}
+.bn-drawer:target .bn-panel,.bn-drawer.bn-open .bn-panel{transform:none}
+.bn-ph{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--bn-tbar-h);
+ padding:0 calc(var(--bn-pad-x) - 8px) 0 var(--bn-pad-x);background:var(--bn-surface);border-bottom:1px solid var(--bn-line)}
+.bn-dsearch{padding:14px var(--bn-pad-x) 2px}
+.bn-dfollow{display:flex;flex-direction:column;gap:0;padding:10px var(--bn-pad-x) 12px;border-top:1px solid var(--bn-line)}
+a.bn-follow.bn-follow-row{justify-content:flex-start;width:100%;padding:0;font-size:16px}
+a.bn-follow.bn-follow-row .bn-ico{width:22px}
+.bn-grp{border-top:1px solid var(--bn-line)}
+.bn-grp>summary{list-style:none;display:flex;align-items:center;gap:8px;min-height:50px;padding:0 var(--bn-pad-x);cursor:pointer;user-select:none;
+ font:700 12px/1 var(--bn-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--bn-muted)}
+.bn-grp>summary::-webkit-details-marker{display:none}
+.bn-grp>summary::after{content:"+";margin-left:auto;font:600 20px/1 var(--bn-font-ui);letter-spacing:0;color:var(--bn-text)}
+.bn-grp[open]>summary::after{content:"\2212"}
+.bn-grp>summary:hover{color:var(--bn-text)}
+.bn-n{font:600 11px/1 var(--bn-font-ui);letter-spacing:0;color:var(--bn-muted);opacity:.8}
+.bn-grp ul{list-style:none;margin:0;padding:0 0 10px}
+.bn-grp li{margin:0;padding:0}
+.bn-grp a{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 var(--bn-pad-x) 0 calc(var(--bn-pad-x) - 3px);border-left:3px solid transparent;
+ color:var(--bn-text)!important;text-decoration:none!important;font-weight:500;font-family:var(--bn-font-body)}
+.bn-grp a:hover{background:var(--bn-hover)}
+.bn-grp a[aria-current="page"]{color:var(--bn-accent)!important;background:var(--bn-active);border-left-color:var(--bn-accent);font-weight:700}
+.bn-grp a .ns-badge,.bn-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--bn-sev-hi);color:#fff;font:700 11px/20px var(--bn-font-ui);text-align:center}
+.bn-dtools{border-top:1px solid var(--bn-line);padding:8px calc(var(--bn-pad-x) - 6px)}
+body .bn-mrow,body .bn-ib.bn-theme-row{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;min-height:var(--bn-tap);height:auto;padding:0 6px;margin:0;border:0;border-radius:var(--bn-radius-sm);
+ background:transparent;color:var(--bn-text);font:500 var(--bn-nav-size)/1.3 var(--bn-font-ui);text-align:left;cursor:pointer}
+body .bn-mrow:hover{background:var(--bn-hover)}
+html.bn-js .bn-ib.bn-theme-row{display:flex!important}
+.bn-ib.bn-theme-row .bn-tl{position:static;width:auto;height:auto;clip:auto}
+.bn-dfoot{display:flex;flex-wrap:wrap;gap:2px 18px;margin:auto 0 0;padding:14px var(--bn-pad-x) 26px;border-top:1px solid var(--bn-line);font:400 13px/1.4 var(--bn-font-body)}
+.bn-dfoot a{color:var(--bn-muted)!important;text-decoration:none;display:inline-flex;align-items:center;min-height:32px}
+.bn-dfoot a:hover{color:var(--bn-text)!important}
+html.bn-lock,html.bn-lock body{overflow:hidden!important}
+/* the site search, moved into the sidebar by sitenav.js */
+.bn-dsearch #bns{position:static!important;display:flex!important;width:100%;max-width:none;flex:1 1 auto;margin:0;padding:0;background:none;border:0}
+.bn-dsearch #bns form{display:flex!important;width:100%}
+.bn-dsearch #bns .bns-ico,.bn-dsearch #bns kbd{display:none!important}
+.bn-dsearch #bns input{font-size:16px;min-height:var(--bn-tap);border-radius:var(--bn-radius-sm) 0 0 var(--bn-radius-sm);background:var(--bn-surface-0);border-color:var(--bn-line-2);color:var(--bn-text)}
+.bn-dsearch #bns .bns-go{min-height:var(--bn-tap);padding:0 14px;border-radius:0 var(--bn-radius-sm) var(--bn-radius-sm) 0;background:var(--bn-surface-2);border-color:var(--bn-line-2);color:var(--bn-text)}
+.bn-dsearch #bns #bns_pop{display:none;position:static;margin-top:6px;min-width:0;box-shadow:none}
+.bn-dsearch #bns #bns_pop.on{display:block!important}
+
+/* ---- settings popover (dashboard scan status / refresh / interval, language) ---- */
+.bn-pop{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:var(--bn-z-pop);max-height:75vh;overflow:auto;padding:14px 16px 16px;
+ background:var(--bn-surface);color:var(--bn-text);border:1px solid var(--bn-line-2);border-radius:var(--bn-radius);box-shadow:var(--bn-shadow);text-align:left}
+.bn-pop[hidden]{display:none!important}
+.bn-pop-h{font:700 12px/1 var(--bn-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--bn-muted);margin:0 0 12px}
+body .bn-pop .ctl{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;justify-content:flex-start;color:var(--bn-muted);font:14px/1.45 var(--bn-font-body)}
+body .bn-pop .ctl:empty::before{content:"No settings on this page.";color:var(--bn-muted)}
+body .bn-pop .ctl #status{flex:1 1 100%}
+body .bn-pop .ctl button,body .bn-pop .ctl select{min-height:40px}
+html.bn-js .bn-gear-row{display:flex!important}
+
+/* ---- tablet / desktop ---- */
+@media(min-width:521px){:root{--bn-panel-w:400px}}
+@media(min-width:821px){
+ :root{--bn-tbar-h:68px;--bn-pad-x:28px;--bn-gap:14px;--bn-icon-w:44px;--bn-logo-size:21px;--bn-icon:38px}
+ .bn-logo{gap:10px}
+ html.bn-js .bn-gear{display:inline-flex!important}
+ html.bn-js .bn-gear-row{display:none!important}
+ .bn-follows{gap:4px;margin-right:6px}
+ .bn-follows a.bn-follow{padding:0 10px}
+ .bn-follows .bn-fl{position:static;width:auto;height:auto;clip:auto}
+ .bn-follows .bn-fl-pre{display:none}
+ .bn-pop{position:absolute;top:calc(100% + 6px);right:var(--bn-pad-x);left:auto;bottom:auto;width:380px}
+ .bn-pagehead{padding:24px var(--bn-pad-x) 4px}
+ body .bn-pagehead h1.bn-ptitle{font-size:26px}
+ body .bn-pagehead .bn-tabdesc{font-size:15px}
+}
+@media(max-width:380px){html.bn-js .bn-theme-bar{display:none!important}}   /* smallest phones: theme toggle stays in the sidebar */
+@media(min-width:1000px){.bn-follows .bn-fl-pre{display:inline}}
+@media(min-width:1200px) and (max-width:1439px){.bn-follows .bn-fl-pre{display:none}}
+@media(min-width:1200px){
+ .bn-primary{display:flex;align-items:center;gap:2px;margin-left:18px}
+ .bn-primary a{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:var(--bn-radius-sm);color:var(--bn-muted)!important;text-decoration:none!important;font:600 14px/1 var(--bn-font-ui)}
+ .bn-primary a:hover{color:var(--bn-text)!important;background:var(--bn-hover)}
+ .bn-primary a[aria-current="page"]{color:var(--bn-text)!important;box-shadow:inset 0 -2px 0 var(--bn-brand)}
+ .bn-primary{margin-left:auto}
+ .bn-acts{margin-left:8px;padding-left:10px}
+ .bn-follows a.bn-follow{padding:0 8px;font-size:13.5px}
+}
+@media(prefers-reduced-motion:reduce){.bn-panel,.bn-scrim,.bn-drawer,.bn-grp>summary::after{transition:none!important}}
+@media print{body header.bn-top,.bn-drawer{display:none!important}}
+
+/* ---- Rank Meter (brand A "Signal"): 10 segments filled to the rank, green 1-3 / amber 4-6 / red 7-10, always with the numeral ----
+   markup: <span class="bn-meter bn-r7" role="img" aria-label="Rank 7 of 10"><span class="bn-segs" aria-hidden="true"><i></i> x10</span><b class="bn-num">7<small>/10</small></b></span>
+   built by window.bnMeter(rank, size) (dashboard.html / sitenav.js) and sitenav.meter_html() server-side. Sizes: default, .bn-meter-s, .bn-meter-l */
+.bn-meter{--seg-w:6px;--seg-h:14px;--seg-gap:2px;--num:18px;display:inline-flex;align-items:center;gap:8px;line-height:1;vertical-align:middle;white-space:nowrap}
+.bn-meter .bn-segs{display:inline-flex;gap:var(--seg-gap)}
+.bn-meter i{display:block;width:var(--seg-w);height:var(--seg-h);border-radius:1.5px;background:var(--bn-seg-off)}
+.bn-meter i:nth-child(-n+3){--c:var(--bn-sev-lo)}.bn-meter i:nth-child(n+4){--c:var(--bn-sev-md)}.bn-meter i:nth-child(n+7){--c:var(--bn-sev-hi)}
+.bn-r1 i:nth-child(-n+1),.bn-r2 i:nth-child(-n+2),.bn-r3 i:nth-child(-n+3),.bn-r4 i:nth-child(-n+4),.bn-r5 i:nth-child(-n+5),
+.bn-r6 i:nth-child(-n+6),.bn-r7 i:nth-child(-n+7),.bn-r8 i:nth-child(-n+8),.bn-r9 i:nth-child(-n+9),.bn-r10 i{background:var(--c)}
+.bn-meter .bn-num{font:800 var(--num)/1 var(--bn-font-ui);color:var(--bn-text);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.bn-meter .bn-num small{font-size:.62em;font-weight:600;color:var(--bn-muted);margin-left:1px}
+.bn-meter-s{--seg-w:4px;--seg-h:10px;--seg-gap:1.5px;--num:13px;gap:6px}
+.bn-meter-l{--seg-w:12px;--seg-h:28px;--seg-gap:4px;--num:36px;gap:14px}
+.bn-rkline{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+/* fixed icon sizes (some page stylesheets size every svg) */
+body a.bn-follow svg.bn-ico{width:22px!important;height:16px!important;max-width:none}
+body a.bn-follow svg.bn-ico[viewBox="0 0 24 24"]{width:16px!important;height:16px!important}
+body .bn-ib svg{width:20px!important;height:20px!important;max-width:none}
+body .bn-logo svg.bn-icon{width:var(--bn-icon)!important;height:var(--bn-icon)!important;max-width:none}
+.bn-logo,.bn-primary,.bn-primary a,.bn-acts{flex:none;white-space:nowrap}
+.bn-logo{flex:0 1 auto}
+
+/* ---- page fixes from the t320 phone audit ---- */
+#ns_gbanner{display:flow-root}      /* its floated dismiss button pushed The Wire 60px narrower on phones */
+@media(max-width:1000px){body>main{grid-template-columns:minmax(0,1fr)}#tl{min-width:0;overflow:hidden}}   /* 820 px tablets: the timeline made The Wire 122,000 px wide */
+@media(max-width:820px){
+ #wh .wh-t,#tab-radio .rd-tab{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}   /* wide tables scroll inside their own box */
+ html body main p,html body main li,html body .brief,html body main dd{font-size:max(14px,1em)!important}       /* running text >= 14 px on phones */
+ html body .meta{font-size:13px}
+}
+/* left alignment everywhere (brand A): footers and empty states were centered */
+#site_foot,footer.ft,.tips-box{text-align:left!important}
+.tips-box{margin-left:0!important}

@@ -1,11 +1,11 @@
 /* Wire history (t246). Dark theme, shared palette from theme.css. */
-#wh .wh-cov{font-size:12.5px;color:#c9d0d9;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--ac);border-radius:6px;padding:7px 10px;margin:0 0 8px}
+#wh .wh-cov{font-size:12.5px;color:var(--bn-text-2,#c9d0d9);background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-left:3px solid var(--ac);border-radius:6px;padding:7px 10px;margin:0 0 8px}
 #wh .wh-src{margin:0 0 10px;font-size:12.5px}#wh .wh-src summary{cursor:pointer;color:var(--ac)}
 #wh .wh-t{width:100%;border-collapse:collapse;margin:8px 0;font-size:12px}#wh .wh-t th{text-align:left;color:var(--mu);font-weight:600;border-bottom:1px solid var(--bd);padding:4px 6px}
 #wh .wh-t td{border-bottom:1px solid var(--bd);padding:4px 6px;vertical-align:top}#wh .wh-t tr.na td{color:var(--mu)}#wh .wh-t a{color:var(--tx)}
 #wh .wh-bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:0 0 8px}
 #wh .wh-lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);margin-right:6px}
-#wh .wh-jump{display:flex;align-items:center;gap:6px;margin:0}#wh .wh-jump input{color-scheme:dark;background:#0f1317;color:var(--tx);border:1px solid var(--bd2,#2f3742);border-radius:6px;padding:4px 6px}
+#wh .wh-jump{display:flex;align-items:center;gap:6px;margin:0}#wh .wh-jump input{color-scheme:dark;background:var(--bn-surface-0,#0f1317);color:var(--tx);border:1px solid var(--bd2,#2f3742);border-radius:6px;padding:4px 6px}
 #wh .wh-quick,#wh .wh-seg{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px}
 #wh .wh-quick button,#wh .wh-seg button,#wh .wh-cats button,#wh #wh_top{font-size:12px;padding:4px 10px;border-radius:14px}
 #wh .wh-quick button.on,#wh .wh-seg button.on{background:var(--ac);color:#000;border-color:var(--ac);font-weight:600}
@@ -15,7 +15,7 @@
 #wh .wh-cats button span{color:var(--mu);font-size:11px}#wh .wh-cats button.on{border-color:var(--cc,var(--ac));box-shadow:inset 0 0 0 1px var(--cc,var(--ac));color:#fff}
 #wh .wh-status{display:flex;gap:10px;align-items:center;margin:0 0 6px}
 #wh .wh-list{max-height:72vh;overflow-y:auto;border:1px solid var(--bd);border-radius:8px;background:#0c0f13;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-#wh .wh-day{position:sticky;top:0;z-index:2;background:#151a20;border-bottom:1px solid var(--bd);padding:6px 12px;font-weight:700;font-size:13px;color:var(--tx)}
+#wh .wh-day{position:sticky;top:0;z-index:2;background:var(--bn-surface,#151a20);border-bottom:1px solid var(--bd);padding:6px 12px;font-weight:700;font-size:13px;color:var(--tx)}
 #wh .wh-day span{color:var(--mu);font-weight:400;font-size:11px}
 #wh .wh-it{display:flex;gap:10px;padding:8px 12px;border-bottom:1px solid #1b2028;border-left:4px solid var(--cc,#2c3440)}
 #wh .wh-it.ar{background:repeating-linear-gradient(135deg,#10141a 0 12px,#12171e 12px 24px);border-left-style:dashed}
@@ -23,8 +23,8 @@
 #wh .wh-bd{min-width:0;flex:1}#wh .wh-ti{font-size:13.5px;line-height:1.35;margin:2px 0;color:var(--tx);overflow-wrap:anywhere}
 #wh .wh-it.ar .wh-ti{color:#c3c9d2}
 #wh .wh-m{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:11.5px}
-#wh .wh-ab{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;color:#0b0d10;background:#c9a227;border-radius:4px;padding:1px 6px}
+#wh .wh-ab{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--bn-bg,#0b0d10);background:#c9a227;border-radius:4px;padding:1px 6px}
 #wh .wh-rk{color:var(--mu)}#wh .wh-wl{font-size:10.5px;color:var(--md);border:1px solid #5a4300;border-radius:8px;padding:0 5px}#wh .wh-wl.bg{color:var(--mu);border-color:var(--bd)}
-#wh .wh-cat{color:#c9d0d9}#wh .meta a{color:var(--ac);text-decoration:none}
+#wh .wh-cat{color:var(--bn-text-2,#c9d0d9)}#wh .meta a{color:var(--ac);text-decoration:none}
 #wh .wh-sent{padding:14px;text-align:center}#wh .wh-note{margin-top:8px}
 @media(max-width:600px){#wh .wh-cats,#wh .wh-quick,#wh .wh-seg{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px}#wh .wh-cats button,#wh .wh-quick button,#wh .wh-seg button{flex:0 0 auto;white-space:nowrap}#wh .wh-bar{gap:8px}#wh .wh-status{flex-wrap:wrap}#wh .wh-it{flex-direction:column;gap:2px;padding:8px 10px}#wh .wh-tm{flex:none}#wh .wh-list{max-height:78vh}#wh .wh-t{font-size:11px}#wh .wh-quick button{padding:4px 8px}}

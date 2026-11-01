@@ -18,21 +18,21 @@ a{color:var(--ac,#4aa3ff)}a:focus-visible,button:focus-visible{outline:2px solid
 .wrap{max-width:860px;margin:0 auto;padding:16px 16px 40px}
 .crumb{font-size:13px;color:var(--mu,#8a94a3);margin:0 0 8px}.crumb a{color:var(--mu,#8a94a3)}
 h1.t{font-size:26px;line-height:1.25;margin:6px 0 8px;letter-spacing:.1px;overflow-wrap:anywhere}
-.dek{font-size:16.5px;color:#c9d1db;margin:0 0 12px}
+.dek{font-size:16.5px;color:var(--bn-text-2,#c9d1db);margin:0 0 12px}
 .meta{font-size:13px;color:var(--mu,#8a94a3);margin:0 0 14px}
-.pill{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.4px;border-radius:6px;padding:2px 8px;margin:0 6px 4px 0;border:1px solid var(--bd2,#2f3742);background:#14181d;white-space:nowrap}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.4px;border-radius:6px;padding:2px 8px;margin:0 6px 4px 0;border:1px solid var(--bd2,#2f3742);background:var(--bn-surface,#14181d);white-space:nowrap}
 .card{background:var(--pn,#12161b);border:1px solid var(--bd,#232a33);border-radius:12px;padding:14px 16px;margin:0 0 14px}
 .card h2{font-size:17px;margin:0 0 8px}
 .article h2{font-size:19px;margin:22px 0 6px}.article p,.article li{font-size:16px;overflow-wrap:anywhere}.article ul{padding-left:22px}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.btn{display:inline-block;text-decoration:none;font-weight:700;font-size:14px;border-radius:9px;padding:10px 14px;border:1px solid var(--bd2,#2f3742);color:var(--tx,#e6e9ee);background:#161b21}
+.btn{display:inline-block;text-decoration:none;font-weight:700;font-size:14px;border-radius:9px;padding:10px 14px;border:1px solid var(--bd2,#2f3742);color:var(--tx,#e6e9ee);background:var(--bn-surface,#161b21)}
 .btn.p{background:#c8102e;border-color:#c8102e;color:#fff}
 .vid{position:relative;aspect-ratio:16/9;width:100%;border-radius:12px;overflow:hidden;background:#000;border:1px solid var(--bd,#232a33)}
 .vid img,.vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0;object-fit:cover}
 .vid button{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;cursor:pointer;padding:0}
 .vid .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:76px;height:54px;border-radius:14px;background:rgba(200,16,46,.92);display:flex;align-items:center;justify-content:center}
 .vid .play:after{content:"";border-style:solid;border-width:12px 0 12px 20px;border-color:transparent transparent transparent #fff;margin-left:5px}
-.vid .note{position:absolute;left:8px;bottom:8px;font-size:11.5px;background:rgba(0,0,0,.7);color:#dfe5ec;padding:3px 7px;border-radius:6px}
+.vid .note{position:absolute;left:8px;bottom:8px;font-size:11.5px;background:rgba(0,0,0,.7);color:var(--bn-text,#dfe5ec);padding:3px 7px;border-radius:6px}
 .tl{list-style:none;margin:0;padding:0}.tl li{border-left:2px solid var(--bd2,#2f3742);padding:4px 0 10px 12px;margin-left:4px;overflow-wrap:anywhere}
 .tl li.new{border-left-color:#f5a524}.tl .when{font-size:12px;color:var(--mu,#8a94a3)}.tl .src{font-size:12.5px;color:var(--mu,#8a94a3)}
 .tag{font-size:10.5px;font-weight:800;letter-spacing:.5px;color:#111;background:#f5a524;border-radius:4px;padding:1px 5px;margin-right:6px}
@@ -41,7 +41,7 @@ h1.t{font-size:26px;line-height:1.25;margin:6px 0 8px;letter-spacing:.1px;overfl
 .sc .th{display:block;aspect-ratio:16/9;background:#000}.sc .th img{width:100%;height:100%;object-fit:cover;display:block}
 .sc .bd{padding:10px 12px 12px}.sc h3{font-size:15px;line-height:1.35;margin:0 0 4px}.sc h3 a{color:var(--tx,#e6e9ee);text-decoration:none}
 .sc .d{font-size:12px;color:var(--mu,#8a94a3)}.sc .btns{margin:8px 0 0}.sc .btn{font-size:12.5px;padding:7px 10px}
-.empty{text-align:center;padding:28px 16px}.empty b{display:block;font-size:20px;margin-bottom:6px}
+.empty{text-align:left;padding:28px 16px}.empty b{display:block;font-size:20px;margin-bottom:6px}
 .xp{border-top:1px solid var(--bd,#232a33);padding:10px 0}.xp:first-child{border-top:0}.xp p{margin:0 0 4px;white-space:pre-wrap;overflow-wrap:anywhere}
 footer.ft{max-width:860px;margin:0 auto;padding:12px 16px 30px;font-size:12.5px;color:var(--mu,#8a94a3)}footer.ft a{color:var(--mu,#8a94a3)}
 @media(max-width:520px){h1.t{font-size:22px}.dek{font-size:15.5px}.btn{flex:1 1 auto;text-align:center}}
@@ -64,12 +64,12 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
             f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
             f'<meta name="twitter:card" content="{"summary_large_image" if image else "summary"}"><meta name="twitter:site" content="@BlkoutNtw">'
             f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">'
-            '<link rel="stylesheet" href="/sitenav.css">')
+            '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
     if noindex: head += '<meta name="robots" content="noindex,nofollow">'
     if jsonld: head += '<script type="application/ld+json">' + json.dumps(jsonld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
     top = ""
     if sitenav is not None:
-        try: top = sitenav.header_html() + sitenav.nav_html(active)
+        try: top = sitenav.header_html(active)
         except Exception: top = ""
     if not top:
         top = '<header class="bn-hd"><h1><a href="/" style="color:inherit;text-decoration:none">BLACKOUT.<b style="color:#c8102e">NETWORK</b></a></h1></header>'

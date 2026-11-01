@@ -1,40 +1,40 @@
 /* blackout.network · Solar & Seismic live layer (live.js) */
 #tab-solar .ssl h2 .ssl-ic{color:var(--sol,#faad14)}
 #tab-solar .ssl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:2px 0 12px}
-#tab-solar .ssl-card{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--tx);background:#11161b;border:1px solid var(--bd);border-top:3px solid var(--c);border-radius:8px;padding:8px 10px}
+#tab-solar .ssl-card{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--tx);background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-top:3px solid var(--c);border-radius:8px;padding:8px 10px}
 #tab-solar .ssl-card:hover{background:#161c22}
 #tab-solar .ssl-card .t{font-size:11.5px;color:var(--mu)}#tab-solar .ssl-card .v{font-size:22px;font-weight:700;color:var(--c);line-height:1.15}
-#tab-solar .ssl-card .v small{font-size:12px;font-weight:500;color:var(--mu)}#tab-solar .ssl-card .s{font-size:12px;color:#c9d0d9}#tab-solar .ssl-card .f{font-size:11px;color:var(--mu)}
+#tab-solar .ssl-card .v small{font-size:12px;font-weight:500;color:var(--mu)}#tab-solar .ssl-card .s{font-size:12px;color:var(--bn-text-2,#c9d0d9)}#tab-solar .ssl-card .f{font-size:11px;color:var(--mu)}
 #tab-solar .ssl-sun{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:10px}
 #tab-solar .ssl-fig video{display:block;width:100%;height:auto;aspect-ratio:1/1;max-height:620px;object-fit:contain;background:#000}
 #tab-solar .ssl-side{margin-top:4px}#tab-solar .ssl-alerts{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 8px;align-items:start}
 @media(max-width:900px){#tab-solar .ssl-sun{grid-template-columns:minmax(0,1fr)}}
 #tab-solar .ssl-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
-#tab-solar .ssl-tabs button{background:#151a20;color:#c9d0d9;border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
+#tab-solar .ssl-tabs button{background:var(--bn-surface,#151a20);color:var(--bn-text-2,#c9d0d9);border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
 #tab-solar .ssl-tabs button.on{background:#2a2410;border-color:#faad14;color:#ffd666}
 #tab-solar .ssl-fig{margin:0;background:#000;border:1px solid var(--bd);border-radius:10px;overflow:hidden}
 #tab-solar .ssl-fig img{display:block;width:100%;height:auto;aspect-ratio:1/1;max-height:620px;object-fit:contain;background:#000}
-#tab-solar .ssl-fig figcaption{font-size:11.5px;color:var(--mu);padding:6px 9px;background:#0f1317}
+#tab-solar .ssl-fig figcaption{font-size:11.5px;color:var(--mu);padding:6px 9px;background:var(--bn-surface-0,#0f1317)}
 #tab-solar .ssl-fig a,#tab-solar .ssl-credit a,#tab-solar .ssl-kv a,#tab-solar .ssl-eqbar a{color:var(--ac)}
-#tab-solar .ssl-cyc{background:none;border:1px solid var(--bd);color:#c9d0d9;border-radius:5px;padding:1px 7px;font-size:11px;cursor:pointer}
+#tab-solar .ssl-cyc{background:none;border:1px solid var(--bd);color:var(--bn-text-2,#c9d0d9);border-radius:5px;padding:1px 7px;font-size:11px;cursor:pointer}
 #tab-solar .ssl-alerts{max-height:520px;overflow:auto}
-#tab-solar .ssl-al{border:1px solid var(--bd);border-left:3px solid var(--c);border-radius:6px;margin:5px 0;background:#11161b}
+#tab-solar .ssl-al{border:1px solid var(--bd);border-left:3px solid var(--c);border-radius:6px;margin:5px 0;background:var(--bn-surface-0,#11161b)}
 #tab-solar .ssl-al summary{cursor:pointer;padding:6px 9px;font-size:12.5px}#tab-solar .ssl-al summary small{display:block;color:var(--mu);font-size:11px}
-#tab-solar .ssl-al pre{white-space:pre-wrap;font-size:11.5px;color:#c9d0d9;margin:0;padding:4px 10px 9px}
+#tab-solar .ssl-al pre{white-space:pre-wrap;font-size:11.5px;color:var(--bn-text-2,#c9d0d9);margin:0;padding:4px 10px 9px}
 #tab-solar .ssl-chip{display:inline-block;border:1px solid var(--c);color:var(--c);border-radius:4px;padding:0 5px;font-size:11px;margin-left:4px}
 #tab-solar .ssl-grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:10px}
 @media(max-width:900px){#tab-solar .ssl-grid2{grid-template-columns:minmax(0,1fr)}}
-#tab-solar .ssl-chart{position:relative;background:#0f1317;border:1px solid var(--bd);border-radius:8px;padding:4px}
+#tab-solar .ssl-chart{position:relative;background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:8px;padding:4px}
 #tab-solar .ssl-chart canvas{display:block;width:100%;height:190px}
 #tab-solar .ssl-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--mu);margin-top:5px;align-items:center}
 #tab-solar .ssl-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 #tab-solar .ssl-leg a{color:var(--ac)}
 #tab-solar .ssl-pr{display:flex;gap:6px;align-items:center;margin:4px 0}
-#tab-solar .ssl-cls{flex:0 0 30px;height:30px;border-radius:6px;background:var(--c);color:#0b0d10;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
-#tab-solar .ssl-pb{flex:1;position:relative;background:#11161b;border:1px solid var(--bd);border-radius:6px;height:30px;overflow:hidden;display:flex;align-items:center;gap:6px;padding:0 8px}
+#tab-solar .ssl-cls{flex:0 0 30px;height:30px;border-radius:6px;background:var(--c);color:var(--bn-bg,#0b0d10);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+#tab-solar .ssl-pb{flex:1;position:relative;background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:6px;height:30px;overflow:hidden;display:flex;align-items:center;gap:6px;padding:0 8px}
 #tab-solar .ssl-pb i{position:absolute;left:0;top:0;bottom:0;opacity:.28}#tab-solar .ssl-pb b{position:relative;font-size:13px}#tab-solar .ssl-pb small{position:relative;color:var(--mu);font-size:11px}
 #tab-solar .ssl-flares{display:flex;flex-wrap:wrap;gap:5px}
-#tab-solar .ssl-fl{display:inline-flex;flex-direction:column;border:1px solid var(--c);border-left:4px solid var(--c);border-radius:6px;padding:3px 8px;background:#11161b}
+#tab-solar .ssl-fl{display:inline-flex;flex-direction:column;border:1px solid var(--c);border-left:4px solid var(--c);border-radius:6px;padding:3px 8px;background:var(--bn-surface-0,#11161b)}
 #tab-solar .ssl-fl b{color:var(--c);font-size:13px}#tab-solar .ssl-fl small{color:var(--mu);font-size:10.5px}
 #tab-solar .ssl-tb{width:100%;border-collapse:collapse}#tab-solar .ssl-tb td,#tab-solar .ssl-tb th{padding:4px 6px;border-bottom:1px solid #1e252d;text-align:left}
 #tab-solar .ssl-cme{display:flex;flex-direction:column;gap:7px}
@@ -43,11 +43,11 @@
 #tab-solar .ssl-cdh{font-size:12px;font-weight:600;color:#ffd666;margin-bottom:3px}
 #tab-solar .ssl-tick{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;color:#ff7a45;letter-spacing:.5px}
 #tab-solar .ssl-asm{margin-top:4px;font-style:italic}
-#tab-solar .ssl-kv{background:#11161b;border:1px solid var(--bd);border-radius:7px;padding:6px 10px;font-size:12.5px;display:flex;flex-direction:column}
-#tab-solar .ssl-kv span{font-size:11px;color:var(--mu)}#tab-solar .ssl-kv small{color:#aab3bf;font-size:11.5px;margin-top:2px}
+#tab-solar .ssl-kv{background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:7px;padding:6px 10px;font-size:12.5px;display:flex;flex-direction:column}
+#tab-solar .ssl-kv span{font-size:11px;color:var(--mu)}#tab-solar .ssl-kv small{color:var(--bn-text-2,#aab3bf);font-size:11.5px;margin-top:2px}
 #tab-solar .ssl-eqbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:8px;font-size:12px}
 #tab-solar .ssl-sig{background:#2a1414;border:1px solid #ff4d4f;color:#ffccc7;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer}
-#tab-solar .ssl-sig:disabled{background:#11161b;border-color:var(--bd);color:var(--mu);cursor:default}
+#tab-solar .ssl-sig:disabled{background:var(--bn-surface-0,#11161b);border-color:var(--bd);color:var(--mu);cursor:default}
 #tab-solar .ssl-dotlive{display:inline-block;width:8px;height:8px;border-radius:50%;background:#52c41a;margin-right:5px;animation:sslp 2s infinite}
 #tab-solar .ssl-newc{color:#fff;background:#d4380d;border-radius:4px;padding:0 5px}
 #tab-solar .ssl-eqgrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:12px}
@@ -55,9 +55,9 @@
 #tab-solar #ssl_eqmap{height:470px;border-radius:10px;border:1px solid var(--bd)}
 @media(max-width:600px){#tab-solar #ssl_eqmap{height:340px}}
 #tab-solar .ssl-eqlist{max-height:470px;overflow:auto;display:flex;flex-direction:column;gap:3px}
-#tab-solar .ssl-q{display:flex;gap:8px;align-items:center;background:#11161b;border:1px solid var(--bd);border-radius:7px;padding:5px 8px;cursor:pointer}
+#tab-solar .ssl-q{display:flex;gap:8px;align-items:center;background:var(--bn-surface-0,#11161b);border:1px solid var(--bd);border-radius:7px;padding:5px 8px;cursor:pointer}
 #tab-solar .ssl-q:hover{background:#161c22}#tab-solar .ssl-q.new{border-color:#ff7a45;box-shadow:0 0 0 1px #ff7a4566 inset}
-#tab-solar .ssl-q .m{flex:0 0 38px;height:30px;border-radius:6px;background:var(--c);color:#0b0d10;font-weight:800;display:flex;align-items:center;justify-content:center}
+#tab-solar .ssl-q .m{flex:0 0 38px;height:30px;border-radius:6px;background:var(--c);color:var(--bn-bg,#0b0d10);font-weight:800;display:flex;align-items:center;justify-content:center}
 #tab-solar .ssl-q .p{flex:1;min-width:0;font-size:12.5px}#tab-solar .ssl-q .p b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 #tab-solar .ssl-q .p small{color:var(--mu);font-size:11px}#tab-solar .ssl-q a{color:var(--ac);text-decoration:none}
 #tab-solar .ssl-q .nb{font-size:10px;font-weight:800;background:#d4380d;color:#fff;border-radius:4px;padding:1px 5px}
