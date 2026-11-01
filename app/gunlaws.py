@@ -130,8 +130,15 @@ def live():
                     if p: prices["Polymarket:" + (m.get("slug") or "")] = {"mid": round(float(p[0]), 4), "bid": _f(m.get("bestBid")), "ask": _f(m.get("bestAsk")), "volume": _f(m.get("volume")),
                                                                            "status": "closed" if m.get("closed") else "active"}
         except Exception as ex: errs.append("Polymarket: " + str(ex)[:120])
-    out = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "prices": prices, "errors": errs, "cache_seconds": 60}
-    with _lock: _live.update(at=time.time(), data=out)
+    # a source that failed (e.g. Kalshi HTTP 429) keeps its last good prices instead of dropping them;
+    # on errors back off for 3 minutes so we don't hammer a rate-limited API
+    prev = (_live.get("good") or {})
+    for k, v in prev.items():
+        if k not in prices: prices[k] = v
+    good = {**prev, **prices}
+    stale = sorted({e.split(":")[0] for e in errs})
+    out = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "prices": prices, "errors": errs, "stale": stale, "cache_seconds": 180 if errs else 60}
+    with _lock: _live.update(at=time.time() + (120 if errs else 0), data=out, good=good)
     return 200, out
 def handle_get(path, qs):
     n = path[len("/api/gunlaws/"):] if path.startswith("/api/gunlaws/") else ""

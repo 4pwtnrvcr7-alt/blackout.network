@@ -257,7 +257,7 @@ async function histChart(det,rng){const key=det.dataset.mk,m=marketFor(key);if(!
 async function live(){try{const r=await fetch(API+"/live",{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error(d.error||r.status);S.live=d.prices||{};S.liveAt=d.at;
   for(const [k,v] of Object.entries(S.live)){M.querySelectorAll(`[data-live="${CSS.escape(k)}"]`).forEach(el=>{const old=el.textContent;el.textContent=P(v.mid);if(old!=el.textContent){el.classList.remove("gl-flash");void el.offsetWidth;el.classList.add("gl-flash")}});
    M.querySelectorAll(`[data-live-ba="${CSS.escape(k)}"]`).forEach(el=>{el.textContent=(v.bid!=null&&v.ask!=null?`bid ${P(v.bid)} · ask ${P(v.ask)}`:"")+(v.volume?` · vol ${Math.round(v.volume).toLocaleString()}`:"")})}
-  q("live").innerHTML=`<span class="gl-dot"></span>live · ${ET(d.at)}${d.errors&&d.errors.length?` · <span class="gl-err">${E(d.errors.join("; ")).slice(0,140)}</span>`:""}`}
+  q("live").innerHTML=`<span class="gl-dot"></span>live · ${ET(d.at)}${d.stale&&d.stale.length?` · <span class="meta">${E(d.stale.join(" and "))} prices delayed; showing the latest available</span>`:""}`}
  catch(e){q("live").innerHTML=`<span class="meta">live prices unavailable; showing the last hourly snapshot</span>`}}
 function paintSources(){const d=S.d,sc=d.scotus_src||{},rv=d.reversal||{};
  const L=[["Supreme Court dockets (JSON), questions presented and opinions","https://www.supremecourt.gov/"],["Duke Center for Firearms Law — SCOTUS Gun Watch"+(sc.duke&&sc.duke.week?` (week of ${sc.duke.week})`:""),(sc.duke||{}).url||"https://firearmslaw.duke.edu/secondthoughts"],
