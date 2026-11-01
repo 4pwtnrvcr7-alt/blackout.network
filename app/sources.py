@@ -320,7 +320,7 @@ def shell(title, body, robots="index", wide=True):
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="stylesheet" href="/api/sources/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="sc-page"><a class="skip" href="#main">Skip to content</a>'
             f'<header><h1>BLACKOUT.<b>NETWORK</b> · {E(title)}<small>{E(TAGLINE)}</small></h1>'
-            '<nav class="sc-nav" aria-label="Site"><a href="/#wire">← Dashboard</a><a href="/scoring">How we score</a><a href="/sources" class="on">📚 Sources</a><a href="/newsletter">✉ Newsletter</a></nav></header>'
+            '<nav class="sc-nav" aria-label="Site"><a href="/#wire">← Dashboard</a><a href="/scoring">How we score</a><a href="/sources" class="on"><span class="sc-ni" data-ico="book-open" aria-hidden="true"></span>Sources</a><a href="/newsletter"><span class="sc-ni" data-ico="mail" aria-hidden="true"></span>Newsletter</a></nav></header>'
             f'<div class="sc-wrap" id="main" role="main">{body}</div>'
             f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a>'
             '<span id="sc_foot_range"></span></footer>'
@@ -363,13 +363,13 @@ def directory_html():
     cats = "".join(f'<option value="{E(c)}">{E(c)} ({n:,})</option>' for c, n in d["by_category"])
     regs = "".join(f'<option value="{E(r)}">{E(r)} ({n:,})</option>' for r, n in d["by_registry"])
     ccs = json.dumps(d["countries"])
-    chips = "".join(f'<li><button type="button" data-cat="{E(c)}" title="Show only {E(c)}"><b>{n:,}</b> {E(c)}</button></li>' for c, n in d["by_category"])
+    chips = "".join(f'<li><button type="button" class="cc" data-cat="{E(c)}" data-ccat="{E(c)}" data-cico title="Show only {E(c)}"><span class="sd-cl"><b>{n:,}</b> {E(c)}</span></button></li>' for c, n in d["by_category"])
     return ('<section class="sc-card" id="directory" aria-labelledby="h-d"><h2 id="h-d">Global directory</h2>'
             f'<p class="sc-sm">{d["total"]:,} real reference sources from around the world: security teams, police and emergency agencies, radar and weather '
             'stations, seismic networks, satellites, river gauges, government data feeds, news outlets, research institutions and public scanner audio. '
             'Every entry comes from a published registry and links to the real page. <b>These are reference entries, not live monitor inputs</b>: '
             'the scanner does not read them, and they never change an alert\'s score or rank.</p>'
-            f'<ul class="sd-cats">{chips}</ul>'
+            f'<ul class="sd-cats" aria-label="Directory categories (color key; select one to filter)">{chips}</ul>'
             '<form class="sc-filters" id="sd_filters" role="search" onsubmit="return false">'
             '<label class="sc-q"><span class="sr">Search the directory</span><input id="sd_q" type="search" placeholder="Search name, link, type or place…" maxlength="80"></label>'
             f'<label><span class="sr">Category</span><select id="sd_cat"><option value="">All categories</option>{cats}</select></label>'
@@ -427,6 +427,7 @@ def page_html():
       '<label><span class="sr">Sort</span><select id="sc_sort"><option value="items">Most items</option><option value="rating">Highest rating</option><option value="rating_asc">Lowest rating</option>'
       '<option value="recent">Most recent</option><option value="name">Name A–Z</option></select></label>'
       '<label class="sc-chk"><input type="checkbox" id="sc_prof"> With profile</label></form>'
+      '<ul class="sc-catleg" aria-label="Category colors">' + "".join(f'<li class="cc" data-ccat="{E(c)}" data-cico>{E(c)}</li>' for c in CATS) + '</ul>'
       '<p class="sc-sm mu" id="sc_count" aria-live="polite">Loading…</p><div id="sc_list" class="sc-list"></div>'
       '<div class="sc-more"><button type="button" id="sc_more" hidden>Show more</button></div>'
       '<noscript><p>The catalog needs JavaScript. The raw data is at <a href="/api/sources/catalog?per=100">/api/sources/catalog</a>.</p></noscript></section>')
@@ -442,13 +443,13 @@ def page_html():
     if s["candidates"]:
         a('<ul class="sc-q-list">' + "".join(
             f'<li><a href="{E(c["url"])}" target="_blank" rel="noopener noreferrer nofollow">{E(c["name"])}</a> <span class="sc-chip">{E(c["type"] or "?")}</span>'
-            f'<span class="sc-chip">{E(c["category"] or "?")}</span><span class="mu sc-sm"> · {E(c["origin"])} · added {E(et(c["added"]))}</span>'
+            f'<span class="sc-chip cat cc" data-ccat="{E(c["category"] or "")}">{E(c["category"] or "?")}</span><span class="mu sc-sm"> · {E(c["origin"])} · added {E(et(c["added"]))}</span>'
             + (f'<div class="sc-sm mu">{E(c["why"][:240])}</div>' if c.get("why") else "") + '</li>' for c in s["candidates"]) + '</ul>')
     else:
         a('<p class="sc-sm mu">None right now. New candidates come from the hourly source search and from approved suggestions.</p>')
     a('</section><section class="sc-card" id="queue" aria-labelledby="h-q"><h2 id="h-q">Review queue</h2>')
     if s["queue"]:
-        a('<ul class="sc-q-list">' + "".join(f'<li><b>{E(q["name"])}</b> <span class="sc-chip">{E(q["type"])}</span><span class="sc-chip">{E(q["category"])}</span>'
+        a('<ul class="sc-q-list">' + "".join(f'<li><b>{E(q["name"])}</b> <span class="sc-chip">{E(q["type"])}</span><span class="sc-chip cat cc" data-ccat="{E(q["category"])}">{E(q["category"])}</span>'
                                               f'<span class="mu sc-sm"> · submitted {E(et(q["created"]))}</span></li>' for q in s["queue"]) + '</ul>')
     else:
         a('<p class="sc-sm mu">The queue is empty. Suggest a source below.</p>')
@@ -509,7 +510,7 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
     if path == "/api/sources/submit":
         code, body = submit(d, ip or "", headers)
         if html_mode:
-            return code, shell("Sources", f'<section class="sc-card"><h2>{"✓ Received" if body.get("ok") else "ⓘ Not submitted"}</h2><p>{E(body["message"])}</p>'
+            return code, shell("Sources", f'<section class="sc-card"><h2>{"Received" if body.get("ok") else "Not submitted"}</h2><p>{E(body["message"])}</p>'
                                          '<p><a href="/sources#submit">Back to Sources</a></p></section>'), "text/html"
         return code, body
     if not NL().origin_ok(headers): return 403, {"ok": False, "message": "Cross-site request blocked."}
