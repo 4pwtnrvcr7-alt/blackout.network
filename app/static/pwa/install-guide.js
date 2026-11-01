@@ -1,154 +1,257 @@
-/* blackout.network: mobile "Add to Home Screen" guide + Share button. Vanilla JS, no dependencies.
-   Privacy: detection runs entirely in this browser (userAgent / userAgentData); nothing is sent anywhere, no analytics, no cookies.
-   Storage: localStorage "bnig_dismissed_until" (30-day dismissal) and sessionStorage "bnig_shown" (once per session). */
+/* BLACKOUT.NETWORK "Add to Home Screen" sheet (t339/t340). Vanilla JS + inline SVG/CSS animation, no dependencies.
+   Rules (Matt, t339/t340): show once to every visitor who has not installed or dismissed; Dismiss = gone for good;
+   never shown to anyone who installed; only the steps for THIS phone + browser; understandable in 3 seconds.
+   Flows checked Nov 2026 against: Apple Support (Safari iPhone/iPad, Safari Mac), Google Chrome Help (Android, iOS, desktop),
+   Microsoft Edge docs, Mozilla Firefox help, Samsung Internet guides. Sources are listed in FLOW_SOURCES below.
+   Privacy: detection runs locally (userAgent / userAgentData); nothing is sent anywhere, no analytics.
+   Storage: localStorage "bn_installed", "bnig_dismissed" (+ cookie "bnig_dismissed" as backup), sessionStorage "bnig_shown".
+   Testing: ?bnig=1 forces the sheet (ignores installed/dismissed/session) for the detected browser. */
 (function () {
   "use strict";
   if (window.__bnig) return; window.__bnig = 1;
-  try { if (window.top !== window.self) return; } catch (e) { return; }      // never inside iframes (newsletter/sources cards)
-  var KEY = "bnig_dismissed_until", SKEY = "bnig_shown", DAYS = 30, DELAY = 2500;
+  try { if (window.top !== window.self) return; } catch (e) { return; }      // never inside iframes
+  var IKEY = "bn_installed", DKEY = "bnig_dismissed", SKEY = "bnig_shown", DELAY = 1800, STEP_MS = 2600;
   var ls = function (k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
   var ss = function (k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } };
+  var ck = function (k, v) { try { if (v === undefined) return (document.cookie.match("(?:^|; )" + k + "=([^;]*)") || [])[1] || null;
+    document.cookie = k + "=" + v + "; Max-Age=315360000; Path=/; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : ""); } catch (e) { return null; } };
+  var reduced = false; try { reduced = matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+
+  // ---------------- installed / dismissed ----------------
+  function standalone() {
+    try { if (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches ||
+              matchMedia("(display-mode: minimal-ui)").matches || matchMedia("(display-mode: window-controls-overlay)").matches) return true; } catch (e) {}
+    return navigator.standalone === true;
+  }
+  function markInstalled() { ls(IKEY, "1"); ck(IKEY, "1"); }
+  function isInstalled() { return ls(IKEY) === "1" || ck(IKEY) === "1"; }
+  function isDismissed() { return ls(DKEY) === "1" || ck(DKEY) === "1"; }
+  if (standalone()) markInstalled();                                         // launched from the home screen: remember it in this browser too
 
   // ---------------- detection (local only) ----------------
   function detect() {
     var ua = navigator.userAgent || "", uad = navigator.userAgentData || null, tp = navigator.maxTouchPoints || 0;
-    var d = { device: "desktop", os: "other", osVersion: null, browser: "other", inApp: false, mobile: false };
-    var iPadDesktop = /Macintosh/.test(ua) && tp > 1;                         // iPadOS 13+ "Request Desktop Website" (default) looks like a Mac
+    var d = { device: "desktop", os: "other", ver: null, safari: null, browser: "other", inApp: false, mobile: false };
+    var iPadDesktop = /Macintosh/.test(ua) && tp > 1;                         // iPadOS "desktop website" mode looks like a Mac
     if (/iPhone|iPod/.test(ua)) d.device = "iphone";
     else if (/iPad/.test(ua) || iPadDesktop) d.device = "ipad";
-    else if (/Android/i.test(ua) || (uad && /Android/i.test(uad.platform || ""))) d.device = /Mobile/i.test(ua) || (uad && uad.mobile) ? "android-phone" : "android-tablet";
+    else if (/Android/i.test(ua) || (uad && /Android/i.test(uad.platform || ""))) d.device = "android";
+    else if (/Macintosh|Mac OS X/.test(ua)) d.os = "mac";
     if (d.device === "iphone" || d.device === "ipad") {
-      d.os = "ios";
-      var m = ua.match(/OS (\d+)[_.](\d+)/);                                  // "CPU iPhone OS 17_4 like Mac OS X"
-      if (m && !iPadDesktop) d.osVersion = parseFloat(m[1] + "." + m[2]);
-      else { var v = ua.match(/Version\/(\d+)(?:\.(\d+))?/); if (v) d.osVersion = parseFloat(v[1] + "." + (v[2] || 0)); }   // Safari version tracks iOS
-    } else if (d.device.indexOf("android") === 0) {
-      d.os = "android"; var a = ua.match(/Android (\d+(?:\.\d+)?)/); if (a) d.osVersion = parseFloat(a[1]);
-    }
+      d.os = "ios"; var m = ua.match(/OS (\d+)[_.](\d+)/); if (m && !iPadDesktop) d.ver = parseFloat(m[1] + "." + m[2]);
+    } else if (d.device === "android") d.os = "android";
+    var sv = ua.match(/Version\/(\d+)(?:\.(\d+))?/); if (sv) d.safari = parseFloat(sv[1] + "." + (sv[2] || 0));   // Safari 26 freezes the OS number at 18.x, so use Version/
     d.mobile = d.os === "ios" || d.os === "android" || !!(uad && uad.mobile);
-    if (/FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|LinkedInApp|Snapchat|GSA\//.test(ua)) d.inApp = true;
+    if (/FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|LinkedInApp|Snapchat|TikTok|musical_ly|GSA\//.test(ua)) d.inApp = true;
     if (/SamsungBrowser/i.test(ua)) d.browser = "samsung";
     else if (/EdgiOS|EdgA|Edg\//.test(ua)) d.browser = "edge";
-    else if (/OPR\/|OPT\/|OPiOS|Opera|OPX\//.test(ua)) d.browser = "opera";
+    else if (/OPR\/|OPT\/|OPiOS|OPX\//.test(ua)) d.browser = "opera";
     else if (/FxiOS|Firefox\//.test(ua)) d.browser = "firefox";
     else if (/CriOS|Chrome\//.test(ua)) d.browser = "chrome";
-    else if (/Safari\//.test(ua) && d.os === "ios") d.browser = "safari";
     else if (/Safari\//.test(ua)) d.browser = "safari";
-    if (uad && uad.brands && d.browser === "other") {
-      var b = uad.brands.map(function (x) { return x.brand; }).join(" ");
-      if (/Edge/.test(b)) d.browser = "edge"; else if (/Opera/.test(b)) d.browser = "opera"; else if (/Samsung/.test(b)) d.browser = "samsung"; else if (/Chrom/.test(b)) d.browser = "chrome";
-    }
     return d;
   }
-  function refineAndroidVersion(d, cb) {                                       // Chrome's reduced UA says "Android 10; K"; ask locally for the real one
-    var uad = navigator.userAgentData;
-    if (d.os !== "android" || !uad || !uad.getHighEntropyValues) return cb(d);
-    uad.getHighEntropyValues(["platformVersion"]).then(function (h) { var v = parseFloat(h.platformVersion); if (v) d.osVersion = v; cb(d); }, function () { cb(d); });
+
+  // ---------------- drawings: simplified, accurate versions of the real buttons ----------------
+  var IC = {
+    share: '<path d="M0 -9v11M-4 -5l4-4 4 4"/><path d="M-6 -2h-1.5v10h15v-10h-1.5" />',
+    dotsh: '<circle cx="-6" cy="0" r="1.8" class="f"/><circle cx="0" cy="0" r="1.8" class="f"/><circle cx="6" cy="0" r="1.8" class="f"/>',
+    dotsv: '<circle cx="0" cy="-6" r="1.8" class="f"/><circle cx="0" cy="0" r="1.8" class="f"/><circle cx="0" cy="6" r="1.8" class="f"/>',
+    burger: '<path d="M-7 -5h14M-7 0h14M-7 5h14"/>',
+    install: '<rect x="-9" y="-7" width="18" height="12" rx="2"/><path d="M0 -4v6M-3 -1l3 3 3-3M-4 8h8"/>',
+    addsq: '<rect x="-7" y="-7" width="14" height="14" rx="3.5"/><path d="M0 -3.5v7M-3.5 0h7"/>',
+    plus: '<path d="M0 -6v12M-6 0h6 6"/>',
+    back: '<path d="M2 -6l-6 6 6 6"/>', fwd: '<path d="M-2 -6l6 6 -6 6"/>', tabs: '<rect x="-6" y="-6" width="12" height="12" rx="2.5"/>',
+    book: '<path d="M-7 -6h6c1 0 1 1 1 1v12c0-1-1-1-1-1h-6zM7 -6h-6c-1 0-1 1-1 1v12c0-1 1-1 1-1h6z"/>',
+    file: '<path d="M-5 -7h7l4 4v10h-11z"/>', dock: '<rect x="-9" y="2" width="18" height="5" rx="2"/><rect x="-4" y="-7" width="8" height="7" rx="1.5"/>',
+    home: '<path d="M-7 0l7-7 7 7M-5 -2v8h10v-8"/>', app: '<rect x="-7" y="-7" width="14" height="14" rx="3.5"/>'
+  };
+  function ico(name, x, y, s) { return '<g transform="translate(' + x + " " + y + ") scale(" + (s || 1) + ')">' + IC[name] + "</g>"; }
+  function ring(x, y, r) { return '<circle class="bnig-pulse" cx="' + x + '" cy="' + y + '" r="' + r + '"/><circle class="bnig-ring" cx="' + x + '" cy="' + y + '" r="' + r + '"/>'; }
+  // a browser bar (top or bottom of the phone) with icons; the target icon gets the pulsing highlight
+  function sceneBar(where, icons, target, url) {
+    var W = 300, H = 132, y = where === "top" ? 30 : 100, s = '<svg viewBox="0 0 ' + W + " " + H + '" class="bnig-svg" aria-hidden="true">';
+    s += '<rect class="ph" x="1" y="1" width="' + (W - 2) + '" height="' + (H - 2) + '" rx="18"/>';
+    s += '<g class="pg">' + [0, 1, 2].map(function (i) { return '<rect x="22" y="' + (where === "top" ? 58 + i * 16 : 18 + i * 16) + '" width="' + (200 - i * 50) + '" height="7" rx="3.5"/>'; }).join("") + "</g>";
+    var left = icons.filter(function (i) { return i.side === "l"; }), right = icons.filter(function (i) { return i.side !== "l"; });
+    var x0 = 14 + left.length * 34, x1 = W - 14 - right.length * 34;
+    s += '<rect class="url" x="' + x0 + '" y="' + (y - 15) + '" width="' + (x1 - x0) + '" height="30" rx="15"/><text class="ut" x="' + (x0 + 14) + '" y="' + (y + 4) + '">' + (url || "blackout.network") + "</text>";
+    var tgt = null;
+    left.forEach(function (ic, i) { var cx = 30 + i * 34; if (ic.t) tgt = [cx, y]; s += '<g class="ic' + (ic.t ? " on" : "") + '">' + ico(ic.n, cx, y) + "</g>"; });
+    right.forEach(function (ic, i) { var cx = x1 + 17 + i * 34; if (ic.t) tgt = [cx, y]; s += '<g class="ic' + (ic.t ? " on" : "") + '">' + ico(ic.n, cx, y) + "</g>"; });
+    if (tgt) s = s + ring(tgt[0], tgt[1], 17);
+    return s + "</svg>";
   }
-  function standalone() {
-    try { if (window.matchMedia && (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches || matchMedia("(display-mode: minimal-ui)").matches)) return true; } catch (e) {}
-    return navigator.standalone === true;
+  // a menu / share sheet with rows; the target row is highlighted
+  function sceneMenu(title, rows, target, from) {
+    var W = 300, H = 132, s = '<svg viewBox="0 0 ' + W + " " + H + '" class="bnig-svg" aria-hidden="true"><rect class="ph" x="1" y="1" width="' + (W - 2) + '" height="' + (H - 2) + '" rx="18"/>';
+    var top = from === "top" ? 10 : 18, mx = 34, mw = W - 68;
+    s += '<rect class="menu" x="' + mx + '" y="' + top + '" width="' + mw + '" height="' + (rows.length * 30 + (title ? 22 : 6)) + '" rx="12"/>';
+    if (title) s += '<text class="mt" x="' + (mx + 14) + '" y="' + (top + 15) + '">' + title + "</text>";
+    var y0 = top + (title ? 22 : 6), tgt = null;
+    rows.forEach(function (r, i) {
+      var y = y0 + i * 30, on = i === target;
+      if (on) { s += '<rect class="row on" x="' + (mx + 4) + '" y="' + y + '" width="' + (mw - 8) + '" height="28" rx="8"/>'; tgt = [mx + mw - 30, y + 14]; }
+      s += '<text class="rt' + (on ? " on" : "") + '" x="' + (mx + 16) + '" y="' + (y + 18) + '">' + r[0] + "</text>";
+      if (r[1]) s += '<g class="ic' + (on ? " on" : "") + '">' + ico(r[1], mx + mw - 22, y + 14, .8) + "</g>";
+    });
+    return s + "</svg>";
+  }
+  // the one-tap install: the BN tile landing on a home screen
+  function sceneInstall(where) {
+    var s = '<svg viewBox="0 0 300 132" class="bnig-svg" aria-hidden="true"><rect class="ph" x="1" y="1" width="298" height="130" rx="18"/>';
+    for (var i = 0; i < 6; i++) if (i !== 2) s += '<rect class="ap" x="' + (32 + i * 42) + '" y="44" width="30" height="30" rx="8"/>';
+    s += '<clipPath id="bnig-cp"><rect x="116" y="44" width="30" height="30" rx="8"/></clipPath><g class="bnig-drop"><image href="/apple-touch-icon.png" x="116" y="44" width="30" height="30" clip-path="url(#bnig-cp)"/></g>';
+    s += '<text class="ut" x="104" y="92">BLACKOUT</text>' + (where ? '<text class="mt" x="22" y="118">' + where + "</text>" : "");
+    return s + "</svg>";
   }
 
-  // ---------------- steps per device/browser ----------------
-  var SHARE = '<svg class="bnig-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M6 11v9h12v-9"/></svg>';
-  var DOTS_V = "<b aria-label='menu (three dots)'>⋮</b>", DOTS_H = "<b aria-label='more (three dots)'>⋯</b>", PLUS = "<b>⊕</b>";
-  function steps(d, canPrompt) {
-    var ipad = d.device === "ipad", where = ipad ? "at the top right" : "in the toolbar";
-    if (d.inApp) return { sub: "You're in an in-app browser.", steps: ["Tap " + DOTS_H + " or the menu in this app", "Choose <b>Open in " + (d.os === "ios" ? "Safari" : "browser") + "</b>", "Then add it to your Home Screen from there"] };
+  // ---------------- flows: max 3 steps, minimal words ----------------
+  // Each step: [text (html), scene]. Buttons named exactly as on screen.
+  var B = function (t) { return "<b>" + t + "</b>"; };
+  function flow(d, canPrompt) {
+    var ipad = d.device === "ipad", ios26 = d.safari !== null && d.safari >= 26;
+    if (canPrompt) return { key: "prompt", sub: "One tap. No app store.", install: true, desktop: !d.mobile, steps: [["Tap " + B("Install") + " below", sceneInstall("")]] };
+    if (d.inApp) return { key: "inapp", sub: "This in-app browser can't add apps.", steps: [
+      ["Tap " + B("•••") + " or the menu", sceneBar("top", [{ n: "dotsh", t: 1 }], 0, "")],
+      ["Tap " + B(d.os === "ios" ? "Open in Safari" : "Open in browser"), sceneMenu("", [["Copy link", ""], [d.os === "ios" ? "Open in Safari" : "Open in browser", "fwd"]], 1)],
+      ["Then use these steps again", sceneInstall("")]] };
     if (d.os === "ios") {
-      var modern = d.osVersion === null || d.osVersion >= 16.4;
-      if (d.browser === "safari") return { sub: (ipad ? "iPad" : "iPhone") + " · Safari", steps: [
-        "Tap <b>Share</b> " + SHARE + " " + where + (ipad ? "" : " (if you don't see it, tap " + DOTS_H + " first)"),
-        "Scroll down and tap <b>Add to Home Screen</b>", "Tap <b>Add</b>"] };
-      if (!modern) return { sub: (ipad ? "iPad" : "iPhone") + " · iOS " + d.osVersion, steps: [
-        "On this iOS version only Safari can add sites to the Home Screen", "Tap <b>Copy link</b>, then open it in <b>Safari</b>",
-        "Then tap <b>Share</b> " + SHARE + " → <b>Add to Home Screen</b>"], copy: true };
-      var name = { chrome: "Chrome", firefox: "Firefox", edge: "Edge", opera: "Opera" }[d.browser] || "your browser";
-      var first = d.browser === "chrome" ? "Tap <b>Share</b> " + SHARE + " in the address bar (top right)"
-        : d.browser === "firefox" ? "Tap the menu <b>☰</b>, then <b>Share</b> " + SHARE
-        : d.browser === "edge" ? "Tap " + DOTS_H + " (menu), then <b>Share</b> " + SHARE
-        : "Tap your browser's <b>Share</b> " + SHARE + " button";
-      return { sub: (ipad ? "iPad" : "iPhone") + " · " + name, steps: [first, "Tap <b>Add to Home Screen</b> (scroll down if needed)", "Tap <b>Add</b>"],
-        note: "Not listed? Open this page in Safari and use Share → Add to Home Screen." };
+      var addRows = [["Copy", ""], ["Add to Reading List", "book"], ["Add to Home Screen", "addsq"]];
+      if (d.browser === "safari" || d.browser === "other") {
+        if (ios26 && !ipad) return { key: "ios26-safari", sub: "iPhone · Safari", note: "Tabs at Top or Bottom? Tap Share " + svgInline("share") + " instead.", steps: [
+          ["Tap " + B("•••") + " next to the address bar", sceneBar("bottom", [{ n: "back", side: "l" }, { n: "dotsh", t: 1 }])],
+          ["Tap " + B("Share"), sceneMenu("", [["Add Bookmark", "book"], ["Share", "share"], ["New Tab", "plus"]], 1)],
+          ["Tap " + B("Add to Home Screen") + ", then " + B("Add"), sceneMenu("Share", addRows, 2)]] };
+        if (ipad) return { key: "ipad-safari", sub: "iPad · Safari", note: "Don't see Share? Tap ••• first.", steps: [
+          ["Tap " + B("Share") + " " + svgInline("share") + " at the top right", sceneBar("top", [{ n: "back", side: "l" }, { n: "share", t: 1 }, { n: "plus" }, { n: "tabs" }])],
+          ["Tap " + B("Add to Home Screen"), sceneMenu("Share", addRows, 2, "top")],
+          ["Tap " + B("Add"), sceneInstall("")]] };
+        return { key: "ios-safari", sub: "iPhone · Safari", steps: [
+          ["Tap " + B("Share") + " " + svgInline("share") + " at the bottom", sceneBar("bottom", [{ n: "back", side: "l" }, { n: "share", t: 1 }, { n: "tabs" }])],
+          ["Scroll down, tap " + B("Add to Home Screen"), sceneMenu("Share", addRows, 2)],
+          ["Tap " + B("Add"), sceneInstall("")]] };
+      }
+      if (d.ver !== null && d.ver < 16.4) return { key: "ios-old", sub: "Open this page in Safari", copy: true, steps: [
+        ["Tap " + B("Copy link") + " below", sceneInstall("")], ["Paste it in " + B("Safari"), sceneBar("bottom", [{ n: "share" }])],
+        ["Tap " + B("Share") + " → " + B("Add to Home Screen"), sceneMenu("Share", addRows, 2)]] };
+      var nm = { chrome: "Chrome", firefox: "Firefox", edge: "Edge", opera: "Opera" }[d.browser] || "your browser";
+      if (d.browser === "edge") return { key: "ios-edge", sub: (ipad ? "iPad" : "iPhone") + " · Edge", note: "Not listed? Open this page in Safari.", steps: [
+        ["Tap " + B("•••") + " at the bottom", sceneBar("bottom", [{ n: "back", side: "l" }, { n: "dotsh", t: 1 }, { n: "tabs" }])],
+        ["Tap " + B("Share"), sceneMenu("", [["Add to favorites", "book"], ["Share", "share"], ["Settings", ""]], 1)],
+        ["Tap " + B("Add to Home Screen") + ", then " + B("Add"), sceneMenu("Share", addRows, 2)]] };
+      if (d.browser === "firefox") return { key: "ios-firefox", sub: (ipad ? "iPad" : "iPhone") + " · Firefox", note: "No Share in the address bar? Tap ☰ → Share.", steps: [
+        ["Tap " + B("Share") + " " + svgInline("share") + " in the address bar", sceneBar("top", [{ n: "share", t: 1 }])],
+        ["Tap " + B("Add to Home Screen"), sceneMenu("Share", addRows, 2, "top")],
+        ["Tap " + B("Add"), sceneInstall("")]] };
+      return { key: "ios-chrome", sub: (ipad ? "iPad" : "iPhone") + " · " + nm, steps: [
+        ["Tap " + B("Share") + " " + svgInline("share") + " in the address bar", sceneBar("top", [{ n: "share", t: 1 }])],
+        ["Tap " + B("Add to Home Screen"), sceneMenu("Share", addRows, 2, "top")],
+        ["Tap " + B("Add"), sceneInstall("")]] };
     }
     if (d.os === "android") {
-      if (canPrompt && (d.browser === "chrome" || d.browser === "edge" || d.browser === "samsung" || d.browser === "opera" || d.browser === "other"))
-        return { sub: "Android · " + ({ chrome: "Chrome", edge: "Edge", samsung: "Samsung Internet", opera: "Opera" }[d.browser] || "browser"), steps: ["Tap <b>Install</b> below, then confirm"], install: true };
-      if (d.browser === "samsung") return { sub: "Android · Samsung Internet", steps: ["Tap the menu <b>≡</b> (bottom right)", "Tap <b>Add page to</b>", "Choose <b>Home screen</b>"] };
-      if (d.browser === "firefox") return { sub: "Android · Firefox", steps: ["Tap the menu " + DOTS_V, "Tap <b>Install</b> (or <b>Add to Home screen</b>)", "Tap <b>Add</b>"] };
-      if (d.browser === "edge") return { sub: "Android · Edge", steps: ["Tap the menu " + DOTS_H + " (bottom)", "Tap <b>Add to phone</b> / <b>Install app</b>", "Tap <b>Install</b>"] };
-      if (d.browser === "opera") return { sub: "Android · Opera", steps: ["Tap the menu " + DOTS_V, "Tap <b>Add to</b> → <b>Home screen</b>", "Tap <b>Add</b>"] };
-      if (d.browser === "chrome") return { sub: "Android · Chrome", steps: ["Tap the menu " + DOTS_V + " (top right)", "Tap <b>Install app</b> or <b>Add to Home screen</b>", "Tap <b>Install</b> / <b>Add</b>"] };
+      if (d.browser === "samsung") return { key: "samsung", sub: "Samsung Internet", steps: [
+        ["Tap the menu " + B("≡") + " at the bottom right", sceneBar("bottom", [{ n: "back", side: "l" }, { n: "home", side: "l" }, { n: "tabs" }, { n: "burger", t: 1 }], 0, "blackout.net…")],
+        ["Tap " + B("Add page to"), sceneMenu("", [["Bookmarks", "book"], ["Add page to", "plus"], ["Settings", ""]], 1)],
+        ["Tap " + B("Home screen") + ", then " + B("Add"), sceneMenu("Add page to", [["Bookmarks", "book"], ["Quick access", "app"], ["Home screen", "home"]], 2)]] };
+      if (d.browser === "firefox") return { key: "android-firefox", sub: "Android · Firefox", steps: [
+        ["Tap the menu " + B("⋮"), sceneBar("bottom", [{ n: "home", side: "l" }, { n: "tabs" }, { n: "dotsv", t: 1 }])],
+        ["Tap " + B("Add to Home screen"), sceneMenu("", [["Bookmark", "book"], ["Share", "share"], ["Add to Home screen", "home"]], 2)],
+        ["Tap " + B("Add"), sceneInstall("")]] };
+      if (d.browser === "edge") return { key: "android-edge", sub: "Android · Edge", steps: [
+        ["Tap " + B("•••") + " at the bottom", sceneBar("bottom", [{ n: "back", side: "l" }, { n: "dotsh", t: 1 }, { n: "tabs" }])],
+        ["Tap " + B("Add to phone"), sceneMenu("", [["Favorites", "book"], ["Share", "share"], ["Add to phone", "home"]], 2)],
+        ["Tap " + B("Install"), sceneInstall("")]] };
+      return { key: "android-chrome", sub: "Android · " + ({ chrome: "Chrome", opera: "Opera" }[d.browser] || "browser"), steps: [
+        ["Tap the menu " + B("⋮") + " at the top right", sceneBar("top", [{ n: "home", side: "l" }, { n: "tabs" }, { n: "dotsv", t: 1 }])],
+        ["Tap " + B("Add to home screen") + " (or " + B("Install app") + ")", sceneMenu("", [["Bookmarks", "book"], ["Share", "share"], ["Add to home screen", "home"]], 2, "top")],
+        ["Tap " + B("Install"), sceneInstall("")]] };
     }
-    return { sub: "", steps: ["Open your browser's menu or Share button", "Choose <b>Add to Home Screen</b> or <b>Install</b>", "Confirm"] };
+    if (d.os === "mac" && d.browser === "safari" && d.safari >= 17) return { key: "mac-safari", sub: "Mac · Safari", desktop: true, steps: [
+      ["Click " + B("File") + " in the menu bar", sceneBar("top", [{ n: "file", side: "l", t: 1 }], 0, "")],
+      ["Click " + B("Add to Dock…"), sceneMenu("File", [["New Window", ""], ["Share", "share"], ["Add to Dock…", "dock"]], 2, "top")],
+      ["Click " + B("Add"), sceneInstall("")]] };
+    if (d.browser === "chrome" || d.browser === "edge") return { key: "desktop-" + d.browser, sub: d.browser === "edge" ? "Edge" : "Chrome", desktop: true, steps: [
+      ["Click the install icon in the address bar", sceneBar("top", [{ n: "back", side: "l" }, { n: "install", t: 1 }, { n: "dotsv" }])],
+      ["Click " + B("Install"), sceneInstall("")]] };
+    return null;
   }
+  function svgInline(n) { return '<svg class="bnig-ic" viewBox="-10 -10 20 20" aria-label="' + n + ' icon" role="img">' + IC[n] + "</svg>"; }
 
-  // ---------------- share ----------------
-  function toast(msg) {
-    var t = document.createElement("div"); t.className = "bnig-toast"; t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite"); t.textContent = msg;
-    document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200);
+  // ---------------- share (kept: [data-bn-share] buttons elsewhere use it) ----------------
+  function toast(msg) { var t = document.createElement("div"); t.className = "bnig-toast"; t.setAttribute("role", "status"); t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200); }
+  function copy(url) {
+    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) return navigator.clipboard.writeText(url).then(function () { toast("Link copied"); }, function () { prompt("Copy this link", url); });
+    prompt("Copy this link", url);
   }
-  function showUrl(host, url) {
-    var box = (host || document.body).querySelector(".bnig-url");
-    if (!box) { box = document.createElement("input"); box.className = "bnig-url"; box.readOnly = true; box.setAttribute("aria-label", "Link to this page"); (host || document.body).appendChild(box); }
-    box.value = url; box.focus(); box.select(); try { box.setSelectionRange(0, url.length); } catch (e) {}
-  }
-  function share(host) {
-    var url = location.origin + "/", title = "blackout.network: Know first. Be ready.";
-    if (navigator.share) return navigator.share({ title: title, url: url }).catch(function (e) { if (e && e.name !== "AbortError") copy(url, host); });
-    copy(url, host);
-  }
-  function copy(url, host) {
-    if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext)
-      return navigator.clipboard.writeText(url).then(function () { toast("Link copied"); }, function () { showUrl(host, url); toast("Select and copy the link"); });
-    showUrl(host, url); toast("Select and copy the link");
-  }
-  window.bnShare = function () { share(document.getElementById("bnig")); };
+  window.bnShare = function () { var url = location.origin + "/"; if (navigator.share) return navigator.share({ title: "BLACKOUT.NETWORK", url: url }).catch(function () {}); copy(url); };
   document.addEventListener("click", function (e) { var t = e.target.closest && e.target.closest("[data-bn-share]"); if (t) { e.preventDefault(); window.bnShare(); } });
 
-  // ---------------- banner ----------------
-  var deferred = null, D = null, el = null;
-  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; if (el && D) render(); });
-  window.addEventListener("appinstalled", function () { ls(KEY, String(Date.now() + 365 * 864e5)); hide(); });
-  function pad(on) { try { document.body.style.paddingBottom = on && el ? (el.offsetHeight + 24) + "px" : ""; } catch (e) {} }   // never leave page content stuck under the banner
-  function hide() { if (!el) return; pad(false); el.classList.remove("bnig-on"); var x = el; setTimeout(function () { x.hidden = true; }, 260); }
-  function dismiss() { ls(KEY, String(Date.now() + DAYS * 864e5)); hide(); }
-  function render() {
-    var s = steps(D, !!deferred), h = "";
-    h += '<button type="button" class="bnig-x" aria-label="Dismiss home screen tip">×</button>';
-    h += '<div class="bnig-hd"><img src="/icons/icon-192.png" alt="" width="32" height="32"><div><p class="bnig-t" id="bnig-t">Add Blackout to your Home Screen</p>' +
-         (s.sub ? '<p class="bnig-sub">' + s.sub + "</p>" : "") + "</div></div>";
-    h += "<ol>" + s.steps.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ol>";
-    if (s.note) h += '<p class="bnig-sub" style="margin:0 0 8px">' + s.note + "</p>";
-    h += '<div class="bnig-row">' + (s.install ? '<button type="button" class="bnig-pri" data-a="install">Install</button>' : "") +
-         (s.copy ? '<button type="button" class="bnig-pri" data-a="copy">Copy link</button>' : "") +
-         '<button type="button" data-a="share" aria-label="Share blackout.network">Share</button><button type="button" data-a="later">Not now</button></div>';
-    el.innerHTML = h;
+  // ---------------- sheet ----------------
+  var deferred = null, D = null, el = null, F = null, cur = 0, timer = null, forced = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    if (isInstalled() || isDismissed()) { if (!forced) return; }
+    e.preventDefault(); deferred = e;
+    if (el && D) { render(); } else if (D && D.ready && !D.mobile && !ss(SKEY)) show();   // desktop Chromium: only shown once install is really possible
+  });
+  window.addEventListener("appinstalled", function () { markInstalled(); hide(); });
+  function pad(on) { try { document.body.style.paddingBottom = on && el ? (el.offsetHeight + 16) + "px" : ""; } catch (e) {} }
+  function hide() { if (!el) return; stop(); pad(false); el.classList.remove("bnig-on"); var x = el; setTimeout(function () { x.hidden = true; }, 260); }
+  function dismiss() { ls(DKEY, "1"); ck(DKEY, "1"); hide(); }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } }
+  function go(i, user) {
+    if (!F) return; cur = (i + F.steps.length) % F.steps.length;
+    el.querySelector(".bnig-stage").innerHTML = F.steps[cur][1];
+    [].forEach.call(el.querySelectorAll(".bnig-step"), function (b, k) { b.classList.toggle("on", k === cur); b.setAttribute("aria-current", k === cur ? "step" : "false"); });
+    if (user) stop();
   }
-  function build() {
-    el = document.createElement("div"); el.id = "bnig"; el.className = "bnig"; el.setAttribute("role", "region"); el.setAttribute("aria-labelledby", "bnig-t");
-    el.setAttribute("data-bn-device", D.device + "/" + D.browser + "/" + D.os + (D.osVersion ? " " + D.osVersion : ""));
-    render(); document.body.appendChild(el);
+  function render() {
+    F = flow(D, !!deferred); if (!F) return hide();
+    var h = '<div class="bnig-hd"><img src="/apple-touch-icon.png" alt="" width="44" height="44"><div class="bnig-tt">' +
+      '<p class="bnig-t" id="bnig-t">Add BLACKOUT.NETWORK to your ' + (F.desktop ? "computer" : "home screen") + "</p>" +
+      '<p class="bnig-sub">' + F.sub + "</p></div>" +
+      '<button type="button" class="bnig-x" data-a="dismiss" aria-label="Dismiss">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>';
+    h += '<div class="bnig-stage" aria-hidden="true"></div>';
+    if (F.steps.length > 1) h += '<ol class="bnig-steps">' + F.steps.map(function (s, i) {
+      return '<li><button type="button" class="bnig-step" data-i="' + i + '"><span class="n">' + (i + 1) + '</span><span class="tx">' + s[0] + "</span></button></li>"; }).join("") + "</ol>";
+    if (F.note) h += '<p class="bnig-note">' + F.note + "</p>";
+    h += '<div class="bnig-row">' + (F.install ? '<button type="button" class="bnig-pri" data-a="install">Install</button>' : "") +
+      (F.copy ? '<button type="button" class="bnig-pri" data-a="copy">Copy link</button>' : "") +
+      '<button type="button" class="bnig-sec" data-a="dismiss">Dismiss</button></div>';
+    el.innerHTML = h; el.setAttribute("data-flow", F.key); go(0);
+    stop(); if (!reduced && F.steps.length > 1) timer = setInterval(function () { go(cur + 1); }, STEP_MS);
+  }
+  function show() {
+    if (el) return; ss(SKEY, "1");
+    el = document.createElement("div"); el.id = "bnig"; el.className = "bnig"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "false"); el.setAttribute("aria-labelledby", "bnig-t");
+    el.setAttribute("data-bn-device", D.device + "/" + D.browser + "/" + D.os + (D.safari ? " safari" + D.safari : ""));
+    render(); if (!F) { el = null; return; }
+    document.body.appendChild(el);
     el.addEventListener("click", function (e) {
       var b = e.target.closest("button"); if (!b) return;
-      if (b.classList.contains("bnig-x") || b.dataset.a === "later") return dismiss();
-      if (b.dataset.a === "share") return share(el);
-      if (b.dataset.a === "copy") return copy(location.origin + "/", el);
-      if (b.dataset.a === "install" && deferred) { var p = deferred; deferred = null; p.prompt(); (p.userChoice || Promise.resolve({})).then(function (r) { if (r && r.outcome === "accepted") dismiss(); else render(); }); }
+      if (b.dataset.i) return go(+b.dataset.i, true);
+      if (b.dataset.a === "dismiss") return dismiss();
+      if (b.dataset.a === "copy") return copy(location.origin + "/");
+      if (b.dataset.a === "install" && deferred) { var p = deferred; deferred = null; p.prompt();
+        (p.userChoice || Promise.resolve({})).then(function (r) { if (r && r.outcome === "accepted") { markInstalled(); hide(); } else render(); }); }
     });
+    el.addEventListener("pointerdown", function () { stop(); });
     el.addEventListener("keydown", function (e) { if (e.key === "Escape") dismiss(); });
     void el.offsetWidth; pad(true); setTimeout(function () { el.classList.add("bnig-on"); }, 30);
-    window.addEventListener("resize", function () { if (el && !el.hidden && el.classList.contains("bnig-on")) pad(true); });
+    addEventListener("resize", function () { if (el && !el.hidden && el.classList.contains("bnig-on")) pad(true); });
   }
   function start() {
-    var force = /[?&]bnig=1\b/.test(location.search);                         // ?bnig=1 shows it for testing regardless of dismissal/session
+    var q = (location.search.match(/[?&]bnig=([\w-]+)/) || [])[1] || null; forced = q;
     D = detect(); window.__bnigDetect = D;
-    if (!force) {
-      if (standalone() || !D.mobile) return;
-      if (+(ls(KEY) || 0) > Date.now() || ss(SKEY)) return;
+    if (!q) {
+      if (standalone() || isInstalled() || isDismissed() || ss(SKEY)) return;
+      if (!D.mobile && !(D.os === "mac" && D.browser === "safari")) { D.ready = true; return; }   // desktop Chromium waits for beforeinstallprompt
     }
-    refineAndroidVersion(D, function () { setTimeout(function () { if (!force && standalone()) return; ss(SKEY, "1"); build(); }, force ? 300 : DELAY); });
+    var go2 = function () { if (!q && (standalone() || isInstalled())) return; show(); };
+    if (!q && navigator.getInstalledRelatedApps) {                            // Chromium: is the web app already installed from this origin?
+      navigator.getInstalledRelatedApps().then(function (apps) { if (apps && apps.length) { markInstalled(); return; } setTimeout(go2, DELAY); }, function () { setTimeout(go2, DELAY); });
+    } else setTimeout(go2, q ? 200 : DELAY);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
