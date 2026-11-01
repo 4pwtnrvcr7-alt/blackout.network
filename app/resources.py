@@ -8,10 +8,14 @@ import json, math, os, re, sqlite3, threading, time, urllib.parse, urllib.reques
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(BASE, "resources_cache.db")
-UA = "BlackoutNetwork/1.0 (private local emergency dashboard; contact via box owner)"
+UA = "BlackoutNetwork/1.1 (+https://blackout.network; hello@blackout.network) local-resources lookup"
 RADIUS_M = 12000
 CAP = 15
-OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://overpass.private.coffee/api/interpreter"]
+OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+OVP_RADIUS_M = 8000      # live Overpass fallback only: smaller circle keeps big-city queries light (offline index still uses RADIUS_M)
+OVP_BUDGET_S = 20        # total wall time across mirrors, one mirror at a time (t480 follow-up)
+OVP_FAIL_TTL = 300       # remember a failed cell for 5 min so retries don't hammer the mirrors
+_ovp_lock = threading.Lock(); _ovp_mirror = [0]
 FEMA = "https://gis.fema.gov/arcgis/rest/services/NSS/OpenShelters/MapServer/0/query"
 DEFAULT_Q = ""   # no default place: the visitor types one or uses the shared location picker
 
@@ -67,20 +71,36 @@ def geocode(q):
     v = {"lat": float(res[0]["lat"]), "lon": float(res[0]["lon"]), "display": res[0].get("display_name", q)}
     cput(k, v); return v, False
 
+def cell(lat, lon):
+    """~2 km grid cell (0.02 deg), used as the 24 h cache key so nearby searches share one Overpass answer."""
+    return f"{round(lat / 0.02) * 0.02:.2f},{round(lon / 0.02) * 0.02:.2f}"
+
 def overpass(lat, lon):
-    k = f"ovp:{lat:.3f},{lon:.3f},{RADIUS_M}"
+    ck = cell(lat, lon); k = f"ovp2:{ck},{OVP_RADIUS_M}"
     v = cget(k, 86400)
     if v is not None: return v, True, "cache"
-    parts = "".join(f"nwr{f}(around:{RADIUS_M},{lat},{lon});" for c in CATS for f in c[3])
-    q = f"[out:json][timeout:60];({parts});out center tags;"
-    err = []
-    for m in OVERPASS:
-        try:
-            r = http(m, data=urllib.parse.urlencode({"data": q}).encode(), timeout=30)
-            els = r.get("elements", [])
-            cput(k, els); return els, False, m
-        except Exception as ex: err.append(f"{m.split('/')[2]}: {type(ex).__name__}")
-    raise RuntimeError("all Overpass mirrors failed: " + "; ".join(err))
+    f = cget("ovpfail:" + ck, OVP_FAIL_TTL)
+    if f: raise RuntimeError("OpenStreetMap lookup service is busy (tried a minute ago: " + f + "). Please retry in a few minutes.")
+    clat, clon = map(float, ck.split(","))
+    parts = "".join(f"nwr{flt}(around:{OVP_RADIUS_M},{clat},{clon});" for c in CATS for flt in c[3])
+    q = f"[out:json][timeout:25][maxsize:67108864];({parts});out center tags qt;"
+    err = []; t0 = time.time()
+    with _ovp_lock:   # one Overpass request at a time from this server (usage policy)
+        n = len(OVERPASS)
+        for i in range(n):
+            left = OVP_BUDGET_S - (time.time() - t0)
+            if left < 3: err.append("time budget used"); break
+            m = OVERPASS[(_ovp_mirror[0] + i) % n]
+            try:
+                r = http(m, data=urllib.parse.urlencode({"data": q}).encode(), timeout=min(25, left))
+                if r.get("remark") and "runtime error" in r["remark"]: raise RuntimeError(r["remark"][:80])
+                els = r.get("elements", [])
+                _ovp_mirror[0] = (_ovp_mirror[0] + i) % n   # stick with the mirror that answered
+                cput(k, els); return els, False, m
+            except Exception as ex: err.append(f"{m.split('/')[2]}: {type(ex).__name__}")
+        _ovp_mirror[0] = (_ovp_mirror[0] + 1) % n
+    msg = "; ".join(err); cput("ovpfail:" + ck, msg)
+    raise RuntimeError("OpenStreetMap lookup service did not answer in time (" + msg + "). Please retry in a few minutes.")
 
 POI_DB = os.path.join(BASE, "resources_pois.db")
 def local_pois(lat, lon):
@@ -183,7 +203,8 @@ def search(q):
         s["miles"] = round(miles(g["lat"], g["lon"], s["lat"], s["lon"]), 2)
         s["map"] = f"https://www.openstreetmap.org/?mlat={s['lat']:.6f}&mlon={s['lon']:.6f}#map=18/{s['lat']:.6f}/{s['lon']:.6f}"
     fema.sort(key=lambda x: x["miles"])
-    return 200, {"query": q, "geocode": g, "radius_km": RADIUS_M / 1000, "radius_miles": round(RADIUS_M / 1609.34, 1),
+    rad = RADIUS_M if meta else OVP_RADIUS_M
+    return 200, {"query": q, "geocode": g, "radius_km": rad / 1000, "radius_miles": round(rad / 1609.34, 1),
                  "categories": list(cats.values()), "fema_open_shelters": fema[:CAP], "fema_error": ferr,
                  "sources": {"geocoder": "Nominatim (OpenStreetMap)" + (" · cached" if gc else ""), "pois": (f"OpenStreetMap offline index from {meta.get('source')}, built {meta.get('built','')[:10]}" if meta else "OpenStreetMap via Overpass API" + (" · cached ≤24h" if oc else f" · {mirror.split('/')[2]}")),
                              "shelters": "FEMA National Shelter System — Open Shelters (public layer; only shelters currently open)"},
@@ -194,5 +215,5 @@ def search(q):
 def handle_get(path, qs):
     if path == "/api/resources":
         try: return search((qs.get("q") or [""])[0])
-        except Exception as ex: return 502, {"error": f"lookup failed: {ex}"}
+        except Exception as ex: return 503, {"error": f"lookup failed: {ex}", "retry": True}
     return 404, {"error": "not found"}

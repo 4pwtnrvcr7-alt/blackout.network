@@ -43,6 +43,8 @@ ROUTES = {
     "/browserconfig.xml": "static_files",
     "/bimi": "static_files",
     "/theme.css": "static_files",
+    "/bn-progress.js": "static_files",       # shared search progress bar (t480)
+    "/bn-progress.css": "static_files",
     "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
     "/sitenav.css": "sitenav",
     "/linkguard.js": "bn_extras",   # hides links the nightly link checker flagged dead (t338)

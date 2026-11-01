@@ -9,6 +9,8 @@ ROOT_ALIASES = {"/favicon.svg": ("img", "favicon.svg", "image/svg+xml"), "/safar
 def handle_get(path, qs):
     if path == "/theme.css":
         with open(os.path.join(BASE, "static", "theme.css"), "rb") as fh: return 200, fh.read(), "text/css"
+    if path in ("/bn-progress.js", "/bn-progress.css"):   # t480 shared progress bar
+        with open(os.path.join(BASE, "static", path[1:]), "rb") as fh: return 200, fh.read(), TYPES[os.path.splitext(path)[1]]
     if path == "/favicon.ico":
         with open(os.path.join(BASE, "static", "img", "favicon.ico"), "rb") as fh: return 200, fh.read(), "image/x-icon"
     if path in ROOT_ALIASES:   # t382: root-level icon aliases + BIMI logo (SVG Tiny PS, https://blackout.network/bimi/logo.svg)

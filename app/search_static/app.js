@@ -59,7 +59,7 @@
  <label>Min rank <select data-f="min">${[0,1,2,3,4,5,6,7,8,9,10].map(i=>`<option value="${i}">${i}+</option>`).join("")}</select></label>
  <label>Sort <select data-f="sort"><option value="rank">Rank, then newest</option><option value="new">Newest</option><option value="rel">Relevance</option></select></label>
  <label><input type="checkbox" data-f="watch" checked> Include Watchlist</label></div>
- <div class="bns-stat"></div></div><div class="bns-body"></div>`;
+ <div class="bns-stat"></div><div class="bns-prog"></div></div><div class="bns-body"></div>`;
  document.body.append(shade,panel);
  const P=s=>panel.querySelector(s),body=P(".bns-body");
  P(".bns-x").onclick=()=>close();shade.onclick=()=>close();
@@ -67,26 +67,27 @@
  P(".bns-pq input").addEventListener("keydown",e=>{if(e.key==="Escape"){e.stopPropagation();close()}});
  panel.querySelectorAll("[data-f]").forEach(el=>el.onchange=render);
  let S=null,es=null,prevHash=null;
- function close(){es&&es.close();es=null;panel.classList.remove("on");shade.classList.remove("on");document.documentElement.style.overflow="";
+ function close(){es&&es.close();es=null;const ph=P(".bns-prog");if(ph&&ph._bnp)ph._bnp.destroy();panel.classList.remove("on");shade.classList.remove("on");document.documentElement.style.overflow="";
   if(/^#search=/.test(location.hash))history.replaceState(null,"",location.pathname+location.search+(prevHash&&!/^#search=/.test(prevHash)?prevHash:""));box.classList.remove("open")}
  function open(q){q=q.replace(/[\u0000-\u001f]/g," ").trim().slice(0,MAXQ);if(!q)return;clearTimeout(sugT);sugCtl&&sugCtl.abort();hidePop();inp.blur();inp.value=q;pushRecent(q);
   if(!/^#search=/.test(location.hash))prevHash=location.hash;
   history.replaceState(null,"","#search="+encodeURIComponent(q));
   panel.classList.add("on");if(matchMedia("(max-width:700px)").matches){shade.classList.remove("on");document.documentElement.style.overflow="hidden"}else shade.classList.add("on");
   box.classList.remove("open");P(".bns-pq input").value=q;P(".bns-title h2").innerHTML=`Search: <q>${esc(q)}</q>`;
+  const BP=window.BNProgress;let pg=BP?BP.create(P(".bns-prog"),{label:"Searching the database…",name:"Site search"}).stage(null,0.03).ease(0.25,1500):null;   // t480 shared progress bar: real stages from the event stream
   S={q,db:null,live:new Map(),src:new Map(),una:[],t0:performance.now(),dbms:null,done:null,notes:[],running:true,mode:null};render();
   es&&es.close();es=new EventSource(API+"stream?q="+encodeURIComponent(q));const my=es;
   const on=(ev,fn)=>my.addEventListener(ev,e=>{if(my!==es)return;try{fn(JSON.parse(e.data))}catch(x){console.warn("search",ev,x)}});
-  on("hello",d=>{d.sources.forEach(s=>S.src.set(s.key,{...s,status:"waiting"}));S.una=d.unavailable||[];render()});
-  on("db",d=>{S.db=d.results||[];S.dbms=d.ms;S.mode=d.mode;S.hidden=d.hidden_noise;S.dbclient=Math.round(performance.now()-S.t0);
+  on("hello",d=>{if(pg)pg.steps(d.sources.length||1,"Checking "+d.sources.length+" live sources");d.sources.forEach(s=>S.src.set(s.key,{...s,status:"waiting"}));S.una=d.unavailable||[];render()});
+  on("db",d=>{if(pg&&!d.sources)pg.stage(null,0.3);S.db=d.results||[];S.dbms=d.ms;S.mode=d.mode;S.hidden=d.hidden_noise;S.dbclient=Math.round(performance.now()-S.t0);
    const m=new Map(S.db.map(x=>[x.cluster_id,x]));S.dbmap=m;render()});
-  on("source",d=>{S.src.set(d.key,{...(S.src.get(d.key)||{}),...d});renderChips();renderStat()});
+  on("source",d=>{const was=(S.src.get(d.key)||{}).status;if(pg&&!/^(searching|waiting)$/.test(d.status||"")&&/^(searching|waiting)$/.test(was||"waiting"))pg.tick();S.src.set(d.key,{...(S.src.get(d.key)||{}),...d});renderChips();renderStat()});
   on("results",d=>{(d.items||[]).forEach(x=>{x._fresh=1;if(S.dbmap&&(S.dbmap.has(x.cluster_id)||x.origin!=="live")){S.dbmap.set(x.cluster_id,{...(S.dbmap.get(x.cluster_id)||{}),...x})}else S.live.set(x.cluster_id,x)});render()});
   on("notice",d=>{S.notes.push(d.text);render()});
   on("queued",d=>{S.notes.push(d.reason);render()});
   on("limited",d=>{S.notes.push(d.reason);S.limited=1;render()});
-  on("done",d=>{S.done=d;S.running=false;my.close();if(d.error)S.notes.push("Search stopped: "+d.error);render()});
-  my.onerror=()=>{if(my!==es)return;if(S.running){S.running=false;S.notes.push("The live connection closed early. Database results above are complete.");render()}my.close()};
+  on("done",d=>{S.done=d;S.running=false;my.close();if(pg){d.error?pg.fail("Live search stopped: "+d.error,()=>open(q)):d.cached?pg.cached():pg.done("Done")}if(d.error)S.notes.push("Search stopped: "+d.error);render()});
+  my.onerror=()=>{if(my!==es)return;if(S.running){if(pg)pg.fail("The live connection closed early. Database results are complete.",()=>open(q));S.running=false;S.notes.push("The live connection closed early. Database results above are complete.");render()}my.close()};
  }
  function chip(s){const st=s.status||"waiting";let t=st==="ok"?`<b>${s.n}</b>`:st==="searching"||st==="waiting"?"searching":st;
   return `<span class="bns-src ${esc(st)}${st==="ok"&&s.n?" hit":""}" title="${esc((s.note||"")+(s.error?" · "+s.error:"")+(s.ms!=null?" · "+s.ms+" ms":"")+(s.cached?" · cached result":""))}">${esc(s.label)} · ${t}</span>`}

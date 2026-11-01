@@ -82,11 +82,14 @@ function initWorld(){var el=$("#cr-world");whenVisible(el,function(){lib().then(
    m.on("mouseenter","w-f",function(){m.getCanvas().style.cursor="pointer"});m.on("mouseleave","w-f",function(){m.getCanvas().style.cursor=""})})}).catch(function(){fail(el,"Country data is not available right now.")})})})}
 // ---- in-place search
 var res=$("#cr-result"),inp=$("#cr-q");
-function go(q,push){q=(q||"").trim();if(!q)return;res.classList.add("busy");if(inp)inp.value=q;
- getJ("/api/crime/search?q="+encodeURIComponent(q)).then(function(d){res.innerHTML=d.html||'<div class="cr-empty">'+esc(d.message||"Not found")+'</div>';
+var crH=null;function crHost(){if(!crH){crH=document.createElement("div");crH.id="cr-prog";res.parentNode.insertBefore(crH,res)}return crH}   // t480 shared progress bar
+function go(q,push){q=(q||"").trim();if(!q)return;res.classList.add("busy");if(inp)inp.value=q;var BP=window.BNProgress,pg=null;
+ var pt=setTimeout(function(){if(BP){pg=BP.create(crHost(),{label:"Finding "+q.slice(0,60)+"…",name:"Crime lookup"});pg.stage(null,0.05).ease(0.9,8000)}},150);
+ getJ("/api/crime/search?q="+encodeURIComponent(q)).then(function(d){clearTimeout(pt);if(pg)pg.done(d.place?"Done":"No match");res.innerHTML=d.html||'<div class="cr-empty">'+esc(d.message||"Not found")+'</div>';
   if(d.place){document.title="Crime in "+d.place.label+": rates, trends and map | BLACKOUT.NETWORK"}if(push)history.pushState({q:q},"","/crime?place="+encodeURIComponent(q));initHeat()})
- .catch(function(st){if(st===404)return fetch("/api/crime/search?q="+encodeURIComponent(q)).then(function(r){return r.json()}).then(function(d){res.innerHTML='<div class="cr-empty">'+esc(d.message||"We couldn't find that place.")+'</div>'});
-  res.innerHTML='<div class="cr-empty">Something went wrong loading that place. Please try again.</div>'})
+ .catch(function(st){clearTimeout(pt);if(st===404){if(pg)pg.done("No match");return fetch("/api/crime/search?q="+encodeURIComponent(q)).then(function(r){return r.json()}).then(function(d){res.innerHTML='<div class="cr-empty">'+esc(d.message||"We couldn't find that place.")+'</div>'})}
+  if(BP){if(!pg)pg=BP.create(crHost(),{label:"Crime lookup"});pg.fail("Something went wrong loading that place.",function(){go(q,false)});res.innerHTML=""}
+  else res.innerHTML='<div class="cr-empty">Something went wrong loading that place. Please try again.</div>'})
  .then(function(){res.classList.remove("busy");var y=res.getBoundingClientRect().top+scrollY-80;if(Math.abs(scrollY-y)>200)scrollTo({top:y,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})})}
 var form=$(".cr-search");if(form)form.addEventListener("submit",function(e){e.preventDefault();go(inp.value,true)});
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-q]");if(!a||e.metaKey||e.ctrlKey||e.shiftKey)return;e.preventDefault();go(a.dataset.q,true)});

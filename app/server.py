@@ -164,6 +164,7 @@ PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple
             b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png">'
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
 ALERTS_HEAD = b'<link rel="stylesheet" href="/alerts.css"><script src="/alerts.js" defer></script>'   # Alerts bell + panel (webpush.py, t341)
+PROGRESS_HEAD = b'<link rel="stylesheet" href="/bn-progress.css"><script src="/bn-progress.js" defer></script>'   # t480 shared search progress bar
 GROWTH_HEAD = b'<link rel="stylesheet" href="/api/growth/app.css"><script src="/api/growth/app.js" defer></script>'   # growth.py: share/follow/visual Wire cards (Nov 1)
 _OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
                  b"The world&#39;s threats, scored and sourced, before cable news catches up."]
@@ -360,6 +361,8 @@ def pwa_head(b):
         if j >= 0 and b"<html" in al[:4000] and b"/alerts.js" not in al[:j]: b = b[:j] + ALERTS_HEAD + b[j:]
         al = b[:120000].lower(); j = al.find(b"</head>")
         if j >= 0 and b"<html" in al[:4000] and b"/api/growth/app.js" not in al[:j]: b = b[:j] + GROWTH_HEAD + b[j:]
+        al = b[:120000].lower(); j = al.find(b"</head>")
+        if j >= 0 and b"<html" in al[:4000] and b"/bn-progress.js" not in al[:j]: b = b[:j] + PROGRESS_HEAD + b[j:]
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]
@@ -401,7 +404,7 @@ BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;win
   b'if(tag=="SCRIPT"){c.src=u+(u.indexOf("?")<0?"?":"&")+"r="+(n+1);c.async=false}else{c.rel="stylesheet";c.href=u+(u.indexOf("?")<0?"?":"&")+"r="+(n+1)}'
   b'c.setAttribute("data-bn-retry",n+1);(t.parentNode||document.head).insertBefore(c,t.nextSibling)},700*(n+1)*(n+1))},true);'
   b'var F=window.fetch;if(!F)return;window.fetch=function(i,init){var m=((init&&init.method)||(i&&i.method)||"GET").toUpperCase(),u=typeof i=="string"?i:(i&&i.url)||"";'
-  b'var same=u.indexOf("://")<0||u.indexOf(o)===0;if(m!="GET"||!same||/\\/api\\/stream/.test(u))return F.apply(this,arguments);var a=arguments,s=this,k=0;'
+  b'var same=u.indexOf("://")<0||u.indexOf(o)===0;if(m!="GET"||!same||(init&&init.bnNoRetry)||/\\/api\\/stream/.test(u))return F.apply(this,arguments);var a=arguments,s=this,k=0;'
   b'return new Promise(function(res,rej){(function go(){F.apply(s,a).then(function(r){if((r.status==502||r.status==503||r.status==504)&&k<3){k++;setTimeout(go,500*k*k)}else res(r)},'
   b'function(err){if(k<2&&!(init&&init.signal&&init.signal.aborted)){k++;setTimeout(go,600*k)}else rej(err)})})()})}})()</script>')
 

@@ -31,3 +31,6 @@ __pycache__/
 *_backup*
 *.bak*
 app/sources_dir/
+
+# t480: static OSM POI index for Local Resources is baked into the image (render_rules.image_include)
+!app/resources_pois.db

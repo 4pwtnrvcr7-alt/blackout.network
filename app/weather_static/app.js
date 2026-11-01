@@ -96,9 +96,11 @@ async function load(force){if(!W.loc){$w("wx_head").innerHTML='<b>Pick a place</
  try{radarLoc()}catch(_){}
  if(W.busy)return;W.busy=true;const l=W.loc;
  const p=new URLSearchParams({lat:l.lat,lon:l.lon,cc:l.cc||"",name:l.name||"",admin1:l.admin1||"",admin2:l.admin2||""});if(force)p.set("force","1");
- $w("wx_head").innerHTML=`<span class=wx-loc>${E(locLabel(l))}</span> <span class=meta>· loading live data…</span>`;
- try{const r=await fetch("api/weather?"+p,{cache:"no-store"});const d=await r.json();if(!r.ok)throw d.error||r.status;W.d=d;W.last=Date.now();render()}
- catch(e){$w("wx_head").innerHTML=`<span class=wx-loc>${E(locLabel(l))}</span><div class=warn>Weather unavailable: ${E(e)}</div>`}
+ $w("wx_head").innerHTML=`<span class=wx-loc>${E(locLabel(l))}</span>`;const wxH=()=>$w("wx_prog")||(()=>{const d=document.createElement("div");d.id="wx_prog";$w("wx_head").after(d);return d})();const BP=window.BNProgress;let pg=null;   // t480 shared progress bar
+ const pt=setTimeout(()=>{if(BP){pg=BP.create(wxH(),{label:"Loading live weather for "+locLabel(l)+"…",name:"Weather lookup"});pg.stage(null,0.05).ease(0.9,6000)}},150);
+ try{const r=await fetch("api/weather?"+p,{cache:"no-store"});if(pg)pg.stage("Drawing the forecast…",0.95);const d=await r.json();if(!r.ok)throw d.error||r.status;clearTimeout(pt);if(pg)pg.done("Done");W.d=d;W.last=Date.now();render()}
+ catch(e){clearTimeout(pt);if(pg)pg.destroy();$w("wx_head").innerHTML=`<span class=wx-loc>${E(locLabel(l))}</span>`;
+  if(BP)BP.create(wxH(),{label:"Weather lookup"}).fail("Weather unavailable: "+e,()=>load(true));else $w("wx_head").insertAdjacentHTML("beforeend",`<div class=warn>Weather unavailable: ${E(e)}</div>`)}
  finally{W.busy=false}}
 const S=k=>(W.d&&W.d.sources[k])||null,OK=k=>S(k)&&S(k).ok?S(k).data:null;
 const sevC=s=>({Extreme:"ex",Severe:"sv",Moderate:"md",Minor:"mi"}[s]||"");
