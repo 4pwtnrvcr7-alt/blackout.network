@@ -1023,7 +1023,7 @@ function dataRange(items){let lo=Infinity,hi=-Infinity;(items||[]).forEach(x=>[x
 function fdr(){const el=document.getElementById("foot_range");if(el&&typeof S!="undefined"&&S)el.textContent=dataRange([...(S.main||[]),...(S.watchlist||[])])}
 fdr();
 </script>
-<link rel="stylesheet" href="api/solar_seismic/app.css"><script src="api/solar_seismic/app.js"></script>
+<link rel="stylesheet" href="api/solar_seismic/app.css"><script src="api/solar_seismic/app.js"></script><link rel="stylesheet" href="api/solar_seismic/live.css"><script src="api/solar_seismic/live.js"></script>
 <link rel="stylesheet" href="api/solar_quake/app.css"><script src="api/solar_quake/app.js"></script>
 <link rel="stylesheet" href="api/heatmap/app.css"><script>if(typeof L!="undefined"&&!L.heatLayer)document.write('<script src="api/heatmap/leaflet-heat.js"><\/script>');if(typeof L!="undefined"&&!L.markerClusterGroup)document.write('<link rel="stylesheet" href="api/heatmap/MarkerCluster.css"><link rel="stylesheet" href="api/heatmap/MarkerCluster.Default.css"><script src="api/heatmap/leaflet.markercluster.js"><\/script>')</script><script src="api/heatmap/app.js"></script>
 <link rel="stylesheet" href="api/politics/app.css"><script src="api/politics/app.js"></script>

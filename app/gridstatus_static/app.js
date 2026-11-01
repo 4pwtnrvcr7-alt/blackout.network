@@ -55,8 +55,11 @@ function fresh(){const d=G.d||{},f=d.freshness||{};const eh=Object.values(d.sect
 function styleFor(id){const s=((G.d||{}).sections||{})[id]||{};return {color:id==G.sel?"#ffffff":"#0b0d10",weight:id==G.sel?2.5:1,fillColor:COL[s.status]||"#5b6573",fillOpacity:id==G.sel?.62:.45}}
 function initMap(){if(G.map||typeof L=="undefined"||!G.geo)return;const el=document.getElementById("gs_map");if(!el||!el.offsetWidth)return;
  G.map=L.map(el,{zoomSnap:.25,minZoom:2,maxZoom:9,worldCopyJump:true,scrollWheelZoom:false}).setView([39,-98],3.6);
- if(window.bnBaseLayer)bnBaseLayer(G.map,{maxZoom:9,extra:'grid sections <a href="https://commongrid.info/" target="_blank" rel="noopener">CommonGrid</a> (ODbL) · EIA · ODIN · NWS'});
- else L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:9,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(G.map);
+ // basemap only through the site's shared keyless basemap function (dashboard.html window.bnBaseLayer); no hardcoded tile URLs here.
+ // If it has not loaded yet the sections still draw on the dark background and the basemap is added as soon as it appears.
+ const BX='grid sections <a href="https://commongrid.info/" target="_blank" rel="noopener">CommonGrid</a> (ODbL) · EIA · ODIN · NWS';
+ const addBase=()=>{if(window.bnBaseLayer){try{bnBaseLayer(G.map,{maxZoom:9,extra:BX})}catch(_){}return true}return false};
+ if(!addBase()){let n=0;const iv=setInterval(()=>{if(addBase()||++n>40)clearInterval(iv)},500);G.map.attributionControl.addAttribution(BX)}
  G.lay=L.geoJSON(G.geo,{style:f=>styleFor(f.properties.id),onEachFeature:(f,l)=>{l.on("click",()=>selSec(f.properties.id,true));
   l.bindTooltip(()=>{const s=((G.d||{}).sections||{})[f.properties.id]||{};return `<b>${E(f.properties.name)}</b><br>${E(LAB[s.status]||"loading")}${s.demand_mw!=null?` · ${Number(s.demand_mw).toLocaleString()} MW`:""}`},{sticky:true})}}).addTo(G.map);
  const fc=L.control({position:"bottomleft"});fc.onAdd=()=>{const d=L.DomUtil.create("div","gs-mfresh");d.id="gs_mfresh";return d};fc.addTo(G.map);mfresh();

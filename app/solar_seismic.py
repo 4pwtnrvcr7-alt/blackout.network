@@ -429,7 +429,13 @@ _ensure_logger()
 
 # ------------------------------------------------------------------ HTTP
 def handle_get(path, qs):
-    if path in ("/api/solar_seismic/app.js", "/api/solar_seismic/app.css"):
+    if path == "/api/solar_seismic/live" or path.startswith(("/api/solar_seismic/img/", "/api/solar_seismic/usgs/")):
+        import importlib, solar_live   # t239-t241: live Sun imagery, flares/CME countdown, USGS proxy fallback
+        mt = os.path.getmtime(solar_live.__file__)
+        if getattr(solar_live, "_bn_mt", None) != mt: solar_live = importlib.reload(solar_live)
+        solar_live._bn_mt = mt
+        return solar_live.handle_get(path, qs)
+    if path in ("/api/solar_seismic/app.js", "/api/solar_seismic/app.css", "/api/solar_seismic/live.js", "/api/solar_seismic/live.css"):
         f = os.path.join(STATIC, os.path.basename(path))
         with open(f, "rb") as fh:
             return 200, fh.read(), "application/javascript" if f.endswith(".js") else "text/css"
