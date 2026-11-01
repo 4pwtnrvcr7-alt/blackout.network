@@ -178,7 +178,7 @@ async function loadQ(){const f=S.feed;try{const [j,via]=await getUSGS(f);if(f!=S
 async function loadSig(){try{const [j]=await getUSGS("significant_week");S.sig=(j.features||[]).map(x=>({id:x.id,mag:x.properties.mag,place:x.properties.place,t:x.properties.time,url:x.properties.url,lat:x.geometry.coordinates[1],lon:x.geometry.coordinates[0]})).sort((a,b)=>b.t-a.t);
  const b=g("ssl_sig");if(S.sig.length){const q=S.sig[0];b.hidden=false;b.innerHTML=`⚠ USGS significant this week: <b>${S.sig.length}</b> · latest M${q.mag.toFixed(1)} ${E(q.place)} (${E(ago(q.t))})`}else{b.hidden=false;b.innerHTML="USGS significant this week: none";b.disabled=true}}catch(e){}}
 function renderQ(){const Q=S.q||[];if(typeof L=="undefined")return;
- if(!S.map){S.map=L.map("ssl_eqmap",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1}).setView([15,-170+190],2);
+ if(!S.map){S.map=L.map("ssl_eqmap",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1});S.map.setView([18,0],g("ssl_eqmap").clientWidth>=1000?2:1);
   if(window.bnBaseLayer)bnBaseLayer(S.map,{maxZoom:10});   // shared keyless basemap from dashboard.html (no hardcoded tile URLs here)
   S.map.attributionControl.addAttribution('Quakes: <a href="https://earthquake.usgs.gov/" target=_blank rel=noopener>USGS</a>');
   S.lay=L.layerGroup().addTo(S.map);S.map.on("click",()=>S.map.scrollWheelZoom.enable());S.map.on("mouseout",()=>S.map.scrollWheelZoom.disable())}
@@ -190,7 +190,7 @@ function renderQ(){const Q=S.q||[];if(typeof L=="undefined")return;
  const nn=Q.filter(q=>S.newIds.has(q.id)).length;
  g("ssl_eqfresh").innerHTML=`<span class=ssl-dotlive></span>last updated ${hm(S.qT)} · next check in 60 s${S.via=="proxy"?" · via blackout.network cache":""}${nn?` · <b class=ssl-newc>${nn} new</b>`:""}`;
  g("ssl_eqcount").textContent=`· ${Q.length} quake${Q.length==1?"":"s"} · ${(FEEDS.find(f=>f[0]==S.feed)||[])[1]||""}`;
- g("ssl_eqleg").innerHTML=[["< 2.5","#73d13d",1.8],["2.5–4","#ffd666",3],["4–5","#faad14",4.5],["5–6","#ff7a45",5.5],["6–7","#ff4d4f",6.5],["7+","#b37feb",7.3]].map(([l,c,m])=>`<span><i style="background:${c};width:${mrad(m)*2}px;height:${mrad(m)*2}px"></i>M${l}</span>`).join("")+`<span><i class=ring></i>new since last check</span><span>Circle size and color = magnitude · click the map to scroll-zoom</span>`;
+ g("ssl_eqleg").innerHTML=[["< 2.5","#73d13d",1.8],["2.5–4","#ffd666",3],["4–5","#faad14",4.5],["5–6","#ff7a45",5.5],["6–7","#ff4d4f",6.5],["7+","#b37feb",7.3]].map(([l,c,m])=>`<span><i style="background:${c};width:${Math.min(22,mrad(m)*1.2)}px;height:${Math.min(22,mrad(m)*1.2)}px"></i>M${l}</span>`).join("")+`<span><i class=ring></i>new since last check</span><span>Circle size and color = magnitude · click the map to scroll-zoom</span>`;
  g("ssl_eqlist").innerHTML=Q.slice(0,40).map(q=>`<div class="ssl-q ${S.newIds.has(q.id)?"new":""}" data-q="${E(q.id)}" tabindex=0><span class=m style="--c:${mcol(q.mag)}">${q.mag.toFixed(1)}</span><span class=p><b>${E(q.place)}</b><small>${E(dt(q.t))} · ${E(ago(q.t))} · ${q.depth!=null?q.depth.toFixed(0)+" km deep":""}${q.tsu?" · tsunami flag":""}</small></span>${S.newIds.has(q.id)?"<span class=nb>NEW</span>":""}<a href="${E(q.url)}" target=_blank rel=noopener title="USGS event page">↗</a></div>`).join("")||`<div class=meta>No quakes in this feed window.</div>`}
 
 // ---------------------------------------------------------------- lifecycle
