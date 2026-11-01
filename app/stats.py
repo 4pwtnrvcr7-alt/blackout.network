@@ -31,7 +31,9 @@ def public_json():
     """Only the published aggregates (the file holds nothing else, but keep the allow-list explicit)."""
     d = load(); keep = {}
     for k in ("generated", "min_bucket", "site", "newsletter", "youtube", "x", "growth"): keep[k] = d.get(k)
-    if isinstance(keep.get("youtube"), dict): keep["youtube"] = {k: v for k, v in keep["youtube"].items() if k != "analytics_note"}
+    if isinstance(keep.get("youtube"), dict): keep["youtube"] = {k: v for k, v in keep["youtube"].items() if k not in ("analytics_note", "daily", "traffic_sources", "views_28d", "minutes_28d", "subs_net_28d", "analytics")}   # audit Nov 1 2026: no YouTube Analytics data on public /stats
+    if isinstance(keep.get("youtube"), dict):
+        for _v in keep["youtube"].get("trending") or []: _v.pop("views_7d", None)
     return keep
 
 def _t(iso):

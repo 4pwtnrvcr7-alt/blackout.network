@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import streams_common as SC
 from faster_whisper import WhisperModel
 BASE = SC.BASE; YTDLP = "/workspace/.whisperenv/bin/yt-dlp"; CHUNK_S = 30; ROTATE_S = 600; MAX_SLOTS = 6; CPU_HI = 50.0; CPU_LO = 33.0
+YT_CAPTURE_ENABLED = os.environ.get("BN_YT_CAPTURE", "0") == "1"   # Nov 1 2026 audit: YouTube capture via yt-dlp/scraping OFF by default (Google API audit)
 MODEL = WhisperModel("base.en", device="cpu", compute_type="int8", cpu_threads=2, num_workers=MAX_SLOTS)
 LOCK = threading.Lock(); S = {"slots": 1, "watching": {}, "last_watched": {}, "cpu": 0.0, "cpu_hist": [], "chunks": 0, "rtf": []}
 def iso(d=None): return (d or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -103,6 +104,7 @@ def slot(n):
             if not x: time.sleep(20); continue
             cid, vid = x["channel_id"], x["video_id"]
             with LOCK: S["watching"][n] = cid; S["last_watched"][cid] = time.time()
+            if not YT_CAPTURE_ENABLED: S["watching"].pop(n, None); time.sleep(300); continue   # audit: yt-dlp capture disabled
             r = subprocess.run([YTDLP, "-g", "-f", "91/92/93/94/bestaudio/best", "--no-warnings", "--no-playlist", f"https://www.youtube.com/watch?v={vid}"], capture_output=True, text=True, timeout=60)
             url = (r.stdout.strip().splitlines() or [""])[0]
             if not url: time.sleep(30); continue

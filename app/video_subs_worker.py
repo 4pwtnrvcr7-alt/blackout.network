@@ -9,6 +9,7 @@ import json, os, re, shutil, subprocess, sys, tempfile, time, traceback, wave
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import video_subs_common as V
 YTDLP = "/workspace/.whisperenv/bin/yt-dlp"; ARGOS_PY = "/workspace/.translateenv/bin/python"
+YT_CAPTURE_ENABLED = os.environ.get("BN_YT_CAPTURE", "0") == "1"   # Nov 1 2026 audit: YouTube capture via yt-dlp/scraping OFF by default (Google API audit)
 TMP = os.path.join(V.BASE, "video_subs"); JOB_BUDGET_S = 15 * 60; IDLE_EXIT_S = 180
 _model = None
 PLAT = {}
@@ -34,6 +35,7 @@ def classify(err, plat=None):
     if "timed out" in e or "timeout" in e: return "timeout"
     return "download_blocked"
 def ytdlp(args, timeout=90):
+    if not YT_CAPTURE_ENABLED and any(("youtube.com" in a or "youtu.be" in a) for a in args): raise Stop("unavailable", "YouTube capture disabled (API compliance)")
     r = subprocess.run(["nice", "-n", "19", YTDLP, "--no-warnings", "--no-playlist", "--socket-timeout", "20", *args], capture_output=True, text=True, timeout=timeout)
     return r.returncode, r.stdout, r.stderr
 def probe(url):

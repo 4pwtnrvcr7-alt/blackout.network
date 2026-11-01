@@ -6,6 +6,7 @@ ingest_external.py (normalization, 12 h dedupe, clustering, scoring). Already-se
 youtube_watch_state.json (7 days), so re-running is safe. No keys, no logins, read-only.
 Usage: python3 youtube_watch.py [--dry-run] [--hours 24] [--json]"""
 import os, sys, json, re, time, subprocess, argparse
+YT_CAPTURE_ENABLED = os.environ.get("BN_YT_CAPTURE", "0") == "1"   # audit Nov 1 2026: channel-page scraping off
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 import requests
@@ -60,6 +61,7 @@ def ago_to_iso(txt):
 def fetch_page(cid):
     """Fallback when the RSS feed server is down (it periodically answers 404/500 for every channel for hours):
     read the public channel /videos page and pull id, title and relative age from ytInitialData. -> (vids, err)"""
+    if not YT_CAPTURE_ENABLED: return None, "page scrape disabled (API compliance)"
     try:
         r = requests.get(f"https://www.youtube.com/channel/{cid}/videos", headers=PAGE_UA, cookies={"CONSENT": "YES+1"}, timeout=20)
         if r.status_code != 200: return None, f"page HTTP {r.status_code}"
