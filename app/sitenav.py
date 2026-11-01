@@ -65,6 +65,7 @@ NAV = [
  ("Community", [
   ("ranked", "ranked", "🗳 Ranked by Users", "Ranked by Users: the crowd's threat level",
    "Vote on how serious each alert is and compare the crowd's 0–10 threat level with the scanner's own ranking, live on BLACKOUT.NETWORK. No sign-up needed."),
+  ("@social", "/social", "▶ Videos & posts", None, None),   # /social page (social.py, t303): YouTube @blkoutntw + X @BLKOUTNTW
   ("newsletter", "newsletter", "✉ Newsletter", "Newsletter: the threat brief by email",
    "Get BLACKOUT.NETWORK's highest-severity, source-verified threats by email once or twice a day. Free, double opt-in, and you can unsubscribe in one click."),
  ]),
@@ -115,6 +116,9 @@ PAGES = {
  "tos": ("", "Terms of Service | BLACKOUT.NETWORK",
          "BLACKOUT.NETWORK's Terms of Service: acceptable use, research-only data with no warranty, limitation of liability, Florida governing law and contact details.",
          "The rules for using BLACKOUT.NETWORK: acceptable use, no warranty, liability limits and Florida law."),
+ "social": ("@social", "Videos & posts | BLACKOUT.NETWORK",
+            "BLACKOUT.NETWORK videos and posts: world threat updates and explainers from YouTube @blkoutntw and X @BLKOUTNTW, each with a full sourced story page.",
+            "Our video reports and posts from YouTube and X, each with a full, sourced write-up on this site."),
  "report-status": ("", "Check a problem report | BLACKOUT.NETWORK",
                    "Check the status of a problem you reported to BLACKOUT.NETWORK using your report ID: whether it was received, reviewed or fixed, with no account needed.",
                    "Look up a problem you reported with its report ID and see whether it was received, reviewed or fixed."),

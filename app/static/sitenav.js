@@ -11,7 +11,11 @@ function init(){
  var desc=document.getElementById("bn_tabdesc");
  if(!desc){desc=document.createElement("p");desc.id="bn_tabdesc";desc.className="bn-tabdesc";nav.parentNode.insertBefore(desc,nav.nextSibling)}
  // ---- one tab bar: groups and order from sitenav.py; tabs not listed there go at the end of the first group
- function el(t){return t.key==="@scoring"?document.getElementById("tab_howscore"):nav.querySelector('button[data-tab="'+t.key+'"]')}
+ function el(t){if(t.key==="@scoring")return document.getElementById("tab_howscore");
+  if(t.key.charAt(0)==="@"&&t.hash.charAt(0)==="/"){var id="tab_"+t.key.slice(1),a=document.getElementById(id);   // page links (e.g. /social, t303)
+   if(!a){a=document.createElement("a");a.id=id;a.href=t.hash;a.textContent=t.label;a.dataset.link=t.key;
+    a.style.cssText="background:#1d232b;color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:6px 10px;text-decoration:none;font-size:14px"}return a}
+  return nav.querySelector('button[data-tab="'+t.key+'"]')}
  function want(){var out=[],known={};D.tabs.forEach(function(t){known[t.key]=1});
   D.groups.forEach(function(g,i){if(i)out.push("sep");if(g)out.push("grp:"+g);
    D.tabs.forEach(function(t){if(t.group===g){var e=el(t);if(e)out.push(e)}});

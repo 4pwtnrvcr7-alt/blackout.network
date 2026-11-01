@@ -53,6 +53,10 @@ ROUTES = {
     "/api/newsletter": "newsletter",
     "/sources": "sources",
     "/api/sources": "sources",
+    "/wire": "story",               # /wire/<cluster_id>: one page per scanner story, every source (story.py, t303); newsletter items link here
+    "/social": "social",            # Videos & posts hub + /social/thumb/<file> hosted thumbnails (social.py, t303)
+    "/api/social": "social",
+    "/story": "social",             # /story/<slug>: one page per launch video (article + nocookie embed), hidden until publish_at (t311)
     "/api/spacex": "spacex",
     "/api/elon": "elon",
     "/api/finance": "finance",

@@ -30,7 +30,7 @@ function enhance(f){
 function enhanceManage(f){
  if(!f||f.dataset.nlReady)return;f.dataset.nlReady=1;const msg=f.querySelector(".nl-msg");
  f.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(f),cats=[...f.querySelectorAll('input[name=interests]')],picked=cats.filter(c=>c.checked).map(c=>c.value);
-  const r=await post("manage",{token:fd.get("token"),frequency:fd.get("frequency"),interests:(!picked.length||picked.length==cats.length)?["all"]:picked});
+  const r=await post("manage",{token:fd.get("token"),frequency:fd.get("frequency"),interests:(!picked.length||picked.length==cats.length)?["all"]:picked,breaking_present:1,breaking:fd.get("breaking")?1:0});
   say(msg,(r.j&&r.j.message)||("Error "+r.status),r.ok)});
 }
 

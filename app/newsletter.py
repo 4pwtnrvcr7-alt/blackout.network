@@ -40,9 +40,9 @@ P = {  # every path is overridable by env var for tests (NEWSLETTER_DB, NEWSLETT
     "sources_db": os.environ.get("NEWSLETTER_SOURCES_DB", os.path.join(BASE, "sources.db")),            # Sources catalog (read-only here)
     "dir_db": os.environ.get("NEWSLETTER_DIR_DB", os.path.join(BASE, "sources_dir", "directory.db")),  # global directory (read-only here)
 }
-BRAND = "blackout.network"
-TAGLINE = "The world's threats, scored and sourced, before cable news catches up."
-DISCLAIMER = ("Research only. blackout.network is not an official warning service. Items are machine-collected and scored; "
+BRAND = "BLACKOUT.NETWORK"   # brand is always written in capitals in every email and page (t300)
+TAGLINE = "Know first. Be ready."
+DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime."
 CATEGORIES = ["war/conflict", "political", "natural disaster", "disease", "cyber", "space weather", "financial", "ufo/uap", "spiritual/religious", "other"]
@@ -51,7 +51,7 @@ SLOTS = ("morning", "evening")
 SENDER_MODES = ("preview", "smtp", "resend", "brevo", "sendgrid")
 DEFAULTS = {
     "base_url": "https://blackout.network",
-    "from_name": "blackout.network",
+    "from_name": "BLACKOUT.NETWORK",
     "from_email": "hello@blackout.network",
     "reply_to": "",
     "mailing_address": "",
@@ -77,6 +77,11 @@ DEFAULTS = {
     "outbox_retention_days": 30,
     "retry_backoff_minutes": [2, 10, 30],
     "editorial_ttl_hours": 24,
+    "dedupe_days": 14,              # a story already sent is never repeated for this long, except as an UPDATE when it develops
+    "max_update_items": 5,          # per section (Stories you follow / Developing stories)
+    "follow_max": 50,               # active follows per subscriber
+    "audience_db": "",              # override for the subscriber list used by live sending (default: render_mirror/newsletter.db when live)
+    "breaking": {"enabled": True, "fresh_hours": 6, "min_gap_hours": 3, "max_per_day": 3, "max_items": 3},
 }
 E = lambda s: html.escape("" if s is None else str(s), quote=True)
 _LOCK = threading.RLock()
@@ -203,12 +208,25 @@ CREATE TABLE IF NOT EXISTS attempts(kind TEXT, k TEXT, ts REAL);
 CREATE INDEX IF NOT EXISTS att_k ON attempts(kind, k, ts);
 CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, kind TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS editorial(cluster_id TEXT PRIMARY KEY, added TEXT, note TEXT);
+CREATE TABLE IF NOT EXISTS follows(subscriber_id INTEGER NOT NULL, cluster_id TEXT NOT NULL, title TEXT, created TEXT, active INTEGER NOT NULL DEFAULT 1,
+  unfollowed_at TEXT, PRIMARY KEY(subscriber_id, cluster_id));
+CREATE INDEX IF NOT EXISTS fo_c ON follows(cluster_id, active);
+CREATE TABLE IF NOT EXISTS breaking_seen(cluster_id TEXT PRIMARY KEY, ts TEXT, rank INTEGER, rule TEXT, status TEXT, run_id INTEGER);
+CREATE TABLE IF NOT EXISTS breaking_runs(id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, cluster_ids TEXT, status TEXT, mode TEXT,
+  n_targets INTEGER DEFAULT 0, n_sent INTEGER DEFAULT 0, note TEXT);
 """
+MIGRATE = [("sent_items", "rank", "INTEGER"), ("sent_items", "n_items", "INTEGER"), ("sent_items", "eff", "INTEGER"), ("sent_items", "fams", "TEXT"),
+           ("sent_items", "kind", "TEXT"), ("subscribers", "breaking", "INTEGER NOT NULL DEFAULT 1")]
 _INIT = {}
 def db():
     c = sqlite3.connect(P["db"], timeout=15); c.row_factory = sqlite3.Row
     if _INIT.get(P["db"]) is None:
-        c.execute("PRAGMA journal_mode=WAL"); c.executescript(SCHEMA); c.commit(); _INIT[P["db"]] = True
+        c.execute("PRAGMA journal_mode=WAL"); c.executescript(SCHEMA)
+        for t, col, decl in MIGRATE:   # additive, idempotent column migrations (t303)
+            if col not in {x[1] for x in c.execute(f"PRAGMA table_info({t})")}:
+                try: c.execute(f"ALTER TABLE {t} ADD COLUMN {col} {decl}")
+                except sqlite3.OperationalError: pass
+        c.commit(); _INIT[P["db"]] = True
     return c
 
 def src():
@@ -355,6 +373,56 @@ def _fams(r):
     try: return [f for f in json.loads(r["families"] or "[]") if f]
     except Exception: return []
 
+TIERS = {0: ("Noise", "local trivia"), 1: ("Background", "very local"), 2: ("Minor", "local"), 3: ("Minor regional", "one-region"),
+         4: ("Regional", "one region or state"), 5: ("Significant", "regional or national"), 6: ("Serious", "national"),
+         7: ("Major", "national or multi-country"), 8: ("Severe", "multi-country or continental"), 9: ("Critical", "global"),
+         10: ("Catastrophic", "global")}   # labels + scope from /scoring (scoring.py)
+CAT_WHY = {
+    "war/conflict": "Armed conflict can escalate fast and ripple into energy prices, shipping lanes, flights and travel advisories.",
+    "political": "Emergency declarations, coups and unrest can quickly shift aid, security, travel safety and markets.",
+    "natural disaster": "Expect knock-on effects in the affected area: power and water outages, blocked roads, displacement and supply gaps.",
+    "disease": "Outbreaks can cross borders before official guidance catches up; watch for health-agency advisories and travel notices.",
+    "cyber": "Attacks on widely used systems can knock out services you depend on; check vendor advisories and patch.",
+    "space weather": "Strong geomagnetic activity can degrade GPS, HF radio and satellites, and at the extreme it stresses power grids.",
+    "financial": "Market shocks can spread to savings, credit, prices and supply chains.",
+    "ufo/uap": "Unexplained aerial reports sometimes lead to airspace closures or military responses.",
+    "spiritual/religious": "Religious flashpoints can spark unrest, security alerts and travel restrictions.",
+    "other": "Could affect safety, services or travel in the affected area.",
+}
+def tier(rank): return TIERS.get(max(0, min(10, int(rank or 0))), ("", ""))
+def why_it_matters(r, official=False):
+    """Deterministic 'why it matters' line built only from the item's own data: rank tier + scope (/scoring), the category's typical
+    knock-on effects, an official-source flag, a population figure quoted by the source, and spread speed. Nothing is invented."""
+    rk = int(r["rank"] or 0); name, scope = tier(rk)
+    out = [f"Rated {name} ({rk}/10), {scope} scale."]
+    out.append(CAT_WHY.get(r["category"] or "other", CAT_WHY["other"]))
+    m = re.search(r"([\d]+(?:\.\d+)?) million", f"{r['title'] or ''} {r['brief'] or ''}")
+    if m:
+        try: out.append(f"The source estimates about {float(m.group(1)):g} million people affected.")
+        except ValueError: pass
+    if official: out.append("An official agency is on record.")
+    try: m3 = int(r["mentions_3h"] or 0); rising = int(r["rising"] or 0)
+    except (KeyError, IndexError, TypeError, ValueError): m3, rising = 0, 0
+    if rising and m3 >= 2: out.append(f"Spreading: {m3} reports in the last 3 hours.")
+    return " ".join(out)
+
+def wire_url(cid, since=None, c=None, anchor=""):
+    """Permalink of one Wire story on the site (story.py). since= highlights what's new; readers reach the original sources from there."""
+    base = (c or cfg())["base_url"].rstrip("/")
+    q = ("?" + urllib.parse.urlencode({"since": iso(since)})) if since else ""
+    return f"{base}/wire/{cid}{q}{anchor}"
+
+def _row_get(r, k, d=None):
+    try: return r[k]
+    except (KeyError, IndexError): return d
+
+_LEAD = re.compile(r"^[^\w(\"'“‘\[]+")
+def clean_title(t):
+    """Readable headline: drop leading flag/emoji runs and dash bullets, trailing @handles, squeeze spaces. Wording is never changed."""
+    t = re.sub(r"\s+", " ", t or "").strip()
+    t = _LEAD.sub("", t); t = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", t).strip()
+    return t or re.sub(r"\s+", " ", t or "").strip()
+
 def item_of(r, section, official=0, editorial=False):
     fams = _fams(r); eff = int(r["eff_families"] or 0)
     t = parse_t(r["event_time"]) or parse_t(r["first_seen"])
@@ -362,18 +430,66 @@ def item_of(r, section, official=0, editorial=False):
     if editorial:
         conf = "UNCONFIRMED: single source, included under the editorial exception for a potential national- or civilizational-scale event"
     elif eff >= 2:
-        conf = f"Confirmed by {eff} independent source families ({', '.join(fams[:5])})" if fams else f"Confirmed by {eff} independent sources"
+        conf = f"Confirmed by {eff} independent source families ({', '.join(fams[:5])}{', …' if len(fams) > 5 else ''})" if fams else f"Confirmed by {eff} independent sources"
     else:
         conf = f"Single {'official ' if official else ''}source ({', '.join(fams[:2]) or 'one outlet'})" + ("" if official else ", not independently confirmed")
-    return {"cluster_id": r["cluster_id"], "section": section, "title": re.sub(r"\s+", " ", r["title"] or "").strip(), "what": _what(r),
+    return {"cluster_id": r["cluster_id"], "section": section, "title": clean_title(r["title"]), "what": clean_title(_what(r)),
             "where": (r["location"] or "").strip() or None, "lat": r["lat"], "lon": r["lon"], "when": t, "category": r["category"] or "other",
             "rank": int(r["rank"] or 0), "score": int(r["score"] or 0), "eff": eff, "families": fams, "confidence": conf,
             "unconfirmed": editorial or eff < 2, "official": bool(official), "editorial": editorial, "links": _links(r),
-            "title_norm": norm_title(r["title"]), "first_seen": parse_t(r["first_seen"])}
+            "title_norm": norm_title(r["title"]), "first_seen": parse_t(r["first_seen"]), "n_items": int(_row_get(r, "n_items", 0) or 0),
+            "why": why_it_matters(r, official), "tier": tier(r["rank"])[0], "update": None, "breaking": False, "followed": False}
+
+# ---- developing stories: what is new in a cluster since a subscriber last got it
+def developments(S, cid, since):
+    """-> (new alerts since `since`, new independent families not seen before `since`) for one cluster, from blackout.db alerts."""
+    rows = S.execute("SELECT source,family,title,first_seen,official,source_url FROM alerts WHERE cluster_id=? ORDER BY first_seen", (cid,)).fetchall()
+    old, new = set(), []
+    for x in rows:
+        t = parse_t(x["first_seen"])
+        if t is not None and since is not None and t > since: new.append(x)
+        else: old.add(x["family"])
+    nf = sorted({x["family"] for x in new if x["family"] and x["family"] not in old})
+    return new, nf
+
+def _update_of(r, h0, new, new_fams, followed, since, c=None):
+    """UPDATE block for a story the subscriber already got (or follows), or None if nothing qualifies as new.
+    Not followed: the rank went up or at least one NEW independent source family reported it.
+    Followed: any new report or any rank change."""
+    rk = int(r["rank"] or 0); was = h0.get("rank") if h0 else None
+    up = was is not None and rk > int(was); down = was is not None and rk < int(was)
+    if not (up or new_fams or (followed and (new or down))): return None
+    reps = []
+    for x in sorted(new, key=lambda y: y["first_seen"] or "", reverse=True)[:4]:
+        reps.append({"source": re.sub(r"^(Google News|Bluesky|RSS):\s*", "", str(x["source"] or x["family"] or ""))[:60],
+                     "title": _cut(re.sub(r"\s+", " ", x["title"] or "").strip(), 160), "when": parse_t(x["first_seen"]), "official": bool(x["official"])})
+    return {"since": since, "rank_from": was, "rank_to": rk, "up": up, "down": down, "n_new": len(new), "new_fams": new_fams, "reports": reps,
+            "timeline": wire_url(r["cluster_id"], since, c, "#timeline")}
+
+def _history(sid, at, c):
+    """cluster_id -> what this subscriber was last sent about it (time, rank), over the last dedupe_days. Also the normalized titles."""
+    out, titles = {}, []
+    if not sid: return out, titles
+    k = db(); cut = iso(at - timedelta(days=float(c.get("dedupe_days") or 14)))
+    try:
+        for x in k.execute("SELECT * FROM sent_items WHERE subscriber_id=? AND sent_at>=? ORDER BY sent_at", (sid, cut)):
+            out[x["cluster_id"]] = {"sent_at": parse_t(x["sent_at"]), "rank": x["rank"], "kind": x["kind"], "section": x["section"]}
+            titles.append(x["title_norm"] or "")
+    finally: k.close()
+    return out, titles
+
+def _breaking_ids():
+    try:
+        k = db(); ids = {x[0] for x in k.execute("SELECT cluster_id FROM breaking_seen")}; k.close(); return ids
+    except Exception: return set()
 
 def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
-    """Select content for one subscriber. sub: dict with id (None for previews), frequency, interests, last_sent_at.
-    Window: since the subscriber's last send, capped at max_window_hours (24 h). Returns main / notable / watchlist / quiet / empty."""
+    """Select content for one subscriber. sub: dict with id (None for previews), frequency, interests, last_sent_at, follows (cluster ids).
+    Window: since the subscriber's last send, capped at max_window_hours (24 h).
+    Dedupe: a story this subscriber already got (any edition or breaking alert in the last dedupe_days, or a near-duplicate title) is never
+    repeated. It comes back only as an UPDATE when it is developing (rank up, or a new independent source; for followed stories any new report
+    or rank change), showing only what is new since they last got it.
+    Returns follow / main / updates / notable / watchlist / bluf / quiet / empty."""
     c = c or cfg(); at = at or now()
     win = timedelta(hours=float(c["max_window_hours"]))
     last = parse_t(sub.get("last_sent_at")) if sub else None
@@ -382,19 +498,14 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     try: ints = set(json.loads(sub.get("interests") or '["all"]')) if sub else {"all"}
     except Exception: ints = {"all"}
     allcats = "all" in ints or not ints
-    # dedupe memory: clusters + normalized titles this subscriber got in the last dedupe_hours (+30 min grace so a 12 h-apart slot still counts)
-    sent_ids, sent_titles = set(), []
-    if sub and sub.get("id"):
-        k = db(); cut = iso(at - timedelta(hours=float(c["dedupe_hours"]), minutes=30))
-        for x in k.execute("SELECT cluster_id, title_norm FROM sent_items WHERE subscriber_id=? AND sent_at>=?", (sub["id"], cut)):
-            sent_ids.add(x["cluster_id"]); sent_titles.append(x["title_norm"] or "")
-        k.close()
+    follows = set((sub or {}).get("follows") or [])
+    hist, sent_titles = _history(sub.get("id") if sub else None, at, c)
     s0, s1 = iso(start), iso(at)
     ed_ids = []
     try:
         k = db(); ed_ids = [x[0] for x in k.execute("SELECT cluster_id FROM editorial WHERE added>=?", (iso(at - timedelta(hours=float(c["editorial_ttl_hours"]))),))]; k.close()
     except Exception: pass
-    own = conn is None; S = conn or src()
+    own = conn is None; S = conn or src(); dev = {}
     try:
         rows = S.execute("""SELECT * FROM clusters WHERE watchlist=0 AND rank>=? AND
               ((first_seen>=? AND first_seen<=?) OR (high_at>=? AND high_at<=?)) ORDER BY rank DESC, score DESC, eff_families DESC LIMIT 400""",
@@ -402,20 +513,40 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         wrows = S.execute("""SELECT * FROM clusters WHERE watchlist=1 AND first_seen>=? AND first_seen<=?
               ORDER BY rank DESC, score DESC, mentions_3h DESC, first_seen DESC LIMIT 300""", (s0, s1)).fetchall()
         erows = S.execute(f"SELECT * FROM clusters WHERE cluster_id IN ({','.join('?' * len(ed_ids))})", ed_ids).fetchall() if ed_ids else []
-        ids = [r["cluster_id"] for r in rows] + [r["cluster_id"] for r in erows]
+        track = sorted(set(hist) | follows)
+        trows = S.execute(f"SELECT * FROM clusters WHERE cluster_id IN ({','.join('?' * len(track))})", track).fetchall() if track else []
+        ids = list({r["cluster_id"] for r in list(rows) + list(erows) + list(trows)})
         offi = {}
         if ids:
             for x in S.execute(f"SELECT cluster_id, MAX(official) o FROM alerts WHERE cluster_id IN ({','.join('?' * len(ids))}) GROUP BY cluster_id", ids):
                 offi[x["cluster_id"]] = x["o"] or 0
+        for r in trows:
+            h0 = hist.get(r["cluster_id"])
+            dev[r["cluster_id"]] = developments(S, r["cluster_id"], h0["sent_at"] if h0 else start)
     finally:
         if own: S.close()
-    picked_titles = []
+    brk = _breaking_ids()
+    follow_u, updates = [], []
+    for r in trows:
+        cid = r["cluster_id"]; followed = cid in follows; h0 = hist.get(cid)
+        if not followed:
+            if not h0 or r["watchlist"] or int(r["rank"] or 0) < int(c["notable_min_rank"]): continue
+            if not allcats and (r["category"] or "other") not in ints: continue
+        new, nf = dev.get(cid, ([], []))
+        u = _update_of(r, h0, new, nf, followed, h0["sent_at"] if h0 else start, c)
+        if not u: continue
+        it = item_of(r, "follow" if followed else "update", offi.get(cid, 0)); it["update"] = u; it["followed"] = followed
+        (follow_u if followed else updates).append(it)
+    keyf = lambda x: (-(x["rank"]), -(x["update"]["n_new"] if x["update"] else 0))
+    follow_u = sorted(follow_u, key=keyf)[:int(c.get("max_update_items") or 5)]
+    updates = sorted(updates, key=keyf)[:int(c.get("max_update_items") or 5)]
+    picked_titles = [x["title_norm"] for x in follow_u + updates]; used = {x["cluster_id"] for x in follow_u + updates}
     def take(r):
-        if r["cluster_id"] in sent_ids: return False
-        if not allcats and (r["category"] or "other") not in ints: return False
+        if r["cluster_id"] in hist or r["cluster_id"] in used: return False
+        if not allcats and (r["category"] or "other") not in ints and r["cluster_id"] not in follows: return False
         tn = norm_title(r["title"])
         if any(similar(tn, x) for x in sent_titles + picked_titles): return False
-        picked_titles.append(tn); return True
+        picked_titles.append(tn); used.add(r["cluster_id"]); return True
     main, notable, watch = [], [], []
     for r in erows:
         if len(main) < int(c["max_main_items"]) and take(r): main.append(item_of(r, "main", offi.get(r["cluster_id"], 0), editorial=True))
@@ -423,7 +554,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         if int(r["rank"] or 0) >= rmin and int(r["eff_families"] or 0) >= smin and len(main) < int(c["max_main_items"]) and take(r):
             main.append(item_of(r, "main", offi.get(r["cluster_id"], 0)))
     if len(main) < int(c["min_main_items"]):
-        room = min(int(c["max_notable_items"]), int(c["min_main_items"]) - len(main)); used = {m["cluster_id"] for m in main}
+        room = min(int(c["max_notable_items"]), int(c["min_main_items"]) - len(main))
         for r in rows:
             if len(notable) >= room: break
             rk, ef = int(r["rank"] or 0), int(r["eff_families"] or 0)
@@ -433,42 +564,132 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     for r in wrows:
         if len(watch) >= int(c["max_watchlist"]): break
         if take(r): watch.append(item_of(r, "watchlist"))
-    quiet = not main and not notable
-    return {"main": main, "notable": notable, "watchlist": watch, "quiet": quiet, "start": start, "end": at, "slot": slot,
-            "empty": not (main or notable or watch), "rule": {"rank": rmin, "sources": smin}}
+    politics = [x for x in main + notable if x["category"] == "political"]
+    main = [x for x in main if x["category"] != "political"]; notable = [x for x in notable if x["category"] != "political"]
+    for r in rows:   # more confirmed political items (rank 5+, 2+ independent sources) for the Politics & Government section
+        if len(politics) >= int(c.get("max_politics_items") or 4): break
+        if (r["category"] or "") == "political" and int(r["eff_families"] or 0) >= 2 and take(r): politics.append(item_of(r, "politics", offi.get(r["cluster_id"], 0)))
+    for it in politics: it["section"] = "politics"
+    for it in follow_u + main + updates + notable + politics:
+        it["breaking"] = it["cluster_id"] in brk; it["followed"] = it["cluster_id"] in follows
+    quiet = not main and not notable and not updates and not follow_u and not politics
+    issue = {"main": main, "notable": notable, "watchlist": watch, "updates": updates, "follow": follow_u, "politics": politics, "quiet": quiet, "start": start,
+             "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics), "rule": {"rank": rmin, "sources": smin}}
+    issue["videos"] = videos_for(issue, c)
+    issue["empty"] = issue["empty"] and not issue["videos"]
+    issue["bluf"] = bluf(issue)
+    return issue
+
+def _short(t, n=90): return _cut(re.sub(r"^[^\w(\"'“]+", "", t or "").strip() or (t or ""), n)
+def bluf(issue):
+    """Bottom line up front: one or two sentences, built from the selected items only."""
+    m, u, f, n = issue["main"], issue.get("updates", []), issue.get("follow", []), issue["notable"]
+    rr = issue["rule"]; hrs = max(1, round((issue["end"] - issue["start"]).total_seconds() / 3600))
+    parts = []
+    if m:
+        top = m[0]
+        parts.append(f"{len(m)} confirmed rank-{rr['rank']}+ threat{'s' if len(m) != 1 else ''} in the last {hrs} h. "
+                     f"Top: {_short(top['title'])} (rank {top['rank']}, {top['category']}).")
+        if len(m) > 1: parts.append("Also: " + "; ".join(f"{_short(x['title'], 60)} (R{x['rank']})" for x in m[1:3]) + ".")
+    else:
+        parts.append(f"No new rank-{rr['rank']}+ confirmed threats in the last {hrs} h.")
+        if n: parts.append(f"Most significant: {_short(n[0]['title'])} (rank {n[0]['rank']}).")
+    dv = f + u
+    if dv:
+        ups = [x for x in dv if x["update"]["up"]]
+        parts.append(f"{len(dv)} developing stor{'ies' if len(dv) != 1 else 'y'} updated" + (f", {len(ups)} raised in rank" if ups else "") + ".")
+    if issue.get("videos"): parts.append(f"{len(issue['videos'])} new video report{'s' if len(issue['videos']) != 1 else ''} below.")
+    return " ".join(parts)
 
 # ------------------------------------------------------------------ rendering (HTML email: tables + inline CSS; plain-text alternative)
 RANK_COLORS = ["#3a4250", "#4b5563", "#2f7d4f", "#52c41a", "#a0d911", "#fadb14", "#faad14", "#fa8c16", "#ff4d4f", "#cf1322", "#8b0000"]
 def rank_color(r): return RANK_COLORS[max(0, min(10, int(r or 0)))]
-def slot_label(slot): return {"morning": "Morning", "evening": "Evening"}.get(slot, "Special")
+def slot_label(slot): return {"morning": "Morning", "evening": "Evening", "breaking": "Breaking"}.get(slot, "Special")
 def _cut(s, n): return s if len(s) <= n else s[:n - 3].rsplit(" ", 1)[0] + "…"
 
 def subject_for(issue):
     d = issue["end"].astimezone(ET).strftime("%b %-d"); lab = slot_label(issue["slot"])
+    pre = f"{BRAND} {lab} Brief, {d}: "
     if issue["main"]:
-        top = issue["main"][0]; more = len(issue["main"]) - 1
-        return f"{BRAND} {lab} Brief, {d}: R{top['rank']} {_cut(top['title'], 70)}" + (f" (+{more} more)" if more else "")
-    if issue["notable"]: return f"{BRAND} {lab} Brief, {d}: no rank-{issue['rule']['rank']}+ confirmed threats; {len(issue['notable'])} notable"
-    return f"{BRAND} {lab} Brief, {d}: quiet period"
+        top = issue["main"][0]; more = len(issue["main"]) - 1 + len(issue.get("updates", [])) + len(issue.get("follow", []))
+        return pre + f"R{top['rank']} {_cut(_short(top['title'], 200), 70)}" + (f" (+{more} more)" if more else "")
+    dv = issue.get("follow", []) + issue.get("updates", [])
+    if dv: return pre + f"UPDATE R{dv[0]['rank']} {_cut(_short(dv[0]['title'], 200), 64)}" + (f" (+{len(dv) - 1} more)" if len(dv) > 1 else "")
+    if issue["notable"]: return pre + f"no rank-{issue['rule']['rank']}+ confirmed threats; {len(issue['notable'])} notable"
+    return pre + "quiet period"
 
-def _item_html(it):
-    rc = rank_color(it["rank"]); btx = "#0b0d10" if 3 <= it["rank"] <= 7 else "#ffffff"
+def follow_links(row, cid, c=None):
+    """One-click, no-login Follow / Unfollow links for one story (signed, purpose-bound, bound to the address). Previews without a
+    subscriber point at the story page's follow section instead."""
+    c = c or cfg(); base = c["base_url"].rstrip("/")
+    if not row or not _row_get(row, "id"): return {"follow": f"{base}/wire/{cid}#follow", "unfollow": None}
+    ttl = int(c["link_ttl_days"]) * 86400; x = h(row["email"], 12)
+    return {"follow": f"{base}/newsletter/follow?token={make_token('follow', int(row['id']), ttl, x=x, c=cid)}",
+            "unfollow": f"{base}/newsletter/unfollow?token={make_token('unfollow', int(row['id']), ttl, x=x, c=cid)}"}
+
+_B = "display:inline-block;border-radius:4px;font-size:11px;font-weight:800;letter-spacing:.5px;padding:2px 7px;margin:0 4px 4px 0;line-height:1.4"
+def _badge(txt, bg, fg="#ffffff", bd=None):
+    return f'<span style="{_B};background:{bg};color:{fg};border:1px solid {bd or bg}">{E(txt)}</span>'
+def _rank_badge(it):
+    rc = rank_color(it["rank"]); fg = "#0b0d10" if 3 <= it["rank"] <= 7 else "#ffffff"
+    u = it.get("update") or {}
+    if u.get("rank_from") is not None and u.get("rank_from") != it["rank"]:
+        return _badge(f"RANK {u['rank_from']}→{it['rank']}/10 {it['tier'].upper()}", rc, fg)
+    return _badge(f"RANK {it['rank']}/10 {it['tier'].upper()}", rc, fg)
+_L = "color:#4aa3ff;text-decoration:underline"
+_BTN = ("display:inline-block;background:#4aa3ff;color:#0b0d10;font-weight:700;font-size:13px;line-height:1.3;text-decoration:none;"
+        "border-radius:6px;padding:8px 14px;margin:8px 8px 0 0;border:1px solid #4aa3ff")
+_BTN2 = ("display:inline-block;background:#1c232c;color:#e6e9ee;font-weight:700;font-size:13px;line-height:1.3;text-decoration:none;"
+         "border-radius:6px;padding:8px 14px;margin:8px 8px 0 0;border:1px solid #2f3742")
+
+def _where(it):
+    w = it["where"] or "Location not reported"
+    if it["lat"] is not None and it["lon"] is not None and it["where"]:
+        try: w += f" (approx. {float(it['lat']):.2f}, {float(it['lon']):.2f})"
+        except (TypeError, ValueError): pass
+    return w
+
+def _follow_html(it, links, c):
+    fl = follow_links(links.get("_row"), it["cluster_id"], c)
+    if it.get("followed") and fl["unfollow"]:
+        return f'<span style="color:#52c41a;font-size:12px;font-weight:700">✓ Following</span> <a href="{E(fl["unfollow"])}" style="color:#8b95a3;font-size:12px">Unfollow</a>'
+    return f'<a href="{E(fl["follow"])}" style="{_BTN2}">☆ Follow this story</a>'
+
+def _item_html(it, links, c):
+    url = wire_url(it["cluster_id"], c=c); u = it.get("update")
+    tags = _rank_badge(it) + _badge(it["category"].upper(), "#1c232c", "#c9d1d9", "#2f3742")
+    if it.get("breaking"): tags += _badge("BREAKING", "#cf1322")
+    if u: tags += _badge("UPDATE", "#faad14", "#0b0d10")
+    if it["editorial"] or (it["section"] == "watchlist"): tags += _badge("UNCONFIRMED", "#14181d", "#faad14", "#faad14")
     conf_col = "#faad14" if it["unconfirmed"] else "#52c41a"
-    unc = ('<span style="display:inline-block;border:1px solid #faad14;color:#faad14;border-radius:4px;font-size:11px;font-weight:700;'
-           'padding:1px 6px;margin-left:6px;letter-spacing:.4px">UNCONFIRMED</span>') if it["editorial"] else ""
-    where = E(it["where"]) if it["where"] else "Location not reported"
-    if it["lat"] is not None and it["lon"] is not None and it["where"]: where += f" (approx. {it['lat']:.2f}, {it['lon']:.2f})"
-    links = " · ".join(f'<a href="{E(l["url"])}" style="color:#4aa3ff;text-decoration:underline">{E(l["source"])}</a>' for l in it["links"]) or "no source link recorded"
-    return (f'<tr><td style="padding:14px 16px;border-top:1px solid #252b33">'
-            f'<div style="margin:0 0 6px 0"><span style="display:inline-block;background:{rc};color:{btx};border-radius:4px;font-size:12px;font-weight:700;padding:2px 7px">'
-            f'RANK {it["rank"]}/10</span> <span style="color:#8b95a3;font-size:12px">score {it["score"]}/100 · {E(it["category"])}</span>{unc}</div>'
-            f'<div style="font-size:16px;line-height:1.35;font-weight:700;color:#e6e9ee;margin:0 0 6px 0">{E(_cut(it["title"], 200))}</div>'
-            f'<p style="margin:0;font-size:14px;line-height:1.55;color:#c9d1d9"><b style="color:#e6e9ee">What happened:</b> {E(it["what"])} '
-            f'<b style="color:#e6e9ee">Where:</b> {where}. <b style="color:#e6e9ee">When:</b> {E(when_str(it["when"]))}. '
-            f'<b style="color:#e6e9ee">Confidence:</b> <span style="color:{conf_col}">{E(it["confidence"])}</span>; rank {it["rank"]}/10, score {it["score"]}/100. '
-            f'<b style="color:#e6e9ee">Verify:</b> {links}</p></td></tr>')
+    H = [f'<tr><td style="padding:16px;border-top:1px solid #252b33"><div>{tags}</div>'
+         f'<div style="font-size:17px;line-height:1.35;font-weight:800;margin:4px 0 8px 0"><a href="{E(url)}" style="color:#e6e9ee;text-decoration:none">{E(_cut(it["title"], 200))}</a></div>']
+    P_ = 'style="margin:0 0 8px 0;font-size:14px;line-height:1.55;color:#c9d1d9"'
+    if u:
+        bits = []
+        if u["rank_from"] is not None and u["rank_from"] != u["rank_to"]:
+            bits.append(f"Rank {'raised' if u['up'] else 'lowered'} {u['rank_from']} → {u['rank_to']}.")
+        if u["n_new"]:
+            bits.append(f"{u['n_new']} new report{'s' if u['n_new'] != 1 else ''}" + (f", {len(u['new_fams'])} from new independent source{'s' if len(u['new_fams']) != 1 else ''} ({', '.join(u['new_fams'][:4])})" if u["new_fams"] else "") + ".")
+        H.append(f'<p {P_}><b style="color:#faad14">WHAT\'S NEW</b> <span style="color:#8b95a3">since {E(fmt_et(u["since"]))}:</span> {E(" ".join(bits) or "Updated.")}</p>')
+        if u["reports"]:
+            H.append('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0">' + "".join(
+                f'<tr><td style="padding:3px 0 3px 10px;border-left:2px solid #faad14;font-size:13px;line-height:1.45;color:#c9d1d9">'
+                f'<span style="color:#8b95a3">{E(fmt_et(x["when"], with_date=False))} · {E(x["source"])}{" · official" if x["official"] else ""}:</span> {E(x["title"])}</td></tr>'
+                for x in u["reports"]) + '</table>')
+        H.append(f'<p {P_}><b style="color:#e6e9ee">WHY IT MATTERS</b> {E(it["why"])}</p>'
+                 f'<p {P_}><b style="color:#e6e9ee">CONFIDENCE</b> <span style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'
+                 f'<div><a href="{E(u["timeline"])}" style="{_BTN}">Story timeline →</a>{_follow_html(it, links, c)}</div></td></tr>')
+        return "".join(H)
+    H.append(f'<p {P_}><b style="color:#e6e9ee">BRIEF</b> {E(it["what"])}</p>'
+             f'<p {P_}><b style="color:#e6e9ee">WHERE</b> {E(_where(it))} · <b style="color:#e6e9ee">WHEN</b> {E(when_str(it["when"]))}</p>'
+             f'<p {P_}><b style="color:#e6e9ee">WHY IT MATTERS</b> {E(it["why"])}</p>'
+             f'<p {P_}><b style="color:#e6e9ee">CONFIDENCE</b> <span style="color:{conf_col}">{E(it["confidence"])}</span>. '
+             f'<span style="color:#8b95a3">{it["n_items"] or 1} report{"s" if (it["n_items"] or 1) != 1 else ""}, score {it["score"]}/100, first seen {E(fmt_et(it["first_seen"]))}.</span></p>'
+             f'<div><a href="{E(url)}" style="{_BTN}">Full story &amp; sources →</a>{_follow_html(it, links, c)}</div></td></tr>')
+    return "".join(H)
 
-# Issue footer: three distinct buttons. Inline styles only (email clients strip <style>); dark theme like render_simple's button.
+# Issue footer: distinct buttons. Inline styles only (email clients strip <style>); dark theme like render_simple's button.
 BTN_PRIMARY = ("display:inline-block;background:#4aa3ff;color:#0b0d10;font-weight:700;font-size:14px;line-height:1.3;text-decoration:none;"
                "border-radius:6px;padding:10px 18px;margin:0 8px 8px 0;border:1px solid #4aa3ff")
 BTN_SECONDARY = ("display:inline-block;background:#1c232c;color:#e6e9ee;font-weight:700;font-size:14px;line-height:1.3;text-decoration:none;"
@@ -486,76 +707,241 @@ def footer_buttons_text(links):
             f"Find new sources: {links.get('sources') or links.get('site')}", "",
             f"Unsubscribe (one click): {links['unsubscribe']}"]
 
+def _addr(c):
+    a = (c.get("mailing_address") or "").strip()
+    return a, (E(a) if a else ('<span style="color:#faad14">Postal address: [PENDING] (CAN-SPAM requires a physical postal address in every issue; '
+                                'live issue sending stays locked until it is set)</span>'))
+
+def _shell(title, pre, head_html, body_rows, links, c, why_line):
+    """Common email frame: dark, single column, 100% wide up to 640 px (phones get full width), table layout + inline CSS only."""
+    addr, addr_html = _addr(c)
+    return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light">'
+            f'<title>{E(title)}</title></head><body style="margin:0;padding:0;background:#0b0d10;-webkit-text-size-adjust:100%">'
+            f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0b0d10">{E(pre)}</div>'
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0b0d10"><tr><td align="center" style="padding:12px 6px">'
+            '<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:#14181d;border:1px solid #252b33;'
+            'border-radius:10px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6e9ee">'
+            + head_html + "".join(body_rows) +
+            f'<tr><td style="padding:16px;border-top:1px solid #252b33;font-size:12px;line-height:1.6;color:#8b95a3">'
+            f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
+            f'<a href="{E(links["scoring"])}" style="color:#4aa3ff">How we score</a> · <a href="{E(links["site"])}" style="color:#4aa3ff">Open the live dashboard</a></p>'
+            f'<p style="margin:0 0 8px 0">{E(why_line)}</p>'
+            f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>'
+            + footer_buttons_html(links) + '</table></td></tr></table></body></html>')
+
+def _head_html(kicker, kcol, line2, rng):
+    return (f'<tr><td style="padding:18px 16px 12px 16px;border-bottom:1px solid #252b33">'
+            f'<div style="font-size:21px;letter-spacing:.5px;font-weight:900;color:#e6e9ee">BLACKOUT.<span style="color:#ff4d4f">NETWORK</span></div>'
+            f'<div style="font-size:12px;color:#8b95a3;margin-top:2px">{E(TAGLINE)}</div>'
+            f'<div style="font-size:15px;font-weight:800;color:{kcol};margin-top:12px;letter-spacing:.3px">{E(kicker)}</div>'
+            f'<div style="font-size:13px;font-weight:600;color:#e6e9ee;margin-top:2px">{E(line2)}</div>'
+            f'<div style="font-size:12px;color:#8b95a3;margin-top:3px">{E(rng)}</div></td></tr>')
+
+def _sec_html(title, sub_, col="#e6e9ee"):
+    return (f'<tr><td style="padding:18px 16px 4px 16px"><div style="font-size:13px;font-weight:900;letter-spacing:.9px;text-transform:uppercase;color:{col}">{E(title)}</div>'
+            f'<div style="font-size:12px;color:#8b95a3;margin-top:2px">{E(sub_)}</div></td></tr>')
+
+def window_str(a, b):
+    hrs = (b - a).total_seconds() / 3600
+    return f"Data window: {fmt_et(a)} – {fmt_et(b, a.astimezone(ET).date() != b.astimezone(ET).date())} ({hrs:.0f} h)"
+
+def _text_item(it, n):
+    u = it.get("update"); T = []
+    tags = [f"RANK {it['rank']}/10 {it['tier'].upper()}", it["category"]] + (["BREAKING"] if it.get("breaking") else []) + (["UPDATE"] if u else []) + \
+           (["UNCONFIRMED"] if it["editorial"] or it["section"] == "watchlist" else [])
+    T.append(f"{n}. [{' · '.join(tags)}] {_cut(it['title'], 200)}")
+    if u:
+        bits = []
+        if u["rank_from"] is not None and u["rank_from"] != u["rank_to"]: bits.append(f"Rank {u['rank_from']} -> {u['rank_to']}.")
+        if u["n_new"]: bits.append(f"{u['n_new']} new report(s)" + (f", new independent sources: {', '.join(u['new_fams'][:4])}" if u["new_fams"] else "") + ".")
+        T.append(f"   WHAT'S NEW since {fmt_et(u['since'])}: {' '.join(bits) or 'Updated.'}")
+        for x in u["reports"]: T.append(f"   - {fmt_et(x['when'], with_date=False)} · {x['source']}: {x['title']}")
+    else:
+        T.append(f"   BRIEF: {it['what']}")
+        T.append(f"   WHERE: {_where(it)} · WHEN: {when_str(it['when'])}")
+    T.append(f"   WHY IT MATTERS: {it['why']}")
+    T.append(f"   CONFIDENCE: {it['confidence']}.")
+    return T
+
 def render(issue, links, c=None):
-    """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site."""
-    c = c or cfg(); subj = subject_for(issue)
-    rr = issue["rule"]; rng = range_str(issue["start"], issue["end"])
-    addr = (c.get("mailing_address") or "").strip()
-    addr_html = E(addr) if addr else ('<span style="color:#faad14">[Mailing address not set. CAN-SPAM requires a physical postal address before live sending: '
-                                      'set "mailing_address" in newsletter_config.json.]</span>')
-    pre = (f"{len(issue['main'])} confirmed rank-{rr['rank']}+ item(s)" if issue["main"] else f"No rank-{rr['rank']}+ confirmed threats in this window") + \
-          (f" · {len(issue['watchlist'])} on the watchlist" if issue["watchlist"] else "")
-    H = []; a = H.append
-    a('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-      '<meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light">'
-      f'<title>{E(subj)}</title></head><body style="margin:0;padding:0;background:#0b0d10">'
-      f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0b0d10">{E(pre)}</div>'
-      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0b0d10"><tr><td align="center" style="padding:16px 8px">'
-      '<table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:#14181d;border:1px solid #252b33;'
-      'border-radius:10px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#e6e9ee">')
-    a(f'<tr><td style="padding:18px 16px 12px 16px;border-bottom:1px solid #252b33">'
-      f'<div style="font-size:20px;letter-spacing:.5px;font-weight:800;color:#e6e9ee">BLACKOUT.<span style="color:#ff4d4f">NETWORK</span></div>'
-      f'<div style="font-size:13px;color:#8b95a3;margin-top:4px">{E(TAGLINE)}</div>'
-      f'<div style="font-size:15px;font-weight:700;color:#e6e9ee;margin-top:12px">{slot_label(issue["slot"])} Brief · {E(issue["end"].astimezone(ET).strftime("%A, %B %-d, %Y"))}</div>'
-      f'<div style="font-size:12px;color:#8b95a3;margin-top:3px">{E(rng)}</div></td></tr>')
-    def section(title, sub_, items, col="#e6e9ee"):
-        a(f'<tr><td style="padding:16px 16px 4px 16px"><div style="font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:{col}">{E(title)}</div>'
-          f'<div style="font-size:12px;color:#8b95a3;margin-top:2px">{E(sub_)}</div></td></tr>')
-        for it in items: a(_item_html(it))
+    """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site (+ _row: the subscriber row, for Follow links)."""
+    c = c or cfg(); subj = subject_for(issue); rr = issue["rule"]
+    rng = window_str(issue["start"], issue["end"]); addr, _ = _addr(c)
+    lab = slot_label(issue["slot"]); day = issue["end"].astimezone(ET).strftime("%A, %B %-d, %Y")
+    if issue.get("label"): day = issue["label"]
+    B = []; a = B.append
+    a(f'<tr><td style="padding:14px 16px 4px 16px"><div style="border-left:4px solid #ff4d4f;background:#181d23;border-radius:6px;padding:10px 12px;'
+      f'font-size:14px;line-height:1.55;color:#e6e9ee"><b style="color:#ff4d4f;letter-spacing:.6px">BLUF</b> {E(issue["bluf"])}</div></td></tr>')
+    if issue.get("follow"):
+        a(_sec_html("Stories you follow", "Updates on stories you chose to follow: only what is new since your last brief.", "#52c41a"))
+        for it in issue["follow"]: a(_item_html(it, links, c))
     if issue["main"]:
-        section("Main feed", f"Rank {rr['rank']}+ confirmed by {rr['sources']}+ independent sources (plus any item marked UNCONFIRMED under the editorial exception).", issue["main"])
+        a(_sec_html("Top threats", f"New since your last brief. Rank {rr['rank']}+ and confirmed by {rr['sources']}+ independent sources, highest first."))
+        for it in issue["main"]: a(_item_html(it, links, c))
     else:
         a(f'<tr><td style="padding:16px"><div style="border:1px solid #2f3742;background:#181d23;border-radius:8px;padding:12px 14px;font-size:14px;color:#c9d1d9">'
-          f'<b style="color:#e6e9ee">Quiet period:</b> No rank-{rr["rank"]}+ confirmed threats in this window.</div></td></tr>')
+          f'<b style="color:#e6e9ee">Quiet period:</b> No new rank-{rr["rank"]}+ confirmed threats in this window.</div></td></tr>')
+    if issue.get("politics"):
+        a(_sec_html("Politics & Government", "Government actions, emergency declarations, sanctions and political crises, confirmed by 2+ independent sources.", "#4aa3ff"))
+        for it in issue["politics"]: a(_item_html(it, links, c))
+    vids = issue.get("videos") or []
+    if vids:
+        a(_sec_html("Watch: new on BLACKOUT.NETWORK", "Our latest video reports. Each one has a full written report with every source on its BLACKOUT.NETWORK page."))
+        for s_ in vids: a(_video_html(s_, c, issue["slot"]))
+    if issue.get("updates"):
+        a(_sec_html("Developing stories", "Stories from earlier briefs with new independent sources or a higher rank. Only what changed is shown.", "#faad14"))
+        for it in issue["updates"]: a(_item_html(it, links, c))
     if issue["notable"]:
-        section("Also notable", f"Below the main-feed bar: confirmed rank 5–6 items, or a rank-{rr['rank']}+ item from a single official source.", issue["notable"])
+        a(_sec_html("Also notable", f"Below the top-threats bar: confirmed rank 5–6 items, or a rank-{rr['rank']}+ item from a single official source."))
+        for it in issue["notable"]: a(_item_html(it, links, c))
     if issue["watchlist"]:
-        a('<tr><td style="padding:16px 16px 4px 16px"><div style="font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#faad14">Watchlist: unconfirmed</div>'
-          '<div style="font-size:12px;color:#8b95a3;margin-top:2px">Low-confidence, single-source reports. Not verified. Shown so you can watch for confirmation.</div></td></tr>')
+        a(_sec_html("Watchlist: unconfirmed", "Low-confidence, single-source reports. Not verified. Shown so you can watch for confirmation.", "#faad14"))
         for it in issue["watchlist"]:
-            l = it["links"][0] if it["links"] else None
             a(f'<tr><td style="padding:8px 16px;border-top:1px solid #252b33;font-size:13px;line-height:1.5;color:#c9d1d9">'
-              f'<span style="color:#faad14;font-weight:700">UNCONFIRMED</span> · {E(_cut(it["title"], 180))} '
-              f'<span style="color:#8b95a3">({E(it["category"])}, {E(fmt_et(it["first_seen"]))})</span>'
-              + (f' · <a href="{E(l["url"])}" style="color:#4aa3ff">{E(l["source"])}</a>' if l else "") + '</td></tr>')
-    a(f'<tr><td style="padding:16px;border-top:1px solid #252b33;font-size:12px;line-height:1.6;color:#8b95a3">'
-      f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} <a href="{E(links["scoring"])}" style="color:#4aa3ff">How we score</a> · '
-      f'<a href="{E(links["site"])}" style="color:#4aa3ff">Open the live dashboard</a></p>'
-      f'<p style="margin:0 0 8px 0">You get this because you confirmed a subscription to the {BRAND} newsletter.</p>'
-      f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>')
-    a(footer_buttons_html(links))
-    a('</table></td></tr></table></body></html>')
-    T = [f"BLACKOUT.NETWORK — {slot_label(issue['slot'])} Brief", TAGLINE, rng, ""]
+              f'<span style="color:#faad14;font-weight:800">UNCONFIRMED</span> · <a href="{E(wire_url(it["cluster_id"], c=c))}" style="color:#e6e9ee">{E(_cut(it["title"], 180))}</a> '
+              f'<span style="color:#8b95a3">({E(it["category"])}, {E(fmt_et(it["first_seen"]))})</span></td></tr>')
+    pre = issue["bluf"]
+    why = f"You get this because you confirmed a subscription to the {BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage."
+    html_ = _shell(subj, pre, _head_html(f"{lab.upper()} BRIEF", "#e6e9ee", day, rng), B, links, c, why)
+    T = [f"{BRAND} — {lab} Brief", day, TAGLINE, rng, "", f"BLUF: {issue['bluf']}", ""]
     def tsec(title, items):
         T.extend([title.upper(), "=" * len(title)])
         for i, it in enumerate(items, 1):
-            T.append(f"{i}. [RANK {it['rank']}/10 · score {it['score']}/100 · {it['category']}]{' UNCONFIRMED' if it['editorial'] else ''} {_cut(it['title'], 200)}")
-            T.append(f"   What happened: {it['what']} Where: {it['where'] or 'Location not reported'}. When: {when_str(it['when'])}. Confidence: {it['confidence']}.")
-            for l in it["links"]: T.append(f"   Verify ({l['source']}): {l['url']}")
+            T.extend(_text_item(it, i))
+            T.append(f"   {'Story timeline' if it.get('update') else 'Full story & sources'}: {(it['update'] or {}).get('timeline') or wire_url(it['cluster_id'], c=c)}")
+            fl = follow_links(links.get("_row"), it["cluster_id"], c)
+            T.append(f"   Unfollow: {fl['unfollow']}" if it.get("followed") and fl["unfollow"] else f"   Follow this story: {fl['follow']}")
             T.append("")
-    if issue["main"]: tsec("Main feed", issue["main"])
-    else: T += [f"QUIET PERIOD: No rank-{rr['rank']}+ confirmed threats in this window.", ""]
+    if issue.get("follow"): tsec("Stories you follow", issue["follow"])
+    if issue["main"]: tsec("Top threats", issue["main"])
+    else: T += [f"QUIET PERIOD: No new rank-{rr['rank']}+ confirmed threats in this window.", ""]
+    if issue.get("politics"): tsec("Politics & Government", issue["politics"])
+    if vids:
+        T.extend(["WATCH: NEW ON BLACKOUT.NETWORK", "=" * 30])
+        for s_ in vids: T.extend(_video_text(s_, c, issue["slot"]))
+    if issue.get("updates"): tsec("Developing stories", issue["updates"])
     if issue["notable"]: tsec("Also notable", issue["notable"])
     if issue["watchlist"]:
         T += ["WATCHLIST: UNCONFIRMED (single-source, not verified)", "=" * 30]
         for it in issue["watchlist"]:
-            T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])})" + (f" {it['links'][0]['url']}" if it["links"] else ""))
+            T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])}) {wire_url(it['cluster_id'], c=c)}")
         T.append("")
-    T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}",
-          f"{BRAND} · {addr or '[Mailing address not set: required by CAN-SPAM before live sending]'}", ""]
+    T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}", why,
+          f"{BRAND} · {addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
     T += footer_buttons_text(links)
-    return subj, "".join(H), "\n".join(T)
+    return subj, html_, "\n".join(T)
 
+# ------------------------------------------------------------------ breaking / emergency alerts
+# Trigger (documented in NEWSLETTER.md, "Breaking alerts"). A main-Wire story (not watchlist) that first appeared, or reached its high
+# rank, in the last breaking.fresh_hours (6 h) qualifies when ANY rule holds:
+#   B1  rank 9-10 (Critical / Catastrophic: nuclear use, WHO PHEIC or pandemic, G5 storm) with an official source or 2+ independent families
+#   B2  rank 8 (Severe) with 3+ independent source families AND (an official source OR a major-event pattern below)
+#   B3  rank 7+ with 2+ independent source families AND a war-outbreak / novel-pathogen / nuclear pattern (WAR_PATHOGEN_RX)
+# Rate limits: at most one alert email every min_gap_hours (3 h) and max_per_day (3) per rolling 24 h; up to max_items (3) stories per
+# email. A story alerts once; it can alert again only if it later escalates into rank 9+. Stories held back by the rate limit are not
+# re-sent as a separate alert: they lead the next scheduled brief, tagged BREAKING.
+WAR_PATHOGEN_RX = re.compile(
+    r"declar\w* (of )?war|war (has )?(breaks?|broke|broken) out|outbreak of war|full[- ]scale (war|invasion|offensive|attack)|invasion of|invades?\b|invaded\b|"
+    r"troops (cross|crossed|enter|entered|pour)|ground (offensive|invasion)|nuclear (strike|attack|detonation|war|exchange|test)|"
+    r"novel (virus|pathogen|coronavirus|influenza|flu|strain|disease)|new (virus|pathogen|strain|variant) (detected|identified|discovered|emerges?)|"
+    r"unknown (disease|illness|pathogen|virus)|mystery (illness|disease|virus)|human[- ]to[- ]human|pandemic|\bPHEIC\b|"
+    r"public health emergency of international concern", re.I)
+MAJOR_RX = re.compile(WAR_PATHOGEN_RX.pattern + r"|ballistic missiles?|missile (strike|attack)s?|air ?strikes? (on|against|hit)|"
+                      r"tsunami warning|martial law|\bcoup\b|assassinat|state of war|mass casualt|\bM ?[89]\.\d|magnitude [89]", re.I)
+def breaking_rule(r, official):
+    rk, ef = int(r["rank"] or 0), int(r["eff_families"] or 0)
+    text = f"{r['title'] or ''} {r['brief'] or ''}"
+    if rk >= 9 and (official or ef >= 2): return "B1"
+    if rk == 8 and ef >= 3 and (official or MAJOR_RX.search(text)): return "B2"
+    if rk >= 7 and ef >= 2 and WAR_PATHOGEN_RX.search(text): return "B3"
+    return None
+BREAKING_RULES = {"B1": "rank 9-10 with official or 2+ independent sources",
+                  "B2": "rank 8 with 3+ independent sources and an official source or a major-event signal",
+                  "B3": "rank 7+ with 2+ independent sources and a war-outbreak, novel-pathogen or nuclear signal"}
+
+def breaking_candidates(at=None, c=None, S=None):
+    """-> [(row, rule, official)] fresh stories meeting the trigger, strongest first."""
+    c = c or cfg(); at = at or now(); b = c.get("breaking") or {}
+    cut = iso(at - timedelta(hours=float(b.get("fresh_hours", 6)))); s1 = iso(at)
+    own = S is None; S = S or src()
+    try:
+        rows = S.execute("""SELECT * FROM clusters WHERE watchlist=0 AND rank>=7 AND ((first_seen>=? AND first_seen<=?) OR (high_at>=? AND high_at<=?))
+                            ORDER BY rank DESC, eff_families DESC, score DESC LIMIT 100""", (cut, s1, cut, s1)).fetchall()
+        offi = {}
+        if rows:
+            ids = [r["cluster_id"] for r in rows]
+            for x in S.execute(f"SELECT cluster_id, MAX(official) o FROM alerts WHERE cluster_id IN ({','.join('?' * len(ids))}) GROUP BY cluster_id", ids):
+                offi[x["cluster_id"]] = x["o"] or 0
+    finally:
+        if own: S.close()
+    out = []
+    for r in rows:
+        rule = breaking_rule(r, offi.get(r["cluster_id"], 0))
+        if rule: out.append((r, rule, offi.get(r["cluster_id"], 0)))
+    return out
+
+def render_breaking(items, links, at, c=None):
+    """items: item_of() dicts with 'rule'. -> (subject, html, text)."""
+    c = c or cfg(); top = items[0]; addr, _ = _addr(c)
+    subj = f"BREAKING · {BRAND}: R{top['rank']} {_cut(_short(top['title'], 200), 80)}" + (f" (+{len(items) - 1} more)" if len(items) > 1 else "")
+    pre = f"{top['tier']} ({top['rank']}/10): {_short(top['title'], 140)}. {top['confidence']}."
+    B = [f'<tr><td style="padding:14px 16px 4px 16px"><div style="border-left:4px solid #cf1322;background:#2a1215;border-radius:6px;padding:10px 12px;'
+         f'font-size:14px;line-height:1.55;color:#e6e9ee"><b style="color:#ff4d4f;letter-spacing:.6px">BLUF</b> {E(pre)}</div></td></tr>']
+    for it in items: B.append(_item_html(it, links, c))
+    ids = {it["cluster_id"] for it in items}
+    vids = [s_ for s_ in load_stories() if ids & set(s_.get("cluster_ids") or []) and (parse_t(s_.get("publish_at")) or at) <= at][:2]
+    for s_ in vids: B.append(_video_html(s_, c, "breaking"))
+    rules = "; ".join(sorted({f"{it['rule']}: {BREAKING_RULES[it['rule']]}" for it in items if it.get("rule")}))
+    B.append(f'<tr><td style="padding:12px 16px;border-top:1px solid #252b33;font-size:12px;line-height:1.55;color:#8b95a3">'
+             f'<b style="color:#e6e9ee">Why you got this:</b> it met the {BRAND} breaking-alert bar ({E(rules)}). Breaking alerts are rare: at most one every '
+             f'{(c.get("breaking") or {}).get("min_gap_hours", 3)} hours and {(c.get("breaking") or {}).get("max_per_day", 3)} a day. Your regular briefs continue as usual.</td></tr>')
+    why = f"You get breaking alerts because you subscribed to the {BRAND} newsletter. Turn them off under Manage, or unsubscribe below."
+    html_ = _shell(subj, pre, _head_html("⚠ BREAKING ALERT", "#ff4d4f", fmt_et(at), f"Data as of {fmt_et(at)} ({fmt_z(at)})"), B, links, c, why)
+    T = [f"{BRAND} — BREAKING ALERT", fmt_et(at), TAGLINE, "", f"BLUF: {pre}", ""]
+    for i, it in enumerate(items, 1):
+        T.extend(_text_item(it, i)); T.append(f"   Full story & sources: {wire_url(it['cluster_id'], c=c)}")
+        T.append(f"   Follow this story: {follow_links(links.get('_row'), it['cluster_id'], c)['follow']}"); T.append("")
+    T += [f"Why you got this: it met the breaking-alert bar ({rules}).", "--", DISCLAIMER, why,
+          f"{BRAND} · {addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""] + footer_buttons_text(links)
+    return subj, html_, "\n".join(T)
+
+# ------------------------------------------------------------------ launch / video stories (social_stories.json, built by tools/build_social_stories.py)
+def load_stories():
+    """Published-or-scheduled video stories. The site story page (/story/<slug>) is the hub; YouTube and X are supplemental."""
+    try:
+        with open(os.environ.get("NEWSLETTER_STORIES", os.path.join(BASE, "social_stories.json"))) as f: return json.load(f).get("stories", [])
+    except Exception: return []
+def story_url(slug, c=None, utm=None):
+    base = (c or cfg())["base_url"].rstrip("/")
+    return f"{base}/story/{slug}" + (f"?utm_source=newsletter&utm_medium=email&utm_campaign={urllib.parse.quote(utm)}" if utm else "")
+def videos_for(issue, c=None, include_upcoming=False):
+    """Video stories that went public inside this issue's window (or, for previews, the upcoming launch lineup)."""
+    out = []
+    for s in load_stories():
+        t = parse_t(s.get("publish_at"))
+        if not t: continue
+        if (issue["start"] < t <= issue["end"]) or (include_upcoming and t > issue["end"]): out.append(s)
+    return sorted(out, key=lambda s: (s.get("order", 99), s.get("publish_at") or ""))[:int((c or cfg()).get("max_videos") or 4)]
+def _video_html(s, c, camp):
+    base = c["base_url"].rstrip("/"); site = story_url(s["slug"], c, camp)
+    img = f'{base}/social/thumb/{urllib.parse.quote(s["thumb"])}' if s.get("thumb") else None
+    alt = s.get("thumb_alt") or f'Thumbnail: {s["title"]}'
+    btns = f'<a href="{E(site)}" style="{_BTN}">Read &amp; watch on {BRAND}</a>'
+    yt = f'https://www.youtube.com/watch?v={s["youtube_id"]}' if s.get("youtube_id") else (s.get("youtube_url") or "https://www.youtube.com/@blkoutntw")
+    btns += f'<a href="{E(yt)}" style="{_BTN2}">Watch on YouTube</a>'
+    btns += f'<a href="{E(s.get("x_url") or "https://x.com/BLKOUTNTW")}" style="{_BTN2}">Watch on X</a>'
+    pic = (f'<a href="{E(site)}" style="text-decoration:none"><img src="{E(img)}" width="608" alt="{E(alt)}" '
+           f'style="display:block;width:100%;max-width:608px;height:auto;border:0;border-radius:8px;background:#0b0d10;color:#c9d1d9;font-size:13px"></a>') if img else ""
+    return (f'<tr><td style="padding:14px 16px;border-top:1px solid #252b33">{pic}'
+            f'<div style="font-size:16px;line-height:1.35;font-weight:800;margin:10px 0 6px 0"><a href="{E(site)}" style="color:#e6e9ee;text-decoration:none">{E(s["title"])}</a></div>'
+            f'<p style="margin:0 0 4px 0;font-size:14px;line-height:1.55;color:#c9d1d9">{E(s.get("dek") or "")}</p>'
+            f'<div>{btns}</div></td></tr>')
+def _video_text(s, c, camp):
+    T = [f"- {s['title']}", f"  {s.get('dek') or ''}", f"  Read & watch on {BRAND}: {story_url(s['slug'], c, camp)}"]
+    T.append(f"  Watch on YouTube: " + (f"https://www.youtube.com/watch?v={s['youtube_id']}" if s.get("youtube_id") else (s.get("youtube_url") or "https://www.youtube.com/@blkoutntw")))
+    T.append(f"  Watch on X: {s.get('x_url') or 'https://x.com/BLKOUTNTW'}")
+    return T + [""]
 def render_simple(title, paras, button=None, c=None, extra_links=None):
     """Transactional email (confirm / already-subscribed). paras: plain strings. button: (label, url). extra_links: [(label, url)]."""
     c = c or cfg(); addr = (c.get("mailing_address") or "").strip()
@@ -564,17 +950,17 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
            f'<p style="font-size:12px;color:#8b95a3;word-break:break-all">Or paste this link into your browser: {E(button[1])}</p>') if button else ""
     xl = "".join(f'<p style="font-size:12px;margin:0 0 6px 0"><a href="{E(u)}" style="color:#4aa3ff">{E(l)}</a></p>' for l, u in (extra_links or []))
     foot = (f'<p style="font-size:12px;color:#8b95a3;margin-top:18px">{E(DISCLAIMER)}<br>{BRAND} · '
-            + (E(addr) if addr else 'https://blackout.network') + "</p>")
+            + (E(addr) if addr else 'https://BLACKOUT.NETWORK') + "</p>")
     body = "".join(f'<p style="font-size:14px;line-height:1.55;color:#c9d1d9;margin:0 0 10px 0">{E(p)}</p>' for p in paras)
     html_ = ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark light"><title>' + E(title) + '</title></head>'
              '<body style="margin:0;background:#0b0d10"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0b0d10"><tr><td align="center" style="padding:16px 8px">'
              '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#14181d;border:1px solid #252b33;border-radius:10px;'
              'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><tr><td style="padding:20px">'
              '<div style="font-size:18px;font-weight:800;color:#e6e9ee">BLACKOUT.<span style="color:#ff4d4f">NETWORK</span></div>'
-             '<div style="font-size:12px;color:#8b95a3;margin:4px 0 14px 0">Know first. Be ready.</div>' f'<h1 style="font-size:17px;color:#e6e9ee;margin:0 0 10px 0">{E(title)}</h1>'
+             '<div style="font-size:12px;color:#8b95a3;margin:4px 0 14px 0">' + E(TAGLINE) + '</div>' f'<h1 style="font-size:17px;color:#e6e9ee;margin:0 0 10px 0">{E(title)}</h1>'
              + body + btn + xl + foot + '</td></tr></table></td></tr></table></body></html>')
     text = "\n\n".join([f"BLACKOUT.NETWORK — {title}", *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
-                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, f"{BRAND} · {addr or 'https://blackout.network'}"])
+                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, f"{BRAND} · {addr or 'https://BLACKOUT.NETWORK'}"])
     return html_, text
 
 # ------------------------------------------------------------------ MIME + pluggable senders
@@ -670,12 +1056,12 @@ def send_transactional(row, kind):
     """kind: confirm | already. Logged to mail_log. Returns ok."""
     c = cfg(); L = links_for(row, c)
     if kind == "confirm":
-        title = "Confirm your blackout.network newsletter subscription"
+        title = f"Confirm your {BRAND} newsletter subscription"
         paras = [f"Someone (hopefully you) asked to subscribe {row['email']} to the {BRAND} newsletter: {FREQS.get(row['frequency'], 'twice daily').lower()} briefs of the highest-severity, source-verified threats.",
                  f"Click the button to confirm. The link expires in {c['confirm_ttl_hours']} hours. If you didn't ask for this, ignore this email and nothing will be sent."]
         hb, tx = render_simple(title, paras, ("Confirm subscription", L["confirm"]), c=c); unsub = None
     else:
-        title = "You're already subscribed to blackout.network"
+        title = f"You're already subscribed to {BRAND}"
         paras = [f"Someone asked to subscribe {row['email']}, which is already an active subscriber. Nothing was changed.",
                  "To change how often you get the brief or which categories you see, use Manage preferences. To stop, use the unsubscribe link."]
         hb, tx = render_simple(title, paras, ("Manage preferences", L["manage"]), c=c, extra_links=[("Unsubscribe", L["unsubscribe"])]); unsub = L["unsubscribe"]
@@ -772,9 +1158,12 @@ def manage(tok, d):
     freq = d.get("frequency") or r["frequency"]
     if freq not in FREQS: return 400, {"ok": False, "message": "Choose a frequency."}
     ints = _clean_ints(d.get("interests") or ["all"])
-    k = db(); k.execute("UPDATE subscribers SET frequency=?, interests=?, updated=? WHERE id=?", (freq, json.dumps(ints), iso(now()), r["id"])); k.commit(); k.close()
+    brk = _row_get(r, "breaking", 1)
+    if "breaking_present" in d or "breaking" in d:   # checkbox (absent = off) when the form says it rendered one
+        brk = 1 if str(d.get("breaking") or "") in ("1", "on", "true", "True", "yes") else 0
+    k = db(); k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, updated=? WHERE id=?", (freq, json.dumps(ints), int(brk if brk is not None else 1), iso(now()), r["id"])); k.commit(); k.close()
     log(f"subscriber #{r['id']} changed preferences", "sub")
-    return 200, {"ok": True, "message": f"Saved: {FREQS[freq].lower()}, {'all categories' if ints == ['all'] else ', '.join(ints)}."}
+    return 200, {"ok": True, "message": f"Saved: {FREQS[freq].lower()}, {'all categories' if ints == ['all'] else ', '.join(ints)}, breaking alerts {'on' if brk else 'off'}."}
 
 def add_category(tok, cat):
     """'Add this category' on the Find new sources page. Same signed manage token; frequency is left alone."""
@@ -873,22 +1262,61 @@ def next_slots(at=None, n=4, c=None):
             if t > at: out.append({"key": slot_key(day, s), "slot": s, "time": iso(t), "time_et": fmt_et(t)})
     return sorted(out, key=lambda x: x["time"])[:n]
 
+def audience_path(c=None):
+    """Where the real subscriber list lives. Signups, confirmations, unsubscribes and Follow clicks happen on the public node (Render owns
+    newsletter.db there); the box mirrors it to render_mirror/newsletter.db every sync cycle. Live issue sending on the box reads that
+    mirror (read-only). While issue sending is locked (preview), the box's own newsletter.db is used, so no outbox spam for real people."""
+    c = c or cfg()
+    p = (c.get("audience_db") or "").strip() or os.environ.get("NEWSLETTER_AUDIENCE_DB", "")
+    if p: return p
+    m = os.path.join(BASE, "render_mirror", "newsletter.db")
+    if not os.environ.get("BN_WEB_ONLY") and os.path.exists(m) and sender_status("issue")["mode"] != "preview": return m
+    return P["db"]
+
+def audience(c=None):
+    """{id: active subscriber dict + 'follows' (active followed cluster ids) + 'last_sent_at' from this node's send ledger}."""
+    p = audience_path(c); local = os.path.abspath(p) == os.path.abspath(P["db"])
+    if local: k = db()
+    else: k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=15); k.row_factory = sqlite3.Row
+    try:
+        subs = {r["id"]: dict(r) for r in k.execute("SELECT * FROM subscribers WHERE status='active'")}
+        try:
+            for f in k.execute("SELECT subscriber_id, cluster_id FROM follows WHERE active=1"):
+                if f[0] in subs: subs[f[0]].setdefault("follows", []).append(f[1])
+        except sqlite3.OperationalError: pass     # a mirror taken before the follows table existed
+    finally: k.close()
+    L = db()
+    try:
+        for s in subs.values():
+            s.setdefault("follows", []); s["breaking"] = 1 if s.get("breaking") is None else int(s["breaking"])
+            r = L.execute("""SELECT MAX(r.slot_time) FROM sends s JOIN slot_runs r ON r.slot_key=s.slot_key
+                             WHERE s.subscriber_id=? AND s.status='sent'""", (s["id"],)).fetchone()[0]
+            s["last_sent_at"] = max([x for x in (s.get("last_sent_at"), r) if x] or [None], key=lambda x: x or "")
+    finally: L.close()
+    return subs
+
+def record_sent(k, send_id, sid, issue_or_items, at, kind=None):
+    """Remember what went to this subscriber (cluster, rank, title) so later editions only repeat it as an UPDATE."""
+    secs = issue_or_items if isinstance(issue_or_items, list) else [it for s in ("follow", "main", "updates", "politics", "notable", "watchlist") for it in issue_or_items.get(s, [])]
+    for it in secs:
+        k.execute("INSERT INTO sent_items(send_id,subscriber_id,cluster_id,title_norm,section,sent_at,rank,n_items,eff,fams,kind) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                  (send_id, sid, it["cluster_id"], it["title_norm"], it["section"], iso(at), it["rank"], it.get("n_items"), it["eff"],
+                   json.dumps(it["families"][:20]), kind or ("update" if it.get("update") else "new")))
+
 def _send_one(k, srow, sub, key, slot, at, c):
     """Build + deliver one issue. Caller holds the 'sending' claim on srow."""
     issue = build_issue(dict(sub), at=at, slot=slot, c=c)
     if issue["empty"]:   # never send an empty email
         k.execute("UPDATE sends SET status='skipped_empty', sent_at=? WHERE id=?", (iso(now()), srow["id"])); k.commit(); return "skipped"
-    L = links_for(sub, c); subj, hb, tx = render(issue, L, c)
+    L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
     msg = build_mime(sub["email"], subj, hb, tx, L["unsubscribe"], "issue", c)
     ok, mode, f, err = deliver(msg, "issue", sub["id"])
     t = iso(now())
     if ok:
         k.execute("""UPDATE sends SET status='sent', sent_at=?, mode=?, outbox_file=?, subject=?, n_main=?, n_notable=?, n_watch=?, quiet=?, error=NULL,
-                     attempts=attempts+1 WHERE id=?""", (t, mode, f, subj, len(issue["main"]), len(issue["notable"]), len(issue["watchlist"]), int(issue["quiet"]), srow["id"]))
-        for sec in ("main", "notable", "watchlist"):
-            for it in issue[sec]:
-                k.execute("INSERT INTO sent_items(send_id,subscriber_id,cluster_id,title_norm,section,sent_at) VALUES(?,?,?,?,?,?)",
-                          (srow["id"], sub["id"], it["cluster_id"], it["title_norm"], sec, iso(at)))
+                     attempts=attempts+1 WHERE id=?""", (t, mode, f, subj, len(issue["main"]) + len(issue["updates"]) + len(issue["follow"]) + len(issue["politics"]), len(issue["notable"]),
+                                                       len(issue["watchlist"]), int(issue["quiet"]), srow["id"]))
+        record_sent(k, srow["id"], sub["id"], issue, at)
         k.execute("UPDATE subscribers SET last_sent_at=? WHERE id=?", (iso(at), sub["id"]))
         k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject) VALUES(?,?,?,?,?,?,?)", (t, "issue", sub["id"], mode, "sent", f, subj))
         k.commit(); return "sent"
@@ -901,8 +1329,9 @@ def _send_one(k, srow, sub, key, slot, at, c):
 def run_slot(key, slot, at, c):
     k = db()
     try:
-        for s in k.execute("SELECT * FROM subscribers WHERE status='active' AND confirmed_at<=?", (iso(at),)).fetchall():
-            if eligible(s["frequency"], slot, c):
+        aud = audience(c)
+        for s in aud.values():
+            if (s.get("confirmed_at") or "9") <= iso(at) and eligible(s["frequency"], slot, c):
                 k.execute("INSERT OR IGNORE INTO sends(subscriber_id,slot_key,status,created) VALUES(?,?,?,?)", (s["id"], key, "queued", iso(now())))
         k.commit()
         # a send claimed but never finished (worker killed mid-send) is never retried, so a restart can't cause a duplicate
@@ -913,7 +1342,7 @@ def run_slot(key, slot, at, c):
         for srow in due:
             cur = k.execute("UPDATE sends SET status='sending', next_retry=? WHERE id=? AND status IN ('queued','failed')", (iso(now()), srow["id"])); k.commit()
             if cur.rowcount != 1: continue
-            sub = k.execute("SELECT * FROM subscribers WHERE id=?", (srow["subscriber_id"],)).fetchone()
+            sub = aud.get(srow["subscriber_id"])
             if not sub or sub["status"] != "active":
                 k.execute("UPDATE sends SET status='skipped_inactive' WHERE id=?", (srow["id"],)); k.commit(); continue
             try: _send_one(k, k.execute("SELECT * FROM sends WHERE id=?", (srow["id"],)).fetchone(), sub, key, slot, at, c)
@@ -930,10 +1359,83 @@ def run_slot(key, slot, at, c):
         k.commit(); return status, agg
     finally: k.close()
 
+def run_breaking(at=None, c=None, dry_run=False):
+    """Check the breaking-alert trigger and send (or, while issue sending is locked, record + write one outbox preview). Rate-limited.
+    -> list of (key, status). dry_run=True evaluates only: nothing is written."""
+    c = c or cfg(); at = at or now(); b = c.get("breaking") or {}
+    if not b.get("enabled", True) or c.get("paused"): return []
+    cands = breaking_candidates(at, c)
+    k = db()
+    try:
+        seen = {r["cluster_id"]: r for r in k.execute("SELECT * FROM breaking_seen")}
+        fresh = [(r, rule, o) for r, rule, o in cands if r["cluster_id"] not in seen
+                 or (int(r["rank"] or 0) >= 9 and int(seen[r["cluster_id"]]["rank"] or 0) < 9)]   # escalation into rank 9+ may alert again
+        if not fresh: return []
+        if dry_run: return [(f"breaking:dry:{r['cluster_id']}", rule) for r, rule, o in fresh]
+        runs = [parse_t(x[0]) for x in k.execute("SELECT ts FROM breaking_runs WHERE status IN ('sent','locked','running','done') AND ts>=?",
+                                                 (iso(at - timedelta(hours=24)),))]
+        lastr = max([x for x in runs if x] or [None], key=lambda x: x or datetime.min.replace(tzinfo=UTC))
+        limited = (lastr and at - lastr < timedelta(hours=float(b.get("min_gap_hours", 3)))) or len(runs) >= int(b.get("max_per_day", 3))
+        if limited:
+            for r, rule, o in fresh:
+                k.execute("INSERT OR REPLACE INTO breaking_seen(cluster_id,ts,rank,rule,status,run_id) VALUES(?,?,?,?,?,NULL)",
+                          (r["cluster_id"], iso(at), int(r["rank"] or 0), rule, "held"))
+            k.commit(); log(f"breaking: {len(fresh)} qualifying stor(ies) held by the rate limit; they lead the next brief", "breaking")
+            return [("breaking:held", len(fresh))]
+        take = fresh[:int(b.get("max_items", 3))]
+        items = []
+        for r, rule, o in take:
+            it = item_of(r, "main", o); it["rule"] = rule; it["breaking"] = True; items.append(it)
+        mode = sender_status("issue")["mode"]
+        status = "locked" if mode == "preview" else "running"
+        note = "issue sending is locked (preview): one outbox preview written, no email sent" if status == "locked" else ""
+        cur = k.execute("INSERT INTO breaking_runs(ts,cluster_ids,status,mode,note) VALUES(?,?,?,?,?)", (iso(at), json.dumps([i["cluster_id"] for i in items]), status, mode, note))
+        run_id = cur.lastrowid
+        for it in items:
+            k.execute("INSERT OR REPLACE INTO breaking_seen(cluster_id,ts,rank,rule,status,run_id) VALUES(?,?,?,?,?,?)", (it["cluster_id"], iso(at), it["rank"], it["rule"], status, run_id))
+        k.commit()
+    finally: k.close()
+    base = c["base_url"].rstrip("/")
+    if status == "locked":
+        L = {"unsubscribe": f"{base}/newsletter", "manage": f"{base}/newsletter", "categories": f"{base}/newsletter", "sources": f"{base}/sources",
+             "scoring": f"{base}/scoring", "site": f"{base}/#wire", "_row": None}
+        subj, hb, tx = render_breaking(items, L, at, c)
+        f = _outbox_write(build_mime("preview@blackout.invalid", subj, hb, tx, None, "breaking", c), "breaking_preview", run_id)
+        log(f"breaking run #{run_id} ({', '.join(i['cluster_id'] + ' ' + i['rule'] for i in items)}): LOCKED, preview -> newsletter_outbox/{f}", "breaking")
+        return [(f"breaking:{run_id}", "locked")]
+    key = f"breaking:{run_id}"; n_sent = n_t = 0
+    k = db()
+    try:
+        aud = audience(c)
+        for s in aud.values():
+            if not s.get("breaking", 1): continue
+            try: ints = set(json.loads(s.get("interests") or '["all"]'))
+            except Exception: ints = {"all"}
+            mine = [i for i in items if "all" in ints or not ints or i["category"] in ints or i["cluster_id"] in (s.get("follows") or [])]
+            if not mine: continue
+            cur = k.execute("INSERT OR IGNORE INTO sends(subscriber_id,slot_key,status,created) VALUES(?,?,?,?)", (s["id"], key, "sending", iso(now()))); k.commit()
+            if cur.rowcount != 1: continue
+            n_t += 1; srow_id = k.execute("SELECT id FROM sends WHERE subscriber_id=? AND slot_key=?", (s["id"], key)).fetchone()[0]
+            for i in mine: i["followed"] = i["cluster_id"] in (s.get("follows") or [])
+            L = links_for(s, c); L["_row"] = s
+            subj, hb, tx = render_breaking(mine, L, at, c)
+            ok, mode, f, err = deliver(build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c), "issue", s["id"])
+            k.execute("UPDATE sends SET status=?, sent_at=?, mode=?, outbox_file=?, subject=?, n_main=?, error=?, attempts=1 WHERE id=?",
+                      ("sent" if ok else "gave_up", iso(now()), mode, f, subj, len(mine), err, srow_id))
+            if ok: record_sent(k, srow_id, s["id"], mine, at, "breaking"); n_sent += 1
+            k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject,error) VALUES(?,?,?,?,?,?,?,?)",
+                      (iso(now()), "breaking", s["id"], mode, "sent" if ok else "failed", f, subj, err))
+            k.commit()
+        k.execute("UPDATE breaking_runs SET status='done', n_targets=?, n_sent=? WHERE id=?", (n_t, n_sent, run_id)); k.commit()
+    finally: k.close()
+    log(f"breaking run #{run_id}: sent {n_sent}/{n_t}", "breaking")
+    return [(key, "done")]
+
 def run_due(at=None):
     """Called every ~30 s by newsletter_worker.py. Idempotent per slot: the slot_runs row is written before anything is sent and each
     (subscriber, slot) pair is UNIQUE in sends, so restarts never double-send. Catch-up: a slot missed while the box was down is sent
-    once if we're within catchup_hours (2 h) of it, otherwise recorded as skipped. Failed sends retry with backoff (2, 10, 30 min)."""
+    once if we're within catchup_hours (2 h) of it, otherwise recorded as skipped. Failed sends retry with backoff (2, 10, 30 min).
+    Then checks the breaking-alert trigger (run_breaking)."""
     c = cfg(); at = at or now(); res = []
     with _LOCK:
         d0 = at.astimezone(ET).date()
@@ -961,6 +1463,8 @@ def run_due(at=None):
                     k.close()
                 st, agg = run_slot(key, s, at if r is None else max(parse_t(r["started"]) or at, t), c)
                 res.append((key, st))
+        try: res += run_breaking(at, c)
+        except Exception as ex: traceback.print_exc(); log(f"breaking check failed: {ex}", "error")
     return res
 
 def cleanup_outbox(days=None):
@@ -970,7 +1474,8 @@ def cleanup_outbox(days=None):
         if f.startswith("sample_issue"): continue
         p = os.path.join(P["outbox"], f)
         if os.path.isfile(p) and os.path.getmtime(p) < cut: os.remove(p); n += 1
-    k = db(); k.execute("DELETE FROM sent_items WHERE sent_at<?", (iso(now() - timedelta(days=7)),)); k.commit(); k.close()
+    keep = float(cfg().get("dedupe_days") or 14) + 1
+    k = db(); k.execute("DELETE FROM sent_items WHERE sent_at<?", (iso(now() - timedelta(days=keep)),)); k.commit(); k.close()
     return n
 
 # ------------------------------------------------------------------ background worker (separate light process, launched like streams_worker)
@@ -1023,7 +1528,7 @@ def preview_issue(at=None, c=None):
     issue = build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=at, since=since, slot=nxt["slot"], c=c)
     base = c["base_url"].rstrip("/")
     L = {"unsubscribe": f"{base}/newsletter", "manage": f"{base}/newsletter", "categories": f"{base}/newsletter", "sources": f"{base}/sources",
-         "scoring": f"{base}/scoring", "site": f"{base}/#wire"}
+         "scoring": f"{base}/scoring", "site": f"{base}/#wire", "_row": None}
     subj, hb, tx = render(issue, L, c)
     return issue, subj, hb, tx, nxt
 
@@ -1114,6 +1619,7 @@ def admin_action(d):
                 r = k.execute("SELECT * FROM subscribers WHERE email=?", (em,)).fetchone()
             if not r: return 404, {"ok": False, "message": "No subscriber with that address or id."}
             k.execute("DELETE FROM sent_items WHERE subscriber_id=?", (r["id"],)); k.execute("DELETE FROM sends WHERE subscriber_id=?", (r["id"],))
+            k.execute("DELETE FROM follows WHERE subscriber_id=?", (r["id"],))
             k.execute("UPDATE mail_log SET subscriber_id=NULL WHERE subscriber_id=?", (r["id"],))
             k.execute("DELETE FROM attempts WHERE k=?", (h("em:" + r["email"]),))
             k.execute("DELETE FROM subscribers WHERE id=?", (r["id"],)); k.commit()
@@ -1149,6 +1655,47 @@ def admin_action(d):
         return 200, {"ok": True}
     return 400, {"error": "unknown action"}
 
+# ------------------------------------------------------------------ Follow this story (one click, signed token, no login)
+def _story_title(cid):
+    try:
+        S = src(); r = S.execute("SELECT title FROM clusters WHERE cluster_id=?", (cid,)).fetchone(); S.close()
+        return re.sub(r"\s+", " ", r[0]).strip() if r and r[0] else None
+    except Exception: return None
+
+def follow(tok, on=True):
+    """-> (ok|invalid|inactive|limit, row, cluster_id, title). Idempotent. The token names one subscriber + one story cluster."""
+    purpose = "follow" if on else "unfollow"
+    st, p = read_token(tok, purpose)
+    if st == "invalid" or not p: return "invalid", None, None, None
+    cid = str(p.get("c") or "")
+    if not re.match(r"^[0-9a-f]{8,40}$", cid): return "invalid", None, None, None
+    k = db()
+    try:
+        r = k.execute("SELECT * FROM subscribers WHERE id=?", (int(p.get("s", 0)),)).fetchone()
+        if not r or h(r["email"], 12) != p.get("x"): return "invalid", None, cid, None
+        if on and r["status"] != "active": return "inactive", r, cid, None
+        title = _story_title(cid); t = iso(now())
+        if on:
+            n = k.execute("SELECT COUNT(*) FROM follows WHERE subscriber_id=? AND active=1", (r["id"],)).fetchone()[0]
+            cur = k.execute("SELECT active FROM follows WHERE subscriber_id=? AND cluster_id=?", (r["id"], cid)).fetchone()
+            if not (cur and cur[0]) and n >= int(cfg().get("follow_max") or 50): return "limit", r, cid, title
+            k.execute("""INSERT INTO follows(subscriber_id,cluster_id,title,created,active) VALUES(?,?,?,?,1)
+                         ON CONFLICT(subscriber_id,cluster_id) DO UPDATE SET active=1, unfollowed_at=NULL, title=COALESCE(excluded.title, follows.title)""",
+                      (r["id"], cid, title, t))
+        else:
+            k.execute("UPDATE follows SET active=0, unfollowed_at=? WHERE subscriber_id=? AND cluster_id=?", (t, r["id"], cid))
+            if not title:
+                x = k.execute("SELECT title FROM follows WHERE subscriber_id=? AND cluster_id=?", (r["id"], cid)).fetchone(); title = x[0] if x else None
+        k.commit()
+    finally: k.close()
+    log(f"subscriber #{r['id']} {'followed' if on else 'unfollowed'} story {cid}", "follow")
+    return "ok", r, cid, title
+
+def follows_of(sid):
+    k = db()
+    try: return [dict(x) for x in k.execute("SELECT cluster_id, title, created FROM follows WHERE subscriber_id=? AND active=1 ORDER BY created DESC", (sid,))]
+    finally: k.close()
+
 # ------------------------------------------------------------------ HTML pages
 def page(title, body, robots="noindex"):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -1180,10 +1727,12 @@ def form_html(mode="page"):
 
 def signup_page():
     rmin, smin = main_rule()
-    body = ('<section class="nl-card"><h2>✉ The blackout.network brief, in your inbox</h2>'
+    body = ('<section class="nl-card"><h2>✉ The BLACKOUT.NETWORK brief, in your inbox</h2>'
             '<p class="nl-lede">Once or twice a day: the highest-severity threats that cleared the main-feed bar, each as a one-paragraph brief '
             '(what happened, where, when, how well it\'s confirmed, and the raw source link so you can verify it yourself), plus a short watchlist '
-            'of unconfirmed single-source reports. Nothing is repeated within 12 hours. Quiet windows get a short "nothing qualified" note, never filler.</p>'
+            'of unconfirmed single-source reports. Every story opens with a bottom line up front and links to its own page on BLACKOUT.NETWORK, '
+            'where you can open every original source. A story you already got is never repeated: when it develops, you get only what is new, '
+            'marked UPDATE. Tap <b>Follow this story</b> on any item to get its updates. Quiet windows get a short "nothing qualified" note, never filler.</p>'
             '<div id="nl_app" data-mode="page">' + form_html("page") + '</div>'
             '<p class="nl-sm"><a href="/newsletter/sample" target="_blank" rel="noopener">See a sample issue built from live data →</a></p></section>'
             '<section class="nl-card nl-faq"><h3>How it works</h3><ul>'
@@ -1192,6 +1741,9 @@ def signup_page():
             'If fewer than 3 qualify, up to 3 "Also notable" items (confirmed rank 5–6, or a high rank from one official source) are added and labeled. '
             'See <a href="/scoring">How we score</a>.</li>'
             '<li><b>Watchlist.</b> Up to 5 low-confidence, single-source reports, each clearly labeled UNCONFIRMED.</li>'
+            '<li><b>Breaking alerts.</b> Rare emergency emails for truly major events only, such as the outbreak of a war, a novel pathogen or a rank 9–10 event, '
+            'at most one every 3 hours. You can turn them off on the manage page.</li>'
+            '<li><b>Follow this story.</b> One click in any email, no login. Updates on that story then lead your next brief until you unfollow.</li>'
             '<li><b>Times.</b> Morning and evening briefs go out at the times shown on the form, Eastern Time.</li>'
             '<li><b>Leaving.</b> Every email has a one-click unsubscribe link and a manage-preferences link. No account or login.</li>'
             f'<li><b>Privacy.</b> {E(PRIVACY)} Your address is never sold, shared or shown publicly.</li></ul></section>'
@@ -1211,7 +1763,10 @@ def prefs_form(tok, r):
                 f'<label class="nl-radio"><input type="radio" name="frequency" value="{k}"{" checked" if r["frequency"] == k else ""}> {E(v)}</label>' for k, v in FREQS.items()) + '</fieldset>'
             '<fieldset><legend>Categories</legend><div class="nl-cats">' +
             "".join(f'<label class="nl-chk"><input type="checkbox" name="interests" value="{E(x)}"{" checked" if allc or x in ints else ""}> {E(x)}</label>' for x in CATEGORIES) +
-            '</div><p class="nl-sm">Leave all ticked (or none) to get every category.</p></fieldset><button class="pri" type="submit">Save preferences</button> '
+            '</div><p class="nl-sm">Leave all ticked (or none) to get every category.</p></fieldset>'
+            '<fieldset><legend>Breaking alerts</legend><input type="hidden" name="breaking_present" value="1">'
+            f'<label class="nl-chk"><input type="checkbox" name="breaking" value="1"{" checked" if _row_get(r, "breaking", 1) else ""}> Send me rare breaking alerts for truly major events (at most one every 3 hours)</label></fieldset>'
+            '<button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')
 
 def _src_li(p):
@@ -1226,7 +1781,7 @@ def sources_body(tok, r):
     S = suggestions(r); mt = E(tok)
     head = ('<section class="nl-card"><h2>Find new sources</h2>'
             f'<p>Picked for <b>{E(mask_email(r["email"]))}</b> from the categories you get: <b>{"all categories" if S["all"] else E(", ".join(S["have"]))}</b>. '
-            'Every suggestion links to the real source. They come from the blackout.network <a href="/sources">Sources catalog</a> (rated 7/10 or higher) '
+            'Every suggestion links to the real source. They come from the BLACKOUT.NETWORK <a href="/sources">Sources catalog</a> (rated 7/10 or higher) '
             'and its global directory of published registries.</p>'
             f'<p><a class="nl-btn" href="/newsletter/manage?token={mt}">Manage my subscription categories</a></p></section>')
     out = [head]
@@ -1250,6 +1805,14 @@ def sources_body(tok, r):
     out.append('<p class="nl-sm"><a href="/sources">Browse all sources</a> · <a href="/sources#sources">Search the global directory</a></p>'
                '<script src="/api/newsletter/app.js"></script>')
     return "".join(out)
+
+def _follows_card(r):
+    fs = follows_of(r["id"])
+    if not fs: return ('<section class="nl-card"><h3>Stories you follow</h3><p class="nl-sm">None yet. Tap <b>Follow this story</b> under any item in a brief '
+                       'to get its updates.</p></section>')
+    li = "".join(f'<li><a href="/wire/{E(f["cluster_id"])}">{E(_cut(f["title"] or f["cluster_id"], 140))}</a> · '
+                 f'<a class="nl-sm" href="{E(follow_links(r, f["cluster_id"])["unfollow"])}">Unfollow</a></li>' for f in fs)
+    return f'<section class="nl-card"><h3>Stories you follow ({len(fs)})</h3><ul class="nl-srclist">{li}</ul></section>'
 
 def handle_get(path, qs):
     if "/admin" in path: return 404, {"error": "not found"}   # admin is not part of the public node
@@ -1292,6 +1855,25 @@ def handle_get(path, qs):
                     '<button type="submit" class="nl-btn-ghost">Unsubscribed by mistake? Resubscribe</button></form>') if (r is not None and r["confirmed_at"]) else ""
             return 200, result_page("You're unsubscribed", "You won't get any more newsletter emails at this address. No login needed, and opening this link again changes nothing.", True, undo), "text/html"
         return 400, result_page("Link not valid", "This unsubscribe link is invalid or was altered. Use the unsubscribe link from your most recent email.", False), "text/html"
+    if path in ("/newsletter/follow", "/newsletter/unfollow"):
+        on = path.endswith("/follow"); tok = q1("token"); st, r, cid, title = follow(tok, on)
+        story = f'/wire/{E(cid)}' if cid else "/#wire"; tl = E(title or "this story")
+        if st == "ok" and on:
+            fl = follow_links(r, cid)
+            return 200, result_page("You're following this story", f"Following: {title or 'this story'}. Updates (new independent sources, rank changes) will lead your "
+                                    "next brief until you unfollow. No login needed.", True,
+                                    f'<p><a class="nl-btn" href="{story}">Open the story</a> <a href="{E(fl["unfollow"])}">Unfollow</a></p>'), "text/html"
+        if st == "ok":
+            fl = follow_links(r, cid)
+            return 200, result_page("Unfollowed", f"You won't get separate updates on: {title or 'this story'}. Your regular brief continues.", True,
+                                    f'<p><a class="nl-btn" href="{story}">Open the story</a> <a href="{E(fl["follow"])}">Follow again</a></p>'), "text/html"
+        if st == "inactive":
+            return 200, result_page("Not currently subscribed", "This address isn't receiving the newsletter, so there is nothing to follow with. Sign up again first.", False,
+                                    '<p><a class="nl-btn" href="/newsletter">Sign up</a></p>'), "text/html"
+        if st == "limit":
+            return 200, result_page("Too many followed stories", f"You already follow {cfg().get('follow_max', 50)} stories. Unfollow some on your manage page first.", False), "text/html"
+        return 400, result_page("Link not valid", "This follow link is invalid or was altered. Use the link in your latest email.", False,
+                                f'<p><a class="nl-btn" href="{story}">Open the story</a></p>'), "text/html"
     if path == "/newsletter/manage":
         tok = q1("token"); st, r = token_sub(tok, "manage")
         if st != "ok" or r is None:
@@ -1305,7 +1887,7 @@ def handle_get(path, qs):
                 f'<section class="nl-card"><h3>Find new sources</h3><p>See top-rated sources and registries for the categories you follow, plus categories you could add.</p>'
                 f'<p><a class="nl-btn" href="/newsletter/sources?token={E(tok)}">Find new sources</a></p>'
                 f'<p class="nl-sm"><a href="/newsletter/unsubscribe?token={E(sub_token("unsub", r))}">Unsubscribe instead</a></p></section>'
-                '<script src="/api/newsletter/app.js"></script>')
+                + _follows_card(r) + '<script src="/api/newsletter/app.js"></script>')
         return 200, page("Subscription categories", body), "text/html"
     if path == "/newsletter/sources":
         tok = q1("token"); st, r = token_sub(tok, "manage")
