@@ -110,6 +110,14 @@ def bo_cfg():
         with open(P["bo_cfg"]) as f: return json.load(f)
     except Exception: return {}
 
+def watchlist_enabled(c=None):
+    """CoS Nov 1: the UNCONFIRMED watchlist is OFF in every subscriber email (brief, sample/preview) until a reviewed filter exists.
+    Env NEWSLETTER_WATCHLIST_ENABLED (1/true/yes/on) wins; otherwise newsletter_config.json "watchlist_enabled"; default False.
+    The site's own watchlist pages are not affected. Breaking, trending and crime alerts never carry a watchlist."""
+    v = (os.environ.get("NEWSLETTER_WATCHLIST_ENABLED") or "").strip().lower()
+    if v: return v in ("1", "true", "yes", "on")
+    return bool((c or cfg()).get("watchlist_enabled", False))
+
 def main_rule(c=None):
     c = c or cfg(); b = bo_cfg()
     r = c.get("main_min_rank") if c.get("main_min_rank") is not None else b.get("push_min_rank", 7)
@@ -659,7 +667,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
             if r["cluster_id"] in used: continue
             ok = (ef >= 2) or (rk >= rmin and offi.get(r["cluster_id"]))   # confirmed rank 5-6, or a rank-7+ item from one official source
             if ok and take(r): notable.append(item_of(r, "notable", offi.get(r["cluster_id"], 0)))
-    for r in wrows:
+    for r in (wrows if watchlist_enabled(c) else []):
         if len(watch) >= int(c["max_watchlist"]): break
         if take(r): watch.append(item_of(r, "watchlist"))
     politics = [x for x in main + notable if x["category"] == "political"]
@@ -2158,8 +2166,8 @@ def signup_page():
     rmin, smin = main_rule()
     body = ('<section class="nl-card"><h2>✉ The BLACKOUT.NETWORK brief, in your inbox</h2>'
             '<p class="nl-lede">Once or twice a day: the highest-severity threats that cleared the main-feed bar, each as a one-paragraph brief '
-            '(what happened, where, when, how well it\'s confirmed, and the raw source link so you can verify it yourself), plus a short watchlist '
-            'of unconfirmed single-source reports. Every story opens with a bottom line up front and links to its own page on BLACKOUT.NETWORK, '
+            '(what happened, where, when, how well it\'s confirmed, and the raw source link so you can verify it yourself)'
+            + (', plus a short watchlist of unconfirmed single-source reports' if watchlist_enabled() else '') + '. Every story opens with a bottom line up front and links to its own page on BLACKOUT.NETWORK, '
             'where you can open every original source. A story you already got is never repeated: when it develops, you get only what is new, '
             'marked UPDATE. Tap <b>Follow this story</b> on any item to get its updates. Quiet windows get a short "nothing qualified" note, never filler.</p>'
             '<div id="nl_app" data-mode="page">' + form_html("page") + '</div>'
@@ -2169,7 +2177,7 @@ def signup_page():
             f'<li><b>What makes the main feed.</b> Rank {rmin}+ items confirmed by {smin}+ independent sources (the same bar as instant alerts). '
             'If fewer than 3 qualify, up to 3 "Also notable" items (confirmed rank 5–6, or a high rank from one official source) are added and labeled. '
             'See <a href="/scoring">How we score</a>.</li>'
-            '<li><b>Watchlist.</b> Up to 5 low-confidence, single-source reports, each clearly labeled UNCONFIRMED.</li>'
+            + ('<li><b>Watchlist.</b> Up to 5 low-confidence, single-source reports, each clearly labeled UNCONFIRMED.</li>' if watchlist_enabled() else '') +
             '<li><b>Breaking alerts.</b> Rare emergency emails for truly major events only, such as the outbreak of a war, a novel pathogen or a rank 9–10 event, '
             f'at most one every {(cfg().get("breaking") or {}).get("min_gap_hours", 3)} hours. You can turn them off on the manage page.</li>'
             '<li><b>Follow this story.</b> One click in any email, no login. Updates on that story then lead your next brief until you unfollow.</li>'
