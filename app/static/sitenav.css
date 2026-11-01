@@ -242,3 +242,11 @@ body .bn-logo svg.bn-icon{width:var(--bn-icon)!important;height:var(--bn-icon)!i
 :root[data-theme="light"] .disc{background:var(--bn-surface-0);color:var(--bn-text-2)}
 /* t333: caps domain (BLACKOUT.NETWORK, small caps) is wider than the old lower-case word: cap it on phones so it never clips */
 .bn-logo .bn-word{font-size:min(var(--bn-logo-size),3.4vw)}
+:root[data-theme="light"] .sc-chip.cat.cc,:root[data-theme="light"] li.cc{color:color-mix(in srgb,var(--cc) 50%,#000)}
+:root[data-theme="light"] .sc-r.b-na{color:#fff}
+:root[data-theme="light"] .nl-lede,:root[data-theme="light"] .nl-lede b{color:var(--bn-text-2)}
+/* rank swatches on /scoring: dark numerals on the light green/yellow/orange ranks (both themes) */
+[style*="background:#52c41a"],[style*="background:#a0d911"],[style*="background:#fadb14"],[style*="background:#faad14"],[style*="background:#fa8c16"]{color:#0B0D10!important}
+#sq_top,#sq_top .sq-tw{min-width:0;max-width:100%}
+:root[data-theme="light"] #sq_top .sq-tb tr.nom td{background:#fff6e0}
+:root[data-theme="light"] #sq_top .sq-tb tr.sig td{background:#fdeeee}
