@@ -609,7 +609,7 @@ def feed_xml(qs):
     code, d = summary(qs)
     esc = lambda s: html.escape(str(s or ""), quote=True)
     out = ['<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>blackout.network — Intel Streams</title><link>https://blackout.network/#intel</link>'
-           '<description>Research, leaks, patents, M&amp;A and markets. Know first. Be ready.</description>']
+           '<description>Research, leaks, patents, M&amp;A and markets.</description>']
     for x in d.get("items", [])[:150]:
         try: pd = datetime.fromisoformat(x["time"].replace("Z", "+00:00")).strftime("%a, %d %b %Y %H:%M:%S +0000")
         except Exception: pd = ""

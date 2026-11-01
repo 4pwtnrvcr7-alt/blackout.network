@@ -40,7 +40,7 @@
    '<rect x="14" y="74" width="20" height="8" rx="1" fill="#2BB673"/><rect x="38" y="74" width="20" height="8" rx="1" fill="#F5A524"/><rect x="62" y="74" width="20" height="8" rx="1" fill="#FF4D4F"/>';
   f.insertBefore(t,f.firstChild);var n=0,tm=0;t.addEventListener("click",function(){n++;clearTimeout(tm);tm=setTimeout(function(){n=0},2500);if(n>=7){n=0;if(!busy())card("<b>Ask better questions.</b>Who says so? How do they know? What would change your mind? Every alert on this site links to its sources, so you can check.",12000)}})}
  // 3. console greeting
- try{console.log("%cBLACKOUT.NETWORK%c  Ask better questions.\nEvery rank is explained at "+location.origin+"/scoring \u2014 and every alert links to its sources.","font:800 14px Montserrat,system-ui,sans-serif;color:#FF4D4F","font:500 12px Inter,system-ui,sans-serif;color:inherit")}catch(e){}
+ try{console.log("%cBLACKOUT.NETWORK%c  Signal over noise.\nEvery rank is explained at "+location.origin+"/scoring \u2014 and every alert links to its sources.","font:800 14px Montserrat,system-ui,sans-serif;color:#FF4D4F","font:500 12px Inter,system-ui,sans-serif;color:inherit")}catch(e){}
  // 5. seasonal shimmer (one per day, once)
  function seasonal(){var t=new Date(),m=t.getMonth()+1,day=t.getDate(),key="bn_season_"+t.toISOString().slice(0,10);
   var hit=(m===1&&day===1)||(m===3&&day===20)||(m===6&&day===21)||(m===9&&day===22)||(m===12&&day===21);if(!hit||RM)return;

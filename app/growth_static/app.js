@@ -43,7 +43,7 @@ function enhanceFeed(root){if(!root)return;var cards=root.querySelectorAll(":sco
  cards.forEach(function(c,i){if((i+1)%10===0&&i+1<cards.length&&n<6){c.after(ctaCard(n++))}})}
 function footer(){if(document.getElementById("bng_follow"))return;var f=document.getElementById("site_foot")||document.querySelector("footer.ft")||document.querySelector("footer");if(!f)return;
  var s=document.createElement("section");s.id="bng_follow";s.className="bng-foot";s.setAttribute("aria-labelledby","bng_follow_h");
- s.innerHTML='<h2 id="bng_follow_h">Follow BLACKOUT.NETWORK</h2><p>Ask better questions. Ranked, sourced alerts on the site, in your inbox, on X and on YouTube. Our full address is <b>blackout.network</b>, no .com.</p><div class="bng-btns">'+btns("footer")+'</div>';
+ s.innerHTML='<h2 id="bng_follow_h">Follow BLACKOUT.NETWORK</h2><p>Signal over noise. Ranked, sourced alerts on the site, in your inbox, on X and on YouTube. Our full address is <b>blackout.network</b>, no .com.</p><div class="bng-btns">'+btns("footer")+'</div>';
  f.parentNode.insertBefore(s,f)}
 function thanks(el){if(!el||el.dataset.bngThanks)return;el.dataset.bngThanks=1;var d=document.createElement("div");d.className="bng-thanks";
  d.innerHTML='<b>One more step to stay ahead:</b> follow along where the stories break first.<div class="bng-btns"><a class="bng-btn bng-p" href="'+XU+'" target="_blank" rel="noopener">'+IX+'<span>Follow @BlkoutNtw on X</span></a><a class="bng-btn" href="'+YTS+'" target="_blank" rel="noopener">'+IY+'<span>Subscribe on YouTube</span></a></div>';

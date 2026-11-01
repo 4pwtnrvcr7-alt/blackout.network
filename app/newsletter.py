@@ -41,7 +41,7 @@ P = {  # every path is overridable by env var for tests (NEWSLETTER_DB, NEWSLETT
     "dir_db": os.environ.get("NEWSLETTER_DIR_DB", os.path.join(BASE, "sources_dir", "directory.db")),  # global directory (read-only here)
 }
 BRAND = "BLACKOUT.NETWORK"   # brand is always written in capitals in every email and page (t300)
-TAGLINE = "Ask better questions."   # global tagline (t326u): small supporting line under the masthead domain and in the footer
+TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line under the masthead domain and in the footer
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime."

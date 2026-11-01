@@ -149,13 +149,13 @@ def follow_html():
 def org_ld():
     return {"@type": "NewsMediaOrganization", "@id": SITE + "/#org", "name": BRAND, "alternateName": ["Blackout Network", "blackout.network"], "url": SITE + "/",
             "logo": {"@type": "ImageObject", "url": SITE + "/icons/icon-512.png", "width": 512, "height": 512},
-            "image": SITE + "/icons/icon-og-1200x630.png", "slogan": "Ask better questions.", "email": "hello@blackout.network",
+            "image": SITE + "/icons/icon-og-1200x630.png", "slogan": "Signal over noise.", "email": "hello@blackout.network",
             "sameAs": [X_URL, YT_URL], "address": {"@type": "PostalAddress", "postOfficeBoxNumber": "1228", "addressLocality": "Lake Mary",
             "addressRegion": "FL", "postalCode": "32746", "addressCountry": "US"}}
 
 def home_ld():
     return {"@context": "https://schema.org", "@graph": [org_ld(), {"@type": "WebSite", "@id": SITE + "/#website", "url": SITE + "/", "name": BRAND,
-            "description": "Free early-warning threat monitor: outbreaks, quakes, space weather, cyber attacks and conflict, ranked 0–10 and linked to sources.",
+            "description": "Independent, sourced early-warning signals on US and global threats: threat alerts and breaking news, updated around the clock. Not official alerts.",
             "publisher": {"@id": SITE + "/#org"}, "inLanguage": "en",
             "potentialAction": {"@type": "SearchAction", "target": {"@type": "EntryPoint", "urlTemplate": SITE + "/?q={search_term_string}"},
                                 "query-input": "required name=search_term_string"}}]}

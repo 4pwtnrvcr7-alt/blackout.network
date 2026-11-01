@@ -14,7 +14,7 @@ import os, sys, json, html
 BASE = os.path.dirname(os.path.abspath(__file__))
 SITE = "https://blackout.network"
 BRAND = "BLACKOUT.NETWORK"
-TAGLINE = "Know first. Be ready."
+TAGLINE = "Signal over noise."
 YT_URL = "https://www.youtube.com/@blkoutntw"
 X_URL = "https://x.com/BlkoutNtw"
 HANDLE = "@BlkoutNtw"
@@ -104,8 +104,8 @@ NAV = [
 
 # Standalone pages: path -> (active nav key, title, meta description, visible one-line description).
 PAGES = {
- "home": ("threat", "BLACKOUT.NETWORK | Know first. Be ready.",
-          "BLACKOUT.NETWORK is a free early-warning threat monitor: outbreaks, quakes, space weather, cyber attacks and conflict, ranked 0–10 and linked to sources.",
+ "home": ("threat", "BLACKOUT.NETWORK · Signal over noise.™",
+          "Independent, sourced early-warning signals on US and global threats: threat alerts and breaking news, updated around the clock. Not official alerts.",
           "Free early-warning threat monitor: threats ranked 0–10, every one linked to its sources."),
  "scoring": ("@scoring", "How we score | BLACKOUT.NETWORK",
              "How BLACKOUT.NETWORK scores threats: the 0–100 severity score and the 0–10 rank, explained factor by factor with real worked examples. Research only.",

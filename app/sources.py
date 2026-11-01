@@ -15,7 +15,7 @@ SD = _il.reload(SD)   # hot-reload servers: pick up a changed sources_directory.
 
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 BRAND = "blackout.network"
-TAGLINE = "Know first. Be ready."
+TAGLINE = "Signal over noise."
 STATIC = os.path.join(BASE, "sources_static")
 TYPES = ["Agency feed", "News outlet", "Research center", "Disease surveillance", "RSS feed", "X account", "Telegram channel", "Mastodon account",
          "Bluesky account", "YouTube channel", "Reddit community", "Other"]

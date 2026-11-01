@@ -46,7 +46,7 @@ d = ImageDraw.Draw(og)
 B.icon(d, 72, 70, 96, bg=True)
 d.text((72, 210), 'BLACKOUT.', font=B.mont(64, 900), fill=(236, 239, 243))
 d.text((72 + d.textlength('BLACKOUT.', font=B.mont(64, 900)), 210), 'NETWORK', font=B.mont(64, 900), fill=B.RED)
-d.text((74, 292), 'Ask better questions.', font=B.inter(34, 600), fill=(201, 209, 219))
+d.text((74, 292), 'Signal over noise.', font=B.inter(34, 600), fill=(201, 209, 219))
 y = 360
 for line in ['Global threats, ranked 0–10 and linked', 'to their sources. Free, updated hourly.']:
     d.text((74, y), line, font=B.inter(27, 400), fill=(150, 160, 174)); y += 38
