@@ -400,6 +400,229 @@ def f_csn():
                           "natural disaster", url, t, lat, lon, place + ", Chile", _small_quake_base(m), extra={"mag": m, "depth_km": int(depth)}))
     return out
 
+
+# ---- t248 (2026-10-31): directory-slice sources vetted in t238, approved by Matt ----
+import os as _os
+T248_UA = {"User-Agent": "Mozilla/5.0 (BlackoutNetwork early-warning research monitor; +https://blackout.network)"}
+_HERE = _os.path.dirname(_os.path.abspath(__file__))
+def _jload(p, d):
+    try: return json.load(open(p))
+    except Exception: return d
+def _jsave(p, v):
+    tmp = p + ".tmp"; json.dump(v, open(tmp, "w"), indent=1); _os.replace(tmp, p)
+# quake solutions relayed by EMSC keep the authoring agency as family, so a relay never counts as independent confirmation
+_AUTH_FAMILY = {"NEIC": "USGS", "GFZ": "GFZ", "INGV": "INGV", "ROM": "INGV"}
+
+def f_emsc():
+    """EMSC FDSN event service (seismicportal.eu), M>=4.5, last 3 days. Family = authoring agency (NEIC -> USGS)."""
+    st = (S.now() - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%S")
+    j = S.get(f"https://www.seismicportal.eu/fdsnws/event/1/query?format=json&minmag=4.5&start={st}&limit=400&orderby=time",
+              headers=T248_UA, timeout=30).json()
+    out = []
+    for f in j.get("features", []):
+        p = f["properties"]; m = p.get("mag") or 0
+        if m < 4.5: continue
+        lon, lat = f["geometry"]["coordinates"][:2]; depth = abs(f["geometry"]["coordinates"][2]) if len(f["geometry"]["coordinates"]) > 2 else None
+        region = (p.get("flynn_region") or "").title(); auth = (p.get("auth") or "EMSC").upper()
+        out.append(S.item("EMSC", _AUTH_FAMILY.get(auth, "EMSC"), p.get("unid") or f.get("id"), f"EMSC: M{m:.1f} earthquake {region}",
+                          "natural disaster", f"https://www.seismicportal.eu/eventdetails.html?unid={p.get('unid') or f.get('id')}",
+                          S.parse_t(p.get("time")), lat, lon, region, _quake_base(m),
+                          extra={"mag": m, "magtype": p.get("magtype"), "depth_km": depth, "author": auth}))
+    return out
+
+def f_geofon():
+    """GFZ GEOFON bulletin RSS (latest 20 events, own network solutions), M>=4.5."""
+    txt = S.get("https://geofon.gfz.de/eqinfo/list.php?fmt=rss", headers=T248_UA, timeout=30).text
+    out = []
+    for it in re.findall(r"<item>(.*?)</item>", txt, re.S):
+        tm = re.search(r"<title>M ([\d.]+), (.*?)</title>", it); dm = re.search(r"<description>\s*(\S+ \S+)\s+(-?[\d.]+)\s+(-?[\d.]+)\s+(\d+) km\s+(\w)", it)
+        gid = re.search(r"<guid[^>]*>(.*?)</guid>", it); lk = re.search(r"<link>(.*?)</link>", it)
+        if not (tm and dm and gid): continue
+        m = float(tm.group(1))
+        if m < 4.5: continue
+        place = html.unescape(tm.group(2).strip())
+        out.append(S.item("GFZ GEOFON", "GFZ", gid.group(1), f"GEOFON: M{m:.1f} earthquake {place}", "natural disaster",
+                          html.unescape(lk.group(1)) if lk else f"https://geofon.gfz.de/eqinfo/event.php?id={gid.group(1)}",
+                          S.parse_t(dm.group(1) + "Z"), float(dm.group(2)), float(dm.group(3)), place, _quake_base(m),
+                          extra={"mag": m, "depth_km": int(dm.group(4)), "status": {"A": "automatic", "M": "manual", "C": "confirmed"}.get(dm.group(5), dm.group(5))}))
+    return out
+
+def f_ingv():
+    """INGV FDSN event service, M>=3.0, last 3 days (Italy/Mediterranean in detail; INGV's own solutions for larger quakes elsewhere)."""
+    st = (S.now() - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%S")
+    txt = S.get(f"https://webservices.ingv.it/fdsnws/event/1/query?format=text&minmag=3.0&starttime={st}&orderby=time&limit=300",
+                headers=T248_UA, timeout=30).text
+    out = []
+    for ln in txt.splitlines():
+        if not ln or ln.startswith("#"): continue
+        c = ln.split("|")
+        if len(c) < 13: continue
+        try: m = float(c[10]); lat = float(c[2]); lon = float(c[3]); depth = float(c[4])
+        except ValueError: continue
+        if m < 3.0: continue
+        place = c[12].strip()
+        out.append(S.item("INGV", "INGV", c[0], f"INGV: M{m:.1f} earthquake {place}", "natural disaster",
+                          f"https://terremoti.ingv.it/event/{c[0]}", S.parse_t(c[1] + "Z"), lat, lon, place, _small_quake_base(m),
+                          extra={"mag": m, "magtype": c[9], "depth_km": depth}))
+    return out
+
+HANS_STATE = _os.path.join(_HERE, "hans_state.json")
+_HANS_BASE = {"GREEN": 5, "YELLOW": 25, "ORANGE": 45, "RED": 65}
+def f_hans():
+    """USGS HANS elevated volcanoes. Emits only on a colour-code / alert-level change (state in hans_state.json).
+    First run seeds the state silently (no items)."""
+    cur = S.get("https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes", headers=T248_UA, timeout=30).json()
+    st = _jload(HANS_STATE, None)
+    seeding = st is None
+    st = st or {"levels": {}, "coords": {}}
+    out, seen = [], set()
+    for v in cur:
+        vn = str(v.get("vnum")); seen.add(vn)
+        lvl = [v.get("color_code"), v.get("alert_level")]
+        if vn not in st["coords"]:
+            try:
+                g = S.get(f"https://volcanoes.usgs.gov/hans-public/api/volcano/getVolcano/{vn}", headers=T248_UA, timeout=20).json()
+                st["coords"][vn] = [g.get("latitude"), g.get("longitude"), g.get("region")]
+            except Exception: st["coords"][vn] = [None, None, None]
+        prev = (st["levels"].get(vn) or {}).get("level")
+        if not seeding and prev != lvl:
+            lat, lon, reg = st["coords"][vn]
+            was = f" (was {prev[0]}/{prev[1]})" if prev else " (was NORMAL/GREEN)"
+            out.append(S.item("USGS Volcano Hazards (HANS)", "USGS", f"hans|{vn}|{lvl[0]}|{lvl[1]}|{v.get('notice_identifier')}",
+                              f"USGS: {v.get('volcano_name')} volcano alert {lvl[1]} / aviation colour code {lvl[0]}{was}", "natural disaster",
+                              v.get("notice_url") or "https://volcanoes.usgs.gov/hans-public/", S.parse_t(v.get("sent_utc")), lat, lon,
+                              ", ".join(x for x in (v.get("volcano_name"), reg) if x), _HANS_BASE.get((lvl[0] or "").upper(), 15),
+                              extra={"aviation_color": lvl[0], "alert_level": lvl[1], "previous": prev, "observatory": v.get("obs_abbr")}))
+        st["levels"][vn] = {"level": lvl, "name": v.get("volcano_name"), "notice": v.get("notice_identifier")}
+    for vn in [k for k in st["levels"] if k not in seen]:   # dropped off the elevated list -> back to NORMAL/GREEN
+        old = st["levels"].pop(vn)
+        if seeding: continue
+        lat, lon, reg = st["coords"].get(vn, [None, None, None])
+        out.append(S.item("USGS Volcano Hazards (HANS)", "USGS", f"hans|{vn}|GREEN|NORMAL|{S.iso(S.now())[:13]}",
+                          f"USGS: {old.get('name')} volcano lowered to NORMAL / GREEN (was {old['level'][0]}/{old['level'][1]})", "natural disaster",
+                          "https://volcanoes.usgs.gov/hans-public/", S.now(), lat, lon, old.get("name"), 5,
+                          extra={"aviation_color": "GREEN", "alert_level": "NORMAL", "previous": old["level"]}))
+    _jsave(HANS_STATE, st)
+    return (out, {"seeded": len(st["levels"])}) if seeding else (out, {"elevated": len(st["levels"])})
+
+IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"
+IODA_CACHE = _os.path.join(_HERE, "ioda_entities.json")
+# noise filters (t238 vetting): no Google-traffic-only (gtr) signals, ignore events that began >72 h ago,
+# country score >= 300 and >= 30 min; region score >= 10000 and >= 2 h
+IODA_RULES = {"country": (300, 1800), "region": (10000, 7200)}
+_GEO = {}
+def _ioda_geo(et, name, cc):
+    """Approximate point for an IODA entity: admin-1 label point (region) or country label point, from heatmap_data/. Needed so
+    unrelated outages with near-identical short titles don't cluster (scanner clustering uses distance + title similarity)."""
+    if not _GEO:
+        try:
+            _GEO["c"] = json.load(open(_os.path.join(_HERE, "heatmap_data", "countries.json")))
+            a1 = {}
+            for k, v in json.load(open(_os.path.join(_HERE, "heatmap_data", "admin1.json"))).items():
+                for n in {v.get("name"), v.get("ascii"), *(v.get("alts") or [])}:
+                    if n: a1.setdefault((k.split(".")[0], n.lower()), v.get("label"))
+            _GEO["a"] = a1
+        except Exception: _GEO["c"], _GEO["a"] = {}, {}
+    pt = None
+    if et == "region" and cc: pt = _GEO["a"].get((cc, (name or "").lower()))
+    if not pt and cc: pt = (_GEO["c"].get(cc) or {}).get("label")
+    return (pt[0], pt[1]) if pt else (None, None)
+def f_ioda():
+    """IODA (Georgia Tech) internet-outage events, country + region level, filtered. One item per entity per outage start."""
+    t1 = int(time.time()); t0 = t1 - 72 * 3600
+    cache = _jload(IODA_CACHE, {}); lookups = 0; out = []
+    for et, (thr, dur) in IODA_RULES.items():
+        evs = S.get(f"{IODA}/outages/events?from={t0}&until={t1}&entityType={et}&limit=1000", headers=T248_UA, timeout=60).json().get("data") or []
+        groups = {}
+        for e in evs:
+            if e.get("datasource") == "gtr" or (e.get("start") or 0) < t0: continue
+            if (e.get("score") or 0) < thr or (e.get("duration") or 0) < dur: continue
+            k = (e["location"], int(e["start"]) // 3600)
+            g = groups.setdefault(k, {"e": e, "ds": set(), "score": 0, "end": 0})
+            g["ds"].add(e["datasource"]); g["score"] = max(g["score"], e["score"]); g["end"] = max(g["end"], e["start"] + e["duration"])
+        for (loc, hr), g in groups.items():
+            e = g["e"]; name = e.get("location_name") or loc
+            code = loc.split("/", 1)[-1]; country = name
+            cc = code if et == "country" else None
+            if et == "region":
+                if not isinstance(cache.get(loc), dict) and lookups < 25:
+                    lookups += 1
+                    try:
+                        d = (S.get(f"{IODA}/entities/query?entityType=region&entityCode={code}", headers=T248_UA, timeout=20).json().get("data") or [{}])[0]
+                        at = d.get("attrs") or {}
+                        cache[loc] = {"country": at.get("country_name") or "", "cc": at.get("country_code") or ""}
+                    except Exception: pass
+                ent = cache.get(loc) if isinstance(cache.get(loc), dict) else {}
+                country, cc = ent.get("country", ""), ent.get("cc") or None
+            lat, lon = _ioda_geo(et, name, cc)
+            place = f"{name}, {country}" if et == "region" and country else name
+            hrs = (g["end"] - e["start"]) / 3600; ongoing = g["end"] >= t1 - 900
+            ds = "+".join(sorted(g["ds"]))
+            st = datetime.fromtimestamp(e["start"], timezone.utc)
+            # short, place-led title: shared boilerplate words would make unrelated outages cluster on title similarity
+            title = f"{place}: internet outage, {hrs:.1f} h (IODA)"
+            out.append(S.item("IODA internet outages", "IODA", f"{loc}|{e['start']}", title, "cyber",
+                              f"https://ioda.inetintel.cc.gatech.edu/{et}/{code}?from={e['start'] - 3600}&until={min(t1, g['end'] + 3600)}",
+                              st, lat, lon, place, (18 if et == "country" else 12) + (5 if len(g["ds"]) > 1 else 0),
+                              extra={"outage": True, "entity_type": et, "datasources": ds, "ioda_score": round(g["score"]), "duration_h": round(hrs, 1), "ongoing": ongoing}))
+    if lookups: _jsave(IODA_CACHE, cache)
+    return out
+
+# approximate country centroids so MeteoAlarm items map and only cluster with nearby warnings
+MA_FEEDS = {"austria": (47.6, 14.1), "belgium": (50.6, 4.6), "bosnia-herzegovina": (44.2, 17.8), "bulgaria": (42.7, 25.3), "croatia": (45.1, 15.6),
+            "cyprus": (35.0, 33.2), "czechia": (49.8, 15.5), "denmark": (56.0, 10.0), "estonia": (58.7, 25.5), "finland": (63.0, 26.0),
+            "france": (46.6, 2.4), "germany": (51.1, 10.4), "greece": (39.1, 22.0), "hungary": (47.2, 19.4), "iceland": (64.9, -18.6),
+            "ireland": (53.2, -8.0), "israel": (31.4, 35.0), "italy": (42.8, 12.6), "latvia": (56.9, 24.6), "lithuania": (55.3, 23.9),
+            "luxembourg": (49.8, 6.1), "malta": (35.9, 14.4), "moldova": (47.2, 28.5), "montenegro": (42.8, 19.3), "netherlands": (52.2, 5.5),
+            "republic-of-north-macedonia": (41.6, 21.7), "norway": (64.5, 12.0), "poland": (52.1, 19.4), "portugal": (39.6, -8.0),
+            "romania": (45.9, 25.0), "serbia": (44.0, 20.9), "slovakia": (48.7, 19.7), "slovenia": (46.1, 14.8), "spain": (40.2, -3.6),
+            "sweden": (62.0, 15.0), "switzerland": (46.8, 8.2), "united-kingdom": (54.0, -2.5), "ukraine": (49.0, 31.4)}
+_MA_LEVEL = {"Severe": "Orange", "Extreme": "Red"}
+def _meteoalarm_one(slug):
+    txt = S.get(f"https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-{slug}", headers=T248_UA, timeout=25).text
+    groups = {}
+    nowt = S.now()
+    for en in re.findall(r"<entry>(.*?)</entry>", txt, re.S):
+        def tag(t):
+            m = re.search(rf"<cap:{t}>(.*?)</cap:{t}>", en, re.S); return html.unescape(m.group(1).strip()) if m else ""
+        sev = tag("severity")
+        if sev not in _MA_LEVEL or tag("status") != "Actual" or tag("message_type") == "Cancel": continue
+        exp = S.parse_t(tag("expires"))
+        if exp and exp < nowt: continue
+        tt = re.search(r"<title>(?:Yellow|Orange|Red)\s+(.*?)\s+Warning issued for", en)   # e.g. "Orange Rain Warning issued for Spain - ..."
+        ev = tt.group(1) if tt else re.sub(r"^((severe|extreme|moderate|yellow|orange|red|warning|for)\s+)+", "", tag("event").strip(), flags=re.I)
+        if "awareness_type" in ev: ev = "weather"
+        ev = re.sub(r"\s+(warning|alert)s?$", "", ev, flags=re.I).strip() or "weather"
+        onset = S.parse_t(tag("onset") or tag("effective") or tag("sent"))
+        k = (ev.lower(), sev, onset.strftime("%Y-%m-%d") if onset else "")
+        g = groups.setdefault(k, {"ev": ev, "sev": sev, "areas": [], "onset": onset, "expires": exp})
+        a = tag("areaDesc")
+        if a and a not in g["areas"]: g["areas"].append(a)
+        if onset and (not g["onset"] or onset < g["onset"]): g["onset"] = onset
+        if exp and (not g["expires"] or exp > g["expires"]): g["expires"] = exp
+    country = slug.replace("republic-of-north-macedonia", "North Macedonia").replace("-", " ").title().replace("Bosnia Herzegovina", "Bosnia and Herzegovina")
+    lat, lon = MA_FEEDS[slug]; out = []
+    for (evl, sev, day), g in groups.items():
+        n = len(g["areas"]); areas = ", ".join(g["areas"][:3]) + (f" +{n - 3} more" if n > 3 else "")
+        out.append(S.item("MeteoAlarm (EUMETNET)", "MeteoAlarm", f"{slug}|{evl}|{sev}|{day}",
+                          f"{country}: {_MA_LEVEL[sev]} {g['ev'].lower()} warning, {n} area{'s' if n != 1 else ''} ({areas}) - MeteoAlarm",
+                          "natural disaster", f"https://meteoalarm.org/en/live/region/{slug}", g["onset"], lat, lon, f"{country}: {areas}"[:200],
+                          {"Severe": 25, "Extreme": 45}[sev] + min(10, n // 5),
+                          extra={"event": f"{_MA_LEVEL[sev]} {g['ev']}", "severity": sev, "areas": n, "expires": S.iso(g["expires"]) if g["expires"] else None}))
+    return out
+def f_meteoalarm():
+    """MeteoAlarm legacy Atom (CAP) per member country, Severe/Extreme (orange/red) only, unexpired.
+    One item per country + hazard + level + onset day (areas aggregated) so a storm doesn't become dozens of items."""
+    from concurrent.futures import ThreadPoolExecutor
+    out, errs = [], []
+    def one(s):
+        try: return _meteoalarm_one(s)
+        except Exception as ex: errs.append(f"{s}: {type(ex).__name__}"); return []
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        for r in ex.map(one, list(MA_FEEDS)): out += r
+    if len(errs) > len(MA_FEEDS) // 2: raise RuntimeError("MeteoAlarm: most country feeds failed: " + "; ".join(errs[:5]))
+    return (out, {"feed_errors": errs}) if errs else out
+
 EXT_SOURCES = [
     ("Reddit public RSS (multireddit: " + ", ".join(SUBS) + ")", "https://www.reddit.com/r/worldnews+news/new/.rss", f_reddit),
     ("Bluesky public search API", "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts", f_bluesky),
@@ -421,6 +644,12 @@ EXT_SOURCES = [
     ("JPCERT/CC English alerts RSS", "https://www.jpcert.or.jp/english/rss/jpcert-en.rdf", f_jpcert),
     ("Canadian Centre for Cyber Security alerts & advisories RSS", "https://www.cyber.gc.ca/api/cccs/rss/v1/get?feed=alerts_advisories&lang=en", f_cccs),
     ("CSN Chile latest quakes (sismologia.cl table, M4+)", "https://www.sismologia.cl/", f_csn),
+    ("EMSC earthquakes (seismicportal.eu FDSN event, M4.5+)", "https://www.seismicportal.eu/fdsnws/event/1/query", f_emsc),
+    ("GFZ GEOFON earthquake bulletin RSS (M4.5+)", "https://geofon.gfz.de/eqinfo/list.php?fmt=rss", f_geofon),
+    ("INGV earthquakes (FDSN event, M3+)", "https://webservices.ingv.it/fdsnws/event/1/query", f_ingv),
+    ("USGS HANS elevated volcanoes (level changes only)", "https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes", f_hans),
+    ("IODA internet outages (country + region, filtered)", "https://api.ioda.inetintel.cc.gatech.edu/v2/outages/events", f_ioda),
+    ("MeteoAlarm warnings (EUMETNET CAP, Severe/Extreme only)", "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-{country}", f_meteoalarm),
 ]
 EXT_FAILED = [
     ("Africa CDC site-wide RSS", "https://africacdc.org/feed/", "HTTP 200 but empty (no items) - news-item and disease-outbreak feeds used instead"),

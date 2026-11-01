@@ -47,7 +47,10 @@
   "region": "Italy/Mediterranean",
   "why": "Italy's national seismic/volcano institute; authoritative for Etna, Campi Flegrei and Mediterranean quakes",
   "found_at": "2026-10-31T17:59:00Z",
-  "status": "candidate"
+  "status": "promoted",
+  "feed_url": "https://webservices.ingv.it/fdsnws/event/1/query",
+  "vetted_t248": "PASS (score 9/10): FDSN text keyless; M>=3.0, last 3 days; family INGV (independent). Manual scan 2026-11-01 01:01Z: 13 fetched, 13 new.",
+  "vetted_at": "2026-11-01T01:03Z"
  },
  {
   "name": "Romania Ministry of National Defence (MApN) press releases",
@@ -346,5 +349,80 @@
   "found_at": "2026-11-01T00:30:00Z",
   "origin": "source researcher",
   "status": "candidate"
+ },
+ {
+  "name": "EMSC (European-Mediterranean Seismological Centre) FDSN events",
+  "url": "https://www.seismicportal.eu/fdsnws/event/1/query",
+  "type": "official agency feed",
+  "category": "natural disaster",
+  "region": "Global",
+  "why": "Inter-agency seismic centre; GeoJSON FDSN event service, global, minutes latency. Adds M4.0-4.5 coverage beyond USGS summary feeds (t238 vetting).",
+  "rating": 9,
+  "rating_reason": "Official inter-agency centre giving primary measurements: starts at 9; no track record yet.",
+  "vetted_t248": "PASS (score 9/10): live GeoJSON, keyless; M>=4.5, last 3 days; family = authoring agency (NEIC-authored -> USGS family so relays never count as independent). Manual scan 2026-11-01 01:01Z: 47 fetched, 47 new.",
+  "found_at": "2026-11-01T00:45:00Z",
+  "origin": "t238 directory-slice vetting",
+  "status": "promoted",
+  "vetted_at": "2026-11-01T01:03Z"
+ },
+ {
+  "name": "GFZ GEOFON earthquake bulletin",
+  "url": "https://geofon.gfz.de/eqinfo/list.php?fmt=rss",
+  "type": "official agency feed",
+  "category": "natural disaster",
+  "region": "Global",
+  "why": "GFZ Potsdam's independent global network solutions; RSS updated about every minute (t238 vetting).",
+  "rating": 9,
+  "rating_reason": "Official research agency primary measurements: 9.",
+  "vetted_t248": "PASS (score 9/10): RSS keyless, M>=4.5, family GFZ (independent). Manual scan 2026-11-01 01:01Z: 19 fetched, 19 new.",
+  "found_at": "2026-11-01T00:45:00Z",
+  "origin": "t238 directory-slice vetting",
+  "status": "promoted",
+  "vetted_at": "2026-11-01T01:03Z"
+ },
+ {
+  "name": "USGS Volcano Hazards Program HANS (elevated volcanoes)",
+  "url": "https://volcanoes.usgs.gov/hans-public/api/volcano/getElevatedVolcanoes",
+  "type": "official agency feed",
+  "category": "natural disaster",
+  "region": "United States (AK, HI, Cascades, Marianas)",
+  "why": "Official USGS volcano alert levels and aviation colour codes (t238 vetting).",
+  "rating": 10,
+  "rating_reason": "Official agency primary measurements and volcano alerts: 10.",
+  "vetted_t248": "PASS (score 8/10): JSON keyless; emits only on level change (state in hans_state.json, seeded silently with 4 elevated volcanoes); family USGS.",
+  "found_at": "2026-11-01T00:45:00Z",
+  "origin": "t238 directory-slice vetting",
+  "status": "promoted",
+  "vetted_at": "2026-11-01T01:03Z"
+ },
+ {
+  "name": "IODA (Georgia Tech) internet outage events",
+  "url": "https://api.ioda.inetintel.cc.gatech.edu/v2/outages/events",
+  "type": "academic measurement feed",
+  "category": "cyber",
+  "region": "Global",
+  "why": "BGP / active-probing / telescope outage detection at country and region level; the usable aggregate form of the directory's internet-outage-sensor slice (t238 vetting).",
+  "rating": 7,
+  "rating_reason": "Academic measurement relay: 7.",
+  "vetted_t248": "PASS (score 9/10, approved with filters): keyless; no gtr-only signals, ignore events started >72 h ago, country score>=300 and >=30 min, region score>=10000 and >=2 h; one item per entity per outage start. Manual scan 2026-11-01 01:01Z: 36 fetched, 36 new (72 h backfill).",
+  "found_at": "2026-11-01T00:45:00Z",
+  "origin": "t238 directory-slice vetting",
+  "status": "promoted",
+  "vetted_at": "2026-11-01T01:03Z"
+ },
+ {
+  "name": "MeteoAlarm (EUMETNET) official warnings",
+  "url": "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-{country}",
+  "type": "official agency feed",
+  "category": "natural disaster",
+  "region": "Europe (38 member countries)",
+  "why": "Aggregator of national met-service CAP warnings for Europe (t238 vetting).",
+  "rating": 10,
+  "rating_reason": "Official agency network: 10.",
+  "vetted_t248": "PASS (score 10/10): legacy Atom/CAP keyless; Severe/Extreme (orange/red) only, unexpired, Actual; aggregated to one item per country+hazard+level+onset day. Manual scan 2026-11-01 01:01Z: 15 fetched, 15 new (38 feeds, 0 errors).",
+  "found_at": "2026-11-01T00:45:00Z",
+  "origin": "t238 directory-slice vetting",
+  "status": "promoted",
+  "vetted_at": "2026-11-01T01:03Z"
  }
 ]
