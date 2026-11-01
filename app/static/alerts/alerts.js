@@ -46,9 +46,15 @@
     for (var i = 0; i < s.length; i++) a[i] = s.charCodeAt(i);
     return a;
   }
-  function post(path, body) {
+  // subscribe/unsubscribe are idempotent, so a dropped request (Render free tier 502/504, network blip) is retried twice
+  function post(path, body, n) {
+    n = n || 0;
+    var again = function () { return new Promise(function (res) { setTimeout(res, 800 * (n + 1)); }).then(function () { return post(path, body, n + 1); }); };
     return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || ("HTTP " + r.status)); return j; }); });
+      .then(function (r) {
+        if ((r.status === 502 || r.status === 504) && n < 2) return again();
+        return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || "Something went wrong (HTTP " + r.status + "). Please try again."); return j; });
+      }, function (e) { if (n < 2) return again(); throw new Error("Can’t reach blackout.network. Check your connection and try again."); });
   }
 
   BN.alertsStatus = function () {
