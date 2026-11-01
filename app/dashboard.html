@@ -174,7 +174,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 <header><h1>BLACKOUT.<b>NETWORK</b> · Early-Warning Threat Monitor <span id="scope_badge" title="Scan scope: worldwide. Items are ranked by global relevance; no region gets extra weight." style="font-size:11px;font-weight:600;letter-spacing:.4px;border:1px solid var(--ac);color:var(--ac);border-radius:10px;padding:2px 8px;margin-left:8px;vertical-align:middle;white-space:nowrap">🌐 Scope: Global</span><a id="howscore_link" href="scoring" title="How the 0–100 score and 0–10 rank are computed" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">ⓘ How we score</a><a id="nl_head_link" href="newsletter" title="Get the morning/evening brief by email (double opt-in, unsubscribe anytime)" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">✉ Newsletter</a><a id="sc_head_link" href="sources" title="Every source we use, with a 0–10 confidence rating" style="font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--bd2,#2f3742);color:var(--tx);border-radius:10px;padding:2px 8px;margin-left:6px;vertical-align:middle;white-space:nowrap;text-decoration:none">📚 Sources</a><span id="brand_tagline" style="display:block;font-size:12px;font-weight:400;letter-spacing:.2px;color:var(--mu);margin-top:4px">Know first. Be ready.</span></h1>
 <div class="ctl"><span id="status">loading…</span>
 <button class="pri" id="refresh">⟳ Manual refresh</button>
-<label>Scan every <select id="interval"></select></label>
+<label title="Set on the scanner node">Scans every <select id="interval"></select></label>
 <span id="msg"></span></div></header>
 <nav class="tabs"><button class="on" data-tab="threat">📡 The Wire</button><button data-tab="jets">✈ Private jets</button><button data-tab="thread">🧵 The Thread</button><button data-tab="bcast">📻 Live Broadcasts</button><button data-tab="streams">📺 Live Streams</button><button data-tab="radio">📻 Radio</button><button data-tab="res">📍 Local Resources</button><button data-tab="bush">🏕 Bushcraft</button><button data-tab="med">⛑ Medical</button><button data-tab="maps">🗺 Maps</button><button data-tab="net">🌐 Network Status</button><button data-tab="solar_seismic">☀ Solar &amp; Seismic</button><button data-tab="heatmap">🔥 Heat Map</button><button data-tab="ranked">🗳 Ranked by Users</button><button data-tab="tips">☕ Tips</button></nav>
 <div id="ns_gbanner" role="alert"></div>
@@ -409,9 +409,11 @@ $("save").onclick=async()=>{
  $("save").disabled=false};
 $("filters").onclick=e=>{if(e.target.dataset.c){filter=e.target.dataset.c;render()}};
 async function load(){try{const r=await fetch("api/state",{cache:"no-store"});S=await r.json();render();try{fdr()}catch(_){}}catch(e){$("status").textContent="dashboard offline: "+e}}
-$("refresh").onclick=async()=>{const b=$("refresh");b.disabled=true;$("msg").textContent="scanning…";
- try{const r=await fetch("api/refresh",{method:"POST"});const j=await r.json();
- $("msg").textContent=r.status==429?`rate-limited, retry in ${j.retry_after_s}s`:j.status=="ok"?`✓ scan done: ${j.fetched} fetched, ${j.new} new, ${j.ok_sources} sources OK, ${j.failed_sources} failed`:"status: "+j.status;await load()}catch(e){$("msg").textContent="error "+e}b.disabled=false};
+/* t225: the public node never triggers scans or changes settings (POST /api/refresh and /api/interval are refused server-side by render_app.py BOX_ONLY).
+   Here Manual refresh only reloads the latest synced data; scans run on the scanner node on its own schedule. */
+$("refresh").textContent="⟳ Reload data";$("refresh").title="Reload the latest data. Scans run automatically on the scanner node.";
+$("refresh").onclick=async()=>{const b=$("refresh");b.disabled=true;$("msg").textContent="reloading…";
+ try{await load();$("msg").textContent=S&&S.scans&&S.scans[0]?`✓ latest data loaded · last scan ${fmt(S.scans[0].finished)}`:"✓ latest data loaded"}catch(e){$("msg").textContent="error "+e}b.disabled=false};
 $("interval").disabled=true;$("interval").title="Scan interval is managed on the scanner node.";$("interval").onchange=async e=>{let p=$("pass").value;if(!p){load();return}
  const r=await fetch("api/interval",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({minutes:+e.target.value,passcode:p})});const j=await r.json();
  $("msg").textContent=r.ok?`✓ interval set to ${j.interval_minutes} min`:"✗ "+(j.error||r.status);load()};
@@ -817,7 +819,7 @@ function hwInit(){HW_NOTES.forEach(([key,mid,pre,txt])=>{if(!window.THREAD_ENABL
  else h2=[...m.querySelectorAll("h2")].find(h=>h.textContent.trim().replace(/^[^A-Za-z]+/,"").startsWith(pre.replace(/^[^A-Za-z]+/,"")));
  hwAttach(h2,key,txt)})}
 hwInit();
-// ---- Live push (SSE /api/stream) + a Manual refresh button on every tab (same /api/refresh, same 60 s cooldown) ----
+// ---- Live push (SSE /api/stream) + a Manual refresh button on every tab (same /api/refresh, same 2 min cooldown) ----
 const LV={es:null,n:0};
 function lvToast(a){if(a.watchlist!=0&&!(a.rank>=4||a.high))return;const box=$("toasts");const d=document.createElement("div");d.className="toast "+(a.high?"h":lv(a.score));d.dataset.cid=a.cluster_id;
  const u=(a.links&&a.links[0])?safeUrl(a.links[0].url):"#";
