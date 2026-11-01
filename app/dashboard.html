@@ -78,6 +78,19 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 #tab-bcast .clip:hover{background:#1e252d}#tab-bcast .clip.audio{border-left-color:var(--ac)}#tab-bcast .clip .txt{font-size:13px;color:#c9d0d9;margin-top:3px}
 #tab-bcast mark{background:none;font-weight:700;border-bottom:2px solid;padding:0 1px}
 #tab-bcast .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:5px}
+/* ---- Inline broadcast players (t245) ---- */
+.bnp{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:8px;padding:7px 8px;background:#10151b;border:1px solid var(--bd);border-radius:8px}
+.bnp.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}.bnp [hidden]{display:none!important}
+.bnp button{min-height:36px;padding:4px 11px;border-radius:6px;border:1px solid var(--bd);background:#1d232b;color:var(--tx);font:600 13px system-ui,sans-serif;cursor:pointer}
+.bnp .bnp-play{background:var(--ac);color:#000;border-color:var(--ac);min-width:92px}.bnp button:hover{filter:brightness(1.15)}
+.bnp button:focus-visible,.bnp input:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.bnp input[type=range]{accent-color:var(--ac);height:28px;margin:0;padding:0;background:none;border:0}.bnp .bnp-seek{flex:1 1 160px;min-width:120px}.bnp .bnp-seek:disabled{opacity:.4}
+.bnp .bnp-vol{width:96px}.bnp .bnp-volw{display:inline-flex;align-items:center;gap:5px}
+.bnp .bnp-live{font:700 11px system-ui,sans-serif;color:#fff;background:var(--hi);border-radius:4px;padding:2px 7px;letter-spacing:.6px}
+.bnp .bnp-t{font:12px ui-monospace,Menlo,monospace;color:var(--mu);min-width:96px}
+.bnp .bnp-st{flex-basis:100%;margin:0;font-size:12px}.bnp .bnp-st:empty{display:none}.bnp .bnp-st.bad{color:var(--hi)}
+#tab-bcast .clip .bnp-src{font-size:12px;margin-top:5px}#tab-bcast .clip .bnp-src a{color:var(--ac)}
+@media(max-width:600px){.bnp .bnp-seek{flex-basis:100%;order:9}.bnp .bnp-vol{width:120px}.bnp button{min-height:40px}}
 /* ---- Maps tab ---- */
 #tab-maps .mp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;margin-top:8px}
 #tab-maps .mp-card{background:#181d23;border:1px solid var(--bd);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
@@ -314,8 +327,8 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
   <div class="row"><label>Source <select id="bc_src"><option value="">All sources</option></select></label>
   <label>Time <select id="bc_win"><option value="1h">Last 1 hour</option><option value="6h">Last 6 hours</option><option value="24h" selected>Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option></select></label>
   <span class="meta" id="bc_filt"></span></div>
-  <div id="bc_clips" class="scroll" style="max-height:900px"></div>
-  <div class="meta">Each clip opens its raw source in a new tab (audio clips open the live stream; the capture time is in the link). Informational only: never changes threat scores.</div></section>
+  <div id="bc_now"></div><div id="bc_clips" class="scroll" style="max-height:900px"></div>
+  <div class="meta">Audio broadcasts play right here: press ▶ Play on a card (only one plays at a time; starting another stops the first). They play the station's live stream now; the transcribed 60-second clip itself isn't archived. These are live Icecast MP3 streams with no server rewind window, so the scrubber rewinds and fast-forwards within what your browser has buffered since you pressed Play, and ⏭ Jump to live returns to the live edge. Text items are news articles and open their source in a new tab. Informational only: never changes threat scores.</div></section>
 </div>
 <div>
  <section class="pn"><h2>Keyword key <span class="meta">(click a keyword to filter · click again to clear · × removes it)</span></h2><div id="bc_kw"></div>
@@ -496,13 +509,74 @@ async function bcLoad(){try{const q=new URLSearchParams({window:$("bc_win").valu
 function bcRender(){const B=BC;bcBuild(B.keywords);
  const sel=$("bc_src"),cur=sel.value;sel.innerHTML='<option value="">All sources</option>'+B.sources.map(x=>`<option${x==cur?" selected":""}>${esc(x)}</option>`).join("");
  $("bc_meta").textContent=`· ${B.total} clips · updated ${B.generated_et}`;$("bc_filt").innerHTML=bcKw?`filtered to “<b>${esc(bcKw)}</b>” <button id="bc_clr">clear</button>`:"";if($("bc_clr"))$("bc_clr").onclick=()=>{bcKw="";bcLoad()};
- $("bc_clips").innerHTML=B.clips.map(c=>`<a class="clip ${c.kind=="audio"?"audio":""}" data-bid="${esc(c.id)}" href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer">
+ $("bc_clips").innerHTML=B.clips.map(c=>{const au=c.kind=="audio"&&/^https?:/i.test(safeUrl(c.link)),su=safeUrl(c.link).split("#")[0];if(au){const a=bnpMedia(c.id,su);a._name=c.source}return `<${au?"div":"a"} class="clip ${c.kind=="audio"?"audio":""}" data-bid="${esc(c.id)}"${au?"":` href="${esc(safeUrl(c.link))}" target="_blank" rel="noopener noreferrer"`}>
   <div class=meta>${c.kind=="audio"?"🎙 ":"📰 "}<b>${esc(c.source)}</b> · ${esc(c.published_et)}${c.matches.length?" · "+[...new Set(c.matches.map(m=>m.cat))].map(k=>`<span class=swatch style="background:${bcCol[k]}"></span>`).join(""):""}</div>
-  <div><b>${bcHi(c.title)}</b></div>${c.text?`<div class=txt>${bcHi(c.kind=="audio"?c.text:c.text.slice(0,300))}</div>`:""}</a>`).join("")+(B.truncated?`<div class=meta>+${B.truncated} more; narrow the filters</div>`:"")||"<div class=meta>No clips match.</div>";
+  <div><b>${bcHi(c.title)}</b></div>${c.text?`<div class=txt>${bcHi(c.kind=="audio"?c.text:c.text.slice(0,300))}</div>`:""}${au?bnpHtml(c.id,su,c.source+" (live)")+`<div class="meta bnp-src">Plays the live stream now. <a href="${esc(safeUrl((c.extra&&c.extra.page)||su))}" target=_blank rel="noopener noreferrer">Open source ↗</a> · <a href="${esc(su)}" target=_blank rel="noopener noreferrer">raw stream ↗</a></div>`:""}</${au?"div":"a"}>`}).join("")+(B.truncated?`<div class=meta>+${B.truncated} more; narrow the filters</div>`:"")||"<div class=meta>No clips match.</div>";
  $("bc_kw").innerHTML=B.keywords.categories.map(c=>`<div class=kwcat><span class=swatch style="background:${catColor(c.id,c.color)}"></span><b style="color:${catColor(c.id,c.color)}">${esc(c.label)}</b><br>${c.words.map(w=>`<span class="kwchip${bcKw==w.toLowerCase()?" on":""}" style="color:${c.color}" data-w="${esc(w)}" data-c="${c.id}">${esc(w)} <span class=meta>${B.keyword_counts[w.toLowerCase()]||0}</span><span class=x data-del="1" title="remove">×</span></span>`).join("")}</div>`).join("");
  const cs=$("bc_cat"),cv=cs.value;cs.innerHTML=B.keywords.categories.map(c=>`<option value="${c.id}"${c.id==cv?" selected":""}>${esc(c.label)}</option>`).join("");
  $("bc_health").innerHTML="<table><tr><th>Source</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+B.health.map(h=>`<tr><td><a href="${esc(safeUrl(h.url))}" target=_blank rel="noopener noreferrer">${esc(h.name)}</a><div class=meta>${esc(h.note||"")}${h.error?" · "+esc(h.error):""}</div></td><td class="${h.ok?"ok":"bad"}">${h.ok?"OK":"FAIL"}</td><td>${h.items}</td><td>${esc(h.last_checked_et||"—")}${!h.ok&&h.last_ok_et?"<div class=meta>last OK "+esc(h.last_ok_et)+"</div>":""}</td></tr>`).join("")+"</table>";
- $("bc_audio").textContent="Audio transcription: "+B.audio_transcription+` · text feeds polled every ${B.text_poll_minutes} min`}
+ $("bc_audio").textContent="Audio transcription: "+B.audio_transcription+` · text feeds polled every ${B.text_poll_minutes} min`;bcNow()}
+// ---- Inline broadcast players (t245): native <audio preload=none>; hls.js (bundled, api/radio/hls.min.js) only for .m3u8 without native HLS. ----
+// One global coordinator: starting any player stops the others and pauses other <audio>/<video> and YouTube embeds on the page.
+const BNP={el:{},hlsP:null,vol:Math.min(1,Math.max(0,+(localStorage.getItem("bnp_vol")??1))),volOK:(()=>{try{const t=document.createElement("audio");t.volume=.5;return t.volume==.5}catch(e){return false}})()};
+const bnpFmt=s=>{if(!isFinite(s)||s<0)s=0;s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return(h?h+":"+String(m).padStart(2,"0"):m)+":"+String(x).padStart(2,"0")};
+const bnpUI=pid=>document.querySelectorAll(`.bnp[data-pid="${CSS.escape(pid)}"]`);
+function bnpHtml(pid,src,name){const n=esc(name);return `<div class="bnp" data-pid="${esc(pid)}" data-src="${esc(src)}" data-name="${n}" role="group" aria-label="${n} player">
+ <button type=button class="bnp-play" aria-label="Play ${n}" aria-pressed="false">▶ Play</button><button type=button class="bnp-stop" aria-label="Stop ${n}" hidden>■ Stop</button>
+ <span class="bnp-live" hidden title="Live stream with no fixed length">LIVE</span>
+ <input type=range class="bnp-seek" min=0 max=0 step=0.5 value=0 aria-label="Rewind or fast-forward ${n}" disabled><span class="bnp-t" aria-hidden="true">—</span>
+ <button type=button class="bnp-edge" aria-label="Jump to live on ${n}" hidden>⏭ Jump to live</button>
+ <span class="bnp-volw"><button type=button class="bnp-mute" aria-label="Mute ${n}" aria-pressed="false">Mute</button>${BNP.volOK?`<input type=range class="bnp-vol" min=0 max=1 step=0.05 value="${BNP.vol}" aria-label="Volume ${n}">`:`<span class=meta>use your device volume</span>`}</span>
+ <div class="bnp-st meta" role="status" aria-live="polite"></div></div>`}
+function bnpMedia(pid,src){let a=BNP.el[pid];if(a)return a;a=document.createElement("audio");a.preload="none";a.dataset.bnp=pid;a._src=src;if(BNP.volOK)a.volume=BNP.vol;
+ let pool=$("bnp_pool");if(!pool){pool=document.createElement("div");pool.id="bnp_pool";pool.hidden=true;document.body.appendChild(pool)}pool.appendChild(a);BNP.el[pid]=a;
+ const st=(s)=>()=>{a._st=s;bnpSync(pid)};a.addEventListener("waiting",st("Buffering…"));a.addEventListener("playing",()=>{a._st="";a._err="";bnpSync(pid)});
+ a.addEventListener("pause",()=>{if(a._loaded)a._st="Paused";bnpSync(pid)});
+ a.addEventListener("error",()=>{if(!a.error||!a._loaded)return;a._err=["","Playback aborted","Network error: the stream didn't respond","The stream couldn't be decoded","The stream is offline or its format isn't supported by this browser"][a.error.code]||"Playback error";a._loaded=0;bnpSync(pid)});
+ ["timeupdate","progress","durationchange","volumechange","ended"].forEach(ev=>a.addEventListener(ev,()=>bnpSync(pid)));return a}
+async function bnpLoad(a){if(a._loaded)return;a._loaded=1;const src=a._src;
+ if(/\.m3u8(\?|#|$)/i.test(src)&&!a.canPlayType("application/vnd.apple.mpegurl")){
+  await (BNP.hlsP||(BNP.hlsP=new Promise((ok,no)=>{if(window.Hls)return ok();const s=document.createElement("script");s.src="api/radio/hls.min.js";s.onload=ok;s.onerror=()=>{BNP.hlsP=null;no(new Error("hls.js failed to load"))};document.head.appendChild(s)})));
+  if(!window.Hls||!Hls.isSupported())throw new Error("This browser can't play HLS streams");const h=new Hls({liveDurationInfinity:true});a._hls=h;h.loadSource(src);h.attachMedia(a);
+  h.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal){a._err="Stream error ("+d.details+")";bnpStop(a.dataset.bnp,true)}})}
+ else a.src=src}
+function bnpStopAll(keep){Object.keys(BNP.el).forEach(k=>{const m=BNP.el[k];if(m!==keep&&(m._loaded||!m.paused))bnpStop(k)});
+ document.querySelectorAll("audio,video").forEach(m=>{if(m!==keep&&!m.paused)try{m.pause()}catch(e){}});
+ document.querySelectorAll('iframe[src*="youtube"]').forEach(f=>{try{f.contentWindow.postMessage(JSON.stringify({event:"command",func:"pauseVideo",args:[]}),"*")}catch(e){}})}
+async function bnpPlay(pid){const ui=bnpUI(pid)[0];if(!ui)return;const a=bnpMedia(pid,ui.dataset.src);bnpStopAll(a);a._err="";a._st="Connecting…";bnpSync(pid);
+ try{await bnpLoad(a);await a.play()}catch(e){if(e&&e.name=="AbortError")return;a._loaded=0;a._err=(e&&e.name=="NotAllowedError")?"The browser blocked playback; press Play again":String(e&&e.message||e);bnpSync(pid)}}
+function bnpStop(pid,keepErr){const a=BNP.el[pid];if(!a)return;try{a.pause()}catch(e){}if(a._hls){a._hls.destroy();a._hls=null}a._loaded=0;a.removeAttribute("src");a.load();a._st=keepErr?"":"Stopped";if(!keepErr)a._err="";bnpSync(pid)}
+function bnpWin(a){if(!a||!a._loaded||a.readyState<1)return null;const d=a.duration;if(isFinite(d)&&d>0)return{s:0,e:d,live:false};
+ const sk=a.seekable,b=a.buffered;if(sk.length&&isFinite(sk.end(sk.length-1)))return{s:sk.start(0),e:sk.end(sk.length-1),live:true,mode:"dvr"};
+ if(sk.length&&b.length)return{s:Math.max(b.start(0),sk.start(0)),e:b.end(b.length-1),live:true,mode:"buffer"};return{s:0,e:0,live:true,mode:"none"}}
+function bnpSync(pid){const a=BNP.el[pid];bnpUI(pid).forEach(u=>{const q=s=>u.querySelector(s),nm=u.dataset.name,on=!!(a&&!a.paused),ld=!!(a&&a._loaded),w=bnpWin(a);
+ const pl=q(".bnp-play");pl.textContent=on?"❚❚ Pause":"▶ Play";pl.setAttribute("aria-label",(on?"Pause ":"Play ")+nm);pl.setAttribute("aria-pressed",String(on));q(".bnp-stop").hidden=!ld;u.classList.toggle("on",on);
+ const mu=q(".bnp-mute"),vo=q(".bnp-vol"),m=!!(a&&a.muted);mu.textContent=m?"Unmute":"Mute";mu.setAttribute("aria-pressed",String(m));mu.setAttribute("aria-label",(m?"Unmute ":"Mute ")+nm);if(vo&&a&&document.activeElement!==vo)vo.value=m?0:a.volume;
+ const sk=q(".bnp-seek"),t=q(".bnp-t"),lv=q(".bnp-live"),ed=q(".bnp-edge");lv.hidden=!(w&&w.live);
+ if(!w){sk.disabled=true;sk.min=0;sk.max=0;sk.value=0;t.textContent="—";ed.hidden=true;sk.title="Press Play to start";}
+ else if(!w.live){sk.disabled=false;sk.min=0;sk.max=w.e;if(document.activeElement!==sk)sk.value=a.currentTime;t.textContent=bnpFmt(a.currentTime)+" / "+bnpFmt(w.e);ed.hidden=true;sk.setAttribute("aria-valuetext",t.textContent)}
+ else{const len=w.e-w.s,beh=Math.max(0,w.e-a.currentTime);sk.disabled=len<2;sk.min=w.s;sk.max=w.e;if(document.activeElement!==sk)sk.value=Math.min(w.e,Math.max(w.s,a.currentTime));
+  ed.hidden=!(beh>3||(!on&&ld));t.textContent=len<2?"live":(beh>3?"−"+bnpFmt(beh)+" behind":"at live edge")+" · "+bnpFmt(len)+" window";sk.setAttribute("aria-valuetext",beh>3?bnpFmt(beh)+" behind live":"at live edge");
+  sk.title=w.mode=="dvr"?"This stream has a rewind (DVR) window":w.mode=="buffer"?"Live stream with no server rewind: you can rewind and fast-forward within what your browser has buffered since you pressed Play":"This live stream can't be rewound in this browser"}
+ const s=q(".bnp-st");s.classList.toggle("bad",!!(a&&a._err));s.textContent=a&&a._err?"⚠ "+a._err+" — try again, or use the open-source link below.":(a&&a._st)||(w&&w.live&&w.mode=="none"&&on?"Live only: this browser can't rewind this stream.":"")})}
+function bnpSyncAll(){Object.keys(BNP.el).forEach(bnpSync)}
+document.addEventListener("click",e=>{const u=e.target.closest(".bnp");if(!u)return;const b=e.target.closest("button");if(!b)return;e.preventDefault();e.stopPropagation();const pid=u.dataset.pid,a=BNP.el[pid];
+ if(b.classList.contains("bnp-play")){if(a&&!a.paused)a.pause();else if(a&&a._loaded){bnpStopAll(a);a.play().catch(()=>{})}else bnpPlay(pid)}
+ else if(b.classList.contains("bnp-stop"))bnpStop(pid);
+ else if(b.classList.contains("bnp-mute")){const m=a||bnpMedia(pid,u.dataset.src);m.muted=!m.muted;if(!m.muted&&m.volume==0)m.volume=.5;bnpSync(pid)}
+ else if(b.classList.contains("bnp-edge")&&a){const w=bnpWin(a);if(w&&w.mode=="dvr"){a.currentTime=a._hls&&a._hls.liveSyncPosition||w.e-1;a.play().catch(()=>{})}
+  else if(w&&w.mode=="buffer"&&!a.paused&&w.e-a.currentTime>3)a.currentTime=Math.max(w.s,w.e-1);else{bnpStop(pid);bnpPlay(pid)}}},true);
+document.addEventListener("input",e=>{const u=e.target.closest&&e.target.closest(".bnp");if(!u)return;const pid=u.dataset.pid,a=BNP.el[pid]||bnpMedia(pid,u.dataset.src),el=e.target;
+ if(el.classList.contains("bnp-vol")){a.volume=+el.value;a.muted=+el.value==0;BNP.vol=+el.value;localStorage.setItem("bnp_vol",el.value);Object.values(BNP.el).forEach(m=>{if(m!==a)m.volume=BNP.vol})}
+ else if(el.classList.contains("bnp-seek")&&a._loaded){try{a.currentTime=+el.value}catch(x){}}bnpSync(pid)});
+document.addEventListener("play",e=>{if(e.target instanceof HTMLMediaElement)bnpStopAll(e.target)},true);
+document.addEventListener("load",e=>{const f=e.target;if(f&&f.tagName=="IFRAME"&&/youtube/.test(f.src)&&/enablejsapi=1/.test(f.src))try{f.contentWindow.postMessage(JSON.stringify({event:"listening",id:"bnp",channel:"widget"}),"*")}catch(x){}},true);
+window.addEventListener("message",e=>{if(!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin))return;let d=e.data;try{if(typeof d=="string")d=JSON.parse(d)}catch(x){return}
+ if(!(d&&d.info&&d.info.playerState===1))return;Object.keys(BNP.el).forEach(k=>{if(BNP.el[k]._loaded)bnpStop(k)});document.querySelectorAll("audio,video").forEach(m=>{if(!m.paused)m.pause()});
+ document.querySelectorAll('iframe[src*="youtube"]').forEach(f=>{if(f.contentWindow!==e.source)try{f.contentWindow.postMessage(JSON.stringify({event:"command",func:"pauseVideo",args:[]}),"*")}catch(x){}})});
+window.bnMedia={stopAll:()=>bnpStopAll(null)};
+function bcNow(){const n=$("bc_now");if(!n)return;const pid=Object.keys(BNP.el).find(k=>BNP.el[k]._loaded);const inList=pid&&$("bc_clips").querySelector(`.bnp[data-pid="${CSS.escape(pid)}"]`);
+ if(!pid||inList){n.innerHTML="";bnpSyncAll();return}if(!n.querySelector(`.bnp[data-pid="${CSS.escape(pid)}"]`)){const a=BNP.el[pid];n.innerHTML=`<div class=meta>Now playing (no longer in the filtered list):</div>`+bnpHtml(pid,a._src,a._name||"broadcast")}bnpSyncAll()}
 async function bcKwPost(body){const r=await fetch("api/broadcast_keywords",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();
  $("bc_kmsg").innerHTML=r.ok?`<span class=ok>✓ ${esc(j.action=="add"?"added":"removed")} “${esc(j.word)}”</span>`:`<span class=bad>✗ ${esc(j.error||r.status)}</span>`;if(r.ok)bcLoad()}
 $("bc_kw").onclick=e=>{const ch=e.target.closest(".kwchip");if(!ch)return;if(e.target.dataset.del){if(confirm(`Remove keyword “${ch.dataset.w}”?`))bcKwPost({action:"remove",category:ch.dataset.c,word:ch.dataset.w});return}
@@ -685,7 +759,7 @@ function stRender(){const d=STR.d;bcBuild(d.keywords);const sel=$("st_reg");if(s
   <div class=st-sum>${c.summary?"<b>What's on:</b> "+bcHi(c.summary):'<span class=meta>No transcript yet — summary appears after the watcher has listened to this stream.</span>'}</div>
   ${c.segments.length?`<div class=st-tr>${c.segments.map(seg).join("")}</div>`:""}<div class=meta>${c.n_segments} segment(s) in window · top score ${c.max_score}</div></div></div>`}).join("")||"<div class=meta>No channels match.</div>";
  $("st_watch").innerHTML=d.stream_watchlist.map(s=>`<div class="card ${lv(s.score)}"><span class="sc ${lv(s.score)}">${s.score}</span><b>${esc(s.channel)}</b> <span class=meta>${esc(fmt(s.t_start))} · single channel, unconfirmed</span><div>${bcHi(s.text)}</div></div>`).join("")||"<div class=meta>Empty.</div>"}
-$("st_grid").onclick=e=>{const p=e.target.closest(".st-play");if(!p||p.classList.contains("on"))return;STR.playing.add(p.dataset.v);p.classList.add("on");p.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.dataset.v)}?autoplay=1&mute=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="live stream"></iframe>`};
+$("st_grid").onclick=e=>{const p=e.target.closest(".st-play");if(!p||p.classList.contains("on"))return;STR.playing.add(p.dataset.v);p.classList.add("on");p.innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.dataset.v)}?autoplay=1&mute=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="live stream"></iframe>`};
 $("st_kw").onclick=e=>{const c=e.target.closest(".kwchip");if(!c)return;STR.kw=STR.kw==c.dataset.w?"":c.dataset.w;stLoad()};
 $("st_reg").onchange=stLoad;$("st_live").onchange=stLoad;$("st_hrs").onchange=stLoad;
 $("st_ref").onclick=async()=>{const b=$("st_ref");b.disabled=true;$("st_msg").textContent=" checking every channel…";try{const r=await fetch("api/streams/refresh",{method:"POST"});const j=await r.json();$("st_msg").textContent=r.status==429?` rate-limited, retry in ${j.retry_after_s}s`:" ✓ "+j.note;stLoad()}catch(e){$("st_msg").textContent=" ✗ "+e}b.disabled=false};
@@ -856,7 +930,7 @@ function lvConnect(){if(!window.EventSource)return;const es=new EventSource("api
 const VT={voter:localStorage.getItem("bn_voter")||(()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);const v=[...a].map(x=>x.toString(16).padStart(2,"0")).join("");localStorage.setItem("bn_voter",v);return v})(),pend:0};
 function vtTargets(){const T=[];
  document.querySelectorAll(".card[data-cid],.tl-card[data-cid]").forEach(el=>T.push([el,"cluster",el.dataset.cid,el,null]));
- document.querySelectorAll("#tab-bcast a.clip[data-bid]").forEach(el=>T.push([el,"bcast",el.dataset.bid,null,el]));
+ document.querySelectorAll("#tab-bcast .clip[data-bid]").forEach(el=>T.push([el,"bcast",el.dataset.bid,null,el]));
  document.querySelectorAll(".st-seg[data-sid]").forEach(el=>T.push([el,"stream",el.dataset.sid,el,null]));
  document.querySelectorAll("#arcs .arc .arc-hd[data-tog]").forEach(el=>T.push([el,"arc",el.dataset.tog,el.parentElement,null]));
  const P=$("th_panel");if(P&&P.style.display!="none"&&TH.sel)T.push([P,"arc",TH.sel,P.querySelector("h3"),null]);return T}
