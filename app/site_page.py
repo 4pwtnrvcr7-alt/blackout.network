@@ -106,7 +106,8 @@ def plain(article):
     return " ".join(t)
 
 _LEAD = re.compile(r"^[^\w(\"'“‘\[]+")
+_HYPE = re.compile(r"^(?:#?(?-i:BREAKING(?: NEWS)?|JUST IN)\b\s*[:!\-–—|]*\s*|(?:BREAKING(?: NEWS)?|JUST IN|URGENT|ALERT|FLASH|DEVELOPING)\s*[:!\-–—|]+\s*)+", re.I)
 def clean_title(t):
-    t = re.sub(r"\s+", " ", t or "").strip(); c = _LEAD.sub("", t)
+    t = re.sub(r"\s+", " ", t or "").strip(); c = _LEAD.sub("", _HYPE.sub("", _LEAD.sub("", t)))
     c = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", c).strip()
     return c or t

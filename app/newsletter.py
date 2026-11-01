@@ -417,10 +417,11 @@ def _row_get(r, k, d=None):
     except (KeyError, IndexError): return d
 
 _LEAD = re.compile(r"^[^\w(\"'“‘\[]+")
+_HYPE = re.compile(r"^(?:#?(?-i:BREAKING(?: NEWS)?|JUST IN)\b\s*[:!\-–—|]*\s*|(?:BREAKING(?: NEWS)?|JUST IN|URGENT|ALERT|FLASH|DEVELOPING)\s*[:!\-–—|]+\s*)+", re.I)
 def clean_title(t):
     """Readable headline: drop leading flag/emoji runs and dash bullets, trailing @handles, squeeze spaces. Wording is never changed."""
     t = re.sub(r"\s+", " ", t or "").strip()
-    t = _LEAD.sub("", t); t = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", t).strip()
+    t = _LEAD.sub("", t); t = _HYPE.sub("", t); t = _LEAD.sub("", t); t = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", t).strip()
     return t or re.sub(r"\s+", " ", t or "").strip()
 
 def item_of(r, section, official=0, editorial=False):
