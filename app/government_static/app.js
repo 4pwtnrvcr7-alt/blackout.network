@@ -164,5 +164,7 @@ M.addEventListener("click",e=>{const t=e.target;let b;
 q("tree").addEventListener("keydown",e=>{const el=e.target.closest(".gv-node");if(!el)return;
  if(e.key=="ArrowRight"&&el.getAttribute("aria-expanded")=="false"){e.preventDefault();toggle(el)}else if(e.key=="ArrowLeft"){e.preventDefault();if(el.getAttribute("aria-expanded")=="true")toggle(el);else{const p=el.parentElement.closest(".gv-node");p&&p.querySelector(".gv-nm").focus()}}});
 nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b&&b.dataset.tab=="gov")setTimeout(()=>{if(!S.d)load()},0)});
+// open a profile from another tab (used by the Midterms tab's incumbent links)
+window.BNGov={open:async id=>{tb.click();for(let i=0;i<60&&!S.d;i++){if(!S.busy)await load();else await new Promise(r=>setTimeout(r,150))}goto(id,true)}};
 if(location.hash=="#government")setTimeout(()=>tb.click(),400);
 })();

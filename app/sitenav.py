@@ -51,6 +51,8 @@ NAV = [
    "See how BLACKOUT.NETWORK's alert volume, severity mix and source health have moved over hours, days and weeks, with charts you can read on any screen."),
   ("politics", "politics", "🏛 Politics", "Politics: developments and markets",
    "Political developments flagged by BLACKOUT.NETWORK's scanner, alongside public prediction-market prices, so you can see what might shift and how fast."),
+  ("midterms", "midterms", "🗳 Midterms 2026", "Midterms 2026: races, polls and results",
+   "The 2026 U.S. midterms on BLACKOUT.NETWORK: every Senate, House and governor race, with cited ratings, polls, market odds and official live results."),
   ("finance", "finance", "💹 Finance", "Finance: global markets",
    "Global markets on BLACKOUT.NETWORK: indices, ETFs, stocks, bonds, options and volatility, forex and crypto, in one dark, phone-friendly dashboard tab."),
   ("jets", "jets", "✈ Private jets", "Private jets: business jets airborne now",

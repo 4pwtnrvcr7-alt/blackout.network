@@ -1,0 +1,84 @@
+/* Midterms 2026 tab (midterms.py). Mobile-first; site palette from theme.css (--bg --pn --pn2 --bd --tx --mu --hi --md --lo --ac). */
+.mt{gap:12px}
+.mt .mt-ic{width:20px;height:20px;vertical-align:-3px;color:var(--ac)}
+.mt h2{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px}
+.mt h2 .meta{font-weight:400;font-size:13px}
+.mt h2 .tab-ref{margin-left:auto}
+.mt .mt-note{color:var(--mu);font-size:13px;line-height:1.5;margin:6px 0}
+.mt .mt-clock{font-size:17px;line-height:1.45;padding:10px 12px;background:var(--pn2,#1a1f25);border:1px solid var(--bd);border-left:3px solid var(--md);border-radius:var(--radius,8px);margin:8px 0}
+.mt .mt-cd{color:var(--md);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mt .mt-fresh{font-size:12px}
+.mt .mt-bad{color:var(--hi)}
+.mt a{color:var(--ac)}
+/* balance */
+.mt .mt-bal{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.mt .mt-card{background:var(--pn2,#1a1f25);border:1px solid var(--bd);border-radius:var(--radius,8px);padding:10px 12px;min-width:0}
+.mt .mt-card h3{margin:0 0 6px;font-size:16px}
+.mt .mt-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#0f1317;border:1px solid var(--bd);margin:4px 0 8px}
+.mt .mt-bar i{display:block;height:100%}
+.mt .mt-ctl{padding:4px 2px 0;line-height:1.6}
+/* tables */
+.mt .mt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.mt .mt-t{width:100%;border-collapse:collapse;font-size:13px}
+.mt .mt-t th,.mt .mt-t td{padding:5px 6px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
+.mt .mt-t thead th{color:var(--mu);font-weight:600;font-size:12px;white-space:nowrap}
+.mt .mt-t tbody th{font-weight:600}
+.mt .mt-pvot td,.mt .mt-pvot th{white-space:nowrap}
+.mt .mt-det{margin:8px 0}
+.mt .mt-pvot tbody th{position:sticky;left:0;background:var(--pn,#14181d);z-index:1}
+.mt .mt-balt th,.mt .mt-balt td{padding:4px 5px}
+.mt .mt-balt tbody th{white-space:nowrap}
+.mt .mt-det>summary{cursor:pointer;color:var(--ac);padding:6px 0;min-height:32px}
+/* chips */
+.mt .mt-chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.mt .mt-p{display:inline-block;min-width:18px;text-align:center;border-radius:4px;padding:0 4px;font-size:11px;font-weight:700;color:#0b0d10;background:var(--pc)}
+.mt .mt-inc{display:inline-block;border:1px solid var(--bd2,#2f3742);border-radius:999px;padding:0 7px;font-size:11px;color:var(--md)}
+.mt .mt-inc.mt-w{color:var(--lo);border-color:var(--lo)}
+/* map */
+.mt .mt-seg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden;margin:4px 0 8px;max-width:100%}
+.mt .mt-seg button{background:transparent;color:var(--tx);border:0;padding:8px 12px;min-height:38px;font:inherit;font-size:13px;cursor:pointer}
+.mt .mt-seg button+button{border-left:1px solid var(--bd)}
+.mt .mt-seg button.on{background:var(--ac);color:#0b0d10;font-weight:700}
+.mt .mt-map{height:250px;border-radius:var(--radius,8px);border:1px solid var(--bd);background:#0f1317;overflow:hidden}
+.mt .mt-legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;margin-top:8px;align-items:center}
+.mt .mt-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-2px}
+/* tools + list */
+.mt .mt-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px}
+.mt .mt-tools input[type=search]{flex:1 1 220px;min-width:0;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:9px 10px;font:inherit;font-size:16px}
+.mt .mt-tools select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px;font:inherit;font-size:14px}
+.mt .mt-tools label{font-size:13px;color:var(--mu);display:flex;gap:6px;align-items:center}
+.mt .mt-list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-top:8px}
+.mt .mt-race{background:var(--pn2,#1a1f25);border:1px solid var(--bd);border-radius:var(--radius,8px);padding:9px 10px;min-width:0;scroll-margin-top:70px;transition:box-shadow .3s}
+.mt .mt-race header{background:none;border:0;padding:0;margin:0;position:static;box-shadow:none;min-height:0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.mt .mt-race h3{margin:0;font-size:16px;line-height:1.3}
+.mt .mt-flash{box-shadow:0 0 0 2px var(--md)}
+.mt tr.mt-flash{outline:2px solid var(--md)}
+.mt .mt-rts{display:flex;flex-wrap:wrap;gap:6px 12px;margin:8px 0}
+.mt .mt-rt{display:inline-flex;gap:5px;align-items:center;font-size:12px}
+.mt .mt-cands{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.mt .mt-c{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 10px;align-items:start;padding:6px 0;border-top:1px solid var(--bd)}
+.mt .mt-ph{width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:50% 20%;background:#0f1317;border:1px solid var(--bd);grid-row:span 2}
+.mt .mt-ini{display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--mu)}
+.mt .mt-cn{min-width:0;line-height:1.4}
+.mt .mt-nums{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;font-variant-numeric:tabular-nums}
+.mt .mt-nums>span{display:inline-flex;gap:4px;align-items:baseline}
+.mt .mt-res{margin:6px 0;padding:7px 9px;border-radius:6px;background:#0f1317;border:1px solid var(--bd);font-size:13px;line-height:1.5}
+.mt .mt-win{border-color:var(--lo)}
+.mt .mt-rest{margin:4px 0}
+.mt .mt-links{margin-top:6px;line-height:1.7}
+.mt .mt-links2{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:13px}
+.mt .mt-ul{margin:6px 0;padding-left:18px;line-height:1.55;font-size:13px}
+.mt .mt-ul ul{padding-left:16px}
+.mt .mt-hst>summary{font-weight:600}
+.mt a.mt-gov{white-space:nowrap}
+.mt .mt-far{flex-basis:100%;font-size:12px;line-height:1.9}
+@media (min-width:760px){
+ .mt .mt-race{padding:10px 12px}
+ .mt .mt-bal{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .mt .mt-ctl{grid-column:auto}
+ .mt .mt-map{height:440px}
+ .mt .mt-list{grid-template-columns:repeat(auto-fill,minmax(440px,1fr))}
+ .mt .mt-c{grid-template-columns:44px minmax(0,1fr) auto}
+ .mt .mt-ph{grid-row:auto}
+ .mt .mt-nums{justify-content:flex-end;text-align:right}
+}
