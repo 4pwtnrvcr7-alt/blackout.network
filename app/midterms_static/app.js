@@ -11,7 +11,7 @@ const N=v=>v==null?"—":Number(v).toLocaleString("en-US");
 const P=p=>p==null?"—":p>=.995&&p<1?"≥99%":p>0&&p<.01?"<1%":Math.round(p*100)+"%";
 const PN={D:"Democratic",R:"Republican",I:"Independent",L:"Libertarian",G:"Green",C:"Constitution",F:"Forward",O:"Other"};
 const OFF={senate:"U.S. Senate",governor:"Governor",house:"U.S. House"};
-const ICON=`<svg class="mt-ic" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v9H4z"/><path d="M8 12V8l4-5 4 5v4"/><path d="M10 16h4"/></svg>`;
+const ICON=`<svg class="mt-ic" width="20" height="20" style="width:20px;height:20px" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v9H4z"/><path d="M8 12V8l4-5 4 5v4"/><path d="M10 16h4"/></svg>`;
 // rating scale -> color (site palette: --ac blue, --hi red, --md amber); v is -3 (Safe D) .. +3 (Safe R)
 const RC=v=>v==null?"#3a424d":v<=-2.5?"#1f6fd1":v<=-1.5?"#4aa3ff":v<=-0.75?"#86c2ff":v<-0.25?"#b9dcff":v<0.25?"#faad14":v<0.75?"#ffc4c4":v<1.5?"#ff8c8d":v<2.5?"#ff4d4f":"#c4292c";
 const RT=v=>v==null?"#e6e9ee":(Math.abs(v)<0.8)?"#0b0d10":"#fff";
@@ -46,6 +46,9 @@ if(!M){M=document.createElement("main");M.id="tab-midterms";M.dataset.addon="mid
  <section class="pn"><h2>All 435 House seats <span class="meta">— every district, its incumbent and the candidates on the ballot</span></h2><div data-el="house"></div></section>
  <section class="pn mt-src"><h2>Sources and method <span class="meta">— every input is free and public; nothing is estimated by us</span></h2><div data-el="src"></div></section>`;
  const last=[...document.querySelectorAll("main[data-addon]")].pop();(last||document.body).insertAdjacentElement(last?"afterend":"beforeend",M)}
+// if this tab's stylesheet failed to load (the host occasionally answers 502 during a busy page load), fetch it again
+setTimeout(()=>{const ok=[...document.styleSheets].some(x=>{try{return /api\/midterms\/app\.css/.test(x.href||"")&&x.cssRules.length>0}catch(_){return false}});
+ if(!ok){const l=document.createElement("link");l.rel="stylesheet";l.href=API+"/app.css?r="+Date.now();document.head.appendChild(l)}},2500);
 const q=s=>M.querySelector(`[data-el="${s}"]`);
 const S={d:null,live:null,off:"senate",map:"senate",sort:"close",qq:"",busy:false,lmap:null,glayer:null,geo:null,timer:null,shown:false};
 // ---- lookups
@@ -53,7 +56,9 @@ const odds=rid=>(((S.d||{}).odds||{}).odds||{})[rid]||[];
 function oddsFor(rid,c){const out={};for(const m of odds(rid)){const o=(m.outcomes||[]).find(o=>ln(o.name)===ln(c.name))||
   (m.outcomes||[]).find(o=>c.code==="D"&&/democrat|\(d\)/i.test(o.name)||c.code==="R"&&/republican|\(r\)/i.test(o.name));if(o)out[m.src]={p:o.p,url:m.url,basis:o.basis}}return out}
 function pollCols(r){const a=(r.page||{}).aggregates;return a||null}
-function avgRow(a){if(!a||!a.rows||!a.rows.length)return null;return a.rows.find(x=>/^average$/i.test(x.source))||a.rows[0]}
+function avgRow(a){if(!a||!a.rows||!a.rows.length)return null;const av=a.rows.find(x=>/^average$/i.test(x.source));if(!av)return a.rows[0];
+ const others=a.rows.filter(x=>x!==av);const ds=others.map(x=>Date.parse(x.updated)).filter(x=>!isNaN(x));
+ return Object.assign({},av,{source:`average of the ${others.length} aggregators listed (computed on Wikipedia)`,updated:ds.length?new Date(Math.max(...ds)).toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:"UTC"}):""})}
 function pollFor(r,c){const a=pollCols(r);if(!a)return null;const col=a.columns.find(k=>ln(k)===ln(c.name));if(!col)return null;const row=avgRow(a);
  return row&&row.values[col]!=null?{v:row.values[col],src:row.source,upd:row.updated}:null}
 const feeds=()=>(((S.live&&S.live.official)||(S.d||{}).official_live||{}).feeds)||{};
@@ -69,6 +74,7 @@ const title=r=>`${E(r.state_name||r.state)}${r.office==="house"?` ${r.district==
 // color follows the label text when it is a standard rating, so a chip's color always matches its words
 const TV=t=>{const m=String(t||"").match(/\b(Safe|Solid|Likely|Lean|Tilt|Toss-?up)\b(?:\s+([DRI]))?/i);if(!m)return null;const k=m[1].toLowerCase();if(k.startsWith("toss"))return 0;const mag={safe:3,solid:3,likely:2,lean:1,tilt:.5}[k];return m[2]&&m[2].toUpperCase()==="D"?-mag:m[2]&&m[2].toUpperCase()==="R"?mag:null};
 const chip=(t,v,extra)=>{const w=TV(t);v=w==null?v:w;return `<span class="mt-chip" style="background:${RC(v)};color:${RT(v)}"${extra||""}>${E(t)}</span>`};
+
 const pchip=c=>`<span class="mt-p" style="--pc:${PC[c]||PC.O}" title="${E(PN[c]||"Other")}">${E(c||"?")}</span>`;
 // ---- countdown to polls closing (times from 270toWin's 2026 poll closing page, Eastern Time)
 function clock(){const d=S.d;if(!d)return;const t=Date.now(),first=Date.parse(d.first_close.at),lastc=Date.parse(d.last_close.at);
@@ -181,7 +187,7 @@ function mapStyle(f){const st=f.properties.st;const r=races().find(x=>x.office==
  if(w)return{color:"#0b0d10",weight:1.5,fillColor:PC[w.code]||PC.O,fillOpacity:.9};
  return{color:"#0b0d10",weight:1,fillColor:RC(r.consensus?(TV(r.consensus.t)??r.consensus.v):null),fillOpacity:.78}}
 function legend(){const L=[["Safe D",-3],["Likely D",-2],["Lean D",-1],["Tilt D",-.5],["Tossup",0],["Tilt R",.5],["Lean R",1],["Likely R",2],["Safe R",3]];
- q("legend").innerHTML=L.map(([t,v])=>`<span><i style="background:${RC(v)}"></i>${t}</span>`).join("")+`<span><i style="background:#1b1f24;border:1px solid #2f3742"></i>No ${S.map==="senate"?"Senate":"governor"} race</span><span class="meta">Average of Cook, Inside Elections and Sabato. Solid ${pchip("D")}/${pchip("R")} fill = winner recorded on Wikipedia.</span>`+(()=>{const far=races().filter(r=>r.office===S.map&&["AK","HI"].includes(r.state));return far.length?`<div class="mt-far">Off the map view: ${far.map(r=>`<a href="#race-${E(r.id)}" data-jump="${E(r.id)}">${E(r.state_name)}</a> ${r.consensus?chip(r.consensus.t,r.consensus.v):""}${winnerOf(r)?" "+pchip(winnerOf(r).code)+" "+E(winnerOf(r).name):""}`).join(" · ")}</div>`:""})()}
+ q("legend").innerHTML=L.map(([t,v])=>`<span><i style="background:${RC(v)}"></i>${t}</span>`).join("")+`<span><i style="background:transparent;border:1px solid var(--bd)"></i>No ${S.map==="senate"?"Senate":"governor"} race</span><span class="meta">Average of Cook, Inside Elections and Sabato. Solid ${pchip("D")}/${pchip("R")} fill = winner recorded on Wikipedia.</span>`+(()=>{const far=races().filter(r=>r.office===S.map&&["AK","HI"].includes(r.state));return far.length?`<div class="mt-far">Off the map view: ${far.map(r=>`<a href="#race-${E(r.id)}" data-jump="${E(r.id)}">${E(r.state_name)}</a> ${r.consensus?chip(r.consensus.t,r.consensus.v):""}${winnerOf(r)?" "+pchip(winnerOf(r).code)+" "+E(winnerOf(r).name):""}`).join(" · ")}</div>`:""})()}
 async function map(){if(typeof L=="undefined")return;const el=q("map");
  if(!S.lmap){S.lmap=L.map(el,{zoomSnap:.25,scrollWheelZoom:false,attributionControl:true,worldCopyJump:false});const w=el.clientWidth||360;
   S.lmap.fitBounds([[24.5,-124.8],[49.4,-66.9]],{padding:[4,4]});if(window.bnBaseLayer)window.bnBaseLayer(S.lmap,{maxZoom:8,extra:"states: Natural Earth"});

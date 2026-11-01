@@ -223,7 +223,7 @@ def wiki_url(title, revid=None):
     return u + (f"?oldid={revid}" if revid else "")
 
 # ------------------------------------------------------------------ parsing helpers
-PARTY = [(r"democratic|democrat\b|\bdem\b|^d$", "D"), (r"republican|\brep\b|^r$|\bgop\b", "R"),
+PARTY = [(r"democratic|democrat\b|\bdem\b|^d$|\bdfl\b|farmer.?labor|\bd-npl\b", "D"), (r"republican|\brep\b|^r$|\bgop\b", "R"),
          (r"independent|\bind\b|^i$|nonpartisan|unaffiliated|no party|\bnpa\b", "I"), (r"libertarian|\blib\b|\blbt\b", "L"),
          (r"green|\bgrn\b|\bgre\b", "G"), (r"constitution", "C"), (r"forward", "F")]
 def pcode(s):
