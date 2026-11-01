@@ -24,7 +24,7 @@ _lock = threading.Lock()
 _days = {}          # day -> {"page_views", "requests", "status": {"2xx":..}, "modules": {..}, "pages": {..}, "_v": set()}
 _last_save = [0.0]
 SKIP = ("/internal/", "/healthz", "/api/reports/pull", "/api/reports/ack", "/api/reports/status", "/api/status", "/api/sync_status",
-        "/api/hit")   # /api/hit is accounted for by beacon()
+        "/api/hit", "/api/email-events")   # /api/hit is accounted for by beacon()
 PAGES = {"/": "dashboard", "/index.html": "dashboard", "/scoring": "scoring", "/about/scoring": "scoring", "/newsletter": "newsletter",
          "/sources": "sources", "/report-status": "report_status", "/guides": "guides", "/maps": "maps",
          "/stats": "stats", "/midterms": "midterms", "/privacy": "privacy", "/tos": "tos", "/alerts": "alerts"}

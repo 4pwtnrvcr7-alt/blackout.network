@@ -1563,7 +1563,11 @@ def unsubscribe(tok, how="link"):
     if r is None: return "ok", None
     if r["status"] == "unsubscribed": return "ok", r
     k = db(); t = iso(now())
-    k.execute("UPDATE subscribers SET status='unsubscribed', unsubscribed_at=?, updated=?, unsub_reason=? WHERE id=?", (t, t, how, r["id"])); k.commit()
+    k.execute("UPDATE subscribers SET status='unsubscribed', unsubscribed_at=?, updated=?, unsub_reason=? WHERE id=?", (t, t, how, r["id"]))
+    try:   # unsubscribing deletes this subscriber's per-recipient open/click/delivery events (email_events.py)
+        import email_events; email_events.purge_subscriber(k, r["id"])
+    except Exception: pass
+    k.commit()
     r = k.execute("SELECT * FROM subscribers WHERE id=?", (r["id"],)).fetchone(); k.close()
     log(f"subscriber #{r['id']} unsubscribed ({how})", "sub"); return "ok", r
 

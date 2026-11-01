@@ -495,6 +495,15 @@ class RH(server.H):
                 import usage_stats; usage_stats.beacon(self.ip(), self.headers.get("User-Agent", ""), self.headers, raw)
             except Exception: pass
             self.send_response(204); self.send_header("Cache-Control", "no-store"); self.send_header("Content-Length", "0"); self.end_headers(); return
+        if path == "/api/email-events":   # Resend webhook (Svix-signed; off unless RESEND_WEBHOOK_SECRET is set). See email_events.py
+            import email_events as EV, newsletter as NL
+            n = int(self.headers.get("Content-Length") or 0)
+            if not EV.enabled(): return self.send(404, {"error": "not found"})
+            if n > EV.MAX_BODY: return self.send(413, {"error": "too large"})
+            raw = self.rfile.read(n) if n > 0 else b""
+            if FREEZE["until"] > time.time() or (SYNC_SECRET and not SYNC["restored"]):   # newsletter.db is being handed off/restored: Resend retries later
+                return self.send(503, {"error": "busy, retry"})
+            return self.send(*EV.handle(self.headers, raw, NL.P["db"]))
         if path in BOX_ONLY:
             self.body(); return self.send(503 if path == "/api/refresh" else 403, {"status": "unavailable", "error": BOX_ONLY[path]})
         if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in POST_ALLOW):
