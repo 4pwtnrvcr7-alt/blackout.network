@@ -26,6 +26,7 @@ ROUTES = {
     "/api/heatmap": "heatmap",
     "/api/weather": "weather",
     "/api/trends": "trends",
+    "/api/wire_history": "wire_history",   # Wire tab scrollable history + ARCHIVE items (t246)
     "/api/noise": "bnoise",
     "/api/politics": "politics",
     "/api/games": "games",
