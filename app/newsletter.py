@@ -1182,6 +1182,23 @@ def load_trending():
     try: return json.load(open(os.path.join(BASE, "social_trending.json"))).get("items") or []
     except Exception: return []
 
+def trend_ok(t, S=None):
+    """CoS Nov 1 guard: a trending alert may never carry a watchlist or unconfirmed story. A trend is about one of our own posts; if it is
+    linked to stories (its own cluster_id / cluster_ids, or a social_stories.json entry with the same YouTube id or URL), every linked
+    cluster must be in blackout.db, on the main feed (watchlist=0) and confirmed (eff_families >= 2, the item_of() bar). Unknown -> refused."""
+    ids = set(t.get("cluster_ids") or []) | ({t["cluster_id"]} if t.get("cluster_id") else set())
+    key = {str(t.get("id") or ""), str(t.get("url") or "")} - {""}
+    for st in load_stories():
+        if key & {str(st.get("youtube_id") or ""), str(st.get("youtube_url") or ""), str(st.get("url") or "")} - {""}: ids |= set(st.get("cluster_ids") or [])
+    if not ids: return True
+    own = S is None; S = S or src()
+    try:
+        rows = {r["cluster_id"]: r for r in S.execute(f"SELECT cluster_id, watchlist, eff_families FROM clusters WHERE cluster_id IN ({','.join('?' * len(ids))})", sorted(ids))}
+    except Exception: return False
+    finally:
+        if own: S.close()
+    return all(i in rows and not rows[i]["watchlist"] and int(rows[i]["eff_families"] or 0) >= 2 for i in ids)
+
 def breaking_candidates(at=None, c=None, S=None):
     """-> [(row, rule, official)] fresh stories meeting the trigger, strongest first."""
     c = c or cfg(); at = at or now(); b = c.get("breaking") or {}
@@ -1210,6 +1227,7 @@ def _trend_row(t):
             f'<p class="bnm" style="margin:0 0 12px 0;color:{PAL["mu"]};font-size:13px">{E(t.get("platform") or "")}: {E(t.get("value"))} {E(t.get("metric") or "views")}, about {E(t.get("ratio") or "")}× our recent average.</p>'
             f'{_btn("Watch it →", t["url"])}</td></tr>')
 def render_trending(t, links, at, c=None):
+    if not trend_ok(t): raise ValueError("trending alert refused: linked to a watchlist or unconfirmed story")   # belt and braces (run_breaking already filters)
     c = c or cfg(); addr, _ = _addr(c)
     subj = f"Trending on {BRAND}: {_cut(t.get('title') or '', 90)}"
     pre = f"One of our posts is taking off: {_cut(t.get('title') or '', 120)}"
@@ -1747,7 +1765,7 @@ def run_breaking(at=None, c=None, dry_run=False):
         if not fresh and not (hr >= int(b.get("quiet_start", 22)) or hr < int(b.get("quiet_end", 7))):
             for t_ in load_trending():
                 tid = "trend:" + str(t_.get("id") or "")
-                if tid != "trend:" and tid not in seen and t_.get("url") and (parse_t(t_.get("at")) or at) > at - timedelta(hours=12): trend = t_; break
+                if tid != "trend:" and tid not in seen and t_.get("url") and (parse_t(t_.get("at")) or at) > at - timedelta(hours=12) and trend_ok(t_): trend = t_; break
         if not fresh and not trend: return []
         if dry_run: return [(f"breaking:dry:{r['cluster_id']}", rule) for r, rule, o in fresh]
         runs = [parse_t(x[0]) for x in k.execute("SELECT ts FROM breaking_runs WHERE status IN ('sent','locked','running','done') AND ts>=?",
