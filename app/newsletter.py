@@ -216,7 +216,9 @@ CREATE TABLE IF NOT EXISTS breaking_runs(id INTEGER PRIMARY KEY AUTOINCREMENT, t
   n_targets INTEGER DEFAULT 0, n_sent INTEGER DEFAULT 0, note TEXT);
 """
 MIGRATE = [("sent_items", "rank", "INTEGER"), ("sent_items", "n_items", "INTEGER"), ("sent_items", "eff", "INTEGER"), ("sent_items", "fams", "TEXT"),
-           ("sent_items", "kind", "TEXT"), ("subscribers", "breaking", "INTEGER NOT NULL DEFAULT 1")]
+           ("sent_items", "kind", "TEXT"), ("subscribers", "breaking", "INTEGER NOT NULL DEFAULT 1"),
+           ("subscribers", "loc_label", "TEXT"), ("subscribers", "loc_lat", "REAL"), ("subscribers", "loc_lon", "REAL"), ("subscribers", "loc_cc", "TEXT"),
+           ("subscribers", "loc_kind", "TEXT")]
 _INIT = {}
 def db():
     c = sqlite3.connect(P["db"], timeout=15); c.row_factory = sqlite3.Row
@@ -277,6 +279,73 @@ def links_for(row, c=None):
             "sources": f"{base}/newsletter/sources?token={mt}",     # "Find new sources" button
             "confirm": f"{base}/newsletter/confirm?token={sub_token('confirm', row)}",
             "scoring": f"{base}/scoring", "site": f"{base}/#wire", "signup": f"{base}/newsletter"}
+
+# ------------------------------------------------------------------ t373: subscriber location (offline geocoder; coarse centroid only)
+_GEO = {}
+def _geo_data():
+    if not _GEO:
+        hd = os.path.join(BASE, "heatmap_data")
+        try: _GEO["zip"] = json.load(open(os.path.join(BASE, "newsletter_zip.json")))         # US Census 2023 ZCTA centroids (public domain)
+        except Exception: _GEO["zip"] = {}
+        try: _GEO["cc"] = json.load(open(os.path.join(hd, "countries.json")))                 # GeoNames / Natural Earth (CC BY)
+        except Exception: _GEO["cc"] = {}
+        try: _GEO["a1"] = json.load(open(os.path.join(hd, "admin1.json")))
+        except Exception: _GEO["a1"] = {}
+        try: cities = json.load(open(os.path.join(hd, "cities.json")))
+        except Exception: cities = []
+        idx = {}
+        for ct in cities:
+            for nm in [ct[0], ct[1]] + list(ct[8] or [])[:6]:
+                k_ = _fold(nm)
+                if k_ and (k_ not in idx or (ct[6] or 0) > (idx[k_][6] or 0)): idx.setdefault(k_, ct) if k_ in idx and (idx[k_][6] or 0) >= (ct[6] or 0) else idx.__setitem__(k_, ct)
+        _GEO["city"] = idx; _GEO["cities"] = cities
+    return _GEO
+def _fold(x):
+    import unicodedata
+    return re.sub(r"[^a-z0-9 ]", "", unicodedata.normalize("NFKD", str(x or "")).encode("ascii", "ignore").decode().lower()).strip()
+def geocode_place(q):
+    """-> {label, lat, lon, cc, kind} or None. US ZIP, 'City', 'City, ST', 'City, Country' or a country name/code. Coordinates rounded to 0.1°."""
+    q = str(q or "").strip()[:80]
+    if not q: return None
+    G = _geo_data(); rnd = lambda v: round(float(v), 1)
+    m = re.fullmatch(r"(\d{5})(?:-\d{4})?", q)
+    if m:
+        z = G["zip"].get(m.group(1))
+        return {"label": f"{z[2]} {m.group(1)}", "lat": rnd(z[0]), "lon": rnd(z[1]), "cc": "US", "kind": "zip", "admin": z[3]} if z else None
+    fq = _fold(q)
+    for cc, v in G["cc"].items():
+        if fq in {_fold(cc), _fold(v.get("iso3")), _fold(v.get("name"))} | {_fold(x) for x in v.get("ne_names") or []} and v.get("label"):
+            return {"label": v["name"], "lat": rnd(v["label"][0]), "lon": rnd(v["label"][1]), "cc": cc, "kind": "country"}
+    parts = [p_.strip() for p_ in q.split(",")]
+    city = _fold(parts[0]); qual = _fold(parts[1]) if len(parts) > 1 else ""
+    cands = [ct for ct in G["cities"] if _fold(ct[0]) == city or _fold(ct[1]) == city] or ([G["city"][city]] if city in G["city"] else [])
+    if qual:
+        def okq(ct):
+            a1 = G["a1"].get(ct[5]) or {}; cv = G["cc"].get(ct[4]) or {}
+            return qual in {_fold(ct[4]), _fold(a1.get("postal")), _fold(a1.get("name")), _fold(a1.get("ascii")), _fold(cv.get("name")), _fold(cv.get("iso3"))}
+        cands = [ct for ct in cands if okq(ct)] or []
+    if not cands: return None
+    ct = max(cands, key=lambda x: x[6] or 0); a1 = G["a1"].get(ct[5]) or {}; cv = G["cc"].get(ct[4]) or {}
+    lab = f"{ct[0]}, {a1.get('postal') or a1.get('ascii') or ''}" if ct[4] == "US" else f"{ct[0]}, {cv.get('name') or ct[4]}"
+    return {"label": lab.strip(", "), "lat": rnd(ct[2]), "lon": rnd(ct[3]), "cc": ct[4], "kind": "city"}
+def _km(a, b, c_, d):
+    import math
+    p = math.pi / 180; x = 0.5 - math.cos((c_ - a) * p) / 2 + math.cos(a * p) * math.cos(c_ * p) * (1 - math.cos((d - b) * p)) / 2
+    return 12742 * math.asin(math.sqrt(max(0, x)))
+NEAR_KM = {"zip": 300, "city": 300, "country": 150}   # country: name match in the location/title, or within 150 km of its centre
+def is_near(sub, r):
+    """Distance-based: within NEAR_KM of the subscriber's centroid (country subscribers also match the country name in the location)."""
+    if not sub or sub.get("loc_lat") is None: return None
+    if r["lat"] is not None and r["lon"] is not None:
+        d = _km(sub["loc_lat"], sub["loc_lon"], r["lat"], r["lon"])
+        if d <= NEAR_KM.get(sub.get("loc_kind") or "city", 300): return round(d)
+    if sub.get("loc_kind") == "country":
+        nm = (sub.get("loc_label") or "").lower()
+        if nm and nm in f"{r['location'] or ''} {r['title'] or ''}".lower(): return 0
+    return None
+def _set_loc(k, sid, loc):
+    if loc is None: k.execute("UPDATE subscribers SET loc_label=NULL, loc_lat=NULL, loc_lon=NULL, loc_cc=NULL, loc_kind=NULL WHERE id=?", (sid,))
+    else: k.execute("UPDATE subscribers SET loc_label=?, loc_lat=?, loc_lon=?, loc_cc=?, loc_kind=? WHERE id=?", (loc["label"], loc["lat"], loc["lon"], loc["cc"], loc["kind"], sid))
 
 # ------------------------------------------------------------------ validation + rate limits
 EMAIL_RE = re.compile(r"^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9])$")
@@ -549,7 +618,28 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         tn = norm_title(r["title"])
         if any(similar(tn, x) for x in sent_titles + picked_titles): return False
         picked_titles.append(tn); used.add(r["cluster_id"]); return True
-    main, notable, watch = [], [], []
+    main, notable, watch, near = [], [], [], []
+    if sub and sub.get("loc_lat") is not None:
+        S2 = src(); n0 = iso(min(start, at - timedelta(hours=24)))   # local news looks back 24 h (dedupe still applies)
+        try:
+            nrows = S2.execute("""SELECT * FROM clusters WHERE watchlist=0 AND rank>=3 AND lat IS NOT NULL AND
+                  ((first_seen>=? AND first_seen<=?) OR (high_at>=? AND high_at<=?)) ORDER BY rank DESC, score DESC LIMIT 600""", (n0, s1, n0, s1)).fetchall()
+            if sub.get("loc_kind") == "country":
+                nrows = list(nrows) + list(S2.execute("""SELECT * FROM clusters WHERE watchlist=0 AND rank>=3 AND (location LIKE ? OR title LIKE ?) AND
+                  ((first_seen>=? AND first_seen<=?) OR (high_at>=? AND high_at<=?)) LIMIT 200""", (f"%{sub['loc_label']}%", f"%{sub['loc_label']}%", n0, s1, n0, s1)))
+            noff = {x["cluster_id"]: x["o"] or 0 for x in S2.execute("SELECT cluster_id, MAX(official) o FROM alerts WHERE first_seen>=? GROUP BY cluster_id", (iso(start - timedelta(days=2)),))}
+        finally: S2.close()
+        cand = []
+        for r in nrows:
+            dk = is_near(sub, r)
+            if dk is None or not (int(r["eff_families"] or 0) >= 2 or noff.get(r["cluster_id"])): continue   # confirmed or official only
+            cand.append((-(int(r["rank"] or 0)), dk, r))
+        seen_ = set()
+        for _, dk, r in sorted(cand, key=lambda x: (x[0], x[1])):
+            if len(near) >= 5 or r["cluster_id"] in seen_: continue
+            seen_.add(r["cluster_id"])
+            if take(r):
+                it = item_of(r, "near", noff.get(r["cluster_id"], 0)); it["dist_km"] = dk; near.append(it)
     for r in erows:
         if len(main) < int(c["max_main_items"]) and take(r): main.append(item_of(r, "main", offi.get(r["cluster_id"], 0), editorial=True))
     for r in rows:
@@ -574,9 +664,11 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     for it in politics: it["section"] = "politics"
     for it in follow_u + main + updates + notable + politics:
         it["breaking"] = it["cluster_id"] in brk; it["followed"] = it["cluster_id"] in follows
-    quiet = not main and not notable and not updates and not follow_u and not politics
-    issue = {"main": main, "notable": notable, "watchlist": watch, "updates": updates, "follow": follow_u, "politics": politics, "quiet": quiet, "start": start,
-             "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics), "rule": {"rank": rmin, "sources": smin}}
+    if not allcats:   # personal relevance: chosen topics first within the same rank
+        main.sort(key=lambda x: (-x["rank"], x["category"] not in ints))
+    quiet = not main and not notable and not updates and not follow_u and not politics and not near
+    issue = {"near": near, "loc_label": (sub or {}).get("loc_label"), "main": main, "notable": notable, "watchlist": watch, "updates": updates, "follow": follow_u, "politics": politics, "quiet": quiet, "start": start,
+             "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics or near), "rule": {"rank": rmin, "sources": smin}}
     issue["videos"] = videos_for(issue, c)
     issue["empty"] = issue["empty"] and not issue["videos"]
     if quiet and not any(int(i.get("rank") or 0) >= 4 for i in watch):   # quiet period: only send if something rank 4+ exists
@@ -910,6 +1002,12 @@ def render(issue, links, c=None):
     if issue.get("label"): day = issue["label"]
     B = []; a = B.append
     a(_bluf_html(issue["bluf"]))
+    if issue.get("near"):
+        a(_sec_html(f"Near you — {issue.get('loc_label') or 'your area'}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country), highest rank first.", "green"))
+        for it in issue["near"]: a(_item_html(it, links, c))
+    elif issue.get("loc_label"):
+        a(_sec_html(f"Near you — {issue['loc_label']}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country).", "green"))
+        a(f'<tr><td style="padding:4px 20px 14px 20px;font:400 15px/1.55 {FB};color:{PAL["body"]}">All quiet near {E(issue["loc_label"])}: no confirmed or official reports in the last 24 hours.</td></tr>')
     if issue.get("follow"):
         a(_sec_html("Stories you follow", "Updates on stories you chose to follow: only what is new since your last brief.", "green"))
         for it in issue["follow"]: a(_item_html(it, links, c))
@@ -954,6 +1052,8 @@ def render(issue, links, c=None):
             fl = follow_links(links.get("_row"), it["cluster_id"], c)
             T.append(f"   Unfollow: {fl['unfollow']}" if it.get("followed") and fl["unfollow"] else f"   Follow this story: {fl['follow']}")
             T.append("")
+    if not issue.get("near") and issue.get("loc_label"): T += [f"NEAR YOU — {issue['loc_label'].upper()}", f"All quiet near {issue['loc_label']}: no confirmed or official reports in the last 24 hours.", ""]
+    if issue.get("near"): tsec(f"Near you — {issue.get('loc_label') or 'your area'}", issue["near"])
     if issue.get("follow"): tsec("Stories you follow", issue["follow"])
     if issue["main"]: tsec("Top threats", issue["main"])
     else: T += [f"QUIET PERIOD: No new rank-{rr['rank']}+ confirmed threats in this window.", ""]
@@ -1266,6 +1366,10 @@ def subscribe(d, ip="", headers=None):
         freq = d.get("frequency") or "twice"
         if freq not in FREQS: return 400, {"ok": False, "message": "Choose a frequency.", "field": "frequency"}
         ints = _clean_ints(d.get("interests") or ["all"])
+        loc = None
+        if str(d.get("location") or "").strip():
+            loc = geocode_place(d.get("location"))
+            if not loc: return 400, {"ok": False, "message": "We couldn't find that place. Try a US ZIP code, a city (e.g. Sanford, FL) or a country.", "field": "location"}
         ek = h("em:" + email)
         if hits(k, "sub_email", ek, 86400) >= int(rl["email_per_day"]):
             return 429, {"ok": False, "message": "This address has had several signup attempts today. Please try again tomorrow, or use the link already sent."}
@@ -1281,6 +1385,7 @@ def subscribe(d, ip="", headers=None):
             k.execute("UPDATE subscribers SET status='pending', frequency=?, interests=?, updated=?, consent_ip_hash=?, confirm_sent_at=? WHERE id=?",
                       (freq, json.dumps(ints), t, ipk, t, r["id"]))
             kind = "confirm"
+        if kind == "confirm" and loc: k.execute("UPDATE subscribers SET loc_label=?, loc_lat=?, loc_lon=?, loc_cc=?, loc_kind=? WHERE email=?", (loc["label"], loc["lat"], loc["lon"], loc["cc"], loc["kind"], email))
         k.commit(); row = k.execute("SELECT * FROM subscribers WHERE email=?", (email,)).fetchone()
     finally: k.close()
     send_transactional(row, kind)
@@ -1330,7 +1435,15 @@ def manage(tok, d):
     brk = _row_get(r, "breaking", 1)
     if "breaking_present" in d or "breaking" in d:   # checkbox (absent = off) when the form says it rendered one
         brk = 1 if str(d.get("breaking") or "") in ("1", "on", "true", "True", "yes") else 0
-    k = db(); k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, updated=? WHERE id=?", (freq, json.dumps(ints), int(brk if brk is not None else 1), iso(now()), r["id"])); k.commit(); k.close()
+    loc = "keep"
+    if "location" in d:
+        if str(d.get("location") or "").strip():
+            loc = geocode_place(d.get("location"))
+            if not loc: return 400, {"ok": False, "message": "We couldn't find that place. Try a US ZIP code, a city (e.g. Sanford, FL) or a country."}
+        else: loc = None
+    k = db()
+    if loc != "keep": _set_loc(k, r["id"], loc)
+    k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, updated=? WHERE id=?", (freq, json.dumps(ints), int(brk if brk is not None else 1), iso(now()), r["id"])); k.commit(); k.close()
     log(f"subscriber #{r['id']} changed preferences", "sub")
     return 200, {"ok": True, "message": f"Saved: {FREQS[freq].lower()}, {'all categories' if ints == ['all'] else ', '.join(ints)}, breaking alerts {'on' if brk else 'off'}."}
 
@@ -1466,7 +1579,7 @@ def audience(c=None):
 
 def record_sent(k, send_id, sid, issue_or_items, at, kind=None):
     """Remember what went to this subscriber (cluster, rank, title) so later editions only repeat it as an UPDATE."""
-    secs = issue_or_items if isinstance(issue_or_items, list) else [it for s in ("follow", "main", "updates", "politics", "notable", "watchlist") for it in issue_or_items.get(s, [])]
+    secs = issue_or_items if isinstance(issue_or_items, list) else [it for s in ("follow", "near", "main", "updates", "politics", "notable", "watchlist") for it in issue_or_items.get(s, [])]
     for it in secs:
         k.execute("INSERT INTO sent_items(send_id,subscriber_id,cluster_id,title_norm,section,sent_at,rank,n_items,eff,fams,kind) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                   (send_id, sid, it["cluster_id"], it["title_norm"], it["section"], iso(at), it["rank"], it.get("n_items"), it["eff"],
@@ -1766,6 +1879,10 @@ def admin_action(d):
         em = str(d.get("email") or "").strip().lower(); c = cfg()
         k = db(); r = k.execute("SELECT * FROM subscribers WHERE email=? AND status='active' AND confirmed_at IS NOT NULL", (em,)).fetchone(); k.close()
         if not r: return 404, {"ok": False, "message": "No confirmed, active subscriber with that address."}
+        if d.get("location"):
+            loc = geocode_place(d["location"])
+            if not loc: return 400, {"ok": False, "message": "location not found"}
+            k = db(); _set_loc(k, r["id"], loc); k.commit(); r = k.execute("SELECT * FROM subscribers WHERE id=?", (r["id"],)).fetchone(); k.close()
         sub = dict(r); at = now(); nxt = next_slots(at, 1, c)[0]
         issue = build_issue(sub, at=at, since=at - timedelta(hours=12), slot=nxt["slot"], c=c)
         L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
@@ -1913,6 +2030,9 @@ def form_html(mode="page"):
             + "".join(f'<label class="nl-radio"><input type="radio" name="frequency" value="{k}"{" checked" if k == "twice" else ""}> {E(v)}'
                       f'<span class="nl-sm"> ({E(sl["morning"] + " & " + sl["evening"] if k == "twice" else sl[k])} ET)</span></label>' for k, v in FREQS.items())
             + '</fieldset>'
+            f'<label for="{uid}_loc" class="nl-loc-l">Your area (optional): US ZIP, city or country</label>'
+            f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="e.g. 32771, Sanford, FL or Germany">'
+            '<p class="nl-sm">Adds a "Near you" section first. We store only the place name and a rough location (about 10 km), never your address.</p>'
             f'<details class="nl-cats-d"><summary>Categories: all (optional: pick only some)</summary><div class="nl-cats">{cats}</div></details>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
@@ -1957,8 +2077,11 @@ def prefs_form(tok, r):
             '<fieldset><legend>Categories</legend><div class="nl-cats">' +
             "".join(f'<label class="nl-chk"><input type="checkbox" name="interests" value="{E(x)}"{" checked" if allc or x in ints else ""}> {E(x)}</label>' for x in CATEGORIES) +
             '</div><p class="nl-sm">Leave all ticked (or none) to get every category.</p></fieldset>'
+            '<fieldset><legend>Your area</legend><label for="nl_m_loc">US ZIP, city or country (leave empty for none)</label>'
+            f'<input id="nl_m_loc" class="nl-loc" type="text" name="location" maxlength="80" value="{E(_row_get(r, "loc_label", "") or "")}" placeholder="e.g. 32771, Sanford, FL or Germany">'
+            '<p class="nl-sm">Used for the "Near you" section and local breaking alerts. Stored as a place name and rough location only.</p></fieldset>'
             '<fieldset><legend>Breaking alerts</legend><input type="hidden" name="breaking_present" value="1">'
-            f'<label class="nl-chk"><input type="checkbox" name="breaking" value="1"{" checked" if _row_get(r, "breaking", 1) else ""}> Send me rare breaking alerts for truly major events (at most one every 3 hours)</label></fieldset>'
+            f'<label class="nl-chk"><input type="checkbox" name="breaking" value="1"{" checked" if _row_get(r, "breaking", 1) else ""}> Send me rare breaking alerts for truly major events (at most 3 a day, 2+ hours apart)</label></fieldset>'
             '<button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')
 

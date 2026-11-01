@@ -317,7 +317,7 @@ class RH(server.H):
                 return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
                                        "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"],
                                        "lookup": _nl_lookup(NL, d.get("email"))})
-            return self.send(*NL.admin_action({"action": "test_send", "email": d.get("email")}))
+            return self.send(*NL.admin_action({"action": "test_send", "email": d.get("email"), "location": d.get("location")}))
         if path in BOX_ONLY:
             self.body(); return self.send(503 if path == "/api/refresh" else 403, {"status": "unavailable", "error": BOX_ONLY[path]})
         if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in POST_ALLOW):

@@ -119,6 +119,12 @@ signed up, confirmed, changed settings or unsubscribed; where on the Site you si
 used to sign up, kept as a consent record and to prevent abuse; a record of which issues and items were sent to you and whether delivery
 succeeded; and, if you choose to give one, your reason for unsubscribing. Signup uses double opt-in: you are not subscribed until you click
 the confirmation link we email you. Every newsletter includes an unsubscribe link, and you can also unsubscribe by contacting us.</p>
+<p><b>Optional location for local news.</b> If you choose to give an area (a US ZIP code, a city or a country) when you sign up or on your
+preferences page, we store only the place name you chose (for example "Sanford, FL 32771") and a rough centre point for it, rounded to about
+10 km. We look it up on our own server from bundled public datasets (US Census ZIP centroids, GeoNames); it is never sent to a third party,
+and we never ask for or store a street address. It is used only to add a "Near you" section and local breaking alerts to your emails. You can
+change or remove it at any time from the preferences link in every email. Your email address, area and topic choices are never shown on any
+public page or shared; our public statistics show subscriber totals only.</p>
 <p>Confirmation emails and newsletters are delivered through a third-party email delivery provider (such as Resend), which processes your
 email address and the message content on our behalf in order to send the email.</p>
 <h3>Alerts (push notifications)</h3>
