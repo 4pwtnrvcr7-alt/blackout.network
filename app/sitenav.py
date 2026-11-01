@@ -51,6 +51,8 @@ NAV = [
    "See how BLACKOUT.NETWORK's alert volume, severity mix and source health have moved over hours, days and weeks, with charts you can read on any screen."),
   ("politics", "politics", "🏛 Politics", "Politics: developments and markets",
    "Political developments flagged by BLACKOUT.NETWORK's scanner, alongside public prediction-market prices, so you can see what might shift and how fast."),
+  ("gunlaws", "gunlaws", "⚖ Gun Laws", "Gun Laws: court cases, bills and forecasts",
+   "Second Amendment cases in U.S. courts, gun bills in Congress and state ballot measures on BLACKOUT.NETWORK, with parties, odds and plain-English forecasts."),
   ("midterms", "midterms", "🗳 Midterms 2026", "Midterms 2026: races, polls and results",
    "The 2026 U.S. midterms on BLACKOUT.NETWORK: every Senate, House and governor race, with cited ratings, polls, market odds and official live results."),
   ("finance", "finance", "💹 Finance", "Finance: global markets",
