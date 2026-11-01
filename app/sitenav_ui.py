@@ -22,8 +22,10 @@ _SVG = 'aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0
 I_MENU = f'<svg {_SVG}><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>'
 I_CLOSE = f'<svg {_SVG}><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>'
 I_SEARCH = f'<svg {_SVG}><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
-I_GEAR = (f'<svg {_SVG}><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.8" fill="none"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" '
-          'd="M12 2.8l1.6 2.3 2.7-.7.7 2.7 2.3 1.6-1.2 2.5 1.2 2.5-2.3 1.6-.7 2.7-2.7-.7L12 21.2l-1.6-2.3-2.7.7-.7-2.7-2.3-1.6L5.9 12 4.7 9.5 7 7.9l.7-2.7 2.7.7z"/></svg>')
+# t397: symmetrical 8-tooth gear (generated: teeth every 45°, tip r 9.5, root r 7.2, hole r 3), same 1.8 stroke as the other bar icons
+I_GEAR = (f'<svg {_SVG}><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" '
+          'd="M9.96 5.10L10.27 2.66A9.5 9.5 0 0 1 13.73 2.66L14.04 5.10A7.2 7.2 0 0 1 15.44 5.67L17.38 4.17A9.5 9.5 0 0 1 19.83 6.62L18.33 8.56A7.2 7.2 0 0 1 18.90 9.96L21.34 10.27A9.5 9.5 0 0 1 21.34 13.73L18.90 14.04A7.2 7.2 0 0 1 18.33 15.44L19.83 17.38A9.5 9.5 0 0 1 17.38 19.83L15.44 18.33A7.2 7.2 0 0 1 14.04 18.90L13.73 21.34A9.5 9.5 0 0 1 10.27 21.34L9.96 18.90A7.2 7.2 0 0 1 8.56 18.33L6.62 19.83A9.5 9.5 0 0 1 4.17 17.38L5.67 15.44A7.2 7.2 0 0 1 5.10 14.04L2.66 13.73A9.5 9.5 0 0 1 2.66 10.27L5.10 9.96A7.2 7.2 0 0 1 5.67 8.56L4.17 6.62A9.5 9.5 0 0 1 6.62 4.17L8.56 5.67A7.2 7.2 0 0 1 9.96 5.10Z"/>'
+          '<circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>')
 I_SUN = (f'<svg class="bn-sun" {_SVG}><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
          'd="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>')
 I_MOON = f'<svg class="bn-moon" {_SVG}><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>'

@@ -158,7 +158,7 @@ import sitenav_ui as UI   # top bar + sidebar markup (t320/t321/t323)
 
 # Dashboard-only controls, shown in the top bar's settings popover (ids used by dashboard.html's script).
 DASH_CTL = ('<span id="status">loading…</span><button class="pri" id="refresh">⟳ Manual refresh</button>'
-            '<label title="Set on the scanner node">Scans every <select id="interval"></select></label><span id="msg"></span>')
+            '<label title="How often this page pulls the latest data on this device. Saved in this browser.">Refresh my view every <select id="interval" aria-label="Refresh my view every"></select></label><span id="msg"></span>')
 
 def header_html(active=""):
     """The shared top bar (logo, The Wire / Sources / Newsletter, Follow us on YouTube / X, search, theme, menu) + the sidebar menu."""

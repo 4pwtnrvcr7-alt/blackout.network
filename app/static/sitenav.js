@@ -30,7 +30,11 @@ window.bnTheme=function(){return R.getAttribute("data-theme")==="light"?"light":
 if(window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)");var onmq=function(){if(!LS.get("bn_theme"))setTheme(mq.matches?"light":"dark",false)};
  if(mq.addEventListener)mq.addEventListener("change",onmq);else if(mq.addListener)mq.addListener(onmq)}
 
+/* t397: the language picker + site-wide translation (/api/translate/app.js) on every page, not just the four that linked it */
+function trLoad(){if(window.BNTR||document.querySelector('script[src*="api/translate/app.js"]'))return;var d=document,l=d.createElement("link");l.rel="stylesheet";l.href="/api/translate/app.css";d.head.appendChild(l);
+ var s=d.createElement("script");s.src="/api/translate/app.js";d.head.appendChild(s)}
 function init(){
+ try{trLoad()}catch(e){}
  setTheme(window.bnTheme(),false);setTimeout(function(){charts(false)},1500);addEventListener("load",function(){charts(R.getAttribute("data-theme")==="light")});
  document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-bn-theme]");if(b){e.preventDefault();setTheme(window.bnTheme()==="light"?"dark":"light",true)}});
 

@@ -326,3 +326,5 @@ body header.bn-top.bn-f4 .bn-primary{display:none!important}
 body header.bn-top.bn-f5 .bn-follows{display:none!important}
 body header.bn-top.bn-f6{--bn-icon-w:31px}
 body header.bn-top.bn-f6 .bn-acts .bn-ib{width:31px!important}
+/* t397: the floating "report a problem" flag sat on top of the open Settings sheet (over the language picker) on phones */
+html:has(#bn_settings:not([hidden])) .bnr-fab{visibility:hidden}

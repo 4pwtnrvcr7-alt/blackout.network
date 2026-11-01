@@ -430,8 +430,7 @@ ${c.brief?`<div class="brief">${esc(c.brief)}</div>`:""}</div>`}
 function render(){
  $("thr").textContent=S.high_threshold;
  $("status").textContent=`Updated ${fmt(S.generated)} · last scan ${S.scans[0]?fmt(S.scans[0].finished):"—"} · next ${S.next_scan?fmt(S.next_scan):"—"}${S.scanning?" · scanning…":""}`;
- const sel=$("interval");if(!sel.options.length){S.allowed_intervals.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=m<60?m+" min":(m/60)+" h";sel.appendChild(o)})}
- if(document.activeElement!==sel)sel.value=S.interval_minutes;
+ vrFill();if(S.interval_minutes)$("status").textContent+=` · scanner checks sources every ${S.interval_minutes<60?S.interval_minutes+" min":(S.interval_minutes/60)+" h"}`;
  $("filters").innerHTML=["all",...CATS].map(c=>`<button class="${c==filter?"on":""}" data-c="${c}">${c}</button>`).join("");
  const feed=S.main.filter(c=>filter=="all"||c.category==filter).sort((a,b)=>(b.score>=S.high_threshold)-(a.score>=S.high_threshold)||(b.score-a.score));
  $("feed").innerHTML=feed.map(card).join("")||"<div class=meta>No items.</div>";
@@ -479,10 +478,17 @@ async function load(){try{S=await bnJSON("api/state");render();try{fdr()}catch(_
 $("refresh").textContent="⟳ Reload data";$("refresh").title="Reload the latest data. Scans run automatically on the scanner node.";
 $("refresh").onclick=async()=>{const b=$("refresh");b.disabled=true;$("msg").textContent="reloading…";
  try{await load();$("msg").textContent=S&&S.scans&&S.scans[0]?`✓ latest data loaded · last scan ${fmt(S.scans[0].finished)}`:"✓ latest data loaded"}catch(e){$("msg").textContent="error "+e}b.disabled=false};
-$("interval").disabled=true;$("interval").title="Scan interval is managed on the scanner node.";$("interval").onchange=async e=>{let p=$("pass").value;if(!p){load();return}
- const r=await fetch("api/interval",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({minutes:+e.target.value,passcode:p})});const j=await r.json();
- $("msg").textContent=r.ok?`✓ interval set to ${j.interval_minutes} min`:"✗ "+(j.error||r.status);load()};
-load();setInterval(load,60000);
+/* t397: "Refresh my view every" is a per-visitor setting (localStorage bn_view_refresh): how often this page re-pulls /api/state.
+   Live (default) = every minute plus instant SSE pushes. The scanner's own schedule is set on the scanner node and shown read-only in the status line. */
+const VR_KEY="bn_view_refresh",VR_OPTS=[1,5,10,15,20,30,45,60,90,120,180,240,300,360];let vrTimer=0;
+function vrGet(){let v=1;try{v=+localStorage.getItem(VR_KEY)||1}catch(_){}return VR_OPTS.includes(v)?v:1}
+function vrLabel(m){return m==1?"Live (1 min)":m<60?m+" min":(m/60)+" h"}
+function vrFill(){const sel=$("interval");if(!sel)return;sel.disabled=false;if(sel.options.length!==VR_OPTS.length){sel.innerHTML="";VR_OPTS.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=vrLabel(m);sel.appendChild(o)})}
+ if(document.activeElement!==sel&&+sel.value!==vrGet())sel.value=vrGet()}
+function vrArm(){clearInterval(vrTimer);vrTimer=setInterval(load,vrGet()*60000)}
+vrFill();$("interval").title="How often this page pulls the latest data on this device";
+$("interval").onchange=e=>{const v=+e.target.value;try{localStorage.setItem(VR_KEY,String(v))}catch(_){}vrArm();$("msg").textContent=`✓ saved · this page refreshes ${v==1?"every minute (live)":"every "+vrLabel(v)}`};
+load();vrArm();
 // ---- private jets tab (informational only; never affects threat ranks) ----
 let J=null,jTab=false,jC=null,jKTouched=false;
 const tbl=(o,n)=>{const e=Object.entries(o||{}).slice(0,n||99);const mx=Math.max(1,...e.map(x=>x[1]));return e.length?"<table>"+e.map(([k,v])=>`<tr><td>${esc(k)}</td><td style="width:45%"><span class=bar style="width:${Math.round(100*v/mx)}%"></span></td><td>${v}</td></tr>`).join("")+"</table>":"<div class=meta>No data yet.</div>"};
@@ -1055,11 +1061,16 @@ async function nsLoad(){try{const d=NS.d=await (await fetch("api/netstatus?windo
 function nsTxt(v){return v==null?"":typeof v=="string"||typeof v=="number"?String(v):Array.isArray(v)?v.map(nsTxt).filter(Boolean).join(", "):typeof v=="object"?nsTxt(v.src||v.name||v.label||v.title||v.status||""):""}
 function nsBadge(a){if(a&&a.data&&a.count==null)a=a.data;a=a||{};a={count:+a.count||0,alerts:(Array.isArray(a.alerts)?a.alerts:[]).map(x=>typeof x=="object"&&x?[nsTxt(x.src),typeof x.status=="string"?x.status:""].filter(Boolean).join(": "):nsTxt(x)).filter(Boolean)};if(!a.alerts.length)a.count=0;const b=document.querySelector('.tabs button[data-tab="net"]');let s=b.querySelector(".ns-badge");if(!a.count){s&&s.remove();$("ns_gbanner").style.display="none";return}
  if(!s){s=document.createElement("span");s.className="ns-badge";b.appendChild(s)}s.textContent=a.count;
- const key=a.alerts.join("|");if(sessionStorage.getItem("ns_dismiss")!==key){$("ns_gbanner").innerHTML=`<span class=ns-txt>🌐 <b>Network alert:</b> ${a.alerts.map(esc).join("; ")}. <span class=meta>Tap to open Network Status.</span></span><button class=ns-x type=button aria-label="Dismiss until the alerts change" title="Dismiss until the alerts change" style="background:none;border:0;color:#ffccc7;cursor:pointer">✕</button>`;$("ns_gbanner").style.display="flex";$("ns_gbanner").dataset.k=key}}
+ const key=nsKey(a.alerts);if(!nsDismissed(key)){$("ns_gbanner").innerHTML=`<span class=ns-txt>🌐 <b>Network alert:</b> ${a.alerts.map(esc).join("; ")}. <span class=meta>Tap to open Network Status.</span></span><button class=ns-x type=button aria-label="Dismiss until the alerts change" title="Dismiss until the alerts change" style="background:none;border:0;color:#ffccc7;cursor:pointer">✕</button>`;$("ns_gbanner").style.display="flex";$("ns_gbanner").dataset.k=key}}
+/* t397: a dismissed network alert stays dismissed across page loads (localStorage "bn_dismiss_ns" = {k, t}). Identity = the sorted list of
+   affected services (status wording changes don't re-show it); it comes back only for a new/different set of services or after 24 h. */
+function nsKey(al){return al.map(x=>String(x).split(":")[0].trim().toLowerCase()).filter(Boolean).sort().join("|")}
+function nsDismissed(k){if(!k)return false;try{const v=JSON.parse(localStorage.getItem("bn_dismiss_ns")||"null");return !!v&&v.k===k&&Date.now()-v.t<864e5}catch(_){return false}}
+function nsDismiss(k){if(!k)return;try{localStorage.setItem("bn_dismiss_ns",JSON.stringify({k:k,t:Date.now()}))}catch(_){}}
 async function nsAlerts(){try{nsBadge(await (await fetch("api/netstatus/alerts",{cache:"no-store"})).json())}catch(e){}}
-$("ns_gbanner").onclick=e=>{if(e.target.closest(".ns-x")){sessionStorage.setItem("ns_dismiss",$("ns_gbanner").dataset.k);$("ns_gbanner").style.display="none";return}document.querySelector('.tabs button[data-tab="net"]').click()};
+$("ns_gbanner").onclick=e=>{if(e.target.closest(".ns-x")){nsDismiss($("ns_gbanner").dataset.k);$("ns_gbanner").style.display="none";return}document.querySelector('.tabs button[data-tab="net"]').click()};
 $("ns_win").onchange=e=>{NS.win=e.target.value;nsLoad()};
-document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="net"){nsLoad();sessionStorage.setItem("ns_dismiss",$("ns_gbanner").dataset.k||"");$("ns_gbanner").style.display="none"}});
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b&&b.dataset.tab=="net"){nsLoad();nsDismiss($("ns_gbanner").dataset.k||"");$("ns_gbanner").style.display="none"}});
 if(LV&&LV.es)LV.es.addEventListener("netstatus",e=>{try{nsBadge(JSON.parse(e.data))}catch(_){}if($("tab-net").style.display!="none")nsLoad()});
 setInterval(()=>{nsAlerts();if($("tab-net").style.display!="none")nsLoad()},300000);nsAlerts();
 (function(){const nav=document.querySelector(".tabs"),B=t=>nav.querySelector(`button[data-tab="${t}"]`);

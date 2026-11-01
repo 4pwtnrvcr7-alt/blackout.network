@@ -1,15 +1,21 @@
-/* blackout.network translation UI (display-only) */
-#bntr_bar{display:inline-flex;align-items:center;gap:6px;margin-inline-start:8px;white-space:nowrap}
+/* blackout.network translation UI (t397: Google Website Translator, loaded on demand) */
+#bntr_bar{display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px 8px;white-space:nowrap}
+#bn_settings #bntr_bar{flex:1 1 100%;border-top:1px solid var(--bn-line,#2a2f3a);padding-top:10px}
 #bntr_bar.bntr-float{position:fixed;top:8px;inset-inline-end:8px;z-index:9999;background:var(--bg,#0d1016);border:1px solid var(--bd,#2a2f3a);border-radius:8px;padding:4px 8px}
-.bntr-sel{max-width:210px;background:var(--pn,#151922);color:var(--tx,#e6e9ef);border:1px solid var(--bd,#2a2f3a);border-radius:6px;padding:3px 6px;font:inherit;font-size:12.5px}
-.bntr-tog{background:none;border:1px solid var(--ac,#4da3ff);color:var(--ac,#4da3ff);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer}
-.bntr-tog.on{background:var(--ac,#4da3ff);color:#000}
-.bntr-st{font-size:11px;color:var(--mu,#8a93a6)}
-#bntr_note{display:none;margin:6px 12px;padding:6px 10px;border:1px dashed var(--ac,#4da3ff);border-radius:8px;font-size:12.5px;color:var(--tx,#e6e9ef);background:rgba(77,163,255,.07)}
-.bntr-orig{float:inline-end;margin:2px 0 0 6px;font-size:10px;line-height:1;padding:3px 5px;border-radius:5px;border:1px solid var(--bd,#3a4150);background:none;color:var(--mu,#8a93a6);cursor:pointer;font-weight:600;letter-spacing:.4px}
-.bntr-orig:hover,.bntr-orig.on{color:var(--ac,#4da3ff);border-color:var(--ac,#4da3ff)}
-.bntr-foot select{font-size:11.5px}
-/* RTL (ar, fa, he, ur): mirror text flow but keep maps, charts, code and numbers-heavy widgets LTR */
+.bntr-lbl{font-size:13px;color:var(--bn-muted,#8a93a6)}
+.bntr-sel{max-width:230px;min-height:40px;background:var(--bn-surface,#151922);color:var(--bn-text,#e6e9ef);border:1px solid var(--bn-line,#2a2f3a);border-radius:6px;padding:3px 6px;font:inherit;font-size:13px}
+.bntr-foot .bntr-sel{min-height:0;font-size:11.5px}
+.bntr-st{font-size:11px;color:var(--bn-muted,#8a93a6)}
+#bntr_note{flex:1 1 100%;white-space:normal;font-size:11.5px;color:var(--bn-muted,#8a93a6)}
+#bntr_note[hidden]{display:none}
+/* hide everything Google adds: top banner, hover tooltip/balloon, spinner, highlight; keep the page from being pushed down */
+#bn_gt_el{position:fixed!important;left:0!important;top:0!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%)!important}
+iframe.skiptranslate,.goog-te-banner-frame,#goog-gt-tt,#goog-gt-vt,.goog-te-balloon-frame,.goog-tooltip,.goog-te-spinner-pos,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,.VIpgJd-ZVi9od-aZ2wEe-wOHMyf,.VIpgJd-ZVi9od-aZ2wEe-OiiCO,.VIpgJd-yAWNEb-L7lbkb,.VIpgJd-ZVi9od-l4eHX-hSRGPd{display:none!important;visibility:hidden!important}
+html body{top:0!important}
+.goog-text-highlight,.VIpgJd-yAWNEb-VIpgJd-fmcmS-sn54Q{background:none!important;box-shadow:none!important}
+font[style*="vertical-align"]{vertical-align:baseline!important}
+/* RTL (Arabic, Persian, Hebrew, Urdu…): mirror text flow, keep maps, charts, code and number widgets LTR */
 [dir=rtl] body{text-align:right}
-[dir=rtl] .leaflet-container,[dir=rtl] canvas,[dir=rtl] code,[dir=rtl] pre,[dir=rtl] input[type=range],[dir=rtl] .sc{direction:ltr}
+[dir=rtl] .leaflet-container,[dir=rtl] .maplibregl-map,[dir=rtl] canvas,[dir=rtl] code,[dir=rtl] pre,[dir=rtl] input[type=range],[dir=rtl] .sc,[dir=rtl] .bn-logo,[dir=rtl] .bn-meter{direction:ltr}
 [dir=rtl] table{direction:rtl}[dir=rtl] th,[dir=rtl] td{text-align:right}

@@ -45,7 +45,7 @@ function notice(d,title,why,cls){
  const link=d.watch_url?`<a href="${e(d.watch_url)}" target="_blank" rel="noopener noreferrer">${e(T(d.watch_label||"Watch on the original platform ↗"))}</a>`:"";
  return `<div class="vs-notice ${cls||""}" role="note"><span class="i" aria-hidden="true">i</span><div><div class="h">${e(T(title))}</div><div class="w">${e(T(why))}</div>${link}</div></div>`}
 function trLinks(root){ // the site picker leaves link text alone, so translate our "Watch on … ↗" links through the same /api/translate engine
- const L=window.BNTR&&BNTR.lang;if(!L||L=="en")return;root.querySelectorAll(".vs-notice a").forEach(async a=>{const src=a.dataset.src||a.textContent;a.dataset.src=src;
+ const L=window.BNTR&&BNTR.lang;if(!L||L=="en"||BNTR.engine=="google")return;root.querySelectorAll(".vs-notice a").forEach(async a=>{const src=a.dataset.src||a.textContent;a.dataset.src=src;
   try{const r=await fetch("/api/translate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:L,texts:[src.replace(/\s*↗$/,"")]})});const j=await r.json();if(j.out&&j.out[0])a.textContent=j.out[0]+" ↗"}catch(x){}})}
 function render(p,d,url){
  const st=d.status;let body=p.querySelector(".vs-body");if(!body){body=document.createElement("div");body.className="vs-body";p.append(body)}
