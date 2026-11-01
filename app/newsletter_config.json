@@ -35,5 +35,6 @@
   10,
   30
  ],
- "editorial_ttl_hours": 24
+ "editorial_ttl_hours": 24,
+ "watchlist_enabled": false
 }
