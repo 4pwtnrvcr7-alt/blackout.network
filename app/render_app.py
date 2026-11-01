@@ -181,7 +181,9 @@ def manifest():
         if os.path.exists(p):
             try: tmp = _db_snapshot(rel); owned[rel] = _sha(tmp); os.unlink(tmp)
             except Exception as ex: owned[rel] = "error:" + str(ex)[:80]
-    with _mlock: files = dict(MAN)
+    with _mlock:   # t338: only files that are really on disk (a restart can keep /tmp/bn_state but lose the pushed data -> "Syncing" forever)
+        for rel in [r for r in MAN if not os.path.exists(os.path.join(BASE, r))]: MAN.pop(rel, None)
+        files = dict(MAN)
     return {"boot_id": BOOT_ID, "booted": BOOTED, "files": files, "owned": owned, "restored": SYNC["restored"],
             "has_data": has_data(), "sync": SYNC, "blocked_background": len(BLOCKED)}
 
