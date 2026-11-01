@@ -45,6 +45,8 @@ SKIP_RE = re.compile(r"^(mailto:|tel:|javascript:|data:|blob:|sms:)|\{|\$\{|%7B|
                      r"fonts\.(googleapis|gstatic)|googletagmanager|/api/|/fdsnws/|api\.weather\.gov/(points|gridpoints|alerts)|services\.swpc|"
                      r"basemaps\.|openfreemap\.org/(styles|planet)|tiles\.|rainviewer\.com/v2|nominatim|overpass|youtube\.com/embed|youtube-nocookie|"
                      r"x\.com/intent/|twitter\.com/intent/|platform\.twitter|schema\.org|w3\.org/|xmlns", re.I)
+# Content-Security-Policy directives: their bare origins (https://host) are allow-list entries, not links, and often 404 at the root.
+CSP_LINE_RE = re.compile(r"\b(default|script|style|font|img|media|connect|frame|child|worker|manifest|object|prefetch)-src\b|\bframe-ancestors\b|\bbase-uri\b|\bform-action\b")
 SOFT_TITLE_RE = re.compile(r"\b(404|410)\b|page not found|not found|page (cannot|can't|could not|couldn.t) be found|page (does not|doesn.t) exist|"
                            r"no longer (available|exists)|page (is )?unavailable|page has (been )?(moved|removed|deleted)|nothing (was )?found|"
                            r"error 404|oops|seite nicht gefunden|página no encontrada|page introuvable|pagina non trovata", re.I)
@@ -339,6 +341,7 @@ def added_urls(base_ref):
             for m in re.finditer(r"""https?://[^\s"'<>`\\)\]]+""", line):
                 u = m.group(0).rstrip(".,;:'\"")
                 if SKIP_RE.search(u) or re.search(r"//(www\.)?example\.(org|com|net)|//(127\.0\.0\.1|localhost)", u): continue
+                if CSP_LINE_RE.search(line) and up.urlsplit(u).path in ("", "/"): continue   # bare origin in a CSP header source list, not a link
                 lab = re.sub(r"<[^>]+>|\s+", " ", line[max(0, m.start() - 100):m.start()])[-80:]
                 n = norm(u)
                 if n: found.setdefault(n, {"url": n, "labels": [], "where": [cur], "kind": "diff"})

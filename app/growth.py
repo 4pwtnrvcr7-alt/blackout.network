@@ -211,7 +211,7 @@ def follow_html():
             f'<a class="btn" href="{YT_SUB}" target="_blank" rel="noopener">Subscribe on YouTube</a></div></section>')
 
 def org_ld():
-    return {"@type": ["Organization", "NewsMediaOrganization"], "@id": SITE + "/#org", "name": BRAND, "alternateName": ["Blackout Network", "blackout.network"], "url": SITE + "/",
+    return {"@type": ["Organization", "NewsMediaOrganization"], "@id": SITE + "/#org", "name": BRAND, "alternateName": ["BLACKOUT NETWORK", "blackout.network"], "url": SITE + "/",
             "logo": {"@type": "ImageObject", "url": SITE + "/icons/icon-512.png", "width": 512, "height": 512},
             "image": SITE + "/icons/icon-og-v2-1200x630.png", "slogan": "Signal over noise.", "email": "hello@blackout.network", "publishingPrinciples": SITE + "/scoring",
             "sameAs": [X_URL, YT_URL], "address": {"@type": "PostalAddress", "postOfficeBoxNumber": "1228", "addressLocality": "Lake Mary",

@@ -197,7 +197,7 @@ window.dataLayer=window.dataLayer||[];window.gtag=window.gtag||function(){dataLa
 var BN_GA_ID='G-KND6CPBB1X',PV=window.BN_POLICY_V||'',BV=1,MAXAGE=183*864e5;
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null;}}
 function tz(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){return '';}}
-/* seo/batch-1 consent (Matt, Nov 1 2:50 PM ET; Compliance banner spec A): EEA/UK/CH by CF-IPCountry; header missing -> browser
+/* seo/batch-1 consent (owner direction, Nov 1; Compliance banner spec A): EEA/UK/CH by CF-IPCountry; header missing -> browser
    timezone (Europe/* = consent region); timezone unknown too -> consent region. There GA loads only after "Accept analytics". */
 var R=window.BN_GA_REGION,Z=tz();
 var CR=R==='eu'||(R!=='ok'&&(Z===''||Z.indexOf('Europe/')===0));
