@@ -1,6 +1,8 @@
 # blackout.network public web node (Render free web service). Data arrives from the box via /internal/sync (render_sync.py).
 FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PORT=10000 TZ=America/New_York
+# t353: one malloc arena pair instead of 8 per CPU; the threaded server otherwise fragments memory past the free plan's 512 MB
+ENV MALLOC_ARENA_MAX=2
 RUN useradd --create-home --uid 10001 bn
 WORKDIR /workspace/blackout
 COPY requirements.txt /tmp/requirements.txt

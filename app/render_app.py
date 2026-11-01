@@ -187,6 +187,19 @@ def manifest():
     return {"boot_id": BOOT_ID, "booted": BOOTED, "files": files, "owned": owned, "restored": SYNC["restored"],
             "has_data": has_data(), "sync": SYNC, "blocked_background": len(BLOCKED)}
 
+# ---------- memory (t353): Render free plan = 512 MB; report RSS publicly (no secrets) and hand freed heap back to the OS ----------
+def _mem():
+    d = {}
+    try:
+        for l in open("/proc/self/status"):
+            k, _, v = l.partition(":")
+            if k in ("VmRSS", "VmHWM", "Threads"): d[k] = int(v.split()[0])
+    except Exception: pass
+    return {"rss_mb": round(d.get("VmRSS", 0) / 1024, 1), "peak_rss_mb": round(d.get("VmHWM", 0) / 1024, 1), "threads": d.get("Threads")}
+try:
+    import ctypes; _libc = ctypes.CDLL("libc.so.6"); _trim = lambda: _libc.malloc_trim(0)
+except Exception: _trim = lambda: None
+
 def _iso(t): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t)) if t else None
 def public_status():
     """Public, secret-free freshness report: when the box last pushed data and when the scanner last finished."""
@@ -195,7 +208,8 @@ def public_status():
     return {"ok": True, "node": "render-public", "has_data": has_data(), "boot_id": BOOT_ID, "booted": _iso(BOOTED),
             "last_sync": _iso(lp), "last_sync_age_s": age, "sync_healthy": bool(lp) and age < 900,
             "pushes_since_boot": SYNC["pushes"], "files_installed_since_boot": SYNC["files"], "owned_restored": SYNC["restored"],
-            "last_scan": _iso(ls), "last_scan_age_s": round(time.time() - ls) if ls else None, "now": _iso(time.time())}
+            "last_scan": _iso(ls), "last_scan_age_s": round(time.time() - ls) if ls else None, "now": _iso(time.time()),
+            "memory": {**_mem(), "limit_mb": 512, "malloc_arena_max": os.environ.get("MALLOC_ARENA_MAX")}}
 
 # ---------- keep "last scan / next scan" meaningful from synced data ----------
 def _refresh_state():
@@ -277,7 +291,10 @@ class RH(server.H):
 
 def _render_bg():
     while True:
-        _refresh_state(); time.sleep(60)
+        _refresh_state()
+        try: _trim()
+        except Exception: pass
+        time.sleep(60)
 
 if __name__ == "__main__":
     server.passcode()      # creates a random one if none was provided (admin then unusable until the box pushes the real one)
