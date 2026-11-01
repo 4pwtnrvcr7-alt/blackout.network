@@ -94,4 +94,7 @@ ROUTES = {
     "/alerts.css": "webpush",
     "/alerts": "webpush",
     "/api/alerts": "webpush",
+    "/robots.txt": "growth",        # growth/SEO add-on (Nov 1): crawl rules, sitemap, cross-promo enhancer, story visuals
+    "/sitemap.xml": "growth",
+    "/api/growth": "growth",
 }

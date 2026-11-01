@@ -83,6 +83,14 @@ def render(cid, since=""):
     if vids:
         vhtml = '<section class="card"><h2>Watch</h2>' + "".join(
             f'<p><a href="/story/{S.E(v["slug"])}">▶ {S.E(v["title"])}</a></p>' for v in vids) + '</section>'
+    try:   # growth.py (Nov 1): Short embed, locator map, headshots, share row, follow card
+        import growth as G
+        g_short, g_img = G.short_html(cid, title)
+        g_loc = G.locator_html(r.get("lat"), r.get("lon"), r.get("location") or "")
+        g_ppl = G.people_html(f"{title} {r.get('brief') or ''}")
+        g_share = G.share_html(f"{S.SITE}/wire/{cid}", f"{title} (rank {rank}/10) via BLACKOUT.NETWORK", "story")
+        g_follow = G.follow_html()
+    except Exception: g_short = g_loc = g_ppl = g_share = g_follow = ""; g_img = None
     upd = (f'<section class="card" style="border-color:#f5a524"><h2>What\'s new since {S.E(et(since))}</h2><p>{len(new)} new report(s), marked NEW below.</p></section>'
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
@@ -94,18 +102,28 @@ def render(cid, since=""):
             + (f'<p class="dek">{S.E(what)}</p>' if what and what != title else "")
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
+            + g_ppl + g_share + (g_short or g_loc)
             + upd + vhtml
             + '<section class="card"><h2>How confident are we?</h2><p>'
             + S.E(f"{len(rows)} report(s) from {eff} independent source famil{'y' if eff == 1 else 'ies'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
             + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></section>'
             + f'<section class="card"><h2>Timeline and sources</h2><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></section>'
             + '<section class="card" id="follow"><h2>☆ Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
-              'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>')
+              'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
+              + g_follow + '<p class="meta"><a href="/#wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
     ld = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": title[:110], "description": desc,
           "datePublished": r.get("first_seen"), "dateModified": r.get("updated"), "url": f"{S.SITE}/wire/{cid}",
-          "publisher": {"@type": "Organization", "name": S.BRAND, "url": S.SITE}, "isBasedOn": [a["source_url"] for a in rows[:10] if a.get("source_url")]}
+          "publisher": {"@type": "NewsMediaOrganization", "@id": f"{S.SITE}/#org", "name": S.BRAND, "url": S.SITE,
+                        "logo": {"@type": "ImageObject", "url": f"{S.SITE}/icons/icon-512.png", "width": 512, "height": 512}},
+          "author": {"@type": "Organization", "name": S.BRAND, "url": S.SITE}, "mainEntityOfPage": f"{S.SITE}/wire/{cid}",
+          "image": [g_img or f"{S.SITE}/icons/icon-og-1200x630.png"], "articleSection": (r.get("category") or "News").title(),
+          "isBasedOn": [a["source_url"] for a in rows[:10] if a.get("source_url")]}
+    if loc: ld["contentLocation"] = {"@type": "Place", "name": loc, **({"geo": {"@type": "GeoCoordinates", "latitude": r["lat"], "longitude": r["lon"]}} if r.get("lat") is not None and r.get("lon") is not None else {})}
+    ld = {"@context": "https://schema.org", "@graph": [{k: v for k, v in ld.items() if k != "@context"},
+          {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "The Wire", "item": f"{S.SITE}/#wire"},
+                                                          {"@type": "ListItem", "position": 2, "name": title[:110], "item": f"{S.SITE}/wire/{cid}"}]}]}
     noindex = watch != 0 or rank < 3
-    return 200, S.page(title[:90], desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld)
+    return 200, S.page(title[:90], desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
 def handle_get(path, qs):
     m = re.match(r"^/wire/([0-9a-f]{16})/?$", path)

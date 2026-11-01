@@ -163,6 +163,7 @@ PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple
             b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png">'
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
 ALERTS_HEAD = b'<link rel="stylesheet" href="/alerts.css"><script src="/alerts.js" defer></script>'   # Alerts bell + panel (webpush.py, t341)
+GROWTH_HEAD = b'<link rel="stylesheet" href="/api/growth/app.css"><script src="/api/growth/app.js" defer></script>'   # growth.py: share/follow/visual Wire cards (Nov 1)
 _OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
                  b"The world&#39;s threats, scored and sourced, before cable news catches up."]
 _DASH_FALLBACK = (b'<header class="bn-top" id="bn_topbar"><div class="bn-tbar"><a class="bn-logo" href="/">BLACKOUT.<b>NETWORK</b></a></div>'
@@ -176,7 +177,12 @@ def dashboard_page():
         top = sitenav.dashboard_top().encode("utf-8")
     except Exception:
         traceback.print_exc(); top = _DASH_FALLBACK
-    return b.replace(b"<!--BN_TOP-->", top, 1)
+    b = b.replace(b"<!--BN_TOP-->", top, 1)
+    try:   # JSON-LD NewsMediaOrganization (sameAs X + YouTube) + WebSite/SearchAction on the home page (growth.py)
+        ld = _addon_mod("growth").home_ld_tag(); i = b.find(b"</head>")
+        if i > 0 and b"application/ld+json" not in b[:i]: b = b[:i] + ld + b[i:]
+    except Exception: traceback.print_exc()
+    return b
 
 def pwa_head(b):
     try:
@@ -185,6 +191,8 @@ def pwa_head(b):
             b = b[:h + 6] + THEME_HEAD + b[h + 6:]
         al = b[:120000].lower(); j = al.find(b"</head>")   # Alerts bell + Web Push (webpush.py, t341)
         if j >= 0 and b"<html" in al[:4000] and b"/alerts.js" not in al[:j]: b = b[:j] + ALERTS_HEAD + b[j:]
+        al = b[:120000].lower(); j = al.find(b"</head>")
+        if j >= 0 and b"<html" in al[:4000] and b"/api/growth/app.js" not in al[:j]: b = b[:j] + GROWTH_HEAD + b[j:]
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]

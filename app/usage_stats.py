@@ -25,7 +25,7 @@ def _load():
             for k, v in d.get("days", {}).items(): _days[k] = {**v, "_v": set()}
     except Exception: pass
 
-def record(path, code, method="GET", ip="", ua=""):
+def record(path, code, method="GET", ip="", ua="", ref=""):
     p = (path or "").split("?", 1)[0]
     if any(p.startswith(s) for s in SKIP): return
     day = time.strftime("%Y-%m-%d", time.gmtime())
@@ -38,6 +38,15 @@ def record(path, code, method="GET", ip="", ua=""):
             d["page_views"] += 1; d["pages"][page] = d["pages"].get(page, 0) + 1
             v = hmac.new(_SALT, f"{day}|{ip}".encode(), hashlib.sha256).digest()[:8]
             if v not in d["_v"]: d["_v"].add(v); d["uniques"] += 1
+        if method == "GET" and page and int(code) < 400:   # growth (Nov 1): aggregate campaign + referrer-site counts only (no per-visitor rows)
+            u = re.search(r"[?&]utm_source=([A-Za-z0-9_.-]{1,24})", path or "")
+            if u: d.setdefault("utm", {}); k = u.group(1).lower(); d["utm"][k] = d["utm"].get(k, 0) + 1
+            rh = re.match(r"^https?://([^/:?#]{1,80})", ref or "")
+            if rh:
+                h = rh.group(1).lower().removeprefix("www.")
+                if not h.endswith("blackout.network"):
+                    d.setdefault("referrers", {}); rf = d["referrers"]
+                    if h in rf or len(rf) < 60: rf[h] = rf.get(h, 0) + 1
         m = re.match(r"^/api/([a-z_]+)", p)
         if m and m.group(1) not in ("report", "reports"): d["modules"][m.group(1)] = d["modules"].get(m.group(1), 0) + 1
         for k in sorted(_days)[:-14]: _days.pop(k, None)
