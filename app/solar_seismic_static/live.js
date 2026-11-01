@@ -45,7 +45,7 @@ function build(){
  <div class=ssl-grid2><div><h3 class=ss-h>Flare probabilities <span class=meta id=ssl_pdate></span></h3><div id=ssl_probs></div>
    <h3 class=ss-h style="margin-top:12px">Recent flares, past 7 days <span class=meta id=ssl_fcount></span></h3><div id=ssl_flares class=ssl-flares></div></div>
   <div><h3 class=ss-h>GOES X-ray flux, past 24 h <span class=meta id=ssl_xnow></span></h3><div class=ssl-chart><canvas id=ssl_xc height=190></canvas></div>
-   <h3 class=ss-h style="margin-top:12px">Active sunspot regions <span class=meta id=ssl_rdate></span></h3><div id=ssl_regions></div></div></div>
+   <h3 class=ss-h style="margin-top:12px">Active sunspot regions <span class=meta id=ssl_rdate></span></h3><div id=ssl_regions style="overflow-x:auto"></div></div></div>
  <p class="meta ssl-credit">Data: NOAA Space Weather Prediction Center (${SWPC}) · NASA CCMC DONKI (<a href="https://kauai.ccmc.gsfc.nasa.gov/DONKI/" target=_blank rel=noopener>kauai.ccmc.gsfc.nasa.gov</a>). Forecasts are NOAA's and NASA's own, shown as published.</p>`;
  const c=document.createElement("section");c.className="pn ssl";c.id="ssl_eq";
  c.innerHTML=`<h2><span class=ssl-ic>🌍</span> Live earthquakes <span class=meta>— real-time world seismicity from the U.S. Geological Survey, refreshed every 60 seconds</span></h2>

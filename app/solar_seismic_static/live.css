@@ -1,6 +1,6 @@
 /* blackout.network · Solar & Seismic live layer (live.js) */
 #tab-solar .ssl h2 .ssl-ic{color:var(--sol,#faad14)}
-#tab-solar .ssl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:8px;margin:2px 0 12px}
+#tab-solar .ssl-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:2px 0 12px}
 #tab-solar .ssl-card{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:var(--tx);background:#11161b;border:1px solid var(--bd);border-top:3px solid var(--c);border-radius:8px;padding:8px 10px}
 #tab-solar .ssl-card:hover{background:#161c22}
 #tab-solar .ssl-card .t{font-size:11.5px;color:var(--mu)}#tab-solar .ssl-card .v{font-size:22px;font-weight:700;color:var(--c);line-height:1.15}
@@ -8,7 +8,7 @@
 #tab-solar .ssl-sun{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:10px}
 #tab-solar .ssl-fig video{display:block;width:100%;height:auto;aspect-ratio:1/1;max-height:620px;object-fit:contain;background:#000}
 #tab-solar .ssl-side{margin-top:4px}#tab-solar .ssl-alerts{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:0 8px;align-items:start}
-@media(max-width:900px){#tab-solar .ssl-sun{grid-template-columns:1fr}}
+@media(max-width:900px){#tab-solar .ssl-sun{grid-template-columns:minmax(0,1fr)}}
 #tab-solar .ssl-tabs{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
 #tab-solar .ssl-tabs button{background:#151a20;color:#c9d0d9;border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer}
 #tab-solar .ssl-tabs button.on{background:#2a2410;border-color:#faad14;color:#ffd666}
@@ -23,7 +23,7 @@
 #tab-solar .ssl-al pre{white-space:pre-wrap;font-size:11.5px;color:#c9d0d9;margin:0;padding:4px 10px 9px}
 #tab-solar .ssl-chip{display:inline-block;border:1px solid var(--c);color:var(--c);border-radius:4px;padding:0 5px;font-size:11px;margin-left:4px}
 #tab-solar .ssl-grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-bottom:10px}
-@media(max-width:900px){#tab-solar .ssl-grid2{grid-template-columns:1fr}}
+@media(max-width:900px){#tab-solar .ssl-grid2{grid-template-columns:minmax(0,1fr)}}
 #tab-solar .ssl-chart{position:relative;background:#0f1317;border:1px solid var(--bd);border-radius:8px;padding:4px}
 #tab-solar .ssl-chart canvas{display:block;width:100%;height:190px}
 #tab-solar .ssl-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--mu);margin-top:5px;align-items:center}
@@ -51,7 +51,7 @@
 #tab-solar .ssl-dotlive{display:inline-block;width:8px;height:8px;border-radius:50%;background:#52c41a;margin-right:5px;animation:sslp 2s infinite}
 #tab-solar .ssl-newc{color:#fff;background:#d4380d;border-radius:4px;padding:0 5px}
 #tab-solar .ssl-eqgrid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr);gap:12px}
-@media(max-width:900px){#tab-solar .ssl-eqgrid{grid-template-columns:1fr}}
+@media(max-width:900px){#tab-solar .ssl-eqgrid{grid-template-columns:minmax(0,1fr)}}
 #tab-solar #ssl_eqmap{height:470px;border-radius:10px;border:1px solid var(--bd)}
 @media(max-width:600px){#tab-solar #ssl_eqmap{height:340px}}
 #tab-solar .ssl-eqlist{max-height:470px;overflow:auto;display:flex;flex-direction:column;gap:3px}
@@ -68,3 +68,5 @@
 @media(prefers-reduced-motion:reduce){#tab-solar path.ssl-new,#tab-solar .ssl-dotlive{animation:none}}
 #tab-solar .ssl-bad{color:#ff7875}
 #tab-solar .ssl-credit{margin:8px 0 0;font-size:11.5px}
+#tab-solar .ssl,#tab-solar .ssl-eqgrid>div,#tab-solar .ssl-grid2>div,#tab-solar .ssl-sun>div{min-width:0}
+@media(max-width:600px){#tab-solar .ssl-alerts{grid-template-columns:minmax(0,1fr)}#tab-solar .ssl-tb{font-size:11px}#tab-solar .ssl-regions{overflow-x:auto}}
