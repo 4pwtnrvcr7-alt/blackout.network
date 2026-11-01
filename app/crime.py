@@ -130,6 +130,12 @@ def nearest_zip(lat, lon):
         d = (v[0] - lat) ** 2 + ((v[1] - lon) * math.cos(math.radians(lat))) ** 2
         if best is None or d < best[0]: best = (d, z)
     return best[1] if best and best[0] < 0.25 else None
+def nearest_county(lat, lon, max_km=60):
+    best = None
+    for r in qa("SELECT fips, lat, lon FROM counties WHERE lat IS NOT NULL"):
+        d = _km(lat, lon, r["lat"], r["lon"])
+        if best is None or d < best[0]: best = (d, r["fips"])
+    return best[1] if best and best[0] <= max_km else None
 def _km(a, b, c, d):
     p = math.pi / 180; x = 0.5 - math.cos((c - a) * p) / 2 + math.cos(a * p) * math.cos(c * p) * (1 - math.cos((d - b) * p)) / 2
     return 12742 * math.asin(math.sqrt(max(0, x)))
@@ -164,6 +170,7 @@ def resolve(q):
     if m:
         z = m.group(1); fp = zip_county(z); g = _nl().geocode_place(z)
         if not fp and not g: return None
+        if not fp and g and g.get("lat") is not None: fp = nearest_county(g["lat"], g["lon"])   # ZIP missing from the crosswalk copy
         st = None; cn = county(fp) if fp else None
         if cn: st = cn["st"]
         return {"label": (g or {}).get("label") or f"ZIP {z}", "kind": "zip", "zip": z, "lat": (g or {}).get("lat"), "lon": (g or {}).get("lon"), "fips": fp, "st": st, "cc": "US"}
@@ -203,7 +210,7 @@ def _feed_summary(f, days=30):
 
 def lookup(q):
     p = resolve(q)
-    if not p: return {"ok": False, "q": q, "message": "We couldn't find that place. Try a US ZIP code (32771), a city (Chicago, IL), a county (Seminole County, FL), a state or a country."}
+    if not p: return {"ok": False, "q": q, "message": "We couldn't find that place. Try a US ZIP code (60614), a city (Chicago, IL), a county (Seminole County, FL), a state or a country."}
     out = {"ok": True, "q": q, "place": p, "national": national()}
     if p["kind"] in ("country", "intl_city"):
         out["country"] = country(iso2=p["cc"])
@@ -470,7 +477,7 @@ def render_page(q=""):
             f'<input id="cr-q" name="place" type="search" value="{E(q)}" maxlength="80" autocomplete="off" placeholder="ZIP, city, county, state or country" enterkeyhint="search">'
             '<button type="submit">Look up</button></form>'
             '<div class="cr-chips">' + "".join(f'<a class="cr-chip" href="/crime?place={urllib.parse.quote(x)}" data-q="{E(x)}">{E(x)}</a>' for x in
-                                                ("32771", "Chicago, IL", "Seminole County, FL", "Philadelphia", "Florida", "Canada")) + '</div>'
+                                                ("60614", "Chicago, IL", "Seminole County, FL", "Philadelphia", "Florida", "Canada")) + '</div>'
             f'<div class="cr-stats"><span><b>{len(fs)}</b> cities with near-real-time maps</span><span><b>{n(q1("SELECT COUNT(*) FROM counties WHERE year IS NOT NULL")[0] if _db() else 0)}</b> US counties with FBI rates</span>'
             f'<span><b>{n(q1("SELECT COUNT(*) FROM countries")[0] if _db() else 0)}</b> countries</span>'
             + (f'<span>Newest police report: <b>{E(dfmt(newest, "%b %-d"))}</b></span>' if newest else "") + '</div></section>')
