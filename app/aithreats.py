@@ -1,4 +1,4 @@
-"""🤖 AI Threats tab (UNLISTED: direct link blackout.network/#ai only; not in the nav, no sitemap, noindex). 2026-10-31, t231.
+"""🤖 AI Threats tab (listed in the main nav since t233; deep link blackout.network/#ai). 2026-10-31, t231.
 AI hacking, rogue bots/agents, AI-enabled or AI-related cyber attacks, deepfake fraud and influence ops, model jailbreak / prompt
 injection / poisoning, AI supply-chain compromises, AI in weapons. Scanner clusters (blackout.db, read-only) are kept when the
 classifier below finds an AI term AND a threat term (or one strong AI-threat term on its own). Ranks/scores are the scanner's own.
@@ -14,14 +14,14 @@ AI_CI = re.compile(r"\b(?:artificial[- ]intelligence|machine[- ]learning|large[-
     r"generative[- ]ai|gen[- ]ai|chat ?gpt|gpt-?[345o]\w*|openai|anthropic|deepseek|chatbots?|ai[- ]chatbots?|deep ?fakes?|deep-fakes?|"
     r"voice[- ]clon\w*|cloned voices?|prompt[- ]injections?|agentic|ai[- ]agents?|autonomous[- ]agents?|neural[- ]networks?|"
     r"(?:model|data|training[- ]data)[- ]poisoning|microsoft copilot|github copilot|copilot ai|google gemini|gemini ai|"
-    r"claude (?:ai|code|opus|sonnet|haiku)|grok|xai|mistral ai|hugging ?face|midjourney|stable diffusion|langflow|langchain|ollama|"
+    r"claude (?:ai|code|opus|sonnet|haiku)|grok (?:ai|chatbot)|xai's grok|mistral ai|hugging ?face|midjourney|stable diffusion|langflow|langchain|ollama|"
     r"comfyui|mlflow|vllm|llama\.cpp|open ?webui|flowise|anythingllm|model context protocol|mcp servers?|ai[- ](?:powered|driven|enabled|"
     r"assisted|generated|written|made|based|equipped|guided|controlled|crafted|fueled|fuelled))\b", re.I)
 # --- threat context
 THREAT = re.compile(r"\b(?:hack\w*|attack\w*|breach\w*|malware|ransomware|infostealer|exploit\w*|vulnerab\w*|cve-\d|zero[- ]day|0-day|"
     r"phish\w*|scam\w*|fraud\w*|impersonat\w*|espionage|spy(?:ing|ware)?|intrusions?|compromis\w*|stole|stolen|steal\w*|leak\w*|"
     r"exfiltrat\w*|backdoor\w*|jailbr[eo]ak\w*|poison\w*|rogue|misuse\w*|weaponi[sz]\w*|disinformation|misinformation|propaganda|"
-    r"influence (?:op\w*|campaign\w*)|manipulat\w*|threat\w*|cyber\w*|botnets?|supply[- ]chain|malicious|abus\w*|extort\w*|sextortion|"
+    r"influence (?:op\w*|campaign\w*)|manipulat\w*|threat actors?|cyber\w*|botnets?|supply[- ]chain|malicious|abus\w*|extort\w*|sextortion|"
     r"harass\w*|surveil\w*|drones?|weapons?|missiles?|targeting|sabotag\w*|outages?|nonconsensual|non-consensual|csam|"
     r"blackmail|ddos|hijack\w*|takeover|unauthori[sz]ed|wiper|crypto ?(?:theft|heist|drain\w*)|heist|fake (?:video|audio|image|news)|"
     r"election interference|out of control|went rogue|self-replicat\w*|autonomous(?:ly)? (?:hack|attack|replicat)\w*)\b", re.I)
@@ -33,7 +33,7 @@ STRONG = re.compile(r"\b(?:deep ?fakes?|deep-fakes?|voice[- ]clon\w*|cloned voic
     r"fraud|hack\w*|intrusion\w*|espionage|disinformation|propaganda|botnet\w*|exploit\w*|deepfake\w*|campaign\w*|influence))\b", re.I)
 # chatter that matches both lists but is not a threat report
 NEG = re.compile(r"\b(?:ai (?:bubble|stocks?|boom|hub|startup|summit|earthquake)|ipo|stock market filing|earnings|shares (?:jump|plunge|fall|rise)\w*|"
-    r"raises \$|funding round|valuation|webinar|careers?|bias check|reconstructions?|epidemiolog\w*|token consumption|career ladder|job (?:market|losses)|workforce)\b", re.I)
+    r"raises \$|funding round|valuation|webinar|careers?|bias check|reconstructions?|epidemiolog\w*|token consumption|career ladder|job (?:market|losses)|workforce|daily roundup|tech digest|evening digest|morning digest|newsletter|intelligence explosion|explosion of content|evaporat\w*)\b", re.I)
 KINDS = [  # first match wins
     ("deepfake", "Deepfakes & AI fraud", re.compile(r"deep ?fake|deep-fake|voice[- ]clon|cloned voice|impersonat|scam|fraud|sextortion|synthetic (?:media|identit)|fake (?:video|audio|image)", re.I)),
     ("model", "Model jailbreak & exploitation", re.compile(r"jailbr[eo]ak|prompt[- ]injection|poison|model (?:theft|weights|extraction|inversion)|adversarial|guardrail", re.I)),

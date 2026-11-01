@@ -1,5 +1,5 @@
-// ---- Unlisted watch tabs (tabfeeds.py): 🤖 AI Threats (#ai, aithreats.py) and ⚡ U.S. Energy Grid (#grid, gridwatch.py). ----
-// UNPUBLISHED: no nav button, opened only by direct link (blackout.network/#ai or /#grid); adds <meta name=robots content=noindex> while shown.
+// ---- Watch tabs (tabfeeds.py): 🤖 AI Threats (#ai, aithreats.py) and ⚡ U.S. Energy Grid (#grid, gridwatch.py; status map in gridstatus.py). ----
+// Listed in the main nav (Monitor group, right after Network Status) since t233; deep links #ai, #grid and #grid/state/XX.
 (()=>{"use strict";
 const E=s=>(typeof esc=="function"?esc:(x=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))))(s==null?"":String(s));
 const U=u=>typeof safeUrl=="function"?safeUrl(u):(/^https?:\/\//i.test(u||"")?u:"#");
@@ -12,11 +12,16 @@ const TABS={
   help:"Every alert the blackout.network scanner has stored (news, agencies and the Telegram, Discord, Mastodon and Bluesky analyst channels it reads) that mentions an AI system together with a threat (hacking, fraud, deepfakes, jailbreaks, rogue agents, supply-chain compromise, AI weapons). Ranks 0–10 and scores 0–100 are the scanner's own, exactly as on The Wire. Extra feeds (AI Incident Database, The Hacker News) are listed as unscored unless the same link is already a scored scanner alert."},
  grid:{api:"api/grid",icon:"⚡",title:"U.S. Energy Grid",sub:"physical and cyber attacks on U.S. power infrastructure, energy-sector ICS vulnerabilities, blackout risk and grid-stressing geomagnetic storms",
   help:"Scanner alerts that name the power grid (substations, transmission, outages, utilities, grid emergencies, ICS/SCADA) with a U.S. anchor: a U.S. place, grid operator, utility or agency, or U.S. coordinates. Space weather counts only at NOAA G3 or stronger. Ranks 0–10 and scores 0–100 are the scanner's own. Extra official feeds (CISA ICS advisories for the Energy sector, NOAA SWPC G3+ alerts, ERCOT grid conditions) are unscored unless the same link is already a scored scanner alert."}};
-const ST={};let robots=null;
+const ST={};
+const nav=document.querySelector(".tabs");
+const NAVB={grid:["⚡ Energy Grid","U.S. power grid status, outages and threats"],ai:["🤖 AI Threats","AI hacking, rogue bots and agents, AI-enabled cyber attacks"]};
+function btn(k){if(!nav)return null;let b=nav.querySelector(`button[data-tab="${k}"]`);if(!b){b=document.createElement("button");b.dataset.tab=k;b.textContent=NAVB[k][0];b.title=NAVB[k][1];nav.appendChild(b)}return b}
+function placeNav(){const g=btn("grid"),a=btn("ai");if(!g||!a)return;const anc=nav.querySelector('button[data-tab="net"]');if(anc){if(anc.nextElementSibling!==g)anc.insertAdjacentElement("afterend",g);if(g.nextElementSibling!==a)g.insertAdjacentElement("afterend",a)}}
+try{if(typeof TABHASH=="object"){TABHASH.grid="grid";HASHTAB.grid="grid";TABHASH.ai="ai";HASHTAB.ai="ai"}}catch(_){}
 function hashTab(){const m=location.hash.match(/^#(ai|grid)(?:[\/-].*)?$/);return m?m[1]:null}
 function mk(k){const T=TABS[k];let M=document.getElementById("tab-"+k);if(M)return M;
  M=document.createElement("main");M.id="tab-"+k;M.dataset.addon=k;M.className="tfx";M.style.cssText="display:none;grid-template-columns:minmax(0,1fr)";
- M.innerHTML=`<section class="pn"><h2><span>${T.icon}</span> ${E(T.title)} <span class="tfx-unl" title="Unpublished preview: not in the site menu, reachable only by direct link">unlisted preview</span> <span class="meta">— ${E(T.sub)}</span><button type="button" class="tab-ref" data-r="1" title="Reload this tab">⟳ Refresh</button></h2>
+ M.innerHTML=`<section class="pn"><h2><span>${T.icon}</span> ${E(T.title)} <span class="meta">— ${E(T.sub)}</span><button type="button" class="tab-ref" data-r="1" title="Reload this tab">⟳ Refresh</button></h2>
  <div class="tfx-help meta">${E(T.help)}</div>
  <div class="tfx-sum" data-el="sum">Loading…</div>
  <div class="tfx-bar"><span class="tfx-lbl">Rank</span><div class="tfx-seg" data-el="rank"></div></div>
@@ -62,11 +67,10 @@ async function more(k){const S=ST[k];if(S.busy||S.done)return;S.busy=true;const 
   S.d=j;S.items.push(...j.items);S.done=!j.items.length||S.items.length>=j.matching;msg.textContent="";paint(k)}
  catch(e){msg.textContent=TABS[k].title+" offline: "+e}finally{S.busy=false}}
 function reset(k){const S=ST[k];S.items=[];S.done=false;more(k)}
-function show(k){mk(k);document.querySelectorAll("main").forEach(m=>m.style.display=m.id=="tab-"+k?"":"none");
- document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("on"));
- if(!robots){robots=document.createElement("meta");robots.name="robots";robots.content="noindex, nofollow";document.head.appendChild(robots)}
- if(!ST[k].items.length&&!ST[k].busy)reset(k);const M=document.getElementById("tab-"+k);setTimeout(()=>M.scrollIntoView({block:"start"}),60)}
-function route(){const k=hashTab();if(k)show(k);else{if(robots){robots.remove();robots=null}}}
+function show(k){mk(k);const b=btn(k);if(b&&!b.classList.contains("on"))b.click();if(!ST[k].items.length&&!ST[k].busy)reset(k)}
+function route(){const k=hashTab();if(k)show(k)}
+mk("grid");mk("ai");placeNav();setTimeout(placeNav,600);
+if(nav)nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(!b||!TABS[b.dataset.tab])return;const k=b.dataset.tab;if(!ST[k].items.length&&!ST[k].busy)reset(k)});
 addEventListener("hashchange",route);if(hashTab())setTimeout(route,400);
 setInterval(()=>{const k=hashTab();if(k&&document.getElementById("tab-"+k)&&document.getElementById("tab-"+k).style.display!="none"&&!ST[k].busy&&ST[k].items.length<=60)reset(k)},300000);
 })();

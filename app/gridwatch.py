@@ -1,4 +1,5 @@
-"""⚡ U.S. Energy Grid tab (UNLISTED: direct link blackout.network/#grid only; not in the nav, no sitemap, noindex). 2026-10-31, t231.
+"""⚡ U.S. Energy Grid tab (listed in the main nav since t233; deep link blackout.network/#grid). 2026-10-31, t231.
+Status map, local outage view and weather-triggered infrastructure check: gridstatus.py (/api/gridstatus, t234).
 Threats to the U.S. power grid: physical attacks on substations/lines, cyber attacks on utilities and ICS/SCADA, energy-sector
 vulnerabilities (CISA ICS advisories), blackout risk (ERCOT grid conditions / EEA, large outages, load shedding), and geomagnetic
 storms strong enough to stress the grid (NOAA SWPC G3+). Scanner clusters (blackout.db, read-only) are kept when the classifier finds a

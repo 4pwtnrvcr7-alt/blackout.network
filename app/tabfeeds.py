@@ -1,5 +1,5 @@
-"""Shared engine for the two unlisted watch tabs (2026-10-31, t231): 🤖 AI Threats (aithreats.py, #ai) and ⚡ U.S. Energy Grid (gridwatch.py, #grid).
-Both tabs are UNPUBLISHED: reachable only by direct link (blackout.network/#ai, /#grid), never added to the nav, no sitemap entry, noindex.
+"""Shared engine for the two watch tabs (2026-10-31, t231; listed in the public nav since t233): 🤖 AI Threats (aithreats.py, #ai) and ⚡ U.S. Energy Grid (gridwatch.py, #grid).
+Both tabs are LISTED in the main nav (Monitor group, after Network Status) and indexable; deep links blackout.network/#ai and /#grid.
 
 Data:
   1. Scanner alerts: every stored cluster in blackout.db (opened read-only, file:blackout.db?mode=ro), including the Telegram / Discord /
@@ -153,7 +153,7 @@ def page(tab, classify, feed_meta, qs, title):
     if q: sel = [x for x in sel if q in ((x["title"] or "") + " " + (x["brief"] or "")).lower()]
     if sort == "rank": sel = sorted(sel, key=lambda x: (-1 if x["rank"] is None else x["rank"], x["score"] or 0, x["first_seen"] or ""), reverse=True)
     return 200, {"tab": tab, "title": title, "summary": summ, "matching": len(sel), "offset": off, "limit": lim,
-                 "items": sel[off:off + lim], "feeds": fstat, "unlisted": True, "generated": iso()}
+                 "items": sel[off:off + lim], "feeds": fstat, "unlisted": False, "generated": iso()}
 
 def serve_static(name):
     if name in FILES:

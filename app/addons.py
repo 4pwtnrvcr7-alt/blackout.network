@@ -50,8 +50,9 @@ ROUTES = {
     "/api/elon": "elon",
     "/api/finance": "finance",
     "/api/intel": "intel_streams",
-    "/api/ai": "aithreats",          # unlisted tab #ai (t231)
-    "/api/grid": "gridwatch",        # unlisted tab #grid (t231)
+    "/api/ai": "aithreats",          # tab #ai (t231; in the nav since t233)
+    "/api/grid": "gridwatch",        # tab #grid (t231; in the nav since t233)
+    "/api/gridstatus": "gridstatus", # #grid status map, local outages, weather-triggered checks (t234)
     "/api/preppers": "preppers",
     "/api/report": "reports",
     "/api/reports": "reports",
