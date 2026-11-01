@@ -128,7 +128,8 @@ function tables(){const d=Q.d;
 function terminator(slat,slon){const pts=[];const t=Math.tan(slat*Math.PI/180)||1e-6;for(let lo=-180;lo<=180;lo+=2){const la=Math.atan(-Math.cos((lo-slon)*Math.PI/180)/t)*180/Math.PI;pts.push([la,lo])}return pts}
 function ensureMap(){if(Q.map||typeof L==="undefined")return!!Q.map;const el=document.getElementById("sq_map");if(!el)return false;
  const nar=el.clientWidth<640;Q.map=L.map(el,{worldCopyJump:true,minZoom:0,maxZoom:8,zoomSnap:.5}).setView(nar?[15,170]:[15,150],nar?0.5:1.5);
- if(window.bnBaseLayer)bnBaseLayer(Q.map,{maxZoom:8});else L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:8,className:"bn-tiles"}).addTo(Q.map);
+ // t252: basemap only via the shared bnBaseLayer() in dashboard.html (OSM standard/HOT tiles block blackout.network); no direct tile servers here.
+ if(window.bnBaseLayer)bnBaseLayer(Q.map,{maxZoom:8});
  Q.layer=L.layerGroup().addTo(Q.map);return true}
 function drawMap(){if(!Q.m){if(!Q.mload){Q.mload=1;fetch("api/solar_quake/map").then(r=>r.json()).then(m=>{Q.m=m;drawMap()}).catch(()=>{const n=document.getElementById("sq_mapnote");if(n)n.textContent="Map data couldn't load."})}return}
  if(!ensureMap())return;Q.layer.clearLayers();const m=Q.m,ev=Q.ev===""?null:+Q.ev,decl=Q.set==="declustered";
