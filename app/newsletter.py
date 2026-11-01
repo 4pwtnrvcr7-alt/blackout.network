@@ -45,6 +45,7 @@ TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime."
+QUIET_LINE = "No confirmed high-severity events in the last 24 hours."   # CoS Nov 1: the one neutral line of a quiet brief
 END_LINE = "BLACKOUT.NETWORK for more. Follow us on YouTube and X. Get the free newsletter at blackout.network."   # brand end line, exact wording (CHARTER §3)
 CATEGORIES = ["war/conflict", "political", "natural disaster", "disease", "cyber", "space weather", "financial", "ufo/uap", "spiritual/religious", "other"]
 FREQS = {"twice": "Twice daily (morning + evening)", "morning": "Once daily: morning", "evening": "Once daily: evening"}
@@ -710,8 +711,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
             import crime as _crime
             issue["crime"] = _crime.brief_for(dict(sub))
         except Exception: issue["crime"] = None
-    if quiet and not any(int(i.get("rank") or 0) >= 4 for i in watch):   # quiet period: only send if something rank 4+ exists
-        issue["empty"] = True
+    issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries QUIET_LINE (no separate "nothing confirmed" email)
     issue["bluf"] = bluf(issue)
     return issue
 
@@ -720,6 +720,7 @@ def bluf(issue):
     """Bottom line up front: one or two sentences, built from the selected items only."""
     m, u, f, n = issue["main"], issue.get("updates", []), issue.get("follow", []), issue["notable"]
     rr = issue["rule"]; hrs = max(1, round((issue["end"] - issue["start"]).total_seconds() / 3600))
+    if issue.get("quiet"): return QUIET_LINE
     parts = []
     if m:
         top = m[0]
@@ -811,7 +812,7 @@ def subject_for(issue):
     dv = issue.get("follow", []) + issue.get("updates", [])
     if dv: return pre + f"UPDATE R{dv[0]['rank']} {_cut(_short(dv[0]['title'], 200), 64)}" + (f" (+{len(dv) - 1} more)" if len(dv) > 1 else "")
     if issue["notable"]: return pre + f"no rank-{issue['rule']['rank']}+ confirmed threats; {len(issue['notable'])} notable"
-    return pre + "quiet period"
+    return pre + "no confirmed high-severity events"
 
 def follow_links(row, cid, c=None):
     """One-click, no-login Follow / Unfollow links for one story (signed, purpose-bound, bound to the address). Previews without a
@@ -1066,7 +1067,7 @@ def render(issue, links, c=None):
     if issue.get("near"):
         a(_sec_html(f"Near you — {issue.get('loc_label') or 'your area'}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country), highest rank first.", "green"))
         for it in issue["near"]: a(_item_html(it, links, c))
-    elif issue.get("loc_label"):
+    elif issue.get("loc_label") and not issue.get("quiet"):
         a(_sec_html(f"Near you — {issue['loc_label']}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country).", "green"))
         a(f'<tr><td style="padding:4px 20px 14px 20px;font:400 15px/1.55 {FB};color:{PAL["body"]}">All quiet near {E(issue["loc_label"])}: no confirmed or official reports in the last 24 hours.</td></tr>')
     if issue.get("crime"):
@@ -1080,9 +1081,9 @@ def render(issue, links, c=None):
     if issue["main"]:
         a(_sec_html("Top threats", f"New since your last brief. Rank {rr['rank']}+ and confirmed by {rr['sources']}+ independent sources, highest first."))
         for it in issue["main"]: a(_item_html(it, links, c))
-    else:
+    elif not issue.get("quiet"):   # fully quiet: the BLUF already carries QUIET_LINE, so it is the only line
         a(f'<tr><td style="padding:16px 20px"><div class="bns2 bnx" style="background:{PAL["surf2"]};border-radius:6px;padding:12px 14px;font:400 15px/1.55 {FB};color:{PAL["body"]}">'
-          f'<b class="bnt" style="color:{PAL["tx"]}">Quiet period:</b> No new rank-{rr["rank"]}+ confirmed threats in this window.</div></td></tr>')
+          f'{E(QUIET_LINE)}</div></td></tr>')
     if issue.get("politics"):
         a(_sec_html("Politics & Government", "Government actions, emergency declarations, sanctions and political crises, confirmed by 2+ independent sources."))
         for it in issue["politics"]: a(_item_html(it, links, c))
@@ -1118,13 +1119,13 @@ def render(issue, links, c=None):
             fl = follow_links(links.get("_row"), it["cluster_id"], c)
             T.append(f"   Unfollow: {fl['unfollow']}" if it.get("followed") and fl["unfollow"] else f"   Follow this story: {fl['follow']}")
             T.append("")
-    if not issue.get("near") and issue.get("loc_label"): T += [f"NEAR YOU — {issue['loc_label'].upper()}", f"All quiet near {issue['loc_label']}: no confirmed or official reports in the last 24 hours.", ""]
+    if not issue.get("near") and issue.get("loc_label") and not issue.get("quiet"): T += [f"NEAR YOU — {issue['loc_label'].upper()}", f"All quiet near {issue['loc_label']}: no confirmed or official reports in the last 24 hours.", ""]
     if issue.get("near"): tsec(f"Near you — {issue.get('loc_label') or 'your area'}", issue["near"])
     if issue.get("crime"):
         cr = issue["crime"]; T += [f"CRIME NEAR YOU — {cr['label'].upper()}"] + cr["lines"] + [f"Map and full numbers: {cr['url']}", ""]
     if issue.get("follow"): tsec("Stories you follow", issue["follow"])
     if issue["main"]: tsec("Top threats", issue["main"])
-    else: T += [f"QUIET PERIOD: No new rank-{rr['rank']}+ confirmed threats in this window.", ""]
+    elif not issue.get("quiet"): T += [QUIET_LINE, ""]
     if issue.get("politics"): tsec("Politics & Government", issue["politics"])
     if vids:
         T.extend(["WATCH: NEW ON BLACKOUT.NETWORK", "=" * 30])
