@@ -735,11 +735,41 @@ _P = f'class="bnx" style="margin:0 0 8px 0;font:400 15px/1.55 {FB};color:{PAL["b
 def _lbl(t): return f'<b class="bnt" style="font:800 11px {FH};letter-spacing:1px;color:{PAL["tx"]}">{t}</b>'
 _ROWTD = f'class="bnl" style="padding:20px;border-top:1px solid {PAL["line"]}"'
 
+_NLF = {"t": 0, "d": {}}
+def _nl_figures():
+    if time.time() - _NLF["t"] > 600:
+        try: _NLF["d"] = json.load(open(os.path.join(BASE, "static", "img", "nl_figures.json")))
+        except Exception: _NLF["d"] = {}
+        _NLF["t"] = time.time()
+    return _NLF["d"]
+def _visuals_html(it, url, c):
+    """t373: per-item visuals (absolute blackout.network URLs, alt text): locator map, headshots of named people, video thumbnail."""
+    base = c["base_url"].rstrip("/"); cid = it["cluster_id"]; out = []
+    if os.path.exists(os.path.join(BASE, "static", "img", f"nl_{cid}.jpg")):
+        loc = it.get("where") or "the event location"
+        out.append(f'<a href="{E(url)}"><img src="{base}/img/nl_{E(cid)}.jpg" width="600" alt="Map showing {E(loc)}" '
+                   f'style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:6px;margin:0 0 10px 0"></a>')
+    text = f"{it.get('title') or ''} {it.get('brief') or ''}"
+    faces = [(k, v) for k, v in _nl_figures().items() if v["name"].split()[-1] in text][:4]
+    if faces:
+        out.append('<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0"><tr>' + "".join(
+            f'<td style="padding:0 10px 0 0;vertical-align:top;text-align:center;font:400 11px/1.3 {FB};color:{PAL["mu"]}">'
+            f'<a href="{base}/#figures"><img src="{base}/img/nlf_{E(k)}.jpg" width="56" height="56" alt="{E(v["name"])}" style="display:block;width:56px;height:56px;border-radius:28px;border:0;margin:0 auto 4px auto"></a>{E(v["name"].split()[-1])}</td>'
+            for k, v in faces) + '</tr></table>')
+    vid = next((s_ for s_ in load_stories() if cid in (s_.get("cluster_ids") or []) and s_.get("youtube_id")), None)
+    if vid:
+        yt = f'https://www.youtube.com/shorts/{vid["youtube_id"]}'
+        out.append(f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0"><tr><td style="padding:0 10px 0 0">'
+                   f'<a href="{E(yt)}"><img src="https://i.ytimg.com/vi/{E(vid["youtube_id"])}/mqdefault.jpg" width="160" alt="Watch the video: {E(it.get("title") or "")}" style="display:block;width:160px;height:auto;border:0;border-radius:6px"></a></td>'
+                   f'<td style="font:700 14px/1.4 {FH}"><a href="{E(yt)}" class="bnt" style="{_L}">▶ Watch the video</a></td></tr></table>')
+    return "".join(out)
+
 def _item_html(it, links, c):
     url = wire_url(it["cluster_id"], c=c); u = it.get("update")
     conf_cls, conf_col = ("ta", PAL["sev"][1]) if it["unconfirmed"] else ("tg", PAL["sev"][0])
     H = [f'<tr><td {_ROWTD}>{_rank_badge(it)}{_kicker(it)}'
          f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:800 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{E(_cut(it["title"], 200))}</a></div>']
+    H.append(_visuals_html(it, url, c))
     if u:
         bits = []
         if u["rank_from"] is not None and u["rank_from"] != u["rank_to"]:
