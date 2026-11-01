@@ -1,0 +1,26 @@
+/* Unlisted watch tabs (#ai, #grid; tabfeeds.py). Shared palette from theme.css; .sc / .wl / .unc / .brief reuse the Wire's styles. */
+.tfx .tfx-unl{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#000;background:var(--md,#faad14);border-radius:6px;padding:1px 6px;vertical-align:2px}
+.tfx .tfx-help{margin:0 0 8px;max-width:980px}
+.tfx .tfx-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 8px}
+.tfx .tfx-seg{display:inline-flex;flex-wrap:wrap;max-width:100%;border:1px solid var(--bd2,#2f3742);border-radius:8px;overflow:hidden}
+.tfx .tfx-seg button{border:0;border-radius:0;padding:5px 10px;background:transparent;color:var(--mu);font-size:12.5px}
+.tfx .tfx-seg button.on{background:var(--ac);color:#000;font-weight:600}
+.tfx .tfx-seg button.on .meta{color:#000}
+.tfx .tfx-lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu);min-width:38px}
+.tfx .tfx-bar input[type=search]{background:#0f1317;border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:5px 8px;font-size:13px;min-width:160px}
+.tfx .tfx-sum{font-size:13px;color:#c9d0d9;background:#0f1317;border:1px solid var(--bd);border-left:3px solid var(--ac);border-radius:6px;padding:6px 10px;margin:0 0 10px}
+.tfx .tfx-row{border-left:4px solid var(--mu);padding:8px 10px;margin:8px 0;background:#181d23;border-radius:6px;content-visibility:auto;contain-intrinsic-size:auto 96px}
+.tfx .tfx-row.h{border-left-color:var(--hi)}.tfx .tfx-row.m{border-left-color:var(--md)}.tfx .tfx-row.l{border-left-color:var(--lo)}
+.tfx .tfx-row b{word-break:break-word}
+.tfx .tfx-row .brief{white-space:pre-line}
+.tfx .tfx-rk{display:inline-block;font-size:11px;font-weight:700;border-radius:8px;padding:0 6px;margin-right:6px;vertical-align:1px;border:1px solid var(--bd2,#2f3742);color:var(--mu)}
+.tfx .tfx-rk.l2{color:#c9d0d9;border-color:#4a5463}.tfx .tfx-rk.m{color:var(--md);border-color:#5a4300}.tfx .tfx-rk.h{color:var(--hi);border-color:#5c1d1d}
+.tfx .tfx-rk.un{font-weight:600;font-style:italic}
+.tfx .tfx-k{display:inline-block;font-size:11px;color:var(--ac);border:1px solid var(--bd);border-radius:8px;padding:0 6px;margin-right:6px;vertical-align:1px}
+.tfx .tfx-off{display:inline-block;margin-left:6px;font-size:11px;color:#9fd3a8;border:1px solid #2e5a37;border-radius:8px;padding:0 6px;vertical-align:1px}
+.tfx .tfx-row .wl,.tfx .tfx-row .unc{display:inline-block;margin-left:6px;vertical-align:1px}
+.tfx .tfx-m{font-size:12.5px;color:#aab3bf;font-style:italic;margin-top:3px;word-break:break-word}
+.tfx .tfx-more{text-align:center;margin:10px 0 4px}
+.tfx .tfx-feeds{margin-top:10px;font-size:13px}.tfx .tfx-feeds summary{cursor:pointer;color:var(--mu)}
+.tfx .tfx-feeds div{margin:3px 0}
+@media(max-width:700px){.tfx .tfx-seg button{padding:5px 8px;flex:1 0 auto}.tfx .tfx-bar input[type=search]{flex:1 1 100%}}

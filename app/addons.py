@@ -48,6 +48,8 @@ ROUTES = {
     "/api/elon": "elon",
     "/api/finance": "finance",
     "/api/intel": "intel_streams",
+    "/api/ai": "aithreats",          # unlisted tab #ai (t231)
+    "/api/grid": "gridwatch",        # unlisted tab #grid (t231)
     "/api/preppers": "preppers",
     "/api/report": "reports",
     "/api/reports": "reports",
