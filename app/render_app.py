@@ -319,6 +319,9 @@ def export_tar(part, out):
                 if os.path.exists(os.path.join(BASE, rel)):
                     sp = _db_snapshot(rel); items.append((rel, sp, True)); meta["restore"].append(rel); meta["hashes"][rel] = _sha(sp)
             meta["restored"] = bool(SYNC["restored"])
+            try:   # analytics 2026-11-01: today's visitor key + hash set, so the new instance doesn't recount today's visitors
+                import usage_stats; meta["usage"] = usage_stats.export_state()
+            except Exception: pass
             if not os.environ.get("NEWSLETTER_SECRET"):
                 try:
                     for line in open(os.environ["NEWSLETTER_ENV"]):
@@ -362,6 +365,10 @@ def _handoff():
                         if meta.get("boot_id") != HANDOFF["peer_boot"]: raise RuntimeError("export came from an unexpected instance")
                         got += len(done)
                         if part == "owned" and meta.get("restored"): SYNC["restored"] = True
+                        if part == "owned" and meta.get("usage"):
+                            try:
+                                import usage_stats; print(f"deploy handoff: visitor hashes adopted: {usage_stats.import_state(meta['usage'])}", flush=True)
+                            except Exception: traceback.print_exc()
                     finally:
                         try: os.unlink(tmp)
                         except FileNotFoundError: pass
