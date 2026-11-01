@@ -170,15 +170,17 @@
         + '<ol class="bnal-steps"><li><span class="bnal-n">1</span><span>Tap <b>Share</b> <span class="bnal-ki">' + SHARE + '</span> in Safari (on newer iPhones it’s under <b>•••</b>)</span></li>'
         + '<li><span class="bnal-n">2</span><span>Tap <b>Add to Home Screen</b></span></li>'
         + '<li><span class="bnal-n">3</span><span>Open <b>BLACKOUT</b> from your Home Screen and tap the bell ' + '<span class="bnal-ki">' + BELL + '</span></span></li></ol>'
-        + (typeof BN.showInstallGuide === "function" ? '<div class="bnal-acts"><button type="button" class="bnal-go" data-bnal="install">Show me how</button></div>' : ""));
+        + IOS_ART
+        + '<div class="bnal-acts">' + (typeof BN.showInstallGuide === "function" ? '<button type="button" class="bnal-go" data-bnal="install">Show me how</button>' : "")
+        + '<button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
     }
-    if (!E.api) return body('<p class="bnal-lead">This browser can’t show alerts.</p><p class="bnal-note">Use a current version of Chrome, Edge, Firefox, Samsung Internet or Safari.</p>');
+    if (!E.api) return body('<p class="bnal-lead">This browser can’t show alerts.</p><p class="bnal-note">Use a current version of Chrome, Edge, Firefox, Samsung Internet or Safari.</p>' + '<div class="bnal-acts"><button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
     if (Notification.permission === "denied") {
       return body('<p class="bnal-lead">Notifications are blocked for this site.</p><p class="bnal-note">'
         + (E.android ? "Open your phone’s <b>Settings › Apps › " + (E.standalone ? "BLACKOUT" : "your browser") + " › Notifications</b>, allow them for blackout.network, then come back."
            : E.ios ? "Open <b>Settings › Notifications › BLACKOUT</b> and turn on <b>Allow Notifications</b>, then come back."
            : "Click the icon to the left of the address bar, set <b>Notifications</b> to <b>Allow</b>, then reload this page.")
-        + '</p>');
+        + '</p>' + '<div class="bnal-acts"><button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
     }
     getCfg().then(function (cf) {
       c = cf;
@@ -188,13 +190,15 @@
         body('<p class="bnal-lead"><span class="bnal-pill">● On</span> You’ll get ' + (s.level === "all" ? "all ranked alerts (rank 5+)" : "major alerts (rank 7+)") + '.</p>'
           + soon(c) + choices(c, s)
           + '<div class="bnal-acts"><button type="button" class="bnal-go" data-bnal="save">Save changes</button>'
+          + '<button type="button" class="bnal-2" data-bnal="testpush">Send me a test push</button>'
           + '<button type="button" class="bnal-2" data-bnal="sample">Show a sample</button>'
-          + '<button type="button" class="bnal-off" data-bnal="off">Turn off alerts</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>');
+          + '<button type="button" class="bnal-off" data-bnal="off">Turn off alerts</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
       } else {
         body(intro + '<p class="bnal-lead">Major threats, the moment they’re confirmed. Free. Turn off any time.</p>' + soon(c) + choices(c, s)
           + '<div class="bnal-acts"><button type="button" class="bnal-go bnal-big" data-bnal="on">' + BELL + '<span>Turn on alerts</span></button></div>'
           + '<p class="bnal-note">Your browser will ask to allow notifications. Tap <b>Allow</b>. Never more than ' + (c.max_per_hour || 6) + ' an hour.</p>'
-          + '<p class="bnal-msg" role="status" aria-live="polite"></p>');
+          + '<p class="bnal-msg" role="status" aria-live="polite"></p>'
+          + '<div class="bnal-acts bnal-acts-2"><button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div>' + SAMPLE_BOX);
       }
     });
   }
@@ -242,12 +246,107 @@
       return post("/api/alerts/unsubscribe", { endpoint: ep }).catch(function () {}).then(function () { return sub.unsubscribe(); });
     }).catch(function () {}).then(function () { save(null); render(); setTimeout(function () { say("Alerts are off.", "ok"); }, 50); });
   }
-  function sample() {
-    getReg().then(function (r) {
-      return r.showNotification("7/10 · SAMPLE", { body: "This is what an alert looks like. Tap it to open the story.", icon: "/icons/icon-192.png",
-        badge: "/alerts/badge.png", tag: "bn-sample", data: { url: location.origin + "/#wire" } });
-    }).then(function () { say("Sample sent. Check your notifications.", "ok"); }, function () { say("Couldn’t show a sample.", "err"); });
+  // ---------------- sample alert (t399): an in-panel preview built from a real recent rank 7+ alert, plus a local notification if allowed ----------------
+  var SAMPLE_BOX = '<div class="bnal-sample" hidden></div>';
+  var SOC = /^(Telegram|X |X:|Mastodon|Reddit|YouTube|Bluesky|social)/i;
+  function cleanT(t) { return String(t || "").replace(/^[^\w"'(\[]+/, "").replace(/^(breaking( news)?|urgent|just in|alert)\s*[:\-–—|]\s*/i, "").replace(/\s*@\w+\s*$/, "").replace(/\s+\./g, ".").trim(); }
+  function catLabel(c) { return ({ "war/conflict": "War & conflict", "natural disaster": "Natural disaster", political: "Politics", disease: "Disease", cyber: "Cyber",
+    financial: "Financial", "space weather": "Space weather", "ufo/uap": "UFO / UAP", "spiritual/religious": "Religious" })[(c || "").toLowerCase()] || "Alert"; }
+  function etTime(iso) {
+    try { return new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET"; }
+    catch (e) { return ""; }
   }
+  var EXAMPLE = { cluster_id: "", rank: 8, category: "natural disaster", confidence: "High", eff_families: 3, families: ["NOAA", "USGS", "AP"], location: "Example City",
+    title: "EXAMPLE: Major hurricane makes landfall; storm surge warnings in effect", high_at: new Date().toISOString(), links: [], example: true };
+  var sampleP = null;
+  function getSample() {
+    if (!sampleP) sampleP = fetch("/api/new_high?mode=alert&since=" + new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 19) + "Z", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        var it = (j.items || []).filter(function (x) { return x.rank >= 7 && x.title; })
+          .sort(function (a, b) { return (b.high_at || "").localeCompare(a.high_at || ""); })[0];
+        if (!it) throw 0; return it;
+      }).catch(function () { sampleP = null; return EXAMPLE; });
+    return sampleP;
+  }
+  function brief(it) {
+    var seen = {}, fam = (it.families || []).filter(function (f) {
+      var k = String(f || "").toLowerCase().replace(/^www\./, "").split(".")[0]; if (!f || f === "social" || seen[k]) return false; seen[k] = 1; return true; }).slice(0, 3);
+    var n = it.eff_families || fam.length;
+    return (it.location ? "Where: " + it.location + ". " : "")
+      + (n ? "Confirmed by " + n + " independent source" + (n === 1 ? "" : "s") + (fam.length ? ", including " + fam.join(", ") : "") + ". " : "")
+      + (it.score != null ? "Severity " + it.score + "/100. " : "")
+      + "Open the alert page for the full brief and every source.";
+  }
+  function srcLink(it) {
+    var ls = it.links || [], l = ls.filter(function (x) { return x.url && !SOC.test(x.source || ""); })[0] || ls[0];
+    if (!l) return "";
+    var h = ""; try { h = new URL(l.url).hostname.replace(/^www\./, ""); } catch (e) {}
+    return '<a class="bnal-src" href="' + esc(l.url) + '" target="_blank" rel="noopener nofollow">Source: ' + esc(l.source && !/^https?:/.test(l.source) ? l.source : h) + ' ↗</a>';
+  }
+  function sampleHTML(it) {
+    var url = it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/#wire", cat = catLabel(it.category), r = Math.max(0, Math.min(10, it.rank | 0));
+    var head = cleanT(it.title);
+    return '<div class="bnal-sh"><span class="bnal-tagS">SAMPLE</span><span>' + (it.example ? "Illustrative example (not a real event)" : "Based on a real alert from " + esc(etTime(it.high_at).replace(/,? \d+:\d\d [AP]M ET$/, ""))) + '</span></div>'
+      + '<div class="bnal-notif" aria-label="How the notification looks on your lock screen"><img src="/icons/icon-192.png" alt="" width="38" height="38">'
+      + '<div><div class="bnal-nt"><b>BLACKOUT</b><span>now</span></div><div class="bnal-nh">' + r + '/10 · ' + esc(cat.toUpperCase()) + '</div><div class="bnal-nb">' + esc(head) + '</div></div></div>'
+      + '<article class="bnal-card2"><div class="bnal-cb"><img class="bnal-logo" src="/icons/icon-192.png" alt="BLACKOUT.NETWORK" width="28" height="28">'
+      + '<span class="bnal-brand">BLACKOUT.<b>NETWORK</b></span><span class="bnal-rk bnal-rk' + (r >= 8 ? "h" : "m") + '">RANK ' + r + '</span></div>'
+      + '<div class="bnal-mt">' + meter(r) + '<span class="bnal-ct">' + esc(cat) + '</span></div>'
+      + '<h3 class="bnal-t">' + esc(head) + '</h3><p class="bnal-p">' + esc(brief(it)) + '</p>'
+      + '<dl class="bnal-meta"><div><dt>Time</dt><dd>' + esc(etTime(it.high_at)) + '</dd></div><div><dt>Confidence</dt><dd>' + esc(it.confidence || "—") + '</dd></div></dl>'
+      + '<div class="bnal-lk">' + srcLink(it) + (it.example ? "" : '<a class="bnal-open" href="' + url + '">Open the alert page →</a>') + '</div></article>'
+      + '<p class="bnal-note">Real alerts arrive as a phone or desktop notification (top). Tap it to open the alert page.</p>';
+  }
+  function sample(btn) {
+    var box = el && el.querySelector(".bnal-sample"); if (!box) return;
+    if (!box.hidden && box.innerHTML) { box.hidden = true; if (btn) btn.setAttribute("aria-expanded", "false"); return; }
+    box.hidden = false; box.innerHTML = '<p class="bnal-note">Loading a sample…</p>'; if (btn) btn.setAttribute("aria-expanded", "true");
+    getSample().then(function (it) {
+      box.innerHTML = sampleHTML(it);
+      try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
+      if (E.api && Notification.permission === "granted" && !(E.ios && !E.standalone)) {
+        getReg().then(function (r) {
+          return r.showNotification("SAMPLE · " + (it.rank | 0) + "/10 · " + catLabel(it.category).toUpperCase(), { body: cleanT(it.title).slice(0, 180),
+            icon: "/icons/icon-192.png", badge: "/alerts/badge.png", tag: "bn-sample",
+            data: { url: location.origin + (it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/#wire") } });
+        }).then(function () { say("Sample shown below and sent to your notifications.", "ok"); }, function () { say("Sample shown below.", "ok"); });
+      } else say("Sample shown below.", "ok");
+    });
+  }
+  // "Send me a test push": a real push from our server through your browser's push service (Apple, Google, Mozilla, Microsoft)
+  function testPush(btn) {
+    btn.disabled = true; say("Requesting a test push…");
+    getReg().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) { save(null); render(); throw null; }
+      return post("/api/alerts/testpush", { endpoint: sub.endpoint });
+    }).then(function (j) {
+      say(j.queued === false ? "A test push is already on its way. It arrives within about 2 minutes." :
+        "Test push requested. It arrives within about 2 minutes, even if you close this page.", "ok");
+      setTimeout(function () { btn.disabled = false; }, 30000);
+    }).catch(function (e) { btn.disabled = false; if (e !== null) say((e && e.message) || "Couldn’t request a test push. Please try again.", "err"); });
+  }
+  var IOS_ART = '<figure class="bnal-ios" aria-label="Three steps: tap Share, tap Add to Home Screen, open BLACKOUT and tap the bell">'
+    + '<svg viewBox="0 0 330 150" role="img" aria-hidden="true" focusable="false">'
+    + '<defs><linearGradient id="bnalm" x1="0" x2="1"><stop offset=".333" stop-color="#2BB673"/><stop offset=".333" stop-color="#F5A524"/><stop offset=".666" stop-color="#F5A524"/><stop offset=".666" stop-color="#FF4D4F"/></linearGradient></defs>'
+    + [0, 1, 2].map(function (k) { return '<rect x="' + (14 + k * 108) + '" y="6" width="86" height="138" rx="14" fill="#14181D" stroke="#2f3742" stroke-width="2"/>'; }).join("")
+    // 1: Safari bar with Share highlighted
+    + '<rect x="22" y="112" width="70" height="22" rx="7" fill="#1d232b"/><circle cx="57" cy="123" r="10" fill="#FF4D4F" fill-opacity=".2" stroke="#FF4D4F" stroke-width="1.6"/>'
+    + '<path d="M57 117v9M53.5 120.5l3.5-3.5 3.5 3.5M52.5 123.5h-1.5v6h12v-6h-1.5" fill="none" stroke="#E6E9EE" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+    + '<rect x="24" y="22" width="66" height="8" rx="3" fill="#252B33"/><rect x="24" y="38" width="50" height="6" rx="3" fill="#252B33"/><rect x="24" y="50" width="58" height="6" rx="3" fill="#252B33"/>'
+    // 2: share sheet row "Add to Home Screen"
+    + '<rect x="130" y="70" width="70" height="66" rx="8" fill="#1d232b"/><rect x="134" y="78" width="62" height="18" rx="5" fill="#FF4D4F" fill-opacity=".18" stroke="#FF4D4F" stroke-width="1.4"/>'
+    + '<rect x="138" y="81" width="12" height="12" rx="3" fill="none" stroke="#E6E9EE" stroke-width="1.4"/><path d="M144 84v6M141 87h6" stroke="#E6E9EE" stroke-width="1.4" stroke-linecap="round"/>'
+    + '<text x="154" y="90.5" fill="#E6E9EE" font-size="7.4" font-family="Inter,system-ui" font-weight="700">Add to Home</text>'
+    + '<rect x="136" y="102" width="50" height="6" rx="3" fill="#252B33"/><rect x="136" y="114" width="40" height="6" rx="3" fill="#252B33"/>'
+    // 3: home screen with BN app + notification badge
+    + '<rect x="248" y="44" width="38" height="38" rx="9" fill="#0B0D10" stroke="#3a4350"/><text x="267" y="69" text-anchor="middle" fill="#fff" font-size="15" font-family="Montserrat,Inter,system-ui" font-weight="800">BN</text>'
+    + '<rect x="254" y="74" width="26" height="3" rx="1.5" fill="url(#bnalm)"/><circle cx="285" cy="45" r="7" fill="#FF4D4F"/><text x="285" y="48.5" text-anchor="middle" fill="#fff" font-size="9" font-weight="800" font-family="Inter,system-ui">1</text>'
+    + '<text x="267" y="96" text-anchor="middle" fill="#c9d0d9" font-size="8" font-family="Inter,system-ui" font-weight="600">BLACKOUT</text>'
+    + [[228, 22], [292, 22], [228, 104], [292, 104]].map(function (q) { return '<rect x="' + (q[0] - 8) + '" y="' + q[1] + '" width="16" height="16" rx="4" fill="#252B33"/>'; }).join("")
+    + [0, 1, 2].map(function (k) { return '<circle cx="' + (57 + k * 108) + '" cy="6" r="10" fill="#FF4D4F"/><text x="' + (57 + k * 108) + '" y="10" text-anchor="middle" fill="#0B0D10" font-size="11" font-weight="800" font-family="Inter,system-ui">' + (k + 1) + '</text>'; }).join("")
+    + '<path d="M103 75h8M211 75h8" stroke="#8B95A3" stroke-width="2" stroke-linecap="round"/><path d="M108 71l4 4-4 4M216 71l4 4-4 4" fill="none" stroke="#8B95A3" stroke-width="2" stroke-linecap="round"/>'
+    + '</svg><figcaption>Add to Home Screen to get alerts</figcaption></figure>';
 
   BN.enableAlerts = function (opts) {
     opts = opts || {};
@@ -269,7 +368,7 @@
       BN.enableAlerts({ from: t.getAttribute("data-bn-alerts") || "" }); return;
     }
     var a = t.getAttribute("data-bnal");
-    if (a === "on") turnOn(t); else if (a === "save") saveChanges(t); else if (a === "off") turnOff(t); else if (a === "sample") sample();
+    if (a === "on") turnOn(t); else if (a === "save") saveChanges(t); else if (a === "off") turnOff(t); else if (a === "sample") sample(t); else if (a === "testpush") testPush(t);
     else if (a === "install") { closePanel(); try { BN.showInstallGuide(); } catch (er) {} }
   });
   if (navigator.serviceWorker) navigator.serviceWorker.addEventListener("message", function (e) {

@@ -25,6 +25,8 @@ self.addEventListener("notificationclick", function (e) {
   var url = safeUrl(e.notification.data && e.notification.data.url);
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (cs) {
     for (var i = 0; i < cs.length; i++) { if (cs[i].url === url && "focus" in cs[i]) return cs[i].focus(); }
+    var w = cs.filter(function (c) { return "navigate" in c && "focus" in c; })[0];   // t399: reuse the open app window (Home Screen app) when there is one
+    if (w) return w.focus().then(function (c) { return (c || w).navigate(url); }).catch(function () { return self.clients.openWindow(url); });
     return self.clients.openWindow(url);
   }));
 });

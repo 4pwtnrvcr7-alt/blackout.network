@@ -65,3 +65,40 @@ html.bnal-lock,html.bnal-lock body{overflow:hidden}
 @media(prefers-reduced-motion:reduce){.bnal-card,.bnal-scrim{transition:none}}
 /* phones: the bell is one more icon in the top bar, so the bar icons get 4px narrower to keep BLACKOUT.NETWORK unclipped */
 @media(max-width:440px){html.bnal-has body .bn-top .bn-acts .bn-ib{width:31px}html.bnal-has .bn-top .bn-follows a.bn-follow{min-width:31px}}
+/* t399: sample alert preview, test push, iOS add-to-home-screen graphic */
+.bnal-acts-2{margin-top:8px}
+.bnal-sample{margin:14px 0 0;display:grid;gap:10px;min-width:0}
+.bnal-sample[hidden]{display:none}
+.bnal-sh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--bn-muted,#8B95A3)}
+.bnal-tagS{padding:3px 8px;border-radius:6px;background:var(--bn-sev-md,#F5A524);color:#0B0D10;font:800 11.5px/1.1 var(--bn-font-ui,system-ui);letter-spacing:.08em}
+.bnal-notif{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:16px;background:rgba(120,130,145,.16);border:1px solid var(--bn-line,#252B33);backdrop-filter:blur(8px);min-width:0}
+.bnal-notif img{width:38px;height:38px;border-radius:9px;flex:none}
+.bnal-notif>div{min-width:0;flex:1}
+.bnal-nt{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--bn-muted,#8B95A3)}
+.bnal-nt b{font:700 12px/1.3 var(--bn-font-ui,system-ui);letter-spacing:.04em;color:var(--bn-text-2,#c9d0d9)}
+.bnal-nh{font:800 14px/1.3 var(--bn-font-ui,system-ui);color:var(--bn-text,#E6E9EE)}
+.bnal-nb{font-size:13.5px;line-height:1.35;color:var(--bn-text-2,#c9d0d9);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.bnal-card2{position:relative;padding:14px;border:1px solid var(--bn-line,#252B33);border-radius:14px;background:var(--bn-raised,#1B2027);min-width:0;overflow:hidden}
+.bnal-card2::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--bn-sev-hi,#FF4D4F)}
+.bnal-cb{display:flex;align-items:center;gap:8px;min-width:0}
+.bnal-logo{width:28px;height:28px;border-radius:7px;flex:none}
+.bnal-brand{font:800 13px/1 var(--bn-font-ui,system-ui);letter-spacing:.02em;color:var(--bn-text,#E6E9EE);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bnal-brand b{color:var(--bn-brand,#FF4D4F)}
+.bnal-rk{padding:4px 8px;border-radius:999px;font:800 11.5px/1 var(--bn-font-ui,system-ui);letter-spacing:.06em;flex:none}
+.bnal-rkh{background:var(--bn-sev-hi,#FF4D4F);color:#0B0D10}.bnal-rkm{background:var(--bn-sev-md,#F5A524);color:#0B0D10}
+.bnal-mt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 6px}
+.bnal-ct{font:700 12px/1 var(--bn-font-ui,system-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--bn-muted,#8B95A3)}
+.bnal-t{margin:0 0 6px;font:800 16.5px/1.3 var(--bn-font-ui,system-ui);color:var(--bn-text,#E6E9EE);overflow-wrap:anywhere}
+.bnal-p{margin:0;font-size:14px;line-height:1.5;color:var(--bn-text-2,#c9d0d9);overflow-wrap:anywhere}
+.bnal-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 0}
+.bnal-meta div{padding:8px 10px;border-radius:9px;background:var(--bn-surface-2,#1d232b);min-width:0}
+.bnal-meta dt{font:700 11px/1.2 var(--bn-font-ui,system-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--bn-muted,#8B95A3)}
+.bnal-meta dd{margin:3px 0 0;font:600 13.5px/1.3 var(--bn-font-ui,system-ui);color:var(--bn-text,#E6E9EE)}
+.bnal-lk{display:flex;flex-wrap:wrap;gap:6px 16px;margin:12px 0 0;align-items:center}
+.bnal-lk a{display:inline-flex;align-items:center;min-height:36px;font:700 14px/1.2 var(--bn-font-ui,system-ui);color:var(--bn-link,#4aa3ff);text-decoration:none;overflow-wrap:anywhere}
+.bnal-lk a:hover{text-decoration:underline}
+.bnal-lk .bnal-open{color:var(--bn-brand,#FF4D4F)}
+.bnal-ios{margin:14px 0 0;padding:12px;border:1px solid var(--bn-line,#252B33);border-radius:14px;background:var(--bn-raised,#1B2027)}
+.bnal-ios svg{display:block;width:100%!important;height:auto!important;max-width:100%}
+.bnal-ios figcaption{margin:8px 0 0;text-align:center;font:800 14px/1.3 var(--bn-font-ui,system-ui);color:var(--bn-text,#E6E9EE)}
+[data-theme=light] .bnal-ios svg rect[fill="#14181D"]{fill:#1B2027}

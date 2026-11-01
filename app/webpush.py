@@ -5,6 +5,7 @@ GET  /alerts/badge.png, /alerts/icon.png   notification badge (monochrome BN) an
 GET  /api/alerts/config        VAPID PUBLIC key, levels, categories, whether public sending is switched on
 POST /api/alerts/subscribe     {sub:{endpoint,keys:{p256dh,auth}}, level:"major"|"all", cats:[...], test:bool} (upsert = change prefs)
 POST /api/alerts/unsubscribe   {endpoint}
+POST /api/alerts/testpush      {endpoint}  'Send me a test push' (t399): stamps subs.test_req; the box notifier sends one test push
 POST /api/alerts/resubscribe   {old_endpoint, sub}  (service worker, after the browser rotates a subscription)
 Subscriptions live in webpush.db, a Render-owned DB: the box mirrors it every minute over the signed sync channel and restores it
 after a Render restart (render_rules.RENDER_OWNED). The box, never this node, holds the VAPID private key and sends the pushes
@@ -44,6 +45,8 @@ def _db():
     c.execute("""CREATE TABLE IF NOT EXISTS subs(id TEXT PRIMARY KEY, endpoint TEXT UNIQUE NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL,
                  level TEXT NOT NULL DEFAULT 'major', cats TEXT NOT NULL DEFAULT '[]', test INTEGER NOT NULL DEFAULT 0, browser TEXT,
                  created TEXT NOT NULL, updated TEXT NOT NULL)""")
+    try: c.execute("ALTER TABLE subs ADD COLUMN test_req TEXT")   # t399: 'Send me a test push' request time (the box notifier sends it)
+    except sqlite3.OperationalError: pass
     return c
 
 _purged = {"mt": None}
@@ -158,6 +161,17 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=b""):
             with c: n = c.execute("DELETE FROM subs WHERE id=?", (sub_id(ep),)).rowcount
         finally: c.close()
         return 200, {"ok": True, "removed": n}
+    if path == "/api/alerts/testpush":   # t399: queue one test push to this (already subscribed) browser; the box sends it within ~2 min
+        ep = d.get("endpoint")
+        if not _ok_endpoint(ep): return 400, {"error": "unknown subscription"}
+        c = _db()
+        try:
+            r = c.execute("SELECT test_req FROM subs WHERE id=?", (sub_id(ep),)).fetchone()
+            if not r: return 404, {"error": "This browser isn't signed up yet. Tap Turn on alerts first."}
+            if r[0] and r[0] >= time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 120)): return 200, {"ok": True, "queued": False}
+            with c: c.execute("UPDATE subs SET test_req=? WHERE id=?", (_iso(), sub_id(ep)))
+        finally: c.close()
+        return 200, {"ok": True, "queued": True}
     if path == "/api/alerts/resubscribe":
         p = _parse_sub(d.get("sub")); old = d.get("old_endpoint")
         if not p or not _ok_endpoint(old): return 400, {"error": "bad request"}
