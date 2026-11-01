@@ -1,11 +1,12 @@
 """PWA / home-screen add-on: web app manifest, app icons and the mobile install guide (static/pwa/).
-GET /manifest.webmanifest (alias /manifest.json), /apple-touch-icon.png (+ -precomposed), /icons/<file>.png,
+GET /manifest.webmanifest (aliases /manifest.json, /site.webmanifest), /apple-touch-icon.png (+ -precomposed), /icons/<file>.png,
 /install-guide.js, /install-guide.css. Plain files only: fixed names, no directory listing, no path traversal, no data collected."""
 import os, re
 BASE = os.path.dirname(os.path.abspath(__file__))
 D = os.path.join(BASE, "static", "pwa")
 FIXED = {"/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
          "/manifest.json": ("manifest.webmanifest", "application/manifest+json"),
+         "/site.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
          "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
          "/apple-touch-icon-precomposed.png": ("apple-touch-icon.png", "image/png"),
          "/install-guide.js": ("install-guide.js", "application/javascript"),

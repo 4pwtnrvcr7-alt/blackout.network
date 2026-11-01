@@ -181,8 +181,8 @@ def head_html(page, path=None):
     E = lambda s: html.escape(s, quote=True)
     return (f'<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             f'<meta property="og:type" content="website"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(title)}">'
-            f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{SITE}/icons/icon-512.png">'
-            f'<meta name="twitter:card" content="summary"><meta name="twitter:site" content="{HANDLE}"><meta name="twitter:title" content="{E(title)}">'
+            f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{SITE}/icons/icon-og-1200x630.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
+            f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{SITE}/icons/icon-og-1200x630.png"><meta name="twitter:site" content="{HANDLE}"><meta name="twitter:title" content="{E(title)}">'
             f'<meta name="twitter:description" content="{E(desc)}"><link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
 
 def data():

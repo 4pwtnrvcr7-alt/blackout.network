@@ -157,7 +157,9 @@ _BRANDED = b"BLACKOUT.NETWORK"
 PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
             b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">'
             b'<meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
-            b'<meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+            b'<meta name="apple-mobile-web-app-title" content="BLACKOUT"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
+            b'<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="mask-icon" href="/img/safari-pinned-tab.svg" color="#0B0D10">'   # BN master tile icon set (t333)
+            b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png">'
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
 _OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
                  b"The world&#39;s threats, scored and sourced, before cable news catches up."]

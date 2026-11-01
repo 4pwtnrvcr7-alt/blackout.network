@@ -75,6 +75,7 @@ ROUTES = {
     "/report-status": "reports",
     "/manifest.webmanifest": "pwa",
     "/manifest.json": "pwa",
+    "/site.webmanifest": "pwa",
     "/apple-touch-icon.png": "pwa",
     "/apple-touch-icon-precomposed.png": "pwa",
     "/icons": "pwa",
