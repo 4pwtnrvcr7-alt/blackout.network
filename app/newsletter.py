@@ -81,7 +81,7 @@ DEFAULTS = {
     "max_update_items": 5,          # per section (Stories you follow / Developing stories)
     "follow_max": 50,               # active follows per subscriber
     "audience_db": "",              # override for the subscriber list used by live sending (default: render_mirror/newsletter.db when live)
-    "breaking": {"enabled": True, "fresh_hours": 6, "min_gap_hours": 3, "max_per_day": 3, "max_items": 3},
+    "breaking": {"enabled": True, "fresh_hours": 6, "min_gap_hours": 2, "max_per_day": 3, "max_items": 3, "quiet_start": 22, "quiet_end": 7, "quiet_min_rank": 9},
 }
 E = lambda s: html.escape("" if s is None else str(s), quote=True)
 _LOCK = threading.RLock()
@@ -272,6 +272,7 @@ def links_for(row, c=None):
     base = (c or cfg())["base_url"].rstrip("/"); mt = sub_token('manage', row)
     return {"unsubscribe": f"{base}/newsletter/unsubscribe?token={sub_token('unsub', row)}",
             "manage": f"{base}/newsletter/manage?token={mt}",
+            "breaking_off": f"{base}/newsletter/breaking_off?token={mt}",
             "categories": f"{base}/newsletter/manage?token={mt}",   # "Manage my subscription categories" button
             "sources": f"{base}/newsletter/sources?token={mt}",     # "Find new sources" button
             "confirm": f"{base}/newsletter/confirm?token={sub_token('confirm', row)}",
@@ -773,11 +774,13 @@ def footer_buttons_html(links):
             f'{_btn("Manage my subscription categories", cat)}{_btn("Find new sources", srcs, primary=False)}</td></tr>'
             f'<tr><td align="left" style="padding:14px 20px 22px 20px;text-align:left;font:400 12px/1.5 {FB}">'
             f'<a href="{E(links["unsubscribe"])}" class="bnm" style="color:{PAL["mu"]};text-decoration:underline">Unsubscribe</a>'
-            f'<span class="bnm" style="color:{PAL["mu"]}"> (one click, no login)</span></td></tr>')
+            f'<span class="bnm" style="color:{PAL["mu"]}"> (one click, no login)</span>'
+            + (f' · <a href="{E(links["breaking_off"])}" class="bnm" style="color:{PAL["mu"]};text-decoration:underline">Stop breaking alerts (keep briefs)</a>' if links.get("breaking_off") else "")
+            + '</td></tr>')
 def footer_buttons_text(links):
     return [f"Manage my subscription categories: {links.get('categories') or links.get('manage')}",
             f"Find new sources: {links.get('sources') or links.get('site')}", "",
-            f"Unsubscribe (one click): {links['unsubscribe']}"]
+            f"Unsubscribe (one click): {links['unsubscribe']}"] + ([f"Stop breaking alerts, keep briefs: {links['breaking_off']}"] if links.get("breaking_off") else [])
 
 def _addr(c):
     a = (c.get("mailing_address") or "").strip()
@@ -943,13 +946,18 @@ MAJOR_RX = re.compile(WAR_PATHOGEN_RX.pattern + r"|ballistic missiles?|missile (
 def breaking_rule(r, official):
     rk, ef = int(r["rank"] or 0), int(r["eff_families"] or 0)
     text = f"{r['title'] or ''} {r['brief'] or ''}"
-    if rk >= 9 and (official or ef >= 2): return "B1"
-    if rk == 8 and ef >= 3 and (official or MAJOR_RX.search(text)): return "B2"
-    if rk >= 7 and ef >= 2 and WAR_PATHOGEN_RX.search(text): return "B3"
+    if ef < 2: return None                 # t373: never single-source / unconfirmed
+    if rk >= 9: return "B1"
+    if rk >= 7: return "B2"
     return None
-BREAKING_RULES = {"B1": "rank 9-10 with official or 2+ independent sources",
-                  "B2": "rank 8 with 3+ independent sources and an official source or a major-event signal",
-                  "B3": "rank 7+ with 2+ independent sources and a war-outbreak, novel-pathogen or nuclear signal"}
+BREAKING_RULES = {"B1": "rank 9-10 confirmed by 2+ independent sources",
+                  "B2": "rank 7+ confirmed by 2+ independent sources",
+                  "T1": "one of our posts is trending (engagement well above our recent baseline)"}
+
+def load_trending():
+    """social_trending.json (written by the box engagement check, pushed via sync): [{id, title, url, platform, metric, value, baseline, at}]."""
+    try: return json.load(open(os.path.join(BASE, "social_trending.json"))).get("items") or []
+    except Exception: return []
 
 def breaking_candidates(at=None, c=None, S=None):
     """-> [(row, rule, official)] fresh stories meeting the trigger, strongest first."""
@@ -972,8 +980,25 @@ def breaking_candidates(at=None, c=None, S=None):
         if rule: out.append((r, rule, offi.get(r["cluster_id"], 0)))
     return out
 
-def render_breaking(items, links, at, c=None):
+def _trend_row(t):
+    return (f'<tr><td class="bnl" style="padding:16px 20px;border-top:1px solid {PAL["line"]};font:400 15px/1.55 {FB};color:{PAL["tx"]}">'
+            f'<p style="margin:0 0 6px 0;font:800 12px/1.4 {FH};letter-spacing:.08em;color:{PAL["ac"]}">TRENDING ON {BRAND}</p>'
+            f'<p style="margin:0 0 10px 0;font:700 18px/1.3 {FH}">{E(t.get("title") or "")}</p>'
+            f'<p class="bnm" style="margin:0 0 12px 0;color:{PAL["mu"]};font-size:13px">{E(t.get("platform") or "")}: {E(t.get("value"))} {E(t.get("metric") or "views")}, about {E(t.get("ratio") or "")}× our recent average.</p>'
+            f'{_btn("Watch it →", t["url"])}</td></tr>')
+def render_trending(t, links, at, c=None):
+    c = c or cfg(); addr, _ = _addr(c)
+    subj = f"Trending on {BRAND}: {_cut(t.get('title') or '', 90)}"
+    pre = f"One of our posts is taking off: {_cut(t.get('title') or '', 120)}"
+    why = f"You get breaking alerts because you subscribed to the {BRAND} newsletter. Turn them off with the link below or under Manage."
+    html_ = _shell(subj, pre, _head_html("TRENDING", PAL["ac"], fmt_et(at), f"As of {fmt_et(at)}"), [_bluf_html(pre), _trend_row(t)], links, c, why)
+    text = "\n".join([subj, "", pre, f"Watch: {t['url']}", "", "See the whole picture: https://blackout.network (no .com)", "--",
+                      f"{BRAND} · {addr}", *footer_buttons_text(links)])
+    return subj, html_, text
+
+def render_breaking(items, links, at, c=None, trend=None):
     """items: item_of() dicts with 'rule'. -> (subject, html, text)."""
+    if not items and trend: return render_trending(trend, links, at, c)
     c = c or cfg(); top = items[0]; addr, _ = _addr(c)
     subj = f"BREAKING · {BRAND}: R{top['rank']} {_cut(_short(top['title'], 200), 80)}" + (f" (+{len(items) - 1} more)" if len(items) > 1 else "")
     pre = f"{top['tier']} ({top['rank']}/10): {_short(top['title'], 140)}. {top['confidence']}."
@@ -1462,9 +1487,18 @@ def run_breaking(at=None, c=None, dry_run=False):
     k = db()
     try:
         seen = {r["cluster_id"]: r for r in k.execute("SELECT * FROM breaking_seen")}
-        fresh = [(r, rule, o) for r, rule, o in cands if r["cluster_id"] not in seen
-                 or (int(r["rank"] or 0) >= 9 and int(seen[r["cluster_id"]]["rank"] or 0) < 9)]   # escalation into rank 9+ may alert again
-        if not fresh: return []
+        briefed = {x[0] for x in k.execute("SELECT DISTINCT cluster_id FROM sent_items WHERE sent_at>=?", (iso(at - timedelta(days=float(c.get("dedupe_days") or 14))),))}
+        fresh = [(r, rule, o) for r, rule, o in cands if r["cluster_id"] not in briefed and (r["cluster_id"] not in seen
+                 or (int(r["rank"] or 0) >= 9 and int(seen[r["cluster_id"]]["rank"] or 0) < 9))]   # escalation into rank 9+ may alert again
+        hr = at.astimezone(ET).hour
+        if hr >= int(b.get("quiet_start", 22)) or hr < int(b.get("quiet_end", 7)):   # overnight: only rank 9+
+            fresh = [x for x in fresh if int(x[0]["rank"] or 0) >= int(b.get("quiet_min_rank", 9))]
+        trend = None
+        if not fresh and not (hr >= int(b.get("quiet_start", 22)) or hr < int(b.get("quiet_end", 7))):
+            for t_ in load_trending():
+                tid = "trend:" + str(t_.get("id") or "")
+                if tid != "trend:" and tid not in seen and t_.get("url") and (parse_t(t_.get("at")) or at) > at - timedelta(hours=12): trend = t_; break
+        if not fresh and not trend: return []
         if dry_run: return [(f"breaking:dry:{r['cluster_id']}", rule) for r, rule, o in fresh]
         runs = [parse_t(x[0]) for x in k.execute("SELECT ts FROM breaking_runs WHERE status IN ('sent','locked','running','done') AND ts>=?",
                                                  (iso(at - timedelta(hours=24)),))]
@@ -1478,12 +1512,14 @@ def run_breaking(at=None, c=None, dry_run=False):
             return [("breaking:held", len(fresh))]
         take = fresh[:int(b.get("max_items", 3))]
         items = []
+        if trend:
+            k.execute("INSERT OR REPLACE INTO breaking_seen(cluster_id,ts,rank,rule,status,run_id) VALUES(?,?,?,?,?,NULL)", ("trend:" + str(trend["id"]), iso(at), 0, "T1", "pending")); k.commit()
         for r, rule, o in take:
             it = item_of(r, "main", o); it["rule"] = rule; it["breaking"] = True; items.append(it)
         mode = sender_status("issue")["mode"]
         status = "locked" if mode == "preview" else "running"
         note = "issue sending is locked (preview): one outbox preview written, no email sent" if status == "locked" else ""
-        cur = k.execute("INSERT INTO breaking_runs(ts,cluster_ids,status,mode,note) VALUES(?,?,?,?,?)", (iso(at), json.dumps([i["cluster_id"] for i in items]), status, mode, note))
+        cur = k.execute("INSERT INTO breaking_runs(ts,cluster_ids,status,mode,note) VALUES(?,?,?,?,?)", (iso(at), json.dumps([i["cluster_id"] for i in items] or ["trend:" + str(trend["id"])]), status, mode, note))
         run_id = cur.lastrowid
         for it in items:
             k.execute("INSERT OR REPLACE INTO breaking_seen(cluster_id,ts,rank,rule,status,run_id) VALUES(?,?,?,?,?,?)", (it["cluster_id"], iso(at), it["rank"], it["rule"], status, run_id))
@@ -1493,7 +1529,7 @@ def run_breaking(at=None, c=None, dry_run=False):
     if status == "locked":
         L = {"unsubscribe": f"{base}/newsletter", "manage": f"{base}/newsletter", "categories": f"{base}/newsletter", "sources": f"{base}/sources",
              "scoring": f"{base}/scoring", "site": f"{base}/#wire", "_row": None}
-        subj, hb, tx = render_breaking(items, L, at, c)
+        subj, hb, tx = render_breaking(items, L, at, c, trend)
         f = _outbox_write(build_mime("preview@blackout.invalid", subj, hb, tx, None, "breaking", c), "breaking_preview", run_id)
         log(f"breaking run #{run_id} ({', '.join(i['cluster_id'] + ' ' + i['rule'] for i in items)}): LOCKED, preview -> newsletter_outbox/{f}", "breaking")
         return [(f"breaking:{run_id}", "locked")]
@@ -1506,13 +1542,13 @@ def run_breaking(at=None, c=None, dry_run=False):
             try: ints = set(json.loads(s.get("interests") or '["all"]'))
             except Exception: ints = {"all"}
             mine = [i for i in items if "all" in ints or not ints or i["category"] in ints or i["cluster_id"] in (s.get("follows") or [])]
-            if not mine: continue
+            if not mine and not (trend and not items): continue
             cur = k.execute("INSERT OR IGNORE INTO sends(subscriber_id,slot_key,status,created) VALUES(?,?,?,?)", (s["id"], key, "sending", iso(now()))); k.commit()
             if cur.rowcount != 1: continue
             n_t += 1; srow_id = k.execute("SELECT id FROM sends WHERE subscriber_id=? AND slot_key=?", (s["id"], key)).fetchone()[0]
             for i in mine: i["followed"] = i["cluster_id"] in (s.get("follows") or [])
             L = links_for(s, c); L["_row"] = s
-            subj, hb, tx = render_breaking(mine, L, at, c)
+            subj, hb, tx = render_breaking(mine, L, at, c, trend if not items else None)
             ok, mode, f, err = deliver(build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c), "issue", s["id"])
             k.execute("UPDATE sends SET status=?, sent_at=?, mode=?, outbox_file=?, subject=?, n_main=?, error=?, attempts=1 WHERE id=?",
                       ("sent" if ok else "gave_up", iso(now()), mode, f, subj, len(mine), err, srow_id))
@@ -1979,6 +2015,14 @@ def handle_get(path, qs):
             return 200, result_page("Too many followed stories", f"You already follow {cfg().get('follow_max', 50)} stories. Unfollow some on your manage page first.", False), "text/html"
         return 400, result_page("Link not valid", "This follow link is invalid or was altered. Use the link in your latest email.", False,
                                 f'<p><a class="nl-btn" href="{story}">Open the story</a></p>'), "text/html"
+    if path == "/newsletter/breaking_off":
+        tok = q1("token"); st, r = token_sub(tok, "manage")
+        if st != "ok" or r is None:
+            return 400, result_page("Link not valid", "This link is invalid or expired. Use the link in your latest email.", False), "text/html"
+        k = db(); k.execute("UPDATE subscribers SET breaking=0, updated=? WHERE id=?", (iso(now()), r["id"])); k.commit(); k.close()
+        log(f"subscriber #{r['id']} turned breaking alerts off (footer link)", "sub")
+        return 200, result_page("Breaking alerts off", "Done. You'll still get your Morning and Evening Briefs. Turn breaking alerts back on any time under Manage.", True,
+                                f'<p><a class="nl-btn" href="/newsletter/manage?token={E(tok)}">Manage preferences</a></p>'), "text/html"
     if path == "/newsletter/manage":
         tok = q1("token"); st, r = token_sub(tok, "manage")
         if st != "ok" or r is None:
