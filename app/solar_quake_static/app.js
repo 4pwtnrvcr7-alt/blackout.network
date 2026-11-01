@@ -6,6 +6,8 @@ const TAB=document.getElementById("tab-solar");if(!TAB)return;
 const E=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const Q={d:null,m:null,agg:"m",set:"declustered",lat:"geo",mapMode:"both",ev:"",charts:{},map:null,layer:null,sun:null,term:null,loading:false,built:false};
 const COL={kp:"#faad14",fl:"#ff7a45",qk:"#4aa3ff",qk2:"#8fc7ff",in:"#ff9c3a",out:"#4aa3ff",null:"rgba(139,149,163,.28)",grid:"#252b33",mu:"#8b95a3"};
+// t302: Render's free tier throws short 502/503 bursts; retry JSON fetches with backoff instead of failing permanently.
+const getJSON=(u,waits=[1500,4000,9000,15000])=>fetch(u).then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).catch(e=>{if(!waits.length)throw e;return new Promise(res=>setTimeout(res,waits[0])).then(()=>getJSON(u,waits.slice(1)))});
 const f2=(v,n=2)=>v==null?"n/a":(+v).toFixed(n);
 const pF=p=>p==null?"n/a":p<0.001?"< 0.001":(+p).toFixed(3);
 const pct=(v,n=1)=>v==null?"n/a":(+v).toFixed(n)+"%";
@@ -20,7 +22,7 @@ function host(){let s=document.getElementById("sq_top");
 function visible(){return TAB.style.display!=="none"&&TAB.offsetParent!==null}
 function boot(){const el=host();if(Q.built||Q.loading)return;
  el.innerHTML='<div class="sq-badge">Exploratory analysis, not established science</div><div class="meta">Loading the correlation lab…</div>';
- const go=()=>{if(Q.loading||Q.built)return;Q.loading=true;fetch("api/solar_quake").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json()}).then(d=>{Q.d=d;Q.loading=false;render()}).catch(e=>{Q.loading=false;el.innerHTML=`<div class="sq-badge">Exploratory analysis, not established science</div><div class="meta">The correlation lab couldn't load (${E(e.message)}).</div>`})};
+ const go=()=>{if(Q.loading||Q.built)return;Q.loading=true;getJSON("api/solar_quake").then(d=>{Q.d=d;Q.loading=false;render()}).catch(e=>{Q.loading=false;el.innerHTML=`<div class="sq-badge">Exploratory analysis, not established science</div><div class="meta">The correlation lab couldn't load (${E(e.message)}).</div>`})};
  if("IntersectionObserver"in window){const io=new IntersectionObserver(es=>{if(es.some(x=>x.isIntersecting)){io.disconnect();go()}},{rootMargin:"600px"});io.observe(el)}else go()}
 
 function verdict(d){const S=d.summary,T=d.tests;const sig=T.filter(t=>t.sig_holm);
@@ -131,7 +133,7 @@ function ensureMap(){if(Q.map||typeof L==="undefined")return!!Q.map;const el=doc
  // t252: basemap only via the shared bnBaseLayer() in dashboard.html (OSM standard/HOT tiles block blackout.network); no direct tile servers here.
  if(window.bnBaseLayer)bnBaseLayer(Q.map,{maxZoom:8});
  Q.layer=L.layerGroup().addTo(Q.map);return true}
-function drawMap(){if(!Q.m){if(!Q.mload){Q.mload=1;fetch("api/solar_quake/map").then(r=>r.json()).then(m=>{Q.m=m;drawMap()}).catch(()=>{const n=document.getElementById("sq_mapnote");if(n)n.textContent="Map data couldn't load."})}return}
+function drawMap(){if(!Q.m){if(!Q.mload){Q.mload=1;getJSON("api/solar_quake/map").then(m=>{Q.m=m;drawMap()}).catch(()=>{Q.mload=0;const n=document.getElementById("sq_mapnote");if(n)n.textContent="Map data couldn't load. Reload the page to try again."})}return}
  if(!ensureMap())return;Q.layer.clearLayers();const m=Q.m,ev=Q.ev===""?null:+Q.ev,decl=Q.set==="declustered";
  const pt=(p,col,inw)=>{const r=Math.max(2.5,(p[2]-4.5)*(ev==null?2.2:3.2));return L.circleMarker([p[0],p[1]],{radius:r,color:col,weight:1,fillColor:col,fillOpacity:inw?.75:.45,opacity:.9}).bindPopup(`<b>M${p[2].toFixed(1)}</b> · ${E(fmtET(p[5]))}<br>${inw?"Within 72 h of storm onset "+E(fmtD(m.events[p[3]].t)):"Outside storm impact windows"}${p[4]?"":"<br><i>flagged as fore/aftershock</i>"}`)};
  let nIn=0,nOut=0;
