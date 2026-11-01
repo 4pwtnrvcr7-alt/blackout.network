@@ -78,6 +78,14 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
 #tab-bcast .clip:hover{background:#1e252d}#tab-bcast .clip.audio{border-left-color:var(--ac)}#tab-bcast .clip .txt{font-size:13px;color:#c9d0d9;margin-top:3px}
 #tab-bcast mark{background:none;font-weight:700;border-bottom:2px solid;padding:0 1px}
 #tab-bcast .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:5px}
+/* ---- Live stations (t251): player-only, not transcribed ---- */
+#bc_stations .bcs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin:8px 0 12px}
+#bc_stations .bcs{background:#181d23;border:1px solid var(--bd);border-left:4px solid var(--ac);border-radius:8px;padding:9px 11px;display:flex;flex-direction:column;gap:4px}
+#bc_stations .bcs.lnk{border-left-color:#5b6573}#bc_stations .bcs b{font-size:14.5px}
+#bc_stations .bcs .tg{display:inline-block;font-size:11px;border:1px solid var(--bd);border-radius:10px;padding:0 7px;margin:2px 4px 0 0;color:var(--mu)}
+#bc_stations .bcs .tg.fund{color:var(--md);border-color:#5a4300}#bc_stations .bcs a{color:var(--ac)}
+#bc_stations .bcs a.go{display:inline-block;margin-top:4px;background:#1d232b;border:1px solid var(--bd);border-radius:6px;padding:7px 11px;color:var(--tx);text-decoration:none;font-weight:600}
+#bc_stations summary{cursor:pointer;font-weight:700;font-size:15px;padding:4px 0}
 /* ---- Inline broadcast players (t245) ---- */
 .bnp{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:8px;padding:7px 8px;background:#10151b;border:1px solid var(--bd);border-radius:8px}
 .bnp.on{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac) inset}.bnp [hidden]{display:none!important}
@@ -327,7 +335,7 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{border-bottom:1px
   <div class="row"><label>Source <select id="bc_src"><option value="">All sources</option></select></label>
   <label>Time <select id="bc_win"><option value="1h">Last 1 hour</option><option value="6h">Last 6 hours</option><option value="24h" selected>Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option></select></label>
   <span class="meta" id="bc_filt"></span></div>
-  <div id="bc_now"></div><div id="bc_clips" class="scroll" style="max-height:900px"></div>
+  <div id="bc_stations"></div><div id="bc_now"></div><div id="bc_clips" class="scroll" style="max-height:900px"></div>
   <div class="meta">Audio broadcasts play right here: press ▶ Play on a card (only one plays at a time; starting another stops the first). They play the station's live stream now; the transcribed 60-second clip itself isn't archived. These are live Icecast MP3 streams with no server rewind window, so the scrubber rewinds and fast-forwards within what your browser has buffered since you pressed Play, and ⏭ Jump to live returns to the live edge. Text items are news articles and open their source in a new tab. Informational only: never changes threat scores.</div></section>
 </div>
 <div>
@@ -506,7 +514,7 @@ let BC=null,bcKw="",bcRe=null,bcCat={},bcCol={};
 function bcBuild(kw){bcCat={};bcCol={};const ws=[];kw.categories.forEach(c=>{bcCol[c.id]=catColor(c.id,c.color);c.words.forEach(w=>{bcCat[w.toLowerCase().replace(/\s+/g," ")]=c.id;ws.push(w)})});
  ws.sort((a,b)=>b.length-a.length);bcRe=ws.length?new RegExp("(?<![A-Za-z0-9])("+ws.map(w=>w.trim().split(/\s+/).map(p=>p.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("\\s+")).join("|")+")(?![A-Za-z0-9])","gi"):null}
 function bcHi(t){t=String(t??"");if(!bcRe)return esc(t);let out="",i=0;t.replace(bcRe,(m,g,off)=>{out+=esc(t.slice(i,off));const c=bcCat[m.toLowerCase().replace(/\s+/g," ")];out+=`<mark style="color:${bcCol[c]||"#fff"};border-color:${bcCol[c]||"#fff"}">${esc(m)}</mark>`;i=off+m.length;return m});return out+esc(t.slice(i))}
-async function bcLoad(){try{const q=new URLSearchParams({window:$("bc_win").value,source:$("bc_src").value,kw:bcKw});const r=await fetch("api/broadcasts?"+q,{cache:"no-store"});BC=await r.json();if(!r.ok)throw BC.error;bcRender()}catch(e){$("bc_meta").textContent="broadcasts unavailable: "+e}}
+async function bcLoad(){bcStations();try{const q=new URLSearchParams({window:$("bc_win").value,source:$("bc_src").value,kw:bcKw});const r=await fetch("api/broadcasts?"+q,{cache:"no-store"});BC=await r.json();if(!r.ok)throw BC.error;bcRender()}catch(e){$("bc_meta").textContent="broadcasts unavailable: "+e}}
 function bcRender(){const B=BC;bcBuild(B.keywords);
  const sel=$("bc_src"),cur=sel.value;sel.innerHTML='<option value="">All sources</option>'+B.sources.map(x=>`<option${x==cur?" selected":""}>${esc(x)}</option>`).join("");
  $("bc_meta").textContent=`· ${B.total} clips · updated ${B.generated_et}`;$("bc_filt").innerHTML=bcKw?`filtered to “<b>${esc(bcKw)}</b>” <button id="bc_clr">clear</button>`:"";if($("bc_clr"))$("bc_clr").onclick=()=>{bcKw="";bcLoad()};
@@ -516,8 +524,8 @@ function bcRender(){const B=BC;bcBuild(B.keywords);
  $("bc_kw").innerHTML=B.keywords.categories.map(c=>`<div class=kwcat><span class=swatch style="background:${catColor(c.id,c.color)}"></span><b style="color:${catColor(c.id,c.color)}">${esc(c.label)}</b><br>${c.words.map(w=>`<span class="kwchip${bcKw==w.toLowerCase()?" on":""}" style="color:${c.color}" data-w="${esc(w)}" data-c="${c.id}">${esc(w)} <span class=meta>${B.keyword_counts[w.toLowerCase()]||0}</span><span class=x data-del="1" title="remove">×</span></span>`).join("")}</div>`).join("");
  const cs=$("bc_cat"),cv=cs.value;cs.innerHTML=B.keywords.categories.map(c=>`<option value="${c.id}"${c.id==cv?" selected":""}>${esc(c.label)}</option>`).join("");
  $("bc_health").innerHTML="<table><tr><th>Source</th><th>Status</th><th>Items</th><th>Checked</th></tr>"+B.health.map(h=>`<tr><td><a href="${esc(safeUrl(h.url))}" target=_blank rel="noopener noreferrer">${esc(h.name)}</a><div class=meta>${esc(h.note||"")}${h.error?" · "+esc(h.error):""}</div></td><td class="${h.ok?"ok":"bad"}">${h.ok?"OK":"FAIL"}</td><td>${h.items}</td><td>${esc(h.last_checked_et||"—")}${!h.ok&&h.last_ok_et?"<div class=meta>last OK "+esc(h.last_ok_et)+"</div>":""}</td></tr>`).join("")+"</table>";
- $("bc_audio").textContent="Audio transcription: "+B.audio_transcription+` · text feeds polled every ${B.text_poll_minutes} min`;bcNow()}
-// ---- Inline broadcast players (t245): native <audio preload=none>; hls.js (bundled, api/radio/hls.min.js) only for .m3u8 without native HLS. ----
+ $("bc_audio").textContent="Audio transcription: "+B.audio_transcription+` · text feeds polled every ${B.text_poll_minutes} min`;bcStations();bcNow()}
+// ---- Inline broadcast players (t245): native <audio preload=none>; hls.js (bundled, api/radio/hls.min.js) only for .m3u8, and only where MediaSource exists (it exposes the stream's seekable live window; Chrome's native HLS doesn't); iPhone Safari uses native HLS. ----
 // One global coordinator: starting any player stops the others and pauses other <audio>/<video> and YouTube embeds on the page.
 const BNP={el:{},hlsP:null,vol:Math.min(1,Math.max(0,+(localStorage.getItem("bnp_vol")??1))),volOK:(()=>{try{const t=document.createElement("audio");t.volume=.5;return t.volume==.5}catch(e){return false}})()};
 const bnpFmt=s=>{if(!isFinite(s)||s<0)s=0;s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s/60)%60,x=s%60;return(h?h+":"+String(m).padStart(2,"0"):m)+":"+String(x).padStart(2,"0")};
@@ -536,7 +544,7 @@ function bnpMedia(pid,src){let a=BNP.el[pid];if(a)return a;a=document.createElem
  a.addEventListener("error",()=>{if(!a.error||!a._loaded)return;a._err=["","Playback aborted","Network error: the stream didn't respond","The stream couldn't be decoded","The stream is offline or its format isn't supported by this browser"][a.error.code]||"Playback error";a._loaded=0;bnpSync(pid)});
  ["timeupdate","progress","durationchange","volumechange","ended"].forEach(ev=>a.addEventListener(ev,()=>bnpSync(pid)));return a}
 async function bnpLoad(a){if(a._loaded)return;a._loaded=1;const src=a._src;
- if(/\.m3u8(\?|#|$)/i.test(src)&&!a.canPlayType("application/vnd.apple.mpegurl")){
+ if(/\.m3u8(\?|#|$)/i.test(src)&&(window.MediaSource||!a.canPlayType("application/vnd.apple.mpegurl"))){
   await (BNP.hlsP||(BNP.hlsP=new Promise((ok,no)=>{if(window.Hls)return ok();const s=document.createElement("script");s.src="api/radio/hls.min.js";s.onload=ok;s.onerror=()=>{BNP.hlsP=null;no(new Error("hls.js failed to load"))};document.head.appendChild(s)})));
   if(!window.Hls||!Hls.isSupported())throw new Error("This browser can't play HLS streams");const h=new Hls({liveDurationInfinity:true});a._hls=h;h.loadSource(src);h.attachMedia(a);
   h.on(Hls.Events.ERROR,(e,d)=>{if(d.fatal){a._err="Stream error ("+d.details+")";bnpStop(a.dataset.bnp,true)}})}
@@ -548,7 +556,7 @@ async function bnpPlay(pid){const ui=bnpUI(pid)[0];if(!ui)return;const a=bnpMedi
  try{await bnpLoad(a);await a.play()}catch(e){if(e&&e.name=="AbortError")return;a._loaded=0;a._err=(e&&e.name=="NotAllowedError")?"The browser blocked playback; press Play again":String(e&&e.message||e);bnpSync(pid)}}
 function bnpStop(pid,keepErr){const a=BNP.el[pid];if(!a)return;try{a.pause()}catch(e){}if(a._hls){a._hls.destroy();a._hls=null}a._loaded=0;a.removeAttribute("src");a.load();a._st=keepErr?"":"Stopped";if(!keepErr)a._err="";bnpSync(pid)}
 function bnpWin(a){if(!a||!a._loaded||a.readyState<1)return null;const d=a.duration;if(isFinite(d)&&d>0)return{s:0,e:d,live:false};
- const sk=a.seekable,b=a.buffered;if(sk.length&&isFinite(sk.end(sk.length-1)))return{s:sk.start(0),e:sk.end(sk.length-1),live:true,mode:"dvr"};
+ const sk=a.seekable,b=a.buffered;if(sk.length&&isFinite(sk.end(sk.length-1))){const se=sk.end(sk.length-1),lp=a._hls&&a._hls.liveSyncPosition;return{s:sk.start(0),e:lp?Math.min(se,lp+1):se,live:true,mode:"dvr"}}
  if(sk.length&&b.length)return{s:Math.max(b.start(0),sk.start(0)),e:b.end(b.length-1),live:true,mode:"buffer"};return{s:0,e:0,live:true,mode:"none"}}
 function bnpSync(pid){const a=BNP.el[pid];bnpUI(pid).forEach(u=>{const q=s=>u.querySelector(s),nm=u.dataset.name,on=!!(a&&!a.paused),ld=!!(a&&a._loaded),w=bnpWin(a);
  const pl=q(".bnp-play");pl.textContent=on?"❚❚ Pause":"▶ Play";pl.setAttribute("aria-label",(on?"Pause ":"Play ")+nm);pl.setAttribute("aria-pressed",String(on));q(".bnp-stop").hidden=!ld;u.classList.toggle("on",on);
@@ -576,7 +584,33 @@ window.addEventListener("message",e=>{if(!/^https:\/\/www\.youtube(-nocookie)?\.
  if(!(d&&d.info&&d.info.playerState===1))return;Object.keys(BNP.el).forEach(k=>{if(BNP.el[k]._loaded)bnpStop(k)});document.querySelectorAll("audio,video").forEach(m=>{if(!m.paused)m.pause()});
  document.querySelectorAll('iframe[src*="youtube"]').forEach(f=>{if(f.contentWindow!==e.source)try{f.contentWindow.postMessage(JSON.stringify({event:"command",func:"pauseVideo",args:[]}),"*")}catch(x){}})});
 window.bnMedia={stopAll:()=>bnpStopAll(null)};
-function bcNow(){const n=$("bc_now");if(!n)return;const pid=Object.keys(BNP.el).find(k=>BNP.el[k]._loaded);const inList=pid&&$("bc_clips").querySelector(`.bnp[data-pid="${CSS.escape(pid)}"]`);
+// ---- Live stations (t251): official, keyless, publisher-published streams; player-only (not in the transcription list). Tested inline in Chrome 2026-10-31. ----
+const BC_STATIONS=[
+ {id:"npr",n:"NPR Program Stream",reg:"United States",lang:"English",cat:"Public radio news",fmt:"MP3",u:"https://npr-ice.streamguys1.com/live.mp3",pg:"https://www.npr.org/",fund:"Public broadcaster"},
+ {id:"bbcws",n:"BBC World Service",reg:"United Kingdom · global",lang:"English",cat:"International news",fmt:"MP3",u:"https://stream.live.vc.bbcmedia.co.uk/bbc_world_service",pg:"https://www.bbc.co.uk/sounds/play/live:bbc_world_service",fund:"Public broadcaster"},
+ {id:"cbc1tor",n:"CBC Radio One — Toronto",reg:"Canada (Ontario)",lang:"English",cat:"Public radio news",fmt:"HLS (AAC)",u:"https://cbcradiolive.akamaized.net/hls/live/2041036/ES_R1ETR/master.m3u8",pg:"https://www.cbc.ca/listen/streams/r1_toronto.html",fund:"Public broadcaster"},
+ {id:"rfien",n:"RFI English",reg:"France · Africa/global",lang:"English",cat:"International news",fmt:"MP3",u:"https://rfienanglais64k.ice.infomaniak.ch/rfienanglais-64.mp3",pg:"https://www.rfi.fr/en/",fund:"State-funded international broadcaster (France)"},
+ {id:"rfifr",n:"RFI Monde",reg:"France · global",lang:"French",cat:"International news",fmt:"MP3",u:"https://rfimonde64k.ice.infomaniak.ch/rfimonde-64.mp3",pg:"https://www.rfi.fr/fr/",fund:"State-funded international broadcaster (France)"},
+ {id:"aje",n:"Al Jazeera English (audio)",reg:"Qatar · global",lang:"English",cat:"International news",fmt:"HLS (AAC)",u:"https://live-hls-audio-web-aje.getaj.net/VOICE-AJE/index.m3u8",pg:"https://www.aljazeera.com/audio/live",fund:"Funded by the Government of Qatar"},
+ {id:"abcnr",n:"ABC NewsRadio",reg:"Australia",lang:"English",cat:"Public radio news",fmt:"HLS (AAC)",u:"https://streaming.abc-cdn.net.au/audio/hls/rnnsw.m3u8",pg:"https://www.abc.net.au/listen/live/news",fund:"Public broadcaster"},
+ {id:"rnz",n:"RNZ National",reg:"New Zealand",lang:"English",cat:"Public radio news",fmt:"MP3",u:"https://stream-ice.radionz.co.nz/national.mp3",pg:"https://www.rnz.co.nz/listen/audiohelp",fund:"Public broadcaster"},
+ {id:"rnzp",n:"RNZ Pacific",reg:"New Zealand · Pacific",lang:"English",cat:"International news",fmt:"MP3",u:"https://stream-ice.radionz.co.nz/international.mp3",pg:"https://www.rnz.co.nz/international",fund:"Public broadcaster"},
+ {id:"finfo",n:"franceinfo",reg:"France",lang:"French",cat:"Public radio news",fmt:"MP3",u:"https://icecast.radiofrance.fr/franceinfo-midfi.mp3",pg:"https://www.francetvinfo.fr/en-direct/radio.html",fund:"Public broadcaster"},
+ {id:"dlf",n:"Deutschlandfunk",reg:"Germany",lang:"German",cat:"Public radio news",fmt:"MP3",u:"https://st01.sslstream.dlf.de/dlf/01/128/mp3/stream.mp3",pg:"https://www.deutschlandfunk.de/",fund:"Public broadcaster"},
+ {id:"nwr63",n:"NOAA Weather Radio KIH63 — Orlando (162.475 MHz)",reg:"Central Florida · covers Seminole County (SAME 012117)",lang:"English",cat:"Weather alerts",fmt:"link",pg:"https://www.broadcastify.com/listen/feed/45304",pg2:["NWS Melbourne NWR page","https://www.weather.gov/mlb/nwr"],why:"NOAA publishes no official web stream. This is a volunteer Broadcastify relay, and Broadcastify's terms forbid embedding or re-streaming its audio, so it opens on Broadcastify. The feed may go quiet overnight unless severe weather is near."},
+ {id:"nwr26",n:"NOAA Weather Radio KIH26 — Daytona Beach (162.400 MHz)",reg:"East Central Florida · covers Seminole County (SAME 012117)",lang:"English",cat:"Weather alerts",fmt:"link",pg:"https://www.broadcastify.com/listen/feed/47344",pg2:["NWS Melbourne NWR page","https://www.weather.gov/mlb/nwr"],why:"Same reason as KIH63: there's no official NOAA stream, and Broadcastify doesn't allow embedding."},
+ {id:"voa",n:"Voice of America",reg:"United States · global",lang:"English",cat:"International news",fmt:"link",pg:"https://www.voanews.com/live/audio/92",fund:"U.S. government-funded international broadcaster",why:"VOA's official live-audio page says \"No live streaming currently available\"."},
+ {id:"dw",n:"Deutsche Welle (English)",reg:"Germany · global",lang:"English",cat:"International news",fmt:"link",pg:"https://www.dw.com/en/live-tv/channel-english",fund:"State-funded international broadcaster (Germany)",why:"DW no longer runs an English live radio stream; it offers live TV (video) and on-demand audio on its own site."},
+ {id:"nhk",n:"NHK World-Japan Radio",reg:"Japan · global",lang:"English (scheduled)",cat:"International news",fmt:"link",pg:"https://www3.nhk.or.jp/nhkworld/en/shows/audio/",fund:"Public broadcaster",why:"NHK's English live-radio page now goes to on-demand audio, and its radio HLS segments return Access Denied outside NHK's own player."},
+ {id:"rci",n:"Radio Canada International",reg:"Canada · global",lang:"English/French + 5 more",cat:"International news",fmt:"link",pg:"https://ici.radio-canada.ca/rci/en",fund:"Public broadcaster",why:"RCI has had no live radio stream since 2012; it publishes web articles and podcasts."},
+ {id:"cgtn",n:"CGTN",reg:"China · global",lang:"English",cat:"International news",fmt:"link",pg:"https://www.cgtn.com/tv",fund:"Chinese state media",why:"No official, publisher-published audio stream found; live TV is on CGTN's own site."},
+];
+function bcStations(){const el=$("bc_stations");if(!el||el.dataset.done)return;el.dataset.done=1;const inl=BC_STATIONS.filter(s=>s.u),lk=BC_STATIONS.filter(s=>!s.u);
+ const tags=s=>`<div><span class=tg>${esc(s.cat)}</span><span class=tg>${esc(s.reg)}</span><span class=tg>${esc(s.lang)}</span><span class=tg>${esc(s.fmt)}</span>${s.fund?`<span class="tg${/state|government/i.test(s.fund)?" fund":""}">${esc(s.fund)}</span>`:""}</div>`;
+ el.innerHTML=`<details open><summary>Live stations (${inl.length} play here · ${lk.length} open on the source site)</summary><div class=meta>Official streams published by each broadcaster: free, no key or account. They're for listening only and aren't transcribed or scored. One plays at a time.</div>
+ <div class=bcs-grid>${inl.map(s=>{const pid="st_"+s.id;const a=bnpMedia(pid,s.u);a._name=s.n;return `<div class=bcs><b>${esc(s.n)}</b>${tags(s)}${bnpHtml(pid,s.u,s.n)}<div class=meta>${/HLS/.test(s.fmt)?"HLS live window: the scrubber can rewind within the stream's own window.":"Icecast MP3: rewind only within what your browser has buffered."} <a href="${esc(safeUrl(s.pg))}" target=_blank rel="noopener noreferrer">Open source ↗</a></div></div>`}).join("")}
+ ${lk.map(s=>`<div class="bcs lnk"><b>${esc(s.n)}</b>${tags(s)}<div class=meta>Why it's a link: ${esc(s.why)}</div><div><a class=go href="${esc(safeUrl(s.pg))}" target=_blank rel="noopener noreferrer">Open on source site ↗</a>${s.pg2?` <a href="${esc(safeUrl(s.pg2[1]))}" target=_blank rel="noopener noreferrer">${esc(s.pg2[0])} ↗</a>`:""}</div></div>`).join("")}</div></details>`;bnpSyncAll()}
+function bcNow(){const n=$("bc_now");if(!n)return;const pid=Object.keys(BNP.el).find(k=>BNP.el[k]._loaded);const inList=pid&&document.querySelector(`#bc_clips .bnp[data-pid="${CSS.escape(pid)}"],#bc_stations .bnp[data-pid="${CSS.escape(pid)}"]`);
  if(!pid||inList){n.innerHTML="";bnpSyncAll();return}if(!n.querySelector(`.bnp[data-pid="${CSS.escape(pid)}"]`)){const a=BNP.el[pid];n.innerHTML=`<div class=meta>Now playing (no longer in the filtered list):</div>`+bnpHtml(pid,a._src,a._name||"broadcast")}bnpSyncAll()}
 async function bcKwPost(body){const r=await fetch("api/broadcast_keywords",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();
  $("bc_kmsg").innerHTML=r.ok?`<span class=ok>✓ ${esc(j.action=="add"?"added":"removed")} “${esc(j.word)}”</span>`:`<span class=bad>✗ ${esc(j.error||r.status)}</span>`;if(r.ok)bcLoad()}
