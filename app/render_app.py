@@ -299,6 +299,18 @@ class RH(server.H):
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/internal/sync/push": return self.send(*handle_push(self))
+        if path in ("/internal/newsletter/test", "/internal/newsletter/status"):   # t373: box-signed (BN_SYNC_SECRET HMAC) newsletter ops
+            self.body(); raw = getattr(self, "_raw", b"") or b""
+            ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())
+            if not ok: return self.send(403, {"error": why})
+            import newsletter as NL
+            try: d = json.loads(raw or b"{}")
+            except Exception: d = {}
+            if path.endswith("/status"):
+                st = NL.admin_stats()
+                return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
+                                       "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"]})
+            return self.send(*NL.admin_action({"action": "test_send", "email": d.get("email")}))
         if path in BOX_ONLY:
             self.body(); return self.send(503 if path == "/api/refresh" else 403, {"status": "unavailable", "error": BOX_ONLY[path]})
         if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in POST_ALLOW):
