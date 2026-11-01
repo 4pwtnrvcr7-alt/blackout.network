@@ -161,8 +161,7 @@ html.bn-js .bn-gear-row{display:flex!important}
  body .bn-pagehead .bn-tabdesc{font-size:15px}
 }
 @media(max-width:380px){html.bn-js .bn-theme-bar{display:none!important}}   /* smallest phones: theme toggle stays in the sidebar */
-@media(min-width:1000px){.bn-follows .bn-fl-pre{display:inline}}
-@media(min-width:1200px) and (max-width:1439px){.bn-follows .bn-fl-pre{display:none}}
+/* t357: "Follow us on" prefix is only shown by the bar fitter (sitenav.js) when it really fits; see the t357 block at the end */
 @media(min-width:1200px){
  .bn-primary{display:flex;align-items:center;gap:2px;margin-left:18px}
  .bn-primary a{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:var(--bn-radius-sm);color:var(--bn-muted)!important;text-decoration:none!important;font:600 14px/1 var(--bn-font-ui)}
@@ -301,3 +300,29 @@ html body main :is(p,li,dd,td) a{overflow-wrap:anywhere}
 @media(max-width:820px){
  html body main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}   /* wide tables scroll inside their own box */
 }
+
+/* ==== t357: the top bar never overlaps or clips anything, at any width or zoom =========================================
+   Cause of the bug: since t343 the bar's contents sit on the 1280 px content column, but at >=1440 px (and 1000-1199 px) the
+   follow links grew a "Follow us on" prefix that no longer fit; the logo was the only item allowed to shrink, so
+   BLACKOUT.NETWORK got squeezed and clipped behind "The Wire" nav link. Now:
+   - the logo never shrinks (flex:none) and nothing in the bar may shrink below its content;
+   - sitenav.js measures the bar and steps down until everything fits on one row: bn-f1 drop the prefix (default), bn-f2 Alerts
+     icon only, bn-f3 follow links icon only, bn-f4 primary nav moves to the sidebar only, bn-f5 follow icons sidebar only, bn-f6
+     narrower icon buttons. Everything removed from the bar is always in the sidebar menu;
+   - last resort (no JS, extreme zoom): the bar wraps to a second row and the sticky header grows with it (min-height, not
+     height; no hard-coded offsets anywhere), so items can never sit on top of each other. */
+body header.bn-top .bn-tbar{height:auto;min-height:var(--bn-tbar-h);flex-wrap:wrap;row-gap:0}
+body header.bn-top .bn-tbar>*{flex-shrink:0}
+body header.bn-top .bn-logo{flex:none;overflow:visible}
+body header.bn-top .bn-acts{flex-wrap:nowrap}
+body header.bn-top .bn-follows .bn-fl-pre{display:none}
+@media(min-width:821px){body header.bn-top.bn-roomy .bn-follows .bn-fl-pre{display:inline}}
+body header.bn-top.bn-f2 .bnal-bell .bnal-bl{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important}
+body header.bn-top.bn-f2 .bn-ib.bnal-bell{width:var(--bn-icon-w)!important;padding:0!important}
+body header.bn-top.bn-f2 .bnal-bell .bnal-dot{left:auto!important;right:9px!important}
+body header.bn-top.bn-f3 .bn-follows .bn-fl{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap}
+body header.bn-top.bn-f3 .bn-follows a.bn-follow{padding:0!important;min-width:var(--bn-icon-w)}
+body header.bn-top.bn-f4 .bn-primary{display:none!important}
+body header.bn-top.bn-f5 .bn-follows{display:none!important}
+body header.bn-top.bn-f6{--bn-icon-w:31px}
+body header.bn-top.bn-f6 .bn-acts .bn-ib{width:31px!important}

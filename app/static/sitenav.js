@@ -143,4 +143,21 @@ function init(){
  var tm=0;function soon(){clearTimeout(tm);tm=setTimeout(function(){if(!busy)order();deep();syncMenu();upd()},60)}
  new MutationObserver(soon).observe(nav,{childList:true,subtree:true,attributes:true,attributeFilter:["class"],characterData:true});
  addEventListener("hashchange",function(){var h=(location.hash||"").slice(1);if(h==="bn-menu")return;pending=h;soon()});addEventListener("load",soon);order();syncMenu();upd();setTimeout(soon,500);setTimeout(soon,2500)}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init()})();
+/* ---------------- t357: top-bar fitter ----------------
+   Steps the bar down (see sitenav.css "t357") until logo + nav + actions fit on one row without clipping the wordmark.
+   Re-runs on resize/zoom, font load, and when add-ons insert buttons (Alerts bell). Only classes on <header> change. */
+function fitBar(){var hd=$("header.bn-top"),bar=hd&&$(".bn-tbar",hd);if(!hd||!bar)return;
+ var acts=$(".bn-acts",bar),logo=$(".bn-logo",bar),MAX=6,busy=false,raf=0,lastW=-1;
+ function set(n){hd.classList.toggle("bn-roomy",n===0);for(var i=1;i<=MAX;i++)hd.classList.toggle("bn-f"+i,n>=i)}
+ function ok(){var min=parseFloat(getComputedStyle(bar).minHeight)||0,h=bar.getBoundingClientRect().height;
+  if(h>min+1)return false;if(bar.scrollWidth>bar.clientWidth+1)return false;
+  if(logo&&logo.scrollWidth>logo.clientWidth+1)return false;
+  if(acts){var ar=acts.getBoundingClientRect(),br=bar.getBoundingClientRect();if(ar.right>br.right+1||acts.scrollWidth>acts.clientWidth+1)return false}
+  return true}
+ function run(){raf=0;if(busy)return;busy=true;var n=0;for(;n<MAX;n++){set(n);if(ok())break}if(n===MAX)set(MAX);lastW=R.clientWidth;busy=false}
+ function soon(){if(!raf)raf=requestAnimationFrame(run)}
+ run();addEventListener("resize",function(){if(R.clientWidth!==lastW)soon()});addEventListener("load",soon);
+ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(soon);
+ if(acts&&window.MutationObserver)new MutationObserver(function(){if(!busy)soon()}).observe(acts,{childList:true,subtree:true,characterData:true});
+ setTimeout(soon,1200)}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){try{fitBar()}catch(e){}init()});else{try{fitBar()}catch(e){}init()}})();
