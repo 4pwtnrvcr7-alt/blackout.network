@@ -81,6 +81,8 @@ ROUTES = {
     "/api/report": "reports",
     "/api/reports": "reports",
     "/report-status": "reports",
+    "/crime": "crime",              # Crime tab (t392): /crime page + /api/crime/* (crime.db from crime_collect.py on the box)
+    "/api/crime": "crime",
     "/stats": "stats",              # Public stats page (t385): aggregate site traffic + YouTube/X numbers (social_public_stats.json from the box)
     "/api/stats": "stats",
     "/manifest.webmanifest": "pwa",

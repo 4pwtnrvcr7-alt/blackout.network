@@ -59,3 +59,5 @@
 .nla-pill{font-size:11.5px;border-radius:10px;padding:1px 8px;border:1px solid var(--bd2)}.nla-pill.ok{border-color:#2f7d4f;color:#95de64}.nla-pill.warn{border-color:#7c5a00;color:var(--md)}
 .nla-frame{width:100%;height:720px;border:1px solid var(--bd);border-radius:8px;background:var(--bn-bg,#0b0d10)}
 @media(max-width:700px){.nl-page>header{padding:10px 12px}.nl-wrap{padding:12px}.nl-card{padding:12px}.nla-frame{height:560px}}
+/* t392: crime opt-ins on the signup form */
+.nl-crime{display:flex;flex-direction:column;gap:6px;margin:2px 0 10px}.nl-crime .nl-chk{align-items:flex-start;line-height:1.35}.nl-crime input{margin-top:2px;flex:none}

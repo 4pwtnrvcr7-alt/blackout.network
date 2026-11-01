@@ -18,7 +18,7 @@ function enhance(f){
   if(v.length>254||!RE.test(v)){say(msg,"That doesn't look like a valid email address.");em.setAttribute("aria-invalid","true");em.focus();return}
   const fd=new FormData(f),cats=[...f.querySelectorAll('input[name=interests]')],picked=cats.filter(c=>c.checked).map(c=>c.value);
   const body={email:v,frequency:fd.get("frequency")||"twice",interests:(!picked.length||picked.length==cats.length)?["all"]:picked,
-   csrf:fd.get("csrf"),website:fd.get("website")||"",source:fd.get("source")||"form",location:(fd.get("location")||"").trim()};
+   csrf:fd.get("csrf"),website:fd.get("website")||"",source:fd.get("source")||"form",location:(fd.get("location")||"").trim(),crime_brief:fd.get("crime_brief")?1:0,crime_alerts:fd.get("crime_alerts")?1:0};
   btn.disabled=true;const old=btn.textContent;btn.textContent="Subscribing…";say(msg,"",true);
   try{let r=await post("subscribe",body);
    if(r.status==403){const m=await (await fetch(API+"meta",{cache:"no-store"})).json();body.csrf=m.csrf;f.querySelector('input[name=csrf]').value=m.csrf;r=await post("subscribe",body)}
@@ -30,7 +30,7 @@ function enhance(f){
 function enhanceManage(f){
  if(!f||f.dataset.nlReady)return;f.dataset.nlReady=1;const msg=f.querySelector(".nl-msg");
  f.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(f),cats=[...f.querySelectorAll('input[name=interests]')],picked=cats.filter(c=>c.checked).map(c=>c.value);
-  const r=await post("manage",{token:fd.get("token"),frequency:fd.get("frequency"),interests:(!picked.length||picked.length==cats.length)?["all"]:picked,breaking_present:1,breaking:fd.get("breaking")?1:0,location:(fd.get("location")||"").trim()});
+  const r=await post("manage",{token:fd.get("token"),frequency:fd.get("frequency"),interests:(!picked.length||picked.length==cats.length)?["all"]:picked,breaking_present:1,breaking:fd.get("breaking")?1:0,location:(fd.get("location")||"").trim(),crime_present:fd.get("crime_present")?1:undefined,crime_brief:fd.get("crime_brief")?1:0,crime_alerts:fd.get("crime_alerts")?1:0});
   say(msg,(r.j&&r.j.message)||("Error "+r.status),r.ok)});
 }
 

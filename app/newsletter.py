@@ -212,13 +212,15 @@ CREATE TABLE IF NOT EXISTS follows(subscriber_id INTEGER NOT NULL, cluster_id TE
   unfollowed_at TEXT, PRIMARY KEY(subscriber_id, cluster_id));
 CREATE INDEX IF NOT EXISTS fo_c ON follows(cluster_id, active);
 CREATE TABLE IF NOT EXISTS breaking_seen(cluster_id TEXT PRIMARY KEY, ts TEXT, rank INTEGER, rule TEXT, status TEXT, run_id INTEGER);
+CREATE TABLE IF NOT EXISTS crime_alert_sent(subscriber_id INTEGER NOT NULL, inc_id TEXT NOT NULL, ts TEXT, mode TEXT, PRIMARY KEY(subscriber_id, inc_id));
 CREATE TABLE IF NOT EXISTS breaking_runs(id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, cluster_ids TEXT, status TEXT, mode TEXT,
   n_targets INTEGER DEFAULT 0, n_sent INTEGER DEFAULT 0, note TEXT);
 """
 MIGRATE = [("sent_items", "rank", "INTEGER"), ("sent_items", "n_items", "INTEGER"), ("sent_items", "eff", "INTEGER"), ("sent_items", "fams", "TEXT"),
            ("sent_items", "kind", "TEXT"), ("subscribers", "breaking", "INTEGER NOT NULL DEFAULT 1"),
            ("subscribers", "loc_label", "TEXT"), ("subscribers", "loc_lat", "REAL"), ("subscribers", "loc_lon", "REAL"), ("subscribers", "loc_cc", "TEXT"),
-           ("subscribers", "loc_kind", "TEXT")]
+           ("subscribers", "loc_kind", "TEXT"),
+           ("subscribers", "crime_brief", "INTEGER NOT NULL DEFAULT 0"), ("subscribers", "crime_alerts", "INTEGER NOT NULL DEFAULT 0")]   # t392 opt-ins (default off)
 _INIT = {}
 def db():
     c = sqlite3.connect(P["db"], timeout=15); c.row_factory = sqlite3.Row
@@ -673,6 +675,11 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
              "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics or near), "rule": {"rank": rmin, "sources": smin}}
     issue["videos"] = videos_for(issue, c)
     issue["empty"] = issue["empty"] and not issue["videos"]
+    if sub and _row_get(sub, "crime_brief", 0) and sub.get("loc_label"):   # t392: opt-in local crime summary (never makes an issue non-empty on its own)
+        try:
+            import crime as _crime
+            issue["crime"] = _crime.brief_for(dict(sub))
+        except Exception: issue["crime"] = None
     if quiet and not any(int(i.get("rank") or 0) >= 4 for i in watch):   # quiet period: only send if something rank 4+ exists
         issue["empty"] = True
     issue["bluf"] = bluf(issue)
@@ -1031,6 +1038,11 @@ def render(issue, links, c=None):
     elif issue.get("loc_label"):
         a(_sec_html(f"Near you — {issue['loc_label']}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country).", "green"))
         a(f'<tr><td style="padding:4px 20px 14px 20px;font:400 15px/1.55 {FB};color:{PAL["body"]}">All quiet near {E(issue["loc_label"])}: no confirmed or official reports in the last 24 hours.</td></tr>')
+    if issue.get("crime"):
+        cr = issue["crime"]
+        a(_sec_html(f"Crime near you — {cr['label']}", f"Official statistics and recent police reports. Source: {cr['source']}."))
+        a(f'<tr><td style="padding:4px 20px 6px 20px;font:400 15px/1.55 {FB};color:{PAL["body"]}">' + "".join(f'<p style="margin:0 0 8px 0">{E(x)}</p>' for x in cr["lines"])
+          + f'<p style="margin:4px 0 12px 0"><a href="{E(cr["url"])}" class="bnt" style="{_L}">Map and full numbers for {E(cr["label"])}</a></p></td></tr>')
     if issue.get("follow"):
         a(_sec_html("Stories you follow", "Updates on stories you chose to follow: only what is new since your last brief.", "green"))
         for it in issue["follow"]: a(_item_html(it, links, c))
@@ -1077,6 +1089,8 @@ def render(issue, links, c=None):
             T.append("")
     if not issue.get("near") and issue.get("loc_label"): T += [f"NEAR YOU — {issue['loc_label'].upper()}", f"All quiet near {issue['loc_label']}: no confirmed or official reports in the last 24 hours.", ""]
     if issue.get("near"): tsec(f"Near you — {issue.get('loc_label') or 'your area'}", issue["near"])
+    if issue.get("crime"):
+        cr = issue["crime"]; T += [f"CRIME NEAR YOU — {cr['label'].upper()}"] + cr["lines"] + [f"Map and full numbers: {cr['url']}", ""]
     if issue.get("follow"): tsec("Stories you follow", issue["follow"])
     if issue["main"]: tsec("Top threats", issue["main"])
     else: T += [f"QUIET PERIOD: No new rank-{rr['rank']}+ confirmed threats in this window.", ""]
@@ -1375,6 +1389,7 @@ def _clean_ints(ints):
     ints = [x for x in (ints or []) if x == "all" or x in CATEGORIES] or ["all"]
     return ["all"] if ("all" in ints or set(ints) >= set(CATEGORIES)) else sorted(set(ints), key=CATEGORIES.index)
 
+def _flag(v): return 1 if str(v or "").strip().lower() in ("1", "on", "true", "yes") else 0
 def subscribe(d, ip="", headers=None):
     """-> (code, {ok, message}). Same response whether the address is new, pending, active or unsubscribed (no enumeration)."""
     c = cfg(); rl = c["rate_limit"]
@@ -1412,6 +1427,8 @@ def subscribe(d, ip="", headers=None):
                       (freq, json.dumps(ints), t, ipk, t, r["id"]))
             kind = "confirm"
         if kind == "confirm" and loc: k.execute("UPDATE subscribers SET loc_label=?, loc_lat=?, loc_lon=?, loc_cc=?, loc_kind=? WHERE email=?", (loc["label"], loc["lat"], loc["lon"], loc["cc"], loc["kind"], email))
+        if kind == "confirm":   # t392: crime opt-ins (default off; only meaningful with an area)
+            k.execute("UPDATE subscribers SET crime_brief=?, crime_alerts=? WHERE email=?", (_flag(d.get("crime_brief")), _flag(d.get("crime_alerts")), email))
         k.commit(); row = k.execute("SELECT * FROM subscribers WHERE email=?", (email,)).fetchone()
     finally: k.close()
     send_transactional(row, kind)
@@ -1461,6 +1478,9 @@ def manage(tok, d):
     brk = _row_get(r, "breaking", 1)
     if "breaking_present" in d or "breaking" in d:   # checkbox (absent = off) when the form says it rendered one
         brk = 1 if str(d.get("breaking") or "") in ("1", "on", "true", "True", "yes") else 0
+    cb, ca = _row_get(r, "crime_brief", 0) or 0, _row_get(r, "crime_alerts", 0) or 0
+    if "crime_present" in d or "crime_brief" in d or "crime_alerts" in d:   # t392 checkboxes (absent = off when the form rendered them)
+        cb, ca = _flag(d.get("crime_brief")), _flag(d.get("crime_alerts"))
     loc = "keep"
     if "location" in d:
         if str(d.get("location") or "").strip():
@@ -1469,9 +1489,12 @@ def manage(tok, d):
         else: loc = None
     k = db()
     if loc != "keep": _set_loc(k, r["id"], loc)
-    k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, updated=? WHERE id=?", (freq, json.dumps(ints), int(brk if brk is not None else 1), iso(now()), r["id"])); k.commit(); k.close()
+    k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, crime_brief=?, crime_alerts=?, updated=? WHERE id=?",
+              (freq, json.dumps(ints), int(brk if brk is not None else 1), cb, ca, iso(now()), r["id"])); k.commit(); k.close()
     log(f"subscriber #{r['id']} changed preferences", "sub")
-    return 200, {"ok": True, "message": f"Saved: {FREQS[freq].lower()}, {'all categories' if ints == ['all'] else ', '.join(ints)}, breaking alerts {'on' if brk else 'off'}."}
+    has_loc = (loc not in (None, "keep")) or (loc == "keep" and _row_get(r, "loc_label"))
+    crime_msg = (f", local crime summary {'on' if cb else 'off'}, crime alerts {'on' if ca else 'off'}" + (" (add your area to use them)" if (cb or ca) and not has_loc else ""))
+    return 200, {"ok": True, "message": f"Saved: {FREQS[freq].lower()}, {'all categories' if ints == ['all'] else ', '.join(ints)}, breaking alerts {'on' if brk else 'off'}{crime_msg}."}
 
 def add_category(tok, cat):
     """'Add this category' on the Find new sources page. Same signed manage token; frequency is left alone."""
@@ -1752,6 +1775,56 @@ def run_breaking(at=None, c=None, dry_run=False):
     log(f"breaking run #{run_id}: sent {n_sent}/{n_t}", "breaking")
     return [(key, "done")]
 
+def run_crime_alerts(at=None, c=None, dry_run=False, only_email=None):
+    """t392: real-time crime alerts for opted-in ZIP/city subscribers. GATED: does nothing unless newsletter_config.json has
+    crime_alerts.enabled=true, and while crime_alerts.test_only (default true) only addresses containing '+bntest' qualify.
+    Rule: serious violent reports (crime.SERIOUS) that occurred in the last 24 h within ~5 km of the subscriber's area centre, from a
+    near-real-time city feed; deduped per subscriber+incident; one email bundles up to 5; at least breaking.min_gap_hours between crime
+    alerts, and crime + breaking alerts share the breaking.max_per_day cap per subscriber. -> list of (email_masked, status, n)."""
+    c = c or cfg(); at = at or now(); ca = c.get("crime_alerts") or {}
+    if not dry_run and (not ca.get("enabled") or c.get("paused")): return []
+    test_only = ca.get("test_only", True); b = c.get("breaking") or {}
+    try: import crime as _crime
+    except Exception: return []
+    hr = at.astimezone(ET).hour
+    if not dry_run and (hr >= int(b.get("quiet_start", 22)) or hr < int(b.get("quiet_end", 7))): return []   # no crime alerts overnight
+    out = []; k = db()
+    try:
+        for s in audience(c).values():
+            if not _row_get(s, "crime_alerts", 0): continue
+            em = s["email"]
+            if only_email and em != only_email: continue
+            if test_only and "+bntest" not in em: continue
+            seen = {x[0] for x in k.execute("SELECT inc_id FROM crime_alert_sent WHERE subscriber_id=?", (s["id"],))}
+            inc = _crime.alert_candidates(s, at.timestamp(), seen)
+            if not inc: continue
+            day = iso(at - timedelta(hours=24))
+            n24 = k.execute("SELECT COUNT(*) FROM mail_log WHERE subscriber_id=? AND kind IN ('breaking','crime_alert') AND status='sent' AND ts>=?", (s["id"], day)).fetchone()[0]
+            last = k.execute("SELECT MAX(ts) FROM mail_log WHERE subscriber_id=? AND kind='crime_alert' AND status='sent'", (s["id"],)).fetchone()[0]
+            if n24 >= int(b.get("max_per_day", 3)) or (last and parse_t(last) and at - parse_t(last) < timedelta(hours=float(b.get("min_gap_hours", 2)))):
+                out.append((mask_email(em), "capped", len(inc))); continue
+            city = inc[0]["city"]; tz = ZoneInfo(inc[0]["tz"])
+            lines = [f"{x['cat']}: reported for {datetime.fromisoformat(x['local']).strftime('%a %b %-d, about %-I %p')} {datetime.fromisoformat(x['local']).replace(tzinfo=tz).strftime('%Z')}, "
+                     f"roughly {x['km']:.0f} km from the centre of {s.get('loc_label')} (block-level location)." for x in inc]
+            paras = [f"{len(inc)} serious violent report{'s' if len(inc) > 1 else ''} near {s.get('loc_label')} appeared in {city}'s police open data in the last 24 hours."] + lines + [
+                f"Source: {inc[0]['source']}. These are initial police reports and may be reclassified. We never show names or addresses.",
+                "If you are in danger, call 911. You get this because you turned on crime alerts; change it in Manage preferences."]
+            L = links_for(s, c)
+            url = f"{c['base_url'].rstrip('/')}/crime?place={urllib.parse.quote(s.get('loc_label') or city)}&utm_source=newsletter&utm_medium=email&utm_campaign=crime_alert"
+            subj = f"Crime alert near {s.get('loc_label')}: {inc[0]['cat'].lower()}" + (f" and {len(inc) - 1} more" if len(inc) > 1 else "")
+            if dry_run: out.append((mask_email(em), "dry_run", len(inc), subj, lines)); continue
+            hb, tx = render_simple(subj, paras, ("See the map", url), c, [("Manage preferences", L["manage"]), ("Unsubscribe", L["unsubscribe"])])
+            msg = build_mime(em, subj, hb, tx, L["unsubscribe"], "issue", c); msg["X-BN-Idem"] = f"bn-crime-{s['id']}-{inc[0]['id']}"
+            ok, mode, f, err = deliver(msg, "issue", s["id"])
+            k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject,error) VALUES(?,?,?,?,?,?,?,?)",
+                      (iso(now()), "crime_alert", s["id"], mode, "sent" if ok else "failed", f, subj, err))
+            if ok:
+                k.executemany("INSERT OR IGNORE INTO crime_alert_sent(subscriber_id,inc_id,ts,mode) VALUES(?,?,?,?)", [(s["id"], x["id"], iso(now()), mode) for x in inc])
+            k.commit(); out.append((mask_email(em), ("sent" if ok else "failed") + f":{mode}", len(inc)))
+    finally: k.close()
+    if out: log(f"crime alerts: {out}", "breaking")
+    return out
+
 def run_due(at=None):
     """Called every ~30 s by newsletter_worker.py. Idempotent per slot: the slot_runs row is written before anything is sent and each
     (subscriber, slot) pair is UNIQUE in sends, so restarts never double-send. Catch-up: a slot missed while the box was down is sent
@@ -1786,6 +1859,8 @@ def run_due(at=None):
                 res.append((key, st))
         try: res += run_breaking(at, c)
         except Exception as ex: traceback.print_exc(); log(f"breaking check failed: {ex}", "error")
+        try: res += [("crime_alert", x[1]) for x in run_crime_alerts(at, c)]   # t392: gated off unless crime_alerts.enabled
+        except Exception as ex: traceback.print_exc(); log(f"crime alert check failed: {ex}", "error")
     return res
 
 def cleanup_outbox(days=None):
@@ -2059,6 +2134,8 @@ def form_html(mode="page"):
             f'<label for="{uid}_loc" class="nl-loc-l">Your area (optional): US ZIP, city or country</label>'
             f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="e.g. 32771, Sanford, FL or Germany">'
             '<p class="nl-sm">Adds a "Near you" section first. We store only the place name and a rough location (about 10 km), never your address.</p>'
+            '<div class="nl-crime"><label class="nl-chk"><input type="checkbox" name="crime_brief" value="1"> Include local crime summary in my briefs</label>'
+            '<label class="nl-chk"><input type="checkbox" name="crime_alerts" value="1"> Real-time crime alerts for my area (cities with live police data)</label></div>'
             f'<details class="nl-cats-d"><summary>Categories: all (optional: pick only some)</summary><div class="nl-cats">{cats}</div></details>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
@@ -2108,6 +2185,12 @@ def prefs_form(tok, r):
             '<p class="nl-sm">Used for the "Near you" section and local breaking alerts. Stored as a place name and rough location only.</p></fieldset>'
             '<fieldset><legend>Breaking alerts</legend><input type="hidden" name="breaking_present" value="1">'
             f'<label class="nl-chk"><input type="checkbox" name="breaking" value="1"{" checked" if _row_get(r, "breaking", 1) else ""}> Send me rare breaking alerts for truly major events (at most 3 a day, 2+ hours apart)</label></fieldset>'
+            '<fieldset><legend>Crime in your area</legend><input type="hidden" name="crime_present" value="1">'
+            f'<label class="nl-chk"><input type="checkbox" name="crime_brief" value="1"{" checked" if _row_get(r, "crime_brief", 0) else ""}> Include local crime summary in my briefs</label>'
+            f'<label class="nl-chk"><input type="checkbox" name="crime_alerts" value="1"{" checked" if _row_get(r, "crime_alerts", 0) else ""}> Real-time crime alerts for my area</label>'
+            '<p class="nl-sm">Uses your area above. The summary uses official FBI rates and, in 16 US cities, recent police reports. Alerts cover serious violent reports '
+            '(homicide, shooting, robbery, aggravated assault, kidnapping) within about 5 km in cities with near-real-time police data, and count toward the same 3-a-day limit as breaking alerts. '
+            '<a href="/crime">See the Crime page</a>.</p></fieldset>'
             '<button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')
 

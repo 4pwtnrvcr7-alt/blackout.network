@@ -45,6 +45,7 @@ NAV = [
    "Space weather and earthquakes on BLACKOUT.NETWORK: solar flares, geomagnetic storms, the Kp index and live global quakes, plus a solar–quake correlation lab."),
   ("heatmap", "heatmap", "🔥 Heat Map", "Heat Map: where the alerts are",
    "BLACKOUT.NETWORK's regional heat map shows where threat alerts cluster, from countries down to states, provinces and cities, updated with every scan."),
+  ("@crime", "/crime", "🚨 Crime", None, None),   # /crime page (crime.py, t392): rates by ZIP/city/county/state/country + near-real-time city heat maps
   ("weather", "weather", "🌦 Weather", "Weather: alerts and forecast",
    "Current conditions, official severe-weather alerts and the forecast for any place you choose, on BLACKOUT.NETWORK. Free, with no account or sign-up needed."),
   ("trends", "trends", "📈 Trends", "Trends: alert volume over time",
@@ -127,6 +128,9 @@ PAGES = {
  "stats": ("@stats", "Public stats: site traffic, YouTube and X | BLACKOUT.NETWORK",
            "BLACKOUT.NETWORK's open stats: daily visitors and page views, the most-read pages and stories, where readers come from, plus YouTube @blkoutntw and X @BlkoutNtw growth.",
            "Open, aggregate numbers for the site, YouTube and X. Totals only, nothing personal."),
+ "crime": ("@crime", "Crime map and statistics near you: ZIP, city, county, country | BLACKOUT.NETWORK",
+           "Look up crime for any US ZIP code, city, county or state, or any country: official FBI rates per 100,000 with trends, near-real-time incident heat maps for 16 US cities, a US county map and a world homicide map.",
+           "Official crime rates for any ZIP, city, county, state or country, plus near-real-time maps for 16 US cities."),
  "report-status": ("", "Check a problem report | BLACKOUT.NETWORK",
                    "Check the status of a problem you reported to BLACKOUT.NETWORK using your report ID: whether it was received, reviewed or fixed, with no account needed.",
                    "Look up a problem you reported with its report ID and see whether it was received, reviewed or fixed."),

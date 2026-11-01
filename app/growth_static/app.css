@@ -75,3 +75,5 @@ body.bng-bar-on{padding-bottom:60px}body.bng-bar-on .bnr-fab,body.bng-bar-on .bn
 @media (min-width:700px){.bng-inline .bng-nlbox form{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:4px 10px;align-items:end}
 .bng-inline .bng-nlbox form>*{grid-column:1/-1}.bng-inline .bng-nlbox form>label[for]:first-of-type{grid-column:1/-1}
 .bng-inline .nl-row{grid-column:1!important}.bng-inline .bng-locrow{grid-column:2!important;margin:0}.bng-inline .bng-submit{grid-column:3!important;margin:0!important;width:auto!important}}
+/* t392: crime opt-ins inside the signup form */
+.bng-nlbox .nl-crime{display:flex;flex-direction:column;gap:6px;margin:4px 0 8px;font-size:13px}.bng-nlbox .nl-crime label{display:flex;align-items:flex-start;gap:7px;line-height:1.35;cursor:pointer}.bng-nlbox .nl-crime input{margin-top:2px;flex:none}

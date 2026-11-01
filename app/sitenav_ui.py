@@ -36,7 +36,7 @@ I_X = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="15" heig
 # tab listed before it in NAV (so a new tab added next to Politics/Government lands in Politics & Government), else the first section.
 MENU = [
  ("Live", ["threat", "noise", "thread", "bcast", "streams", "radio", "trends", "heatmap"]),
- ("Threat categories", ["net", "grid", "ai", "solar_seismic", "weather", "finance", "jets", "spacex", "intel"]),
+ ("Threat categories", ["net", "grid", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "intel"]),
  ("Politics & Government", ["politics", "gov"]),
  ("Community", ["ranked", "@social", "@stats", "newsletter"]),
  ("Reference", ["res", "maps", "bush", "med", "preppers", "figures"]),
