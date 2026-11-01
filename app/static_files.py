@@ -4,11 +4,16 @@ import os, re
 BASE = os.path.dirname(os.path.abspath(__file__))
 DIRS = {"/guides": os.path.join(BASE, "static", "guides"), "/maps": os.path.join(BASE, "static", "maps"), "/img": os.path.join(BASE, "static", "img")}
 TYPES = {".html": "text/html", ".pdf": "application/pdf", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".js": "application/javascript", ".css": "text/css", ".ico": "image/x-icon"}
+ROOT_ALIASES = {"/favicon.svg": ("img", "favicon.svg", "image/svg+xml"), "/safari-pinned-tab.svg": ("img", "safari-pinned-tab.svg", "image/svg+xml"),
+                "/browserconfig.xml": ("img", "browserconfig.xml", "application/xml"), "/bimi/logo.svg": ("bimi", "logo.svg", "image/svg+xml")}
 def handle_get(path, qs):
     if path == "/theme.css":
         with open(os.path.join(BASE, "static", "theme.css"), "rb") as fh: return 200, fh.read(), "text/css"
     if path == "/favicon.ico":
         with open(os.path.join(BASE, "static", "img", "favicon.ico"), "rb") as fh: return 200, fh.read(), "image/x-icon"
+    if path in ROOT_ALIASES:   # t382: root-level icon aliases + BIMI logo (SVG Tiny PS, https://blackout.network/bimi/logo.svg)
+        sub, name, ct = ROOT_ALIASES[path]
+        with open(os.path.join(BASE, "static", sub, name), "rb") as fh: return 200, fh.read(), ct
     for pre, d in DIRS.items():
         if path.startswith(pre + "/"):
             name = path[len(pre) + 1:]

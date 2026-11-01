@@ -36,6 +36,10 @@ ROUTES = {
     "/maps": "static_files",
     "/img": "static_files",
     "/favicon.ico": "static_files",
+    "/favicon.svg": "static_files",          # root aliases of the BN tile icon set + BIMI mail logo (t382)
+    "/safari-pinned-tab.svg": "static_files",
+    "/browserconfig.xml": "static_files",
+    "/bimi": "static_files",
     "/theme.css": "static_files",
     "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
     "/sitenav.css": "sitenav",
