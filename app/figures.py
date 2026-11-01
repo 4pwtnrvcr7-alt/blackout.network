@@ -7,7 +7,7 @@ Who appears: a curated base list (people in today's reports, roles as of Nov 1 2
 rank 4+ alert on The Wire in the last 7 days. Headlines: matching scanner alerts first (link to /wire/<id>, which the
 page turns into a jump to the item on The Wire), topped up from Google News (verbatim headlines) when fewer than 3 alerts match.
 Memory: one bounded DB pass (<=1500 short rows, truncated text), results cached 10 min; Google News per person cached 1 h (figures.db)."""
-import os, re, sqlite3, threading, time, urllib.parse
+import os, re, json, hashlib, sqlite3, threading, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 import importlib, bn_feeds as B
@@ -90,6 +90,96 @@ POOL = [
 CATS = {"conflict": "conflict", "war": "conflict", "political": "politics", "disease": "health", "natural": "natural hazards", "cyber": "cyber",
         "financial": "finance", "space": "space weather"}
 INITIALS = {"kimju": "KJU", "tedros": "TAG", "mbs": "MBS", "xi": "XJ"}
+# ---- photos (t370). Curated: self-hosted 400x400 WebP headshots in static/img/figures, credits in figures_photos.json (built on the box by
+# tools/figures_photos.py). Anyone not in the manifest (e.g. a person added to POOL later): their Wikidata P18 image is looked up live from
+# their Wikipedia link, used only if freely licensed (PD / CC0 / CC BY / CC BY-SA / GODL / OGL; never NC, ND or fair use), and served
+# through /api/figures/photo/<key>.webp from a small on-disk cache (never hotlinked). No approved image -> the card keeps its initials tile.
+PHOTO_DIR = os.path.join(BASE, "static", "img", "figures"); MANIFEST = os.path.join(BASE, "figures_photos.json")
+CACHE_DIR = os.path.join(BASE, "logs", "figures_img"); IMG_TTL, IMG_MAX = 7 * 86400, 1_500_000
+LIC_OK = re.compile(r"public domain|^pd\b|cc0|cc[ -]by|^attribution|godl|\bogl\b|open government licen", re.I)
+LIC_BAD = re.compile(r"\bnc\b|\bnd\b|non-?commercial|no ?deriv|non-?free|fair use|all rights reserved", re.I)
+UA = "BlackoutNetworkBot/1.0 (https://blackout.network; hello@blackout.network)"
+_M = {"mt": None, "v": {}}
+
+def _manifest():
+    try:
+        mt = os.path.getmtime(MANIFEST)
+        if mt != _M["mt"]:
+            with open(MANIFEST, encoding="utf-8") as f: _M["v"] = json.load(f)
+            _M["mt"] = mt
+    except Exception: pass
+    return _M["v"]
+
+def _jget(url, params):
+    req = urllib.request.Request(url + "?" + urllib.parse.urlencode(params), headers={"User-Agent": UA, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=12) as r: return json.loads(r.read(400_000))
+
+def _strip(s): return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", s or "")).replace("&amp;", "&").strip()
+
+def _lookup_photo(key, links):
+    """Wikidata P18 for a person not in the manifest; first freely licensed file wins. Cached 7 days (also caches 'none')."""
+    wl = [u for _l, u in links or [] if "en.wikipedia.org/wiki/" in u]
+    if not wl: return {}
+    def f():
+        title = urllib.parse.unquote(wl[0].split("/wiki/", 1)[1])
+        r = _jget("https://en.wikipedia.org/w/api.php", {"action": "query", "prop": "pageprops", "titles": title, "redirects": 1, "format": "json"})
+        qid = next(iter(r["query"]["pages"].values())).get("pageprops", {}).get("wikibase_item")
+        if not qid: return {}
+        c = _jget("https://www.wikidata.org/w/api.php", {"action": "wbgetclaims", "entity": qid, "property": "P18", "format": "json"})
+        for x in (c.get("claims") or {}).get("P18", [])[:3]:
+            fn = (x["mainsnak"].get("datavalue") or {}).get("value")
+            if not fn: continue
+            r = _jget("https://commons.wikimedia.org/w/api.php", {"action": "query", "titles": "File:" + fn, "prop": "imageinfo",
+                      "iiprop": "url|extmetadata", "iiurlwidth": 400, "format": "json"})
+            ii = next(iter(r["query"]["pages"].values())).get("imageinfo", [{}])[0]; m = ii.get("extmetadata") or {}
+            g = lambda k: (m.get(k) or {}).get("value", "")
+            lic = _strip(g("LicenseShortName"))
+            if not lic or not LIC_OK.search(lic) or LIC_BAD.search(lic): continue
+            th = ii.get("thumburl") or ""
+            u = urllib.parse.urlsplit(th)
+            if u.scheme != "https" or u.hostname not in ("upload.wikimedia.org", "thumb.wikimedia.org"): continue
+            return {"thumb": th, "file": fn, "source": ii.get("descriptionurl"), "license": lic, "license_url": ("https://commons.wikimedia.org/wiki/Template:GODL-India" if "godl" in lic.lower() else g("LicenseUrl") or None),
+                    "author": re.sub(r"^(?:Autor|Author|Auteur|Photo)\s*:\s*", "", _strip(g("Artist")), flags=re.I)[:120] or "Wikimedia Commons", "auto": True}
+        return {}
+    try: return B.cached(DB, "photo:" + key, IMG_TTL, f) or {}
+    except Exception: return {}
+
+def _photo(p):
+    m = _manifest().get(p["key"])
+    if m and os.path.isfile(os.path.join(PHOTO_DIR, m.get("img") or "")):
+        v = m.get("bytes") or 0
+    else:
+        m = _lookup_photo(p["key"], p.get("links"))
+        if not m: return None
+        v = hashlib.sha1((m.get("thumb") or "").encode()).hexdigest()[:8]
+    return {"src": f"api/figures/photo/{p['key']}.webp?v={v}", "author": m.get("author"), "license": m.get("license"),
+            "license_url": m.get("license_url"), "source": m.get("source"), "auto": bool(m.get("auto"))}
+
+def photo_bytes(key):
+    """(bytes, content-type) for /api/figures/photo/<key>.webp, or None."""
+    if not re.fullmatch(r"[a-z0-9_]{1,40}", key or ""): return None
+    m = _manifest().get(key)
+    if m:
+        f = os.path.join(PHOTO_DIR, m.get("img") or "")
+        if os.path.isfile(f):
+            with open(f, "rb") as fh: return fh.read(), "image/webp"
+    links = next((p[-1] for p in BASE_LIST + POOL if p[0] == key), None)
+    a = _lookup_photo(key, links) if links else {}
+    if not a.get("thumb"): return None
+    os.makedirs(CACHE_DIR, exist_ok=True); cp = os.path.join(CACHE_DIR, hashlib.sha1(a["thumb"].encode()).hexdigest())
+    if os.path.exists(cp) and time.time() - os.path.getmtime(cp) < IMG_TTL:
+        with open(cp, "rb") as fh: return fh.read(), open(cp + ".ct").read() if os.path.exists(cp + ".ct") else "image/jpeg"
+    try:
+        req = urllib.request.Request(a["thumb"], headers={"User-Agent": UA, "Accept": "image/*"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            ct = (r.headers.get("Content-Type") or "").split(";")[0].strip(); b = r.read(IMG_MAX + 1)
+        if len(b) > IMG_MAX or ct not in ("image/jpeg", "image/png", "image/webp", "image/gif"): return None
+        with open(cp + ".tmp", "wb") as fh: fh.write(b)
+        os.replace(cp + ".tmp", cp); open(cp + ".ct", "w").write(ct); return b, ct
+    except Exception:
+        if os.path.exists(cp):
+            with open(cp, "rb") as fh: return fh.read(), open(cp + ".ct").read() if os.path.exists(cp + ".ct") else "image/jpeg"
+        return None
 URL1 = re.compile(r'"url"\s*:\s*"(https?://[^"]+)"|"(https?://[^"]+)"')
 _lock = threading.Lock(); _C = {"t": 0, "v": None}
 
@@ -151,6 +241,11 @@ def build():
         p["headlines"] = h[:MAX_HEADLINES]; p["alerts"] = counts.get(p["key"], 0)
         p["latest"] = max([x.get("updated") or x.get("time") or "" for x in h] or [""])
         p["initials"] = INITIALS.get(p["key"]) or (p["name"].split()[0][0] + p["name"].split()[-1][0]).upper()
+    need_ph = [p for p in out if p["key"] not in _manifest()]
+    if need_ph:   # live P18 lookups only for people without a curated photo (cached; usually none)
+        with ThreadPoolExecutor(max_workers=3) as ex: list(ex.map(lambda p: p.__setitem__("photo", _photo(p)), need_ph))
+    for p in out:
+        if "photo" not in p: p["photo"] = _photo(p)
     # newest related mention first (alphabetical tie-break); not a ranking of people
     out.sort(key=lambda p: p["name"]); out.sort(key=lambda p: (p["alerts"] > 0, p["latest"]), reverse=True)
     return {"updated": B.iso(), "as_of": AS_OF, "days": DAYS, "people": out, "db_error": err,
@@ -169,7 +264,20 @@ def handle_get(path, qs):
     n = path[len("/api/figures/"):] if path.startswith("/api/figures/") else ""
     if n in FILES:
         with open(os.path.join(STATIC, n), "rb") as fh: return 200, fh.read(), FILES[n]
+    if n.startswith("photo/") and n.endswith(".webp"):
+        r = photo_bytes(n[6:-5])
+        return (200, r[0], r[1]) if r else (404, {"error": "no photo"})
     if path == "/api/figures":
         try: return 200, summary()
         except Exception as ex: return 503, {"error": f"{type(ex).__name__}: {str(ex)[:160]}"}
     return 404, {"error": "not found"}
+
+def handle_stream(path, qs, h):
+    """Same as handle_get; photos go out with a browser cache header (everything else: h.send defaults)."""
+    res = handle_get(path, qs)
+    if path.startswith("/api/figures/photo/") and res[0] == 200 and len(res) == 3:
+        b, ct = res[1], res[2]
+        h.send_response(200); h.send_header("Content-Type", ct); h.send_header("Cache-Control", "public, max-age=604800")
+        h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "no-referrer"); h.send_header("Content-Length", str(len(b))); h.end_headers(); h.wfile.write(b)
+        return
+    return h.send(*res)

@@ -19,14 +19,21 @@ const app=M.querySelector("#kf_app");const S={d:null,t:0,busy:false,q:""};
 function hl(x){const t=etT(x.time);
  if(x.via=="scanner")return `<li><a href="/wire/${E(x.cid)}" data-goto="${E(x.cid)}">${E(x.title)}</a><div class=kf-m>${E(x.list)}${t?" · "+E(t):""}${x.url?` · <a href="${U(x.url)}" target=_blank rel=noopener>${E(x.source||"source")}</a>`:""}</div></li>`;
  return `<li><a href="${U(x.url)}" target=_blank rel=noopener>${E(x.title)}</a><div class=kf-m>${E(x.source||"")}${t?" · "+E(t):""} · via Google News</div></li>`}
+// t370: real photo (self-hosted, freely licensed; credits listed under the grid). Initials tile stays underneath as the fallback if the image fails.
+function av(p){const ph=p.photo;const cr=ph?`Photo: ${ph.author||"Wikimedia Commons"}${ph.license?" · "+ph.license:""}`:"";
+ return `<div class="kf-av${ph?"":" kf-noimg"}"><span class=kf-ini aria-hidden=true>${E(p.initials)}</span>${ph?`<img src="${E(ph.src)}" alt="Photo of ${E(p.name)}" title="${E(cr)}" width=72 height=72 loading=lazy decoding=async onerror="this.parentNode.classList.add('kf-noimg');this.remove()">`:""}</div>`}
+function credits(ps){const c=ps.filter(p=>p.photo);if(!c.length)return"";
+ return `<details class=kf-cred><summary>Photo credits (${c.length})</summary><ul>${c.map(p=>{const f=p.photo;
+  return `<li><b>${E(p.name)}</b>: ${f.source?`<a href="${U(f.source)}" target=_blank rel=noopener>${E(f.author||"Wikimedia Commons")}</a>`:E(f.author||"")}${f.license?` · ${f.license_url?`<a href="${U(f.license_url)}" target=_blank rel="noopener license">${E(f.license)}</a>`:E(f.license)}`:""}${f.auto?" · via Wikidata":""}</li>`}).join("")}</ul>
+ <p>Photos are cropped and resized from the files linked above (Wikimedia Commons, many of them official government portraits). Public-domain images need no attribution; it is given anyway.</p></details>`}
 function card(p){const n=p.alerts;
- return `<article class=kf-card data-k="${E((p.name+" "+p.role+" "+p.country).toLowerCase())}"><div class=kf-hd><div class=kf-ini aria-hidden=true>${E(p.initials)}</div><div class=kf-id><h3>${E(p.name)}</h3><div class=kf-role>${E(p.role)}</div><div class=kf-ctry>${E(p.country)}</div></div></div>
+ return `<article class=kf-card data-k="${E((p.name+" "+p.role+" "+p.country).toLowerCase())}"><div class=kf-hd>${av(p)}<div class=kf-id><h3>${E(p.name)}</h3><div class=kf-role>${E(p.role)}</div><div class=kf-ctry>${E(p.country)}</div></div></div>
  <p class=kf-why>${E(p.why)}</p><div class=kf-cnt>${n?`${n} related alert${n==1?"":"s"} on The Wire in the last ${S.d.days} days`:`No related alerts on The Wire in the last ${S.d.days} days`}</div>
  <ul class=kf-ul>${(p.headlines||[]).map(hl).join("")||"<li class=kf-m>No recent headlines found.</li>"}</ul>
  <div class=kf-lk>${(p.links||[]).map(l=>`<a href="${U(l[1])}" target=_blank rel=noopener>${E(l[0])} ↗</a>`).join("")}</div></article>`}
 function render(){const d=S.d;if(!d)return;const q=S.q.trim().toLowerCase();
  const ps=d.people.filter(p=>!q||(p.name+" "+p.role+" "+p.country).toLowerCase().includes(q));
- app.innerHTML=`<div class=kf-grid>${ps.map(card).join("")||`<div class=meta>No one matches “${E(S.q)}”.</div>`}</div><p class=kf-note>${E(d.note)} Updated ${E(etT(d.updated))}.</p>`;
+ app.innerHTML=`<div class=kf-grid>${ps.map(card).join("")||`<div class=meta>No one matches “${E(S.q)}”.</div>`}</div><p class=kf-note>${E(d.note)} Updated ${E(etT(d.updated))}.</p>${credits(d.people)}`;
  app.querySelectorAll("[data-goto]").forEach(a=>a.onclick=e=>{const w=document.querySelector('.tabs button[data-tab="threat"]');if(!w)return;
   const find=()=>document.querySelector(`#tab-threat [data-cid="${CSS.escape(a.dataset.goto)}"]`)||document.querySelector(`main:not(#tab-figures) [data-cid="${CSS.escape(a.dataset.goto)}"]`);
   e.preventDefault();w.click();setTimeout(()=>{const el=find();if(el&&el.offsetParent!==null){el.scrollIntoView({block:"center"});el.style.outline="2px solid var(--bn-brand,#ff4d4f)";setTimeout(()=>el.style.outline="",2500)}else location.href=a.getAttribute("href")},350)})}
