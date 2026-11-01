@@ -114,7 +114,7 @@ PAGES = {
              "Every source BLACKOUT.NETWORK uses, with item counts, profiles and a transparent 0–10 confidence rating. Search the directory or suggest a new source.",
              "Every source we use, with item counts, profiles and a 0–10 confidence rating. Suggest one for review."),
  "newsletter": ("newsletter", "Newsletter | BLACKOUT.NETWORK",
-                "Sign up for BLACKOUT.NETWORK's free email brief: the highest-severity, source-verified threats once or twice a day. Double opt-in, one-click unsubscribe.",
+                "Sign up for BLACKOUT.NETWORK's free email brief: the highest-severity threats. Double opt-in, one-click unsubscribe.",
                 "The highest-severity, source-verified threats by email, once or twice a day. Free, double opt-in."),
  "privacy": ("", "Privacy Policy | BLACKOUT.NETWORK",
              "BLACKOUT.NETWORK's Privacy Policy: what the site collects, how the newsletter and YouTube data are used and stored, retention, deletion and how to reach us.",

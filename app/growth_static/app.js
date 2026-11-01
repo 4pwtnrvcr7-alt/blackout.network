@@ -83,7 +83,7 @@ function mountForm(box,src,cb){getForm().then(function(h){box.innerHTML=h;var f=
    .catch(function(){say("Network error. Please try again.")}).then(function(){btn.disabled=false})});
 }).catch(function(){box.innerHTML='<a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=cta&utm_campaign='+src+'">Get the free brief</a>'})}
 function inlineBlock(src,title){var d=document.createElement("section");d.className="card bng-inline";d.setAttribute("data-bng-inline",src);d.setAttribute("aria-label","Newsletter signup");
- d.innerHTML='<div class="bng-cta-k">FREE · 7 AM &amp; 7 PM ET</div><div class="bng-cta-h">'+(title||"Get the brief: every confirmed threat, twice a day")+'</div><p>The last 12 hours, ranked 0–10 and sourced, in a 2-minute read. Double opt-in, one-click unsubscribe.</p><div class="bng-nlbox"></div>';
+ d.innerHTML='<div class="bng-cta-k">FREE</div><div class="bng-cta-h">'+(title||"Get the free brief by email.")+'</div><p>Ranked 0–10 and sourced, in a 2-minute read. Double opt-in, one-click unsubscribe.</p><div class="bng-nlbox"></div>';
  mountForm(d.querySelector(".bng-nlbox"),src);return d}
 function inlines(){if(subscribed()||isNL)return;var feed=document.getElementById("feed");
  if(feed&&!feed.querySelector("[data-bng-inline]")){var c=feed.querySelectorAll(":scope > .card[data-cid]");if(c.length>=3)c[2].after(inlineBlock("inline_home"))}
@@ -93,7 +93,7 @@ function escK(e){if(e.key==="Escape")closePrompt(true)}
 var shown=false;function showPrompt(){if(shown||subscribed()||isNL||location.hash==="#newsletter")return;var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
  if(document.querySelector(".bnr-back"))return;shown=true;
  var p=document.createElement("aside");p.id="bng_prompt";p.className="bng-prompt";p.setAttribute("role","dialog");p.setAttribute("aria-modal","false");p.setAttribute("aria-labelledby","bng_prompt_h");
- p.innerHTML='<button type="button" class="bng-x" aria-label="Close">×</button><div class="bng-cta-k">BLACKOUT.NETWORK BRIEF</div><h2 id="bng_prompt_h">Finding this useful?</h2><p>Get the 7 AM / 7 PM brief tailored to your area: every confirmed threat from the last 12 hours, ranked and sourced. Free.</p><div class="bng-nlbox"></div><p class="bng-fine">Double opt-in · one-click unsubscribe · <a href="/privacy">Privacy</a></p><button type="button" class="bng-no">No thanks</button>';
+ p.innerHTML='<button type="button" class="bng-x" aria-label="Close">×</button><div class="bng-cta-k">BLACKOUT.NETWORK BRIEF</div><h2 id="bng_prompt_h">Finding this useful?</h2><p>Get the free brief by email, tailored to your area: every confirmed threat, ranked and sourced.</p><div class="bng-nlbox"></div><p class="bng-fine">Double opt-in · one-click unsubscribe · <a href="/privacy">Privacy</a></p><button type="button" class="bng-no">No thanks</button>';
  document.body.appendChild(p);p.querySelector(".bng-x").onclick=function(){closePrompt(true)};p.querySelector(".bng-no").onclick=function(){closePrompt(true)};
  document.addEventListener("keydown",escK);mountForm(p.querySelector(".bng-nlbox"),"prompt");requestAnimationFrame(function(){p.classList.add("bng-in")});
  var b=document.getElementById("bng_bar");if(b){b.hidden=true;document.body.classList.remove("bng-bar-on")}}
