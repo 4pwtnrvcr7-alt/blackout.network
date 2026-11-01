@@ -139,6 +139,10 @@ a.st-k:hover{border-color:var(--bn-line-2,#2f3742)}
 .st-p p{margin:0 0 10px;font-size:14px;line-height:1.45;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .st-p .m{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--st-mu)}.st-p .m b{color:var(--bn-text,#E6E9EE)}
 .st-spark{display:flex;align-items:flex-end;gap:3px;height:70px}.st-spark i{flex:1 1 0;background:var(--c,var(--st-red));border-radius:3px 3px 0 0;min-height:2px;opacity:.85}
+.st-pmw{display:flex;justify-content:center;gap:3px;height:120px;position:relative;border-top:1px dashed transparent}
+.st-pmw:after{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--st-line)}
+.st-pm{flex:1 1 0;min-width:0;max-width:72px;position:relative}.st-pm i{position:absolute;left:15%;right:15%;display:block}
+.st-pm .g{bottom:50%;background:#2BB673;border-radius:3px 3px 0 0;min-height:1px}.st-pm .l{top:50%;background:#FF4D4F;border-radius:0 0 3px 3px;min-height:1px}
 .st-cta{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:center;border-radius:16px;padding:18px;margin:26px 0 0;border:1px solid var(--st-line);
  background:radial-gradient(100% 160% at 0% 0%,rgba(255,77,79,.20),transparent 60%),var(--st-card)}
 .st-cta h2{margin:0 0 4px;font-size:20px}.st-cta p{margin:0;color:var(--bn-text-2,#c9d0d9);font-size:14px}
@@ -193,6 +197,32 @@ def spark(vals, color):
     mx = max(vals) or 1
     return f'<div class="st-spark" style="--c:{color}">' + "".join(f'<i style="height:{max(3, round(100 * v / mx))}%" title="{v:,}"></i>' for v in vals) + "</div>"
 
+def dual(rows, a, b, la, lb, ca="#FF0033", cb="#F5A524", fmt_b=lambda v: f"{v:,}"):
+    """Two-series daily bar chart (a = main bar, b = inner bar), CSS only."""
+    if not rows: return ""
+    mxa = max([r[a] for r in rows] + [1]); mxb = max([r[b] for r in rows] + [1]); cols, axis = [], []
+    step = max(1, len(rows) // 6)
+    for i, r in enumerate(rows):
+        ha = round(100 * r[a] / mxa, 1); hb = round(100 * r[b] / mxb, 1)
+        tip = f'{day_label(r["day"], "%a %b %-d")}: {r[a]:,} {la.lower()}, {fmt_b(r[b])} {lb.lower()}'
+        cols.append(f'<div class="st-col" title="{E(tip)}" aria-label="{E(tip)}" role="img"><div class="pv" style="height:{ha}%;background:{ca}55"></div>'
+                    f'<div class="uv" style="height:{hb}%;background:{cb}"></div></div>')
+        axis.append(f'<span>{E(day_label(r["day"], "%-m/%-d")) if (i % step == 0 or i == len(rows) - 1) else ""}</span>')
+    return (f'<div class="st-chart" style="height:150px">{"".join(cols)}</div><div class="st-axis" aria-hidden="true">{"".join(axis)}</div>'
+            f'<div class="st-legend"><span><i style="background:{ca}88"></i>{E(la)}</span><span><i style="background:{cb}"></i>{E(lb)}</span></div>')
+
+def subs_chart(rows):
+    if not rows: return ""
+    mx = max([max(r["subs_gained"], r["subs_lost"]) for r in rows] + [1]); cols, axis = [], []
+    step = max(1, len(rows) // 6)
+    for i, r in enumerate(rows):
+        g = round(50 * r["subs_gained"] / mx, 1); l = round(50 * r["subs_lost"] / mx, 1)
+        tip = f'{day_label(r["day"], "%a %b %-d")}: +{r["subs_gained"]:,} gained, -{r["subs_lost"]:,} lost'
+        cols.append(f'<div class="st-pm" title="{E(tip)}" aria-label="{E(tip)}" role="img"><i class="g" style="height:{g}%"></i><i class="l" style="height:{l}%"></i></div>')
+        axis.append(f'<span>{E(day_label(r["day"], "%-m/%-d")) if (i % step == 0 or i == len(rows) - 1) else ""}</span>')
+    return (f'<div class="st-pmw">{"".join(cols)}</div><div class="st-axis" aria-hidden="true">{"".join(axis)}</div>'
+            '<div class="st-legend"><span><i style="background:#2BB673"></i>Subscribers gained</span><span><i style="background:#FF4D4F"></i>Subscribers lost</span></div>')
+
 CH_COLORS = {"Search": "#4aa3ff", "Social": "#FF4D4F", "Direct / bookmarks / apps": "#8B95A3", "Email": "#F5A524", "AI assistants": "#b37feb", "Other sites": "#2BB673"}
 
 def render():
@@ -238,15 +268,35 @@ def render():
     vids = y.get("trending") or []
     vcards = "".join(
         f'<a class="st-v" href="{E(v["url"])}" target="_blank" rel="noopener"><div class="th"><img src="{E(v["thumb"])}" alt="{E(v["title"])}" loading="lazy" width="480" height="270">'
-        f'<span class="rk">#{i + 1}</span><span class="vw">{n(v.get("views_7d") if v.get("views_7d") is not None else v["views"])} views</span></div>'
+        f'<span class="rk">#{i + 1}</span><span class="vw">{n(v.get("views_7d") if v.get("views_7d") is not None else v["views"])} {"views this week" if v.get("views_7d") is not None else "views"}</span></div>'
         f'<div class="bd"><h4>{E(v["title"])}</h4><div class="d">{"Short · " if v.get("short") else ""}{E(when(v.get("published"), "%b %-d"))} · {n(v.get("likes"))} likes</div></div></a>'
         for i, v in enumerate(vids))
     ytg = [r.get("yt_views_day") for r in g]
+    daily = y.get("daily") or []; ysrc = y.get("traffic_sources") or []; an = ""
+    if daily or y.get("analytics"):
+        last = daily[-1]["day"] if daily else None
+        akpi = ('<div class="st-kpis" style="margin:12px 0">' +
+                kpi("Views, 28 days", n(y.get("views_28d")), "YouTube Analytics", "#FF0033", icon=I_YT) +
+                kpi("Watch time, 28 days", n(round((y.get("minutes_28d") or 0) / 60, 1)) + " h", f'{n(y.get("minutes_28d"))} minutes', "#F5A524") +
+                kpi("Net subscribers, 28 days", (("+" if (y.get("subs_net_28d") or 0) > 0 else "") + n(y.get("subs_net_28d"))) if y.get("subs_net_28d") is not None else "—",
+                    f'{n(sum(d["subs_gained"] for d in daily))} gained · {n(sum(d["subs_lost"] for d in daily))} lost', "#2BB673") +
+                kpi("Latest analytics day", E(day_label(last, "%b %-d")) if last else "—", "YouTube reports with a 1–3 day delay", "#8B95A3") + "</div>")
+        an += akpi + '<div class="st-grid two">'
+        an += f'<div class="st-card"><h3>Daily views and watch time · 28 days</h3>{dual(daily, "views", "minutes", "Views", "Minutes watched") or "<div class=st-empty>No analytics rows yet.</div>"}</div>'
+        an += f'<div class="st-card"><h3>Subscribers gained and lost per day · 28 days</h3>{subs_chart(daily) or "<div class=st-empty>No analytics rows yet.</div>"}</div>'
+        if ysrc:
+            tot = sum(x_["views"] for x_ in ysrc) or 1; pal = ["#FF0033", "#F5A524", "#4aa3ff", "#2BB673", "#b37feb", "#36cfc9", "#8B95A3", "#fa8c16"]
+            stack = '<div class="st-stack" role="img" aria-label="YouTube traffic sources">' + "".join(f'<i style="width:{100 * x_["views"] / tot:.2f}%;background:{pal[i % 8]}" title="{E(x_["label"])}: {x_["views"]:,}"></i>' for i, x_ in enumerate(ysrc)) + "</div>"
+            leg = '<div class="st-legend" style="margin:0 0 12px">' + "".join(f'<span><i style="background:{pal[i % 8]}"></i>{E(x_["label"])} {round(100 * x_["views"] / tot)}%</span>' for i, x_ in enumerate(ysrc)) + "</div>"
+            an += f'<div class="st-card"><h3>How viewers find our videos · 28 days</h3>{stack}{leg}{bars(ysrc, "label", "views")}</div>'
+        else:
+            an += '<div class="st-card"><h3>How viewers find our videos · 28 days</h3><div class="st-empty">YouTube search, Shorts feed, suggested videos and more show here as soon as YouTube reports them (1–3 days).</div></div>'
+        an += "</div>"
     yt_html = ('<div class="st-sec"><h2>YouTube</h2><span class="st-mu">Trending videos on @blkoutntw: the most-watched of the last 7 days.</span></div>'
                f'<div class="st-plat">{I_YT}<div class="nm"><div><b>@blkoutntw</b><span>{n(y.get("subscribers"))} subscribers · {n(y.get("video_views_total"))} views · '
                f'{n(y.get("uploads_7d"))} new videos this week · updated {E(ago(y.get("fetched")))}</span></div></div>'
                f'<a class="st-btn red" href="https://www.youtube.com/@blkoutntw?sub_confirmation=1" target="_blank" rel="noopener">{I_YT} Subscribe</a></div>'
-               + (f'<div class="st-vids">{vcards}</div>' if vcards else '<div class="st-empty">Videos load here after the next hourly refresh.</div>')
+               + (f'<div class="st-vids">{vcards}</div>' if vcards else '<div class="st-empty">Videos load here after the next hourly refresh.</div>') + an
                + (f'<div class="st-card" style="margin-top:12px"><h3>YouTube views per day</h3>{spark(ytg, "#FF0033")}</div>' if len([v for v in ytg if v is not None]) >= 2 else ""))
     # X
     posts = x.get("top") or []
@@ -265,13 +315,16 @@ def render():
            '<div class="b"><a class="st-btn red" href="/newsletter?utm_source=stats&amp;utm_medium=cta">✉ Get the free brief</a>'
            f'<a class="st-btn" href="https://www.youtube.com/@blkoutntw?sub_confirmation=1" target="_blank" rel="noopener">{I_YT} YouTube</a>'
            f'<a class="st-btn" href="https://x.com/BlkoutNtw" target="_blank" rel="noopener">{I_X} X</a></div></section>')
+    bys = nl.get("by_source") or []
+    nlsrc = ('<div class="st-card" style="margin-top:12px"><h3>Newsletter signups by source</h3>' +
+             (bars(bys, "source", "signups", unit="signups") if bys else '<div class="st-empty">Each signup source appears here once it passes 5 confirmed readers.</div>') + "</div>")
     how = ('<div class="st-card st-how"><h3>How we count (and what we never collect)</h3><ul>'
            '<li>Counted on our own server: page views per page and per day, and an estimate of unique visitors made with a keyed hash that changes every day and lives only in memory. We never store IP addresses or browser details.</li>'
            '<li>No cookies, no third-party analytics, no ad trackers. Browsers that send Do Not Track or Global Privacy Control are not counted.</li>'
            '<li>Referrers are reduced to the site name (for example google.com). Countries are totals only. Any number under 5 is hidden or shown as &lt;5.</li>'
            '<li>Visitor estimates restart if our server restarts, so a returning reader can be counted twice in a day; treat them as approximate. Known bots and crawlers are excluded.</li>'
            '<li>YouTube and X numbers are the public counts from each platform, refreshed hourly. Full details: <a href="/privacy#usage">Privacy Policy</a>. Raw numbers: <a href="/api/stats">/api/stats</a>.</li></ul></div>')
-    body = f'<main class="st" id="main">{hero}{"".join(k)}{site_html}{yt_html}{x_html}{cta}{how}</main>'
+    body = f'<main class="st" id="main">{hero}{"".join(k)}{site_html}{yt_html}{x_html}{cta}{nlsrc}{how}</main>'
     foot = ('<footer class="st-foot">Research only: BLACKOUT.NETWORK is not an official warning service. · <a href="/">The Wire</a> · <a href="/social">Videos &amp; posts</a> · '
             '<a href="/newsletter">Newsletter</a> · <a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · blackout.network (no .com)</footer>')
     ld = {"@context": "https://schema.org", "@graph": [
