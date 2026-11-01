@@ -4,12 +4,48 @@
 <script>/* early error capture for "Report a problem" (messages only, max 10; see /api/report/app.js) */window.__bnErr=[];window.__bnErrHooked=1;(function(){function u(s){return String(s||"").split(/[?#]/)[0]}function c(s){return String(s||"").replace(/[A-Za-z0-9_\-]{32,}/g,"[redacted]").slice(0,300)}function p(o){__bnErr.push(o);if(__bnErr.length>10)__bnErr.shift()}addEventListener("error",function(e){var t=e.target;if(t&&t!==window&&t.tagName){p({kind:"resource",msg:"Failed to load "+t.tagName.toLowerCase(),src:u(t.src||t.href),t:new Date().toISOString()});return}p({kind:"error",msg:c(e.message),src:u(e.filename),line:e.lineno||null,t:new Date().toISOString()})},true);addEventListener("unhandledrejection",function(e){var r=e.reason;p({kind:"unhandledrejection",msg:c(r&&r.message?r.message:r),t:new Date().toISOString()})})})()</script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>/* t230: keyless basemap. CARTO basemaps now return "API KEY REQUIRED" tiles, so every map uses OpenStreetMap's standard tiles (no key, no account), darkened with a CSS filter; falls back to the OSM France HOT tiles if OSM tiles keep failing. */
-window.bnBaseLayer=function(map,o){o=o||{};const OSM='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors';
- const S=[{u:"https://tile.openstreetmap.org/{z}/{x}/{y}.png",a:OSM,mz:19},{u:"https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",s:"abc",a:OSM+', tiles <a href="https://www.hotosm.org/" target="_blank" rel="noopener">HOT</a> / <a href="https://www.openstreetmap.fr/" target="_blank" rel="noopener">OSM France</a>',mz:19}];
- let i=0,lay=null,bad=0,ok=0;const add=()=>{const s=S[i];bad=ok=0;lay=L.tileLayer(s.u,{subdomains:s.s||"abc",maxZoom:Math.min(o.maxZoom||19,s.mz),attribution:s.a+(o.extra?" · "+o.extra:""),className:"bn-tiles"});
-  lay.on("tileload",()=>ok++);lay.on("tileerror",()=>{if(++bad>=6&&bad>ok*2&&i<S.length-1){map.removeLayer(lay);i++;add()}});lay.addTo(map);lay.bringToBack()};add();return lay};
-</script><style>.leaflet-container .bn-tiles{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.55)}.leaflet-container{background:#1b1f24}</style>
+<script>/* t252: shared keyless basemap: window.bnBaseLayer(map,{maxZoom,extra}) (alias window.bnBasemap). OpenStreetMap's volunteer tile servers
+ (tile.openstreetmap.org, and the OSM France/HOT community servers) are NOT used anywhere: the site sends Referrer-Policy: no-referrer and OSM's
+ tile usage policy blocks referer-less web traffic ("403 Access blocked" tiles). Order: (1) OpenFreeMap "dark" vector style (free, no key, no
+ registration, commercial/high-traffic use allowed; openfreemap.org) rendered by MapLibre GL JS 5.24.0 (BSD-3) via @maplibre/maplibre-gl-leaflet
+ 0.1.4 (ISC), lazy-loaded and pinned with SRI; (2) VersaTiles "colorful-dark" vector style (tiles.versatiles.org, free, no key, MIT/CC0) if
+ OpenFreeMap's style or tiles fail; (3) NASA GIBS VIIRS Black Marble + reference features/labels raster tiles (public domain, no key) if WebGL is
+ unavailable or both vector providers fail. The basemap sits in its own "bnBase" pane (z-index 150), below Leaflet's tilePane (200), overlayPane
+ (400) and markerPane, so radar/other raster overlays and data layers always draw above it. Returns an L.LayerGroup; group.provider names the source. */
+(function(){
+ const lk=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener">'+t+'</a>', OSMC=lk("https://www.openstreetmap.org/copyright","OpenStreetMap");
+ const VEC=[{n:"openfreemap",style:"https://tiles.openfreemap.org/styles/dark",a:lk("https://openfreemap.org/","OpenFreeMap")+" &copy; "+lk("https://www.openmaptiles.org/","OpenMapTiles")+" Data from "+OSMC},
+  {n:"versatiles",style:"https://tiles.versatiles.org/assets/styles/colorful-dark/style.json",a:"Map "+lk("https://versatiles.org/","VersaTiles")+" · &copy; "+OSMC+" contributors · landcover &copy; "+lk("https://esa-worldcover.org/","ESA WorldCover")}];
+ const GIBS="https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/", GIBS_A="Imagery "+lk("https://www.earthdata.nasa.gov/engage/open-data-services-software/earthdata-developer-portal/gibs-api","NASA GIBS")+" (VIIRS Black Marble, public domain)";
+ const LIB=[["maplibre-gl@5.24.0/dist/maplibre-gl.js","sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8OVYXHYOxcffFmCJBL0dgdvGp"],["@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js","sha384-tXYNKOHx4T02jMP7YYCtBxPIv1B5gaA5mcVPBzqMp6d7VzWzxJgI2aWF/nJLrQdS"]];
+ const CSS=["maplibre-gl@5.24.0/dist/maplibre-gl.css","sha384-uTttxo/aOKbdE5RlD/SPzSDoDmNvGlUYPjONi2MN/b7c9HPSvW07OIuyP7uL6jxK"], CDN=["https://unpkg.com/","https://cdn.jsdelivr.net/npm/"];
+ const tag=(t,a)=>new Promise((ok,no)=>{const e=document.createElement(t);Object.assign(e,a);e.crossOrigin="anonymous";e.onload=()=>ok(e);e.onerror=()=>{e.remove();no()};document.head.appendChild(e)});
+ let gl=null; const hasGL=()=>{if(gl==null)try{const c=document.createElement("canvas");gl=!!(c.getContext("webgl2")||c.getContext("webgl"))}catch(e){gl=false}return gl};
+ let ld=null; const loadGL=()=>ld||(ld=(async()=>{for(const c of CDN){try{
+   if(!document.getElementById("bn-mlcss"))await tag("link",{id:"bn-mlcss",rel:"stylesheet",href:c+CSS[0],integrity:CSS[1]}).catch(()=>{});
+   if(!window.maplibregl)await tag("script",{src:c+LIB[0][0],integrity:LIB[0][1]});
+   if(!(L.maplibreGL))await tag("script",{src:c+LIB[1][0],integrity:LIB[1][1]});
+   if(window.maplibregl&&L.maplibreGL)return true}catch(e){}}return false})());
+ window.bnBaseLayer=function(map,o){o=o||{};const ex=o.extra?" · "+o.extra:"",mz=o.maxZoom||19,grp=L.layerGroup().addTo(map);grp.provider="loading";(window.bnBaseLayers=window.bnBaseLayers||[]).push(grp);
+  if(!map.getPane("bnBase")){const p=map.createPane("bnBase");p.style.zIndex=150;p.style.pointerEvents="none"}
+  const live=()=>grp._map===map;
+  const raster=()=>{if(!live())return;grp.clearLayers();grp.provider="nasa-gibs";const op={pane:"bnBase",maxZoom:mz,bounds:[[-85.05,-180],[85.05,180]],noWrap:false};
+   grp.addLayer(L.tileLayer(GIBS+"VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png",Object.assign({maxNativeZoom:8,className:"bn-gibs",attribution:GIBS_A+" · boundaries &copy; "+OSMC+" contributors, Natural Earth"+ex},op)));
+   grp.addLayer(L.tileLayer(GIBS+"Reference_Features_15m/default/GoogleMapsCompatible_Level13/{z}/{y}/{x}.png",Object.assign({maxNativeZoom:13,opacity:.6},op)));
+   grp.addLayer(L.tileLayer(GIBS+"Reference_Labels_15m/default/GoogleMapsCompatible_Level13/{z}/{y}/{x}.png",Object.assign({maxNativeZoom:13,opacity:.85},op)))};
+  const vec=k=>{if(!live())return;if(k>=VEC.length)return raster();const s=VEC[k];let lay,ml,done=false,bad=0,good=0;
+   const fail=why=>{if(done===2)return;done=2;clearTimeout(t);try{grp.removeLayer(lay)}catch(e){}console.warn("bnBaseLayer: "+s.n+" failed ("+why+"), trying next");vec(k+1)};
+   const t=setTimeout(()=>{if(!done)fail("timeout")},15000);
+   try{lay=L.maplibreGL({style:s.style,pane:"bnBase",interactive:false,attributionControl:{customAttribution:s.a+ex},maxZoom:Math.max(mz,1)});grp.addLayer(lay);ml=lay.getMaplibreMap()}catch(e){return fail("init")}
+   if(!ml)return fail("no map");
+   ml.on("load",()=>{if(done)return;done=1;clearTimeout(t);grp.provider=s.n});
+   ml.on("data",e=>{if(e.dataType==="source"&&e.tile)good++});
+   ml.on("error",e=>{if(!done)return fail("style");if(++bad>=12&&bad>good*2)fail("tiles")});
+   ml.on("webglcontextlost",()=>fail("webgl lost"))};
+  map.whenReady(()=>{if(!hasGL())return raster();loadGL().then(ok=>ok?vec(0):raster())});return grp};
+ window.bnBasemap=window.bnBaseLayer;
+})();
+</script><style>.leaflet-container{background:#1b1f24}.leaflet-bnBase-pane canvas{outline:none}.leaflet-container .bn-gibs{filter:brightness(2.6) contrast(1.15) saturate(.6)}</style>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"><link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>

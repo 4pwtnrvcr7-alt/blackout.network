@@ -230,7 +230,7 @@ function rLoop(){clearInterval(R.timer);R.timer=setInterval(()=>{if(!R.play||!R.
 function radarInit(){if(R.map||typeof L=="undefined"||!W.loc)return;const el=$w("wx_rmap");if(!el||!el.offsetWidth)return;el.innerHTML="";
  R.map=L.map(el,{minZoom:3,maxZoom:12,worldCopyJump:true,scrollWheelZoom:false}).setView([+W.loc.lat,+W.loc.lon],8);
  R.map.on("click",()=>R.map.scrollWheelZoom.enable());
- R.base=window.bnBaseLayer?bnBaseLayer(R.map,{maxZoom:12}):L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:12,className:"bn-tiles"}).addTo(R.map);
+ R.base=(window.bnBaseLayer?bnBaseLayer(R.map,{maxZoom:12}):null)/* t252: shared keyless basemap (OpenFreeMap → VersaTiles → NASA GIBS); no OSM tile servers */;
  R.mk=L.circleMarker([+W.loc.lat,+W.loc.lon],{radius:7,color:"#fff",weight:2,fillColor:"#4aa3ff",fillOpacity:.9}).addTo(R.map).bindTooltip(E(locLabel(W.loc)));
  R.loc=W.loc.lat+","+W.loc.lon;R.map.on("zoomend",()=>{if(R.used=="rv"&&R.map.getZoom()>7&&!/zoom 7/.test($w("wx_rnote").textContent))$w("wx_rnote").textContent="RainViewer's free tiles stop at zoom 7, so the radar is upscaled when you zoom in further."});
  rLoop();rFetch()}

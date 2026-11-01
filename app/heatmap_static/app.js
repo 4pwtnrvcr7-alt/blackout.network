@@ -75,7 +75,7 @@ function catbar(c,n){return `<div class=hm-catbar>${GR.map(([g])=>c[g]?`<i style
 // ---------- map ----------
 function initMap(){if(H.map||typeof L=="undefined")return;
  H.map=L.map("hm_map",{worldCopyJump:true,minZoom:2,maxZoom:12,zoomSnap:.5,scrollWheelZoom:false,preferCanvas:false}).setView([24,12],2);
- window.bnBaseLayer?bnBaseLayer(H.map,{maxZoom:12,extra:"boundaries © Natural Earth · places © GeoNames"}):L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:12,className:"bn-tiles"}).addTo(H.map);
+ (window.bnBaseLayer?bnBaseLayer(H.map,{maxZoom:12,extra:"boundaries © Natural Earth · places © GeoNames"}):null)/* t252: shared keyless basemap (OpenFreeMap → VersaTiles → NASA GIBS); no OSM tile servers */;
  H.map.createPane("hmReg");H.map.getPane("hmReg").style.zIndex=350;H.map.createPane("hmHeat");H.map.getPane("hmHeat").style.zIndex=420;H.map.getPane("hmHeat").style.pointerEvents="none";
  H.rend0=L.canvas({pane:"hmReg",padding:.4});H.rend1=L.canvas({pane:"hmReg",padding:.4});
  H.map.on("click",()=>H.map.scrollWheelZoom.enable());H.map.on("mouseout",()=>H.map.scrollWheelZoom.disable());
