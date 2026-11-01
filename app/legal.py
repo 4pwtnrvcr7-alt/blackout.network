@@ -4,6 +4,7 @@ Terms adds 'YouTube content'. Static, self-contained HTML (no scripts, no data r
 Styled like /scoring: shared /theme.css palette plus a small inline stylesheet. Never touches scanner.py, scoring,
 push.py, jets.py, aviation_watch.py or config.json."""
 import html
+import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 EFFECTIVE = "October 31, 2026"
 CONTACT = "hello@blackout.network"
@@ -42,13 +43,11 @@ def _page(slug, title, desc, toc, sections, intro):
                   (("/#wire", "← Dashboard"), ("/scoring", "How we score"), ("/sources", "Sources"), ("/newsletter", "Newsletter"),
                    ("/privacy", "Privacy"), ("/tos", "Terms")))
     toc_html = "".join(f'<li><a href="#{a}">{html.escape(t)}</a></li>' for a, t in toc)
-    return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>{html.escape(title)}: blackout.network</title><meta name="description" content="{html.escape(desc)}">'
-            f'<link rel="canonical" href="https://blackout.network/{slug}">'
+    return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+            sitenav.head_html(slug) +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
             f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>'
-            f'<header><h1>BLACKOUT.<b>NETWORK</b> · {html.escape(title)}<small>The world\'s threats, scored and sourced, before cable news catches up.</small></h1>'
-            f'<nav class="site" aria-label="Site">{nav}</nav></header>'
+            + sitenav.site_top(slug) +
             f'<main class="wrap" id="main"><h2 class="title">{html.escape(title)}</h2>'
             f'<p class="upd">Effective date: {EFFECTIVE} · Last updated: {EFFECTIVE}</p>{intro}'
             f'<nav class="toc" aria-label="Contents"><b>Contents</b><ol>{toc_html}</ol></nav>{sections}</main>'

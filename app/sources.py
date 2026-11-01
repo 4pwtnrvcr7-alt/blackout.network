@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 BASE = os.path.dirname(os.path.abspath(__file__))
 if BASE not in sys.path: sys.path.insert(0, BASE)
 import sources_catalog as SC
+import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 import sources_directory as SD, importlib as _il
 SD = _il.reload(SD)   # hot-reload servers: pick up a changed sources_directory.py together with this file
 
@@ -315,12 +316,10 @@ def et(s, with_date=True):
 
 def shell(title, body, robots="index", wide=True):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<meta name="robots" content="{robots}"><title>Know first. Be ready.</title>'
-            '<meta name="description" content="Every source blackout.network has used, with item counts, profiles and a transparent 0–10 confidence rating. Suggest a source for review.">'
+            f'<meta name="robots" content="{robots}">' + sitenav.head_html("sources") +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="stylesheet" href="/api/sources/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="sc-page"><a class="skip" href="#main">Skip to content</a>'
-            f'<header><h1>BLACKOUT.<b>NETWORK</b> · {E(title)}<small>{E(TAGLINE)}</small></h1>'
-            '<nav class="sc-nav" aria-label="Site"><a href="/#wire">← Dashboard</a><a href="/scoring">How we score</a><a href="/sources" class="on"><span class="sc-ni" data-ico="book-open" aria-hidden="true"></span>Sources</a><a href="/newsletter"><span class="sc-ni" data-ico="mail" aria-hidden="true"></span>Newsletter</a></nav></header>'
+            + sitenav.site_top("sources") +
             f'<div class="sc-wrap" id="main" role="main">{body}</div>'
             f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a>'
             '<span id="sc_foot_range"></span></footer>'

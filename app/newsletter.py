@@ -19,6 +19,7 @@ from email.message import EmailMessage
 from email import policy as _email_policy
 from email.utils import formataddr, format_datetime, make_msgid
 from zoneinfo import ZoneInfo
+import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ET = ZoneInfo("America/New_York")
@@ -1151,11 +1152,10 @@ def admin_action(d):
 # ------------------------------------------------------------------ HTML pages
 def page(title, body, robots="noindex"):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<meta name="robots" content="{robots}"><title>Know first. Be ready.</title>'
+            f'<meta name="robots" content="{robots}">' + sitenav.head_html("newsletter") +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="stylesheet" href="/api/newsletter/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="nl-page"><a class="skip" href="#main">Skip to content</a>'
-            f'<header><h1>BLACKOUT.<b>NETWORK</b> · {E(title)}<small>Know first. Be ready.</small></h1>'
-            '<nav class="nl-nav" aria-label="Site"><a href="/#wire">← Dashboard</a><a href="/scoring">How we score</a><a href="/newsletter" class="on">✉ Newsletter</a></nav></header>'
+            + sitenav.site_top("newsletter") +
             f'<div class="nl-wrap" id="main" role="main">{body}</div>'
             f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></footer>'
             '<script src="/api/translate/app.js"></script><script src="/api/search/app.js"></script></body></html>')

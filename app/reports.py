@@ -31,6 +31,7 @@ Routes (addons.py): /api/report/* , /api/reports/* , /report-status , /report-st
   POST /api/reports/status                 HMAC-signed: public views + stats pushed down from the box"""
 import os, re, json, time, hmac, hashlib, secrets, sqlite3, threading, unicodedata, html
 from urllib.parse import urlsplit
+import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "reports_static")
@@ -346,8 +347,8 @@ def status_page(rid=""):
     rid = html.escape(norm_id(rid) or "", quote=True)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
-<title>Know first. Be ready.</title><link rel="icon" href="/favicon.ico"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png"><meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script><link rel="stylesheet" href="/api/report/status.css"></head>
-<body data-report-id="{rid}"><header class="rs-hd"><a href="/" class="rs-brand">blackout<b>.network</b></a><nav><a href="/">← Back to the dashboard</a></nav></header>
+{sitenav.head_html("report-status", "/report-status")}<link rel="icon" href="/favicon.ico"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png"><meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script><link rel="stylesheet" href="/api/report/status.css"></head>
+<body data-report-id="{rid}">{sitenav.site_top("report-status")}
 <main class="rs-main" id="main">
 <h1>Check a problem report</h1>
 <p class="rs-lead">Enter the reference ID you got after sending a report (it looks like <code>BN-7K2M-Q9XD</code>). You'll see only that report: what you sent, where it is in the queue, its status and our reply.</p>

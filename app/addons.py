@@ -37,6 +37,8 @@ ROUTES = {
     "/img": "static_files",
     "/favicon.ico": "static_files",
     "/theme.css": "static_files",
+    "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
+    "/sitenav.css": "sitenav",
     "/scoring": "scoring",
     "/about/scoring": "scoring",
     "/privacy": "legal",            # Privacy Policy (t270), static page, served during warm-up

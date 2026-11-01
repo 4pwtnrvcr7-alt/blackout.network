@@ -1,0 +1,25 @@
+/* BLACKOUT.NETWORK shared header + tab bar (t301/t302). Generated markup: sitenav.py. Same look as the dashboard header and tab bar.
+   Selectors start with "body" so they beat each standalone page's own header/h1 rules. */
+body header.bn-hd{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:14px 20px;margin:0;max-width:none;
+ border-bottom:1px solid var(--bd,#252b33);position:sticky;top:0;background:var(--bg,#0b0d10);z-index:1000;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--tx,#e6e9ee);text-align:left}
+body header.bn-hd h1{font-size:18px;margin:0;letter-spacing:.5px;font-weight:700;line-height:1.45;color:var(--tx,#e6e9ee);text-transform:none}
+body header.bn-hd h1 b{color:var(--hi,#ff4d4f)}
+body header.bn-hd h1 small{display:none}
+body nav.bn-tabs{display:flex;flex-wrap:wrap;gap:6px;row-gap:6px;align-items:center;padding:10px 20px 0;margin:0;max-width:none;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:none;border:0}
+body nav.bn-tabs a{background:#1d232b;color:var(--tx,#e6e9ee);border:1px solid var(--bd,#252b33);border-radius:6px;padding:6px 10px;font:inherit;text-decoration:none;display:inline-block;margin:0;line-height:1.45}
+body nav.bn-tabs a:hover{border-color:var(--bd2,#2f3742)}
+body nav.bn-tabs a.on{border-color:var(--ac,#4aa3ff);color:var(--ac,#4aa3ff)}
+body nav.bn-tabs a:focus-visible,a.bn-follow:focus-visible{outline:2px solid var(--ac,#4aa3ff);outline-offset:2px}
+nav.tabs .tab-sep{width:1px;align-self:stretch;background:var(--bd2,#2f3742);margin:2px 6px}
+nav.tabs .tab-grp{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mu,#8b95a3);margin-right:-2px}
+.bn-tabdesc{margin:8px 20px 0;color:var(--mu,#8b95a3);font:13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:none}
+/* Follow us pills (header, every page) */
+a.bn-follow{-webkit-tap-highlight-color:rgba(74,163,255,.25)}
+a.bn-follow:hover{border-color:var(--ac,#4aa3ff)!important}
+a.bn-follow .bn-ico{flex:none;display:block}
+@media(max-width:700px){
+ body header.bn-hd{position:static;padding:12px 14px}
+ body nav.bn-tabs{padding:10px 14px 0}
+ .bn-tabdesc{margin:8px 14px 0}
+ a.bn-follow{font-size:13px!important;padding:6px 10px!important;margin:6px 6px 0 0!important}   /* bigger tap target on phones */
+}

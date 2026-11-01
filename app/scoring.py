@@ -294,12 +294,11 @@ def _render():
     P = []
     a = P.append
     a('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
-    a('<title>How we score: blackout.network</title>')
-    a('<meta name="description" content="How blackout.network scores threats: the 0–100 severity score and the 0–10 rank, factor by factor, with real examples. Research only.">')
+    import sitenav   # shared header, tab bar and SEO tags (t301/t302)
+    a(sitenav.head_html("scoring"))
     a('<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">')
     a(f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>')
-    a('<header><h1>BLACKOUT.<b>NETWORK</b> · How we score<small>The world\'s threats, scored and sourced, before cable news catches up.</small></h1>'
-      '<span><a class="back" href="/newsletter" style="margin-right:6px">✉ Newsletter</a><a class="back" href="/#wire">← Back to the dashboard</a></span></header>')
+    a(sitenav.site_top("scoring"))
     a('<div class="wrap" id="main" role="main">')
     a('<nav class="toc" aria-label="On this page"><a href="#why7">Why is this a 7?</a><a href="#scale">0–10 scale</a><a href="#table">Rank by rank</a>'
       '<a href="#factors">Scoring factors</a><a href="#worked">Worked example</a><a href="#rules">Watchlist &amp; alerts</a><a href="#disclaimer">Disclaimer</a></nav>')

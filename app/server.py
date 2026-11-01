@@ -146,6 +146,7 @@ _RW = b'<link rel="stylesheet" href="/api/report/app.css"><script src="/api/repo
 # PWA / home-screen support + site title (pwa.py, static/pwa/): every full HTML page served through send() gets the manifest, icons,
 # iOS/Android web-app meta tags and the install guide in its <head>, and the public title "Know first. Be ready." (2026-10-31).
 SITE_TITLE = b"Know first. Be ready."
+_BRANDED = b"BLACKOUT.NETWORK"
 PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
             b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">'
             b'<meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
@@ -158,8 +159,9 @@ def pwa_head(b):
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]
-        b = re.sub(rb"<title>[^<]*</title>", b"<title>" + SITE_TITLE + b"</title>", b, count=1)
-        b = re.sub(rb'(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*(")', rb"\g<1>" + SITE_TITLE + rb"\g<2>", b)
+        # per-page titles such as "How we score | BLACKOUT.NETWORK" (sitenav.py, t302) are kept; any other title becomes the site title
+        b = re.sub(rb"<title>([^<]*)</title>", lambda m: m.group(0) if _BRANDED in m.group(1) else b"<title>" + SITE_TITLE + b"</title>", b, count=1)
+        b = re.sub(rb'(<meta (?:property="og:title"|name="twitter:title") content=")([^"]*)(")', lambda m: m.group(0) if _BRANDED in m.group(2) else m.group(1) + SITE_TITLE + m.group(3), b)
         b = re.sub(rb'(<meta name="viewport" content="width=device-width,\s*initial-scale=1)(")', rb"\g<1>,viewport-fit=cover\g<2>", b, count=1)
         for t in _OLD_TAGLINES: b = b.replace(t, SITE_TITLE)
         return b
