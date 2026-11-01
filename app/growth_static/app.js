@@ -33,7 +33,7 @@ function enhanceCard(el){if(el.dataset.bng)return;var cid=el.getAttribute("data-
  var br=body.querySelector(".brief");if(br&&br.textContent.length>260){var mb=document.createElement("button");mb.type="button";mb.className="bng-more";mb.textContent="Read the full brief ▾";
   mb.onclick=function(){var o=br.classList.toggle("bng-open");mb.textContent=o?"Show less ▴":"Read the full brief ▾"};br.after(mb)}
  var t=title+(rank!=null?" (rank "+rank+"/10)":"")+" via BLACKOUT.NETWORK";var sh=document.createElement("div");sh.innerHTML=shareRow(SITE+"/wire/"+cid,t,"wire");body.appendChild(sh.firstChild)}
-var CTAS=[["Never miss a rank 7+","The free morning and evening brief: every confirmed threat from the last 12 hours, ranked and sourced.","brief"],
+var CTAS=[["Never miss a rank 7+","The free email brief: threats ranked 0–10 and sourced.","brief"],
  ["Watch the 60-second version","Our Shorts turn the biggest stories into maps, satellite views and plain-English narration.","yt"],
  ["Follow the live wire on X","@BlkoutNtw posts confirmed, ranked alerts as they break. No hype, every source linked.","x"]];
 function ctaCard(i){var k=CTAS[i%CTAS.length],d=document.createElement("div");d.className="card bng-cta";d.setAttribute("data-bng-cta",1);
