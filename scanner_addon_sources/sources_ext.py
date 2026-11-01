@@ -623,6 +623,177 @@ def f_meteoalarm():
     if len(errs) > len(MA_FEEDS) // 2: raise RuntimeError("MeteoAlarm: most country feeds failed: " + "; ".join(errs[:5]))
     return (out, {"feed_errors": errs}) if errs else out
 
+# ---- t414 (2026-11-01): Matt-approved batch (JTWC, AFAD, PAGASA, CERT-FR, UKHSA, Geoscience Australia, Taiwan CWA, NCSC-NL, HKCERT) ----
+_T414_LAST = {}
+def _polite(key, min_s=2.0):
+    """per-host spacing between requests inside one scan (polite rate limit)"""
+    w = _T414_LAST.get(key, 0) + min_s - time.time()
+    if w > 0: time.sleep(w)
+    _T414_LAST[key] = time.time()
+
+def f_jtwc():
+    """JTWC RSS: one item per active warning; position/winds from the warning text product."""
+    _polite("jtwc")
+    txt = S.get("https://www.metoc.navy.mil/jtwc/rss/jtwc.rss", headers=T248_UA, timeout=30).text
+    out = []
+    for name, num, issued, prod in re.findall(r"<b>\s*([A-Za-z ]+?\s+\w{3}\s*\([^)]*\))\s+Warning\s*#\s*(\d+)\s*</b>.*?Issued at (\d{2}/\d{4})Z.*?href='(https[:]//www\.metoc\.navy\.mil/jtwc/products/\w+web\.txt)'", txt, re.S):
+        name = re.sub(r"\s+", " ", name).strip()
+        lat = lon = None; wind = None; t = S.now()
+        try:
+            _polite("jtwc", 1.5)
+            w = S.get(prod, headers=T248_UA, timeout=30).text
+            m = re.search(r"(\d{6})Z --- NEAR (\d+\.\d)([NS]) (\d+\.\d)([EW])", w)
+            if m:
+                lat = float(m.group(2)) * (1 if m.group(3) == "N" else -1); lon = float(m.group(4)) * (1 if m.group(5) == "E" else -1)
+                d = S.now(); t = d.replace(day=int(m.group(1)[:2]), hour=int(m.group(1)[2:4]), minute=int(m.group(1)[4:6]), second=0, microsecond=0)
+                if t > d + timedelta(hours=1): t = (t.replace(day=1) - timedelta(days=1)).replace(day=int(m.group(1)[:2]))
+            mw = re.search(r"MAX SUSTAINED WINDS - (\d+) KT", w); wind = int(mw.group(1)) if mw else None
+        except Exception: pass
+        base = 25 + (20 if wind and wind >= 64 else 0) + (15 if wind and wind >= 113 else 0)
+        sid = re.search(r"(\w{3})\s*\(", name).group(1)
+        title = f"JTWC: {name.title().replace('(', '(').strip()} warning #{int(num)}" + (f", max winds {wind} kt" if wind else "")
+        out.append(S.item("JTWC", "JTWC", f"{sid}-{t.year}", title, "natural disaster", prod, t, lat, lon,
+                          "West Pacific / Indian Ocean", base, extra={"storm": name, "warning_no": int(num), "max_wind_kt": wind}))
+    return out
+
+def f_afad():
+    """AFAD (Turkey) earthquake API, M>=4.0, last 3 days (Turkey + neighbours). Family AFAD."""
+    _polite("afad")
+    st = (S.now() - timedelta(days=3)).strftime("%Y-%m-%dT%H:%M:%S"); en = (S.now() + timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%S")
+    j = S.get(f"https://servisnet.afad.gov.tr/apigateway/deprem/apiv2/event/filter?start={st}&end={en}&minmag=4.0&format=json&orderby=timedesc",
+              headers=T248_UA, timeout=30).json()
+    out = []
+    for e in j:
+        try: m = float(e["magnitude"]); lat = float(e["latitude"]); lon = float(e["longitude"])
+        except Exception: continue
+        if m < 4.0: continue
+        place = (e.get("location") or "").strip()
+        prov = e.get("province"); loc = ", ".join(x for x in (e.get("district"), prov, e.get("country") or ("Türkiye" if prov else None)) if x) or place
+        t = S.parse_t(e["date"] + "Z")   # AFAD API dates are UTC
+        out.append(S.item("AFAD Türkiye", "AFAD", e["eventID"], f"AFAD: M{m:.1f} earthquake {place}", "natural disaster",
+                          f"https://deprem.afad.gov.tr/event-detail/{e['eventID']}", t, lat, lon, loc, _small_quake_base(m),
+                          extra={"mag": m, "magtype": e.get("type"), "depth_km": float(e.get("depth") or 0)}))
+    return out
+
+def f_pagasa():
+    """PAGASA tropical cyclone bulletin page (HTML only). Emits one item per named cyclone inside the PAR; empty when none."""
+    _polite("pagasa")
+    h = S.get("https://bagong.pagasa.dost.gov.ph/tropical-cyclone/severe-weather-bulletin", headers=T248_UA, timeout=30).text
+    if re.search(r"No Active Tropical Cyclone", h, re.I): return []
+    out = []
+    for kind, nm in set(re.findall(r"(Super Typhoon|Typhoon|Severe Tropical Storm|Tropical Storm|Tropical Depression)\s+[\"“]?([A-Z][A-Za-z]+)[\"”]?", S.strip(h))):
+        sig = re.findall(r"(?:TCWS|Wind Signal)\s*(?:No\.?|#)\s*(\d)", h, re.I); top = max(map(int, sig)) if sig else 0
+        out.append(S.item("PAGASA", "PAGASA", f"{nm.lower()}-{S.now().year}", f"PAGASA: {kind} {nm} bulletin" + (f", Wind Signal No. {top} raised" if top else ""),
+                          "natural disaster", "https://bagong.pagasa.dost.gov.ph/tropical-cyclone/severe-weather-bulletin", S.now(), 12.9, 122.0,
+                          "Philippines", 25 + 10 * top, extra={"max_signal": top}))
+    if not out: raise RuntimeError("PAGASA: active-cyclone page but no storm name parsed (layout changed)")
+    return out
+
+def f_certfr():
+    _polite("certfr")
+    out = S.rss_generic("CERT-FR alerts (ANSSI)", "CERT-FR", "https://cert.cyber.gouv.fr/alerte/feed/", "cyber", 25, True, maxage_d=14,
+                         force_cat=True, kwboost=r"exploit|zero|critique|critical")
+    for it in out: it["location"] = it.get("location") or "France"
+    return out
+
+_UKHSA_RX = r"outbreak|case[s]? of|confirmed|mpox|measles|avian|influenza|bird flu|H5N|ebola|marburg|cholera|diphtheria|polio|pertussis|legionell|incident|warning|alert|heat|cold|lassa|novel|pandemic|anthrax|plague"
+def f_ukhsa():
+    """GOV.UK Atom for UKHSA: noisy (guidance, stats), so keep only outbreak/incident/alert items."""
+    _polite("govuk")
+    out = []
+    for it in S.rss_generic("UK Health Security Agency", "UKHSA", "https://www.gov.uk/government/organisations/uk-health-security-agency.atom",
+                            "disease", 15, True, force_cat=True, kwboost=r"outbreak|confirmed|case of|novel|pandemic|ebola|marburg|H5N1"):
+        if re.search(_UKHSA_RX, it["title"], re.I) and not re.search(r"statistics|data|report: week|template|training|guidance on", it["title"], re.I):
+            it["location"] = it.get("location") or "United Kingdom"
+            if it.get("lat") is None: it["lat"], it["lon"] = 54.0, -2.5
+            out.append(it)
+    return out
+
+def f_ga():
+    """Geoscience Australia Earthquakes@GA 7-day WFS, M>=4.0 (Australia + region)."""
+    _polite("ga")
+    j = S.get("https://earthquakes.ga.gov.au/geoserver/earthquakes/wfs?service=WFS&request=getfeature&typeNames=earthquakes:earthquakes_seven_days"
+              "&outputFormat=application/json&CQL_FILTER=display_flag=%27Y%27", headers=T248_UA, timeout=40).json()
+    out = []
+    for f in j.get("features", []):
+        p = f["properties"]; m = p.get("preferred_magnitude") or p.get("magnitude") or 0
+        try: m = float(m)
+        except Exception: continue
+        if m < 4.0: continue
+        lon, lat = f["geometry"]["coordinates"][:2]
+        if not (-50 <= lat <= -8 and 105 <= lon <= 160): continue   # Australia + near region only; global quakes already come from USGS/EMSC
+        place = (p.get("description") or p.get("region") or "Australian region").strip()
+        eid = p.get("event_id") or p.get("earthquake_id")
+        t = S.parse_t((p.get("origin_time") or "").replace("Z", "") + "Z") if p.get("origin_time") else None
+        out.append(S.item("Geoscience Australia", "GA", str(eid), f"Geoscience Australia: M{m:.1f} earthquake {place}", "natural disaster",
+                          f"https://earthquakes.ga.gov.au/event/{eid}", t, lat, lon, place, _small_quake_base(m),
+                          extra={"mag": m, "depth_km": p.get("depth")}))
+    return out
+
+# CWA serves a chain rooted in Taiwan GRCA, which certifi lacks; the OS CA bundle (still full verification) has it
+_SYS_CA = "/etc/ssl/certs/ca-certificates.crt" if _os.path.exists("/etc/ssl/certs/ca-certificates.crt") else True
+def _cwa_get(url):
+    """Full chain + hostname verification, minus Python 3.13's extra X509_STRICT check (CWA's GRCA intermediate lacks a Subject Key Identifier)."""
+    import ssl, urllib.request
+    ctx = ssl.create_default_context(cafile=_SYS_CA if isinstance(_SYS_CA, str) else None)
+    ctx.verify_flags &= ~getattr(ssl, "VERIFY_X509_STRICT", 0)
+    req = urllib.request.Request(url, headers=T248_UA)
+    with urllib.request.urlopen(req, timeout=30, context=ctx) as r: return r.read().decode("utf-8", "replace")
+def f_cwa():
+    """Taiwan CWA Seismological Center numbered (felt, significant) quakes from the English list; lat/lon from the detail page title."""
+    _polite("cwa")
+    from zoneinfo import ZoneInfo
+    h = _cwa_get("https://scweb.cwa.gov.tw/en-US/Earthquake")
+    rows = re.findall(r'href="(/en-us/earthquake/details/(ee(\d{14})\d*))".*?<td class="">([\d/: ]+)</td>\s*<td class="">([\d.]+)</td>\s*<td class="">([\d.]+)</td>\s*<td class="">\s*(.*?)\s*</td>', h, re.S)
+    if not rows and "btnInfo" in h: raise RuntimeError("CWA: list rows not parsed (layout changed)")
+    out, cache = [], _jload(_os.path.join(_HERE, "cwa_state.json"), {})
+    for href, eid, stamp, _lt, mag, depth, county in rows[:15]:
+        m = float(mag)
+        t = datetime.strptime(stamp[:12], "%Y%m%d%H%M").replace(tzinfo=ZoneInfo("Asia/Taipei")).astimezone(timezone.utc)
+        if t < S.now() - timedelta(days=S.HISTORY_D) or m < 4.0: continue
+        url = "https://scweb.cwa.gov.tw" + href; ll = cache.get(eid)
+        if not ll:
+            try:
+                _polite("cwa", 1.5)
+                tt = re.search(r"([\d.]+)N ([\d.]+)E", _cwa_get(url))
+                ll = cache[eid] = [float(tt.group(1)), float(tt.group(2))] if tt else [23.7, 121.0]
+            except Exception: ll = [23.7, 121.0]
+        county = S.strip(county)
+        out.append(S.item("Taiwan CWA", "CWA", eid, f"Taiwan CWA: M{m:.1f} earthquake near {county}, Taiwan (depth {depth} km)", "natural disaster",
+                          url, t, ll[0], ll[1], county + ", Taiwan", _small_quake_base(m), extra={"mag": m, "depth_km": float(depth)}))
+    _jsave(_os.path.join(_HERE, "cwa_state.json"), dict(list(cache.items())[-60:]))
+    return out
+
+def f_ncscnl():
+    """NCSC-NL advisories: only High-damage/High-probability (H) ratings matter; the feed title carries [x.xx] [M/H]."""
+    _polite("ncscnl")
+    out = []
+    for it in S.rss_generic("NCSC-NL advisories", "NCSC-NL", "https://advisories.ncsc.nl/rss/advisories", "cyber", 8, True, force_cat=True,
+                            kwboost=r"\[H/H\]|actively exploit|zero-day"):
+        if re.search(r"\[H/H\]|\[M/H\]|\[H/M\]", it["title"]): it["base"] += 10
+        it["location"] = it.get("location") or "Netherlands"; out.append(it)
+    return out
+
+def f_hkcert():
+    _polite("hkcert")
+    out = []
+    for it in S.rss_generic("HKCERT security bulletins", "HKCERT", "https://www.hkcert.org/getrss/security-bulletin", "cyber", 8, True, force_cat=True,
+                            kwboost=r"extreme risk|high risk|actively exploit|zero-day|in the wild"):
+        it["location"] = it.get("location") or "Hong Kong"; out.append(it)
+    return out
+
+T414_SOURCES = [
+    ("JTWC tropical cyclone warnings (RSS + warning text)", "https://www.metoc.navy.mil/jtwc/rss/jtwc.rss", f_jtwc),
+    ("AFAD Türkiye earthquakes (API, M4+)", "https://deprem.afad.gov.tr/last-earthquakes", f_afad),
+    ("PAGASA Philippines tropical cyclone bulletin", "https://bagong.pagasa.dost.gov.ph/tropical-cyclone/severe-weather-bulletin", f_pagasa),
+    ("CERT-FR (ANSSI) critical alerts RSS", "https://cert.cyber.gouv.fr/alerte/feed/", f_certfr),
+    ("UKHSA GOV.UK Atom (outbreaks/incidents only)", "https://www.gov.uk/government/organisations/uk-health-security-agency.atom", f_ukhsa),
+    ("Geoscience Australia earthquakes (7-day WFS, M4+)", "https://earthquakes.ga.gov.au/", f_ga),
+    ("Taiwan CWA Seismological Center (numbered quakes, M4+)", "https://scweb.cwa.gov.tw/en-US/Earthquake", f_cwa),
+    ("NCSC-NL security advisories RSS", "https://advisories.ncsc.nl/rss/advisories", f_ncscnl),
+    ("HKCERT security bulletins RSS", "https://www.hkcert.org/getrss/security-bulletin", f_hkcert),
+]
+
 EXT_SOURCES = [
     ("Reddit public RSS (multireddit: " + ", ".join(SUBS) + ")", "https://www.reddit.com/r/worldnews+news/new/.rss", f_reddit),
     ("Bluesky public search API", "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts", f_bluesky),
@@ -651,7 +822,9 @@ EXT_SOURCES = [
     ("IODA internet outages (country + region, filtered)", "https://api.ioda.inetintel.cc.gatech.edu/v2/outages/events", f_ioda),
     ("MeteoAlarm warnings (EUMETNET CAP, Severe/Extreme only)", "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-{country}", f_meteoalarm),
 ]
+EXT_SOURCES += T414_SOURCES
 EXT_FAILED = [
+    ("ReliefWeb API v2", "https://apidoc.reliefweb.int/", "2026-11-01 t414: HTTP 403 'not using an approved appname' (v1 is 410 decommissioned); needs an appname request to ReliefWeb (form, not done). ReliefWeb still covered by the Disasters RSS in scanner.py"),
     ("Africa CDC site-wide RSS", "https://africacdc.org/feed/", "HTTP 200 but empty (no items) - news-item and disease-outbreak feeds used instead"),
     ("Icelandic Met Office site RSS", "https://en.vedur.is/rss.xml", "HTTP 200 but empty - api.vedur.is JSON used instead"),
     ("YouTube channel RSS feeds (feeds/videos.xml)", "https://www.youtube.com/feeds/videos.xml?channel_id=UCNye-wNBqNL5ZzHSJj3l8Bg", "HTTP 404 for every channel tested (Al Jazeera, Sky News, DW, Reuters, WION) - using live search instead"),
