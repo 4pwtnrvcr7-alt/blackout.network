@@ -45,6 +45,7 @@ TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime."
+END_LINE = "BLACKOUT.NETWORK for more. Follow us on YouTube and X. Get the free newsletter at blackout.network."   # brand end line, exact wording (CHARTER §3)
 CATEGORIES = ["war/conflict", "political", "natural disaster", "disease", "cyber", "space weather", "financial", "ufo/uap", "spiritual/religious", "other"]
 FREQS = {"twice": "Twice daily (morning + evening)", "morning": "Once daily: morning", "evening": "Once daily: evening"}
 SLOTS = ("morning", "evening")
@@ -496,6 +497,7 @@ def clean_title(t):
     """Readable headline: drop leading flag/emoji runs and dash bullets, trailing @handles, squeeze spaces. Wording is never changed."""
     t = re.sub(r"\s+", " ", t or "").strip()
     t = _LEAD.sub("", t); t = _HYPE.sub("", t); t = _LEAD.sub("", t); t = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", t).strip()
+    t = re.sub(r"\s+([.,;:!?])", r"\1", t); t = re.sub(r"(?<!\.)\.\.(?!\.)", ".", t)   # "million ." / "Moscow.." -> one full stop
     return t or re.sub(r"\s+", " ", t or "").strip()
 
 def item_of(r, section, official=0, editorial=False):
@@ -975,8 +977,9 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
             f'<a href="{E(links["scoring"])}" class="bnt" style="{_L}">How we score</a> · <a href="{E(links["site"])}" class="bnt" style="{_L}">Open the live dashboard</a></p>'
             f'<p style="margin:0 0 8px 0">{E(why_line)}</p>'
-            f'<p style="margin:0 0 8px 0">Visit <a href="https://blackout.network" class="bnt" style="{_L}">blackout.network</a> to see the whole picture. '
-            f'Follow: <a href="https://www.youtube.com/@blkoutntw" class="bnt" style="{_L}">YouTube @blkoutntw</a> · <a href="https://x.com/BlkoutNtw" class="bnt" style="{_L}">X @BlkoutNtw</a></p>'
+            f'<p style="margin:0 0 8px 0"><a href="https://blackout.network" class="bnt" style="{_L}">BLACKOUT.NETWORK</a> for more. Follow us on '
+            f'<a href="https://www.youtube.com/@blkoutntw" class="bnt" style="{_L}">YouTube</a> and <a href="https://x.com/BlkoutNtw" class="bnt" style="{_L}">X</a>. '
+            f'Get the free newsletter at <a href="https://blackout.network/newsletter" class="bnt" style="{_L}">blackout.network</a>.</p>'
             f'<p style="margin:0 0 8px 0">Know someone who should get this? <a href="{FORWARD_URL}" class="bnt" style="{_L}">Forward to a friend: blackout.network/newsletter</a></p>'
             f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>'
             + footer_buttons_html(links) + '</table></td></tr></table></body></html>')
@@ -1105,7 +1108,7 @@ def render(issue, links, c=None):
         for it in issue["watchlist"]:
             T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])}) {wire_url(it['cluster_id'], c=c)}")
         T.append("")
-    T += [f"Forward to a friend: {FORWARD_URL}", "See the whole picture: https://blackout.network", "YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
+    T += [f"Forward to a friend: {FORWARD_URL}", END_LINE, "https://blackout.network · YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
     T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}", why,
           f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
     T += footer_buttons_text(links)
@@ -1179,7 +1182,7 @@ def render_trending(t, links, at, c=None):
     pre = f"One of our posts is taking off: {_cut(t.get('title') or '', 120)}"
     why = f"You get breaking alerts because you subscribed to the {BRAND} newsletter. Turn them off with the link below or under Manage."
     html_ = _shell(subj, pre, _head_html("TRENDING", PAL["ac"], fmt_et(at), f"As of {fmt_et(at)}"), [_bluf_html(pre), _trend_row(t)], links, c, why)
-    text = "\n".join([subj, "", pre, f"Watch: {t['url']}", "", "See the whole picture: https://blackout.network", "--",
+    text = "\n".join([subj, "", pre, f"Watch: {t['url']}", "", END_LINE, "--",
                       f"{BRAND} · {addr}", *footer_buttons_text(links)])
     html_, text = utm_tag(html_, text, f"trending-{at.astimezone(ET).strftime('%Y-%m-%d')}")
     return subj, html_, text
@@ -1189,7 +1192,8 @@ def render_breaking(items, links, at, c=None, trend=None):
     if not items and trend: return render_trending(trend, links, at, c)
     c = c or cfg(); top = items[0]; addr, _ = _addr(c)
     subj = f"BREAKING · {BRAND}: R{top['rank']} {_cut(_short(top['title'], 200), 80)}" + (f" (+{len(items) - 1} more)" if len(items) > 1 else "")
-    pre = f"{top['tier']} ({top['rank']}/10): {_short(top['title'], 140)}. {top['confidence']}."
+    _tt = _short(top['title'], 140).rstrip(" .")
+    pre = f"{top['tier']} ({top['rank']}/10): {_tt}. {top['confidence']}."
     B = [_bluf_html(pre)]
     for it in items: B.append(_item_html(it, links, c))
     ids = {it["cluster_id"] for it in items}
@@ -1205,7 +1209,7 @@ def render_breaking(items, links, at, c=None, trend=None):
     for i, it in enumerate(items, 1):
         T.extend(_text_item(it, i)); T.append(f"   Full story & sources: {wire_url(it['cluster_id'], c=c)}")
         T.append(f"   Follow this story: {follow_links(links.get('_row'), it['cluster_id'], c)['follow']}"); T.append("")
-    T += [f"Why you got this: it met the breaking-alert bar ({rules}).", "--", DISCLAIMER, why,
+    T += [f"Why you got this: it met the breaking-alert bar ({rules}).", "", END_LINE, "--", DISCLAIMER, why,
           f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""] + footer_buttons_text(links)
     html_, txt_ = utm_tag(html_, "\n".join(T), f"breaking-{at.astimezone(ET).strftime('%Y-%m-%d')}")
     return subj, html_, txt_
@@ -1255,7 +1259,7 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
            f'<p class="bnm" style="font:400 12px/1.5 {FB};color:{PAL["mu"]};word-break:break-all;margin:14px 0 0 0">Or paste this link into your browser: {E(button[1])}</p>') if button else ""
     xl = "".join(f'<p style="font:400 13px/1.5 {FB};margin:0 0 6px 0"><a href="{E(u)}" class="bnt" style="{_L}">{E(l)}</a></p>' for l, u in (extra_links or []))
     foot = (f'<tr><td class="bnl" style="padding:22px 20px 8px 20px;border-top:1px solid {PAL["line"]}">{_logo_html(c, 32)}</td></tr>'
-            f'<tr><td class="bnm" style="padding:8px 20px 22px 20px;font:400 12px/1.6 {FB};color:{PAL["mu"]};text-align:left">{E(DISCLAIMER)}<br>{BRAND} · '
+            f'<tr><td class="bnm" style="padding:8px 20px 22px 20px;font:400 12px/1.6 {FB};color:{PAL["mu"]};text-align:left">{E(DISCLAIMER)}<br>{E(END_LINE)}<br>{BRAND} · '
             + (E(addr) if addr else 'https://BLACKOUT.NETWORK') + "</td></tr>")
     body = "".join(f'<p {_P}>{E(p)}</p>' for p in paras)
     html_ = (_head(title) + f'<body class="bnb" style="margin:0;padding:0;background:{PAL["bg"]};-webkit-text-size-adjust:100%">'
@@ -1266,7 +1270,7 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
              f'<h1 class="bnt" style="font:800 22px/1.25 {FH};color:{PAL["tx"]};margin:0 0 12px 0">{E(title)}</h1>'
              + body + btn + xl + '</td></tr>' + foot + '</table></td></tr></table></body></html>')
     text = "\n\n".join([f"{BRAND} — {title}", TAGLINE, *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
-                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, f"{BRAND} · {TAGLINE} · {addr or 'https://BLACKOUT.NETWORK'}"])
+                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, END_LINE, f"{BRAND} · {TAGLINE} · {addr or 'https://BLACKOUT.NETWORK'}"])
     return html_, text
 
 # ------------------------------------------------------------------ MIME + pluggable senders
@@ -1805,7 +1809,7 @@ def run_crime_alerts(at=None, c=None, dry_run=False, only_email=None):
                 out.append((mask_email(em), "capped", len(inc))); continue
             city = inc[0]["city"]; tz = ZoneInfo(inc[0]["tz"])
             lines = [f"{x['cat']}: reported for {datetime.fromisoformat(x['local']).strftime('%a %b %-d, about %-I %p')} {datetime.fromisoformat(x['local']).replace(tzinfo=tz).strftime('%Z')}, "
-                     f"roughly {x['km']:.0f} km from the centre of {s.get('loc_label')} (block-level location)." for x in inc]
+                     f"roughly {x['km']:.0f} km from the center of {s.get('loc_label')} (block-level location)." for x in inc]
             paras = [f"{len(inc)} serious violent report{'s' if len(inc) > 1 else ''} near {s.get('loc_label')} appeared in {city}'s police open data in the last 24 hours."] + lines + [
                 f"Source: {inc[0]['source']}. These are initial police reports and may be reclassified. We never show names or addresses.",
                 "If you are in danger, call 911. You get this because you turned on crime alerts; change it in Manage preferences."]
@@ -1813,7 +1817,8 @@ def run_crime_alerts(at=None, c=None, dry_run=False, only_email=None):
             url = f"{c['base_url'].rstrip('/')}/crime?place={urllib.parse.quote(s.get('loc_label') or city)}&utm_source=newsletter&utm_medium=email&utm_campaign=crime_alert"
             subj = f"Crime alert near {s.get('loc_label')}: {inc[0]['cat'].lower()}" + (f" and {len(inc) - 1} more" if len(inc) > 1 else "")
             if dry_run: out.append((mask_email(em), "dry_run", len(inc), subj, lines)); continue
-            hb, tx = render_simple(subj, paras, ("See the map", url), c, [("Manage preferences", L["manage"]), ("Unsubscribe", L["unsubscribe"])])
+            hb, tx = render_simple(subj, paras, ("See the map", url), c, ([("Police data source", inc[0]["src_url"])] if inc[0].get("src_url") else [])
+                                   + [("Manage preferences", L["manage"]), ("Unsubscribe", L["unsubscribe"])])
             msg = build_mime(em, subj, hb, tx, L["unsubscribe"], "issue", c); msg["X-BN-Idem"] = f"bn-crime-{s['id']}-{inc[0]['id']}"
             ok, mode, f, err = deliver(msg, "issue", s["id"])
             k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,outbox_file,subject,error) VALUES(?,?,?,?,?,?,?,?)",
@@ -2166,7 +2171,7 @@ def signup_page():
             'See <a href="/scoring">How we score</a>.</li>'
             '<li><b>Watchlist.</b> Up to 5 low-confidence, single-source reports, each clearly labeled UNCONFIRMED.</li>'
             '<li><b>Breaking alerts.</b> Rare emergency emails for truly major events only, such as the outbreak of a war, a novel pathogen or a rank 9–10 event, '
-            'at most one every 3 hours. You can turn them off on the manage page.</li>'
+            f'at most one every {(cfg().get("breaking") or {}).get("min_gap_hours", 3)} hours. You can turn them off on the manage page.</li>'
             '<li><b>Follow this story.</b> One click in any email, no login. Updates on that story then lead your next brief until you unfollow.</li>'
             '<li><b>Times.</b> Morning and evening briefs go out at the times shown on the form, Eastern Time.</li>'
             '<li><b>Leaving.</b> Every email has a one-click unsubscribe link and a manage-preferences link. No account or login.</li>'
