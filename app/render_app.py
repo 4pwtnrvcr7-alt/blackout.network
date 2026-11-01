@@ -406,11 +406,20 @@ WARMING = b"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=re
 
 class RH(server.H):
     server_version = "Blackout/1.0"
+    # Visitor counter env vars (analytics 2026-11-01): BN_INTERNAL_TOKEN (optional; our own tools send it as X-BN-Internal and those
+    # requests are left out of the counter, counted only as internal_requests; unset = header check skipped, User-Agent/cookie checks
+    # still apply). BN_HIT_BEACON=0 removes the visitor beacon script from pages (unique visitors then stay 0).
     def send_response(self, code, message=None):
         try:   # privacy-safe aggregate traffic counters (usage_stats.py); pulled by the box over the signed reports sync
             import usage_stats; usage_stats.record(self.path, code, self.command, self.ip(), self.headers.get("User-Agent", ""), self.headers.get("Referer", ""), self.headers)
         except Exception: pass
-        return super().send_response(code, message)
+        r = super().send_response(code, message)
+        if self.command in ("GET", "HEAD") and "internal=" in self.path:   # staff link: /?internal=1 sets bn_internal=1 (1 year), /?internal=0 clears it
+            try:
+                import usage_stats; c = usage_stats.internal_cookie_header(self.path)
+                if c: self.send_header("Set-Cookie", c)
+            except Exception: pass
+        return r
     def ip(self):
         return self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or self.client_address[0]
     def do_GET(self):
@@ -473,6 +482,12 @@ class RH(server.H):
                                        "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"],
                                        "lookup": _nl_lookup(NL, d.get("email"))})
             return self.send(*NL.admin_action({"action": "test_send", "email": d.get("email"), "location": d.get("location")}))
+        if path == "/api/hit":   # own visitor counter beacon (usage_stats.beacon): no cookies, no body beyond the page path, always 204
+            self.body(); raw = getattr(self, "_raw", b"") or b""
+            try:
+                import usage_stats; usage_stats.beacon(self.ip(), self.headers.get("User-Agent", ""), self.headers, raw)
+            except Exception: pass
+            self.send_response(204); self.send_header("Cache-Control", "no-store"); self.send_header("Content-Length", "0"); self.end_headers(); return
         if path in BOX_ONLY:
             self.body(); return self.send(503 if path == "/api/refresh" else 403, {"status": "unavailable", "error": BOX_ONLY[path]})
         if not any(path == p or path.startswith(p + "/") or path.startswith(p + "?") for p in POST_ALLOW):

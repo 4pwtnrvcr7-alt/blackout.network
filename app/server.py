@@ -210,7 +210,7 @@ function why(){if(gpc)return 'gpc';if(dnt)return 'dnt';if(ls('bn_analytics')==='
 if(CR){var c=consent();if(!c)return 'consent_pending';if(c.choice!=='granted')return 'consent_denied';}return '';}
 var skip=why();window.BN_GA_SKIP=skip;window.BN_CONSENT_REGION=CR;
 gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:(CR||skip)?'denied':'granted',functionality_storage:'granted',security_storage:'granted'});
-function bnCleanUrl(u){try{var url=new URL(u);['token','email','e','zip','q_email'].forEach(function(k){url.searchParams.delete(k);});
+function bnCleanUrl(u){try{var url=new URL(u);['token','email','e','zip','q_email','internal'].forEach(function(k){url.searchParams.delete(k);});
 if(/^\/newsletter\/(confirm|unsubscribe|manage|breaking_off|follow|unfollow)/.test(url.pathname))url.search='';return url.toString();}catch(e){return location.origin+location.pathname;}}
 /* content_group (seo/batch-1): one of Home, Wire, Midterms, Solar, Weather, Preppers, Bushcraft, Network, Gov, Alerts, Stats, Legal */
 var TABG={threat:'Wire',wire:'Wire',noise:'Wire',thread:'Wire',bcast:'Wire',broadcasts:'Wire',streams:'Wire',radio:'Wire',ai:'Wire',heatmap:'Wire',trends:'Wire',
@@ -227,7 +227,11 @@ var s=p.split('/')[1];return TABG[s]||'Home';}
 window.bnContentGroup=bnGroup;
 function bnLoadGA(){if(window.bnGALoaded||window.BN_GA_SKIP)return;window.bnGALoaded=true;var s=document.createElement('script');s.async=true;
 s.src='https://www.googletagmanager.com/gtag/js?id='+BN_GA_ID;document.head.appendChild(s);gtag('js',new Date());
-gtag('config',BN_GA_ID,{allow_google_signals:false,allow_ad_personalization_signals:false,cookie_expires:34128000,page_location:bnCleanUrl(location.href),content_group:bnGroup()});}
+var gc={allow_google_signals:false,allow_ad_personalization_signals:false,cookie_expires:34128000,page_location:bnCleanUrl(location.href),content_group:bnGroup()};
+/* analytics 2026-11-01: staff/bot traffic -> traffic_type=internal (GA4 Admin > Data filters > Internal Traffic). Staff cookie bn_internal=1 is set by
+   any page opened with ?internal=1 (cleared by ?internal=0); our box tools send a User-Agent containing BlackoutNetwork-Internal. */
+if(!/[?&]internal=0(&|$)/.test(location.search)&&(/(^|;\s*)bn_internal=1(;|$)/.test(document.cookie)||/[?&]internal=1(&|$)/.test(location.search)||/BlackoutNetwork-Internal/i.test(navigator.userAgent||'')))gc.traffic_type='internal';
+gtag('config',BN_GA_ID,gc);}
 /* Events (seo/batch-1, spec in ga4-events.md): sent only when GA is loaded and allowed. Nothing is queued while GA is skipped
    (EEA/UK/CH, Europe/ timezone, GPC, DNT, opt-out), and nothing that looks like an email or phone number is ever sent. */
 var PII=/@|%40|\d{3}[\s.\-]?\d{3}[\s.\-]?\d{4}/;
@@ -408,6 +412,27 @@ BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;win
   b'return new Promise(function(res,rej){(function go(){F.apply(s,a).then(function(r){if((r.status==502||r.status==503||r.status==504)&&k<3){k++;setTimeout(go,500*k*k)}else res(r)},'
   b'function(err){if(k<2&&!(init&&init.signal&&init.signal.aborted)){k++;setTimeout(go,600*k)}else rej(err)})})()})}})()</script>')
 
+# Visitor beacon (analytics 2026-11-01): our own counter counts a unique visitor only when a page's script reports it (POST /api/hit,
+# usage_stats.beacon), so page-only checkers (curl, link checkers, scanners, link previews) never count as visitors. No cookies, no
+# identifiers in the request: the server hashes IP + User-Agent with the daily key. Skipped for DNT/GPC, the staff cookie, and webdriver.
+# Only on the public web node (BN_WEB_ONLY=1, set by render_app.py); BN_HIT_BEACON=0 turns it off, BN_HIT_BEACON=1 forces it on.
+HIT_JS = (b"<script>(function(){try{var n=navigator;if(n.webdriver||n.globalPrivacyControl===true||n.doNotTrack==='1'||window.doNotTrack==='1'"
+          b"||/(^|;\\s*)bn_internal=1(;|$)/.test(document.cookie)||/[?&]internal=[01](&|$)/.test(location.search))return;var sent=0;"
+          b"function go(){if(sent||document.visibilityState==='hidden'||document.visibilityState==='prerender')return;sent=1;"
+          b"var d=JSON.stringify({p:location.pathname});try{if(n.sendBeacon&&n.sendBeacon('/api/hit',new Blob([d],{type:'text/plain'})))return;}catch(e){}"
+          b"try{fetch('/api/hit',{method:'POST',body:d,keepalive:true,credentials:'same-origin',headers:{'Content-Type':'text/plain'}});}catch(e){}}"
+          b"if(document.readyState==='complete')setTimeout(go,800);else addEventListener('load',function(){setTimeout(go,800);});"
+          b"document.addEventListener('visibilitychange',function(){setTimeout(go,800);});}catch(e){}})();</script>")
+def hit_beacon(b):
+    try:
+        f = os.environ.get("BN_HIT_BEACON", "").strip()
+        if f == "0" or (f != "1" and os.environ.get("BN_WEB_ONLY") != "1"): return b
+        lo = b[:6000].lower()
+        if b"<html" not in lo or b"/api/hit" in b: return b
+        i = b.lower().rfind(b"</body>")
+        return b[:i] + HIT_JS + b[i:] if i >= 0 else b
+    except Exception: return b
+
 def report_widget(b):
     try:
         i = b.rfind(b"</body>")
@@ -426,6 +451,7 @@ class H(BaseHTTPRequestHandler):
             except Exception: pass
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
+        if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
         self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "public, max-age=31536000, immutable" if versioned else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
