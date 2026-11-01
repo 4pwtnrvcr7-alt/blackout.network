@@ -6,6 +6,7 @@
    - Dashboard: tab order + grouping, per-tab <title>/meta/Open Graph, the page title + one-line description, deep links.
    All data (tabs, groups, labels, titles) is embedded by the server from sitenav.py. */
 (function(){"use strict";
+if(window.bnSitenav)return;window.bnSitenav=1;
 var D=/*BN_SITENAV_DATA*/null;var R=document.documentElement;R.classList.add("bn-js");
 var LS={get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 if(!window.bnMeter)window.bnMeter=function(r,sz){r=Math.max(0,Math.min(10,Math.round(+r||0)));return '<span class="bn-meter bn-r'+r+(sz?" bn-meter-"+sz:"")+'" role="img" aria-label="Rank '+r+' of 10" title="Rank '+r+' of 10"><span class="bn-segs" aria-hidden="true">'+new Array(11).join("<i></i>")+'</span><b class="bn-num" aria-hidden="true">'+r+'<small>/10</small></b></span>'};

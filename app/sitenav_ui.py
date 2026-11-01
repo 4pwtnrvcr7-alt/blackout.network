@@ -92,7 +92,7 @@ def topbar(sn, active="", ctl_html=""):
             f'<a class="bn-ib bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">{I_MENU}<span class="bn-bl">Menu</span></a>'
             '</div></div>'
             '<div class="bn-pop" id="bn_settings" role="dialog" aria-label="Settings" hidden><div class="bn-pop-h">Settings</div>'
-            f'<div class="ctl">{ctl_html}</div></div></header>')
+            f'<div class="ctl">{ctl_html}</div></div></header>' + LOADER)
 
 def drawer(sn, active=""):
     """The sidebar menu (<div id="bn-menu">): search slot, follow links, every tab by group, theme toggle, legal links."""
@@ -130,3 +130,13 @@ def meter_html(rank, size=""):
     sz = f" bn-meter-{size}" if size else ""
     return (f'<span class="bn-meter bn-r{r}{sz}" role="img" aria-label="Rank {r} of 10" title="Rank {r} of 10"><span class="bn-segs" aria-hidden="true">'
             + "<i></i>" * 10 + f'</span><b class="bn-num" aria-hidden="true">{r}<small>/10</small></b></span>')
+
+# Light/dark theme before first paint (same script as server.THEME_HEAD; the "bn_theme" marker stops a second copy).
+THEME_SCRIPT = ('<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
+                'if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";'
+                'd.setAttribute("data-theme",t);d.style.colorScheme=t})()</script>')
+
+# If Render drops /sitenav.css or /sitenav.js during a busy load (it sometimes 502s a few of a page's ~30 files), load them again.
+LOADER = ('<script>addEventListener("load",function(){var d=document,r=d.documentElement;'
+          'if(!getComputedStyle(r).getPropertyValue("--bn-tbar-h")){var l=d.createElement("link");l.rel="stylesheet";l.href="/sitenav.css?retry=1";d.head.appendChild(l)}'
+          'if(!window.bnSitenav)setTimeout(function(){if(window.bnSitenav)return;var s=d.createElement("script");s.src="/sitenav.js?retry=1";d.head.appendChild(s)},1500)})</script>')

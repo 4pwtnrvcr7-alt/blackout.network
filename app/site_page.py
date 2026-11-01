@@ -59,7 +59,7 @@ def _title_tag(title):
 
 def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=None, og_type="article", script=False):
     t = _title_tag(title); url = SITE + path; img = image or f"{SITE}/icons/icon-og-1200x630.png"  # BN master tile og:image (t333)
-    head = (f'<title>{E(t)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
+    head = ((sitenav.UI.THEME_SCRIPT if sitenav is not None else "") + f'<title>{E(t)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
             f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
             f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'

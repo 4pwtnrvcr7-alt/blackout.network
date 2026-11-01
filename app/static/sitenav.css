@@ -208,5 +208,37 @@ body .bn-logo svg.bn-icon{width:var(--bn-icon)!important;height:var(--bn-icon)!i
 /* left alignment everywhere (brand A): footers and empty states were centered */
 #site_foot,footer.ft,.tips-box{text-align:left!important}
 .tips-box{margin-left:0!important}
+
+/* ---- light mode: add-on colors that were tuned for the dark background (t323 contrast audit) ---- */
+:root[data-theme="light"] #ns_gbanner{background:#fdeeee;border-color:#e9a4a5;color:#7d1416}
+:root[data-theme="light"] #ns_gbanner b{color:#5e0e10}
+:root[data-theme="light"] #ns_gbanner .meta{color:#7d1416}
+:root[data-theme="light"] #ns_gbanner .ns-x{color:#7d1416!important}
+:root[data-theme="light"] .toast{background:rgba(255,255,255,.97);box-shadow:var(--bn-shadow)}
+:root[data-theme="light"] #wh .wh-list{background:var(--bn-surface-0)}
+:root[data-theme="light"] #tab-grid .gs-rs{color:#8a4b00}
+:root[data-theme="light"] #tab-solar .ss-ac b{color:var(--bn-text)}
+:root[data-theme="light"] #tab-trends .tr-org.l{color:var(--bn-sev-lo);border-color:currentColor}
+:root[data-theme="light"] #tab-trends .tr-org.a{color:#6d3fc9;border-color:currentColor}
+:root[data-theme="light"] .real{color:var(--bn-sev-lo)}
+:root[data-theme="light"] .kwchip{color:var(--bn-text)!important}
+:root[data-theme="light"] #rk_tick,:root[data-theme="light"] [style*="#120d1a"]{background:var(--bn-surface)!important;border-color:var(--bn-line-2)!important}
+:root[data-theme="light"] .rk-badge.up{background:#fde8e8;color:#a8071a}
+:root[data-theme="light"] .rk-badge.dn{background:#e6f1fb;color:#0a5fc2}
+:root[data-theme="light"] .rk-row.new{background:#f3ecfd}
+:root[data-theme="light"] .rk-pos,:root[data-theme="light"] .rk-big{color:#6d3fc9}
+:root[data-theme="light"] .badge.rec{background:#fff4dc;color:#8a5a00}
+:root[data-theme="light"] .sc.l{color:var(--bn-text)}
+/* Bushcraft / Medical guides */
+:root[data-theme="light"] .gd{color:var(--bn-text)}
+:root[data-theme="light"] .gd h2,:root[data-theme="light"] .gd b,:root[data-theme="light"] .gd strong{color:var(--bn-text)}
+:root[data-theme="light"] .gd h3{color:#8a5a00}
+:root[data-theme="light"] .gd a,:root[data-theme="light"] .gd .toc a{color:var(--bn-link)}
+:root[data-theme="light"] .gd .toc .sub{color:var(--bn-muted)}
+:root[data-theme="light"] .gd .toc a:hover{background:var(--bn-surface-2);color:var(--bn-text)}
+:root[data-theme="light"] .gd .warnbox{background:#fdeeee;color:#5e0e10}
+:root[data-theme="light"] .gd .tip{background:#e9f2fc}
+:root[data-theme="light"] .gd .fl{background:#fff6e0}
+:root[data-theme="light"] .disc{background:var(--bn-surface-0);color:var(--bn-text-2)}
 /* t333: caps domain (BLACKOUT.NETWORK, small caps) is wider than the old lower-case word: cap it on phones so it never clips */
 .bn-logo .bn-word{font-size:min(var(--bn-logo-size),3.4vw)}
