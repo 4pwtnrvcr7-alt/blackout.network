@@ -3,7 +3,7 @@ services:
   - type: web
     name: blackout-network
     runtime: docker
-    plan: free
+    plan: starter
     region: virginia
     branch: main
     dockerfilePath: ./Dockerfile
