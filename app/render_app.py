@@ -85,6 +85,12 @@ if os.environ.get("NEWSLETTER_SECRET"): apply_secrets({})
 # ---------- newsletter scheduler (t373): 07:00 / 19:00 America/New_York via newsletter.run_due() ----------
 # Runs only when newsletter_config.json (pushed by the box) has render_scheduler=true. run_due is idempotent per slot
 # (slot_runs + UNIQUE(subscriber, slot)); an flock keeps a second process/instance on this disk from running it at the same time.
+def _nl_lookup(NL, em):
+    if not em: return None
+    k = NL.db()
+    try: r = k.execute("SELECT status, created, confirmed_at FROM subscribers WHERE email=?", (str(em).strip().lower(),)).fetchone()
+    finally: k.close()
+    return dict(r) if r else "not found"
 def _nl_tick():
     import fcntl
     while True:
@@ -309,7 +315,8 @@ class RH(server.H):
             if path.endswith("/status"):
                 st = NL.admin_stats()
                 return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
-                                       "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"]})
+                                       "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"],
+                                       "lookup": _nl_lookup(NL, d.get("email"))})
             return self.send(*NL.admin_action({"action": "test_send", "email": d.get("email")}))
         if path in BOX_ONLY:
             self.body(); return self.send(503 if path == "/api/refresh" else 403, {"status": "unavailable", "error": BOX_ONLY[path]})

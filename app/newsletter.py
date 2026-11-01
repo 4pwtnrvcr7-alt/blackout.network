@@ -742,15 +742,34 @@ def _nl_figures():
         except Exception: _NLF["d"] = {}
         _NLF["t"] = time.time()
     return _NLF["d"]
+_NLI = {"t": 0, "d": {}}
+def _nl_images():
+    if time.time() - _NLI["t"] > 300:
+        try: _NLI["d"] = json.load(open(os.path.join(BASE, "static", "social", "nl_images.json")))
+        except Exception: _NLI["d"] = {}
+        _NLI["t"] = time.time()
+    return _NLI["d"]
 def _visuals_html(it, url, c):
     """t373: per-item visuals (absolute blackout.network URLs, alt text): locator map, headshots of named people, video thumbnail."""
     base = c["base_url"].rstrip("/"); cid = it["cluster_id"]; out = []
-    if os.path.exists(os.path.join(BASE, "static", "social", f"nl_{cid}.jpg")):
-        loc = it.get("where") or "the event location"
-        out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/nl_{E(cid)}.jpg" width="600" alt="Map showing {E(loc)}" '
-                   f'style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:6px;margin:0 0 10px 0"></a>')
-    text = f"{it.get('title') or ''} {it.get('brief') or ''}"
-    faces = [(k, v) for k, v in _nl_figures().items() if v["name"].split()[-1] in text][:4]
+    loc = it.get("where") or "the event location"; ev = _nl_images().get(cid)
+    _IMG = "display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:6px;margin:0 0 4px 0"
+    _CR = f'margin:0 0 10px 0;font:400 11px/1.4 {FB};color:{PAL["mu"]}'
+    if ev and os.path.exists(os.path.join(BASE, "static", "social", ev["file"])):
+        out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/{E(ev["file"])}" width="600" alt="{E(ev["credit"].split(" (")[0])}: {E(loc)}" style="{_IMG}"></a>'
+                   f'<p class="bnm" style="{_CR}">Image: <a href="{E(ev["source"])}" class="bnm" style="color:{PAL["mu"]}">{E(ev["credit"])}</a></p>')
+    elif os.path.exists(os.path.join(BASE, "static", "social", f"nl_{cid}.jpg")):
+        out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/nl_{E(cid)}.jpg" width="600" alt="Map showing {E(loc)}" style="{_IMG}"></a>'
+                   f'<p class="bnm" style="{_CR}">Map imagery: NASA GIBS Blue Marble (public domain)</p>')
+    else:
+        cat = re.sub("[^a-z]", "", (it.get("category") or "other").lower())
+        cat = cat if os.path.exists(os.path.join(BASE, "static", "social", f"nlc_{cat}.jpg")) else "other"
+        out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/nlc_{cat}.jpg" width="600" alt="{E(it.get("category") or "News")} on BLACKOUT.NETWORK" style="{_IMG};margin-bottom:10px"></a>')
+    text = f"{it.get('title') or ''} {it.get('brief') or ''} {it.get('what') or ''}"
+    def _hit(v):
+        try: return re.search(v.get("rx") or re.escape(v["name"]), text) or v["name"] in text
+        except re.error: return v["name"] in text
+    faces = [(k, v) for k, v in _nl_figures().items() if _hit(v)][:4]
     if faces:
         out.append('<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0"><tr>' + "".join(
             f'<td style="padding:0 10px 0 0;vertical-align:top;text-align:center;font:400 11px/1.3 {FB};color:{PAL["mu"]}">'
@@ -1178,7 +1197,8 @@ def deliver(msg, kind="issue", sid=None, force_preview=False):
         elif mode == "resend":
             p = {"from": str(msg["From"]), "to": [to], "subject": str(msg["Subject"]), "html": html_, "text": text, "headers": hdrs}
             if c.get("reply_to"): p["reply_to"] = c["reply_to"]
-            code, body = _http_json("https://api.resend.com/emails", p, {"Authorization": "Bearer " + e["RESEND_API_KEY"]})
+            idem = {"Idempotency-Key": str(msg["X-BN-Idem"])} if msg["X-BN-Idem"] else {}
+            code, body = _http_json("https://api.resend.com/emails", p, {"Authorization": "Bearer " + e["RESEND_API_KEY"], **idem})
             if code >= 300: raise RuntimeError(f"resend HTTP {code}: {body[:200]}")
             try: return True, mode, "resend:" + str(json.loads(body).get("id") or ""), None
             except Exception: pass
@@ -1459,6 +1479,7 @@ def _send_one(k, srow, sub, key, slot, at, c):
         k.execute("UPDATE sends SET status='skipped_empty', sent_at=? WHERE id=?", (iso(now()), srow["id"])); k.commit(); return "skipped"
     L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
     msg = build_mime(sub["email"], subj, hb, tx, L["unsubscribe"], "issue", c)
+    msg["X-BN-Idem"] = f"bn-{key}-{sub['id']}"   # Resend Idempotency-Key: a restored/stale DB can never double-send this slot
     ok, mode, f, err = deliver(msg, "issue", sub["id"])
     t = iso(now())
     if ok:
@@ -1579,7 +1600,8 @@ def run_breaking(at=None, c=None, dry_run=False):
             for i in mine: i["followed"] = i["cluster_id"] in (s.get("follows") or [])
             L = links_for(s, c); L["_row"] = s
             subj, hb, tx = render_breaking(mine, L, at, c, trend if not items else None)
-            ok, mode, f, err = deliver(build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c), "issue", s["id"])
+            bm = build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c); bm["X-BN-Idem"] = f"bn-{key}-{s['id']}-{iso(at)[:13]}"
+            ok, mode, f, err = deliver(bm, "issue", s["id"])
             k.execute("UPDATE sends SET status=?, sent_at=?, mode=?, outbox_file=?, subject=?, n_main=?, error=?, attempts=1 WHERE id=?",
                       ("sent" if ok else "gave_up", iso(now()), mode, f, subj, len(mine), err, srow_id))
             if ok: record_sent(k, srow_id, s["id"], mine, at, "breaking"); n_sent += 1
