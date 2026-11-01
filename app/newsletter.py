@@ -1182,22 +1182,27 @@ def load_trending():
     try: return json.load(open(os.path.join(BASE, "social_trending.json"))).get("items") or []
     except Exception: return []
 
-def trend_ok(t, S=None):
-    """CoS Nov 1 guard: a trending alert may never carry a watchlist or unconfirmed story. A trend is about one of our own posts; if it is
+def trend_ok(t, S=None): return trend_check(t, S)[0]
+def trend_check(t, S=None):
+    """-> (ok, cluster_id or None, reason). CoS Nov 1 guard: a trending alert may never carry a watchlist or unconfirmed story. A trend is about one of our own posts; if it is
     linked to stories (its own cluster_id / cluster_ids, or a social_stories.json entry with the same YouTube id or URL), every linked
     cluster must be in blackout.db, on the main feed (watchlist=0) and confirmed (eff_families >= 2, the item_of() bar). Unknown -> refused."""
     ids = set(t.get("cluster_ids") or []) | ({t["cluster_id"]} if t.get("cluster_id") else set())
     key = {str(t.get("id") or ""), str(t.get("url") or "")} - {""}
     for st in load_stories():
         if key & {str(st.get("youtube_id") or ""), str(st.get("youtube_url") or ""), str(st.get("url") or "")} - {""}: ids |= set(st.get("cluster_ids") or [])
-    if not ids: return True
+    if not ids: return True, None, ""
     own = S is None; S = S or src()
     try:
         rows = {r["cluster_id"]: r for r in S.execute(f"SELECT cluster_id, watchlist, eff_families FROM clusters WHERE cluster_id IN ({','.join('?' * len(ids))})", sorted(ids))}
-    except Exception: return False
+    except Exception as ex: return False, ",".join(sorted(ids)), f"story lookup failed ({type(ex).__name__})"
     finally:
         if own: S.close()
-    return all(i in rows and not rows[i]["watchlist"] and int(rows[i]["eff_families"] or 0) >= 2 for i in ids)
+    for i in sorted(ids):
+        if i not in rows: return False, i, "story not found in blackout.db"
+        if rows[i]["watchlist"]: return False, i, "story is on the watchlist"
+        if int(rows[i]["eff_families"] or 0) < 2: return False, i, f"story is unconfirmed ({int(rows[i]['eff_families'] or 0)} independent source families)"
+    return True, None, ""
 
 def breaking_candidates(at=None, c=None, S=None):
     """-> [(row, rule, official)] fresh stories meeting the trigger, strongest first."""
@@ -1227,7 +1232,9 @@ def _trend_row(t):
             f'<p class="bnm" style="margin:0 0 12px 0;color:{PAL["mu"]};font-size:13px">{E(t.get("platform") or "")}: {E(t.get("value"))} {E(t.get("metric") or "views")}, about {E(t.get("ratio") or "")}× our recent average.</p>'
             f'{_btn("Watch it →", t["url"])}</td></tr>')
 def render_trending(t, links, at, c=None):
-    if not trend_ok(t): raise ValueError("trending alert refused: linked to a watchlist or unconfirmed story")   # belt and braces (run_breaking already filters)
+    ok, cid, why = trend_check(t)   # re-checked at build time: the story may have changed since run_breaking picked the trend
+    if not ok:
+        log(f"trending alert skipped: trend {t.get('id')} linked story {cid}: {why}", "breaking"); return None
     c = c or cfg(); addr, _ = _addr(c)
     subj = f"Trending on {BRAND}: {_cut(t.get('title') or '', 90)}"
     pre = f"One of our posts is taking off: {_cut(t.get('title') or '', 120)}"
@@ -1797,7 +1804,9 @@ def run_breaking(at=None, c=None, dry_run=False):
     if status == "locked":
         L = {"unsubscribe": f"{base}/newsletter", "manage": f"{base}/newsletter", "categories": f"{base}/newsletter", "sources": f"{base}/sources",
              "scoring": f"{base}/scoring", "site": f"{base}/#wire", "_row": None}
-        subj, hb, tx = render_breaking(items, L, at, c, trend)
+        r_ = render_breaking(items, L, at, c, trend)
+        if r_ is None: return [(f"breaking:{run_id}", _skip_run(run_id, trend))]
+        subj, hb, tx = r_
         f = _outbox_write(build_mime("preview@blackout.invalid", subj, hb, tx, None, "breaking", c), "breaking_preview", run_id)
         log(f"breaking run #{run_id} ({', '.join(i['cluster_id'] + ' ' + i['rule'] for i in items)}): LOCKED, preview -> newsletter_outbox/{f}", "breaking")
         return [(f"breaking:{run_id}", "locked")]
@@ -1816,7 +1825,11 @@ def run_breaking(at=None, c=None, dry_run=False):
             n_t += 1; srow_id = k.execute("SELECT id FROM sends WHERE subscriber_id=? AND slot_key=?", (s["id"], key)).fetchone()[0]
             for i in mine: i["followed"] = i["cluster_id"] in (s.get("follows") or [])
             L = links_for(s, c); L["_row"] = s
-            subj, hb, tx = render_breaking(mine, L, at, c, trend if not items else None)
+            r_ = render_breaking(mine, L, at, c, trend if not items else None)
+            if r_ is None:   # trend refused at build time: drop this alert for everyone, nothing was sent
+                k.execute("DELETE FROM sends WHERE id=?", (srow_id,)); k.commit(); k.close(); k = None
+                return [(key, _skip_run(run_id, trend))]
+            subj, hb, tx = r_
             bm = build_mime(s["email"], subj, hb, tx, L["unsubscribe"], "issue", c); bm["X-BN-Idem"] = f"bn-{key}-{s['id']}-{iso(at)[:13]}"
             ok, mode, f, err = deliver(bm, "issue", s["id"])
             k.execute("UPDATE sends SET status=?, sent_at=?, mode=?, outbox_file=?, subject=?, n_main=?, error=?, attempts=1 WHERE id=?",
@@ -1826,9 +1839,20 @@ def run_breaking(at=None, c=None, dry_run=False):
                       (iso(now()), "breaking", s["id"], mode, "sent" if ok else "failed", f, subj, err))
             k.commit()
         k.execute("UPDATE breaking_runs SET status='done', n_targets=?, n_sent=? WHERE id=?", (n_t, n_sent, run_id)); k.commit()
-    finally: k.close()
+    finally:
+        if k is not None: k.close()
     log(f"breaking run #{run_id}: sent {n_sent}/{n_t}", "breaking")
     return [(key, "done")]
+
+def _skip_run(run_id, trend):
+    """Mark a breaking run whose trending alert was refused at build time as skipped (no email went out). -> 'skipped'."""
+    k = db()
+    try:
+        k.execute("UPDATE breaking_runs SET status='skipped', n_targets=0, n_sent=0, note=? WHERE id=?", ("trend refused at build time (linked story not confirmed)", run_id))
+        if trend: k.execute("UPDATE breaking_seen SET status='skipped' WHERE cluster_id=?", ("trend:" + str(trend.get("id")),))
+        k.commit()
+    finally: k.close()
+    return "skipped"
 
 def run_crime_alerts(at=None, c=None, dry_run=False, only_email=None):
     """t392: real-time crime alerts for opted-in ZIP/city subscribers. GATED: does nothing unless newsletter_config.json has
