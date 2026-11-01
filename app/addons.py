@@ -58,6 +58,7 @@ ROUTES = {
     "/api/ai": "aithreats",          # tab #ai (t231; in the nav since t233)
     "/api/grid": "gridwatch",        # tab #grid (t231; in the nav since t233)
     "/api/gridstatus": "gridstatus", # #grid status map, local outages, weather-triggered checks (t234)
+    "/api/government": "government",   # Government tab #government (t247): index + org chart, government.db from government_collect.py
     "/api/preppers": "preppers",
     "/api/report": "reports",
     "/api/reports": "reports",
