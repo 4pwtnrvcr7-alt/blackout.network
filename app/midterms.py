@@ -939,10 +939,8 @@ def handle_get(path, qs):
         with open(os.path.join(STATIC, os.path.basename(path)), "rb") as fh: return 200, fh.read(), FILES[os.path.basename(path)]
     if path == "/api/midterms": return summary()
     if path == "/api/midterms/live": return live()
-    if path in ("/midterms", "/midterms/", "/election", "/elections"):
-        return 200, (b'<!doctype html><meta charset="utf-8"><script>location.replace("/"+location.search+"#midterms")</script>'   # seo/batch-1: keeps ?utm_* (the meta refresh below is the no-JS fallback)
-                     b'<meta http-equiv="refresh" content="0;url=/#midterms"><link rel="canonical" href="https://blackout.network/#midterms">'
-                     b'<title>Midterms 2026 | BLACKOUT.NETWORK</title><a href="/#midterms">Midterms 2026 on BLACKOUT.NETWORK</a>'), "text/html; charset=utf-8"
+    if path in ("/midterms", "/midterms/", "/election", "/elections"):   # seo/batch-2: real server-rendered hub (midterms_hub.py), self-canonical /midterms
+        import midterms_hub; return midterms_hub.handle(path)
     return 404, {"error": "not found"}
 
 if __name__ == "__main__":

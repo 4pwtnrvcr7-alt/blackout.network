@@ -64,8 +64,9 @@ STATIC_PAGES = [("/", "hourly", "1.0"), ("/newsletter", "daily", "0.9"), ("/scor
                 ("/network/aws", "hourly", "0.7"), ("/network/azure", "hourly", "0.7"), ("/network/m365", "hourly", "0.7"), ("/network/gcp", "hourly", "0.7"),
                 ("/network/workspace", "hourly", "0.7"), ("/network/cloudflare", "hourly", "0.7"), ("/network/akamai", "hourly", "0.7"), ("/newsletter/sample", "daily", "0.5"),
                 ("/cookies", "yearly", "0.2"), ("/privacy-choices", "yearly", "0.2"),
-                ("/privacy", "yearly", "0.2"), ("/tos", "yearly", "0.2")]
-# seo/batch-1: /midterms (meta-refresh stub to /#midterms) and /guides/*.html (HTML fragments, no <head>) removed until they are real pages
+                ("/privacy", "yearly", "0.2"), ("/tos", "yearly", "0.2"),
+                ("/midterms", "hourly", "0.8")]   # seo/batch-2: /midterms is now a real server-rendered hub
+# seo/batch-1: /guides/*.html (HTML fragments, no <head>) removed until they are real pages
 
 def sitemap():
     def build():
@@ -153,7 +154,7 @@ and situational awareness only; it is not an official warning service. Follow of
 ## Dashboard tabs
 
 - [Network Status]({SITE}/network), [Energy Grid]({SITE}/#grid), [Solar & Seismic]({SITE}/#solar), [Weather]({SITE}/#weather)
-- [Midterms 2026]({SITE}/#midterms), [Government]({SITE}/#government), [Politics]({SITE}/#politics)
+- [Midterms 2026]({SITE}/midterms), [Government]({SITE}/#government), [Politics]({SITE}/#politics)
 - [Preppers]({SITE}/#preppers), [Bushcraft]({SITE}/#bushcraft), [Medical]({SITE}/#medical), [Maps]({SITE}/#maps)
 
 ## Policies

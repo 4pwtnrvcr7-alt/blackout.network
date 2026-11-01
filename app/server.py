@@ -269,6 +269,7 @@ document.addEventListener('change',function(e){var el=e.target;if(!el||!el.close
 if(el.classList&&el.classList.contains('bntr-sel')){T('translate_language',{language_code:el.value});return;}
 if(!el.closest('#bn_settings'))return;var ty=(el.type||'').toLowerCase();if(/^(text|email|tel|password|search|hidden|url)$/.test(ty)||el.tagName==='TEXTAREA')return;
 T('settings_change',{setting:el.id||el.name||'setting',value:ty==='checkbox'?(el.checked?'on':'off'):String(el.value)});},true);
+document.addEventListener('toggle',function(e){var d=e.target;if(!d||d.tagName!=='DETAILS'||!d.open||!d.hasAttribute('data-bn-expand'))return;if(d.hasAttribute('data-bn-bulk')){d.removeAttribute('data-bn-bulk');return;}T('expand',{content_category:d.getAttribute('data-cat')||cat(),item:(d.getAttribute('data-item')||'').slice(0,100)});},true);
 var played=[];document.addEventListener('play',function(e){var m=e.target;if(!m||!/^(AUDIO|VIDEO)$/.test(m.tagName)||played.indexOf(m)>=0)return;played.push(m);
 var c=m.closest&&m.closest('[data-station],.rd-card,.bnp,.card,section');var n=(m.getAttribute('data-station')||(c&&(c.getAttribute('data-station')||((c.querySelector('b,h3,h2')||{}).textContent)))||m.getAttribute('aria-label')||'').trim();
 T('broadcast_play',{station:n||'unknown'});},true);
