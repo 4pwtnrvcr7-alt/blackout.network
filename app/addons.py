@@ -39,6 +39,11 @@ ROUTES = {
     "/theme.css": "static_files",
     "/scoring": "scoring",
     "/about/scoring": "scoring",
+    "/privacy": "legal",            # Privacy Policy (t270), static page, served during warm-up
+    "/privacy-policy": "legal",
+    "/tos": "legal",                # Terms of Service (t270)
+    "/terms": "legal",
+    "/terms-of-service": "legal",
     "/api/video_subs": "video_subs",
     "/vsubs": "video_subs",
     "/api/search": "search",

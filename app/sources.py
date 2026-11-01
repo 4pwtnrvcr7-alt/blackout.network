@@ -322,7 +322,7 @@ def shell(title, body, robots="index", wide=True):
             f'<header><h1>BLACKOUT.<b>NETWORK</b> · {E(title)}<small>{E(TAGLINE)}</small></h1>'
             '<nav class="sc-nav" aria-label="Site"><a href="/#wire">← Dashboard</a><a href="/scoring">How we score</a><a href="/sources" class="on"><span class="sc-ni" data-ico="book-open" aria-hidden="true"></span>Sources</a><a href="/newsletter"><span class="sc-ni" data-ico="mail" aria-hidden="true"></span>Newsletter</a></nav></header>'
             f'<div class="sc-wrap" id="main" role="main">{body}</div>'
-            f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a>'
+            f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/sources">Sources</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a>'
             '<span id="sc_foot_range"></span></footer>'
             '<script src="/api/sources/app.js"></script><script src="/api/translate/app.js"></script><script src="/api/search/app.js"></script></body></html>')
 

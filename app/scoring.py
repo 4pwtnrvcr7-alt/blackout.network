@@ -452,7 +452,7 @@ def _render():
     a('<section id="disclaimer" aria-labelledby="h-disc"><h2 id="h-disc">Disclaimer</h2><div class="disc">blackout.network is a research-only aggregator. Scores and ranks are '
       'automated estimates from public feeds and keyword rules, so they can be wrong, late or skewed by how sources word their reports. Always check the linked original source '
       'and follow official guidance (local emergency management, NWS, WHO, national authorities). Nothing here is a warning, an order or advice. In an emergency, call your local emergency number.</div></section>')
-    a(f'</div><footer>Research-only data · blackout.network · <a href="/#wire">Dashboard</a> · <a href="/newsletter">Newsletter</a> · Data range: {E(_et(rng[0]))} – {E(_et(rng[1]))} · '
+    a(f'</div><footer>Research-only data · blackout.network · <a href="/#wire">Dashboard</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · Data range: {E(_et(rng[0]))} – {E(_et(rng[1]))} · '
       f'Page generated {E(_et(datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")))}</footer><script src="/api/search/app.js"></script><link rel="stylesheet" href="/api/translate/app.css"><script src="/api/translate/app.js"></script></body></html>')
     return "".join(P)
 
