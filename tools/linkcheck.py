@@ -151,15 +151,15 @@ def collect(base, tabs=None, dir_sample=1500, quick=False):
 def host_lock(h):
     with _hl:
         return _host_locks.setdefault(h, threading.Semaphore(4))
-def fetch(u, timeout=(7, 15)):
+def fetch(u, timeout=(6, 12)):
     s = requests.Session(); s.headers.update(HDRS); s.max_redirects = 12
     r = s.get(u, timeout=timeout, allow_redirects=True, stream=True, verify=True)
     ct = r.headers.get("content-type", "")
-    body = b""
-    if "html" in ct or "xml" in ct or not ct:
+    body = b""; t0 = time.time()
+    if ("html" in ct or "xml" in ct or not ct) and not re.search(r"audio|video|mpegurl|octet", ct, re.I):
         for chunk in r.iter_content(16384):
             body += chunk
-            if len(body) > 400_000: break
+            if len(body) > 400_000 or time.time() - t0 > 20: break   # slow-drip / endless responses
     r.close()
     return r, ct, body.decode(r.encoding or "utf-8", "replace") if body else ""
 def page_bits(text):
@@ -249,7 +249,8 @@ def browser_recheck(results, entries):
     todo = [r for r in results if r["status"] in ("unverified", "unreachable") or (r["status"] == "dead" and not r.get("why", "").startswith(("DNS", "HTTP 404", "HTTP 410")))]
     kinds = {e["url"]: e.get("kind") for e in entries}
     todo.sort(key=lambda r: kinds.get(r["url"]) == "feed")      # curated/rendered links first; live feed links last
-    todo = todo[:int(os.environ.get("BN_LC_BROWSER_MAX", "600"))]
+    todo = todo[:int(os.environ.get("BN_LC_BROWSER_MAX", "300"))]
+    deadline = time.time() + int(os.environ.get("BN_LC_BROWSER_SECONDS", "1200"))
     if not todo: return
     from playwright.sync_api import sync_playwright
     labels = {e["url"]: e.get("labels", []) for e in entries}
@@ -257,9 +258,10 @@ def browser_recheck(results, entries):
         br = p.chromium.launch(args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
         ctx = br.new_context(user_agent=UA, viewport={"width": 1280, "height": 900}, locale="en-US")
         for r in todo:
+            if time.time() > deadline: r.setdefault("browser", {"skipped": "time budget"}); continue
             pg = ctx.new_page()
             try:
-                resp = pg.goto(r["url"], wait_until="domcontentloaded", timeout=35000); pg.wait_for_timeout(2500)
+                resp = pg.goto(r["url"], wait_until="domcontentloaded", timeout=20000); pg.wait_for_timeout(1500)
                 code = resp.status if resp else 0; title = pg.title() or ""; final = pg.url
                 h1 = pg.evaluate("()=>{const h=document.querySelector('h1');return h?h.innerText:''}") or ""
                 vis = pg.evaluate("()=>document.body?document.body.innerText.slice(0,6000):''") or ""
@@ -277,14 +279,37 @@ def browser_recheck(results, entries):
                 r["browser"] = {"error": str(ex)[:120]}
             finally: pg.close()
         br.close()
+def sample_feed(entries):
+    """Live feed items (quake/alert/post pages from a handful of hosts) are machine-generated and churn every hour:
+    check every curated/rendered/directory link, but only a rotating sample of feed links per host so one big host
+    (gdacs, usgs, news.google, bsky...) can't stall the run. BN_LC_FEED_PER_HOST=0 checks them all."""
+    cap = int(os.environ.get("BN_LC_FEED_PER_HOST", "40"))
+    if not cap: return entries, 0
+    import random
+    rnd = random.Random(time.strftime("%Y%m%d")); keep = []; per = {}; feeds = [e for e in entries if e.get("kind") == "feed"]
+    rnd.shuffle(feeds)
+    for e in feeds:
+        h = host(e["url"]); per[h] = per.get(h, 0) + 1
+        if per[h] <= cap: keep.append(e)
+    rest = [e for e in entries if e.get("kind") != "feed"]
+    return rest + keep, len(feeds) - len(keep)
 def check(entries, workers=24, browser=True):
     out = []
-    with cf.ThreadPoolExecutor(workers) as ex:
-        futs = {ex.submit(check_one, e): e for e in entries}
-        for i, f in enumerate(cf.as_completed(futs)):
+    entries, skipped = sample_feed(entries)
+    if skipped: print(f"  feed sample: skipping {skipped} feed links this run (rotating sample per host)", file=sys.stderr, flush=True)
+    ex = cf.ThreadPoolExecutor(workers)              # not a with-block: a hung server must not hold up the whole run
+    futs = {ex.submit(check_one, e): e for e in entries}
+    done_urls = set()
+    try:
+        for i, f in enumerate(cf.as_completed(futs, timeout=int(os.environ.get("BN_LC_SECONDS", str(max(900, len(entries) // 4)))))):
+            done_urls.add(futs[f]["url"])
             try: out.append(f.result())
             except Exception as x: out.append({"url": futs[f]["url"], "status": "unreachable", "why": str(x)[:100]})
-            if (i + 1) % 200 == 0: print(f"  checked {i + 1}/{len(entries)}", file=sys.stderr, flush=True)
+            if (i + 1) % 500 == 0: print(f"  checked {i + 1}/{len(entries)}", file=sys.stderr, flush=True)
+    except cf.TimeoutError:
+        for f, e in futs.items():
+            if e["url"] not in done_urls: out.append({"url": e["url"], "status": "unreachable", "why": "check timed out (slow server)"})
+    ex.shutdown(wait=False, cancel_futures=True)
     if browser: browser_recheck(out, entries)
     meta = {e["url"]: e for e in entries}
     for r in out:
@@ -391,4 +416,5 @@ def main():
         res = check(inv["links"], a.workers, True); flags = update_flags(res)
         rep = write_report(a.out or REPORT_F, inv, res, {"flagged_dead": len(flags), "seconds": round(time.time() - t0)})
         print(json.dumps(rep["totals"]), "flagged:", len(flags))
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    main(); sys.stdout.flush(); os._exit(0)   # daemon-less exit even if a hung request thread remains
