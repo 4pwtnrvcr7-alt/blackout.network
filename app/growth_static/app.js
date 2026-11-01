@@ -29,7 +29,7 @@ function enhanceCard(el){if(el.dataset.bng)return;var cid=el.getAttribute("data-
  var body=document.createElement("div");body.className="bng-body";Array.prototype.slice.call(el.childNodes).forEach(function(n){if(!(n.classList&&n.classList.contains("bnr-flag")))body.appendChild(n)});
  var m=document.createElement("div");m.className="bng-media";m.innerHTML=media(c,cid,title);el.insertBefore(body,el.firstChild);el.insertBefore(m,body);el.classList.add("bng-card");
  var ps=people(title+" "+((c&&c.brief)||""));if(ps.length){var p=document.createElement("div");p.className="bng-people";
-  p.innerHTML=ps.map(function(f){return '<a class="bng-person" href="/#figures" title="'+esc(f.name)+' · Photo: '+esc(f.author)+', '+esc(f.license)+'"><img src="'+esc(f.img)+'" alt="'+esc(f.name)+'" width="28" height="28" loading="lazy" decoding="async"><span>'+esc(f.name)+'</span></a>'}).join("");body.appendChild(p)}
+  p.innerHTML=ps.map(function(f){return '<a class="bng-person" href="/#figures" title="'+esc(f.name)+' · Photo: '+esc(f.author)+', '+esc(f.license)+'"><img src="'+esc(f.img)+'" alt="'+esc(f.name)+'" width="28" height="28" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'"><span>'+esc(f.name)+'</span></a>'}).join("");body.appendChild(p)}
  var br=body.querySelector(".brief");if(br&&br.textContent.length>260){var mb=document.createElement("button");mb.type="button";mb.className="bng-more";mb.textContent="Read the full brief ▾";
   mb.onclick=function(){var o=br.classList.toggle("bng-open");mb.textContent=o?"Show less ▴":"Read the full brief ▾"};br.after(mb)}
  var t=title+(rank!=null?" (rank "+rank+"/10)":"")+" via BLACKOUT.NETWORK";var sh=document.createElement("div");sh.innerHTML=shareRow(SITE+"/wire/"+cid,t,"wire");body.appendChild(sh.firstChild)}
@@ -49,15 +49,65 @@ function thanks(el){if(!el||el.dataset.bngThanks)return;el.dataset.bngThanks=1;v
  d.innerHTML='<b>One more step to stay ahead:</b> follow along where the stories break first.<div class="bng-btns"><a class="bng-btn bng-p" href="'+XU+'" target="_blank" rel="noopener">'+IX+'<span>Follow @BlkoutNtw on X</span></a><a class="bng-btn" href="'+YTS+'" target="_blank" rel="noopener">'+IY+'<span>Subscribe on YouTube</span></a></div>';
  el.parentNode.insertBefore(d,el.nextSibling)}
 function signup(){document.querySelectorAll(".nl-result.ok").forEach(function(r){var p=r.querySelector("p");if(p)thanks(p)});
- document.querySelectorAll(".nl-msg.ok").forEach(function(m){if(m.textContent.trim().length>8)thanks(m)})}
+ document.querySelectorAll(".nl-msg.ok").forEach(function(m){if(m.textContent.trim().length>8){thanks(m);markSub()}})}
 function share(){document.querySelectorAll(".bng-share .bng-native[hidden]").forEach(function(b){if(navigator.share)b.hidden=false})}
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".bng-copy,.bng-native");if(!b)return;var w=b.closest(".bng-share"),u=w.dataset.url,t=w.dataset.text;
  if(b.classList.contains("bng-copy")){var done=function(){var o=b.textContent;b.textContent="Copied ✓";setTimeout(function(){b.textContent=o},1600)};
   if(navigator.clipboard)navigator.clipboard.writeText(u).then(done,function(){prompt("Copy this link:",u)});else prompt("Copy this link:",u)}
  else navigator.share({title:t,text:t,url:utm(u,"share","native","share")}).catch(function(){})});
-function scan(){if(!ready)return;["feed","watch"].forEach(function(id){enhanceFeed(document.getElementById(id))});footer();signup();share()}
+
+/* ---- Newsletter-first growth (Matt, Nov 1 8:40 AM): engagement prompt, inline blocks, sticky bar. Signups carry source=prompt|inline_home|
+   inline_story|sticky|page_<utm> (stored per subscriber by newsletter.py; aggregated for stats). localStorage only: bn_nl_sub (subscribed),
+   bn_nl_dis (prompt dismissed at), bn_nl_bar (bar dismissed at), bn_pv (page views). No cookies. Mobile: bottom sheet, never full screen. */
+var LS={g:function(k){try{return localStorage.getItem(k)}catch(e){return null}},s:function(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+var WEEK=7*864e5,isNL=/^\/newsletter/.test(location.pathname);
+function subscribed(){return LS.g("bn_nl_sub")==="1"}
+function markSub(){LS.s("bn_nl_sub","1");var p=document.getElementById("bng_prompt");if(p)setTimeout(function(){closePrompt(false)},15000);var b=document.getElementById("bng_bar");if(b)b.remove();document.body.classList.remove("bng-bar-on")}
+var FORM=null;function getForm(){if(!FORM)FORM=fetch("/api/newsletter/form?mode=card",{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.text()});return FORM}
+var NLRE=/^[^\s@"<>(),;:\\[\]]{1,64}@[^\s@"<>(),;:\\[\]]+\.[A-Za-z]{2,63}$/;
+function mountForm(box,src,cb){getForm().then(function(h){box.innerHTML=h;var f=box.querySelector("form[data-nl-form]");if(!f)throw 0;f.dataset.nlReady=1;
+ var si=f.querySelector("input[name=source]");if(si)si.value=src;var em=f.querySelector("input[name=email]"),msg=f.querySelector(".nl-msg"),btn=f.querySelector("button[type=submit]");
+ if(btn)btn.textContent="Get the brief";
+ f.querySelectorAll("[id]").forEach(function(el){var o=el.id,n=o+"_"+src;el.id=n;var l=f.querySelector('label[for="'+o+'"]');if(l)l.htmlFor=n;f.querySelectorAll('[aria-describedby="'+o+'"]').forEach(function(x){x.setAttribute("aria-describedby",n)})});
+ var say=function(t,ok){if(msg){msg.textContent=t;msg.className="nl-msg "+(ok?"ok":"err")}};
+ f.addEventListener("submit",function(e){e.preventDefault();var v=(em.value||"").trim();if(!NLRE.test(v)||v.length>254){say("Enter a valid email address.");em.focus();return}
+  var fd=new FormData(f),body={},cats=[].slice.call(f.querySelectorAll("input[name=interests]")),pk=cats.filter(function(c){return c.checked}).map(function(c){return c.value});
+  fd.forEach(function(val,k){if(k!=="interests")body[k]=val});body.email=v;body.frequency=body.frequency||"twice";body.interests=(!pk.length||pk.length==cats.length)?["all"]:pk;body.source=src;
+  var go=function(){return fetch("/api/newsletter/subscribe",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),credentials:"same-origin"}).then(function(r){return r.json().catch(function(){return{}}).then(function(j){return{ok:r.ok,status:r.status,j:j}})})};
+  btn.disabled=true;say("",true);
+  go().then(function(r){if(r.status!==403)return r;return fetch("/api/newsletter/meta",{cache:"no-store"}).then(function(m){return m.json()}).then(function(m){body.csrf=m.csrf;var c=f.querySelector("input[name=csrf]");if(c)c.value=m.csrf;return go()})})
+   .then(function(r){say((r.j&&r.j.message)||("Something went wrong ("+r.status+"). Please try again."),r.ok);if(r.ok){em.value="";markSub();if(cb)cb()}})
+   .catch(function(){say("Network error. Please try again.")}).then(function(){btn.disabled=false})});
+}).catch(function(){box.innerHTML='<a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=cta&utm_campaign='+src+'">Get the free brief</a>'})}
+function inlineBlock(src,title){var d=document.createElement("section");d.className="card bng-inline";d.setAttribute("data-bng-inline",src);d.setAttribute("aria-label","Newsletter signup");
+ d.innerHTML='<div class="bng-cta-k">FREE · 7 AM &amp; 7 PM ET</div><div class="bng-cta-h">'+(title||"Get the brief: every confirmed threat, twice a day")+'</div><p>The last 12 hours, ranked 0–10 and sourced, in a 2-minute read. Double opt-in, one-click unsubscribe.</p><div class="bng-nlbox"></div>';
+ mountForm(d.querySelector(".bng-nlbox"),src);return d}
+function inlines(){if(subscribed()||isNL)return;var feed=document.getElementById("feed");
+ if(feed&&!feed.querySelector("[data-bng-inline]")){var c=feed.querySelectorAll(":scope > .card[data-cid]");if(c.length>=3)c[2].after(inlineBlock("inline_home"))}
+ document.querySelectorAll(".bng-inline-slot:not([data-done])").forEach(function(s){s.dataset.done=1;s.replaceWith(inlineBlock(s.dataset.src||"inline_story","Follow stories like this in your inbox"))})}
+function closePrompt(dismissed){var p=document.getElementById("bng_prompt");if(!p)return;if(dismissed)LS.s("bn_nl_dis",String(Date.now()));p.classList.remove("bng-in");setTimeout(function(){p.remove()},300);document.removeEventListener("keydown",escK)}
+function escK(e){if(e.key==="Escape")closePrompt(true)}
+var shown=false;function showPrompt(){if(shown||subscribed()||isNL||location.hash==="#newsletter")return;var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
+ if(document.querySelector(".bnr-back"))return;shown=true;
+ var p=document.createElement("aside");p.id="bng_prompt";p.className="bng-prompt";p.setAttribute("role","dialog");p.setAttribute("aria-modal","false");p.setAttribute("aria-labelledby","bng_prompt_h");
+ p.innerHTML='<button type="button" class="bng-x" aria-label="Close">×</button><div class="bng-cta-k">BLACKOUT.NETWORK BRIEF</div><h2 id="bng_prompt_h">Finding this useful?</h2><p>Get the 7 AM / 7 PM brief tailored to your area: every confirmed threat from the last 12 hours, ranked and sourced. Free.</p><div class="bng-nlbox"></div><p class="bng-fine">Double opt-in · one-click unsubscribe · <a href="/privacy">Privacy</a></p><button type="button" class="bng-no">No thanks</button>';
+ document.body.appendChild(p);p.querySelector(".bng-x").onclick=function(){closePrompt(true)};p.querySelector(".bng-no").onclick=function(){closePrompt(true)};
+ document.addEventListener("keydown",escK);mountForm(p.querySelector(".bng-nlbox"),"prompt");requestAnimationFrame(function(){p.classList.add("bng-in")});
+ var b=document.getElementById("bng_bar");if(b){b.hidden=true;document.body.classList.remove("bng-bar-on")}}
+function promptTriggers(){if(subscribed()||isNL)return;var pv=(+LS.g("bn_pv")||0)+1;LS.s("bn_pv",String(pv));
+ setTimeout(showPrompt,pv>=2?8000:50000);
+ var onS=function(){var h=document.documentElement,max=h.scrollHeight-h.clientHeight;if(max>400&&h.scrollTop/max>=.5){removeEventListener("scroll",onS);showPrompt()}};addEventListener("scroll",onS,{passive:true})}
+function bar(){if(subscribed()||isNL||document.getElementById("bng_bar"))return;var d=+LS.g("bn_nl_bar")||0;if(Date.now()-d<WEEK)return;
+ var b=document.createElement("div");b.id="bng_bar";b.className="bng-bar";b.setAttribute("role","region");b.setAttribute("aria-label","Newsletter");
+ b.innerHTML='<span class="bng-bar-t"><b>Get the free brief</b><span class="bng-bar-s"> · 7 AM &amp; 7 PM ET, ranked and sourced</span></span><a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=sticky&utm_campaign=bar">Sign up</a><button type="button" class="bng-x" aria-label="Dismiss">×</button>';
+ b.querySelector(".bng-x").onclick=function(){LS.s("bn_nl_bar",String(Date.now()));b.remove();document.body.classList.remove("bng-bar-on")};
+ b.querySelector("a").onclick=function(e){e.preventDefault();shown=false;LS.s("bn_nl_dis","0");showPrompt();if(!document.getElementById("bng_prompt"))location.href=this.href};
+ document.body.appendChild(b);var on=function(){var h=document.documentElement;if(h.scrollTop>600){removeEventListener("scroll",on);if(!document.getElementById("bng_prompt")){b.classList.add("bng-in");document.body.classList.add("bng-bar-on")}}};addEventListener("scroll",on,{passive:true})}
+function nlPage(){if(!isNL)return;var m=/[?&]utm_source=([A-Za-z0-9_-]{1,12})/.exec(location.search);if(m)document.querySelectorAll("form[data-nl-form] input[name=source]").forEach(function(i){i.value="page_"+m[1].toLowerCase()});
+ if(document.querySelector(".nl-result.ok")&&/confirm/.test(location.pathname))markSub()}
+function scan(){if(!ready)return;inlines();["feed","watch"].forEach(function(id){enhanceFeed(document.getElementById(id))});footer();signup();share()}
 function q(){var m=/[?&]q=([^&#]+)/.exec(location.search);if(!m||!window.bnMenuOpen)return;var v=decodeURIComponent(m[1].replace(/\+/g," ")).slice(0,120);
  window.bnMenuOpen({search:true});setTimeout(function(){var i=document.getElementById("bns_q");if(!i)return;i.value=v;i.dispatchEvent(new Event("input",{bubbles:true}));var f=i.closest("form");if(f&&f.requestSubmit)f.requestSubmit()},150)}
 function start(){fetch("/api/growth/data").then(function(r){return r.json()}).then(function(j){D=j||D}).catch(function(){}).then(function(){ready=true;scan()});
- var t=null;new MutationObserver(function(){if(t)return;t=setTimeout(function(){t=null;scan()},120)}).observe(document.body,{childList:true,subtree:true});setTimeout(q,600)}
+ var t=null;new MutationObserver(function(){if(t)return;t=setTimeout(function(){t=null;scan()},120)}).observe(document.body,{childList:true,subtree:true});setTimeout(q,600);nlPage();promptTriggers();bar()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start()})();

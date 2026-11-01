@@ -104,6 +104,7 @@ def render(cid, since=""):
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
             + g_ppl + g_share + (g_short or g_loc)
             + upd + vhtml
+            + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
             + '<section class="card"><h2>How confident are we?</h2><p>'
             + S.E(f"{len(rows)} report(s) from {eff} independent source famil{'y' if eff == 1 else 'ies'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
             + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></section>'

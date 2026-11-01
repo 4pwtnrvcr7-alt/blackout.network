@@ -39,7 +39,7 @@ def figures():
         out = []
         for k, f in (_j("figures_photos.json", {}) or {}).items():
             if not f.get("img") or not f.get("name"): continue
-            out.append({"key": k, "name": f["name"], "img": f"/img/figures/{f['img']}", "author": f.get("author") or "",
+            out.append({"key": k, "name": f["name"], "img": f"/api/figures/photo/{k}.webp", "author": f.get("author") or "",
                         "license": f.get("license") or "", "source": f.get("source") or ""})
         last = {}
         for f in out: last.setdefault(f["name"].split()[-1], []).append(f)
@@ -67,7 +67,8 @@ STATIC_PAGES = [("/", "hourly", "1.0"), ("/newsletter", "daily", "0.9"), ("/scor
 def sitemap():
     def build():
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        u = [(SITE + p, now if f in ("hourly", "daily") else None, f, pr) for p, f, pr in STATIC_PAGES]
+        pages = STATIC_PAGES + ([("/stats", "daily", "0.4")] if os.path.exists(os.path.join(BASE, "stats.py")) else [])
+        u = [(SITE + p, now if f in ("hourly", "daily") else None, f, pr) for p, f, pr in pages]
         try:
             import social
             for s in social.stories(public_only=True):
@@ -86,7 +87,9 @@ def sitemap():
             x.append(f"<url><loc>{E(loc)}</loc>" + (f"<lastmod>{E(lm)}</lastmod>" if lm else "") + f"<changefreq>{f}</changefreq><priority>{pr}</priority></url>")
         x.append("</urlset>")
         return "\n".join(x).encode()
-    return _cached("sm", 600, build)
+    v = _cached("sm", 600, build)
+    if b"/wire/" not in v and _C.get("sm") and _C["sm"][0] > time.time() - 30: _C["sm"] = (time.time() - 570, v)   # data not synced yet: retry in ~30 s
+    return v
 
 ROBOTS = f"""User-agent: *
 Allow: /
@@ -122,7 +125,7 @@ def people_html(text):
     if not ps: return ""
     return ('<div class="bng-people" aria-label="People in this story">' + "".join(
         f'<a class="bng-person" href="/#figures" title="{E(p["name"])} · Photo: {E(p["author"])}, {E(p["license"])}">'
-        f'<img src="{E(p["img"])}" alt="{E(p["name"])}" width="32" height="32" loading="lazy" decoding="async"><span>{E(p["name"])}</span></a>' for p in ps) + '</div>')
+        f'<img src="{E(p["img"])}" alt="{E(p["name"])}" width="32" height="32" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'"><span>{E(p["name"])}</span></a>' for p in ps) + '</div>')
 
 def short_html(cid, title):
     s = shorts().get(cid)
