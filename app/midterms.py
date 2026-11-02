@@ -60,6 +60,14 @@ POLL_CLOSE = {}
 for _t, _ss in _PC.items():
     _h, _m = map(int, _t.split(":"))
     for _s in _ss.split(): POLL_CLOSE[_s] = (datetime(2026, 11, 3, 0, 0, tzinfo=ET) + timedelta(hours=_h, minutes=_m)).isoformat()
+# Split-time-zone states whose FIRST closing (ET) is earlier than the latest one above; checked against NCSL polling place hours
+# (https://www.ncsl.org/elections-and-campaigns/polling-places, fetched 2026-11-02). Table: /workspace/seo/data/poll_close_2026-11-03.json
+POLL_CLOSE_NCSL = {"label": "NCSL: Polling Place Hours", "url": "https://www.ncsl.org/elections-and-campaigns/polling-places", "fetched": "2026-11-02"}
+_PC_FIRST = {"18:00": "IN KY", "19:00": "FL", "20:00": "KS MI ND SD TX", "22:00": "ID OR", "24:00": "AK"}
+POLL_CLOSE_FIRST = dict(POLL_CLOSE)
+for _t, _ss in _PC_FIRST.items():
+    _h, _m = map(int, _t.split(":"))
+    for _s in _ss.split(): POLL_CLOSE_FIRST[_s] = (datetime(2026, 11, 3, 0, 0, tzinfo=ET) + timedelta(hours=_h, minutes=_m)).isoformat()
 FIRST_CLOSE = {"at": datetime(2026, 11, 3, 18, 0, tzinfo=ET).isoformat(), "where": "Eastern-time parts of Indiana and Kentucky"}
 LAST_CLOSE = {"at": datetime(2026, 11, 4, 1, 0, tzinfo=ET).isoformat(), "where": "the Hawaii-Aleutian time zone of Alaska"}
 

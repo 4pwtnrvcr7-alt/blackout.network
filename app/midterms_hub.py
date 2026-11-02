@@ -79,7 +79,11 @@ def _race(r, b, office):
     st = r.get("state") or ""; lab = r.get("label") or r.get("state_name") or st
     con = r.get("consensus") or {}
     sub = (f'Published ratings: {E(con.get("t"))} (Cook · Inside Elections · Sabato average, {int(con.get("n") or 0)} of 3 rated)' if con.get("t") else "No published ratings")
-    if r.get("poll_close"): sub += f' · Polls close {E(_et(r["poll_close"], "%-I:%M %p ET"))}'
+    if r.get("poll_close"):
+        _f = M.POLL_CLOSE_FIRST.get(st) if r.get("district") in (None, "", 0) else None
+        if _f and _f != r["poll_close"]:
+            sub += f' · Polls close {E(_et(_f, "%-I:%M %p ET"))} to {E(_et(r["poll_close"], "%-I:%M %p ET"))} (state spans two time zones)'
+        else: sub += f' · Polls close {E(_et(r["poll_close"], "%-I:%M %p ET"))}'
     winners = [c["name"] for c in r.get("candidates") or [] if c.get("winner")]
     cands = "".join(f'<li>{E(c.get("name"))} ({E(c.get("party") or "party not listed")}){" · incumbent" if c.get("incumbent") else ""}'
                     f'{" · <b>winner (as recorded by Wikipedia editors)</b>" if c.get("winner") else ""}'
@@ -153,6 +157,7 @@ def render():
             + '<section class="mh-sec" id="sources"><h2>Sources</h2><p class="mh-src">Race lists, candidates, ratings and polling averages are compiled from Wikipedia (CC BY-SA 4.0), '
               'which cites each rater and pollster' + (f': {src_links}' if src_links else '') + '. Poll closing times: '
             + _ext((b.get("poll_close_source") or M.POLL_CLOSE_SRC).get("url"), (b.get("poll_close_source") or M.POLL_CLOSE_SRC).get("label"))
+            + '; checked against ' + _ext(M.POLL_CLOSE_NCSL["url"], M.POLL_CLOSE_NCSL["label"])
             + '. Official results come only from state election offices. Research only; always check official sources.</p></section>'
             + f'<style>{CSS}</style>' + CTL_JS)
     ld = {"@context": "https://schema.org", "@graph": [
