@@ -21,7 +21,7 @@ const ln=n=>{n=String(n||"").replace(/\([^)]*\)/g," ").replace(/\[[^\]]*\]/g," "
 // ---- nav button (Monitor group, right after Politics) + panel + deep link #midterms
 const nav=document.querySelector(".tabs");if(!nav)return;
 let tb=nav.querySelector('button[data-tab="midterms"]');
-if(!tb){tb=document.createElement("button");tb.type="button";tb.dataset.tab="midterms";tb.textContent="🗳 Midterms 2026";tb.title="2026 midterm elections: races, ratings, polls, market prices and results";nav.appendChild(tb)}
+if(!tb){tb=document.createElement("button");tb.type="button";tb.dataset.tab="midterms";tb.innerHTML='<svg class="bn-ei bn-ei-ballot" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12.5h16v8H4zM8 12.5V4h8v8.5"/><path d="m9.8 8 1.6 1.6L14.4 6.5"/></svg> Midterms 2026';tb.title="2026 midterm elections: races, ratings, polls, market prices and results";nav.appendChild(tb)}
 const place=()=>{const a=nav.querySelector('button[data-tab="politics"]');if(a&&a.nextElementSibling!==tb)a.insertAdjacentElement("afterend",tb)};place();setTimeout(place,450);setTimeout(place,1500);
 try{if(typeof TABHASH=="object"){TABHASH.midterms="midterms";HASHTAB.midterms="midterms"}}catch(_){}
 let M=document.getElementById("tab-midterms");
