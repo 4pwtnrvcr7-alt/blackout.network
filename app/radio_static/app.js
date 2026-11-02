@@ -12,7 +12,7 @@ function SS(k,v){try{localStorage.setItem(k,v)}catch(_){}}
 
 // tab button + deep link (#radio): in the Monitor group right after Live Streams
 const nav=document.querySelector(".tabs");let tb=nav&&nav.querySelector('button[data-tab="radio"]');
-if(nav&&!tb){tb=document.createElement("button");tb.dataset.tab="radio";tb.innerHTML='<svg class="bn-ei bn-ei-radio" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8l9-5"/><circle cx="15.5" cy="14" r="3"/><path d="M6.5 12.5h3M6.5 16h3"/></svg> Radio';const s=nav.querySelector('button[data-tab="streams"]');s?s.after(tb):nav.appendChild(tb)}
+if(nav&&!tb){tb=document.createElement("button");tb.dataset.tab="radio";tb.textContent="📻 Radio";const s=nav.querySelector('button[data-tab="streams"]');s?s.after(tb):nav.appendChild(tb)}
 try{if(typeof TABHASH=="object"){TABHASH.radio="radio";HASHTAB.radio="radio"}}catch(_){}
 
 const app=document.getElementById("rd_app");

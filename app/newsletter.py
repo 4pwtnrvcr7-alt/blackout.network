@@ -1472,7 +1472,7 @@ def send_transactional(row, kind):
     c = cfg(); L = links_for(row, c)
     if kind == "confirm":
         title = f"Confirm your {BRAND} newsletter subscription"
-        paras = [f"Someone (hopefully you) asked to subscribe {row['email']} to the {BRAND} newsletter: {FREQS.get(row['frequency'], 'twice daily').lower()} briefs of the highest-severity sourced threats.",
+        paras = [f"Someone (hopefully you) asked to subscribe {row['email']} to the {BRAND} newsletter: {FREQS.get(row['frequency'], 'twice daily').lower()} briefs of the highest-severity, source-verified threats.",
                  f"Click the button to confirm. The link expires in {c['confirm_ttl_hours']} hours. If you didn't ask for this, ignore this email and nothing will be sent."]
         hb, tx = render_simple(title, paras, ("Confirm subscription", L["confirm"]), c=c); unsub = None
     else:
