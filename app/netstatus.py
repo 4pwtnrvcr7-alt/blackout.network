@@ -1,18 +1,29 @@
 """Network Status: keyless official status feeds + this box's own DNS/HTTPS probes, polled every 5 min into netstatus.db.
 Read-only corroboration from blackout.db / broadcasts.db. Never touches the scanner, scoring or push.
-Downdetector is tried politely (once an hour, plain UA); if it serves a bot block we record "blocked" and never try to evade it."""
+ISPs come from IODA (Georgia Tech's public internet-outage API, per-ASN alerts), polled every 15 min. Downdetector is no longer used
+(it blocks automated readers and we don't get around bot protection). Visitors never see raw HTTP codes or exception text: see plain()."""
 import builtins, json, os, re, socket, sqlite3, ssl, struct, threading, time, random, urllib.request, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 BASE = os.path.dirname(os.path.abspath(__file__)); NDB = os.path.join(BASE, "netstatus.db")
 UA = "BlackoutNetwork-dashboard/1.0 (private personal dashboard; polite 5-minute poll)"
-POLL = 300; DD_EVERY = 3600
+POLL = 300; ISP_EVERY = 900
 LV = {0: "operational", 1: "notice", 2: "degraded", 3: "major outage", -1: "unreachable", -2: "blocked"}
 SP = [("GitHub", "Dev & cloud", "https://www.githubstatus.com"), ("Cloudflare (CDN, DNS 1.1.1.1)", "DNS & CDN", "https://www.cloudflarestatus.com"),
       ("Akamai", "DNS & CDN", "https://www.akamaistatus.com"), ("DigitalOcean", "Dev & cloud", "https://status.digitalocean.com"),
       ("Discord", "Apps & social", "https://discordstatus.com"), ("Reddit", "Apps & social", "https://www.redditstatus.com"),
       ("Zoom", "Apps & social", "https://www.zoomstatus.com"), ("Dropbox", "Apps & social", "https://status.dropbox.com"), ("OpenAI", "Apps & social", "https://status.openai.com")]
-ISPS = [("Spectrum", "spectrum"), ("Xfinity / Comcast", "comcast-xfinity"), ("AT&T", "att"), ("Verizon", "verizon"), ("T-Mobile", "t-mobile")]
+# ISPs: each provider's own outage pages need a login or a service address and publish no public machine-readable feed, so the
+# signal is IODA's per-network (ASN) outage alerts. First ASN = the provider's main network (it is the source link). An ISP with
+# an empty ASN list shows a neutral "No public status feed" row.
+IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu/asn/"
+ISPS = [("Spectrum", [(20115, "Charter"), (33363, "Bright House, Florida"), (7843, "Time Warner Cable"), (11427, "Texas"), (20001, "Pacific West"),
+                      (10796, "Midwest"), (12271, "New York City"), (11351, "Northeast")]),
+        ("Xfinity / Comcast", [(7922, "Comcast"), (7015, "Comcast"), (21508, "Comcast"), (33651, "Comcast")]),
+        ("AT&T", [(7018, "AT&T Internet"), (20057, "AT&T Mobility")]),
+        ("Verizon", [(701, "Verizon Business / Fios"), (22394, "Verizon Wireless"), (6167, "Verizon Wireless")]),
+        ("T-Mobile", [(21928, "T-Mobile US")])]
+IODA_DS = {"bgp": "routing (BGP)", "ping-slash24": "active probing", "merit-nt": "network telescope"}
 PROBE_HOSTS = ["google.com", "youtube.com", "x.com", "facebook.com", "amazon.com", "microsoft.com", "apple.com", "cloudflare.com", "netflix.com", "floridadisaster.org", "weather.gov"]
 RESOLVERS = [("Cloudflare 1.1.1.1", "1.1.1.1"), ("Google 8.8.8.8", "8.8.8.8"), ("Quad9 9.9.9.9", "9.9.9.9")]
 OUT_RE = re.compile(r"\b(outages?|down for|went down|is down|service (?:disruption|interruption)|internet (?:down|outage|disruption)|connectivity|ddos|dns|cloudflare|aws|azure|google cloud|microsoft 365|starlink|verizon|at&t|spectrum|comcast|xfinity|t-mobile|cell(?:ular)? service|911 (?:outage|down)|fiber cut|submarine cable|undersea cable)\b", re.I)
@@ -91,17 +102,30 @@ def meta():
     d = json.loads(get("https://metastatus.com/data/orgs.json")); bad = [(o["name"], s) for o in d for s in o.get("services", []) if s.get("status") not in (None, "No known issues")]
     lvl = max([3 if "outage" in s["status"].lower() or "major" in s["status"].lower() else 2 for _, s in bad] or [0])
     return R("Meta (Facebook, Instagram, WhatsApp, Messenger)", "Apps & social", lvl, "No known issues" if not bad else f"{len(bad)} service(s) with issues", "; ".join(f'{o}/{s["name"]}: {s["status"]}' for o, s in bad[:4]), "https://metastatus.com")
-def downdetector(name, slug):
-    url = f"https://downdetector.com/status/{slug}/"
-    try:
-        t = get(url, timeout=12)
-        m = re.search(r"User reports (?:indicate|show)([^<.]{0,140})", t)
-        if not m: return R(name, "ISPs (Downdetector)", -1, "fetched, but no status text found", "", url, "isp")
-        s = m.group(1).strip(); lvl = 0 if "no current problems" in s.lower() else 1 if "possible" in s.lower() else 2
-        return R(name, "ISPs (Downdetector)", lvl, "User reports " + s, "", url, "isp")
-    except urllib.error.HTTPError as e:
-        if e.code in (401, 403, 429, 503): return R(name, "ISPs (Downdetector)", -2, f"blocked by Downdetector's bot protection (HTTP {e.code}); not bypassed", "", url, "isp")
-        return R(name, "ISPs (Downdetector)", -1, f"HTTP {e.code}", "", url, "isp")
+def ioda_isp(name, asns, hours=24):
+    """Normal / Degraded / Outage from IODA per-ASN alerts. IODA alerts are state changes (critical, then normal on recovery), so an
+    ASN counts as affected while its latest alert on a data source in the last `hours` is still critical."""
+    if not asns: return R(name, "ISPs", -1, "No public status feed", "", "", "isp")
+    src = "Source: IODA (Georgia Tech internet-outage monitor)"
+    url = IODA_UI + str(asns[0][0]); now = int(time.time()); hit = []; ok = 0
+    for asn, lab in asns:
+        try: d = json.loads(get(f"{IODA}/outages/alerts?from={now - hours * 3600}&until={now}&entityType=asn&entityCode={asn}", timeout=15)).get("data") or []
+        except Exception: continue
+        ok += 1; last = {}
+        for x in d:
+            if x.get("datasource") in IODA_DS and (x["datasource"] not in last or x.get("time", 0) >= last[x["datasource"]].get("time", 0)): last[x["datasource"]] = x
+        bad = [x for x in last.values() if x.get("level") == "critical"]
+        if bad: hit.append((asn, lab, bad))
+    if not ok: return R(name, "ISPs", -1, "Status temporarily unavailable", src, url, "isp")
+    net = f"{len(asns)} network{'s' if len(asns) > 1 else ''} checked" if ok == len(asns) else f"{ok} of {len(asns)} networks checked"
+    if not hit: return R(name, "ISPs", 0, "Normal", f"{src} · {net}", url, "isp")
+    def pct(x):
+        try: return round(100 * x["value"] / x["historyValue"])
+        except Exception: return None
+    deep = any(len(b) >= 2 or any((pct(x) or 100) < 50 for x in b) for _, _, b in hit)
+    lvl = 3 if deep or len(hit) >= 2 else 2
+    why = "; ".join(f"{lab} (AS{asn}): " + ", ".join(IODA_DS[x["datasource"]] + (f" at {pct(x)}% of normal" if pct(x) is not None else " below normal") for x in b) for asn, lab, b in hit[:3])
+    return R(name, "ISPs", lvl, "Outage" if lvl == 3 else "Degraded", f"{why} · {src} · {net}", IODA_UI + str(hit[0][0]), "isp")
 def dnsq(server, name="example.com", timeout=3):
     qid = random.randint(0, 65535); q = struct.pack(">HHHHHH", qid, 0x0100, 1, 0, 0, 0) + b"".join(bytes([len(p)]) + p.encode() for p in name.split(".")) + b"\0" + struct.pack(">HH", 1, 1)
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.settimeout(timeout); t0 = time.time()
@@ -114,8 +138,8 @@ def resolver(label, ip):
     try:
         try: ok, ms, det = dnsq(ip)
         except socket.timeout: ok, ms, det = dnsq(ip, timeout=4)   # one retry before calling it down
-        return R(label, "Box probes: DNS resolvers", 0 if ok and ms < 500 else 1 if ok else 2, f"answered in {ms} ms" if ok else "bad answer", det, "", "probe", ms)
-    except Exception as e: return R(label, "Box probes: DNS resolvers", 3, "no answer", str(e)[:120], "", "probe")
+        return R(label, "Box probes: DNS resolvers", 0 if ok and ms < 500 else 1 if ok else 2, f"Answered in {ms} ms" if ok else "Answered with an error", det, "", "probe", ms)
+    except Exception as e: return R(label, "Box probes: DNS resolvers", 3, "No answer", str(e)[:120], "", "probe")
 def hprobe(host):
     t0 = time.time()
     try: socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP); dms = int((time.time() - t0) * 1000)
@@ -127,14 +151,14 @@ def hprobe(host):
         except urllib.error.HTTPError as e: code = e.code
         ms = int((time.time() - t1) * 1000)
         lvl = 0 if code < 500 and ms < 3000 else 1 if code < 500 else 2
-        return R(host, "Box probes: HTTPS", lvl, f"HTTP {code} in {ms} ms", f"DNS {dms} ms", "https://" + host, "probe", ms)
+        return R(host, "Box probes: HTTPS", lvl, (f"Responded in {ms} ms" if code < 500 else f"Server error after {ms} ms"), f"DNS lookup {dms} ms", "https://" + host, "probe", ms)
     except Exception as e: return R(host, "Box probes: HTTPS", 3, "HTTPS failed", str(e)[:120], "https://" + host, "probe")
 def jobs(with_dd):
     J = [lambda a=a: statuspage(*a) for a in SP] + [slack, aws, azure, apple, m365, meta,
          lambda: gstyle("Google Cloud", "Big cloud", "https://status.cloud.google.com/incidents.json", "https://status.cloud.google.com"),
          lambda: gstyle("Google Workspace (Gmail, Drive, Meet)", "Big cloud", "https://www.google.com/appsstatus/dashboard/incidents.json", "https://www.google.com/appsstatus/dashboard/")]
     J += [lambda a=a: resolver(*a) for a in RESOLVERS] + [lambda h=h: hprobe(h) for h in PROBE_HOSTS]
-    if with_dd: J += [lambda a=a: downdetector(*a) for a in ISPS]
+    if with_dd: J += [lambda a=a: ioda_isp(*a) for a in ISPS]
     return J
 NAMES = {}
 def safe(f):
@@ -142,21 +166,21 @@ def safe(f):
     except Exception as e:
         n = getattr(f, "__defaults__", None); n = n[0] if n else None
         lab = (n[0] if isinstance(n, tuple) else n) or getattr(f, "__name__", "?")
-        return R(str(lab), "Feed errors", -1, "feed unreachable or changed", f"{type(e).__name__}: {str(e)[:140]}")
+        return R(str(lab), "Feed errors", -1, "Status feed temporarily unavailable", f"{type(e).__name__}: {str(e)[:140]}")   # detail is internal; plain() hides it
 def alerts_from(rows):
-    return [r for r in rows if r["level"] >= 2 and not (r["kind"] == "probe" and r.get("streak", 1) < 2)]
+    return [r for r in rows if r["level"] >= 2 and not (r["kind"] in ("probe", "isp") and r.get("streak", 1) < 2)]   # probes and ISPs alert on 2 readings in a row
 def poll_once():
     c = db()
     try:
-        last_dd = float((c.execute("SELECT v FROM meta WHERE k='dd'").fetchone() or ["0"])[0])
-        with_dd = time.time() - last_dd >= DD_EVERY
+        last_isp = float((c.execute("SELECT v FROM meta WHERE k='isp'").fetchone() or ["0"])[0])
+        with_dd = time.time() - last_isp >= ISP_EVERY
         with ThreadPoolExecutor(8) as ex: rows = list(ex.map(safe, jobs(with_dd)))
         ts = iso()
         for r in rows:   # a resolver/host this box has NEVER reached is a property of this network (egress filtering), not an outage
             if r["kind"] == "probe" and r["level"] == 3 and not c.execute("SELECT 1 FROM checks WHERE src=? AND level IN (0,1) LIMIT 1", (r["src"],)).fetchone():
-                r["level"] = -1; r["status"] = "never reachable from this box (likely blocked by this network, not an outage)"
+                r["level"] = -1; r["status"] = NEVER
         c.executemany("INSERT INTO checks VALUES(?,?,?,?,?,?,?,?,?)", [(ts, r["src"], r["grp"], r["kind"], r["level"], r["status"], r["detail"], r["ms"], r["url"]) for r in rows])
-        if with_dd: c.execute("INSERT OR REPLACE INTO meta VALUES('dd',?)", (str(time.time()),))
+        if with_dd: c.execute("INSERT OR REPLACE INTO meta VALUES('isp',?)", (str(time.time()),))
         c.execute("INSERT OR REPLACE INTO meta VALUES('last_poll',?)", (ts,))
         c.execute("DELETE FROM checks WHERE ts<?", (iso(datetime.now(timezone.utc) - timedelta(days=8)),)); c.commit()
     finally: c.close()
@@ -177,18 +201,42 @@ def loop():
         ST["last"] = iso(); time.sleep(max(30, POLL - (time.time() - t0)))
 if not ST["started"]:
     ST["started"] = True; threading.Thread(target=lambda: loop(), daemon=True, name="netstatus").start()
+NEVER = "Not reachable from our server"
+HTTP_RE = re.compile(r"^HTTP (\d{3}) in (\d+) ms$"); DNS_RE = re.compile(r"^rcode (\d+), (\d+) answer")
+def plain(r):
+    """What visitors see: no HTTP status codes, exception text or resolver internals. Applied on read, so older rows are cleaned too."""
+    st, det, k = r.get("status") or "", r.get("detail") or "", r.get("kind")
+    if r.get("grp") == "Feed errors":
+        r["grp"] = "Status feeds unavailable"; st = "Status feed temporarily unavailable"; det = "Shown in grey until the provider's feed answers again."
+    elif k == "probe":
+        m = HTTP_RE.match(st)
+        if m: st = f"Responded in {m.group(2)} ms" if int(m.group(1)) < 500 else f"Server error after {m.group(2)} ms"
+        if st.startswith("answered in"): st = "A" + st[1:]
+        if st.startswith("never reachable") or st == NEVER:
+            st = NEVER; det = "Our server's network doesn't allow this check. It isn't an outage."
+        elif r.get("level", 0) >= 2 or st in ("no answer", "No answer", "HTTPS failed", "DNS lookup failed", "bad answer"):
+            st = {"no answer": "No answer", "bad answer": "Answered with an error"}.get(st, st)
+            low = det.lower()
+            det = ("No reply in time" if "timed out" in low or "timeout" in low else "Connection refused" if "refused" in low
+                   else "Name not found" if "name or service" in low or "nodename" in low or "getaddrinfo" in low else "")
+        else:
+            d = DNS_RE.match(det)
+            if d: det = "" if d.group(1) == "0" else "Answered with an error"
+            if det.startswith("DNS ") and not det.startswith("DNS lookup"): det = "DNS lookup " + det[4:]
+    r["status"], r["detail"] = st, det
+    return r
 def latest(c):
     lp = (c.execute("SELECT v FROM meta WHERE k='last_poll'").fetchone() or [None])[0]
     if not lp: return None, []
-    rows = [dict(r) for r in c.execute("SELECT * FROM checks WHERE ts=?", (lp,))]
-    # latest ISP rows come from the last poll that included them
+    rows = [dict(r) for r in c.execute("SELECT * FROM checks WHERE ts=? AND NOT (kind='isp' AND grp!='ISPs')", (lp,))]
+    # latest ISP rows come from the last poll that included them (rows from the retired Downdetector check are ignored)
     if not any(r["kind"] == "isp" for r in rows):
-        t = c.execute("SELECT MAX(ts) FROM checks WHERE kind='isp'").fetchone()[0]
-        if t: rows += [dict(r) for r in c.execute("SELECT * FROM checks WHERE ts=? AND kind='isp'", (t,))]
+        t = c.execute("SELECT MAX(ts) FROM checks WHERE kind='isp' AND grp='ISPs'").fetchone()[0]
+        if t: rows += [dict(r) for r in c.execute("SELECT * FROM checks WHERE ts=? AND kind='isp' AND grp='ISPs'", (t,))]
     for r in rows:
         prev = c.execute("SELECT level FROM checks WHERE src=? AND ts<? ORDER BY ts DESC LIMIT 1", (r["src"], r["ts"])).fetchone()
         r["streak"] = 2 if prev and prev[0] >= 2 else 1
-    return lp, rows
+    return lp, [plain(r) for r in rows]
 def alerts():
     c = db()
     try: lp, rows = latest(c)
@@ -219,7 +267,7 @@ def status(qs):
     try:
         lp, rows = latest(c)
         hist = {}
-        for src, ts, lvl in c.execute("SELECT src, ts, level FROM checks WHERE ts>=?", (iso(start),)):
+        for src, ts, lvl in c.execute("SELECT src, ts, level FROM checks WHERE ts>=? AND NOT (kind='isp' AND grp!='ISPs')", (iso(start),)):
             i = int((datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc) - start).total_seconds() // bsec)
             h = hist.setdefault(src, [None] * nb)
             if 0 <= i < nb: h[i] = lvl if h[i] is None else (max(h[i], lvl) if lvl >= 0 or h[i] < 0 else lvl)
