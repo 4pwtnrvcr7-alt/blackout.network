@@ -276,6 +276,8 @@ html body>#ns_gbanner[style*="block"],html body>#ns_gbanner.on{display:flex!impo
 /* wide tables, charts and canvases scroll or shrink inside their own box instead of widening the page */
 html body main table{max-width:100%}
 html body main :is(canvas,svg,img,video,iframe){max-width:100%}
+/* ...except inside maps: Leaflet panes are 0x0 boxes, so max-width:100% collapsed every overlay canvas/SVG to 0 px wide (Heat Map heat layer and region shading never painted). Map layers size themselves. */
+html body main .leaflet-container :is(canvas,svg,img){max-width:none}
 html body main pre{max-width:100%;overflow-x:auto}
 /* maps never cover the top bar or the sidebar: each map is its own stacking context below the bar (Leaflet panes/controls use z 400-1000) */
 .leaflet-container,.maplibregl-map{position:relative;z-index:0;isolation:isolate}
