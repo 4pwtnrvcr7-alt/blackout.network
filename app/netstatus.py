@@ -106,7 +106,7 @@ def ioda_isp(name, asns, hours=24):
     """Normal / Degraded / Outage from IODA per-ASN alerts. IODA alerts are state changes (critical, then normal on recovery), so an
     ASN counts as affected while its latest alert on a data source in the last `hours` is still critical."""
     if not asns: return R(name, "ISPs", -1, "No public status feed", "", "", "isp")
-    src = "Source: IODA (Georgia Tech internet-outage monitor)"
+    src = "Source: IODA, Georgia Tech"
     url = IODA_UI + str(asns[0][0]); now = int(time.time()); hit = []; ok = 0
     for asn, lab in asns:
         try: d = json.loads(get(f"{IODA}/outages/alerts?from={now - hours * 3600}&until={now}&entityType=asn&entityCode={asn}", timeout=15)).get("data") or []
@@ -116,9 +116,9 @@ def ioda_isp(name, asns, hours=24):
             if x.get("datasource") in IODA_DS and (x["datasource"] not in last or x.get("time", 0) >= last[x["datasource"]].get("time", 0)): last[x["datasource"]] = x
         bad = [x for x in last.values() if x.get("level") == "critical"]
         if bad: hit.append((asn, lab, bad))
-    if not ok: return R(name, "ISPs", -1, "Status temporarily unavailable", src, url, "isp")
+    if not ok: return R(name, "ISPs", -1, "Status temporarily unavailable", "Shown in grey until IODA answers again · " + src, url, "isp")
     net = f"{len(asns)} network{'s' if len(asns) > 1 else ''} checked" if ok == len(asns) else f"{ok} of {len(asns)} networks checked"
-    if not hit: return R(name, "ISPs", 0, "Normal", f"{src} · {net}", url, "isp")
+    if not hit: return R(name, "ISPs", 0, "Normal", f"{net} · {src}", url, "isp")
     def pct(x):
         try: return round(100 * x["value"] / x["historyValue"])
         except Exception: return None
