@@ -42,8 +42,6 @@ P = {  # every path is overridable by env var for tests (NEWSLETTER_DB, NEWSLETT
 }
 BRAND = "BLACKOUT.NETWORK"   # brand is always written in capitals in every email and page (t300)
 TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line under the masthead domain and in the footer
-TAGLINE_TM = TAGLINE + "\u2122"   # brand rule: the tagline carries TM (never R) and always sits next to BLACKOUT.NETWORK
-BRAND_LINE = f"{BRAND} \u00b7 {TAGLINE_TM}"
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime. We count opens and clicks to improve it; in the EEA, UK and Switzerland only if you tick the box."
@@ -804,7 +802,7 @@ def _logo_html(c, size=48):
             f'<td width="{size}" valign="middle" style="width:{size}px;padding:0">{dk}{lt}</td>'
             f'<td valign="middle" style="padding:0 0 0 12px;text-align:left">'
             f'<div class="bnt" style="font:700 {fs}px/1.3 {FH};letter-spacing:1.4px;color:{PAL["tx"]}">BLACKOUT.<span class="bnr" style="color:{PAL["ac"]}">NETWORK</span></div>'
-            f'<div class="bnm" style="font:400 {fs - 1}px/1.4 {FB};color:{PAL["mu"]};margin-top:1px">{E(TAGLINE_TM)}</div></td></tr></table>')
+            f'<div class="bnm" style="font:400 {fs - 1}px/1.4 {FB};color:{PAL["mu"]};margin-top:1px">{E(TAGLINE)}</div></td></tr></table>')
 _LIGHT_CSS = ("@media (prefers-color-scheme: light){"
     f".bnb{{background:{PAL_LIGHT['bg']}!important}}.bns{{background:{PAL_LIGHT['surf']}!important}}.bns2{{background:{PAL_LIGHT['surf2']}!important}}"
     f".bnl{{border-color:{PAL_LIGHT['line']}!important}}.bnt{{color:{PAL_LIGHT['tx']}!important}}.bnm{{color:{PAL_LIGHT['mu']}!important}}"
@@ -1154,7 +1152,7 @@ def render(issue, links, c=None):
     pre = issue["bluf"]
     why = f"You get this because you confirmed a subscription to the {BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage."
     html_ = _shell(subj, pre, _head_html(f"{lab.upper()} BRIEF", PAL["ac"], day, rng), B, links, c, why)
-    T = [f"{BRAND} — {lab} Brief", BRAND_LINE, day, rng, "", f"BLUF: {issue['bluf']}", ""]
+    T = [f"{BRAND} — {lab} Brief", TAGLINE, day, rng, "", f"BLUF: {issue['bluf']}", ""]
     def tsec(title, items):
         T.extend([title.upper(), "=" * len(title)])
         for i, it in enumerate(items, 1):
@@ -1183,7 +1181,7 @@ def render(issue, links, c=None):
         T.append("")
     T += [f"Forward to a friend: {FORWARD_URL}", END_LINE, "https://blackout.network · YouTube: https://www.youtube.com/@blkoutntw · X: https://x.com/BlkoutNtw", ""]
     T += ["--", DISCLAIMER, f"How we score: {links['scoring']}", f"Dashboard: {links['site']}", why,
-          BRAND_LINE, f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
+          f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""]
     T += footer_buttons_text(links)
     html_, txt_ = utm_tag(html_, "\n".join(T), f"{issue.get('slot') or 'brief'}-{issue['end'].astimezone(ET).strftime('%Y-%m-%d')}")
     return subj, html_, txt_
@@ -1303,12 +1301,12 @@ def render_breaking(items, links, at, c=None, trend=None):
              f'{(c.get("breaking") or {}).get("min_gap_hours", 3)} hours and {(c.get("breaking") or {}).get("max_per_day", 3)} a day. Your regular briefs continue as usual.</td></tr>')
     why = f"You get breaking alerts because you subscribed to the {BRAND} newsletter. Turn them off under Manage, or unsubscribe below."
     html_ = _shell(subj, pre, _head_html("BREAKING ALERT", PAL["ac"], fmt_et(at), f"Data as of {fmt_et(at)} ({fmt_z(at)})"), B, links, c, why)
-    T = [f"{BRAND} — BREAKING ALERT", BRAND_LINE, fmt_et(at), "", f"BLUF: {pre}", ""]
+    T = [f"{BRAND} — BREAKING ALERT", TAGLINE, fmt_et(at), "", f"BLUF: {pre}", ""]
     for i, it in enumerate(items, 1):
         T.extend(_text_item(it, i)); T.append(f"   Full story & sources: {wire_url(it['cluster_id'], c=c)}")
         T.append(f"   Follow this story: {follow_links(links.get('_row'), it['cluster_id'], c)['follow']}"); T.append("")
     T += [f"Why you got this: it met the breaking-alert bar ({rules}).", "", END_LINE, "--", DISCLAIMER, why,
-          BRAND_LINE, f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""] + footer_buttons_text(links)
+          f"{BRAND} · {TAGLINE}", f"{addr or 'Postal address: [PENDING] (required by CAN-SPAM before live sending)'}", ""] + footer_buttons_text(links)
     html_, txt_ = utm_tag(html_, "\n".join(T), f"breaking-{at.astimezone(ET).strftime('%Y-%m-%d')}")
     return subj, html_, txt_
 
@@ -1367,8 +1365,8 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
              f'<tr><td class="bnl" style="padding:14px 20px 22px 20px;border-top:1px solid {PAL["line"]};text-align:left">'
              f'<h1 class="bnt" style="font:800 22px/1.25 {FH};color:{PAL["tx"]};margin:0 0 12px 0">{E(title)}</h1>'
              + body + btn + xl + '</td></tr>' + foot + '</table></td></tr></table></body></html>')
-    text = "\n\n".join([f"{BRAND} — {title}", BRAND_LINE, *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
-                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, END_LINE, f"{BRAND_LINE} · {addr or 'https://BLACKOUT.NETWORK'}"])
+    text = "\n\n".join([f"{BRAND} — {title}", TAGLINE, *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
+                       + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, END_LINE, f"{BRAND} · {TAGLINE} · {addr or 'https://BLACKOUT.NETWORK'}"])
     return html_, text
 
 # ------------------------------------------------------------------ MIME + pluggable senders
