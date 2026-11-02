@@ -172,8 +172,11 @@ def render():
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "CollectionPage", "@id": S.SITE + PATH + "#page", "url": S.SITE + PATH, "name": H1, "description": DESC, "inLanguage": "en",
          "isPartOf": {"@id": S.SITE + "/#website"}, "publisher": {"@id": S.SITE + "/#org"}, "dateModified": b.get("built"),
-         "about": {"@type": "Event", "name": "2026 United States elections", "startDate": "2026-11-03", "eventStatus": "https://schema.org/EventScheduled",
-                   "location": {"@type": "Country", "name": "United States"}},
+         "about": {"@type": "Event", "name": "2026 United States elections", "startDate": "2026-11-03", "endDate": "2026-11-03",
+                   "description": "U.S. general election day, Tuesday, November 3, 2026, with all 435 U.S. House seats, a third of the U.S. Senate and many governorships on the ballot.",
+                   "eventStatus": "https://schema.org/EventScheduled", "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+                   "image": [S.SITE + "/icons/icon-og-v2-1200x630.png"],
+                   "location": {"@type": "Place", "name": "United States", "address": {"@type": "PostalAddress", "addressCountry": "US"}}},
          "mainEntity": {"@type": "ItemList", "numberOfItems": len(sen) + len(gov),
                         "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": f'{"Senate" if r.get("office") == "senate" else "Governor"}: {r.get("label")}',
                                              "url": f'{S.SITE}{PATH}#{r.get("office")}'} for i, r in enumerate(sen + gov)]}},
