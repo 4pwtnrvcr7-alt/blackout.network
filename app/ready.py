@@ -78,6 +78,8 @@ html[data-theme="light"] .rd-jump{background:#f6f7f9}
 .rd-jump a{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:7px 12px;border:1px solid var(--rd-bd);border-radius:999px;color:inherit;text-decoration:none;font:600 14px/1 Inter,system-ui,sans-serif}
 .rd-jump a:hover,.rd-jump a:focus-visible{border-color:var(--rd-acc);color:var(--rd-acc)}
 .rd-jump .rd-ic{width:16px;height:16px;color:var(--rd-acc)}
+/* sitenav.css:278 sets max-width:100% on every svg in <main>; inside the shrink-wrapped jump chips that resolved to 0 px at narrow widths. Scoped to this page. */
+.rd .rd-ic{max-width:none;flex:none}
 .rd-g{display:grid;grid-template-columns:170px 1fr;gap:22px;align-items:start;padding:22px;margin:18px 0;border:1px solid var(--rd-bd);border-left:4px solid var(--rd-acc);border-radius:12px;background:var(--rd-card);scroll-margin-top:70px}
 .rd-g img{width:170px;height:auto;aspect-ratio:340/440;border-radius:6px;border:1px solid var(--rd-bd);background:#fff;display:block}
 .rd-g h2{font-family:Montserrat,Inter,system-ui,sans-serif;font-weight:700;font-size:clamp(21px,2.4vw,26px);margin:2px 0 8px;display:flex;align-items:center;gap:10px}
