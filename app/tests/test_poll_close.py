@@ -24,5 +24,10 @@ def test_texas_render():
     html = H._race({"state": "GA", "label": "Georgia", "consensus": con, "poll_close": M.POLL_CLOSE["GA"], "candidates": []}, {}, "senate")
     assert "Polls close 7:00 PM ET" in html and " to " not in html.split("Polls close")[1][:30]
 
+def test_county_caveat():
+    for st, nm in (("KS", "Kansas"), ("ND", "North Dakota"), ("OR", "Oregon"), ("TX", "Texas")):
+        html = H._race({"state": st, "label": nm, "state_name": nm, "consensus": {"t": "Safe R", "n": 3}, "poll_close": M.POLL_CLOSE[st], "candidates": []}, {}, "senate")
+        assert ("; local hours vary by county" in html) == (st != "TX"), st
+
 if __name__ == "__main__":
-    for f in (test_all_51, test_last_and_first_match, test_texas_render): f(); print("ok", f.__name__)
+    for f in (test_all_51, test_last_and_first_match, test_texas_render, test_county_caveat): f(); print("ok", f.__name__)

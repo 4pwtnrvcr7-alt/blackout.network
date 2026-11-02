@@ -75,6 +75,9 @@ def _rating_rows(r, meta):
     return (f'<div class="mh-tw"><table class="mh-t"><thead><tr><th>Rater</th><th>Rating</th><th>As of</th></tr></thead><tbody>{rows}</tbody></table></div>'
             if rows else "<p>No published ratings recorded for this race.</p>")
 
+# States whose poll-close times are set county by county (Kansas, North Dakota, Oregon): every shown close time carries this caveat.
+COUNTY_HOURS_VARY = {"KS", "ND", "OR"}
+
 def _race(r, b, office):
     st = r.get("state") or ""; lab = r.get("label") or r.get("state_name") or st
     con = r.get("consensus") or {}
@@ -84,7 +87,7 @@ def _race(r, b, office):
         if _f and _f != r["poll_close"]:
             z1, z2, part = M.POLL_CLOSE_ZONES.get(st, ("", "", "most"))
             sub += ' · ' + E(f'Polls close {_et(_f, "%-I:%M %p ET")} in {part} of {r.get("state_name") or lab} ({z1} time), '
-                             f'{_et(r["poll_close"], "%-I:%M %p ET")} in the {z2}-time area')
+                             f'{_et(r["poll_close"], "%-I:%M %p ET")} in the {z2}-time area' + ('; local hours vary by county' if st in COUNTY_HOURS_VARY else ''))
         else: sub += f' · Polls close {E(_et(r["poll_close"], "%-I:%M %p ET"))}'
     winners = [c["name"] for c in r.get("candidates") or [] if c.get("winner")]
     cands = "".join(f'<li>{E(c.get("name"))} ({E(c.get("party") or "party not listed")}){" · incumbent" if c.get("incumbent") else ""}'
