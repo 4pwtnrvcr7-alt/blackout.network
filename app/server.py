@@ -491,7 +491,9 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
         self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") else "public, max-age=31536000, immutable" if versioned else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
+        # hotfix/confirm-origin: was no-referrer, which makes Safari send "Origin: null" on same-site form POSTs (403 on /newsletter/confirm).
+        # same-origin keeps the real Origin for our own POSTs and still sends no Referer (no token leak) to any other site.
+        self.send_header("Referrer-Policy", "same-origin"); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     # Security headers (Security Officer baseline 2026-11-01). Added to EVERY response (send(), redirects, add-on raw replies)
     # at end_headers(); headers already set by the handler (send() sets nosniff + Referrer-Policy) are never duplicated.
     # HSTS: 6 months, no includeSubDomains (M365/Resend CNAMEs like autodiscover/sip/email are not verified HTTPS sites), no preload.

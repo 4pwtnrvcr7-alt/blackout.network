@@ -201,6 +201,6 @@ def handle_stream(path, qs, h):
     if path.startswith("/api/government/img") and res[0] == 200 and len(res) == 3:
         b, ct = res[1], res[2]
         h.send_response(200); h.send_header("Content-Type", ct); h.send_header("Cache-Control", "public, max-age=86400")
-        h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "no-referrer"); h.send_header("Content-Length", str(len(b))); h.end_headers(); h.wfile.write(b)
+        h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "same-origin"); h.send_header("Content-Length", str(len(b))); h.end_headers(); h.wfile.write(b)
         return
     return h.send(*res)

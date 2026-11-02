@@ -340,7 +340,7 @@ def _send(h, code, body, ctype="application/json", robots=False):
             if srv: b = srv.ga_head(b, ga=False)
         except Exception: pass
     h.send_response(code); h.send_header("Content-Type", ctype + "; charset=utf-8"); h.send_header("Cache-Control", "no-store")
-    h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "no-referrer")
+    h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "same-origin")
     if robots: h.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
     h.send_header("Content-Length", str(len(b))); h.end_headers(); h.wfile.write(b)
 
@@ -352,7 +352,7 @@ def config():
 def status_page(rid=""):
     rid = html.escape(norm_id(rid) or "", quote=True)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="same-origin">
 {sitenav.head_html("report-status", "/report-status")}<link rel="icon" href="/favicon.ico"><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png"><meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Blackout"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script><link rel="stylesheet" href="/api/report/status.css"></head>
 <body data-report-id="{rid}">{sitenav.site_top("report-status")}
 <main class="rs-main" id="main">
