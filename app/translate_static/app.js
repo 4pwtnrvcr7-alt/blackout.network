@@ -67,7 +67,7 @@ function ui(){if(document.getElementById("bntr_bar"))return;
  const host=document.querySelector("#bn_settings .ctl")||document.querySelector("header .ctl");
  if(host)host.appendChild(bar);else{bar.classList.add("bntr-float");document.body.appendChild(bar)}
  const f=document.getElementById("site_foot")||document.querySelector("body>footer")||document.querySelector("footer");
- if(f&&!f.querySelector(".bntr-foot")){const w=document.createElement("span");w.className="bntr-foot notranslate";w.setAttribute("translate","no");w.append(" · 🌐 ",picker("bntr_lang_f"));f.appendChild(w)}
+ if(f&&!f.querySelector(".bntr-foot")){const w=document.createElement("span");w.className="bntr-foot notranslate";w.setAttribute("translate","no");const g=document.createElement("span");g.className="bntr-fglobe";g.setAttribute("aria-hidden","true");g.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align:-2px;margin-right:4px" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5S9.4 5.9 12 3.5z"/></svg>';w.append(" · ",g,picker("bntr_lang_f"));f.appendChild(w)}
  refresh()}
 function refresh(){document.querySelectorAll(".bntr-sel").forEach(s=>{if(s.value!==lang)s.value=lang});
  const R=document.documentElement;R.dir=RTL.has(lang)?"rtl":"ltr";R.lang=lang=="en"?"en":(HTMLLANG[lang]||lang);R.classList.toggle("bn-tr",lang!="en");
