@@ -102,6 +102,13 @@ def render(cid, since=""):
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
     loc = r.get("location") or ""
+    elec = ""
+    try:   # seo/midterms-phases: election-tagged stories (midterms_hub.is_election_story) link to the /midterms hub
+        import midterms_hub as MH
+        if MH.is_election_story(r.get("category"), r.get("title")):
+            elec = ('<section class="card" id="bn_midterms_rel"><h2>2026 midterm elections</h2><p><a href="/midterms">2026 midterm elections: '
+                    'where to vote, poll closing times and official results by state</a></p></section>')
+    except Exception: elec = ""
     body = (f'<span id="bn_story" hidden data-rank="{rank}" data-tier="{S.E(tname.lower())}" data-cat="{S.E((r.get("category") or "").lower())}"></span>'   # seo/batch-1: GA4 story_view params
             f'<p class="crumb"><a href="/#wire">The Wire</a> › Story</p>'
             f'<div><span class="pill" style="color:{col};border-color:{col}">RANK {rank}/10 · {tname.upper()}</span>'
@@ -111,7 +118,7 @@ def render(cid, since=""):
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
             + g_ppl + g_share + (g_short or g_loc)
-            + upd + vhtml
+            + upd + vhtml + elec
             + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
             + '<section class="card"><h2>How confident are we?</h2><p>'
             + S.E(f"{len(rows)} report(s) from {eff} independent source famil{'y' if eff == 1 else 'ies'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))

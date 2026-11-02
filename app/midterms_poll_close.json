@@ -1,0 +1,543 @@
+{
+ "election": "2026-11-03",
+ "note": "Latest scheduled poll closing time for each state (or each time-zone part of a split state), converted to Eastern Standard Time. Individual polling places may close earlier; voters in line at closing time can still vote.",
+ "sources": [
+  {
+   "label": "270toWin: 2026 Election Poll Closing Times (Eastern Time, by time zone)",
+   "url": "https://www.270towin.com/poll-closing-times/",
+   "fetched": "2026-11-02"
+  },
+  {
+   "label": "National Conference of State Legislatures: Polling Places (state polling hours with statute citations)",
+   "url": "https://www.ncsl.org/elections-and-campaigns/polling-places",
+   "fetched": "2026-11-02"
+  }
+ ],
+ "states": [
+  {
+   "state": "AL",
+   "name": "Alabama",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "AK",
+   "name": "Alaska",
+   "closes": [
+    {
+     "at_et": "2026-11-04T00:00:00-05:00",
+     "zone": "Alaska"
+    },
+    {
+     "at_et": "2026-11-04T01:00:00-05:00",
+     "zone": "Hawaii-Aleutian"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "AZ",
+   "name": "Arizona",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "AR",
+   "name": "Arkansas",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:30:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "CA",
+   "name": "California",
+   "closes": [
+    {
+     "at_et": "2026-11-03T23:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "CO",
+   "name": "Colorado",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "CT",
+   "name": "Connecticut",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "DE",
+   "name": "Delaware",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "FL",
+   "name": "Florida",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:00:00-05:00",
+     "zone": "Eastern"
+    },
+    {
+     "at_et": "2026-11-03T20:00:00-05:00",
+     "zone": "Central"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "GA",
+   "name": "Georgia",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "HI",
+   "name": "Hawaii",
+   "closes": [
+    {
+     "at_et": "2026-11-04T00:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "ID",
+   "name": "Idaho",
+   "closes": [
+    {
+     "at_et": "2026-11-03T22:00:00-05:00",
+     "zone": "Mountain"
+    },
+    {
+     "at_et": "2026-11-03T23:00:00-05:00",
+     "zone": "Pacific"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "IL",
+   "name": "Illinois",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "IN",
+   "name": "Indiana",
+   "closes": [
+    {
+     "at_et": "2026-11-03T18:00:00-05:00",
+     "zone": "Eastern"
+    },
+    {
+     "at_et": "2026-11-03T19:00:00-05:00",
+     "zone": "Central"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "IA",
+   "name": "Iowa",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "KS",
+   "name": "Kansas",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00",
+     "zone": "Central"
+    },
+    {
+     "at_et": "2026-11-03T21:00:00-05:00",
+     "zone": "Mountain"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "KY",
+   "name": "Kentucky",
+   "closes": [
+    {
+     "at_et": "2026-11-03T18:00:00-05:00",
+     "zone": "Eastern"
+    },
+    {
+     "at_et": "2026-11-03T19:00:00-05:00",
+     "zone": "Central"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "LA",
+   "name": "Louisiana",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "ME",
+   "name": "Maine",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "MD",
+   "name": "Maryland",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "MA",
+   "name": "Massachusetts",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "MI",
+   "name": "Michigan",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00",
+     "zone": "Eastern"
+    },
+    {
+     "at_et": "2026-11-03T21:00:00-05:00",
+     "zone": "Central"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "MN",
+   "name": "Minnesota",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "MS",
+   "name": "Mississippi",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "MO",
+   "name": "Missouri",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "MT",
+   "name": "Montana",
+   "closes": [
+    {
+     "at_et": "2026-11-03T22:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NE",
+   "name": "Nebraska",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NV",
+   "name": "Nevada",
+   "closes": [
+    {
+     "at_et": "2026-11-03T22:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NH",
+   "name": "New Hampshire",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NJ",
+   "name": "New Jersey",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NM",
+   "name": "New Mexico",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NY",
+   "name": "New York",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "NC",
+   "name": "North Carolina",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:30:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "ND",
+   "name": "North Dakota",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00",
+     "zone": "Central"
+    },
+    {
+     "at_et": "2026-11-03T21:00:00-05:00",
+     "zone": "Mountain"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "OH",
+   "name": "Ohio",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:30:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "OK",
+   "name": "Oklahoma",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "OR",
+   "name": "Oregon",
+   "closes": [
+    {
+     "at_et": "2026-11-03T22:00:00-05:00",
+     "zone": "Mountain"
+    },
+    {
+     "at_et": "2026-11-03T23:00:00-05:00",
+     "zone": "Pacific"
+    }
+   ],
+   "early_part": "part"
+  },
+  {
+   "state": "PA",
+   "name": "Pennsylvania",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "RI",
+   "name": "Rhode Island",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "SC",
+   "name": "South Carolina",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "SD",
+   "name": "South Dakota",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00",
+     "zone": "Central"
+    },
+    {
+     "at_et": "2026-11-03T21:00:00-05:00",
+     "zone": "Mountain"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "TN",
+   "name": "Tennessee",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "TX",
+   "name": "Texas",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00",
+     "zone": "Central"
+    },
+    {
+     "at_et": "2026-11-03T21:00:00-05:00",
+     "zone": "Mountain"
+    }
+   ],
+   "early_part": "most"
+  },
+  {
+   "state": "UT",
+   "name": "Utah",
+   "closes": [
+    {
+     "at_et": "2026-11-03T22:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "VT",
+   "name": "Vermont",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "VA",
+   "name": "Virginia",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "WA",
+   "name": "Washington",
+   "closes": [
+    {
+     "at_et": "2026-11-03T23:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "DC",
+   "name": "Washington, D.C.",
+   "closes": [
+    {
+     "at_et": "2026-11-03T20:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "WV",
+   "name": "West Virginia",
+   "closes": [
+    {
+     "at_et": "2026-11-03T19:30:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "WI",
+   "name": "Wisconsin",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  },
+  {
+   "state": "WY",
+   "name": "Wyoming",
+   "closes": [
+    {
+     "at_et": "2026-11-03T21:00:00-05:00"
+    }
+   ]
+  }
+ ]
+}
