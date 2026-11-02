@@ -256,13 +256,13 @@ if(document.referrer)gc.page_referrer=bnCleanUrl(document.referrer);   /* G4: ev
 /* analytics 2026-11-01: staff/bot traffic -> traffic_type=internal (GA4 Admin > Data filters > Internal Traffic). Staff cookie bn_internal=1 is set by
    any page opened with ?internal=1 (cleared by ?internal=0); our box tools send a User-Agent containing BlackoutNetwork-Internal. */
 if(!/[?&]internal=0(&|$)/.test(location.search)&&(/(^|;\s*)bn_internal=1(;|$)/.test(document.cookie)||/[?&]internal=1(&|$)/.test(location.search)||/BlackoutNetwork-Internal/i.test(navigator.userAgent||'')))gc.traffic_type='internal';
-gtag('config',BN_GA_ID,gc);}
+gtag('config',BN_GA_ID,gc);gtag('set',{page_title:bnTitle()});}
 /* Events (seo/batch-1, spec in ga4-events.md): sent only when GA is loaded and allowed. Nothing is queued while GA is skipped
    (EEA/UK/CH, Europe/ timezone, GPC, DNT, opt-out), and nothing that looks like an email or phone number is ever sent. */
 window.bnTrack=function(name,p){if(!window.bnGALoaded||window.BN_GA_SKIP)return false;var o={};p=p||{};
 for(var k in p){if(!Object.prototype.hasOwnProperty.call(p,k))continue;var v=p[k];if(v==null||v==='')continue;
 if(typeof v==='string'){if(window.bnPII(v)&&!window.bnIdOK(k,v))continue;v=v.slice(0,100);}else if(typeof v!=='number'&&typeof v!=='boolean')continue;o[k]=v;}
-o.content_group=o.content_group||bnGroup();gtag('event',name,o);return true;};
+o.content_group=o.content_group||bnGroup();o.page_title=bnTitle();gtag('event',name,o);return true;};
 var T=window.bnTrack;
 function killGA(){window['ga-disable-'+BN_GA_ID]=true;gtag('consent','update',{analytics_storage:'denied'});
 document.cookie.split(';').forEach(function(c){var n=c.split('=')[0].trim();if(n==='_ga'||n.indexOf('_ga_')===0){document.cookie=n+'=; Max-Age=0; path=/; domain=.blackout.network';document.cookie=n+'=; Max-Age=0; path=/';document.cookie=n+'=; Max-Age=0; path=/; domain='+location.hostname;}});}
@@ -286,7 +286,7 @@ var lastTab='';
    bnReLoc: re-sets the clean page_location and sends one page_view per NEW cleaned URL (deduplicated back-to-back; never on initial load,
    which config covers). Respects consent (bnGALoaded && !BN_GA_SKIP) and BN_GA_OFF (whole script absent). */
 var bnLastPV=bnCleanUrl(location.href);
-function bnReLoc(){var c=bnCleanUrl(location.href);gtag('set',{page_location:c});
+function bnReLoc(){var c=bnCleanUrl(location.href);gtag('set',{page_location:c,page_title:bnTitle()});
 if(c===bnLastPV)return;bnLastPV=c;if(!window.bnGALoaded||window.BN_GA_SKIP)return;gtag('event','page_view',{page_location:c,page_title:bnTitle(),content_group:bnGroup()});}
 ['pushState','replaceState'].forEach(function(m){try{var o=history[m];if(!o||o.bnWrapped)return;history[m]=function(st,t,u){if(u!=null){try{gtag('set',{page_location:bnCleanUrl(String(u))});}catch(x){}}var r=o.apply(this,arguments);bnReLoc();return r;};history[m].bnWrapped=1;}catch(e){}});
 window.addEventListener('hashchange',function(){bnReLoc();gtag('set',{content_group:bnGroup()});},true);
