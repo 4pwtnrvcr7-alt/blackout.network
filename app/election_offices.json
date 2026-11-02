@@ -7,12 +7,12 @@
  },
  "states": {
   "AK": {
-   "office_name": "Alaska Division of Elections",
-   "office_url": "https://www.elections.alaska.gov/",
+   "office_name": "vote.gov: Alaska voting information",
+   "office_url": "https://vote.gov/",
    "link_check": {
     "date": "2026-11-02",
-    "http": 0,
-    "note": "curl: TLS chain incomplete on the server (200 with certificate check off); listed by USA.gov"
+    "http": "browser",
+    "note": "elections.alaska.gov fails certificate validation in Chrome (ERR_CERT_AUTHORITY_INVALID, Senior Analyst 2026-11-02), so visitors would see a security warning; linking vote.gov until the state site is fixed."
    }
   },
   "AL": {
@@ -37,7 +37,7 @@
    "link_check": {
     "date": "2026-11-02",
     "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov; loads in a real browser (Senior Analyst 2026-11-02)"
    }
   },
   "CA": {
@@ -94,7 +94,7 @@
    "link_check": {
     "date": "2026-11-02",
     "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov; loads in a real browser (Senior Analyst 2026-11-02)"
    }
   },
   "HI": {
@@ -106,12 +106,12 @@
    }
   },
   "IA": {
-   "office_name": "Iowa Secretary of State: Voter Information",
-   "office_url": "https://sos.iowa.gov/elections/voterinformation/index.html",
+   "office_name": "Iowa Secretary of State: Voters",
+   "office_url": "https://sos.iowa.gov/voters",
    "link_check": {
     "date": "2026-11-02",
-    "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "http": "browser",
+    "note": "Senior Analyst browser check 2026-11-02: old voterinformation URL 404; this page loads (\"Voters | Iowa Secretary of State\"). curl gets 403 (bot protection)."
    }
   },
   "ID": {
@@ -224,7 +224,7 @@
    "link_check": {
     "date": "2026-11-02",
     "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov; loads in a real browser (Senior Analyst 2026-11-02)"
    }
   },
   "NC": {
@@ -257,7 +257,7 @@
    "link_check": {
     "date": "2026-11-02",
     "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov; loads in a real browser (Senior Analyst 2026-11-02)"
    }
   },
   "NJ": {
@@ -290,16 +290,16 @@
    "link_check": {
     "date": "2026-11-02",
     "http": 500,
-    "note": "curl: bot protection (403/500); listed by USA.gov"
+    "note": "curl: bot protection (403/500); listed by USA.gov; loads in a real browser (Senior Analyst 2026-11-02)"
    }
   },
   "OH": {
-   "office_name": "Ohio Secretary of State: Voters",
-   "office_url": "https://www.ohiosos.gov/elections/voters/",
+   "office_name": "Ohio Secretary of State: Elections",
+   "office_url": "https://www.ohiosos.gov/elections/",
    "link_check": {
     "date": "2026-11-02",
-    "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "http": "browser",
+    "note": "Senior Analyst browser check 2026-11-02: /elections/voters/ redirects here; final URL used. curl gets 403 (bot protection)."
    }
   },
   "OK": {
@@ -332,7 +332,7 @@
    "link_check": {
     "date": "2026-11-02",
     "http": 403,
-    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov; loads in a real browser (Senior Analyst 2026-11-02)"
    }
   },
   "SC": {
