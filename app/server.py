@@ -180,6 +180,9 @@ def dashboard_page():
     except Exception:
         traceback.print_exc(); top = _DASH_FALLBACK
     b = b.replace(b"<!--BN_TOP-->", top, 1)
+    try:   # design v3: Top of mind + What's coming bands at the top of The Wire (hidden when their data files are missing)
+        b = b.replace(b"<!--BN_V3_WIRE-->", _addon_mod("design_v3").wire_html().encode("utf-8"), 1)
+    except Exception: traceback.print_exc()
     try:   # JSON-LD NewsMediaOrganization (sameAs X + YouTube) + WebSite/SearchAction on the home page (growth.py)
         ld = _addon_mod("growth").home_ld_tag(); i = b.find(b"</head>")
         if i > 0 and b"application/ld+json" not in b[:i]: b = b[:i] + ld + b[i:]
@@ -417,7 +420,7 @@ def pwa_head(b):
 # t338/t343: Render's free tier drops some of a page's ~40 parallel requests (502/503). (1) every same-origin JS/CSS URL in a page gets
 # ?v=<build> so Cloudflare and browsers can cache it for a year (Cache-Control immutable below) and the origin rarely sees asset requests;
 # (2) BN_RETRY_HEAD retries a failed script/stylesheet (twice, with backoff) and same-origin GET fetches that come back 502/503/504.
-_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
+_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons|bn-v3)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
 _ASSET_V = {"t": 0, "v": b"0"}
 def asset_version():
     now = time.time()
@@ -436,6 +439,11 @@ def version_assets(b):
         if h >= 0 and b"<html" in lo and b"bnRetry" not in b[:40000]: b = b[:h + 6] + BN_RETRY_HEAD + b[h + 6:]
         j = b.rfind(b"</body>")   # dead-link guard + easter eggs (bn_extras.py) on every full page
         if j > 0 and b"<html" in lo and b"/linkguard.js" not in b: b = b[:j] + b'<script src="/bn-icons.js"></script><script src="/linkguard.js" defer></script><script src="/bn-eggs.js" defer></script>' + b[j:]   # bn-icons runs before first paint (no emoji flash)
+        if os.environ.get("BN_DESIGN_V3", "1") != "0" and b"<html" in lo and b"/bn-v3.css" not in b:   # design v3 phase 1 (design_v3.py); BN_DESIGN_V3=0 = off
+            k = b.find(b"</head>")
+            if k > 0: b = b[:k] + b'<link rel="stylesheet" href="/bn-v3.css">' + b[k:]
+            j = b.rfind(b"</body>")
+            if j > 0: b = b[:j] + b'<script src="/bn-v3.js" defer></script>' + b[j:]
         return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
     except Exception: return b
 BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;window.__bnRetry=1;var o=location.origin;'

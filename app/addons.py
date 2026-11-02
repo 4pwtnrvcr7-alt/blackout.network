@@ -50,6 +50,9 @@ ROUTES = {
     "/sitenav.css": "sitenav",
     "/linkguard.js": "bn_extras",   # hides links the nightly link checker flagged dead (t338)
     "/bn-icons.js": "bn_extras",    # emoji -> SVG icons (Nov 1)
+    "/bn-v3.css": "design_v3",      # design v3 phase 1: tokens, full-page menu, accordions (Nov 2)
+    "/bn-v3.js": "design_v3",
+    "/api/v3": "design_v3",         # /api/v3/wire: Top of mind + What's coming bands (data/top_of_mind.json, data/whats_coming.json)
     "/bn-eggs.js": "bn_extras",     # discreet easter eggs (t347)
     "/api/linkcheck": "bn_extras",  # /api/linkcheck/dead: flagged URLs (tools/linkcheck.py nightly)
     "/fonts": "sitenav",            # self-hosted Montserrat + Inter woff2 (OFL), t323

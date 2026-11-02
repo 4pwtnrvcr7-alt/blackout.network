@@ -46,6 +46,18 @@ MENU = [
  ("About", ["@scoring", "sources", "tips"]),
 ]
 
+# Design v3 full-page menu: a line icon and a one-line description per section (24px grid, 1.8 stroke, currentColor).
+_GI = 'aria-hidden="true" focusable="false" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
+MENU_META = {
+ "Live": ("The Wire, broadcasts, streams, radio and trends", f'<svg {_GI}><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></svg>'),
+ "Threat categories": ("Network, grid, AI, space weather, weather, crime and markets", f'<svg {_GI}><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16v.5"/></svg>'),
+ "Politics & Government": ("Politics, midterms, gun laws and the government index", f'<svg {_GI}><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M2 10l10-6 10 6z"/></svg>'),
+ "Community": ("Crowd rankings, videos, public stats and the newsletter", f'<svg {_GI}><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.6c3 .1 6 2 6 5.4"/></svg>'),
+ "Reference": ("Local resources, maps, bushcraft, first aid and preppers", f'<svg {_GI}><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7M8 11h7"/></svg>'),
+ "Play": ("Original 8-bit games", f'<svg {_GI}><rect x="2.5" y="7" width="19" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3M15.5 12h.01M18 14h.01"/></svg>'),
+ "About": ("How we score, sources and tips", f'<svg {_GI}><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'),
+}
+
 def menu_sections(sn):
     items = [it for g, its in sn.NAV for it in its if not (len(it) > 5 and it[5])]
     where = {k: i for i, (_, ks) in enumerate(MENU) for k in ks}
@@ -107,13 +119,16 @@ def drawer(sn, active=""):
     act = next((n for n, its in secs for it in its if it[0] == active), None)
     for name, its in secs:
         op = " open" if (name == act or name == "Live") else ""
-        out.append(f'<details class="bn-grp" data-grp="{E(name)}"{op}><summary>{E(name)}</summary><ul>')
+        desc, ico = MENU_META.get(name, ("", ""))
+        out.append(f'<details class="bn-grp" data-grp="{E(name)}"{op}><summary><span class="bn-gi">{ico}</span><span class="bn-gt">{E(name)}'
+                   + (f'<small class="bn-gd">{E(desc)}</small>' if desc else "") + '</span></summary><ul>')
         for it in its:
             key, h, label = it[0], it[1], it[2]
             href = h if h.startswith("/") else "/#" + h
             cur = ' aria-current="page"' if key == active else ""
             out.append(f'<li><a href="{E(href)}" data-tab="{E(key)}"{cur}>{E(plain(label))}</a></li>')
         out.append('</ul></details>')
+    out.append('<div class="bn-dcta"><a class="bn-cta" href="/newsletter">Get the brief</a><span class="bn-ctag">BLACKOUT.NETWORK · Signal over noise.</span></div>')
     out.append(f'<div class="bn-dfollow">{follow_links(sn, "bn-follow bn-follow-row")}</div>')
     out.append('<div class="bn-dtools">' + theme_btn("bn-js-only bn-theme-row") +
                '<button type="button" class="bn-mrow bn-js-only bn-gear-row" aria-controls="bn_settings">' + I_GEAR + '<span>Settings &amp; scan status</span></button></div>'

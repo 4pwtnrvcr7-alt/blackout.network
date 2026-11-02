@@ -33,7 +33,8 @@ RENDER_OWNED = [x for x in os.environ.get("BN_RENDER_OWNED", "votes.db,newslette
 SYNC_DIRS = ["snapshots", "static/vsubs", "video_subs", "static/social"]   # static/social: story thumbnails (t303)
 SYNC_JSON = ["page_data.json", "config.json", "keywords.json", "arcs_settings.json", "tips.json", "newsletter_config.json",
              "translate_glossary.json", "translate_langs.json", "sources*.json", "youtube*.json",
-             "social_*.json", "webpush_config.json", "webpush_dead.json"]   # social_stories/social_youtube/social_x_posts.json (t303)
+             "social_*.json", "webpush_config.json", "webpush_dead.json",
+             "data/top_of_mind.json", "data/whats_coming.json"]   # design v3 Wire bands: the team edits these on the box, sync pushes them   # social_stories/social_youtube/social_x_posts.json (t303)
 # Code/static that hot-reloads on Render (add-ons re-import on mtime change; dashboard.html is read per request).
 CODE_GLOBS = ["*.py", "*.html", "*.css", "*.js", "*_static/*", "games_static/*", "static/theme.css", "static/img/*", "static/pwa/*", "static/guides/*",
               "heatmap_data/*.json", "newsletter_disposable.txt"]
