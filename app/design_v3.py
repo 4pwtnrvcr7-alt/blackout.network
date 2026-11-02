@@ -92,7 +92,13 @@ def whats_coming(now=None):
         items.append({"date": day.isoformat(), "days": dd, "time": tm, "title": t, "detail": _txt(it.get("detail"), 160), "category": cat,
                       "kind": "hazard" if it.get("kind") == "hazard" else "event", "sources": src,
                       "link": it.get("link") if _internal_ok(it.get("link")) else None})
-    items.sort(key=lambda x: (x["date"], x["time"] or "99"))
+    def _mins(t):   # "8:30 AM ET" -> 510; items without a time sort first (all-day)
+        import re
+        m = re.match(r"\s*(\d{1,2})(?::(\d\d))?\s*([AaPp])", t or "")
+        if not m: return -1
+        h = int(m.group(1)) % 12 + (12 if m.group(3).lower() == "p" else 0)
+        return h * 60 + int(m.group(2) or 0)
+    items.sort(key=lambda x: (x["date"], _mins(x["time"])))
     return {"items": items[:MAX_ITEMS], "updated": d.get("updated")}
 
 def _fmt_asof(iso):

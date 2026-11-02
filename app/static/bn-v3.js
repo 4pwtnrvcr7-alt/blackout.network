@@ -50,7 +50,7 @@
  function wire(){
   var m=d.getElementById("tab-threat");if(!m)return;
   var sec=function(id){var e=d.getElementById(id);return e?e.closest("section"):null};
-  var band=d.getElementById("v3_wireband");if(band&&m.firstElementChild!==band)m.insertBefore(band,m.firstElementChild);
+  var band=d.getElementById("v3_wireband");
   var wh=wrapEl(d.getElementById("wh"),"acc-history",{title:"Timeline history",desc:"Every stored scanner story plus archived source data, back to Oct 2024",icon:"book"});
   var tl=wrapEl(d.getElementById("tl"),"acc-timeline",{title:"Timeline",desc:"Scrub hour by hour through everything cataloged, with source snapshots",icon:"clock"});
   [wh,tl].forEach(function(x){if(x)x.style.gridColumn="1/-1"});
@@ -62,7 +62,7 @@
   wrapEl(sec("sources"),"acc-sources",{title:"Sources & health",desc:"Every feed the scanner reads and whether its last fetch worked",icon:"list"});
   wrapEl(sec("apilink"),"acc-api",{title:"API",desc:"Public JSON endpoints for high-severity items",icon:"code"});
   var first=d.getElementById("acc-history")||d.getElementById("acc-timeline");if(first&&!first.dataset.tools){first.dataset.tools=1;allToggle(first,m)}
-  var tools=$(".bn-acc-tools",m);if(tools&&band&&tools.previousElementSibling!==band)band.after(tools);
+  order(m);
   setVal(d.getElementById("acc-watchlist"),txt("#wcount")?'<span class="bn-acc-st warn">'+esc(txt("#wcount"))+' items</span>':"");
   setVal(d.getElementById("acc-timeline"),esc(txt("#tl_cnt",40)));
   var ok=$$("#sources .ok,#sources [data-ok=1]").length;setVal(d.getElementById("acc-sources"),ok?'<span class="bn-acc-st">'+ok+' OK</span>':"")}
@@ -98,7 +98,30 @@
    if(lastBand===null){lastBand=j.html;if(!host.children.length&&j.html)host.innerHTML=j.html;return}
    if(j.html!==lastBand){lastBand=j.html;host.innerHTML=j.html}}).catch(function(){})}
 
+ /* ---------- Wire pulse: 4 live numbers from /api/state (the same data as the feed), animated; nothing shown until real data arrives ---------- */
+ var RM=matchMedia("(prefers-reduced-motion: reduce)");
+ function countUp(el,to){if(RM.matches||!window.requestAnimationFrame){el.textContent=to.toLocaleString();return}var t0=null,from=0;
+  function f(t){t0=t0||t;var k=Math.min(1,(t-t0)/900),e=1-Math.pow(1-k,3);el.textContent=Math.round(from+(to-from)*e).toLocaleString();if(k<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
+ function pulse(){var m=d.getElementById("tab-threat");if(!m)return;
+  fetch("/api/state",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(S){if(!S||!S.main)return;
+   var main=S.main,top=main.reduce(function(a,x){return(x.rank||0)>(a?a.rank||0:-1)?x:a},null),rk=top?top.rank||0:0;
+   var src=S.sources||[],ok=src.filter(function(x){return x.ok}).length,wl=S.watchlist_count!=null?S.watchlist_count:(S.watchlist||[]).length;
+   var days={};(S.volume||[]).forEach(function(v){days[v.d]=(days[v.d]||0)+v.n});var dk=Object.keys(days).sort().slice(-7),mx=Math.max.apply(null,dk.map(function(k){return days[k]}).concat([1]));
+   var el=d.getElementById("v3_pulse"),fresh=!el;if(fresh){el=d.createElement("div");el.id="v3_pulse";el.className="v3-pulse";el.setAttribute("aria-label","The Wire right now");}
+   var segs="";for(var i=1;i<=10;i++)segs+='<i class="'+(i<=rk?(rk>=7?"on hot":rk>=5?"on mid":"on"):"")+'" style="--k:'+i+'"></i>';
+   var bars=dk.map(function(k,i){return'<i style="--h:'+Math.max(6,Math.round(days[k]/mx*100))+'%;--k:'+i+'" title="'+esc(k)+': '+days[k]+'"></i>'}).join("");
+   var pct=src.length?ok/src.length:0,C=2*Math.PI*16;
+   el.innerHTML='<div class="v3-pc"><span class="v3-pk">Top rank now</span><b class="v3-pn"><span data-n="'+rk+'">'+rk+'</span><small>/10</small></b><span class="v3-meter'+(rk>=7?" hot":"")+'" aria-hidden="true">'+segs+'</span><span class="v3-ps">'+esc(top?(top.category||"")+(top.location?", "+top.location:""):"")+'</span></div>'+
+    '<div class="v3-pc"><span class="v3-pk">On The Wire</span><b class="v3-pn"><span data-n="'+main.length+'">'+main.length+'</span></b><span class="v3-spark" aria-hidden="true">'+bars+'</span><span class="v3-ps">confirmed items · alerts per day, last 7 days</span></div>'+
+    '<div class="v3-pc"><span class="v3-pk">Watchlist</span><b class="v3-pn"><span data-n="'+wl+'">'+wl+'</span></b><span class="v3-ps">single-source, waiting for a second source</span></div>'+
+    '<div class="v3-pc v3-pc-ring"><svg class="v3-ring" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16"/><circle class="v3-ring-v" cx="20" cy="20" r="16" style="stroke-dasharray:'+C.toFixed(1)+';--off:'+(C*(1-pct)).toFixed(1)+'"/></svg><div><span class="v3-pk">Sources OK</span><b class="v3-pn"><span data-n="'+ok+'">'+ok+'</span><small> of '+src.length+'</small></b><span class="v3-ps">at the last scan</span></div></div>';
+   if(fresh){m.insertBefore(el,m.firstElementChild);order(m);$$(".v3-pn [data-n]",el).forEach(function(n){countUp(n,+n.getAttribute("data-n"))})}
+  }).catch(function(){})}
+ function order(m){   // top of The Wire: pulse, bands, expand-all, timeline history, timeline (moves only what is out of place)
+  var prev=null;[d.getElementById("v3_pulse"),d.getElementById("v3_wireband"),$(":scope>.bn-acc-tools",m),d.getElementById("acc-history"),d.getElementById("acc-timeline")].forEach(function(el){
+   if(!el||el.parentNode!==m)return;var target=prev?prev.nextElementSibling:m.firstElementChild;if(el!==target)m.insertBefore(el,target);prev=el})}
+
  function tick(){try{wire()}catch(e){}try{solar()}catch(e){}try{net()}catch(e){}}
- function boot(){try{menu()}catch(e){}tick();setInterval(tick,2000);if(d.getElementById("v3_wireband")){bands();setInterval(bands,300000)}}
+ function boot(){try{menu()}catch(e){}tick();setInterval(tick,2000);if(d.getElementById("v3_wireband")){bands();setInterval(bands,300000);pulse();setInterval(pulse,180000)}}
  if(d.readyState==="loading")d.addEventListener("DOMContentLoaded",boot);else boot();
 })();
