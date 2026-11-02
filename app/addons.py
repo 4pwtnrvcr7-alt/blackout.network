@@ -45,6 +45,7 @@ ROUTES = {
     "/theme.css": "static_files",
     "/bn-progress.js": "static_files",       # shared search progress bar (t480)
     "/bn-progress.css": "static_files",
+    "/bn-ga-events.js": "static_files",  # GA4 event module, loaded only with the GA tag (analyst, Nov 2)
     "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
     "/sitenav.css": "sitenav",
     "/linkguard.js": "bn_extras",   # hides links the nightly link checker flagged dead (t338)

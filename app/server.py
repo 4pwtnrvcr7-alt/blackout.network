@@ -274,7 +274,7 @@ var played=[];document.addEventListener('play',function(e){var m=e.target;if(!m|
 var c=m.closest&&m.closest('[data-station],.rd-card,.bnp,.card,section');var n=(m.getAttribute('data-station')||(c&&(c.getAttribute('data-station')||((c.querySelector('b,h3,h2')||{}).textContent)))||m.getAttribute('aria-label')||'').trim();
 T('broadcast_play',{station:n||'unknown'});},true);
 try{if(window.PushManager&&PushManager.prototype.subscribe&&!PushManager.prototype.subscribe.bnWrapped){var ps=PushManager.prototype.subscribe;
-PushManager.prototype.subscribe=function(){return ps.apply(this,arguments).then(function(s){T('push_subscribe',{platform:platform()});return s;});};PushManager.prototype.subscribe.bnWrapped=1;}}catch(e){}
+PushManager.prototype.subscribe=function(){return ps.apply(this,arguments).then(function(s){T('push_subscribe',{platform:platform()});T('push_optin',{platform:platform()});return s;});};PushManager.prototype.subscribe.bnWrapped=1;}}catch(e){}
 try{var f0=window.fetch;if(f0&&!f0.bnWrapped){window.fetch=function(input,init){var u=typeof input==='string'?input:(input&&input.url)||'';var r=f0.apply(this,arguments);
 if(/\/api\/newsletter\/subscribe(\?|$)/.test(u)&&init&&String(init.method||'').toUpperCase()==='POST'){var src='form';try{src=String(JSON.parse(init.body).source||'form');}catch(x){}
 r.then(function(res){if(res&&res.ok){var loc=location.pathname==='/'?'home'+(tabKey()?'_'+tabKey():''):location.pathname.replace(/^\/+|\/+$/g,'').replace(/\/[0-9a-f]{16}$/,'').replace(/\//g,'_');
@@ -344,7 +344,7 @@ def ga_head(b, country=None, ga=True):
         lo = b[:6000].lower(); h = lo.find(b"<head>")
         if h < 0 or b"<html" not in lo: return b
         if ga and not _flag("BN_GA_OFF") and b"BN_GA_REGION" not in b[:60000]:
-            tag = ("<script>window.BN_GA_REGION=" + json.dumps(ga_region(country)) + ";window.BN_POLICY_V=" + json.dumps(CONSENT_POLICY_VERSION) + ";" + GA_JS + "</script>").encode("utf-8")
+            tag = ("<script>window.BN_GA_REGION=" + json.dumps(ga_region(country)) + ";window.BN_POLICY_V=" + json.dumps(CONSENT_POLICY_VERSION) + ";" + GA_JS + "</script><script src=\"/bn-ga-events.js\" defer></script>").encode("utf-8")
             m = re.search(rb"<meta charset=[^>]*>", b[:60000], re.I); i = m.end() if m and m.start() < b.lower().find(b"</head>") else h + 6   # after <meta charset>, else right after <head>
             b = b[:i] + tag + b[i:]
         lo = b.lower(); j = lo.rfind(b"</footer>"); fs = lo.rfind(b"<footer", 0, j) if j >= 0 else -1
