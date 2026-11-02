@@ -180,13 +180,9 @@ def soft404(orig, final, title, h1, vis):
             return "redirects to the homepage"
         if re.search(r"/(404|not-?found|error|page-not-found|pagenotfound)(\.\w+)?$", fp, re.I) and not re.search(r"404|not-?found|error", po.path, re.I):
             return "redirects to an error page"
-    # Nov 2 (CoS): soft-404 TEXT tests. Our own wire story pages (blackout.network/wire/...) put the story headline in <title>/<h1>,
-    # so headlines like "...not found..." or "410 troops" tripped them; skip the text tests there (HTTP status, DNS and redirects still count).
-    if host(orig).replace("www.", "") == "blackout.network" and po.path.startswith("/wire/"): return None
-    # For every URL, judge only <title> (not <h1> or headline/body text, which on news homepages is a story headline).
-    # A near-empty page with no title at all still gets the short-body check.
     if SOFT_TITLE_RE.search(title) and not SOFT_TITLE_RE.search(up.unquote(po.path)): return f"title says: {title[:80]}"
-    if not title and len(vis) < 1200 and re.search(r"page not found|404 not found|does not exist|no longer available", vis, re.I): return "page body says not found"
+    if SOFT_TITLE_RE.search(h1) and len(vis) < 4000: return f"heading says: {h1[:80]}"
+    if len(vis) < 1200 and re.search(r"page not found|404 not found|does not exist|no longer available", vis, re.I): return "page body says not found"
     return None
 def mismatch(labels, final, title, h1, og):
     hay = toks(title) | toks(h1) | toks(og) | toks(host(final).replace("www.", "")) | toks(up.unquote(up.urlsplit(final).path))
