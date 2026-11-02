@@ -311,14 +311,15 @@
   }
   function naRender(state, info) {
     naShell(); na.dataset.state = state; var h = "", E2 = naEnv();
+    var dev = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && (navigator.maxTouchPoints || 0) > 1) ? "iPad" : (E2.ios || E2.android || /Mobi/i.test(navigator.userAgent)) ? "phone" : "computer";
     if (state === "ask") {
-      h = naHead("bell", "Get alerts on this phone?", "Free · Turn off any time", "later") +
+      h = naHead("bell", "Get alerts on this " + dev + "?", "Free · Turn off any time", "later") +
         '<div class="bnig-stage">' + sceneNotif() + '</div>' +
         '<ul class="bnna-list">' +
         '<li>' + nico("bolt") + '<span><b>Major threats, once confirmed</b><small>Rank 7+ out of 10, usually a few a week.</small></span></li>' +
         '<li>' + nico("globe") + '<span><b>What we track</b><small>War, disasters, cyber attacks, outbreaks, space weather.</small></span></li>' +
         '<li>' + nico("gauge") + '<span><b>Never more than 6 an hour</b><small>No ads or promos. Manage them from the bell.</small></span></li></ul>' +
-        '<p class="bnig-note bnna-msg" role="status" aria-live="polite">Your phone asks next. Tap <b>Allow</b>.</p>' +
+        '<p class="bnig-note bnna-msg" role="status" aria-live="polite">Your ' + (dev === "computer" ? "browser" : dev) + ' asks next. Tap <b>Allow</b>.</p>' +
         '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="on">' + nico("bell", "bnna-bti") + '<span>Turn on alerts</span></button>' +
         '<button type="button" class="bnig-sec" data-na="later">Not now</button></div>';
     } else if (state === "granted") {
