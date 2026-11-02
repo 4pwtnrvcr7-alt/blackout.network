@@ -146,7 +146,7 @@ and situational awareness only; it is not an official warning service. Follow of
 - [Story pages]({SITE}/sitemap.xml): one page per ranked story at /wire/<id>, with a timeline and every source linked
 - [How we score]({SITE}/scoring): the 0-100 severity score and the 0-10 rank, explained factor by factor
 - [Sources]({SITE}/sources): every source we use, with item counts and a 0-10 confidence rating
-- [Newsletter]({SITE}/newsletter): the free email brief, double opt-in
+- [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
 - [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
 - [Videos & posts]({SITE}/social): our YouTube and X updates, each with a sourced story page
 - [Public stats]({SITE}/stats): our open traffic and audience numbers

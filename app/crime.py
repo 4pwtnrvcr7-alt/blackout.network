@@ -499,7 +499,7 @@ def render_page(q=""):
              f'<div class="cr-scale"><span>0</span><i class="cr-grad"></i><span>30+</span></div></div>'
              f'<div class="cr-grid2"><div class="cr-card"><h3>Highest rates (2018 or later)</h3><ol class="cr-rank">{tl(top)}</ol></div>'
              f'<div class="cr-card"><h3>Lowest rates (2018 or later)</h3><ol class="cr-rank">{tl(low)}</ol></div></div>')
-    nl = ('<section class="cr-cta"><div><div class="cr-kick">FREE</div><h2>Get your area\'s crime numbers in the brief</h2>'
+    nl = ('<section class="cr-cta"><div><div class="cr-kick">FREE · 7 AM &amp; 7 PM ET</div><h2>Get your area\'s crime numbers in the brief</h2>'
           '<p>Add your ZIP, city or country, then tick <b>Include local crime summary in my briefs</b> and, if you want them, '
           '<b>Real-time crime alerts for my area</b>. Both start off and you can change them any time in Manage preferences. Nothing is sent until you confirm by email.</p></div>'
           '<div class="bng-inline-slot" data-src="crime"><a class="cr-btn red" href="/newsletter?utm_source=crime&amp;utm_medium=cta&amp;utm_campaign=crime">✉ Get the free brief</a></div>'
