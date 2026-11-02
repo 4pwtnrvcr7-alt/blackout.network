@@ -30,13 +30,13 @@
 #tab-heatmap .hm-mapw{position:relative;border:1px solid var(--hm-bd);border-radius:9px;overflow:hidden;background:#0d1116}
 #hm_map{height:580px;background:#0d1116}
 #tab-heatmap .hm-dark{filter:none}   /* t252: basemap is the shared dark OpenFreeMap vector style from dashboard.html bnBaseLayer() (no CSS filter needed) */
-#tab-heatmap .hm-crumb{position:absolute;top:8px;left:52px;z-index:500;background:#0c0f12e6;border:1px solid var(--hm-bd);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--mu);pointer-events:auto}
+#tab-heatmap .hm-crumb{position:absolute;top:8px;left:52px;z-index:500;background:#0c0f12;border:1px solid var(--hm-bd);border-radius:14px;padding:3px 10px;font-size:12px;color:var(--mu);pointer-events:auto}
 #tab-heatmap .hm-crumb a{color:var(--ac);cursor:pointer;text-decoration:none}
 #tab-heatmap .hm-crumb b{color:var(--tx)}
-#tab-heatmap .hm-legend{background:#0c0f12e6;border:1px solid var(--hm-bd);border-radius:8px;padding:6px 9px;font-size:11.5px;color:var(--bn-text-2,#c9d0d9);line-height:1.5;min-width:170px}
+#tab-heatmap .hm-legend{background:#0c0f12;border:1px solid var(--hm-bd);border-radius:8px;padding:6px 9px;font-size:11.5px;color:var(--bn-text-2,#c9d0d9);line-height:1.5;min-width:170px}
 #tab-heatmap .hm-legend .ramp{height:8px;border-radius:4px;margin:3px 0 1px}
 #tab-heatmap .hm-legend .rl{display:flex;justify-content:space-between;color:var(--mu);font-size:10.5px}
-#tab-heatmap .hm-zoomhint{position:absolute;bottom:8px;right:8px;z-index:500;background:#0c0f12e6;border:1px solid var(--hm-bd);border-radius:8px;padding:3px 9px;font-size:11.5px;color:var(--mu)}
+#tab-heatmap .hm-zoomhint{position:absolute;bottom:8px;right:8px;z-index:500;background:#0c0f12;border:1px solid var(--hm-bd);border-radius:8px;padding:3px 9px;font-size:11.5px;color:var(--mu)}
 #tab-heatmap .leaflet-container{font:12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 #tab-heatmap .leaflet-popup-content-wrapper,#tab-heatmap .leaflet-popup-tip{background:var(--bn-surface,#14181d);color:var(--tx);border:1px solid var(--hm-bd)}
 #tab-heatmap .leaflet-popup-content a{color:var(--ac)}
@@ -59,16 +59,16 @@
 #tab-heatmap .hm-catbar i{display:block;height:100%}
 #tab-heatmap .hm-sb{overflow:auto;padding:6px 8px 10px;flex:1;min-height:0;overflow-anchor:none;scrollbar-width:thin}
 #tab-heatmap .hm-reg{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;padding:6px 7px;border-radius:6px;font-size:13px}
-#tab-heatmap .hm-reg:hover{background:#1a2027}
+#tab-heatmap .hm-reg:hover{background:var(--bn-surface-2,#1a2027)}
 #tab-heatmap .hm-reg .rk{color:var(--mu);font-size:11px;text-align:right}
 #tab-heatmap .hm-reg .bar{height:4px;border-radius:2px;background:#ff7a45;margin-top:3px;opacity:.8}
 #tab-heatmap .hm-reg .n{font-size:12px;color:var(--mu);text-align:right;white-space:nowrap}
 #tab-heatmap .hm-reg .n b{color:var(--tx)}
 #tab-heatmap .hm-h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin:8px 6px 4px}
 /* accordion rows */
-#tab-heatmap .hm-acc{background:#171c22;border:1px solid var(--hm-bd);border-left:3px solid #3a4250;border-radius:7px;margin:5px 0;overflow-anchor:none}
+#tab-heatmap .hm-acc{background:var(--bn-raised,#171c22);border:1px solid var(--hm-bd);border-left:3px solid #3a4250;border-radius:7px;margin:5px 0;overflow-anchor:none}
 #tab-heatmap .hm-ah{all:unset;box-sizing:border-box;display:flex;gap:8px;align-items:flex-start;width:100%;padding:6px 9px;cursor:pointer;font-size:12.8px;color:var(--tx);border-radius:7px}
-#tab-heatmap .hm-ah:hover{background:#1e252d}
+#tab-heatmap .hm-ah:hover{background:var(--bn-surface-2,#1e252d)}
 #tab-heatmap .hm-ah:focus-visible{outline:2px solid var(--ac);outline-offset:-2px}
 #tab-heatmap .hm-ah .t{flex:1;min-width:0;line-height:1.35}
 #tab-heatmap .hm-ah .t small{display:block;color:var(--mu);font-size:11.5px;margin-top:2px}
@@ -94,11 +94,11 @@
 #tab-heatmap .hm-unl .hm-grp>.hm-ah{font-size:13.5px;padding:8px 11px}
 #tab-heatmap .hm-unl .hm-grp>.hm-ab .hm-ac{padding:0 10px 10px 14px}
 #tab-heatmap .hm-cnt{font-size:12px;font-weight:700;border-radius:10px;background:var(--bn-line,#24303c);padding:1px 8px;color:var(--tx);flex:0 0 auto}
-#tab-heatmap .hm-why{color:#d6dbe2;font-size:12px;background:var(--bn-surface-0,#0f1317);border:1px dashed #2f3946;border-radius:6px;padding:4px 7px;margin:3px 0}
+#tab-heatmap .hm-why{color:var(--bn-text-2,#d6dbe2);font-size:12px;background:var(--bn-surface-0,#0f1317);border:1px dashed #2f3946;border-radius:6px;padding:4px 7px;margin:3px 0}
 #tab-heatmap .hm-foot{font-size:12px;color:var(--mu);margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 14px}
 #tab-heatmap .hm-foot a{color:var(--ac)}
 #tab-heatmap .hm-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:10px}
-#tab-heatmap .hm-stat{background:#14191f;border:1px solid var(--hm-bd);border-radius:8px;padding:8px 10px;font-size:12px}
+#tab-heatmap .hm-stat{background:var(--bn-surface,#14191f);border:1px solid var(--hm-bd);border-radius:8px;padding:8px 10px;font-size:12px}
 #tab-heatmap .hm-stat h4{margin:0 0 5px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mu)}
 #tab-heatmap .hm-stat .r{display:grid;grid-template-columns:minmax(0,1fr) 44px 90px;gap:6px;align-items:center;margin:2px 0}
 #tab-heatmap .hm-stat .r i{display:block;height:6px;border-radius:3px;background:var(--bn-link,#4aa3ff)}
@@ -109,3 +109,8 @@
 #tab-heatmap .hm-crumb,#tab-heatmap .hm-zoomhint{color:#aab3bf}#tab-heatmap .hm-crumb b{color:#e6e9ee}
 #tab-heatmap .hm-zoomhint{bottom:auto;top:8px;right:8px;max-width:calc(100% - 150px)}
 @media(max-width:600px){#tab-heatmap .hm-zoomhint{top:44px;left:52px;right:8px;max-width:none}}
+/* SVG icons (no emoji): same line style as the site icon set */
+.hm-i{display:inline-block;width:1.05em;height:1.05em;vertical-align:-.16em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#tab-heatmap .hm-crumb a .hm-i{color:var(--ac)}
+#tab-heatmap .hm-chev .hm-i{width:10px;height:10px;vertical-align:0;stroke-width:3;display:block}
+#tab-heatmap .hm-rsn{color:var(--bn-text-2,#d6dbe2)}

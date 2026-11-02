@@ -14,13 +14,15 @@ const H={d:null,shown:false,map:null,win:localStorage.getItem("hm_win")||"24h",c
 const etF=t=>t?new Date(t).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET":"—";
 const ago=t=>{const s=(Date.now()-Date.parse(t))/1e3;if(!isFinite(s))return"";if(s<3600)return Math.max(1,Math.round(s/60))+"m ago";if(s<86400)return Math.round(s/3600)+"h ago";return Math.round(s/86400)+"d ago"};
 const rk=r=>r>=7?"h":r>=4?"m":"l";
+// inline SVG line icons (24px grid, 2px stroke, currentColor; same paths as the site icon set) - no emoji on the site
+const ICO={globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 2.6 4.2 5.6 4.2 9s-1.4 6.4-4.2 9c-2.8-2.6-4.2-5.6-4.2-9S9.2 5.6 12 3z"/>',fire:'<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.4 2.4-5.4 3.6-8.3.9 1.6 1.7 2.5 2.9 3 .2-2.9 1.3-5.1 3.3-6.5-.3 3.1 3.2 6.1 3.2 11.4C18.5 18.4 15.9 21 12 21z"/>',pin:'<path d="M12 21.5s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10.5" r="2.4"/>',chev:'<path d="M9 5l7 7-7 7"/>'},ico=k=>`<svg class=hm-i viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" aria-hidden=true focusable=false>${ICO[k]}</svg>`;
 const RAMP=["#1b2a3a","#3b2a6b","#7a2d8c","#c2255c","#f0532d","#fa8c16","#ffd666"];
 function ramp(f){f=Math.max(0,Math.min(1,f));const p=f*(RAMP.length-1),i=Math.floor(p),k=p-i;if(i>=RAMP.length-1)return RAMP[RAMP.length-1];
  const a=RAMP[i],b=RAMP[i+1],h=(s,o)=>parseInt(s.substr(o,2),16),m=o=>Math.round(h(a,o)+(h(b,o)-h(a,o))*k).toString(16).padStart(2,"0");return"#"+m(1)+m(3)+m(5)}
 
 // ---------- tab button placement + deep link (#heatmap) ----------
 const nav=document.querySelector(".tabs");let tb=nav&&nav.querySelector('button[data-tab="heatmap"]');
-if(nav&&!tb){tb=document.createElement("button");tb.dataset.tab="heatmap";tb.textContent="🔥 Heat Map";nav.appendChild(tb)}
+if(nav&&!tb){tb=document.createElement("button");tb.dataset.tab="heatmap";tb.innerHTML=ico("fire")+" Heat Map";nav.appendChild(tb)}
 const after=nav&&nav.querySelector('button[data-tab="solar_seismic"]');if(after&&tb)after.insertAdjacentElement("afterend",tb);
 try{if(typeof TABHASH=="object"){TABHASH.heatmap="heatmap";HASHTAB.heatmap="heatmap"}}catch(_){}
 
@@ -37,7 +39,7 @@ app.innerHTML=`<div class=hm-status id=hm_status><span class=meta>Loading geoloc
 <div class=hm-grid><div class=hm-mapw><div id=hm_map></div><div class=hm-crumb id=hm_crumb></div><div class=hm-zoomhint id=hm_zh></div></div><aside class=hm-side id=hm_side aria-live=polite></aside></div>
 <div class=hm-foot id=hm_foot></div>
 <div class=hm-stats id=hm_stats></div>
-<div class=hm-unl id=hm_unlw><h2>📍 Unlocated alerts <span class=meta id=hm_unlmeta></span></h2><div id=hm_unl></div></div>`;
+<div class=hm-unl id=hm_unlw><h2>${ico("pin")} Unlocated alerts <span class=meta id=hm_unlmeta></span></h2><div id=hm_unl></div></div>`;
 const $$=id=>document.getElementById(id);
 
 // how-this-works notes (shared component)
@@ -133,7 +135,7 @@ function bigBounds(layer){let best=null,ba=-1;const walk=ls=>{ls.forEach(r=>{if(
  try{walk(layer.getLatLngs())}catch(_){}return best||layer.getBounds()}
 function selectRegion(sel,layer){H.sel=sel;H.page=25;if(layer&&H.map){const b=bigBounds(layer);if(b&&b.isValid())H.map.flyToBounds(b,{maxZoom:sel.type=="a1"?7:5,padding:[20,20],duration:.6})}
  side();crumb()}
-function crumb(){const el=$$("hm_crumb"),s=H.sel;let h=`<a data-c="world">🌍 World</a>`;
+function crumb(){const el=$$("hm_crumb"),s=H.sel;let h=`<a data-c="world">${ico("globe")} World</a>`;
  if(s){const cc=s.type=="cc"?s.key:s.cc||(H.d&&(H.d.items.find(x=>x.id==s.id)||{}).cc);const cn=(H.agg&&H.agg.cc[cc]||{}).name||(s.type=="cc"?s.name:s.cn)||cc;
   if(cc)h+=` › ${s.type=="cc"?`<b>${e_(cn)}</b>`:`<a data-c="cc" data-k="${e_(cc)}">${e_(cn)}</a>`}`;if(s.type!="cc")h+=` › <b>${e_(s.name)}</b>`}
  el.innerHTML=h}
@@ -149,7 +151,7 @@ function accItem(x,opt){opt=opt||{};const id=(opt.pre||"")+x.id,open=(opt.set||H
  if(x.ev)kv.push(["Evidence",x.ev]);
  if(x.reason)kv.push(["Why unlocated",x.reason]);if(x.cands&&x.cands.length)kv.push(["Candidates",x.cands.join(" · ")]);
  const sub=opt.sub!=null?opt.sub:`${etF(x.t)} · ${x.conf||"?"} confidence${x.watch?' <span class="hm-tag unc">watchlist</span>':' <span class="hm-tag ok">on The Wire</span>'}${x.place?" · "+e_(x.place):""}`;
- return `<div class="hm-acc${open?" open":""}" data-acc="${e_(id)}" style="border-left-color:${col(x.grp)}"><button class=hm-ah type=button aria-expanded="${open}"><span class="hm-rank ${rk(x.rank)}" title="Rank ${x.rank}/10 · score ${x.score}">${x.rank}</span><span class=t>${e_(x.title)}<small>${sub}</small></span><span class=hm-chev>▶</span></button>
+ return `<div class="hm-acc${open?" open":""}" data-acc="${e_(id)}" style="border-left-color:${col(x.grp)}"><button class=hm-ah type=button aria-expanded="${open}"><span class="hm-rank ${rk(x.rank)}" title="Rank ${x.rank}/10 · score ${x.score}">${x.rank}</span><span class=t>${e_(x.title)}<small>${sub}</small></span><span class=hm-chev>${ico("chev")}</span></button>
  <div class=hm-ab><div class=hm-ai><div class=hm-ac><div class=kv>${kv.map(([k,v])=>`<span>${e_(k)}</span><span>${e_(v)}</span>`).join("")}</div><div class=lk>${lk||'<span class=meta>no source link</span>'}${x.watch==0?`<a href="#wire" data-goto="${e_(x.id)}">show on The Wire →</a>`:""}</div></div></div></div></div>`}
 function regRow(i,name,o,mx,attrs){return `<button type=button class=hm-reg ${attrs}><span class=rk>${i}</span><span><span>${e_(name)}</span><div class=bar style="width:${Math.max(4,100*o.v/mx)}%;background:${ramp(Math.sqrt(o.v/mx)*.92+.08)}"></div></span><span class=n><b>${o.n}</b> · max ${o.max}</span></button>`}
 function side(){const el=$$("hm_side");if(!H.d){el.innerHTML='<div class=hm-empty>Loading…</div>';return}const s=H.sel,A=H.agg;
@@ -187,8 +189,8 @@ function unlRender(){const U_=(H.d.unlocated||[]).filter(pass);const g={};U_.for
  const G_=Object.entries(g).sort((a,b)=>b[1].length-a[1].length);
  $$("hm_unlmeta").textContent=`— ${U_.length} alert${U_.length==1?"":"s"} in the ${WINL[H.win]} could not be placed (matching the filters above), grouped by reason`;
  $$("hm_unl").innerHTML=G_.map(([rc,L_])=>{const id="g_"+rc,open=H.openU.has(id),n=H.upage[rc]||20;const S=sortA(L_);
-  return `<div class="hm-acc hm-grp${open?" open":""}" data-acc="${e_(id)}"><button class=hm-ah type=button aria-expanded="${open}"><span class=hm-cnt>${L_.length}</span><span class=t><b>${e_(lab[rc]||rc)}</b><small>e.g. “${e_(S[0].title.slice(0,90))}${S[0].title.length>90?"…":""}” — ${e_(S[0].reason.slice(0,140))}</small></span><span class=hm-chev>▶</span></button>
-  <div class=hm-ab><div class=hm-ai><div class=hm-ac>${S.slice(0,n).map(x=>accItem(x,{pre:"u_",set:H.openU,sub:`${etF(x.t)} · ${e_(x.cat)} · <span style="color:#d6dbe2">${e_(x.reason)}</span>`})).join("")}${L_.length>n?`<button type=button class=hm-more data-umore="${e_(rc)}">Show ${Math.min(20,L_.length-n)} more of ${L_.length-n}</button>`:""}</div></div></div></div>`}).join("")||'<div class=hm-empty>Every alert matching the filters has a location.</div>'}
+  return `<div class="hm-acc hm-grp${open?" open":""}" data-acc="${e_(id)}"><button class=hm-ah type=button aria-expanded="${open}"><span class=hm-cnt>${L_.length}</span><span class=t><b>${e_(lab[rc]||rc)}</b><small>e.g. “${e_(S[0].title.slice(0,90))}${S[0].title.length>90?"…":""}” — ${e_(S[0].reason.slice(0,140))}</small></span><span class=hm-chev>${ico("chev")}</span></button>
+  <div class=hm-ab><div class=hm-ai><div class=hm-ac>${S.slice(0,n).map(x=>accItem(x,{pre:"u_",set:H.openU,sub:`${etF(x.t)} · ${e_(x.cat)} · <span class=hm-rsn>${e_(x.reason)}</span>`})).join("")}${L_.length>n?`<button type=button class=hm-more data-umore="${e_(rc)}">Show ${Math.min(20,L_.length-n)} more of ${L_.length-n}</button>`:""}</div></div></div></div>`}).join("")||'<div class=hm-empty>Every alert matching the filters has a location.</div>'}
 $$("hm_unl").addEventListener("click",e=>{const m=e.target.closest("[data-umore]");if(m){const rc=m.dataset.umore;H.upage[rc]=(H.upage[rc]||20)+20;unlRender();return}
  const h=e.target.closest(".hm-ah");if(h&&!e.target.closest("a")){togAcc(h.parentElement,H.openU);return}gotoWire(e)});
 

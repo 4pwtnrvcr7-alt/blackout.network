@@ -1,4 +1,4 @@
-"""Regional Heat Map add-on (tab "🔥 Heat Map"). Read-only against blackout.db (mode=ro); geolocation lives in geo.db (see geo.py).
+"""Regional Heat Map add-on (tab "Heat Map"). Read-only against blackout.db (mode=ro); geolocation lives in geo.db (see geo.py).
 Routes: /api/heatmap (data; ?run=1 runs a quick offline geocoding pass first), /api/heatmap/<static file>, /api/heatmap/unlocated.csv, /api/heatmap/geo.csv.
 A background worker (one thread, guarded across hot reloads) geocodes new alerts and backfills the last 7 days every 5 minutes,
 and is woken early by each dashboard refresh. Nothing here changes scores, ranks or the scanner."""
