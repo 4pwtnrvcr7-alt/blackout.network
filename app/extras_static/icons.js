@@ -179,7 +179,7 @@
   function fixText(n) {
     var t = n.nodeValue; if (!t || !TEST.test(t)) return;
     var p = n.parentNode; if (!p || SKIP[p.nodeName] || (p.closest && p.closest("svg,[contenteditable=''],[contenteditable=true],.bn-noicons"))) return;
-    if (p.nodeName === "OPTION" || p.nodeName === "TITLE") { n.nodeValue = t.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " "); return; }
+    if (p.nodeName === "OPTION" || p.nodeName === "TITLE") { var nt = t.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " "); if (nt !== t) n.nodeValue = nt; return; }
     var frag = document.createDocumentFragment(), last = 0, m, changed = false; RE.lastIndex = 0;
     while ((m = RE.exec(t))) {
       if (keepIt(m[0])) continue;
@@ -195,8 +195,10 @@
   }
   var ATTRS = ["title", "aria-label", "placeholder", "alt", "data-tip"];
   function fixAttrs(el) {
+    // write only when the value really changes: re-setting an unchanged attribute queues another mutation record, and a kept symbol
+    // (e.g. a scissors or chess glyph) still matches TEST, so the observer below looped forever and froze the tab (Nov 2 hotfix)
     for (var i = 0; i < ATTRS.length; i++) { var v = el.getAttribute && el.getAttribute(ATTRS[i]); if (v && TEST.test(v)) { var nv = v.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " "); if (nv !== v) el.setAttribute(ATTRS[i], nv); } }
-    if (el.nodeName === "INPUT" && (el.type === "button" || el.type === "submit") && TEST.test(el.value || "")) el.value = el.value.replace(RE, "").trim();
+    if (el.nodeName === "INPUT" && (el.type === "button" || el.type === "submit") && TEST.test(el.value || "")) { var nvv = el.value.replace(RE, "").trim(); if (nvv !== el.value) el.value = nvv; }
   }
   function walk(root) {
     if (!root) return;
@@ -207,7 +209,7 @@
     while ((n = w.nextNode())) { if (n.nodeType === 3) { if (TEST.test(n.nodeValue)) texts.push(n); } else fixAttrs(n); }
     for (var i = 0; i < texts.length; i++) fixText(texts[i]);
   }
-  function fixTitle() { if (TEST.test(document.title)) document.title = document.title.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " "); }
+  function fixTitle() { if (TEST.test(document.title)) { var t = document.title.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " "); if (t !== document.title) document.title = t; } }
   var st = document.createElement("style");
   st.textContent = ".bn-ei{display:inline-block;width:1.05em;height:1.05em;vertical-align:-.16em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}" +
     ".bn-ei .bn-eif{fill:currentColor;stroke:none}";
