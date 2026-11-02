@@ -160,6 +160,9 @@ def _static(name, ctype):
 def handle_get(path, qs):
     if path == "/bn-v3.css": return _static("bn-v3.css", "text/css")
     if path == "/bn-v3.js": return _static("bn-v3.js", "application/javascript")
+    # v3 menu art (Nov 2): engraved section art + guilloche tile, fetched by bn-v3.js only when the menu first opens
+    if path == "/api/v3/menu-art": return _static("bn-menu-art.json", "application/json")
+    if path == "/api/v3/menu-guilloche.svg": return _static("bn-menu-guilloche.svg", "image/svg+xml")
     if path == "/api/v3/wire":
         if not ENABLED(): return 200, {"enabled": False, "html": ""}
         tom, wc = top_of_mind(), whats_coming()

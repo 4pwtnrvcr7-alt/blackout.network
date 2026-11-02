@@ -1,7 +1,7 @@
 /* BLACKOUT.NETWORK design v3, phase 1 (2026-11-02): full-page menu layout, accordions on The Wire / Network Status / Solar & Seismic,
    live refresh of the Top of mind + What's coming bands. Additive only: every section, id, link and control stays in the DOM
-   (accordions are native <details>, so find-in-page, print and screen readers keep working). No MutationObservers: a light
-   2 s check wraps content that a tab renders later. Open/closed choices are remembered for the session only (sessionStorage). */
+   (accordions are native <details>, so find-in-page, print and screen readers keep working). No MutationObservers except one class
+   watch on #bn-menu (menu open); a light 2 s check wraps content that a tab renders later. Open/closed choices are remembered for the session only (sessionStorage). */
 (function(){
  if(window.__bnV3)return;window.__bnV3=1;
  var d=document,R=d.documentElement,$=function(s,r){return(r||d).querySelector(s)},$$=function(s,r){return[].slice.call((r||d).querySelectorAll(s))};
@@ -84,12 +84,58 @@
  /* Network Status groups are built as accordions by dashboard.html (nsLoad); this only adds Expand all */
  function net(){var m=d.getElementById("tab-net"),first=m&&$("#ns_list details.bn-acc",m);if(first&&$$("#ns_list details.bn-acc",m).length>=5)allToggle(d.getElementById("ns_list"),m)}
 
- /* ---------- full-page menu: desktop board (all sections open, 3 columns) ---------- */
+ /* ---------- v3 graphical menu (approved Nov 2): desktop board, accordion keys, lazy art + live previews ----------
+    Nothing here runs at first paint: art (/api/v3/menu-art) and previews (same-origin /api endpoints only) load the first
+    time the menu opens; previews refresh at most every 5 minutes while it is open. A value that can't be fetched keeps a dash. */
+ var M3={art:null,t:0,busy:false},RMQ=matchMedia("(prefers-reduced-motion: reduce)"),DESK=matchMedia("(min-width:768px)");
+ function etFmt(iso){try{return new Date(iso).toLocaleString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",month:"short",day:"numeric"}).replace(/^(\w+ \d+), /,"$1, ")+" ET"}catch(e){return ""}}
+ function etTime(iso){try{return new Date(iso).toLocaleString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+" ET"}catch(e){return ""}}
+ function pv(p,k){return $('[data-pv="'+k+'"]',p)}
+ function put(p,k,v){var e=pv(p,k);if(e&&v!=null&&v!=="")e.textContent=v;return e}
+ function count(e,to,dec,pre){if(!e)return;var f=function(v){return (pre||"")+v.toLocaleString("en-US",{minimumFractionDigits:dec,maximumFractionDigits:dec})};
+  if(RMQ.matches||!window.requestAnimationFrame){e.textContent=f(to);return}var t0=null;(function s(t){t0=t0||t;var k=Math.min(1,(t-t0)/900),x=1-Math.pow(1-k,3);e.textContent=f(to*x);if(k<1)requestAnimationFrame(s)})(performance.now())}
+ function J(u){return fetch(u,{cache:"no-store",credentials:"same-origin"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})}
+ function m3desk(p){var g=$$(".m3-p",p);g.forEach(function(x){var s=$("summary",x);if(DESK.matches){if(!x.open){x.open=true;x.dataset.v3auto="1"}s&&s.setAttribute("tabindex","-1")}
+   else{s&&s.removeAttribute("tabindex");if(x.dataset.v3auto){x.open=false;delete x.dataset.v3auto}}})}
+ function m3art(p){if(M3.art)return;M3.art=1;J("/api/v3/menu-art").then(function(a){if(!a)return;
+   $$("svg[data-art]",p).forEach(function(s){var k=s.getAttribute("data-art");if(!a[k])return;s.innerHTML=a[k];
+    if(RMQ.matches)return;var w=s.parentNode;$$("path,circle",s).forEach(function(e){var l=1;try{l=Math.ceil(e.getTotalLength())}catch(_){}e.style.setProperty("--l",l)});w.classList.add("m3-draw");
+    setTimeout(function(){w.classList.remove("m3-draw");$$("path,circle",s).forEach(function(e){e.style.removeProperty("--l")})},1600)})})}
+ function m3data(p){var now=Date.now();if(M3.busy||now-M3.t<300000)return;M3.busy=true;M3.t=now;var stamp=[];
+  var done=0,fin=function(){if(++done<6)return;M3.busy=false;var st=$("#m3_stamp",p);if(st)st.textContent=stamp.length?"As of "+etFmt(new Date().toISOString())+" · "+stamp.join(" · "):""};
+  var sec=function(k){return $('[data-pvsec="'+k+'"]',p)};
+  J("/api/state").then(function(S){var x=sec("latest");if(S&&S.main&&S.main.length&&x){var top=S.main.reduce(function(a,b){return (+b.rank||0)>(+a.rank||0)?b:a},S.main[0]),rk=Math.max(0,Math.min(10,Math.round(+top.rank||0)));
+    put(x,"wire-title",String(top.title||"").split(" | ")[0]);var m=pv(x,"wire-meter");
+    if(m){var segs="";for(var i=0;i<10;i++)segs+='<i class="'+(i<rk?(i>=6?"on hot":"on"):"")+'"></i>';m.innerHTML='<span>Rank <b>'+rk+'</b>/10</span><span class="m3-segs" aria-hidden="true">'+segs+'</span>';m.setAttribute("role","img");m.setAttribute("aria-label","Rank "+rk+" of 10")}
+    put(x,"wire-asof",(top.n_families?top.n_families+" source families · ":"")+"updated "+etFmt(top.updated));stamp.push("Wire "+etTime(top.updated))}
+   else if(x)put(x,"wire-title","The Wire: latest item unavailable right now");fin()});
+  J("/api/solar_seismic").then(function(S){var x=sec("threats");if(S&&x){var kp=S.now&&S.now.kp;if(kp&&kp.value!=null){count(pv(x,"kp"),+kp.value,2);stamp.push("Kp period from "+etTime(kp.t))}
+    var q=(S.quakes_notable||[])[0];if(q){count(pv(x,"quake"),+q.mag,1,"M");put(x,"quake-place",q.place);stamp.push("quake "+etTime(q.t))}
+    put(x,"threats-asof",kp?"NOAA SWPC · USGS · "+etFmt(S.generated):"")}fin()});
+  J("/api/grid").then(function(G){var x=sec("threats");if(G&&G.summary&&x){var br=G.summary.by_rank||{},top=0;Object.keys(br).forEach(function(k){if(/^\d+$/.test(k)&&br[k])top=Math.max(top,+k)});
+    count(pv(x,"grid"),+G.summary.total,0);put(x,"grid-sub","items, top rank "+top)}fin()});
+  J("/api/finance").then(function(F){var x=sec("markets");if(F&&F.groups&&x){var it=null;F.groups.forEach(function(g){(g.items||[]).forEach(function(i){if(!it&&i.sym==="^GSPC")it=i})});
+    if(it){put(x,"spx-label",it.label+(it.spark&&it.spark.length>2?" · today":""));count(pv(x,"spx"),+it.price,2);var c=pv(x,"spx-chg");if(c&&it.chg_pct!=null){c.textContent=(it.chg_pct>=0?"+":"")+(+it.chg_pct).toFixed(2)+"%";c.classList.toggle("dn",it.chg_pct<0)}
+     var s=(it.spark||[]).filter(function(v){return typeof v==="number"});if(s.length>2){var lo=Math.min.apply(null,s),hi=Math.max.apply(null,s)||1,r=(hi-lo)||1;
+      pv(x,"spark").setAttribute("points",s.map(function(v,i){return (i*200/(s.length-1)).toFixed(1)+","+(38-(v-lo)/r*34).toFixed(1)}).join(" "))}
+     put(x,"markets-asof","Quote "+etFmt(F.quotes_fetched||F.updated)+(F.delay_note?" (delayed)":""))}}fin()});
+  J("/api/spacex").then(function(X){var x=sec("markets");if(X&&X.next&&x){put(x,"launch",X.next.name+" · NET "+etFmt(X.next.net))}fin()});
+  J("/api/sources/catalog?per=1").then(function(C){var a=sec("about"),c=sec("community");if(C&&C.total){count(pv(a,"sources"),+C.total,0);count(pv(c,"sources-c"),+C.total,0);put(a,"sources-asof","as of "+etFmt(new Date().toISOString()))}fin()});
+  var mx=sec("politics");if(mx){var d=Math.ceil((Date.UTC(2026,10,3,5)-Date.now())/86400000);if(d>0){count(pv(mx,"midterms"),d,0);put(mx,"midterms-unit",(d===1?"day":"days")+" to Election Day, Nov 3")}
+   else if(d===0){put(mx,"midterms","Today");put(mx,"midterms-unit","Election Day, Nov 3")}else{put(mx,"midterms","Results");put(mx,"midterms-unit","Midterms 2026")}}}
  function menu(){
-  var p=$("#bn-menu .bn-panel");if(!p||$(".bn-v3grid",p))return;var g=$$(".bn-grp",p);if(!g.length)return;
-  var w=d.createElement("div");w.className="bn-v3grid";g[0].parentNode.insertBefore(w,g[0]);g.forEach(function(x){w.appendChild(x)});
-  var mq=matchMedia("(min-width:900px)");var sync=function(){if(mq.matches)g.forEach(function(x){if(!x.open){x.open=true;x.dataset.v3auto="1"}});else g.forEach(function(x){if(x.dataset.v3auto){x.open=false;delete x.dataset.v3auto}})};
-  sync();mq.addEventListener?mq.addEventListener("change",sync):mq.addListener(sync)}
+  var dr=d.getElementById("bn-menu"),p=dr&&$(".bn-panel",dr);if(!p||!dr.classList.contains("bn-m3")||p.dataset.m3)return;p.dataset.m3="1";
+  m3desk(p);DESK.addEventListener?DESK.addEventListener("change",function(){m3desk(p)}):DESK.addListener(function(){m3desk(p)});
+  // desktop: the board is always open (summaries are headings, not toggles)
+  p.addEventListener("click",function(e){var s=e.target.closest&&e.target.closest(".m3-p>summary");if(s&&DESK.matches)e.preventDefault()},true);
+  // phone accordion keys: Up/Down/Home/End move between section headers (Enter/Space toggle natively)
+  p.addEventListener("keydown",function(e){var s=e.target.closest&&e.target.closest(".m3-p>summary");if(!s||DESK.matches)return;var all=$$(".m3-p>summary",p),i=all.indexOf(s),j=-1;
+   if(e.key==="ArrowDown")j=Math.min(all.length-1,i+1);else if(e.key==="ArrowUp")j=Math.max(0,i-1);else if(e.key==="Home")j=0;else if(e.key==="End")j=all.length-1;if(j<0)return;e.preventDefault();all[j].focus()});
+  // Alerts: opens the existing Alerts panel (alerts.js) when it is on the page
+  $$(".m3-alerts",p).forEach(function(b){if(!(window.BN&&window.BN.enableAlerts)&&!d.querySelector(".bn-bell,[data-bn-alerts]"))b.hidden=true;
+   b.addEventListener("click",function(){if(window.bnMenuClose)bnMenuClose(true);if(window.BN&&window.BN.enableAlerts)window.BN.enableAlerts({from:"menu"});else{var x=d.querySelector(".bn-bell,[data-bn-alerts]");x&&x.click()}})});
+  var opened=function(){if(!dr.classList.contains("bn-open"))return;m3desk(p);m3art(p);m3data(p)};
+  new MutationObserver(opened).observe(dr,{attributes:true,attributeFilter:["class"]});opened()}
 
  /* ---------- Wire bands: refresh from /api/v3/wire every 5 minutes (server already rendered them into the page) ---------- */
  var lastBand=null;

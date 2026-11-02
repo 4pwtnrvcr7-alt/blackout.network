@@ -108,32 +108,94 @@ def topbar(sn, active="", ctl_html=""):
             '<div class="bn-pop" id="bn_settings" role="dialog" aria-label="Settings" hidden><div class="bn-pop-h">Settings</div>'
             f'<div class="ctl">{ctl_html}</div></div></header>' + LOADER)
 
+# v3 graphical menu (approved Nov 2, 11:41 ET): seven sections, each with engraved art, a one-line description, a live
+# preview slot and its links. Labels follow review/menu/structure.json (option A); hrefs come from sitenav.NAV so every
+# existing link keeps its exact href. An item with no live route ("soon") renders as plain tagged text, never a link.
+# A NAV tab not listed here lands in the section of the tab before it (so new tabs still appear).
+MENU3 = [
+ ("latest", "Latest", "The live feed, ranked as it happens.",
+  [("threat", "The Wire"), ("streams", "Live TV & Radio"), ("noise", "Background Noise"), ("heatmap", "Heat Map"), ("trends", "Trends"),
+   ("thread", "The Thread"), ("bcast", "Broadcast transcripts"), ("radio", "Live Radio")]),
+ ("threats", "Threats", "Weather, space, grid and network risks.",
+  [("weather", "Weather"), ("solar_seismic", "Solar & Seismic"), ("grid", "Energy Grid"), ("net", "Network Status"),
+   ("starlink", "Starlink"), ("netnear", "Networks near me"), ("ai", "AI Threats"), ("@crime", "Crime")]),
+ ("prepare", "Prepare", "Guides and tools to get ready.",
+  [("preppers", "Preppers"), ("res", "Local Resources"), ("maps", "Offline Maps"), ("med", "First Aid"), ("bush", "Bushcraft")]),
+ ("politics", "Politics & Government", "Elections, laws and the people in power.",
+  [("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"), ("gunlaws", "Gun Laws"), ("figures", "Key Figures")]),
+ ("markets", "Markets & Tech", "Money, intel streams, launches and jets.",
+  [("finance", "Markets"), ("intel", "Intel Streams"), ("spacex", "SpaceX"), ("jets", "Private Jets")]),
+ ("community", "Community", "Briefs, videos and what readers rank.",
+  [("newsletter", "Newsletter"), ("@social", "Videos & Posts"), ("ranked", "Ranked by Users"), ("games", "Games")]),
+ ("about", "About", "Our sources, scoring and public numbers.",
+  [("sources", "Sources"), ("@scoring", "How We Score"), ("@stats", "Public Stats"), ("tips", "Support Us")]),
+]
+# empty preview slots, filled by bn-v3.js from same-origin endpoints only when the menu opens (nothing is fetched at first paint)
+M3_PV = {
+ "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/#wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
+ "threats": '<span class="m3-row3"><span><span class="m3-k">Kp index</span><b class="m3-big" data-pv="kp">&ndash;</b></span><span><span class="m3-k">Latest quake</span><b class="m3-big" data-pv="quake">&ndash;</b><span class="m3-sm" data-pv="quake-place"></span></span><span><span class="m3-k">Grid desk</span><b class="m3-big" data-pv="grid">&ndash;</b><span class="m3-sm" data-pv="grid-sub"></span></span></span><span class="m3-asof" data-pv="threats-asof"></span>',
+ "prepare": '<span class="m3-k">Offline-first guides</span><span class="m3-sm">Printable maps, grid-down first aid and bushcraft, readable without internet.</span>',
+ "politics": '<span class="m3-k">Midterms 2026</span><span><b class="m3-big" data-pv="midterms">&ndash;</b> <span class="m3-sm" data-pv="midterms-unit"></span></span>',
+ "markets": '<span class="m3-k" data-pv="spx-label">S&amp;P 500</span><span class="m3-sprow"><svg class="m3-spark" viewBox="0 0 200 40" aria-hidden="true" focusable="false"><polyline data-pv="spark" points=""/></svg><b class="m3-mid" data-pv="spx">&ndash;</b><span class="m3-chg" data-pv="spx-chg"></span></span><span class="m3-k">Next SpaceX launch</span><span class="m3-sm m3-strong" data-pv="launch">&ndash;</span><span class="m3-asof" data-pv="markets-asof"></span>',
+ "community": '<a class="m3-trailer" href="/social"><span class="m3-k">Channel trailer</span><b class="m3-big" data-pv="sources-c">&ndash;</b><span class="m3-sm">sources, one feed</span></a>',
+ "about": '<span class="m3-k">Sources in the feed</span><b class="m3-big" data-pv="sources">&ndash;</b><span class="m3-asof" data-pv="sources-asof"></span>',
+}
+M3_SOON = {"thread", "starlink", "netnear"}
+
+def menu3_sections(sn):
+    nav = {it[0]: it for g, its in sn.NAV for it in its}
+    listed = {k for _, _, _, its in MENU3 for k, _ in its}
+    secs = [(sid, name, desc, list(its)) for sid, name, desc, its in MENU3]
+    where = {k: i for i, (_, _, _, its) in enumerate(MENU3) for k, _ in its}
+    prev = 0
+    for g, its in sn.NAV:                      # unlisted live tabs follow their NAV neighbour
+        for it in its:
+            if it[0] in where: prev = where[it[0]]; continue
+            if len(it) > 5 and it[5]: continue
+            secs[prev][3].append((it[0], plain(it[2])))
+    out = []
+    for sid, name, desc, its in secs:
+        rows = []
+        for key, label in its:
+            it = nav.get(key)
+            if key in M3_SOON or not it or (len(it) > 5 and it[5]): rows.append((key, label, None))
+            else: rows.append((key, label, it[1] if it[1].startswith("/") else "/#" + it[1]))
+        out.append((sid, name, desc, rows))
+    return out
+
 def drawer(sn, active=""):
-    """The sidebar menu (<div id="bn-menu">): search slot, follow links, every tab by group, theme toggle, legal links."""
-    out = ['<div class="bn-drawer" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
+    """The v3 graphical menu (<div id="bn-menu">): full-viewport overlay on desktop/tablet (all seven sections open, no scroll),
+    full-screen accordion on phones. Behaviour (dialog, focus trap, Escape, search, theme) stays in sitenav.js; art, previews
+    and motion are added by bn-v3.js when the menu first opens."""
+    out = ['<div class="bn-drawer bn-m3" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
            '<nav class="bn-panel" aria-label="Site menu"><div class="bn-ph">'
            f'<a class="bn-logo" href="/" tabindex="-1">{LOGO_HTML}</a>'
-           f'<a class="bn-ib bn-close" href="#_" role="button" aria-label="Close menu">{I_CLOSE}</a></div>'
-           '<div class="bn-dsearch bn-js-only" id="bn_dsearch"></div>']
-    secs = menu_sections(sn)
-    act = next((n for n, its in secs for it in its if it[0] == active), None)
-    for name, its in secs:
-        op = " open" if (name == act or name == "Live") else ""
-        desc, ico = MENU_META.get(name, ("", ""))
-        out.append(f'<details class="bn-grp" data-grp="{E(name)}"{op}><summary><span class="bn-gi">{ico}</span><span class="bn-gt">{E(name)}'
-                   + (f'<small class="bn-gd">{E(desc)}</small>' if desc else "") + '</span></summary><ul>')
-        for it in its:
-            key, h, label = it[0], it[1], it[2]
-            href = h if h.startswith("/") else "/#" + h
-            cur = ' aria-current="page"' if key == active else ""
-            out.append(f'<li><a href="{E(href)}" data-tab="{E(key)}"{cur}>{E(plain(label))}</a></li>')
-        out.append('</ul></details>')
-    out.append('<div class="bn-dcta"><a class="bn-cta" href="/newsletter">Get the brief</a><span class="bn-ctag">BLACKOUT.NETWORK · Signal over noise.</span></div>')
-    out.append(f'<div class="bn-dfollow">{follow_links(sn, "bn-follow bn-follow-row")}</div>')
-    out.append('<div class="bn-dtools">' + theme_btn("bn-js-only bn-theme-row") +
-               '<button type="button" class="bn-mrow bn-js-only bn-gear-row" aria-controls="bn_settings">' + I_GEAR + '<span>Settings &amp; scan status</span></button></div>'
-               '<p class="bn-dfoot"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/stats">Stats</a><a href="/report-status">Report status</a></p>'
-               '</nav></div>')
+           '<div class="bn-dsearch bn-js-only" id="bn_dsearch"></div>'
+           '<div class="m3-tools"><button type="button" class="m3-tl m3-alerts bn-js-only">Alerts</button>'
+           + theme_btn("bn-js-only bn-theme-row m3-tl") +
+           '<button type="button" class="m3-tl bn-gear-row bn-js-only" aria-controls="bn_settings">Settings</button>'
+           '<a class="bn-cta m3-cta" href="/newsletter">Free brief</a>'
+           f'<a class="bn-close m3-close" href="#_" role="button" aria-label="Close menu"><span>Close</span></a></div></div>'
+           '<div class="m3-grid">']
+    for n, (sid, name, desc, rows) in enumerate(menu3_sections(sn), 1):
+        cur_sec = any(k == active for k, _, _ in rows)
+        out.append(f'<details class="bn-grp m3-p m3-{sid}" data-grp="{E(name)}" data-sec="{sid}"' + (" open" if cur_sec or sid == "latest" else "") + '>'
+                   f'<summary><span class="m3-art" aria-hidden="true"><svg viewBox="560 0 640 440" preserveAspectRatio="xMidYMid slice" focusable="false" data-art="{sid}"></svg></span>'
+                   f'<span class="bn-gt"><span class="m3-n">{n:02d}</span><b class="m3-t">{E(name)}</b><small class="bn-gd">{E(desc)}</small></span><i class="m3-pm" aria-hidden="true"></i></summary>'
+                   f'<div class="m3-body"><i class="m3-rule" aria-hidden="true"></i><div class="m3-pv" data-pvsec="{sid}">{M3_PV.get(sid, "")}</div><ul>')
+        for key, label, href in rows:
+            if href is None:
+                out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
+            else:
+                cur = ' aria-current="page"' if key == active else ""
+                out.append(f'<li><a href="{E(href)}" data-tab="{E(key)}"{cur}>{E(label)}</a></li>')
+        out.append('</ul></div></details>')
+    out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'
+               f'<a href="{E(sn.YT_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on YouTube {sn.HANDLE} (opens in a new tab)">YouTube</a>'
+               f'<a href="{E(sn.X_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on X {sn.HANDLE} (opens in a new tab)">X</a></div>'
+               '<div class="m3-stamp" id="m3_stamp" aria-live="off"></div>'
+               '<p class="bn-dfoot m3-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/stats">Stats</a><a href="/report-status">Report status</a></p>'
+               '</div></nav></div>')
     return "".join(out)
 
 def pagehead(title, desc):

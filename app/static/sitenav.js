@@ -64,7 +64,7 @@ function init(){
   if(location.hash==="#bn-menu")bnMenuOpen();
   // sections: remember open/closed (the current tab's section always opens)
   $$("details.bn-grp",panel).forEach(function(d){var k="bn_grp_"+d.dataset.grp,v=LS.get(k);if(v==="1")d.open=true;else if(v==="0"&&!$('a[aria-current="page"]',d))d.open=false;
-   d.addEventListener("toggle",function(){LS.set(k,d.open?"1":"0")})});
+   d.addEventListener("toggle",function(){if(!d.dataset.v3auto)LS.set(k,d.open?"1":"0")})});
   // "/" opens the sidebar with search focused (the search script then focuses its field)
   document.addEventListener("keydown",function(e){if(e.key!=="/"||e.ctrlKey||e.metaKey||e.altKey)return;var a=document.activeElement;if(a&&(/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)||a.isContentEditable))return;
    if(document.getElementById("bns")){bnMenuOpen({search:true})}},true);
