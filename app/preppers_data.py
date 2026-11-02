@@ -208,7 +208,7 @@ Ready.gov: make a plan|https://www.ready.gov/plan|training|family plan,official|
 FEMA Emergency Management Institute (free courses)|https://training.fema.gov/is|training|online courses,official|Free · Global|Free|22222|Free online independent-study courses, open to anyone.
 Red Cross: how to prepare|https://www.redcross.org/get-help/how-to-prepare-for-emergencies.html|training|guide,official|Free · US|Free|22222|Hazard-by-hazard preparation guides.
 National Weather Service safety|https://www.weather.gov/safety|training|weather,guide,official|Free · US|Free|22222|Safety for every type of weather hazard.
-National Hurricane Center: prepare|https://www.nhc.noaa.gov/prepare|training|hurricane,guide,official|Free · Atlantic/Pacific|Free|22222|Hurricane preparedness week-by-week.
+National Hurricane Center: prepare|https://www.nhc.noaa.gov/prepare/|training|hurricane,guide,official|Free · Atlantic/Pacific|Free|22222|Hurricane preparedness week-by-week.
 Great ShakeOut (earthquakes)|https://www.shakeout.org|training|earthquake,drills|Free · Global|Free|22222|Drop, Cover, Hold On drills and earthquake guides.
 The Prepared|https://theprepared.com|training|guides,gear reviews,independent|Free · Global|Free|21222|Independent, evidence-minded prepping guides and gear reviews.
 UK Government: Prepare|https://prepare.campaign.gov.uk|training|official,UK|Free · UK|Free|22222|UK government advice on emergencies and kits.
