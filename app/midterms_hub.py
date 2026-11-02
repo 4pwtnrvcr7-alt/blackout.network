@@ -78,6 +78,9 @@ def _rating_rows(r, meta):
 # States whose poll-close times are set county by county (Kansas, North Dakota, Oregon): every shown close time carries this caveat.
 COUNTY_HOURS_VARY = {"KS", "ND", "OR"}
 
+VOTE_GOV_TEXT = "Confirm your polling place and hours with your state election office"
+VOTE_GOV_LINE = f'<p class="meta">{_ext("https://vote.gov", VOTE_GOV_TEXT)}</p>'
+
 def _race(r, b, office):
     st = r.get("state") or ""; lab = r.get("label") or r.get("state_name") or st
     con = r.get("consensus") or {}
@@ -101,6 +104,7 @@ def _race(r, b, office):
             + '<p><b>Published race ratings</b></p>' + _rating_rows(r, (b.get("ratings_meta") or {}).get(office))
             + '<p class="mh-src">Sources: ' + " · ".join(x for x in (_ext(r.get("article"), "Wikipedia race article"),
                                                                      _ext(M.OFFICIAL_LINKS.get(st), f"{r.get('state_name') or st} official election results")) if x)
+            + (f'<p class="mh-src">Election office: {_ext(_o.get("office_url"), _o.get("office_name"))}</p>' if (_o := M.ELECTION_OFFICES.get(st) or {}) and r.get("poll_close") else "")
             + '</p>')
     return (f'<details class="mh" data-bn-expand data-cat="{E(office)}" data-item="{E(r.get("id") or lab)}"><summary>{E(lab)}<small>{sub}</small></summary>'
             f'<div class="mh-b">{body}</div></details>')
@@ -140,7 +144,7 @@ def render():
         if not items: return ""
         return (f'<section class="mh-sec" id="{gid}"><h2>{E(title)} ({len(items)})</h2><p class="meta">{note}</p>'
                 f'<div class="mh-ctl"><button type="button" data-mh-all="{gid}_g" data-open="1" hidden>Open all</button><button type="button" data-mh-all="{gid}_g" data-open="0" hidden>Close all</button></div>'
-                f'<div id="{gid}_g">' + "".join(_race(r, b, office) for r in items) + '</div></section>')
+                f'<div id="{gid}_g">' + "".join(_race(r, b, office) for r in items) + '</div>' + (VOTE_GOV_LINE if any(r.get("poll_close") for r in items) else '') + '</section>')
     srcs = b.get("sources") or {}
     src_links = " · ".join(_ext(v.get("permalink") or v.get("url"), v.get("title")) for v in srcs.values() if isinstance(v, dict))
     body = ('<p class="crumb"><a href="/">Home</a> › Midterms 2026</p>'
@@ -150,7 +154,7 @@ def render():
             + '<p><a class="btn p" href="/#midterms">Open the full Midterms tab: map, polls and live results</a></p>'
             + '<section class="mh-sec" id="vote"><h2>Where and how to vote</h2><ul class="mh-list">'
             + "".join(f'<li>{_ext(u, t)}</li>' for t, u in WHERE_TO_VOTE)
-            + '</ul><p class="meta">Each race panel below also links to that state\'s official election results page.</p></section>'
+            + '</ul><p class="meta">Each race panel below also links to that state\'s election office and official election results page.</p>' + VOTE_GOV_LINE + '</section>'
             + group("senate", "Senate races", sen, "senate", "Ratings are published by the named raters; the summary line averages Cook Political Report, Inside Elections and Sabato\'s Crystal Ball; each rater\'s own call is in the panel.")
             + group("governor", "Governor races", gov, "governor", "Ratings are published by the named raters; the summary line averages Cook Political Report, Inside Elections and Sabato\'s Crystal Ball; each rater\'s own call is in the panel.")
             + group("house", "Competitive House races", house, "house",

@@ -73,6 +73,8 @@ POLL_CLOSE_ZONES = {"AK": ("Alaska", "Hawaii-Aleutian", "most"), "FL": ("Eastern
                     "IN": ("Eastern", "Central", "most"), "KS": ("Central", "Mountain", "most"), "KY": ("Eastern", "Central", "most"),
                     "MI": ("Eastern", "Central", "most"), "ND": ("Central", "Mountain", "most"), "OR": ("Mountain", "Pacific", "part"),
                     "SD": ("Central", "Mountain", "most"), "TX": ("Central", "Mountain", "most")}
+# Each state's official election office page (office_name, office_url), from USA.gov's state election office directory; see the JSON for link checks.
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "election_offices.json")) as _fh: ELECTION_OFFICES = json.load(_fh)["states"]
 FIRST_CLOSE = {"at": datetime(2026, 11, 3, 18, 0, tzinfo=ET).isoformat(), "where": "Eastern-time parts of Indiana and Kentucky"}
 LAST_CLOSE = {"at": datetime(2026, 11, 4, 1, 0, tzinfo=ET).isoformat(), "where": "the Hawaii-Aleutian time zone of Alaska"}
 

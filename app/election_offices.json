@@ -1,0 +1,427 @@
+{
+ "_source": {
+  "label": "USA.gov (GSA): State election offices",
+  "url": "https://www.usa.gov/state-election-office",
+  "fetched": "2026-11-02",
+  "note": "Official state election office pages. Cross-reference: vote.gov state pages (Cloudflare challenge blocks automated checks). LA, ME, NM, OH use the current official page where the USA.gov link no longer resolved."
+ },
+ "states": {
+  "AK": {
+   "office_name": "Alaska Division of Elections",
+   "office_url": "https://www.elections.alaska.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 0,
+    "note": "curl: TLS chain incomplete on the server (200 with certificate check off); listed by USA.gov"
+   }
+  },
+  "AL": {
+   "office_name": "Alabama Secretary of State: Alabama Votes",
+   "office_url": "https://www.sos.alabama.gov/alabama-votes",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "AR": {
+   "office_name": "Arkansas Secretary of State: Elections",
+   "office_url": "https://www.sos.arkansas.gov/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "AZ": {
+   "office_name": "Arizona Secretary of State: Elections",
+   "office_url": "https://azsos.gov/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "CA": {
+   "office_name": "California Secretary of State: Elections",
+   "office_url": "https://www.sos.ca.gov/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "CO": {
+   "office_name": "Colorado Secretary of State: Elections",
+   "office_url": "https://www.sos.state.co.us/pubs/elections/main.html",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "CT": {
+   "office_name": "Connecticut Secretary of the State: Elections and Voting",
+   "office_url": "https://portal.ct.gov/sots/common-elements/v5-template---redesign/elections--voting--home-page",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "DC": {
+   "office_name": "DC Board of Elections",
+   "office_url": "https://dcboe.org/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "DE": {
+   "office_name": "Delaware Department of Elections",
+   "office_url": "https://elections.delaware.gov/index.shtml",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "FL": {
+   "office_name": "Florida Division of Elections",
+   "office_url": "https://www.dos.myflorida.com/elections/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "GA": {
+   "office_name": "Georgia Secretary of State: Elections Division",
+   "office_url": "https://sos.ga.gov/elections-division-georgia-secretary-states-office",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "HI": {
+   "office_name": "Hawaii Office of Elections",
+   "office_url": "https://elections.hawaii.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "IA": {
+   "office_name": "Iowa Secretary of State: Voter Information",
+   "office_url": "https://sos.iowa.gov/elections/voterinformation/index.html",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "ID": {
+   "office_name": "Idaho Secretary of State: VoteIdaho",
+   "office_url": "https://voteidaho.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "IL": {
+   "office_name": "Illinois State Board of Elections",
+   "office_url": "https://www.elections.il.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "IN": {
+   "office_name": "Indiana Election Division: IndianaVoters",
+   "office_url": "https://indianavoters.in.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "KS": {
+   "office_name": "Kansas Secretary of State: Elections",
+   "office_url": "https://sos.ks.gov/elections/elections.html",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "KY": {
+   "office_name": "Kentucky State Board of Elections",
+   "office_url": "https://elect.ky.gov/Pages/default.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "LA": {
+   "office_name": "Louisiana Secretary of State: Voter Portal",
+   "office_url": "https://voterportal.sos.la.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MA": {
+   "office_name": "Massachusetts Secretary of the Commonwealth: Elections and Voting",
+   "office_url": "https://www.sec.state.ma.us/divisions/elections/elections-and-voting.htm",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MD": {
+   "office_name": "Maryland State Board of Elections",
+   "office_url": "https://elections.maryland.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "ME": {
+   "office_name": "Maine Secretary of State: Elections and Voting",
+   "office_url": "https://www.maine.gov/sos/elections-voting",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MI": {
+   "office_name": "Michigan Secretary of State: Elections",
+   "office_url": "https://www.michigan.gov/sos/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MN": {
+   "office_name": "Minnesota Secretary of State: Elections and Voting",
+   "office_url": "https://www.sos.state.mn.us/elections-voting/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MO": {
+   "office_name": "Missouri Secretary of State: Elections",
+   "office_url": "https://www.sos.mo.gov/elections/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MS": {
+   "office_name": "Mississippi Secretary of State: Elections and Voting",
+   "office_url": "https://www.sos.ms.gov/elections-voting",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "MT": {
+   "office_name": "Montana Secretary of State: Elections",
+   "office_url": "https://sosmt.gov/elections/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "NC": {
+   "office_name": "North Carolina State Board of Elections",
+   "office_url": "https://www.ncsbe.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "ND": {
+   "office_name": "North Dakota Secretary of State: Vote Information Portal",
+   "office_url": "https://vip.sos.nd.gov/PortalList.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "NE": {
+   "office_name": "Nebraska Secretary of State: Elections and Voting",
+   "office_url": "https://www.nebraska.gov/featured/elections-voting/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "NH": {
+   "office_name": "New Hampshire Secretary of State: Voters",
+   "office_url": "https://www.sos.nh.gov/elections/voters",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "NJ": {
+   "office_name": "New Jersey Division of Elections",
+   "office_url": "https://www.nj.gov/state/elections/vote.shtml",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "NM": {
+   "office_name": "New Mexico Secretary of State: Voting and Elections",
+   "office_url": "https://www.sos.nm.gov/voting-and-elections/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "NV": {
+   "office_name": "Nevada Secretary of State: Elections",
+   "office_url": "https://www.nvsos.gov/sos/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "NY": {
+   "office_name": "New York State Board of Elections",
+   "office_url": "https://www.elections.ny.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 500,
+    "note": "curl: bot protection (403/500); listed by USA.gov"
+   }
+  },
+  "OH": {
+   "office_name": "Ohio Secretary of State: Voters",
+   "office_url": "https://www.ohiosos.gov/elections/voters/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "OK": {
+   "office_name": "Oklahoma State Election Board",
+   "office_url": "https://oklahoma.gov/elections.html",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "OR": {
+   "office_name": "Oregon Secretary of State: Voting and Elections",
+   "office_url": "https://sos.oregon.gov/voting-elections/Pages/default.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "PA": {
+   "office_name": "Pennsylvania Department of State: Voting and Elections",
+   "office_url": "https://www.dos.pa.gov/VotingElections/Pages/default.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "RI": {
+   "office_name": "Rhode Island Department of State: Elections",
+   "office_url": "https://vote.sos.ri.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 403,
+    "note": "curl: blocked with 403 (bot protection); listed by USA.gov"
+   }
+  },
+  "SC": {
+   "office_name": "South Carolina Election Commission: SCVotes",
+   "office_url": "https://www.scvotes.org/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "SD": {
+   "office_name": "South Dakota Secretary of State: Elections and Voting",
+   "office_url": "https://sdsos.gov/elections-voting/default.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "TN": {
+   "office_name": "Tennessee Secretary of State: Elections",
+   "office_url": "https://sos.tn.gov/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "TX": {
+   "office_name": "Texas Secretary of State: Elections",
+   "office_url": "https://www.sos.state.tx.us/elections/index.shtml",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "UT": {
+   "office_name": "Utah Lieutenant Governor: Vote Utah",
+   "office_url": "https://vote.utah.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "VA": {
+   "office_name": "Virginia Department of Elections",
+   "office_url": "https://www.elections.virginia.gov/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "VT": {
+   "office_name": "Vermont Secretary of State: Elections",
+   "office_url": "https://sos.vermont.gov/elections/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "WA": {
+   "office_name": "Washington Secretary of State: Elections",
+   "office_url": "https://www.sos.wa.gov/elections",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "WI": {
+   "office_name": "Wisconsin Elections Commission: MyVote Wisconsin",
+   "office_url": "https://myvote.wi.gov/en-us/",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "WV": {
+   "office_name": "West Virginia Secretary of State: Elections",
+   "office_url": "https://sos.wv.gov/elections/pages/default.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  },
+  "WY": {
+   "office_name": "Wyoming Secretary of State: Elections",
+   "office_url": "https://sos.wyo.gov/Elections/Default.aspx",
+   "link_check": {
+    "date": "2026-11-02",
+    "http": 200
+   }
+  }
+ }
+}
