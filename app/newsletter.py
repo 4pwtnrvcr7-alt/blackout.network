@@ -2261,7 +2261,7 @@ def form_html(mode="page"):
             f'<input type="hidden" name="csrf" value="{E(csrf_token())}"><input type="hidden" name="source" value="{E(mode)}">'
             f'<label for="{uid}_email">Email address</label>'
             f'<div class="nl-row"><input id="{uid}_email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" placeholder="you@example.org" aria-describedby="{uid}_msg">'
-            '<button class="pri" type="submit">Subscribe</button></div>'
+            '<button class="pri" type="submit">Get the brief</button></div>'
             f'<fieldset class="nl-freq"><legend>How often</legend>'
             + "".join(f'<label class="nl-radio"><input type="radio" name="frequency" value="{k}"{" checked" if k == "twice" else ""}> {E(v)}'
                       f'<span class="nl-sm"> ({E(sl["morning"] + " & " + sl["evening"] if k == "twice" else sl[k])} ET)</span></label>' for k, v in FREQS.items())
@@ -2275,13 +2275,13 @@ def form_html(mode="page"):
             f'<div class="nl-trk" hidden><label class="nl-chk"><input type="checkbox" name="track_consent" value="1"> {E(TRACK_CONSENT_LABEL)}</label></div>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
-            f'<p class="nl-sm nl-priv">🔒 {consent_line()} {E(DISCLAIMER)}</p></form>')
+            f'<p class="nl-sm nl-priv"><svg class="nl-lock" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" style="vertical-align:-2px;margin-right:3px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>{consent_line()} {E(DISCLAIMER)}</p></form>')
 
 def consent_line():
     """Signup consent wording (Compliance global-legal-gap K, CASL-grade): names the sender and its contact details and says consent can be withdrawn.
-    The Subscribe button itself is the express action; no pre-ticked box."""
+    The 'Get the brief' button itself is the express action; no pre-ticked box."""
     c = cfg(); frm = E(c.get("from_email") or "hello@blackout.network"); addr = E((c.get("mailing_address") or DEFAULTS["mailing_address"]).strip())
-    return (f'By tapping <b>Subscribe</b>, you agree to get the BLACKOUT.NETWORK brief and, if you choose, breaking alerts by email from BLACKOUT.NETWORK '
+    return (f'By tapping <b>Get the brief</b>, you agree to get the BLACKOUT.NETWORK brief and, if you choose, breaking alerts by email from BLACKOUT.NETWORK '
             f'({frm}, {addr}). We\'ll send a confirmation email first, and nothing else arrives until you confirm. You can withdraw consent and '
             'unsubscribe at any time with the link in every email. We count opens and clicks to improve the newsletter; in the EEA, UK and Switzerland '
             'only if you tick the box. See our <a href="/privacy#email-tracking">Privacy Policy</a> and <a href="/tos">Terms</a>.')
