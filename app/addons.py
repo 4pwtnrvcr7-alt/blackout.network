@@ -85,6 +85,8 @@ ROUTES = {
     "/api/government": "government",   # Government tab #government (t247): index + org chart, government.db from government_collect.py
     "/api/gunlaws": "gunlaws",   # Gun Laws tab #gunlaws (t319): cases, bills, ballot measures, markets, estimates; gunlaws.db from gunlaws_collect.py
     "/api/midterms": "midterms",   # Midterms 2026 tab #midterms: races, ratings, polls vs markets, official live results (midterms.py)
+    "/ready": "ready",              # seo/ready-hub: Everyday Readiness guides page (5 printable PDFs)
+    "/static/ready": "ready_files",  # seo/ready-hub: the guide PDFs + first-page thumbnails (application/pdf, inline, 1-day cache)
     "/midterms": "midterms", "/election": "midterms", "/elections": "midterms",
     "/api/preppers": "preppers",
     "/api/report": "reports",
