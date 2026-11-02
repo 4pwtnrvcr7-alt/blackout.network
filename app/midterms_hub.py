@@ -98,6 +98,19 @@ def _poll_table():
         with open(_PCF, encoding="utf-8") as f: return json.load(f)
     except Exception: return None
 
+def _state_close_text(st):
+    """Race-panel line from the sourced table: split states show the earlier closing for most of the state and the later one for the rest
+    (e.g. Texas: 8:00 PM ET in most of Texas, 9:00 PM ET in the Mountain-time El Paso area)."""
+    t = _poll_table()
+    row = next((x for x in (t or {}).get("states") or [] if x.get("state") == st), None)
+    if not row: return ""
+    cl = sorted((c for c in row.get("closes") or [] if _dt(c.get("at_et"))), key=lambda c: _dt(c["at_et"]))
+    if not cl: return ""
+    f = lambda c: _et(c["at_et"], "%-I:%M %p ET")
+    if len(cl) == 1 or f(cl[0]) == f(cl[-1]): return f"Polls close {f(cl[-1])}"
+    return (f'Polls close {f(cl[0])} in {row.get("early_part") or "most"} of {row["name"]} ({cl[0].get("zone", "")} time), '
+            f'{f(cl[-1])} in the {cl[-1].get("zone", "")}-time area')
+
 def closed_states(now):
     t = _poll_table()
     if not t: return None, []
@@ -278,13 +291,9 @@ def _race(r, b, office):
     st = r.get("state") or ""; lab = r.get("label") or r.get("state_name") or st
     con = r.get("consensus") or {}
     sub = (f'Published ratings: {E(con.get("t"))} (Cook · Inside Elections · Sabato average, {int(con.get("n") or 0)} of 3 rated)' if con.get("t") else "No published ratings")
-    if r.get("poll_close"):
-        _f = M.POLL_CLOSE_FIRST.get(st) if r.get("district") in (None, "", 0) else None
-        if _f and _f != r["poll_close"]:
-            z1, z2, part = M.POLL_CLOSE_ZONES.get(st, ("", "", "most"))
-            sub += ' · ' + E(f'Polls close {_et(_f, "%-I:%M %p ET")} in {part} of {r.get("state_name") or lab} ({z1} time), '
-                             f'{_et(r["poll_close"], "%-I:%M %p ET")} in the {z2}-time area' + ('; local hours vary by county' if st in COUNTY_HOURS_VARY else ''))
-        else: sub += f' · Polls close {E(_et(r["poll_close"], "%-I:%M %p ET"))}'
+    pc = _state_close_text(st)
+    if pc: sub += f' · {E(pc)}'
+    elif r.get("poll_close"): sub += f' · Polls close {E(_et(r["poll_close"], "%-I:%M %p ET"))}'
     winners = [c["name"] for c in r.get("candidates") or [] if c.get("winner")]
     cands = "".join(f'<li>{E(c.get("name"))} ({E(c.get("party") or "party not listed")}){" · incumbent" if c.get("incumbent") else ""}'
                     f'{" · <b>winner (as recorded by Wikipedia editors)</b>" if c.get("winner") else ""}'
