@@ -82,7 +82,9 @@ def _race(r, b, office):
     if r.get("poll_close"):
         _f = M.POLL_CLOSE_FIRST.get(st) if r.get("district") in (None, "", 0) else None
         if _f and _f != r["poll_close"]:
-            sub += f' · Polls close {E(_et(_f, "%-I:%M %p ET"))} to {E(_et(r["poll_close"], "%-I:%M %p ET"))} (state spans two time zones)'
+            z1, z2, part = M.POLL_CLOSE_ZONES.get(st, ("", "", "most"))
+            sub += ' · ' + E(f'Polls close {_et(_f, "%-I:%M %p ET")} in {part} of {r.get("state_name") or lab} ({z1} time), '
+                             f'{_et(r["poll_close"], "%-I:%M %p ET")} in the {z2}-time area')
         else: sub += f' · Polls close {E(_et(r["poll_close"], "%-I:%M %p ET"))}'
     winners = [c["name"] for c in r.get("candidates") or [] if c.get("winner")]
     cands = "".join(f'<li>{E(c.get("name"))} ({E(c.get("party") or "party not listed")}){" · incumbent" if c.get("incumbent") else ""}'

@@ -68,6 +68,11 @@ POLL_CLOSE_FIRST = dict(POLL_CLOSE)
 for _t, _ss in _PC_FIRST.items():
     _h, _m = map(int, _t.split(":"))
     for _s in _ss.split(): POLL_CLOSE_FIRST[_s] = (datetime(2026, 11, 3, 0, 0, tzinfo=ET) + timedelta(hours=_h, minutes=_m)).isoformat()
+# Time-zone names and wording for split states (same wording as the sourced table app/midterms_poll_close.json on seo/midterms-phases)
+POLL_CLOSE_ZONES = {"AK": ("Alaska", "Hawaii-Aleutian", "most"), "FL": ("Eastern", "Central", "most"), "ID": ("Mountain", "Pacific", "most"),
+                    "IN": ("Eastern", "Central", "most"), "KS": ("Central", "Mountain", "most"), "KY": ("Eastern", "Central", "most"),
+                    "MI": ("Eastern", "Central", "most"), "ND": ("Central", "Mountain", "most"), "OR": ("Mountain", "Pacific", "part"),
+                    "SD": ("Central", "Mountain", "most"), "TX": ("Central", "Mountain", "most")}
 FIRST_CLOSE = {"at": datetime(2026, 11, 3, 18, 0, tzinfo=ET).isoformat(), "where": "Eastern-time parts of Indiana and Kentucky"}
 LAST_CLOSE = {"at": datetime(2026, 11, 4, 1, 0, tzinfo=ET).isoformat(), "where": "the Hawaii-Aleutian time zone of Alaska"}
 

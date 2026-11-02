@@ -14,13 +14,13 @@ def test_all_51():
 
 def test_last_and_first_match():
     for st, r in _rows().items():
-        assert datetime.fromisoformat(M.POLL_CLOSE[st]) == datetime.fromisoformat(r["last_close_et"]), st
-        assert datetime.fromisoformat(M.POLL_CLOSE_FIRST[st]) == datetime.fromisoformat(r["first_close_et"]), st
+        cl = sorted(datetime.fromisoformat(c["at_et"]) for c in r["closes"])
+        assert datetime.fromisoformat(M.POLL_CLOSE[st]) == cl[-1] and datetime.fromisoformat(M.POLL_CLOSE_FIRST[st]) == cl[0], st
 
 def test_texas_render():
     con = {"t": "Safe R", "n": 3}
-    html = H._race({"state": "TX", "label": "Texas", "consensus": con, "poll_close": M.POLL_CLOSE["TX"], "candidates": []}, {}, "senate")
-    assert "Polls close 8:00 PM ET to 9:00 PM ET" in html
+    html = H._race({"state": "TX", "label": "Texas", "state_name": "Texas", "consensus": con, "poll_close": M.POLL_CLOSE["TX"], "candidates": []}, {}, "senate")
+    assert "Polls close 8:00 PM ET in most of Texas (Central time), 9:00 PM ET in the Mountain-time area" in html
     html = H._race({"state": "GA", "label": "Georgia", "consensus": con, "poll_close": M.POLL_CLOSE["GA"], "candidates": []}, {}, "senate")
     assert "Polls close 7:00 PM ET" in html and " to " not in html.split("Polls close")[1][:30]
 
