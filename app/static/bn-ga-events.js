@@ -59,8 +59,8 @@ function setUP(){if(!window.bnGALoaded||window.BN_GA_SKIP||!window.gtag)return;v
 setTimeout(setUP,2000);
 /* Monetization stubs for the future shop. NOT called anywhere. Pass real items only; never call with placeholder values. */
 function ec(n,o){if(!o||!Array.isArray(o.items)||!o.items.length)return false;if(!window.bnGALoaded||window.BN_GA_SKIP||!window.gtag)return false;
- var S=window.bnPII||function(){return true;};for(var k in o){if(o[k]==null||(typeof o[k]==='string'&&S(o[k])))delete o[k];}
- o.items=o.items.map(function(it){var c={};for(var j in it){var v=it[j];if(v==null)continue;if(typeof v==='string'){if(S(v))continue;v=v.slice(0,100);}else if(typeof v!=='number')continue;c[j]=v;}return c;});
+ var P=window.bnPII||function(){return true;},I=window.bnIdOK||function(){return false;},S=function(v,k){return P(v)&&!I(k,v);};for(var k in o){if(o[k]==null||(typeof o[k]==='string'&&S(o[k],k)))delete o[k];}
+ o.items=o.items.map(function(it){var c={};for(var j in it){var v=it[j];if(v==null)continue;if(typeof v==='string'){if(S(v,j))continue;v=v.slice(0,100);}else if(typeof v!=='number')continue;c[j]=v;}return c;});
  window.gtag('event',n,o);return true;} /* direct gtag: bnTrack drops arrays; same consent gate */
 window.bnGAEvents={
  track:T,setUserProperties:setUP,
