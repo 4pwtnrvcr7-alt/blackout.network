@@ -39,7 +39,7 @@
  function setVal(det,html){if(!det)return;var v=det.querySelector(":scope>summary>.bn-acc-v");if(v&&v.innerHTML!==html)v.innerHTML=html}
  function allToggle(host,scope){                   // "Expand all / Collapse all" for 5+ accordions
   if(!host||$(".bn-acc-tools",host.parentNode))return;var t=d.createElement("div");t.className="bn-acc-tools";
-  t.innerHTML='<button type="button" class="bn-acc-all" aria-pressed="false">Expand all</button>';host.parentNode.insertBefore(t,host);
+  t.style.gridColumn="1/-1";t.innerHTML='<button type="button" class="bn-acc-all" aria-pressed="false">Expand all</button>';host.parentNode.insertBefore(t,host);
   var b=t.firstChild;b.onclick=function(){var on=b.getAttribute("aria-pressed")!=="true";$$("details.bn-acc",scope).forEach(function(x){x.open=on;SS.set(x.id,on?"1":"0")});
    b.setAttribute("aria-pressed",on?"true":"false");b.textContent=on?"Collapse all":"Expand all";kick()}}
  // print: everything expanded, then restored
@@ -50,7 +50,10 @@
  function wire(){
   var m=d.getElementById("tab-threat");if(!m)return;
   var sec=function(id){var e=d.getElementById(id);return e?e.closest("section"):null};
+  var band=d.getElementById("v3_wireband");if(band&&m.firstElementChild!==band)m.insertBefore(band,m.firstElementChild);
+  var wh=wrapEl(d.getElementById("wh"),"acc-history",{title:"Timeline history",desc:"Every stored scanner story plus archived source data, back to Oct 2024",icon:"book"});
   var tl=wrapEl(d.getElementById("tl"),"acc-timeline",{title:"Timeline",desc:"Scrub hour by hour through everything cataloged, with source snapshots",icon:"clock"});
+  [wh,tl].forEach(function(x){if(x)x.style.gridColumn="1/-1"});
   wrapEl(sec("watch"),"acc-watchlist",{title:"Watchlist",desc:"Single-source, low-confidence items waiting for a second source",icon:"eye"});
   wrapEl(sec("map"),"acc-heatmap",{title:"Geographic heat map",desc:"Where the last 7 days of alerts cluster",icon:"map",open:true});
   wrapEl(sec("vol")||(function(){var h=$$("#tab-threat h2").filter(function(x){return/^Alert volume/.test(x.textContent.trim())})[0];return h&&h.closest("section")})(),"acc-volume",{title:"Alert volume by category",desc:"Merged items per day for 7 days, stacked by category",icon:"bars",open:true});
@@ -58,7 +61,8 @@
   wrapEl((function(){var h=$$("#tab-threat h2").filter(function(x){return/^Notification settings/.test(x.textContent.trim())})[0];return h&&h.closest("section")})(),"acc-notify",{title:"Notification settings",desc:"How and when alerts are pushed",icon:"bell"});
   wrapEl(sec("sources"),"acc-sources",{title:"Sources & health",desc:"Every feed the scanner reads and whether its last fetch worked",icon:"list"});
   wrapEl(sec("apilink"),"acc-api",{title:"API",desc:"Public JSON endpoints for high-severity items",icon:"code"});
-  if(tl)allToggle(tl,m);
+  var first=d.getElementById("acc-history")||d.getElementById("acc-timeline");if(first&&!first.dataset.tools){first.dataset.tools=1;allToggle(first,m)}
+  var tools=$(".bn-acc-tools",m);if(tools&&band&&tools.previousElementSibling!==band)band.after(tools);
   setVal(d.getElementById("acc-watchlist"),txt("#wcount")?'<span class="bn-acc-st warn">'+esc(txt("#wcount"))+' items</span>':"");
   setVal(d.getElementById("acc-timeline"),esc(txt("#tl_cnt",40)));
   var ok=$$("#sources .ok,#sources [data-ok=1]").length;setVal(d.getElementById("acc-sources"),ok?'<span class="bn-acc-st">'+ok+' OK</span>':"")}

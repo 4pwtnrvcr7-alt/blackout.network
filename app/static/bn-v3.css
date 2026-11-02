@@ -33,7 +33,7 @@ button.pri,.pri[role=button],a.pri,.nl-card button[type=submit]{background:var(-
 
 /* ---------- 2. full-page menu (markup: sitenav_ui.drawer, behaviour: sitenav.js) ---------- */
 .bn-drawer .bn-scrim{background:var(--bn-bg);opacity:0;transition:opacity var(--bn-nav-fade) ease}
-.bn-drawer:target .bn-scrim,.bn-drawer.bn-open .bn-scrim{opacity:.985}
+.bn-drawer:target .bn-scrim,.bn-drawer.bn-open .bn-scrim{opacity:1}
 .bn-drawer .bn-panel{left:0;right:0;width:100%;max-width:none;border-left:0;box-shadow:none;background:transparent;transform:none;opacity:0;
  transition:opacity var(--bn-nav-fade) ease,transform var(--bn-nav-fade) ease;transform:translateY(8px)}
 .bn-drawer:target .bn-panel,.bn-drawer.bn-open .bn-panel{opacity:1;transform:none}
@@ -188,3 +188,9 @@ details.bn-acc[open]>summary{border-bottom:1px solid var(--bn-line)}
  .v3-art .v3a-line{stroke-dashoffset:0}.v3-card:hover{transform:none}
 }
 .bn-acc-ns .bn-acc-body>h3{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+/* growth CTAs + stats button: brand yellow instead of red (red is reserved for rank 7+) */
+.bng-p,.st-btn.red{background:var(--bn-brand)!important;border-color:var(--bn-brand)!important;color:var(--bn-ink-on-brand)!important}
+.bng-cta,.bng-inline{border-color:color-mix(in srgb,var(--bn-brand) 55%,transparent)!important;background:linear-gradient(135deg,var(--v3-glow),transparent 60%),var(--pn,#12161b)!important}
+.bng-foot{background:linear-gradient(135deg,var(--v3-glow),transparent 55%),var(--pn,#12161b)}
+.bng-thanks{border-color:color-mix(in srgb,var(--bn-brand) 50%,transparent);background:var(--v3-glow)}
+.bng-prompt,.bng-bar{border-color:color-mix(in srgb,var(--bn-brand) 60%,transparent)!important}
