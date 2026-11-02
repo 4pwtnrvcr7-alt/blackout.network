@@ -1,6 +1,7 @@
 """Small site-wide extras (t338/t347), served to every page by server.version_assets():
   /linkguard.js           hides links the nightly link checker flagged dead (tools/linkcheck.py -> linkcheck_dead.json)
   /api/linkcheck/dead     the flagged URLs (data-level 'dead' flags: the link stays in the data, the page just stops showing it)
+  /bn-icons.js            emoji -> inline SVG icons on every page (Matt: no emojis on the site)
   /bn-eggs.js             a few discreet, accessible easter eggs (see the comment at the top of extras_static/eggs.js)"""
 import os, json, time
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +22,7 @@ def dead():
 
 def handle_get(path, qs):
     if path == "/api/linkcheck/dead": return 200, dead()
-    files = {"/linkguard.js": "linkguard.js", "/bn-eggs.js": "eggs.js"}
+    files = {"/linkguard.js": "linkguard.js", "/bn-eggs.js": "eggs.js", "/bn-icons.js": "icons.js"}
     if path in files:
         with open(os.path.join(STATIC, files[path]), "rb") as fh: return 200, fh.read(), "application/javascript"
     return 404, {"error": "not found"}

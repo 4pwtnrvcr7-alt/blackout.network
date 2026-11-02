@@ -382,7 +382,7 @@ def pwa_head(b):
 # t338/t343: Render's free tier drops some of a page's ~40 parallel requests (502/503). (1) every same-origin JS/CSS URL in a page gets
 # ?v=<build> so Cloudflare and browsers can cache it for a year (Cache-Control immutable below) and the origin rarely sees asset requests;
 # (2) BN_RETRY_HEAD retries a failed script/stylesheet (twice, with backoff) and same-origin GET fetches that come back 502/503/504.
-_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
+_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
 _ASSET_V = {"t": 0, "v": b"0"}
 def asset_version():
     now = time.time()
@@ -400,7 +400,7 @@ def version_assets(b):
         v = asset_version(); lo = b[:6000].lower(); h = lo.find(b"<head>")
         if h >= 0 and b"<html" in lo and b"bnRetry" not in b[:40000]: b = b[:h + 6] + BN_RETRY_HEAD + b[h + 6:]
         j = b.rfind(b"</body>")   # dead-link guard + easter eggs (bn_extras.py) on every full page
-        if j > 0 and b"<html" in lo and b"/linkguard.js" not in b: b = b[:j] + b'<script src="/linkguard.js" defer></script><script src="/bn-eggs.js" defer></script>' + b[j:]
+        if j > 0 and b"<html" in lo and b"/linkguard.js" not in b: b = b[:j] + b'<script src="/bn-icons.js"></script><script src="/linkguard.js" defer></script><script src="/bn-eggs.js" defer></script>' + b[j:]   # bn-icons runs before first paint (no emoji flash)
         return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
     except Exception: return b
 BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;window.__bnRetry=1;var o=location.origin;'
