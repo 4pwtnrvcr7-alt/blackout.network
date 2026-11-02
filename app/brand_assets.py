@@ -63,31 +63,30 @@ def _font(path, size):
     return ImageFont.truetype(path, size)
 
 def band(W, url):
-    """Footer band (W wide) in the site's dark theme: 'blackout.network' + tagline left, 'view more at' + QR right."""
+    """Footer band (W wide) in the site's dark theme: V2 mark + 'blackout.network' + tagline + 'view more at <url>' left, QR right."""
     from PIL import Image, ImageDraw
     qpx = max(140, min(260, int(W * 0.13)))
     f_lab = _font(FONT, max(15, qpx // 9)); f_big = _font(FONTB, max(24, min(56, int(W * 0.035)))); f_s = _font(FONT, max(15, min(26, int(W * 0.016))))
-    pad = max(14, qpx // 8); lab_h = int(f_lab.size * 1.5)
+    pad = max(14, qpx // 8)
     tile = qr_pil(url, qpx); qpx = tile.width
-    H = pad + lab_h + qpx + pad
+    H = 3 + pad + qpx + pad                  # 3 px red rule on top; QR centred below it (the one "view more at" line is in the text block)
     b = Image.new("RGB", (W, H), BG); d = ImageDraw.Draw(b)
     d.rectangle([0, 0, W, 3], fill=HI)
     qx = W - pad - qpx
-    d.text((qx + qpx // 2, pad + lab_h // 2), "view more at", font=f_lab, fill=TX, anchor="mm")
-    b.paste(tile, (qx, pad + lab_h))
+    b.paste(tile, (qx, 3 + pad))
     x = pad + 4; maxw = qx - x - pad
     big = f_big
     lh = max(28, min(104, int((H - 2 * pad) * 0.5)))
     lh = min(lh, int(maxw * 0.30 / 2))                 # narrow images: shrink the mark so the domain keeps its size
     lg = logo_mark(lh) if lh >= 24 else None
     if lg is not None:
-        b.paste(lg, (x, (H - lg.height) // 2 + 2), lg); gap = max(18, lg.height // 3); x += lg.width + gap; maxw -= lg.width + gap
+        b.paste(lg, (x, (H + 3 - lg.height) // 2), lg); gap = max(18, lg.height // 3); x += lg.width + gap; maxw -= lg.width + gap
     while d.textlength("blackout.network", font=big) > maxw and big.size > 14: big = _font(FONTB, big.size - 2)
     small = f_s
     for t in (TAGLINE, "view more at " + _short(url)):
         while d.textlength(t, font=small) > maxw and small.size > 10: small = _font(FONT, small.size - 1)
     block = int(big.size * 1.35) + 12 + 2 * int(small.size * 1.5)
-    y = max(pad // 2 + 3, (H - block) // 2 + 2)
+    y = max(pad // 2 + 3, (H + 3 - block) // 2)
     d.text((x, y), "blackout.network", font=big, fill=TX); y += int(big.size * 1.35)
     d.rectangle([x, y, x + min(maxw, int(big.size * 3)), y + 3], fill=HI); y += 12
     for t, col in ((TAGLINE, MU), ("view more at " + _short(url), AC)):

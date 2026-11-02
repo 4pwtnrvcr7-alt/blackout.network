@@ -12,7 +12,7 @@ The libraries live in the venv `/workspace/.brandenv` (`python3 -m venv --system
 
 | Asset type | What is added |
 |---|---|
-| Image (JPG/PNG) | Footer band in the site's dark theme (`#0b0d10`, red `#ff4d4f` rule): the logo V2-final mark (`static/brand/v2/mark-dark@2x.png`), then "blackout.network" + "Signal over noise." on the left, "view more at" + QR tile (≥140 px) on the right. JPEG EXIF/XMP are kept. |
+| Image (JPG/PNG) | Footer band in the site's dark theme (`#0b0d10`, red `#ff4d4f` rule): the logo V2-final mark (`static/brand/v2/mark-dark@2x.png`), then "blackout.network" + "Signal over noise." + "view more at <url>" on the left, the QR tile (≥140 px) centred on the right. JPEG EXIF/XMP are kept. |
 | PDF | The same band (logo mark as an image, QR in vector), at the bottom of the last page. The page content is scaled down slightly (about 7%), so the paper size stays the same (tabloid still prints 1:1). |
 | Video | A 3.5 s end card (logo V2 mark, "blackout.network", tagline, "view more at", QR, URL) appended at the source resolution and frame rate. The original audio is kept, with silence under the card. An optional corner watermark (`--corner`) is off by default because the ads already carry one. |
 
