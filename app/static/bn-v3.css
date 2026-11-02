@@ -217,3 +217,5 @@ details.bn-acc[open]>summary{border-bottom:1px solid var(--bn-line)}
 @media(max-width:820px){.v3-pulse{grid-template-columns:repeat(2,minmax(0,1fr))}.v3-pc:nth-child(3){border-left:0}.v3-pc:nth-child(n+3){border-top:1px solid var(--bn-line)}.v3-pn{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.v3-pc,.v3-meter i,.v3-spark i,.v3-ring .v3-ring-v{animation:none!important}}
 #tab-threat>details.bn-acc{margin:0}
+/* text that used the brand color: text-safe brand ink (light mode #8C5800, since #C97B00 is for fills and marks only) */
+.bnal-hi,.bnal-brand b,.bnal-lk .bnal-open,#tab-figures .kf-ini,#tab-figures .kf-ul a:hover{color:var(--bn-brand-ink)!important}
