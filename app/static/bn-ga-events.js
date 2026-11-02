@@ -1,4 +1,5 @@
 /* BLACKOUT.NETWORK GA4 events (analyst/ga4-events, 2026-11-02). Schema: launch/team/analyst/ga4_event_schema.md.
+   Sanitizer: window.bnPII (server.py GA_JS) is shared; ecommerce helpers apply it too (fail closed if missing).
    Consent: every event goes through window.bnTrack (server.py GA_JS), which drops events unless gtag loaded WITH consent
    (EEA/UK/CH banner, GPC, DNT, opt-out all respected) and strips email/phone-like strings. Nothing is queued before consent.
    Primary hook: delegation on [data-ga-event] + data-ga-* params. Fallback selectors cover today's markup.
@@ -58,7 +59,9 @@ function setUP(){if(!window.bnGALoaded||window.BN_GA_SKIP||!window.gtag)return;v
 setTimeout(setUP,2000);
 /* Monetization stubs for the future shop. NOT called anywhere. Pass real items only; never call with placeholder values. */
 function ec(n,o){if(!o||!Array.isArray(o.items)||!o.items.length)return false;if(!window.bnGALoaded||window.BN_GA_SKIP||!window.gtag)return false;
- for(var k in o)if(o[k]==null)delete o[k];window.gtag('event',n,o);return true;} /* direct gtag: bnTrack drops arrays; same consent gate */
+ var S=window.bnPII||function(){return true;};for(var k in o){if(o[k]==null||(typeof o[k]==='string'&&S(o[k])))delete o[k];}
+ o.items=o.items.map(function(it){var c={};for(var j in it){var v=it[j];if(v==null)continue;if(typeof v==='string'){if(S(v))continue;v=v.slice(0,100);}else if(typeof v!=='number')continue;c[j]=v;}return c;});
+ window.gtag('event',n,o);return true;} /* direct gtag: bnTrack drops arrays; same consent gate */
 window.bnGAEvents={
  track:T,setUserProperties:setUP,
  viewItem:function(items,value,currency){return ec('view_item',{currency:currency||'USD',value:value,items:items});},

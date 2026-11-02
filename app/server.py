@@ -210,8 +210,17 @@ function why(){if(gpc)return 'gpc';if(dnt)return 'dnt';if(ls('bn_analytics')==='
 if(CR){var c=consent();if(!c)return 'consent_pending';if(c.choice!=='granted')return 'consent_denied';}return '';}
 var skip=why();window.BN_GA_SKIP=skip;window.BN_CONSENT_REGION=CR;
 gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:(CR||skip)?'denied':'granted',functionality_storage:'granted',security_storage:'granted'});
-function bnCleanUrl(u){try{var url=new URL(u);['token','email','e','zip','q_email','internal'].forEach(function(k){url.searchParams.delete(k);});
-if(/^\/newsletter\/(confirm|unsubscribe|manage|breaking_off|stop_tracking|follow|unfollow)/.test(url.pathname))url.search='';return url.toString();}catch(e){return location.origin+location.pathname;}}
+/* compliance 2026-11-02: one shared sanitizer (window.bnPII / bnSanitize) for bnTrack, bn-ga-events.js and page_location. Drops: emails,
+   phone numbers, any run of 9+ digits, street addresses (house number + street word), PO Box, US ZIP+4. Tested on decoded text. */
+var PII=/@|%40|\d{3}[\s.\-]?\d{3}[\s.\-]?\d{4}|\d{9,}|\bp\.?\s*o\.?\s*box\b|\b\d{5}-\d{4}\b|\b\d{1,6}[a-z]?\s+(?:[a-z0-9.'\-]+\s+){0,4}(?:st|street|ave|avenue|rd|road|blvd|ln|lane|dr|drive|ct|court|way|pl|hwy|pkwy|ter|cir)\b/i;
+function dec(v){try{return decodeURIComponent(String(v).replace(/\+/g,' '));}catch(e){return String(v);}}
+window.bnPII=function(v){return typeof v==='string'&&(PII.test(v)||PII.test(dec(v)));};
+window.bnSanitize=function(v){return window.bnPII(v)?undefined:v;};
+/* page_location: user-text params (q = /?q= SearchAction deep link, place = /crime GET form, s/search/query/term) and tokens removed; any other
+   param whose value looks like PII removed; newsletter token routes lose the whole query; the #fragment (#search=<q>) is never sent. */
+function bnCleanUrl(u){try{var url=new URL(u);['token','email','e','zip','q_email','internal','q','place','s','search','query','term','address','name','phone'].forEach(function(k){url.searchParams.delete(k);});
+var del=[];url.searchParams.forEach(function(v,k){if(window.bnPII(v)||window.bnPII(k))del.push(k);});del.forEach(function(k){url.searchParams.delete(k);});
+if(/^\/newsletter\/(confirm|unsubscribe|manage|breaking_off|stop_tracking|follow|unfollow)/.test(url.pathname))url.search='';url.hash='';return url.toString();}catch(e){return location.origin+location.pathname;}}
 /* content_group (seo/batch-1): one of Home, Wire, Midterms, Solar, Weather, Preppers, Bushcraft, Network, Gov, Alerts, Stats, Legal */
 var TABG={threat:'Wire',wire:'Wire',noise:'Wire',thread:'Wire',bcast:'Wire',broadcasts:'Wire',streams:'Wire',radio:'Wire',ai:'Wire',heatmap:'Wire',trends:'Wire',
 finance:'Wire',jets:'Wire',spacex:'Wire',intel:'Wire',ranked:'Wire',figures:'Wire',sources:'Wire',net:'Network',network:'Network',grid:'Network',
@@ -234,10 +243,9 @@ if(!/[?&]internal=0(&|$)/.test(location.search)&&(/(^|;\s*)bn_internal=1(;|$)/.t
 gtag('config',BN_GA_ID,gc);}
 /* Events (seo/batch-1, spec in ga4-events.md): sent only when GA is loaded and allowed. Nothing is queued while GA is skipped
    (EEA/UK/CH, Europe/ timezone, GPC, DNT, opt-out), and nothing that looks like an email or phone number is ever sent. */
-var PII=/@|%40|\d{3}[\s.\-]?\d{3}[\s.\-]?\d{4}/;
 window.bnTrack=function(name,p){if(!window.bnGALoaded||window.BN_GA_SKIP)return false;var o={};p=p||{};
 for(var k in p){if(!Object.prototype.hasOwnProperty.call(p,k))continue;var v=p[k];if(v==null||v==='')continue;
-if(typeof v==='string'){if(PII.test(v))continue;v=v.slice(0,100);}else if(typeof v!=='number'&&typeof v!=='boolean')continue;o[k]=v;}
+if(typeof v==='string'){if(window.bnPII(v))continue;v=v.slice(0,100);}else if(typeof v!=='number'&&typeof v!=='boolean')continue;o[k]=v;}
 o.content_group=o.content_group||bnGroup();gtag('event',name,o);return true;};
 var T=window.bnTrack;
 function killGA(){window['ga-disable-'+BN_GA_ID]=true;gtag('consent','update',{analytics_storage:'denied'});
