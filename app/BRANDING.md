@@ -12,9 +12,9 @@ The libraries live in the venv `/workspace/.brandenv` (`python3 -m venv --system
 
 | Asset type | What is added |
 |---|---|
-| Image (JPG/PNG) | Footer band in the site's dark theme (`#0b0d10`, red `#ff4d4f` rule): "blackout.network" + "Signal over noise." on the left, "view more at" + QR tile (≥140 px) on the right. JPEG EXIF/XMP are kept. |
-| PDF | The same band, in vector, at the bottom of the last page. The page content is scaled down slightly (about 7%), so the paper size stays the same (tabloid still prints 1:1). |
-| Video | A 3.5 s end card ("blackout.network", tagline, "view more at", QR, URL) appended at the source resolution and frame rate. The original audio is kept, with silence under the card. An optional corner watermark (`--corner`) is off by default because the ads already carry one. |
+| Image (JPG/PNG) | Footer band in the site's dark theme (`#0b0d10`, red `#ff4d4f` rule): the logo V2-final mark (`static/brand/v2/mark-dark@2x.png`), then "blackout.network" + "Signal over noise." on the left, "view more at" + QR tile (≥140 px) on the right. JPEG EXIF/XMP are kept. |
+| PDF | The same band (logo mark as an image, QR in vector), at the bottom of the last page. The page content is scaled down slightly (about 7%), so the paper size stays the same (tabloid still prints 1:1). |
+| Video | A 3.5 s end card (logo V2 mark, "blackout.network", tagline, "view more at", QR, URL) appended at the source resolution and frame rate. The original audio is kept, with silence under the card. An optional corner watermark (`--corner`) is off by default because the ads already carry one. |
 
 Branded files are marked (JPEG comment, PNG text chunk or PDF/MP4 metadata `bn-brand-qr:<url>`), so re-running skips them unless you pass `--force`.
 
@@ -42,3 +42,6 @@ From Python: `import brand_assets as BA; BA.brand_pil(img, BA.PAGE["wire"])` or 
 - `/workspace/brief_video/ad_v2/mux.sh`: every ad render also gets `*_branded.mp4` copies with the end card.
 
 Originals: `snapshots_pre_qr_backup/` (box only; never synced or packaged) and `static/maps/*_pre_qr_backup.pdf` (box only).
+
+## Logo (V2-final, Nov 1 2026)
+Masters: `static/brand/v2/` (SVG + PNG; dark = #FFC21A elevated cells, light = #C97B00, marks only, never small text). Every site/email icon is rebuilt by `tools/logo_v2_assets.py`; the OG card by `tools/growth_assets.py`. BIMI: `static/bimi/logo.svg` = `static/brand/v2/blackout-network-bimi.svg` (SVG Tiny PS, RelaxNG-validated).

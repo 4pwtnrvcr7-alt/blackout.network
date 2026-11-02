@@ -719,8 +719,8 @@ FH = "Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif"                   
 FB = "Inter,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"   # body
 LOGO_ALT = "BLACKOUT.NETWORK"
 def logo_url(theme="dark", c=None):
-    """Hosted master logo (t333u): the BN square tile with the green/amber/red meter underneath, solid background. Served by social.py /social/thumb/."""
-    return f'{(c or cfg())["base_url"].rstrip("/")}/social/thumb/brand_tile_{theme}_168.png'
+    """Hosted master logo: logo V2-final tile (dark version; light version on a bordered white tile), solid background, built by tools/logo_v2_assets.py. New filename busts mail-client image caches. Served by social.py /social/thumb/."""
+    return f'{(c or cfg())["base_url"].rstrip("/")}/social/thumb/brand_tile_v2_{theme}_168.png'
 def _logo_html(c, size=48):
     """Masthead: BN tile + the domain in a small, quiet size beside it, with the tagline under the domain. Left-aligned."""
     dk = (f'<img class="bn-dk" src="{E(logo_url("dark", c))}" width="{size}" height="{size}" alt="{LOGO_ALT}" '

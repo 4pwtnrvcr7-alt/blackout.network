@@ -17,7 +17,7 @@
  /* palette: brand A "Signal", dark (default) */
  --bn-bg:#0B0D10;--bn-tbar-bg:rgba(11,13,16,.97);--bn-surface-0:#0f1317;--bn-surface:#14181D;--bn-raised:#1B2027;--bn-surface-2:#1d232b;
  --bn-line:#252B33;--bn-line-2:#2f3742;--bn-text:#E6E9EE;--bn-text-2:#c9d0d9;--bn-muted:#8B95A3;
- --bn-brand:#FF4D4F;--bn-ink-on-brand:#0B0D10;--bn-accent:var(--bn-brand);--bn-link:#4aa3ff;--bn-mark-bg:#0B0D10;--bn-mark-fg:#FFFFFF;
+ --bn-brand:#FF4D4F;--bn-ink-on-brand:#0B0D10;--bn-accent:var(--bn-brand);--bn-link:#4aa3ff;--bn-mark-bg:#0B0D10;--bn-mark-fg:#FFFFFF;--bn-mark-line:#252B33;--bn-mark-hi:#FFC21A;--bn-mark-lo:#3FAE80;--bn-mark-crit:#C8102E;
  --bn-hover:rgba(255,255,255,.06);--bn-active:rgba(255,77,79,.10);--bn-scrim:rgba(0,0,0,.62);--bn-shadow:0 12px 40px rgba(0,0,0,.5);
  --bn-sev-lo:#2BB673;--bn-sev-md:#F5A524;--bn-sev-hi:#FF4D4F;--bn-seg-off:#252B33;
  --bn-rule-h:3px;--bn-icon:30px;
@@ -27,6 +27,7 @@
  --bn-bg:#F6F7F9;--bn-tbar-bg:rgba(246,247,249,.97);--bn-surface-0:#EEF0F3;--bn-surface:#FFFFFF;--bn-raised:#FBFBFC;--bn-surface-2:#EEF0F3;
  --bn-line:#DDE1E6;--bn-line-2:#C5CCD5;--bn-text:#0B0D10;--bn-text-2:#2C333C;--bn-muted:#5B6573;
  --bn-brand:#D92D30;--bn-ink-on-brand:#FFFFFF;--bn-link:#0a5fc2;
+ --bn-mark-bg:#FFFFFF;--bn-mark-fg:#0B0D10;--bn-mark-line:#DDE1E6;--bn-mark-hi:#C97B00;--bn-mark-lo:#1D7350;--bn-mark-crit:#C8102E; /* logo V2 light version on a bordered white tile */
  --bn-hover:rgba(11,13,16,.05);--bn-active:rgba(217,45,48,.08);--bn-scrim:rgba(11,13,16,.38);--bn-shadow:0 12px 40px rgba(20,30,45,.18);
  --bn-sev-lo:#16884B;--bn-sev-md:#C77700;--bn-sev-hi:#D92D30;--bn-seg-off:#DDE1E6;
  /* the site's legacy palette names follow the tokens, so every tab and page switches with them */

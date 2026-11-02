@@ -159,7 +159,7 @@ PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple
             b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">'
             b'<meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
             b'<meta name="apple-mobile-web-app-title" content="BLACKOUT"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
-            b'<link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96-bn3.png"><link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192-bn3.png">'   # BN favicons, new names so Google's favicon cache (YouTube channel links) refetches
+            b'<link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96-v2.png"><link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192-v2.png">'   # BN favicons, new names so Google's favicon cache (YouTube channel links) refetches
             b'<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="mask-icon" href="/img/safari-pinned-tab.svg" color="#0B0D10">'   # BN master tile icon set (t333)
             b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png">'
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')

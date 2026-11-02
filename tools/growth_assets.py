@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build static growth/SEO graphics (box only; needs Pillow + Natural Earth in /workspace/geodata):
   app/growth_static/world.webp   2:1 equirectangular dark locator base map (Natural Earth, public domain) used for Wire thumbnails
-  app/static/pwa/icon-og-1200x630.png  branded Open Graph / Twitter card image (all pages)"""
+  app/static/pwa/icon-og-v2-1200x630.png (+ legacy name icon-og-1200x630.png)  branded Open Graph / Twitter card image (all pages),
+  with the logo V2-final tile (tools/logo_v2_assets.py; needs cairosvg, run with /workspace/.brandenv/bin/python)"""
 import json, sys, os
 from PIL import Image, ImageDraw, ImageFilter
 sys.path.insert(0, '/workspace/launch/brand'); import bn_signal as B
@@ -43,7 +44,8 @@ for lon, lat, r in dots:
     x = (lon + 180) / 360 * 1500 - 150; y = (90 - lat) / 180 * 750 - 60
     gd.ellipse([x - 5, y - 5, x + 5, y + 5], fill=B.sev(r))
 d = ImageDraw.Draw(og)
-B.icon(d, 72, 70, 96, bg=True)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import logo_v2_assets as LV2   # logo V2-final (Nov 1 2026)
+_t = LV2.png(LV2.tile('dark', 1024, rx=200, stroke='#2A3038', sw=10), 104); og.paste(_t, (70, 66), _t)
 d.text((72, 210), 'BLACKOUT.', font=B.mont(64, 900), fill=(236, 239, 243))
 d.text((72 + d.textlength('BLACKOUT.', font=B.mont(64, 900)), 210), 'NETWORK', font=B.mont(64, 900), fill=B.RED)
 d.text((74, 292), 'Signal over noise.', font=B.inter(34, 600), fill=(201, 209, 219))
@@ -54,5 +56,6 @@ B.meter(d, 74, 462, 30, 7)
 d.text((74, 548), 'blackout.network', font=B.mont(28, 800), fill=(236, 239, 243))
 x2 = 74 + d.textlength('blackout.network', font=B.mont(28, 800)) + 22
 d.text((x2, 553), '·   X @BlkoutNtw   ·   YouTube @blkoutntw', font=B.inter(23, 500), fill=(150, 160, 174))
+og.save(f'{ROOT}/app/static/pwa/icon-og-v2-1200x630.png', optimize=True)   # new name busts X/YouTube/Facebook preview caches
 og.save(f'{ROOT}/app/static/pwa/icon-og-1200x630.png', optimize=True)
 print('ok')

@@ -15,6 +15,24 @@ BG, PANEL, TX, MU, HI, AC = "#0b0d10", "#14181d", "#e6e9ee", "#8b95a3", "#ff4d4f
 TAGLINE = "Signal over noise."
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"; FONTB = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 MARK = "bn-brand-qr:"          # JPEG comment / PNG text / PDF metadata marker -> idempotent
+# Logo V2-final mark (BN + severity meter, dark version, transparent), shown left of "blackout.network" on every band/end card.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+LOGO_CANDIDATES = [os.path.join(_HERE, "static", "brand", "v2", "mark-dark@2x.png"),
+                   "/workspace/launch/team/review/design/logo-variations/v2-final/png/mark-dark@2x.png"]
+_logo_cache = {}
+
+def logo_mark(h):
+    """V2 mark as an RGBA PIL image h px tall (aspect ~2:1), or None if the asset is missing (branding still works without it)."""
+    if h in _logo_cache: return _logo_cache[h]
+    from PIL import Image
+    im = None
+    for p in LOGO_CANDIDATES:
+        if os.path.isfile(p):
+            src = Image.open(p).convert("RGBA"); im = src.resize((max(1, round(src.width * h / src.height)), h), Image.LANCZOS); break
+    _logo_cache[h] = im; return im
+
+def logo_path():
+    return next((p for p in LOGO_CANDIDATES if os.path.isfile(p)), None)
 
 def _libs():
     """segno lives in /workspace/.brandenv (pure python); make it importable from other venvs (e.g. the snapshot worker's)."""
@@ -57,14 +75,22 @@ def band(W, url):
     qx = W - pad - qpx
     d.text((qx + qpx // 2, pad + lab_h // 2), "view more at", font=f_lab, fill=TX, anchor="mm")
     b.paste(tile, (qx, pad + lab_h))
-    x = pad + 4; y = pad + 2; maxw = qx - x - pad
+    x = pad + 4; maxw = qx - x - pad
     big = f_big
+    lh = max(28, min(104, int((H - 2 * pad) * 0.5)))
+    lh = min(lh, int(maxw * 0.30 / 2))                 # narrow images: shrink the mark so the domain keeps its size
+    lg = logo_mark(lh) if lh >= 24 else None
+    if lg is not None:
+        b.paste(lg, (x, (H - lg.height) // 2 + 2), lg); gap = max(18, lg.height // 3); x += lg.width + gap; maxw -= lg.width + gap
     while d.textlength("blackout.network", font=big) > maxw and big.size > 14: big = _font(FONTB, big.size - 2)
+    small = f_s
+    for t in (TAGLINE, "view more at " + _short(url)):
+        while d.textlength(t, font=small) > maxw and small.size > 10: small = _font(FONT, small.size - 1)
+    block = int(big.size * 1.35) + 12 + 2 * int(small.size * 1.5)
+    y = max(pad // 2 + 3, (H - block) // 2 + 2)
     d.text((x, y), "blackout.network", font=big, fill=TX); y += int(big.size * 1.35)
     d.rectangle([x, y, x + min(maxw, int(big.size * 3)), y + 3], fill=HI); y += 12
-    small = f_s
     for t, col in ((TAGLINE, MU), ("view more at " + _short(url), AC)):
-        while d.textlength(t, font=small) > maxw and small.size > 10: small = _font(FONT, small.size - 1)
         if y + small.size < H - 4: d.text((x, y), t, font=small, fill=col); y += int(small.size * 1.5)
     return b
 
@@ -128,8 +154,11 @@ def brand_pdf(src, url, dst, band_pt=None, keep_size=True):
             if v: c.rect(qx + (xx + 4) * s, qy + qs - (yy + 5) * s, s + 0.05, s + 0.05, stroke=0, fill=1)
     c.setFillColor(TX); c.setFont("Helvetica", 9); c.drawRightString(qx - 8, qy + qs - 12, "view more at")
     c.setFont("Helvetica-Bold", 11); c.setFillColor(AC); c.drawRightString(qx - 8, qy + qs - 26, _short(url))
-    c.setFillColor(TX); c.setFont("Helvetica-Bold", min(30, bh * 0.34)); c.drawString(pad + 4, bh * 0.48, "blackout.network")
-    c.setFillColor(MU); c.setFont("Helvetica", 10); c.drawString(pad + 4, bh * 0.22, TAGLINE + "  ·  scan the QR code to view more")
+    tx = pad + 4; lp = logo_path()
+    if lp:   # V2 mark, ~2:1, vertically centred in the band
+        lh = bh * 0.56; lw = lh * 1.9929; c.drawImage(lp, tx, (bh - lh) / 2 - 2, width=lw, height=lh, mask="auto"); tx += lw + lh * 0.38
+    c.setFillColor(TX); c.setFont("Helvetica-Bold", min(30, bh * 0.34)); c.drawString(tx, bh * 0.48, "blackout.network")
+    c.setFillColor(MU); c.setFont("Helvetica", 10); c.drawString(tx, bh * 0.22, TAGLINE + "  ·  scan the QR code to view more")
     c.showPage(); c.save()
     if keep_size:   # paper size unchanged (prints 1:1 on the same sheet): shrink the page content to make room, centred
         H = y1 - y0; k = (H - bh) / H; dx = (W - W * k) / 2
@@ -153,14 +182,18 @@ def end_card(W, H, url):
     if W >= H:   # landscape: text left, QR right
         qx, qy = int(W * 0.60), (H - qpx) // 2 + int(u * 0.03); tx = int(W * 0.08)
         d.text((qx + qpx // 2, qy - int(u * 0.05)), "view more at", font=f_lab, fill=TX, anchor="mm")
+        lg = logo_mark(int(u * 0.13))
+        if lg is not None: img.paste(lg, (tx, H // 2 - int(u * 0.12) - lg.height - int(u * 0.05)), lg)
         d.text((tx, H // 2 - int(u * 0.10)), "blackout.network", font=f_big, fill=TX)
         d.rectangle([tx, H // 2 + int(u * 0.0), tx + int(u * 0.3), H // 2 + int(u * 0.0) + 5], fill=HI)
         d.text((tx, H // 2 + int(u * 0.04)), TAGLINE, font=f_s, fill=MU)
-    else:        # portrait: stacked
-        qx, qy = (W - qpx) // 2, int(H * 0.42)
-        d.text((W // 2, int(H * 0.25)), "blackout.network", font=f_big, fill=TX, anchor="mm")
-        d.rectangle([W // 2 - int(u * 0.15), int(H * 0.29), W // 2 + int(u * 0.15), int(H * 0.29) + 5], fill=HI)
-        d.text((W // 2, int(H * 0.33)), TAGLINE, font=f_s, fill=MU, anchor="mm")
+    else:        # portrait: stacked, vertically centred as a group (logo V2 on top)
+        qx, qy = (W - qpx) // 2, int(H * 0.50)
+        lg = logo_mark(int(u * 0.16))
+        if lg is not None: img.paste(lg, ((W - lg.width) // 2, int(H * 0.33) - int(u * 0.06) - lg.height - int(u * 0.04)), lg)
+        d.text((W // 2, int(H * 0.33)), "blackout.network", font=f_big, fill=TX, anchor="mm")
+        d.rectangle([W // 2 - int(u * 0.15), int(H * 0.37), W // 2 + int(u * 0.15), int(H * 0.37) + 5], fill=HI)
+        d.text((W // 2, int(H * 0.41)), TAGLINE, font=f_s, fill=MU, anchor="mm")
         d.text((W // 2, qy - int(u * 0.05)), "view more at", font=f_lab, fill=TX, anchor="mm")
     img.paste(tile, (qx, qy))
     d.text((qx + qpx // 2, qy + qpx + int(u * 0.04)), _short(url), font=f_s, fill=AC, anchor="mm")
