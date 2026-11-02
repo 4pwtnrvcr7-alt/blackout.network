@@ -310,7 +310,7 @@ def render():
               + (f'<div class="st-posts">{pcards}</div>' if pcards else '<div class="st-empty">Posts load here after the next hourly refresh.</div>'))
     nlv = n(nl.get("subscribers"), nl.get("lt5"))
     cta = ('<section class="st-cta"><div><h2>Get the brief before it trends</h2>'
-           f'<p>The free BLACKOUT.NETWORK email brief: threats ranked 0–10 and sourced. Newsletter readers: <b>{nlv}</b>. Join them.</p></div>'
+           f'<p>The free BLACKOUT.NETWORK email brief: threats ranked 0–10 and sourced. Newsletter readers: <b>{nlv}</b>. Be one of the first.</p></div>'
            '<div class="b"><a class="st-btn red" href="/newsletter?utm_source=stats&amp;utm_medium=cta">✉ Get the free brief</a>'
            f'<a class="st-btn" href="https://www.youtube.com/@blkoutntw?sub_confirmation=1" target="_blank" rel="noopener">{I_YT} YouTube</a>'
            f'<a class="st-btn" href="https://x.com/BlkoutNtw" target="_blank" rel="noopener">{I_X} X</a></div></section>')
