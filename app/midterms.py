@@ -88,7 +88,7 @@ OFFICIAL_LINKS = {  # each state's official election-results page (secretary of 
  "IA": "https://sos.iowa.gov/elections/results/", "KS": "https://sos.ks.gov/elections/election-results.html", "KY": "https://elect.ky.gov/results/",
  "LA": "https://voterportal.sos.la.gov/graphical", "ME": "https://www.maine.gov/sos/elections-voting/election-results-data", "MD": "https://elections.maryland.gov/elections/2026/index.html",
  "MA": "https://electionstats.state.ma.us/", "MI": "https://mielections.us/election/results/", "MN": "https://electionresults.sos.mn.gov/",
- "MS": "https://www.sos.ms.gov/elections-voting/election-results", "MO": "https://enr.sos.mo.gov/", "MT": "https://electionresults.mt.gov/",
+ "MS": "https://www.sos.ms.gov/elections-voting/election-results", "MO": "https://www.sos.mo.gov/elections/results", "MT": "https://electionresults.mt.gov/",
  "NE": "https://electionresults.nebraska.gov/", "NV": "https://silverstateelection.nv.gov/", "NH": "https://www.sos.nh.gov/elections/election-results",
  "NJ": "https://www.nj.gov/state/elections/election-information-results.shtml", "NM": "https://electionresults.sos.nm.gov/",
  "NY": "https://nyenr.elections.ny.gov/", "NC": "https://er.ncsbe.gov/", "ND": "https://results.sos.nd.gov/", "OH": "https://liveresults.ohiosos.gov/",
