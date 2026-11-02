@@ -70,6 +70,7 @@
   // ---------------- icons ----------------
   var BELL = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 1.8H4.4z"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M10 20.6a2.2 2.2 0 0 0 4 0"/></svg>';
   var X = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>';
+  var PAGEMENU = '<svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="-10 -10 20 20"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M-6.5 -4.5h13M-6.5 0h13M-6.5 4.5h8"/></svg>';
   var SHARE = '<svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="-10 -10 20 20"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M0 -9v11M-4 -5l4-4 4 4M-6 -2h-1.5v10h15v-10h-1.5"/></svg>';
   function meter(r) {
     if (window.bnMeter) return window.bnMeter(r, "s");
@@ -167,7 +168,7 @@
       var old = E.ver && E.ver < 16.4;
       return body('<p class="bnal-lead">On iPhone and iPad, alerts work from the Home Screen app.</p>'
         + (old ? '<p class="bnal-note bnal-warn">This needs iOS 16.4 or newer. Update iOS in Settings first.</p>' : "")
-        + '<ol class="bnal-steps"><li><span class="bnal-n">1</span><span>Tap <b>Share</b> <span class="bnal-ki">' + SHARE + '</span> in Safari (on newer iPhones it’s under <b>•••</b>)</span></li>'
+        + '<ol class="bnal-steps"><li><span class="bnal-n">1</span><span>Tap <b>Share</b> <span class="bnal-ki">' + SHARE + '</span> in Safari (on iOS 26, tap <span class="bnal-ki">' + PAGEMENU + '</span> at the left of the address bar first)</span></li>'
         + '<li><span class="bnal-n">2</span><span>Tap <b>Add to Home Screen</b></span></li>'
         + '<li><span class="bnal-n">3</span><span>Open <b>BLACKOUT</b> from your Home Screen and tap the bell ' + '<span class="bnal-ki">' + BELL + '</span></span></li></ol>'
         + IOS_ART
@@ -228,6 +229,30 @@
       });
     }).catch(function (e) { if (e === null) return; btn.disabled = false; say((e && e.message) || "Something went wrong. Please try again.", "err"); });
   }
+  // For the Home Screen soft-ask card (install-guide.js). Call it straight from the tap handler: requestPermission runs synchronously
+  // here, inside the user gesture. Resolves {perm, ok, live, error}; never rejects. Uses the same subscribe path as the panel.
+  BN.turnOnAlerts = function (opts) {
+    opts = opts || {}; var level = opts.level === "all" ? "all" : "major";
+    if (!E.api) return Promise.resolve({ perm: "unsupported", ok: false });
+    var permP = Notification.permission === "granted" ? Promise.resolve("granted") : new Promise(function (res) {
+      var p = Notification.requestPermission(res); if (p && p.then) p.then(res);
+    });
+    return permP.then(function (perm) {
+      if (perm !== "granted") return { perm: perm, ok: false };
+      return Promise.all([getReg(), getCfg()]).then(function (rc) {
+        var reg = rc[0], cf = rc[1];
+        if (!cf.vapid_public_key) throw new Error("Alerts are not available right now. Please try again later.");
+        return reg.pushManager.getSubscription().then(function (sub) {
+          return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(cf.vapid_public_key) });
+        });
+      }).then(function (sub) {
+        return post("/api/alerts/subscribe", { sub: sub.toJSON(), level: level, cats: [], test: isTest() }).then(function (j) {
+          save({ on: true, level: j.level, cats: j.cats, endpoint: sub.endpoint, test: !!j.test, since: new Date().toISOString() });
+          return { perm: "granted", ok: true, live: !!j.live, level: j.level };
+        });
+      }).catch(function (e) { return { perm: "granted", ok: false, error: (e && e.message) || "Something went wrong. Please try again." }; });
+    });
+  };
   function saveChanges(btn) {
     var ch = readChoices();
     if (ch.none) { say("Pick at least one category under More options.", "err"); return; }

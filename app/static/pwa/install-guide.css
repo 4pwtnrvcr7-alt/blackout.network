@@ -65,3 +65,28 @@ html.bn-lock .bnig{visibility:hidden}   /* sidebar menu open: step aside (z abov
 @media print{.bnig,.bnig-toast{display:none!important}}
 /* installed (standalone) app: keep content clear of the iOS status bar (black-translucent) */
 @media (display-mode:standalone){body{padding-top:env(safe-area-inset-top)}}
+/* Home Screen app: notifications soft-ask (install-guide.js maybeAsk). Same sheet as the install guide; V2 yellow on dark, red only as accent. */
+.bnna{--na-y:#FFC21A;--na-yi:#0B0D10}
+html[data-theme="light"] .bnna{--na-y:#C97B00;--na-yi:#fff}
+.bnna .bnna-badge{width:44px;height:44px;flex:none;border-radius:12px;display:grid;place-items:center;background:rgba(255,194,26,.12);box-shadow:0 0 0 1px rgba(255,194,26,.35);color:var(--na-y)}
+.bnna .bnna-badge.ok{background:rgba(43,182,115,.14);box-shadow:0 0 0 1px rgba(43,182,115,.4);color:var(--g-lo)}
+.bnna .bnna-badge.off{background:var(--g-raised);box-shadow:0 0 0 1px var(--g-line);color:var(--g-mu)}
+.bnna .bnna-bi{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.bnna-svg .bnna-clk{fill:var(--g-tx);font:700 22px var(--bn-font-ui,"Montserrat",system-ui,sans-serif);letter-spacing:-.01em}
+.bnna-svg .bnna-n{fill:var(--g-raised);stroke:var(--g-line)}
+.bnna-svg .bnna-a{fill:var(--g-tx);font:700 11px var(--bn-font-ui,system-ui,sans-serif);letter-spacing:.04em}
+.bnna-svg .bnna-t{fill:var(--g-mu);font:500 10px var(--bn-font-body,system-ui,sans-serif)}
+.bnna-svg .bnna-rk{fill:var(--g-hi)}
+.bnna-svg .bnna-rkt{fill:#fff;font:800 9.5px var(--bn-font-ui,system-ui,sans-serif)}
+.bnna-svg .bnna-c{fill:var(--g-tx);font:700 9.5px var(--bn-font-ui,system-ui,sans-serif);letter-spacing:.05em}
+.bnna-svg .bnna-l{fill:var(--bn-line,#2a313a)}
+.bnna-list,.bnna-steps{list-style:none;margin:0 0 10px;padding:0;display:grid;gap:10px}
+.bnna-list li{display:flex;gap:12px;align-items:flex-start}
+.bnna-list .bnna-i{flex:none;width:22px;height:22px;margin-top:1px;fill:none;stroke:var(--na-y);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.bnna-list b{display:block;font:700 15px/1.3 var(--bn-font-ui,"Montserrat",system-ui,sans-serif);color:var(--g-tx)}
+.bnna-list small{display:block;margin-top:2px;font-size:13.5px;line-height:1.4;color:var(--g-mu)}
+.bnna-steps li{display:flex;gap:12px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--g-tx)}
+.bnna-steps .n{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:2px solid var(--g-line);font:800 13px/1 var(--bn-font-ui,"Montserrat",system-ui,sans-serif);color:var(--g-mu)}
+.bnna .bnna-err{color:var(--g-hi)}
+.bnna .bnig-row .bnna-pri{background:var(--na-y);border-color:var(--na-y);color:var(--na-yi);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.bnna .bnna-bti{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}

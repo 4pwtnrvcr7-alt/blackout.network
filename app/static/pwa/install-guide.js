@@ -64,7 +64,10 @@
     back: '<path d="M2 -6l-6 6 6 6"/>', fwd: '<path d="M-2 -6l6 6 -6 6"/>', tabs: '<rect x="-6" y="-6" width="12" height="12" rx="2.5"/>',
     book: '<path d="M-7 -6h6c1 0 1 1 1 1v12c0-1-1-1-1-1h-6zM7 -6h-6c-1 0-1 1-1 1v12c0-1 1-1 1-1h6z"/>',
     file: '<path d="M-5 -7h7l4 4v10h-11z"/>', dock: '<rect x="-9" y="2" width="18" height="5" rx="2"/><rect x="-4" y="-7" width="8" height="7" rx="1.5"/>',
-    home: '<path d="M-7 0l7-7 7 7M-5 -2v8h10v-8"/>', app: '<rect x="-7" y="-7" width="14" height="14" rx="3.5"/>'
+    home: '<path d="M-7 0l7-7 7 7M-5 -2v8h10v-8"/>', app: '<rect x="-7" y="-7" width="14" height="14" rx="3.5"/>',
+    pagemenu: '<path d="M-6.5 -4.5h13M-6.5 0h13M-6.5 4.5h8"/>',                                    // Safari 26 Page Menu button (left end of the address bar)
+    reload: '<path d="M5.2 -1.8A5.6 5.6 0 1 0 5.4 2.6"/><path d="M5.6 -6.2v4.6H1"/>',
+    tabs2: '<rect x="-6.5" y="-3" width="9.5" height="9.5" rx="2.2"/><path d="M-3 -3.4v-1.4a2.2 2.2 0 0 1 2.2-2.2h5.1a2.2 2.2 0 0 1 2.2 2.2v5.1a2.2 2.2 0 0 1-2.2 2.2h-1.3"/>'
   };
   function ico(name, x, y, s) { return '<g transform="translate(' + x + " " + y + ") scale(" + (s || 1) + ')">' + IC[name] + "</g>"; }
   function ring(x, y, r) { return '<circle class="bnig-pulse" cx="' + x + '" cy="' + y + '" r="' + r + '"/><circle class="bnig-ring" cx="' + x + '" cy="' + y + '" r="' + r + '"/>'; }
@@ -81,6 +84,18 @@
     right.forEach(function (ic, i) { var cx = x1 + 17 + i * 34; if (ic.t) tgt = [cx, y]; s += '<g class="ic' + (ic.t ? " on" : "") + '">' + ico(ic.n, cx, y) + "</g>"; });
     if (tgt) s = s + ring(tgt[0], tgt[1], 17);
     return s + "</svg>";
+  }
+  // Safari 26+ on iPhone (Compact tabs, the default): back button, floating address bar with the Page Menu button at its left end
+  // and reload at its right end, tabs button on the right. Drawn from Matt's iPhone screenshot (Nov 1 2026) + Apple Support.
+  function sceneSafari26() {
+    var W = 300, H = 132, y = 100, s = '<svg viewBox="0 0 ' + W + " " + H + '" class="bnig-svg" aria-hidden="true">';
+    s += '<rect class="ph" x="1" y="1" width="' + (W - 2) + '" height="' + (H - 2) + '" rx="18"/>';
+    s += '<g class="pg">' + [0, 1, 2].map(function (i) { return '<rect x="22" y="' + (18 + i * 16) + '" width="' + (200 - i * 50) + '" height="7" rx="3.5"/>'; }).join("") + "</g>";
+    s += '<circle class="url" cx="32" cy="' + y + '" r="16"/><g class="ic">' + ico("back", 31, y) + "</g>";
+    s += '<rect class="url" x="56" y="' + (y - 16) + '" width="188" height="32" rx="16"/>';
+    s += '<g class="ic on">' + ico("pagemenu", 76, y) + '</g><text class="ut" x="152" y="' + (y + 4) + '" text-anchor="middle">blackout.network</text><g class="ic">' + ico("reload", 226, y, .85) + "</g>";
+    s += '<circle class="url" cx="268" cy="' + y + '" r="16"/><g class="ic">' + ico("tabs2", 268, y, .9) + "</g>";
+    return s + ring(76, y, 14) + "</svg>";
   }
   // a menu / share sheet with rows; the target row is highlighted
   function sceneMenu(title, rows, target, from) {
@@ -119,8 +134,9 @@
     if (d.os === "ios") {
       var addRows = [["Copy", ""], ["Add to Reading List", "book"], ["Add to Home Screen", "addsq"]];
       if (d.browser === "safari" || d.browser === "other") {
-        if (ios26 && !ipad) return { key: "ios26-safari", sub: "iPhone · Safari", note: "Tabs at Top or Bottom? Tap Share " + svgInline("share") + " instead.", steps: [
-          ["Tap " + B("•••") + " next to the address bar", sceneBar("bottom", [{ n: "back", side: "l" }, { n: "dotsh", t: 1 }])],
+        if (ios26 && !ipad) return { key: "ios26-safari", sub: "iPhone · Safari",
+          note: "No " + B("Add to Home Screen") + "? Scroll down or tap " + B("View More") + ".<br>Tabs set to Top or Bottom? Tap Share " + svgInline("share") + " first.", steps: [
+          ["Tap " + svgInline("pagemenu") + " at the left of the address bar", sceneSafari26()],
           ["Tap " + B("Share"), sceneMenu("", [["Add Bookmark", "book"], ["Share", "share"], ["New Tab", "plus"]], 1)],
           ["Tap " + B("Add to Home Screen") + ", then " + B("Add"), sceneMenu("Share", addRows, 2)]] };
         if (ipad) return { key: "ipad-safari", sub: "iPad · Safari", note: "Don't see Share? Tap ••• first.", steps: [
@@ -176,7 +192,8 @@
       ["Click " + B("Install"), sceneInstall("")]] };
     return null;
   }
-  function svgInline(n) { return '<svg class="bnig-ic" viewBox="-10 -10 20 20" aria-label="' + n + ' icon" role="img">' + IC[n] + "</svg>"; }
+  var ICN = { pagemenu: "Page Menu button", share: "Share button" };
+  function svgInline(n) { return '<svg class="bnig-ic" viewBox="-10 -10 20 20" aria-label="' + (ICN[n] || n + " icon") + '" role="img">' + IC[n] + "</svg>"; }
 
   // ---------------- share (kept: [data-bn-share] buttons elsewhere use it) ----------------
   function toast(msg) { var t = document.createElement("div"); t.className = "bnig-toast"; t.setAttribute("role", "status"); t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2200); }
@@ -241,9 +258,118 @@
     void el.offsetWidth; pad(true); setTimeout(function () { el.classList.add("bnig-on"); }, 30);
     addEventListener("resize", function () { if (el && !el.hidden && el.classList.contains("bnig-on")) pad(true); });
   }
+  // ---------------- Home Screen app: ask before the official notification prompt (Matt, t561u/t562u) ----------------
+  // Shown only when running from the Home Screen (standalone) and Notification.permission is "default". "Turn on alerts" calls
+  // Notification.requestPermission() inside the tap (via BN.turnOnAlerts in alerts.js) and subscribes to our existing Web Push.
+  // "Not now" / close = ask again after 7 days. Storage: localStorage "bnna_snooze" (time of the last "Not now").
+  // Testing: ?bnna=ask | granted | denied | error forces that state (nothing is requested or stored in forced mode).
+  var NKEY = "bnna_snooze", NDAYS = 7, na = null;
+  var NI = {
+    bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 1.8H4.4z"/><path d="M10 20.6a2.2 2.2 0 0 0 4 0"/>',
+    bolt: '<path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/>',
+    globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5S9.4 5.9 12 3.5z"/>',
+    gauge: '<path d="M4 16a8 8 0 1 1 16 0"/><path d="M12 16l4-5"/><path d="M4 19.5h16"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m7.8 12.3 2.8 2.8 5.6-5.8"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>'
+  };
+  function nico(n, cls) { return '<svg class="' + (cls || "bnna-i") + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + NI[n] + "</svg>"; }
+  // lock-screen preview: what a real alert looks like (format of webpush_notifier: "rank/10 · CATEGORY" + headline)
+  function sceneNotif() {
+    return '<svg viewBox="0 0 300 132" class="bnig-svg bnna-svg" aria-hidden="true"><rect class="ph" x="1" y="1" width="298" height="130" rx="18"/>' +
+      '<text class="bnna-clk" x="150" y="34" text-anchor="middle">9:41</text>' +
+      '<rect class="bnna-n" x="22" y="48" width="256" height="66" rx="16"/>' +
+      '<clipPath id="bnna-cp"><rect x="34" y="60" width="30" height="30" rx="7"/></clipPath><image href="/apple-touch-icon.png" x="34" y="60" width="30" height="30" clip-path="url(#bnna-cp)"/>' +
+      '<text class="bnna-a" x="74" y="68">BLACKOUT</text><text class="bnna-t" x="266" y="68" text-anchor="end">now</text>' +
+      '<rect class="bnna-rk" x="74" y="76" width="34" height="14" rx="4"/><text class="bnna-rkt" x="91" y="86.5" text-anchor="middle">8/10</text>' +
+      '<text class="bnna-c" x="114" y="87">NATURAL DISASTER</text>' +
+      '<rect class="bnna-l" x="74" y="96" width="176" height="6" rx="3"/><rect class="bnna-l" x="74" y="106" width="118" height="5" rx="2.5"/></svg>';
+  }
+  function naSnoozed() { var t = +ls(NKEY) || 0; return t && Date.now() - t < NDAYS * 864e5; }
+  function naEnv() { return { api: "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && window.isSecureContext,
+    ios: /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && (navigator.maxTouchPoints || 0) > 1),
+    android: /Android/i.test(navigator.userAgent) }; }
+  function naShell() {
+    if (na) return na;
+    na = document.createElement("div"); na.id = "bnna"; na.className = "bnig bnna"; na.setAttribute("role", "dialog"); na.setAttribute("aria-modal", "false"); na.setAttribute("aria-labelledby", "bnna-t");
+    document.body.appendChild(na);
+    na.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return; var a = b.dataset.na;
+      if (a === "on") return naOn(b);
+      if (a === "later") { if (!forcedNa) ls(NKEY, String(Date.now())); return naHide(); }
+      if (a === "done") return naHide();
+      if (a === "bell") { naHide(); try { window.BN.enableAlerts({}); } catch (er) {} }
+    });
+    na.addEventListener("keydown", function (e) { if (e.key === "Escape") { if (!forcedNa && na.dataset.state === "ask") ls(NKEY, String(Date.now())); naHide(); } });
+    return na;
+  }
+  function naHide() { if (!na) return; na.classList.remove("bnig-on"); try { document.body.style.paddingBottom = ""; } catch (e) {} var x = na; setTimeout(function () { x.hidden = true; }, 260); }
+  function naHead(icon, title, sub, closeAs) {
+    return '<div class="bnig-hd"><span class="bnna-badge' + (icon === "check" ? " ok" : icon === "gear" ? " off" : "") + '">' + nico(icon, "bnna-bi") + '</span><div class="bnig-tt">' +
+      '<p class="bnig-t" id="bnna-t">' + title + '</p><p class="bnig-sub">' + sub + '</p></div>' +
+      '<button type="button" class="bnig-x" data-na="' + closeAs + '" aria-label="Close"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' + NI.x + '</svg></button></div>';
+  }
+  function naRender(state, info) {
+    naShell(); na.dataset.state = state; var h = "", E2 = naEnv();
+    if (state === "ask") {
+      h = naHead("bell", "Get alerts on this phone?", "Free · Turn off any time", "later") +
+        '<div class="bnig-stage">' + sceneNotif() + '</div>' +
+        '<ul class="bnna-list">' +
+        '<li>' + nico("bolt") + '<span><b>Major threats, once confirmed</b><small>Rank 7+ out of 10, usually a few a week.</small></span></li>' +
+        '<li>' + nico("globe") + '<span><b>What we track</b><small>War, disasters, cyber attacks, outbreaks, space weather.</small></span></li>' +
+        '<li>' + nico("gauge") + '<span><b>Never more than 6 an hour</b><small>No ads or promos. Manage them from the bell.</small></span></li></ul>' +
+        '<p class="bnig-note bnna-msg" role="status" aria-live="polite">Your phone asks next. Tap <b>Allow</b>.</p>' +
+        '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="on">' + nico("bell", "bnna-bti") + '<span>Turn on alerts</span></button>' +
+        '<button type="button" class="bnig-sec" data-na="later">Not now</button></div>';
+    } else if (state === "granted") {
+      h = naHead("check", "Alerts are on", info && info.live === false ? "You’re signed up. Alerts start soon." : "You’ll get major alerts (rank 7+).", "done") +
+        '<ul class="bnna-list"><li>' + nico("bell") + '<span><b>Change them any time</b><small>Tap the bell at the top of any page to pick more alerts, send a test, or turn them off.</small></span></li></ul>' +
+        '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="done">Done</button><button type="button" class="bnig-sec" data-na="bell">Settings</button></div>';
+    } else if (state === "denied") {
+      var how = E2.ios ? "Open <b>Settings</b> › <b>Notifications</b> › <b>BLACKOUT</b> and turn on <b>Allow Notifications</b>."
+        : E2.android ? "Open <b>Settings</b> › <b>Apps</b> › <b>BLACKOUT</b> › <b>Notifications</b> and allow them."
+        : "Open this app’s site settings and set <b>Notifications</b> to <b>Allow</b>.";
+      h = naHead("gear", "Notifications are off", "You can turn them on later in Settings.", "done") +
+        '<ol class="bnna-steps"><li><span class="n">1</span><span>' + how + '</span></li><li><span class="n">2</span><span>Come back here and tap the bell to finish.</span></li></ol>' +
+        '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="done">Got it</button></div>';
+    } else if (state === "error") {
+      h = naHead("bell", "Couldn’t turn on alerts", "Notifications are allowed. One more try should do it.", "done") +
+        '<p class="bnig-note bnna-msg bnna-err" role="status">' + ((info && info.error) || "Something went wrong. Please try again.").replace(/[<>&]/g, "") + '</p>' +
+        '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="on">Try again</button><button type="button" class="bnig-sec" data-na="done">Close</button></div>';
+    }
+    na.innerHTML = h; na.hidden = false; void na.offsetWidth;
+    setTimeout(function () { na.classList.add("bnig-on"); try { document.body.style.paddingBottom = (na.offsetHeight + 16) + "px"; } catch (e) {} }, 30);
+  }
+  function naOn(btn) {
+    if (forcedNa) return naRender(forcedNa === "ask" ? "granted" : forcedNa, { live: true });
+    btn.disabled = true; var m = na.querySelector(".bnna-msg"); if (m) m.textContent = "Waiting for your answer…";
+    var run = window.BN && window.BN.turnOnAlerts ? window.BN.turnOnAlerts({ level: "major" })     // requestPermission runs inside this tap
+      : new Promise(function (res) { var p = Notification.requestPermission(res); if (p && p.then) p.then(res); }).then(function (perm) { return { perm: perm, ok: false, error: perm === "granted" ? "Tap the bell to finish turning on alerts." : "" }; });
+    run.then(function (r) {
+      if (r.perm === "granted" && r.ok) return naRender("granted", r);
+      if (r.perm === "granted") return naRender("error", r);
+      if (r.perm === "denied") return naRender("denied");
+      ls(NKEY, String(Date.now())); naHide();                                    // closed the system prompt without answering: ask again in 7 days
+    });
+  }
+  var forcedNa = null;
+  function maybeAsk(q) {
+    forcedNa = q && /^(ask|granted|denied|error)$/.test(q) ? q : null;
+    if (forcedNa) return setTimeout(function () { naRender(forcedNa, forcedNa === "error" ? { error: "Alerts are not available right now. Please try again later." } : { live: true }); }, 200);
+    var E2 = naEnv();
+    if (!standalone() || !E2.api || Notification.permission !== "default" || naSnoozed()) return;
+    try { if ((JSON.parse(ls("bn_alerts") || "{}") || {}).on) return; } catch (e) {}
+    setTimeout(function () { if (Notification.permission === "default" && !document.querySelector(".bnal.bnal-open")) naRender("ask"); }, DELAY + 600);
+  }
+  window.BN = window.BN || {};
+  window.BN.showInstallGuide = function () {                                    // used by the Alerts panel's "Show me how" button
+    D = D || detect(); if (el) { el.hidden = false; render(); void el.offsetWidth; pad(true); setTimeout(function () { el.classList.add("bnig-on"); }, 30); } else show();
+  };
   function start() {
     var q = (location.search.match(/[?&]bnig=([\w-]+)/) || [])[1] || null; forced = q;
     D = detect(); window.__bnigDetect = D;
+    maybeAsk((location.search.match(/[?&]bnna=([\w-]+)/) || [])[1] || null);
+    if (forcedNa) return;                                                     // testing a soft-ask state: no install sheet
     if (!q) {
       if (standalone() || isInstalled() || isDismissed() || ss(SKEY)) return;
       if (!D.mobile && !(D.os === "mac" && D.browser === "safari")) { D.ready = true; return; }   // desktop Chromium waits for beforeinstallprompt
