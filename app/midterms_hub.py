@@ -380,7 +380,8 @@ def render(now=None):
               'which cites each rater and pollster' + (f': {src_links}' if src_links else '') + '. Poll closing times: '
             + _ext((b.get("poll_close_source") or M.POLL_CLOSE_SRC).get("url"), (b.get("poll_close_source") or M.POLL_CLOSE_SRC).get("label"))
             + '; checked against ' + _ext(M.POLL_CLOSE_NCSL["url"], M.POLL_CLOSE_NCSL["label"])
-            + '. Official results come only from state election offices. Research only; always check official sources.</p></section>'
+            + '. Official results come only from state election offices. Polling places, hours and ID rules: your county elections office or '
+            + _ext("https://vote.gov/", "vote.gov") + '.</p></section>'
             + f'<style>{CSS}</style>' + CTL_JS)
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "CollectionPage", "@id": S.SITE + PATH + "#page", "url": S.SITE + PATH, "name": P["h1"], "headline": P["h1"], "description": P["desc"], "inLanguage": "en",
