@@ -98,6 +98,9 @@ def _poll_table():
         with open(_PCF, encoding="utf-8") as f: return json.load(f)
     except Exception: return None
 
+# States whose poll-close times are set county by county (Kansas, North Dakota, Oregon): every shown close time carries this caveat.
+COUNTY_HOURS_VARY = {"KS", "ND", "OR"}
+
 def _state_close_text(st):
     """Race-panel line from the sourced table: split states show the earlier closing for most of the state and the later one for the rest
     (e.g. Texas: 8:00 PM ET in most of Texas, 9:00 PM ET in the Mountain-time El Paso area)."""
@@ -109,7 +112,7 @@ def _state_close_text(st):
     f = lambda c: _et(c["at_et"], "%-I:%M %p ET")
     if len(cl) == 1 or f(cl[0]) == f(cl[-1]): return f"Polls close {f(cl[-1])}"
     return (f'Polls close {f(cl[0])} in {row.get("early_part") or "most"} of {row["name"]} ({cl[0].get("zone", "")} time), '
-            f'{f(cl[-1])} in the {cl[-1].get("zone", "")}-time area')
+            f'{f(cl[-1])} in the {cl[-1].get("zone", "")}-time area' + ('; local hours vary by county' if st in COUNTY_HOURS_VARY else ''))
 
 def closed_states(now):
     t = _poll_table()
@@ -130,6 +133,7 @@ def _closed_html(now):
     return (f'<section class="mh-sec" id="results-so-far"><h2>Results so far</h2><p>Results come in state by state as polls close.</p>'
             f'<p><b>Polls have closed in:</b> {E(lst)}.</p>'
             f'<p class="mh-src">Scheduled poll closing times, Eastern Time: {src}. {E(t.get("note") or "")} '
+            'In Kansas, North Dakota and Oregon, local hours vary by county. '
             'Results for each race are on its state\'s official results page, linked in the race panels below.</p></section>')
 
 # ---------------- Tight races (seo/midterms-phases, Nov 2) ----------------
