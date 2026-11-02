@@ -195,7 +195,7 @@
   }
   var ATTRS = ["title", "aria-label", "placeholder", "alt", "data-tip"];
   function fixAttrs(el) {
-    for (var i = 0; i < ATTRS.length; i++) { var v = el.getAttribute && el.getAttribute(ATTRS[i]); if (v && TEST.test(v)) el.setAttribute(ATTRS[i], v.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " ")); }
+    for (var i = 0; i < ATTRS.length; i++) { var v = el.getAttribute && el.getAttribute(ATTRS[i]); if (v && TEST.test(v)) { var nv = v.replace(RE, function (e) { return keepIt(e) ? e : ""; }).replace(/^\s+/, "").replace(/\s{2,}/g, " "); if (nv !== v) el.setAttribute(ATTRS[i], nv); } }
     if (el.nodeName === "INPUT" && (el.type === "button" || el.type === "submit") && TEST.test(el.value || "")) el.value = el.value.replace(RE, "").trim();
   }
   function walk(root) {
