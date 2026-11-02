@@ -71,7 +71,7 @@ NAV = [
   ("@social", "/social", "▶ Videos & posts", None, None),   # /social page (social.py, t303): YouTube @blkoutntw + X @BLKOUTNTW
   ("@stats", "/stats", "📊 Public stats", None, None),       # /stats page (stats.py, t385): open aggregate traffic + YouTube/X numbers
   ("newsletter", "newsletter", "✉ Newsletter", "Newsletter: the threat brief by email",
-   "Get BLACKOUT.NETWORK's free email brief on the highest-severity threats. Free, double opt-in, and you can unsubscribe in one click."),
+   "Get BLACKOUT.NETWORK's highest-severity, source-verified threats by email once or twice a day. Free, double opt-in, and you can unsubscribe in one click."),
  ]),
  ("Reference", [
   ("res", "resources", "📍 Local Resources", "Local Resources: emergency services near you",
@@ -115,7 +115,7 @@ PAGES = {
              "Every source we use, with item counts, profiles and a 0–10 confidence rating. Suggest one for review."),
  "newsletter": ("newsletter", "Newsletter | BLACKOUT.NETWORK",
                 "Sign up for BLACKOUT.NETWORK's free email brief: the highest-severity threats. Double opt-in, one-click unsubscribe.",
-                "The highest-severity threats by email. Free, double opt-in."),
+                "The highest-severity, source-verified threats by email, once or twice a day. Free, double opt-in."),
  "privacy": ("", "Privacy Policy | BLACKOUT.NETWORK",
              "BLACKOUT.NETWORK's Privacy Policy: what the site collects, how the newsletter and YouTube data are used and stored, retention, deletion and how to reach us.",
              "What we collect, how we use and protect it, how long we keep it, and how to ask us to delete it."),
