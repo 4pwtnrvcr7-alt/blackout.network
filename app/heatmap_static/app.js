@@ -79,7 +79,7 @@ function initMap(){if(H.map||typeof L=="undefined")return;
  H.map.createPane("hmReg");H.map.getPane("hmReg").style.zIndex=350;H.map.createPane("hmHeat");H.map.getPane("hmHeat").style.zIndex=420;H.map.getPane("hmHeat").style.pointerEvents="none";
  H.rend0=L.canvas({pane:"hmReg",padding:.4});H.rend1=L.canvas({pane:"hmReg",padding:.4});
  H.map.on("click",()=>H.map.scrollWheelZoom.enable());H.map.on("mouseout",()=>H.map.scrollWheelZoom.disable());
- H.map.on("zoomend",()=>{layers();crumb()});
+ H.map.on("zoomend",()=>{layers();crumb()});H.map.on("resize",legendLift);
  const lg=L.control({position:"bottomleft"});lg.onAdd=()=>{const d=L.DomUtil.create("div","hm-legend");d.id="hm_legend";L.DomEvent.disableClickPropagation(d);return d};lg.addTo(H.map);
  fetch("api/heatmap/admin0.geojson").then(r=>r.json()).then(j=>{H.a0=L.geoJSON(j,{renderer:H.rend0,pane:"hmReg",style:st0,onEachFeature:(f,l)=>{
    l.on("click",e=>{L.DomEvent.stopPropagation(e);const cc=f.properties.ISO_A2_EH;selectRegion({type:"cc",key:cc,name:f.properties.NAME},l)});
@@ -111,7 +111,10 @@ function layers(){if(!H.map)return;const z=H.map.getZoom(),m=H.map;
  legend()}
 function legend(){const el=$$("hm_legend");if(!el)return;const z=H.map.getZoom();const mx=z>=4?(H.agg?H.agg.mx1:1):(H.agg?H.agg.mx0:1);
  el.innerHTML=`<b>${z>=4?"States / provinces":"Countries"}</b> — ${H.wm=="sev"?"severity (sum of ranks)":"number of alerts"}<div class=ramp style="background:linear-gradient(90deg,${RAMP.join(",")})"></div><div class=rl><span>low</span><span>${Math.round(mx)}</span></div>
- <div style="margin-top:4px">${GR.map(([g,l])=>`<span style="white-space:nowrap;margin-right:6px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col(g)};margin-right:3px"></i>${e_(l.split(" ")[0])}</span>`).join("")}</div>`}
+ <div style="margin-top:4px">${GR.map(([g,l])=>`<span style="white-space:nowrap;margin-right:6px"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${col(g)};margin-right:3px"></i>${e_(l.split(" ")[0])}</span>`).join("")}</div>`;legendLift()}
+// narrow maps: the attribution line wraps under the legend, so lift the legend just above it
+function legendLift(){const el=$$("hm_legend"),at=H.map&&H.map.getContainer().querySelector(".leaflet-control-attribution");if(!el||!at)return;
+ el.style.marginBottom="";const a=at.getBoundingClientRect(),b=el.getBoundingClientRect();el.style.marginBottom=(a.width&&a.left<b.right&&a.top<b.bottom)?(at.offsetHeight+4)+"px":""}
 function heatAndPoints(L_){if(!H.map)return;const m=H.map;
  const pts=L_.map(x=>[x.lat,x.lon,wt(x)]);
  if(H.heat)m.removeLayer(H.heat);

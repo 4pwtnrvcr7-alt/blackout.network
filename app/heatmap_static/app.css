@@ -104,3 +104,8 @@
 #tab-heatmap .hm-stat .r i{display:block;height:6px;border-radius:3px;background:var(--bn-link,#4aa3ff)}
 #tab-heatmap .hm-stat .r .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--tx)}
 #tab-heatmap .leaflet-heatmap-layer{pointer-events:none}
+/* map overlays sit on a fixed dark backing: fixed light text (theme text vars went dark in light mode and made the legend unreadable); zoom hint moved to the top so it no longer covers the legend or the attribution */
+#tab-heatmap .hm-legend{color:#c9d0d9}#tab-heatmap .hm-legend b{color:#e6e9ee}#tab-heatmap .hm-legend .rl{color:#9aa4b2}
+#tab-heatmap .hm-crumb,#tab-heatmap .hm-zoomhint{color:#aab3bf}#tab-heatmap .hm-crumb b{color:#e6e9ee}
+#tab-heatmap .hm-zoomhint{bottom:auto;top:8px;right:8px;max-width:calc(100% - 150px)}
+@media(max-width:600px){#tab-heatmap .hm-zoomhint{top:44px;left:52px;right:8px;max-width:none}}
