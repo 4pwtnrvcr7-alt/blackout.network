@@ -508,6 +508,10 @@ class H(BaseHTTPRequestHandler):
         if path.startswith(("/api/", "/internal/")): return False
         seg = path.strip("/").lower()
         if seg == "elon": seg = "figures"   # t353: the old Elon Musk tab is now Key Figures
+        if seg == "ready":   # seo: printed short link on the Everyday Readiness PDFs -> Preppers section (permanent; keep ?utm_*)
+            q = urlparse(self.path).query
+            self.send_response(301); self.send_header("Location", "/preppers" + ("?" + q if q else "")); self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "public, max-age=3600"); self.end_headers(); return True
         if seg in self.TAB_PATHS:
             q = urlparse(self.path).query   # seo/batch-1: keep ?utm_* (and any other query) through the tab redirect
             self.send_response(302); self.send_header("Location", "/" + ("?" + q if q else "") + "#" + seg); self.send_header("Content-Length", "0")
