@@ -57,5 +57,21 @@ def test_render_page_lines():
     assert page.count(H.VOTE_GOV_TEXT) == 3   # where-to-vote, Senate and Governor sections
     assert M.ELECTION_OFFICES["DC"]["office_url"] in page and M.ELECTION_OFFICES["TX"]["office_url"] in page
 
+def test_office_link_from_table_only():
+    # (a) a card whose time comes only from the sourced table still gets its office link
+    html = H._race({"state": "GA", "label": "Georgia", "state_name": "Georgia", "consensus": {}, "candidates": []}, {}, "senate")
+    if H._state_close_text("GA"): assert M.ELECTION_OFFICES["GA"]["office_url"] in html and "Election office:" in html
+
+def test_results_so_far_links():
+    from datetime import datetime
+    now = datetime.fromisoformat("2026-11-03T20:30:00-05:00")
+    html = H._closed_html(now)
+    assert html and H.VOTE_GOV_LINE in html                                             # (b)
+    t, names, codes = H.closed_states(now)
+    assert names and len(names) == len(codes)
+    for n, c in zip(names, codes):                                                     # (c)
+        assert f'<a href="{M.ELECTION_OFFICES[c]["office_url"]}" target="_blank" rel="noopener">' in html, c
+    assert "most of Texas" in names or "Texas" in names
+
 if __name__ == "__main__":
-    for f in (test_all_51, test_last_and_first_match, test_texas_render, test_county_caveat, test_office_links, test_vote_gov_line, test_render_page_lines): f(); print("ok", f.__name__)
+    for f in (test_all_51, test_last_and_first_match, test_texas_render, test_county_caveat, test_office_links, test_vote_gov_line, test_render_page_lines, test_office_link_from_table_only, test_results_so_far_links): f(); print("ok", f.__name__)

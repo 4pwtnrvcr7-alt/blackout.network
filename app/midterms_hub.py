@@ -116,25 +116,27 @@ def _state_close_text(st):
 
 def closed_states(now):
     t = _poll_table()
-    if not t: return None, []
-    out = []
+    if not t: return None, [], []
+    out, codes = [], []
     for st in t.get("states") or []:
         times = sorted(_dt(c.get("at_et")) for c in st.get("closes") or [] if _dt(c.get("at_et")))
         if not times or now < times[0]: continue
         out.append(st["name"] if now >= times[-1] else f'{st.get("early_part") or "most"} of {st["name"]}')
-    return t, out
+        codes.append(st.get("state"))
+    return t, out, codes
 
 def _closed_html(now):
-    t, names = closed_states(now)
+    t, names, codes = closed_states(now)
     if not t or not names: return ""
     total = len(t.get("states") or []); full = sum(1 for n in names if not n.startswith(("most of ", "part of ")))
-    lst = ("all states and Washington, D.C." if full == total else ", ".join(names))
+    lst = ("all states and Washington, D.C." if full == total else
+           ", ".join(_ext((M.ELECTION_OFFICES.get(c) or {}).get("office_url"), n) or E(n) for n, c in zip(names, codes)))
     src = " · ".join(_ext(x.get("url"), x.get("label")) for x in t.get("sources") or [])
     return (f'<section class="mh-sec" id="results-so-far"><h2>Results so far</h2><p>Results come in state by state as polls close.</p>'
-            f'<p><b>Polls have closed in:</b> {E(lst)}.</p>'
+            f'<p><b>Polls have closed in:</b> {lst}.</p>'
             f'<p class="mh-src">Scheduled poll closing times, Eastern Time: {src}. {E(t.get("note") or "")} '
             'In Kansas, North Dakota and Oregon, local hours vary by county. '
-            'Results for each race are on its state\'s official results page, linked in the race panels below.</p></section>')
+            'Results for each race are on its state\'s official results page, linked in the race panels below.</p>' + VOTE_GOV_LINE + '</section>')
 
 # ---------------- Tight races (seo/midterms-phases, Nov 2) ----------------
 # Data comes ONLY from the Senior Analyst's hand-off (launch/team/review/analyst/midterms_tight_races_2026-11-02/), copied
@@ -310,7 +312,7 @@ def _race(r, b, office):
             + '<p><b>Published race ratings</b></p>' + _rating_rows(r, (b.get("ratings_meta") or {}).get(office))
             + '<p class="mh-src">Sources: ' + " · ".join(x for x in (_ext(r.get("article"), "Wikipedia race article"),
                                                                      _ext(M.OFFICIAL_LINKS.get(st), f"{r.get('state_name') or st} official election results")) if x)
-            + (f'<p class="mh-src">Election office: {_ext(_o.get("office_url"), _o.get("office_name"))}</p>' if (_o := M.ELECTION_OFFICES.get(st) or {}) and r.get("poll_close") else "")
+            + (f'<p class="mh-src">Election office: {_ext(_o.get("office_url"), _o.get("office_name"))}</p>' if (_o := M.ELECTION_OFFICES.get(st) or {}) and (_state_close_text(st) or r.get("poll_close")) else "")
             + '</p>')
     return (f'<details class="mh" data-bn-expand data-cat="{E(office)}" data-item="{E(r.get("id") or lab)}"><summary>{E(lab)}<small>{sub}</small></summary>'
             f'<div class="mh-b">{body}</div></details>')
