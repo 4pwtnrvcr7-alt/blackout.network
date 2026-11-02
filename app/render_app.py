@@ -293,9 +293,13 @@ def _sign_get(path):
     sig = hmac.new(SYNC_SECRET.encode(), f"{ts}\nGET\n{path}\n{hashlib.sha256(b'').hexdigest()}".encode(), hashlib.sha256).hexdigest()
     return {"X-BN-Ts": ts, "X-BN-Sig": sig, "User-Agent": "blackout-handoff/1.0"}
 
-def _peer_get(path, timeout, to_file=None):
-    """GET from the peer (old) instance. Returns (status, bytes|None); with to_file the body is streamed to disk."""
-    req = urllib.request.Request(HANDOFF_URL + path, headers=_sign_get(path))
+def _peer_get(path, timeout, to_file=None, want=None):
+    """GET from the peer (old) instance. Returns (status, bytes|None); with to_file the body is streamed to disk.
+    want = the old instance's boot_id: during a deploy Render can route the public URL to EITHER instance (Nov 1 push 2: the new
+    instance reached itself), so an instance that is not `want` answers 421 at once and we simply ask again."""
+    h = _sign_get(path)
+    if want: h["X-BN-Want-Boot"] = want
+    req = urllib.request.Request(HANDOFF_URL + path, headers=h)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             if to_file is None: return r.status, r.read(1 << 20)
@@ -342,7 +346,7 @@ def export_tar(part, out):
     return len(items)
 
 def _handoff():
-    t0 = time.time(); misses = 0
+    t0 = time.time(); misses = 0; done_parts = {}
     def _done(state, detail):
         HANDOFF.update(state=state, detail=detail, seconds=round(time.time() - t0, 1))
         print(f"deploy handoff: {state} ({detail}) after {HANDOFF['seconds']} s", flush=True)
@@ -352,28 +356,35 @@ def _handoff():
             code, body = _peer_get("/healthz", 10)
             try: info = json.loads(body or b"{}")
             except Exception: info = {}
-            if info.get("boot_id") and info["boot_id"] != BOOT_ID and info.get("has_data"):
+            if info.get("boot_id") == BOOT_ID:              # Render routed us to ourselves: not a miss, just ask again
+                time.sleep(1); continue
+            if info.get("boot_id") and info.get("has_data"):
+                if HANDOFF["peer_boot"] != info["boot_id"]: done_parts = {}
                 HANDOFF["peer_boot"] = info["boot_id"]
-                got = 0
                 for part, tmo in (("bulk", 300), ("owned", 120)):
-                    fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".handoff.tgz"); os.close(fd)
-                    try:
-                        c, b = _peer_get(f"/internal/sync/export?part={part}", tmo, to_file=tmp)
-                        if c != 200: raise RuntimeError(f"export {part} -> HTTP {c}: {(b or b'')[:120]!r}")
-                        HANDOFF["bytes"] += os.path.getsize(tmp)
-                        done, refused, meta = _apply_tar(tmp, "handoff")
-                        if meta.get("boot_id") != HANDOFF["peer_boot"]: raise RuntimeError("export came from an unexpected instance")
-                        got += len(done)
-                        if part == "owned" and meta.get("restored"): SYNC["restored"] = True
-                        if part == "owned" and meta.get("usage"):
-                            try:
-                                import usage_stats; print(f"deploy handoff: visitor hashes adopted: {usage_stats.import_state(meta['usage'])}", flush=True)
-                            except Exception: traceback.print_exc()
-                    finally:
-                        try: os.unlink(tmp)
-                        except FileNotFoundError: pass
-                HANDOFF["files"] = got; _refresh_state()
-                if has_data(): return _done("done", f"{got} files from instance {HANDOFF['peer_boot']}")
+                    if part in done_parts: continue
+                    for attempt in range(40):                # each try may land on either instance; 409/421 = wrong one
+                        fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".handoff.tgz"); os.close(fd)
+                        try:
+                            c, b = _peer_get(f"/internal/sync/export?part={part}", tmo, to_file=tmp, want=HANDOFF["peer_boot"])
+                            if c in (409, 421, 429, 502, 503):
+                                time.sleep(0.5 if c != 429 else 3); continue
+                            if c != 200: raise RuntimeError(f"export {part} -> HTTP {c}: {(b or b'')[:120]!r}")
+                            done, refused, meta = _apply_tar(tmp, "handoff")
+                            if meta.get("boot_id") != HANDOFF["peer_boot"]: continue   # a stray answer from another instance
+                            HANDOFF["bytes"] += os.path.getsize(tmp); done_parts[part] = len(done)
+                            if part == "owned" and meta.get("restored"): SYNC["restored"] = True
+                            if part == "owned" and meta.get("usage"):
+                                try:
+                                    import usage_stats; print(f"deploy handoff: visitor hashes adopted: {usage_stats.import_state(meta['usage'])}", flush=True)
+                                except Exception: traceback.print_exc()
+                            break
+                        finally:
+                            try: os.unlink(tmp)
+                            except FileNotFoundError: pass
+                    if part not in done_parts: raise RuntimeError(f"export {part}: never reached the old instance")
+                HANDOFF["files"] = sum(done_parts.values()); _refresh_state()
+                if has_data(): return _done("done", f"{HANDOFF['files']} files from instance {HANDOFF['peer_boot']}")
                 raise RuntimeError("export had no blackout.db")
             misses += 1; HANDOFF["detail"] = f"no live peer with data (HTTP {code})"
         except Exception as ex:
@@ -438,6 +449,8 @@ class RH(server.H):
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})
             part = "owned" if "part=owned" in self.path else "bulk"
+            want = self.headers.get("X-BN-Want-Boot")
+            if want and want != BOOT_ID: return self.send(421, {"error": "wrong instance", "boot_id": BOOT_ID})
             if not has_data(): return self.send(409, {"error": "no data to hand off"})
             if not _export_lock.acquire(timeout=120): return self.send(429, {"error": "export busy"})
             fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".export.tgz"); os.close(fd)
