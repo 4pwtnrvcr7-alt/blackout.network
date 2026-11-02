@@ -109,7 +109,11 @@ details.bn-acc[open]>summary{border-bottom:1px solid var(--bn-line)}
 .v3-live{align-self:center;width:10px;height:10px;border-radius:50%;background:var(--bn-brand);box-shadow:0 0 0 0 var(--v3-glow);animation:v3-pulse 2.2s ease-out infinite}
 .v3-tom-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 @media(max-width:1180px){.v3-tom-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:620px){.v3-tom-grid{grid-template-columns:1fr}}
+@media(max-width:620px){ /* phones: a swipeable row instead of a 4-card wall */
+ .v3-tom-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -12px;padding:0 12px 10px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+ .v3-tom-grid>.v3-card{flex:0 0 86%;scroll-snap-align:start}
+ .v3-art{height:70px}.v3-card-b{padding:12px 14px 14px}
+}
 .v3-card{--c:var(--bn-cat-other);position:relative;display:flex;flex-direction:column;min-width:0;border:1px solid var(--bn-line);border-radius:16px;overflow:hidden;
  background:linear-gradient(180deg,var(--v3-card-2),var(--v3-card));color:var(--bn-text);animation:v3-rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0)*90ms);
  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
