@@ -212,7 +212,9 @@ var skip=why();window.BN_GA_SKIP=skip;window.BN_CONSENT_REGION=CR;
 gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:(CR||skip)?'denied':'granted',functionality_storage:'granted',security_storage:'granted'});
 /* compliance 2026-11-02: one shared sanitizer (window.bnPII / bnSanitize) for bnTrack, bn-ga-events.js and page_location. Drops: emails,
    phone numbers, any run of 9+ digits, street addresses (house number + street word), PO Box, US ZIP+4. Tested on decoded text. */
-var PII=/@|%40|\d{3}[\s.\-]?\d{3}[\s.\-]?\d{4}|\d{9,}|\bp\.?\s*o\.?\s*box\b|\b\d{5}-\d{4}\b|\b\d{1,6}[a-z]?\s+(?:[a-z0-9.'\-]+\s+){0,4}(?:st|street|ave|avenue|rd|road|blvd|ln|lane|dr|drive|ct|court|way|pl|hwy|pkwy|ter|cir)\b/i;
+/* G1/G2 (Compliance 2026-11-02): phone part replaced with the spec pattern (catches (407) 555-1234, +44 20 7946 0958, +1-407-555-1234,
+   407.555.1234); address suffixes extended per spec plus trail/route/pike/crossing/run/path/row/sr/cr; Apt/Suite/Ste/Unit forms. */
+var PII=/@|%40|(?:\+?\d{1,3}[\s.\-]?)?\(?\d{2,4}\)?[\s.\-]?\d{3,4}[\s.\-]?\d{3,4}|\d{9,}|\bp\.?\s*o\.?\s*box\b|\b\d{5}-\d{4}\b|\b(?:apt|suite|ste|unit)\s*#?\s*\d+|\b\d{1,6}[a-z]?\s+(?:[a-z0-9.'\-]+\s+){0,4}(?:st|street|ave|avenue|rd|road|blvd|boulevard|ln|lane|dr|drive|ct|court|way|pl|place|hwy|highway|pkwy|parkway|ter|terrace|cir|circle|trl|trail|loop|sq|square|plz|plaza|apt|suite|ste|unit|run|path|row|crossing|xing|pike|route|rte)\b|\b\d{1,6}\s+(?:highway|hwy|route|rte|sr|cr|state\s+road|county\s+road)\s*-?\d+\b|\b(?:sr|cr)[\s\-]?\d{1,4}\b/i;
 function dec(v){try{return decodeURIComponent(String(v).replace(/\+/g,' '));}catch(e){return String(v);}}
 window.bnPII=function(v){return typeof v==='string'&&(PII.test(v)||PII.test(dec(v)));};
 /* site-generated ids (item_id, transaction_id, story_id): exempt from the digit rules (phone / 9+ digits) only when strictly id-shaped and
@@ -223,8 +225,11 @@ window.bnSanitize=function(v,k){return (window.bnPII(v)&&!window.bnIdOK(k,v))?un
 /* page_location: place (/crime GET form), term, address, name, phone and tokens always removed. Site-search params q (/?q= SearchAction
    deep link), s, search, query are KEPT when the decoded value passes bnPII (GA site-search report) and dropped when not; any other
    param whose name/value looks like PII removed; newsletter token routes lose the whole query; the #fragment (#search=<q>) is never sent. */
-function bnCleanUrl(u){try{var url=new URL(u);['token','email','e','zip','q_email','internal','place','term','address','name','phone'].forEach(function(k){url.searchParams.delete(k);});
-var del=[];url.searchParams.forEach(function(v,k){if(window.bnPII(v)||window.bnPII(k))del.push(k);});del.forEach(function(k){url.searchParams.delete(k);});
+/* G3: /report-status/<ref> (status.js pushState) and ?id= lose the reference ID; id/rid/ref removed everywhere. G4: same cleaner is used for
+   page_referrer, which also loses key/code/session/auth/sid/state/password/sig params. */
+function bnCleanUrl(u){try{var url=new URL(u,location.href);['token','email','e','zip','q_email','internal','place','term','address','name','phone','id','rid','ref','key','api_key','code','session','session_id','sessionid','sid','auth','auth_token','access_token','state','password','pass','sig','signature','otp'].forEach(function(k){url.searchParams.delete(k);});
+if(/^\/report-status(\/|$)/.test(url.pathname)){url.pathname='/report-status/';url.search='';}
+var del=[];url.searchParams.forEach(function(v,k){if(window.bnPII(v)||window.bnPII(k)||/token|session|auth|secret|passw|email/i.test(k))del.push(k);});del.forEach(function(k){url.searchParams.delete(k);});
 if(/^\/newsletter\/(confirm|unsubscribe|manage|breaking_off|stop_tracking|follow|unfollow)/.test(url.pathname))url.search='';url.hash='';return url.toString();}catch(e){return location.origin+location.pathname;}}
 /* content_group (seo/batch-1): one of Home, Wire, Midterms, Solar, Weather, Preppers, Bushcraft, Network, Gov, Alerts, Stats, Legal */
 var TABG={threat:'Wire',wire:'Wire',noise:'Wire',thread:'Wire',bcast:'Wire',broadcasts:'Wire',streams:'Wire',radio:'Wire',ai:'Wire',heatmap:'Wire',trends:'Wire',
@@ -242,6 +247,7 @@ window.bnContentGroup=bnGroup;
 function bnLoadGA(){if(window.bnGALoaded||window.BN_GA_SKIP)return;window.bnGALoaded=true;var s=document.createElement('script');s.async=true;
 s.src='https://www.googletagmanager.com/gtag/js?id='+BN_GA_ID;document.head.appendChild(s);gtag('js',new Date());
 var gc={allow_google_signals:false,allow_ad_personalization_signals:false,cookie_expires:34128000,page_location:bnCleanUrl(location.href),content_group:bnGroup()};
+if(document.referrer)gc.page_referrer=bnCleanUrl(document.referrer);   /* G4: every referrer cleaned (same-site token pages included) */
 /* analytics 2026-11-01: staff/bot traffic -> traffic_type=internal (GA4 Admin > Data filters > Internal Traffic). Staff cookie bn_internal=1 is set by
    any page opened with ?internal=1 (cleared by ?internal=0); our box tools send a User-Agent containing BlackoutNetwork-Internal. */
 if(!/[?&]internal=0(&|$)/.test(location.search)&&(/(^|;\s*)bn_internal=1(;|$)/.test(document.cookie)||/[?&]internal=1(&|$)/.test(location.search)||/BlackoutNetwork-Internal/i.test(navigator.userAgent||'')))gc.traffic_type='internal';
@@ -267,8 +273,12 @@ function platform(){var ua=navigator.userAgent||'';var ios=/iPhone|iPad|iPod/.te
 var sa=false;try{sa=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch(e){}
 return (ios?'ios':/Android/i.test(ua)?'android':'desktop')+(sa?'_app':'_web');}
 var lastTab='';
-window.addEventListener('hashchange',function(){gtag('set',{content_group:bnGroup()});},true);
-window.addEventListener('popstate',function(){gtag('set',{content_group:bnGroup()});},true);
+/* G4: #search=<q> and /report-status/<ref> never reach GA: page_location is re-set clean on every hash/history change (before and after
+   pushState/replaceState). Recommend also turning off Enhanced Measurement > Page views > "Page changes based on browser history events". */
+function bnReLoc(){gtag('set',{page_location:bnCleanUrl(location.href)});}
+['pushState','replaceState'].forEach(function(m){try{var o=history[m];if(!o||o.bnWrapped)return;history[m]=function(st,t,u){if(u!=null){try{gtag('set',{page_location:bnCleanUrl(String(u))});}catch(x){}}var r=o.apply(this,arguments);bnReLoc();return r;};history[m].bnWrapped=1;}catch(e){}});
+window.addEventListener('hashchange',function(){bnReLoc();gtag('set',{content_group:bnGroup()});},true);
+window.addEventListener('popstate',function(){bnReLoc();gtag('set',{content_group:bnGroup()});},true);
 document.addEventListener('click',function(e){var t=e.target;if(!t||!t.closest)return;
 var b=t.closest('.tabs button[data-tab]');if(b){var k=b.getAttribute('data-tab');if(k&&k!==lastTab){lastTab=k;var g=bnGroup(TABG[k]?k:'');gtag('set',{content_group:g});T('tab_view',{content_category:k,content_group:g});}return;}
 if(t.closest('.tab-ref,#refresh,[data-bn-refresh]')){T('refresh_click',{});return;}
