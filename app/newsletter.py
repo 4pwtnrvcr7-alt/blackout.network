@@ -41,7 +41,7 @@ P = {  # every path is overridable by env var for tests (NEWSLETTER_DB, NEWSLETT
     "dir_db": os.environ.get("NEWSLETTER_DIR_DB", os.path.join(BASE, "sources_dir", "directory.db")),  # global directory (read-only here)
 }
 BRAND = "BLACKOUT.NETWORK"   # brand is always written in capitals in every email and page (t300)
-TAGLINE = "Signal over noise."   # global tagline (t326u): small supporting line under the masthead domain and in the footer
+TAGLINE = "Signal over noise.\u2122"   # global tagline (t326u): small supporting line under the masthead domain and in the footer
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime. We count opens and clicks to improve it; in the EEA, UK and Switzerland only if you tick the box."
@@ -541,9 +541,10 @@ def set_tracking(k, sid, on, how, c=None):
 
 _LEAD = re.compile(r"^[^\w(\"'“‘\[]+")
 _HYPE = re.compile(r"^(?:#?(?-i:BREAKING(?: NEWS)?|JUST IN)\b\s*[:!\-–—|]*\s*|(?:BREAKING(?: NEWS)?|JUST IN|URGENT|ALERT|FLASH|DEVELOPING)\s*[:!\-–—|]+\s*)+", re.I)
+_EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D\U000E0000-\U000E007F]+")   # brand rule: no emojis in our mail
 def clean_title(t):
     """Readable headline: drop leading flag/emoji runs and dash bullets, trailing @handles, squeeze spaces. Wording is never changed."""
-    t = re.sub(r"\s+", " ", t or "").strip()
+    t = re.sub(r"\s+", " ", _EMOJI.sub("", t or "")).strip()
     t = _LEAD.sub("", t); t = _HYPE.sub("", t); t = _LEAD.sub("", t); t = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", t).strip()
     t = re.sub(r"\s+([.,;:!?])", r"\1", t); t = re.sub(r"(?<!\.)\.\.(?!\.)", ".", t)   # "million ." / "Moscow.." -> one full stop
     return t or re.sub(r"\s+", " ", t or "").strip()
@@ -781,39 +782,34 @@ def bluf(issue):
 # @media (prefers-color-scheme: light) block in <head> where the client supports it (Apple Mail, iOS Mail, Outlook for Mac). Clients that strip
 # <style> (Gmail, Outlook.com) get the dark design. The logo is a hosted PNG (email clients do not load web fonts reliably); every text style has a
 # web-safe fallback stack. All text is left-aligned. Masthead = BN tile + small domain + tagline (t333u).
-PAL = {"bg": "#0B0D10", "surf": "#14181D", "surf2": "#1B2027", "line": "#252B33", "tx": "#E6E9EE", "mu": "#8B95A3", "ac": "#FF4D4F", "ink": "#0B0D10",
-       "sev": ("#2BB673", "#F5A524", "#FF4D4F"), "empty": "#252B33", "body": "#C9CED6"}
-PAL_LIGHT = {"bg": "#F6F7F9", "surf": "#FFFFFF", "surf2": "#EEF0F3", "line": "#DDE1E6", "tx": "#0B0D10", "mu": "#5B6573", "ac": "#D92D30", "ink": "#FFFFFF",
-             "sev": ("#16884B", "#C77700", "#D92D30"), "empty": "#DDE1E6", "body": "#2A313B"}
-FH = "Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif"                   # headlines, kickers, numerals
-FB = "Inter,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"   # body
+# apple_v1 (Nov 3 2026): the email mirrors the minimal site (review/design/apple_style_v1/STYLE_GUIDE.md): text wordmark only, big clean
+# headline, quiet rounded cards with no borders, yellow pill buttons, red only for rank 7+. Dark stays the inline default; light via @media.
+PAL = {"bg": "#0B0D10", "surf": "#16181C", "surf2": "#121418", "line": "#2A2D33", "tx": "#F5F5F7", "mu": "#A1A1A6", "ac": "#FFC21A", "ink": "#0B0D10",
+       "sev": ("#F5F5F7", "#FFC21A", "#C8102E"), "empty": "#2A2D33", "body": "#D2D2D7", "fill": "#FFC21A", "red": "#C8102E", "onred": "#FFFFFF"}
+PAL_LIGHT = {"bg": "#F5F5F7", "surf": "#FFFFFF", "surf2": "#FBFBFD", "line": "#D2D2D7", "tx": "#1D1D1F", "mu": "#6E6E73", "ac": "#8A6100", "ink": "#0B0D10",
+             "sev": ("#1D1D1F", "#8A6100", "#C8102E"), "empty": "#D2D2D7", "body": "#424245", "fill": "#FFC21A", "red": "#C8102E", "onred": "#FFFFFF"}
+FB = "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"   # body
+FH = "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"  # headlines (600, tight)
 LOGO_ALT = "BLACKOUT.NETWORK"
 def logo_url(theme="dark", c=None):
     """Hosted master logo: logo V2-final tile (dark version; light version on a bordered white tile), solid background, built by tools/logo_v2_assets.py. New filename busts mail-client image caches. Served by social.py /social/thumb/."""
     return f'{(c or cfg())["base_url"].rstrip("/")}/social/thumb/brand_tile_v2_{theme}_168.png'
 def _logo_html(c, size=48):
-    """Masthead: BN tile + the domain in a small, quiet size beside it, with the tagline under the domain. Left-aligned."""
-    dk = (f'<img class="bn-dk" src="{E(logo_url("dark", c))}" width="{size}" height="{size}" alt="{LOGO_ALT}" '
-          f'style="display:block;width:{size}px;height:{size}px;border:0;outline:none;text-decoration:none;color:{PAL["tx"]};font:900 16px {FH}">')
-    lt = (f'<!--[if !mso]><!--><img class="bn-lt" src="{E(logo_url("light", c))}" width="{size}" height="{size}" alt="{LOGO_ALT}" '
-          f'style="display:none;width:{size}px;height:{size}px;max-height:0;overflow:hidden;mso-hide:all;border:0;outline:none"><!--<![endif]-->')
-    fs = 13 if size >= 44 else 11
-    return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
-            f'<td width="{size}" valign="middle" style="width:{size}px;padding:0">{dk}{lt}</td>'
-            f'<td valign="middle" style="padding:0 0 0 12px;text-align:left">'
-            f'<div class="bnt" style="font:700 {fs}px/1.3 {FH};letter-spacing:1.4px;color:{PAL["tx"]}">BLACKOUT.<span class="bnr" style="color:{PAL["ac"]}">NETWORK</span></div>'
-            f'<div class="bnm" style="font:400 {fs - 1}px/1.4 {FB};color:{PAL["mu"]};margin-top:1px">{E(TAGLINE)}</div></td></tr></table>')
+    """Masthead / footer mark: the BLACKOUT text wordmark only (no tile image), like the site's top bar. size>=44: masthead; smaller: footer
+    lockup with BLACKOUT.NETWORK and the tagline."""
+    if size >= 44:
+        return (f'<div class="bnt" style="font:600 17px/1.2 {FH};letter-spacing:2.4px;color:{PAL["tx"]}">BLACKOUT</div>')
+    return (f'<div class="bnt" style="font:600 12px/1.4 {FH};letter-spacing:1.6px;color:{PAL["tx"]}">BLACKOUT.NETWORK</div>'
+            f'<div class="bnm" style="font:400 12px/1.5 {FB};color:{PAL["mu"]};margin-top:2px">{E(TAGLINE)}</div>')
 _LIGHT_CSS = ("@media (prefers-color-scheme: light){"
     f".bnb{{background:{PAL_LIGHT['bg']}!important}}.bns{{background:{PAL_LIGHT['surf']}!important}}.bns2{{background:{PAL_LIGHT['surf2']}!important}}"
     f".bnl{{border-color:{PAL_LIGHT['line']}!important}}.bnt{{color:{PAL_LIGHT['tx']}!important}}.bnm{{color:{PAL_LIGHT['mu']}!important}}"
     f".bnx{{color:{PAL_LIGHT['body']}!important}}.bnr{{color:{PAL_LIGHT['ac']}!important}}.bnrl{{border-left-color:{PAL_LIGHT['ac']}!important}}"
-    f".bnp{{background:{PAL_LIGHT['tx']}!important;color:{PAL_LIGHT['ink']}!important;border-color:{PAL_LIGHT['tx']}!important}}"
     f".bng{{background:{PAL_LIGHT['surf']}!important;color:{PAL_LIGHT['tx']}!important;border-color:{PAL_LIGHT['line']}!important}}"
-    f".sg{{background:{PAL_LIGHT['sev'][0]}!important}}.sa{{background:{PAL_LIGHT['sev'][1]}!important}}.sr{{background:{PAL_LIGHT['sev'][2]}!important}}"
     f".se{{background:{PAL_LIGHT['empty']}!important}}.tg{{color:{PAL_LIGHT['sev'][0]}!important}}.ta{{color:{PAL_LIGHT['sev'][1]}!important}}"
-    f".tr{{color:{PAL_LIGHT['sev'][2]}!important}}.bga{{border-color:{PAL_LIGHT['sev'][1]}!important}}"
-    ".bn-dk{display:none!important;max-height:0!important;overflow:hidden!important}.bn-lt{display:block!important;max-height:none!important}}"
-    "a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}")
+    f".bga{{border-color:{PAL_LIGHT['fill']}!important}}"
+    "}a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}"
+    "@media only screen and (max-width:480px){.bnh1{font-size:26px!important;line-height:1.15!important}.bnpad{padding-left:12px!important;padding-right:12px!important}.bncard{padding:20px 16px!important}}")
 def _head(title):
     return ('<!DOCTYPE html><html lang="en" xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<meta name="x-apple-disable-message-reformatting"><meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light">'
@@ -822,7 +818,7 @@ def _head(title):
 def sev_band(r):
     r = max(0, min(10, int(r or 0)))
     return 0 if r <= 3 else (1 if r <= 6 else 2)
-RANK_COLORS = [PAL["sev"][sev_band(i)] for i in range(11)]          # kept for callers: severity colour of a rank (green 0–3 / amber 4–6 / red 7–10)
+RANK_COLORS = [PAL["red"] if i >= 7 else PAL["fill"] for i in range(11)]   # kept for callers: yellow below rank 7, red for rank 7+ (site rule)
 _SEVCLS = ("sg", "sa", "sr"); _SEVTXT = ("tg", "ta", "tr")
 def rank_color(r): return RANK_COLORS[max(0, min(10, int(r or 0)))]
 def slot_label(slot): return {"morning": "Morning", "evening": "Evening", "breaking": "Breaking"}.get(slot, "Special")
@@ -832,14 +828,14 @@ def meter_html(rank, big=False, rank_from=None):
     """Signal Rank Meter: 10 segments filled to the rank (segment colour by its own band), always followed by the numeral (e.g. 7/10)."""
     rk = max(0, min(10, int(rank or 0))); w, hgt, fs = (9, 16, 24) if big else (7, 12, 17)
     cells = "".join(
-        f'<td class="{_SEVCLS[sev_band(i)] if i <= rk else "se"}" width="{w}" height="{hgt}" style="width:{w}px;height:{hgt}px;padding:0;font-size:0;line-height:0;'
-        f'border-radius:2px;background:{PAL["sev"][sev_band(i)] if i <= rk else PAL["empty"]}">&nbsp;</td><td width="2" style="width:2px;padding:0;font-size:0;line-height:0">&nbsp;</td>'
+        f'<td class="{"sf" if i <= rk else "se"}" width="{w}" height="{hgt}" style="width:{w}px;height:{hgt}px;padding:0;font-size:0;line-height:0;'
+        f'border-radius:3px;background:{(PAL["red"] if rk >= 7 else PAL["fill"]) if i <= rk else PAL["empty"]}">&nbsp;</td><td width="2" style="width:2px;padding:0;font-size:0;line-height:0">&nbsp;</td>'
         for i in range(1, 11))
     chg = ""
     if rank_from is not None and rank_from != rk:
         chg = f'<span class="bnm" style="font:700 12px {FH};color:{PAL["mu"]};letter-spacing:.3px">&nbsp;{"▲" if rk > rank_from else "▼"} from {int(rank_from)}</span>'
     return ('<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate"><tr>' + cells +
-            f'<td style="padding:0 0 0 8px;white-space:nowrap;vertical-align:middle"><span class="bnt" style="font:800 {fs}px/1 {FH};color:{PAL["tx"]}">{rk}</span>'
+            f'<td style="padding:0 0 0 8px;white-space:nowrap;vertical-align:middle"><span class="bnt" style="font:600 {fs}px/1 {FH};color:{PAL["tx"]}">{rk}</span>'
             f'<span class="bnm" style="font:700 {round(fs * .62)}px/1 {FH};color:{PAL["mu"]}">/10</span>{chg}</td></tr></table>')
 
 def subject_for(issue):
@@ -863,28 +859,32 @@ def follow_links(row, cid, c=None):
             "unfollow": f"{base}/newsletter/unfollow?token={make_token('unfollow', int(row['id']), ttl, x=x, c=cid)}"}
 
 # Status chips (BREAKING / UPDATE / UNCONFIRMED) and the kicker line under the meter.
+def _pill(txt):   # rank 7+ / breaking only: red pill, white text (AA in both themes)
+    return (f'<span style="display:inline-block;background:{PAL["red"]};color:{PAL["onred"]};border-radius:999px;padding:2px 9px;'
+            f'font:600 11px/1.4 {FH};letter-spacing:.8px">{E(txt)}</span>')
 def _chip(txt, kind):
-    if kind == "red": return f'<span class="tr" style="font:800 11px/1.4 {FH};letter-spacing:1px;color:{PAL["sev"][2]}">{E(txt)}</span>'
-    return f'<span class="ta" style="font:800 11px/1.4 {FH};letter-spacing:1px;color:{PAL["sev"][1]}">{E(txt)}</span>'
+    if kind == "red": return _pill(txt)
+    return f'<span class="ta" style="font:600 11px/1.4 {FH};letter-spacing:.8px;color:{PAL["sev"][1]}">{E(txt)}</span>'
 def _badge(txt, bg, fg="#ffffff", bd=None):   # legacy helper kept for compatibility (not used by the Signal layout)
-    return f'<span style="display:inline-block;border-radius:4px;font:800 11px/1.4 {FH};letter-spacing:.5px;padding:2px 7px;margin:0 4px 4px 0;background:{bg};color:{fg};border:1px solid {bd or bg}">{E(txt)}</span>'
+    return f'<span style="display:inline-block;border-radius:4px;font:600 11px/1.4 {FH};letter-spacing:.5px;padding:2px 7px;margin:0 4px 4px 0;background:{bg};color:{fg};border:1px solid {bd or bg}">{E(txt)}</span>'
 def _kicker(it):
     sep = f'<span class="bnm" style="color:{PAL["mu"]}"> · </span>'
-    parts = [f'<span class="{_SEVTXT[sev_band(it["rank"])]}" style="color:{rank_color(it["rank"])}">{E((it.get("tier") or "").upper())}</span>'] if it.get("tier") else []
+    tier = (it.get("tier") or "").upper()
+    parts = ([_pill(tier) if int(it.get("rank") or 0) >= 7 else f'<span class="bnt" style="color:{PAL["tx"]}">{E(tier)}</span>'] if tier else [])
     parts.append(f'<span class="bnm" style="color:{PAL["mu"]}">{E((it.get("category") or "other").upper())}</span>')
     if it.get("breaking"): parts.append(_chip("BREAKING", "red"))
     if it.get("update"): parts.append(_chip("UPDATE", "amber"))
     if it.get("editorial") or it.get("section") == "watchlist": parts.append(_chip("UNCONFIRMED", "amber"))
-    return f'<div style="font:800 11px/1.5 {FH};letter-spacing:1px;margin:8px 0 4px 0">{sep.join(parts)}</div>'
+    return f'<div style="font:600 11px/1.5 {FH};letter-spacing:1px;margin:8px 0 4px 0">{sep.join(parts)}</div>'
 def _rank_badge(it):
     u = it.get("update") or {}
     return meter_html(it["rank"], rank_from=u.get("rank_from"))
 
 _L = f"color:{PAL['tx']};text-decoration:underline"
-_BTN = (f"display:inline-block;background:{PAL['tx']};color:{PAL['ink']};font:700 14px/1.3 {FH};text-decoration:none;"
-        f"border-radius:6px;padding:10px 16px;margin:10px 8px 0 0;border:1px solid {PAL['tx']}")
-_BTN2 = (f"display:inline-block;background:{PAL['bg']};color:{PAL['tx']};font:700 14px/1.3 {FH};text-decoration:none;"
-         f"border-radius:6px;padding:10px 16px;margin:10px 8px 0 0;border:1px solid {PAL['line']}")
+_BTN = (f"display:inline-block;background:{PAL['fill']};color:{PAL['ink']};font:600 15px/1.2 {FH};text-decoration:none;"
+        f"border-radius:999px;padding:12px 20px;margin:12px 8px 0 0;border:1px solid {PAL['fill']}")
+_BTN2 = (f"display:inline-block;background:{PAL['surf']};color:{PAL['tx']};font:600 15px/1.2 {FH};text-decoration:none;"
+         f"border-radius:999px;padding:12px 20px;margin:12px 8px 0 0;border:1px solid {PAL['line']}")
 def _btn(label, url, primary=True):
     return f'<a href="{E(url)}" class="{"bnp" if primary else "bng"}" style="{_BTN if primary else _BTN2}">{label}</a>'
 
@@ -898,13 +898,16 @@ def _where(it):
 def _follow_html(it, links, c):
     fl = follow_links(links.get("_row"), it["cluster_id"], c)
     if it.get("followed") and fl["unfollow"]:
-        return (f'<span class="tg" style="display:inline-block;margin:10px 8px 0 0;font:700 13px {FH};color:{PAL["sev"][0]}">✓ Following</span> '
+        return (f'<span class="tg" style="display:inline-block;margin:10px 8px 0 0;font:700 13px {FH};color:{PAL["sev"][0]}">Following</span> '
                 f'<a href="{E(fl["unfollow"])}" class="bnm" style="font:400 13px {FB};color:{PAL["mu"]}">Unfollow</a>')
-    return _btn("☆ Follow this story", fl["follow"], primary=False)
+    return _btn("Follow this story", fl["follow"], primary=False)
 
 _P = f'class="bnx" style="margin:0 0 8px 0;font:400 15px/1.55 {FB};color:{PAL["body"]}"'
-def _lbl(t): return f'<b class="bnt" style="font:800 11px {FH};letter-spacing:1px;color:{PAL["tx"]}">{t}</b>'
-_ROWTD = f'class="bnl" style="padding:20px;border-top:1px solid {PAL["line"]}"'
+def _lbl(t): return f'<b class="bnt" style="font:600 11px {FH};letter-spacing:1px;color:{PAL["tx"]}">{t}</b>'
+_ROWTD = f'class="bnl" style="padding:20px;border-top:1px solid {PAL["line"]}"'   # legacy row (kept for callers)
+_CARD_O = ('<tr><td class="bnpad" style="padding:6px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+           f'style="border-collapse:separate;table-layout:fixed"><tr><td class="bns bncard" style="padding:24px 22px;background:{PAL["surf"]};border-radius:18px;word-break:break-word;overflow-wrap:anywhere">')
+_CARD_C = '</td></tr></table></td></tr>'
 
 _NLF = {"t": 0, "d": {}}
 def _nl_figures():
@@ -924,7 +927,7 @@ def _visuals_html(it, url, c):
     """t373: per-item visuals (absolute blackout.network URLs, alt text): locator map, headshots of named people, video thumbnail."""
     base = c["base_url"].rstrip("/"); cid = it["cluster_id"]; out = []
     loc = it.get("where") or "the event location"; ev = _nl_images().get(cid)
-    _IMG = "display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:6px;margin:0 0 4px 0"
+    _IMG = "display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:12px;margin:0 0 4px 0"
     _CR = f'margin:0 0 10px 0;font:400 11px/1.4 {FB};color:{PAL["mu"]}'
     if ev and os.path.exists(os.path.join(BASE, "static", "social", ev["file"])):
         out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/{E(ev["file"])}" width="600" alt="{E(ev["credit"].split(" (")[0])}: {E(loc)}" style="{_IMG}"></a>'
@@ -935,7 +938,7 @@ def _visuals_html(it, url, c):
     else:
         cat = re.sub("[^a-z]", "", (it.get("category") or "other").lower())
         cat = cat if os.path.exists(os.path.join(BASE, "static", "social", f"nlc_{cat}.jpg")) else "other"
-        out.append(f'<a href="{E(url)}"><img src="{base}/social/thumb/nlc_{cat}.jpg" width="600" alt="{E(it.get("category") or "News")} on BLACKOUT.NETWORK" style="{_IMG};margin-bottom:10px"></a>')
+        pass   # apple_v1: no generic category placeholder image (old tile art); real photos and locator maps only
     text = f"{it.get('title') or ''} {it.get('brief') or ''} {it.get('what') or ''}"
     def _hit(v):
         try: return re.search(v.get("rx") or re.escape(v["name"]), text) or v["name"] in text
@@ -950,15 +953,15 @@ def _visuals_html(it, url, c):
     if vid:
         yt = f'https://www.youtube.com/shorts/{vid["youtube_id"]}'
         out.append(f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0"><tr><td style="padding:0 10px 0 0">'
-                   f'<a href="{E(yt)}"><img src="https://i.ytimg.com/vi/{E(vid["youtube_id"])}/mqdefault.jpg" width="160" alt="Watch the video: {E(it.get("title") or "")}" style="display:block;width:160px;height:auto;border:0;border-radius:6px"></a></td>'
-                   f'<td style="font:700 14px/1.4 {FH}"><a href="{E(yt)}" class="bnt" style="{_L}">▶ Watch the video</a></td></tr></table>')
+                   f'<a href="{E(yt)}"><img src="https://i.ytimg.com/vi/{E(vid["youtube_id"])}/mqdefault.jpg" width="160" alt="Watch the video: {E(it.get("title") or "")}" style="display:block;width:160px;height:auto;border:0;border-radius:12px"></a></td>'
+                   f'<td style="font:700 14px/1.4 {FH}"><a href="{E(yt)}" class="bnt" style="{_L}">Watch the video</a></td></tr></table>')
     return "".join(out)
 
 def _item_html(it, links, c):
     url = wire_url(it["cluster_id"], c=c); u = it.get("update")
     conf_cls, conf_col = ("ta", PAL["sev"][1]) if it["unconfirmed"] else ("tg", PAL["sev"][0])
-    H = [f'<tr><td {_ROWTD}>{_rank_badge(it)}{_kicker(it)}'
-         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:800 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{E(_cut(it["title"], 200))}</a></div>']
+    H = [_CARD_O + f'{_rank_badge(it)}{_kicker(it)}'
+         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{E(_cut(it["title"], 200))}</a></div>']
     H.append(_visuals_html(it, url, c))
     if u:
         bits = []
@@ -966,7 +969,7 @@ def _item_html(it, links, c):
             bits.append(f"Rank {'raised' if u['up'] else 'lowered'} {u['rank_from']} → {u['rank_to']}.")
         if u["n_new"]:
             bits.append(f"{u['n_new']} new report{'s' if u['n_new'] != 1 else ''}" + (f", {len(u['new_fams'])} from new independent source{'s' if len(u['new_fams']) != 1 else ''} ({', '.join(u['new_fams'][:4])})" if u["new_fams"] else "") + ".")
-        H.append(f'<p {_P}><b class="ta" style="font:800 11px {FH};letter-spacing:1px;color:{PAL["sev"][1]}">WHAT\'S NEW</b> '
+        H.append(f'<p {_P}><b class="ta" style="font:600 11px {FH};letter-spacing:1px;color:{PAL["sev"][1]}">WHAT\'S NEW</b> '
                  f'<span class="bnm" style="color:{PAL["mu"]}">since {E(fmt_et(u["since"]))}:</span> {E(" ".join(bits) or "Updated.")}</p>')
         if u["reports"]:
             H.append('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 8px 0">' + "".join(
@@ -975,14 +978,14 @@ def _item_html(it, links, c):
                 for x in u["reports"]) + '</table>')
         H.append(f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
                  f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'
-                 f'<div>{_btn("Story timeline →", u["timeline"])}{_follow_html(it, links, c)}</div></td></tr>')
+                 f'<div>{_btn("Story timeline", u["timeline"])}{_follow_html(it, links, c)}</div>' + _CARD_C)
         return "".join(H)
     H.append(f'<p {_P}>{_lbl("BRIEF")} {E(it["what"])}</p>'
              f'<p {_P}>{_lbl("WHERE")} {E(_where(it))} · {_lbl("WHEN")} {E(when_str(it["when"]))}</p>'
              f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
              f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>. '
              f'<span class="bnm" style="color:{PAL["mu"]};font-size:13px">{it["n_items"] or 1} report{"s" if (it["n_items"] or 1) != 1 else ""}, score {it["score"]}/100, first seen {E(fmt_et(it["first_seen"]))}.</span></p>'
-             f'<div>{_btn("Full story &amp; sources →", url)}{_follow_html(it, links, c)}</div></td></tr>')
+             f'<div>{_btn("Full story &amp; sources", url)}{_follow_html(it, links, c)}</div>' + _CARD_C)
     return "".join(H)
 
 # Issue footer: distinct buttons. Inline styles only (email clients strip <style>).
@@ -1011,11 +1014,8 @@ def _addr(c):
                                 'live issue sending stays locked until it is set)</span>'))
 
 def _sevbar():
-    """Thin green / amber / red strip across the top of every email (the meter's three bands)."""
-    return ('<tr><td style="padding:0;font-size:0;line-height:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
-            f'<td class="sg" width="30%" height="4" style="height:4px;background:{PAL["sev"][0]};font-size:0;line-height:0">&nbsp;</td>'
-            f'<td class="sa" width="30%" height="4" style="height:4px;background:{PAL["sev"][1]};font-size:0;line-height:0">&nbsp;</td>'
-            f'<td class="sr" width="40%" height="4" style="height:4px;background:{PAL["sev"][2]};font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>')
+    """apple_v1: no colour strip (the site has none); kept as a no-op for callers."""
+    return ""
 
 _UTM_SKIP = re.compile(r"/newsletter/(unsubscribe|manage|breaking_off|stop_tracking|confirm|follow|unfollow|sources)\b|[?&]token=")
 def _utm_url(u, campaign):
@@ -1031,19 +1031,20 @@ def utm_tag(html_, text, campaign):
 FORWARD_URL = "https://blackout.network/newsletter?utm_source=email&utm_medium=forward"
 def _follow_bar():
     b = lambda lab, u: (f'<a href="{u}" class="bnt" style="display:inline-block;margin:0 8px 6px 0;padding:6px 12px;border:1px solid {PAL["line"]};'
-                        f'border-radius:999px;font:700 12px/1.2 {FH};color:{PAL["tx"]};text-decoration:none">{lab}</a>')
-    return (f'<tr><td class="bnl" style="padding:2px 20px 8px 20px;text-align:left">'
-            + b("Follow on X @BlkoutNtw", "https://x.com/BlkoutNtw") + b("▶ YouTube @blkoutntw", "https://www.youtube.com/@blkoutntw") + '</td></tr>')
+                        f'border-radius:999px;font:500 13px/1.2 {FH};color:{PAL["tx"]};text-decoration:none">{lab}</a>')
+    return (f'<tr><td class="bnl bnpad" style="padding:4px 20px 14px 20px;text-align:left">'
+            + b("Follow on X @BlkoutNtw", "https://x.com/BlkoutNtw") + b("YouTube @blkoutntw", "https://www.youtube.com/@blkoutntw") + '</td></tr>')
 def _shell(title, pre, head_html, body_rows, links, c, why_line):
     """Common email frame: single column, 100% wide up to 640 px (phones get full width), table layout + inline CSS, left-aligned text."""
     addr, addr_html = _addr(c); mu = PAL["mu"]
     return (_head(title) + f'<body class="bnb" style="margin:0;padding:0;background:{PAL["bg"]};-webkit-text-size-adjust:100%">'
             f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:{PAL["bg"]}">{E(pre)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>'
             f'<table role="presentation" class="bnb" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAL["bg"]}"><tr><td align="center" style="padding:0">'
-            f'<table role="presentation" class="bnb" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;background:{PAL["bg"]};'
+            f'<table role="presentation" class="bnb" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:{PAL["bg"]};'
             f'font-family:{FB};color:{PAL["tx"]};text-align:left">'
             + _sevbar() + head_html + _follow_bar() + "".join(body_rows) +
-            f'<tr><td class="bnl" style="padding:22px 20px 8px 20px;border-top:1px solid {PAL["line"]};text-align:left">{_logo_html(c, 32)}</td></tr>'
+            f'<tr><td style="padding:40px 20px 0 20px;font-size:0;line-height:0">&nbsp;</td></tr>'
+            f'<tr><td class="bnl bnpad" style="padding:22px 20px 8px 20px;border-top:1px solid {PAL["line"]};text-align:left">{_logo_html(c, 32)}</td></tr>'
             f'<tr><td class="bnm" style="padding:8px 20px 4px 20px;font:400 12px/1.6 {FB};color:{mu};text-align:left">'
             f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
             f'<a href="{E(links["scoring"])}" class="bnt" style="{_L}">How we score</a> · <a href="{E(links["site"])}" class="bnt" style="{_L}">Open the live dashboard</a></p>'
@@ -1056,22 +1057,23 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             + footer_buttons_html(links) + '</table></td></tr></table></body></html>')
 
 def _head_html(kicker, kcol, line2, rng):
-    kcls = "bnr" if kcol.lower() in ("#ff4d4f", PAL["ac"].lower()) else "bnt"
-    return (f'<tr><td style="padding:22px 20px 6px 20px;text-align:left">{_logo_html(None, 48)}</td></tr>'
-            f'<tr><td class="bnl" style="padding:14px 20px 16px 20px;border-bottom:1px solid {PAL["line"]};text-align:left">'
-            f'<div class="{kcls}" style="font:800 12px/1.4 {FH};letter-spacing:1.6px;color:{kcol}">{E(kicker)}</div>'
-            f'<div class="bnt" style="font:800 22px/1.25 {FH};color:{PAL["tx"]};margin-top:4px">{E(line2)}</div>'
-            f'<div class="bnm" style="font:400 13px/1.5 {FB};color:{PAL["mu"]};margin-top:4px">{E(rng)}</div></td></tr>')
+    """Masthead: the BLACKOUT wordmark, then a big clean headline block (kicker, headline, data window). Breaking = red pill (rank 7+ only)."""
+    k = _pill(kicker) if kicker.upper().startswith("BREAKING") else f'<div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:{PAL["ac"]}">{E(kicker)}</div>'
+    return (f'<tr><td class="bnpad" style="padding:26px 20px 0 20px;text-align:left">{_logo_html(None, 48)}</td></tr>'
+            f'<tr><td class="bnpad" style="padding:44px 20px 22px 20px;text-align:left">{k}'
+            f'<div class="bnt bnh1" style="font:600 34px/1.12 {FH};letter-spacing:-0.8px;color:{PAL["tx"]};margin-top:10px">{E(line2)}</div>'
+            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:10px">{E(rng)}</div></td></tr>')
 
-_SECCOL = {"#e6e9ee": ("bnt", PAL["tx"]), "green": ("tg", PAL["sev"][0]), "amber": ("ta", PAL["sev"][1]), "red": ("tr", PAL["sev"][2])}
+_SECCOL = {"#e6e9ee": ("bnt", PAL["tx"]), "green": ("bnt", PAL["tx"]), "amber": ("bnt", PAL["tx"]), "red": ("bnt", PAL["tx"])}
 def _sec_html(title, sub_, col="#e6e9ee"):
+    """Section title in the site's H2 voice: ink title, muted one-line explainer under it."""
     cls, colv = _SECCOL.get(col, ("bnt", PAL["tx"]))
-    return (f'<tr><td style="padding:26px 20px 6px 20px;text-align:left"><div class="{cls}" style="font:800 13px/1.3 {FH};letter-spacing:1.6px;text-transform:uppercase;color:{colv}">{E(title)}</div>'
-            f'<div class="bnm" style="font:400 13px/1.5 {FB};color:{PAL["mu"]};margin-top:3px">{E(sub_)}</div></td></tr>')
+    return (f'<tr><td class="bnpad" style="padding:40px 20px 10px 20px;text-align:left"><div class="{cls}" style="font:600 24px/1.2 {FH};letter-spacing:-0.4px;color:{colv}">{E(title)}</div>'
+            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:6px">{E(sub_)}</div></td></tr>')
 
 def _bluf_html(txt, label="BLUF"):
-    return (f'<tr><td style="padding:18px 20px 4px 20px"><div class="bns2 bnrl bnt" style="border-left:3px solid {PAL["ac"]};background:{PAL["surf2"]};border-radius:6px;'
-            f'padding:12px 14px;font:400 15px/1.55 {FB};color:{PAL["tx"]}"><b class="bnr" style="font:800 12px {FH};letter-spacing:1.4px;color:{PAL["ac"]}">{label}</b> {E(txt)}</div></td></tr>')
+    return (f'<tr><td class="bnpad" style="padding:0 20px 8px 20px"><div class="bns bnt" style="background:{PAL["surf"]};border-radius:18px;'
+            f'padding:20px 22px;font:400 17px/1.5 {FB};color:{PAL["tx"]}"><div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:{PAL["ac"]};margin:0 0 6px 0">{label}</div>{E(txt)}</div></td></tr>')
 
 def window_str(a, b):
     hrs = (b - a).total_seconds() / 3600
@@ -1105,7 +1107,7 @@ def render(issue, links, c=None):
     a(_bluf_html(issue["bluf"]))
     _tv = next((v for v in (issue.get("videos") or []) if v.get("youtube_id")), None)
     if _tv:
-        a(f'<tr><td class="bnl" style="padding:0 20px 12px 20px;font:700 15px/1.4 {FH}"><a href="https://www.youtube.com/shorts/{E(_tv["youtube_id"])}" class="bnt" style="{_L}">▶ Watch today\'s top story</a></td></tr>')
+        a(f'<tr><td class="bnl" style="padding:0 20px 12px 20px;font:700 15px/1.4 {FH}"><a href="https://www.youtube.com/shorts/{E(_tv["youtube_id"])}" class="bnt" style="{_L}">Watch today\'s top story</a></td></tr>')
     if issue.get("near"):
         a(_sec_html(f"Near you — {issue.get('loc_label') or 'your area'}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country), highest rank first.", "green"))
         for it in issue["near"]: a(_item_html(it, links, c))
@@ -1124,7 +1126,7 @@ def render(issue, links, c=None):
         a(_sec_html("Top threats", f"New since your last brief. Rank {rr['rank']}+ and confirmed by {rr['sources']}+ independent sources, highest first."))
         for it in issue["main"]: a(_item_html(it, links, c))
     elif not issue.get("quiet"):   # fully quiet: the BLUF already carries QUIET_LINE, so it is the only line
-        a(f'<tr><td style="padding:16px 20px"><div class="bns2 bnx" style="background:{PAL["surf2"]};border-radius:6px;padding:12px 14px;font:400 15px/1.55 {FB};color:{PAL["body"]}">'
+        a(f'<tr><td style="padding:16px 20px"><div class="bns2 bnx" style="background:{PAL["surf2"]};border-radius:12px;padding:12px 14px;font:400 15px/1.55 {FB};color:{PAL["body"]}">'
           f'{E(quiet_line(issue))}</div></td></tr>')
     if issue.get("politics"):
         a(_sec_html("Politics & Government", "Government actions, emergency declarations, sanctions and political crises, confirmed by 2+ independent sources."))
@@ -1140,14 +1142,14 @@ def render(issue, links, c=None):
         a(_sec_html("Also notable", f"Below the top-threats bar: confirmed rank 5–6 items, or a rank-{rr['rank']}+ item from a single official source."))
         for it in issue["notable"]: a(_item_html(it, links, c))
     if issue["watchlist"]:
-        a(_sec_html("Watchlist: unconfirmed", "Low-confidence, single-source reports. Not verified. Shown so you can watch for confirmation.", "amber"))
+        a(_sec_html("Watchlist: unconfirmed", "Low-confidence, single-source reports. Not yet confirmed. Shown so you can watch for confirmation.", "amber"))
         for it in issue["watchlist"]:
             rk = int(it.get("rank") or 0)
             a(f'<tr><td class="bnl" style="padding:12px 20px;border-top:1px solid {PAL["line"]};font:400 14px/1.5 {FB}">'
               f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>'
-              f'<td width="34" valign="top" class="{_SEVTXT[sev_band(rk)]}" style="width:34px;font:800 20px/1.1 {FH};color:{rank_color(rk)}">{rk}</td>'
+              f'<td width="34" valign="top" class="{_SEVTXT[sev_band(rk)]}" style="width:34px;font:600 20px/1.1 {FH};color:{rank_color(rk)}">{rk}</td>'
               f'<td valign="top"><a href="{E(wire_url(it["cluster_id"], c=c))}" class="bnt" style="font:700 15px/1.35 {FH};color:{PAL["tx"]};text-decoration:none">{E(_cut(it["title"], 180))}</a>'
-              f'<div style="font:800 11px/1.6 {FH};letter-spacing:1px;margin-top:3px">{_chip("UNCONFIRMED", "amber")}'
+              f'<div style="font:600 11px/1.6 {FH};letter-spacing:1px;margin-top:3px">{_chip("UNCONFIRMED", "amber")}'
               f'<span class="bnm" style="color:{PAL["mu"]}"> · {E((it["category"] or "").upper())} · {E(fmt_et(it["first_seen"]).upper())}</span></div></td></tr></table></td></tr>')
     pre = issue["bluf"]
     why = f"You get this because you confirmed a subscription to the {BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage."
@@ -1175,7 +1177,7 @@ def render(issue, links, c=None):
     if issue.get("updates"): tsec("Developing stories", issue["updates"])
     if issue["notable"]: tsec("Also notable", issue["notable"])
     if issue["watchlist"]:
-        T += ["WATCHLIST: UNCONFIRMED (single-source, not verified)", "=" * 30]
+        T += ["WATCHLIST: UNCONFIRMED (single-source, not yet confirmed)", "=" * 30]
         for it in issue["watchlist"]:
             T.append(f"- UNCONFIRMED · {_cut(it['title'], 180)} ({it['category']}, {fmt_et(it['first_seen'])}) {wire_url(it['cluster_id'], c=c)}")
         T.append("")
@@ -1265,10 +1267,10 @@ def breaking_candidates(at=None, c=None, S=None):
 
 def _trend_row(t):
     return (f'<tr><td class="bnl" style="padding:16px 20px;border-top:1px solid {PAL["line"]};font:400 15px/1.55 {FB};color:{PAL["tx"]}">'
-            f'<p style="margin:0 0 6px 0;font:800 12px/1.4 {FH};letter-spacing:.08em;color:{PAL["ac"]}">TRENDING ON {BRAND}</p>'
+            f'<p style="margin:0 0 6px 0;font:600 12px/1.4 {FH};letter-spacing:.08em;color:{PAL["ac"]}">TRENDING ON {BRAND}</p>'
             f'<p style="margin:0 0 10px 0;font:700 18px/1.3 {FH}">{E(t.get("title") or "")}</p>'
             f'<p class="bnm" style="margin:0 0 12px 0;color:{PAL["mu"]};font-size:13px">{E(t.get("platform") or "")}: {E(t.get("value"))} {E(t.get("metric") or "views")}, about {E(t.get("ratio") or "")}× our recent average.</p>'
-            f'{_btn("Watch it →", t["url"])}</td></tr>')
+            f'{_btn("Watch it", t["url"])}</td></tr>')
 def render_trending(t, links, at, c=None):
     ok, cid, why = trend_check(t)   # re-checked at build time: the story may have changed since run_breaking picked the trend
     if not ok:
@@ -1332,17 +1334,17 @@ def _video_html(s, c, camp):
     img = f'{base}/social/thumb/{urllib.parse.quote(s["thumb"])}' if s.get("thumb") else None
     alt = s.get("thumb_alt") or f'Thumbnail: {s["title"]}'
     yt = f'https://www.youtube.com/watch?v={s["youtube_id"]}' if s.get("youtube_id") else (s.get("youtube_url") or "https://www.youtube.com/@blkoutntw")
-    btns = (_btn(f"Read &amp; watch on {BRAND}", site) + _btn("▶ Watch on YouTube", yt, primary=False)
+    btns = (_btn(f"Read &amp; watch on {BRAND}", site) + _btn("Watch on YouTube", yt, primary=False)
             + _btn("Watch on X", s.get("x_url") or "https://x.com/BLKOUTNTW", primary=False))
     pic = (f'<a href="{E(site)}" style="text-decoration:none"><img src="{E(img)}" width="600" alt="{E(alt)}" '
-           f'style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:8px;background:{PAL["surf"]};color:{PAL["body"]};font:400 13px {FB}"></a>') if img else ""
+           f'style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:12px;background:{PAL["surf"]};color:{PAL["body"]};font:400 13px {FB}"></a>') if img else ""
     meter = meter_html(s["rank"]) if isinstance(s.get("rank"), int) else ""
     kind = (s.get("kind") or s.get("category") or "video report").upper()
-    return (f'<tr><td {_ROWTD}>{pic}<div style="height:12px;line-height:12px;font-size:0">&nbsp;</div>{meter}'
-            f'<div class="bnm" style="font:800 11px/1.5 {FH};letter-spacing:1px;color:{PAL["mu"]};margin:6px 0 4px 0">{E(kind)}{" · " + E(s["duration_label"]) if s.get("duration_label") else ""}</div>'
-            f'<div style="margin:0 0 8px 0"><a href="{E(site)}" class="bnt" style="font:800 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{E(s["title"])}</a></div>'
+    return (_CARD_O + f'{pic}<div style="height:12px;line-height:12px;font-size:0">&nbsp;</div>{meter}'
+            f'<div class="bnm" style="font:600 11px/1.5 {FH};letter-spacing:1px;color:{PAL["mu"]};margin:6px 0 4px 0">{E(kind)}{" · " + E(s["duration_label"]) if s.get("duration_label") else ""}</div>'
+            f'<div style="margin:0 0 8px 0"><a href="{E(site)}" class="bnt" style="font:600 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{E(s["title"])}</a></div>'
             f'<p {_P}>{E(s.get("dek") or "")}</p>'
-            f'<div>{btns}</div></td></tr>')
+            f'<div>{btns}</div>' + _CARD_C)
 def _video_text(s, c, camp):
     T = [f"- {s['title']}", f"  {s.get('dek') or ''}", f"  Read & watch on {BRAND}: {story_url(s['slug'], c, camp)}"]
     T.append(f"  Watch on YouTube: " + (f"https://www.youtube.com/watch?v={s['youtube_id']}" if s.get("youtube_id") else (s.get("youtube_url") or "https://www.youtube.com/@blkoutntw")))
@@ -1361,9 +1363,9 @@ def render_simple(title, paras, button=None, c=None, extra_links=None):
     html_ = (_head(title) + f'<body class="bnb" style="margin:0;padding:0;background:{PAL["bg"]};-webkit-text-size-adjust:100%">'
              f'<table role="presentation" class="bnb" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAL["bg"]}"><tr><td align="center" style="padding:0">'
              f'<table role="presentation" class="bnb" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:{PAL["bg"]};font-family:{FB};text-align:left">'
-             + _sevbar() + f'<tr><td style="padding:22px 20px 6px 20px">{_logo_html(c, 48)}</td></tr>'
-             f'<tr><td class="bnl" style="padding:14px 20px 22px 20px;border-top:1px solid {PAL["line"]};text-align:left">'
-             f'<h1 class="bnt" style="font:800 22px/1.25 {FH};color:{PAL["tx"]};margin:0 0 12px 0">{E(title)}</h1>'
+             + _sevbar() + f'<tr><td class="bnpad" style="padding:26px 20px 0 20px">{_logo_html(c, 48)}</td></tr>'
+             f'<tr><td class="bnpad" style="padding:40px 20px 40px 20px;text-align:left">'
+             f'<h1 class="bnt bnh1" style="font:600 34px/1.12 {FH};letter-spacing:-0.8px;color:{PAL["tx"]};margin:0 0 16px 0">{E(title)}</h1>'
              + body + btn + xl + '</td></tr>' + foot + '</table></td></tr></table></body></html>')
     text = "\n\n".join([f"{BRAND} — {title}", TAGLINE, *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
                        + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, END_LINE, f"{BRAND} · {TAGLINE} · {addr or 'https://BLACKOUT.NETWORK'}"])
@@ -1470,7 +1472,7 @@ def send_transactional(row, kind):
     c = cfg(); L = links_for(row, c)
     if kind == "confirm":
         title = f"Confirm your {BRAND} newsletter subscription"
-        paras = [f"Someone (hopefully you) asked to subscribe {row['email']} to the {BRAND} newsletter: {FREQS.get(row['frequency'], 'twice daily').lower()} briefs of the highest-severity, source-verified threats.",
+        paras = [f"Someone (hopefully you) asked to subscribe {row['email']} to the {BRAND} newsletter: {FREQS.get(row['frequency'], 'twice daily').lower()} briefs of the highest-severity threats, each confirmed by independent sources.",
                  f"Click the button to confirm. The link expires in {c['confirm_ttl_hours']} hours. If you didn't ask for this, ignore this email and nothing will be sent."]
         hb, tx = render_simple(title, paras, ("Confirm subscription", L["confirm"]), c=c); unsub = None
     else:
