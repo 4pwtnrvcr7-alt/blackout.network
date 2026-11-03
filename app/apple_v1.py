@@ -57,7 +57,7 @@ def head_tag():
     # bna-home: the new homepage (dashboard path "/" with no tab hash). bna-pg: the page groups restyled so far
     # (The Wire, Threats tabs, /crime, /network, /wire/<id> event pages); every other page keeps its current look.
     return (b'<script>(function(){var d=document.documentElement,p=location.pathname;function f(){var h=location.hash.replace(/^#/,""),home=p=="/"&&(!h||h=="home");'
-            b'd.classList.toggle("bna-home",home);d.classList.toggle("bna-pg",!home&&(p=="/"?/^(wire|weather|solar|grid|network|ai|streams|noise|heatmap|trends|broadcasts|radio|preppers|medical|resources|tips|bushcraft|politics|midterms|government|gunlaws|finance|social|games|spacex|jets|intel)$/.test(h):/^\\/crime\\/?$|^\\/network(\\/[a-z0-9-]+)?\\/?$|^\\/wire\\/[0-9a-f]{16}\\/?$|^\\/social\\/?$|^\\/story\\/[a-z0-9-]+\\/?$/.test(p)))}'
+            b'd.classList.toggle("bna-home",home);d.classList.toggle("bna-pg",!home)}'
             b'f();addEventListener("hashchange",f)})()</script>'
             b'<link rel="stylesheet" href="/bn-apple.css">')
 
