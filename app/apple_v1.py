@@ -209,5 +209,6 @@ def handle_get(path, qs):
     if path == "/bn-apple.js": return _static("bn-apple.js", "application/javascript")
     if path in ("/api/apple/home", "/api/apple/dash"):
         _ensure_bg(); v = (_cache if path.endswith("home") else _dcache)["v"]
-        return 200, v if v else {"pending": True}
+        if not v: v = home_data() if path.endswith("home") else dash_data()   # cold start fallback: compute once on request (as before)
+        return 200, v
     return 404, {"error": "not found"}
