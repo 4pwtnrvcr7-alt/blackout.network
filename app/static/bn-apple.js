@@ -156,7 +156,7 @@
      "Advisory (be aware), Watch (be prepared), Warning (take action), Extreme (life-threatening).")})}else none("wx");
   var N=D.net;if(N&&N.count!=null){var a=N.alerts||[];
    put("net",{v:N.count?pl(N.count,"provider issue"):"All clear",sev:N.count>=3,s:N.count?esc(a.map(function(z){return z.src}).join(", ")):(N.checked?n(N.checked)+" services checked":"Major providers operating normally"),
-    c:line(N.series||[],{lo:0,hi:3,from:"24 hours ago"}),t:"Provider status pages &middot; "+esc(et(N.t)),
+    c:bars((N.series||[]).map(function(p){return{v:[0,p[1]]}}),{from:"24 hours ago"}),t:"Provider status pages &middot; "+esc(et(N.t)),
     x:x(N.count?a.map(function(z){return"<b>"+esc(z.src)+"</b>: "+esc(z.status)}).join("; ")+".":"Every monitored internet, cloud and DNS provider reports normal operation.",
      "We poll the status pages and DNS of major cloud, CDN, DNS and app providers. The chart counts providers with a problem at each check.",
      "Operational, Notice, Degraded, Major outage.")})}else none("net");
