@@ -22,9 +22,31 @@ def _body(r):
 def _slim(x):
     return {k: x.get(k) for k in ("cluster_id", "title", "category", "location", "lat", "lon", "rank", "n_families", "updated", "first_seen")}
 
+# Memory (Render limit, 1:27 PM ET): caches are single-flight. Only one thread rebuilds a stale snapshot; every other request gets the
+# last one immediately (or waits for the first build). Before, each concurrent request at expiry rebuilt its own copy (api_state,
+# the sources catalog, solar_seismic JSON), so a burst of N requests held N full copies at once.
+_build = {"home": threading.Lock(), "dash": threading.Lock()}
+def _single(key, cache, ttl, build):
+    v = cache["v"]
+    if v and time.time() - cache["t"] < ttl: return v
+    lk = _build[key]
+    if not lk.acquire(blocking=not v, timeout=20 if not v else -1): return cache["v"]
+    try:
+        if cache["v"] and time.time() - cache["t"] < ttl: return cache["v"]
+        out = build()
+        with _lock: cache.update(t=time.time(), v=out)
+        return out
+    finally: lk.release()
+_src = {"t": 0, "n": None}
+def _sources_total(srv):
+    """The catalog is heavy (whole source list); the homepage only needs its total, refreshed every 15 min."""
+    if _src["n"] is not None and time.time() - _src["t"] < 900: return _src["n"]
+    c = _body(srv._addon_mod("sources").handle_get("/api/sources/catalog", {"per": ["1"]}))
+    _src.update(t=time.time(), n=(c or {}).get("total")); c = None
+    return _src["n"]
 def home_data():
-    with _lock:
-        if _cache["v"] and time.time() - _cache["t"] < 60: return _cache["v"]
+    return _single("home", _cache, 60, _home_build)
+def _home_build():
     srv = sys.modules.get("server"); out = {"generated": None, "main": [], "counts": {}, "kp": None, "quake": None, "grid": None, "sources": None}
     try:
         st = srv.api_state(); out["generated"] = st.get("generated")
@@ -46,10 +68,8 @@ def home_data():
         out["grid"] = {"total": s.get("total"), "top": max(ranks) if ranks else None, "by_kind": s.get("by_kind"), "generated": g.get("generated")}
     except Exception: pass
     try:
-        c = _body(srv._addon_mod("sources").handle_get("/api/sources/catalog", {"per": ["1"]}))
-        out["sources"] = c.get("total")
+        out["sources"] = _sources_total(srv)
     except Exception: pass
-    with _lock: _cache.update(t=time.time(), v=out)
     return out
 
 # ---- Active Threat Monitoring (homepage chart cards). Slim, same-origin, cached 2 min; every number from stored or same-origin data. ----
@@ -62,8 +82,8 @@ def _r(c, f):
     try: return f()
     except Exception: return None
 def dash_data():
-    with _lock:
-        if _dcache["v"] and time.time() - _dcache["t"] < 90: return _dcache["v"]
+    return _single("dash", _dcache, 90, _dash_build)
+def _dash_build():
     import sqlite3
     srv = sys.modules.get("server"); now = time.time(); out = {"now": now}
     ss = _r(None, lambda: _body(srv._addon_mod("solar_seismic").handle_get("/api/solar_seismic", {}))) or {}
@@ -141,7 +161,6 @@ def dash_data():
         days = [[r[0], r[1] or 0, r[2] or 0, r[3] or 0] for r in rows][-7:]   # ET calendar days (EST offset), today last
         return {"days": days, "total": sum(d[1] + d[2] + d[3] for d in days), "hi": sum(d[1] for d in days)}
     out["wire"] = _r(None, wire_card)
-    with _lock: _dcache.update(t=time.time(), v=out)
     return out
 
 # Snapshot refresher: one background thread rebuilds the homepage snapshot every ~100 s from the same in-process data the APIs use.

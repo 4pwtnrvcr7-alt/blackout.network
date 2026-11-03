@@ -287,3 +287,8 @@ html.bna-pg .nsa-b .nm small{color:var(--a-ink2,#6E6E73)!important;letter-spacin
 html[data-theme="light"].bna-pg .nsa-b .nm small{color:#515154!important}
 html[data-theme="light"].bna-pg .nsa-b .dt{color:#515154!important}
 html[data-theme="light"].bna-pg .nsa-b .st{color:#1D1D1F!important}
+/* iOS keeps :hover on the last tapped element even with (hover:none); in light mode the legacy dark hover (#1c232b) must never show.
+   Applies to every expandable row/header, open or not, independent of media queries. */
+html[data-theme="light"].bna-pg :is(.nsa>.nsa-b,.ns-row,#tab-finance .fin-cl,#tab-bcast .clip,#tab-solar .ss-ah,#tab-solar .ssl-card,#tab-solar .ssl-q,#sq_top .sq-seg button,details.bn-acc>summary,.hm-ah,.wx-list [role=option]):is(:hover,:active,:focus){background:transparent!important;color:inherit}
+html[data-theme="light"].bna-pg .nsa.open>.nsa-b{background:transparent!important}
+html[data-theme="light"].bna-pg .nsa.open{background:#fff!important;border-color:rgba(0,0,0,.1)!important}
