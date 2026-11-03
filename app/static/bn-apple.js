@@ -110,7 +110,7 @@
    (tap the title to open; nothing is removed). Very long lists show their first part with a "Show all" button. Pages are switched on
    group by group via ON. Nothing here runs when BN_APPLE=0 (this file is not served then). */
 (function(){
- var d=document,ON=[/^(wire|streams|noise|heatmap|trends|broadcasts|radio)$/];
+ var d=document,ON=[/^(wire|streams|noise|heatmap|trends|broadcasts|radio)$/,/^(ranked|intel|ai|finance|weather|grid|solar|network|jets|spacex|maps|politics|government)$/];
  function key(){var p=location.pathname,h=location.hash.replace(/^#/,"");return p=="/"?(h||"home"):p}
  function on(){var k=key();return d.documentElement.classList.contains("bna-pg")&&ON.some(function(r){return r.test(k)})}
  function mainEl(){var ms=d.querySelectorAll("body>main");for(var i=0;i<ms.length;i++){var r=ms[i].getBoundingClientRect();if(r.height>0&&getComputedStyle(ms[i]).display!="none")return ms[i]}return null}
