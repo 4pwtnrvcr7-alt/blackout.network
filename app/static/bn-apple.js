@@ -27,35 +27,7 @@
  function sync(){R.classList.toggle("bna-home",onHome())}
  addEventListener("hashchange",sync);addEventListener("popstate",sync);sync();
  ["pushState","replaceState"].forEach(function(m){var o=history[m];if(!o)return;history[m]=function(){var r=o.apply(this,arguments);try{sync()}catch(e){}return r}});   // menu tab links change the hash via history (no hashchange event): keep the homepage/tab view in sync
- var CAT={"natural disaster":"Natural hazard","war/conflict":"Conflict","disease":"Health","political":"Politics","financial":"Markets","cyber":"Cyber","space weather":"Space weather"};
- function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
- function et(z){if(!z)return"";var d=new Date(z);if(isNaN(d))return"";return d.toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET"}
- function title(t){return String(t||"").replace(/\s+\./g,".").replace(/ \| [A-Z][\w .]{1,30}$/,"").trim()}
- function isQuake(x){return /earthquake|^m ?\d/i.test(x.title||"")}
- // Same-event quakes (one quake reported by several agencies) collapse into one card: same category, within 1.5 degrees and 36 h.
- function group(items){var out=[];items.forEach(function(x){
-   if(isQuake(x)&&x.lat!=null){for(var i=0;i<out.length;i++){var y=out[i];if(y.q&&Math.abs(y.lat-x.lat)<1.5&&Math.abs(y.lon-x.lon)<1.5&&Math.abs(new Date(y.first_seen)-new Date(x.first_seen))<1296e5){y.more++;return}}}
-   out.push({title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,q:isQuake(x),more:0})});return out}
- function card(x){var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"";
-  return '<a class="bna-card bna-it'+(hi?" hi":"")+'" href="/#wire"><div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
-   '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'}
- function set(k,v){var e=H.querySelector('[data-bna="'+k+'"]');if(e)e.innerHTML=v}
- var row=document.getElementById("bna_row_latest"),arws=H.querySelectorAll(".bna-arw");
- function arrows(){if(!row)return;var m=row.scrollWidth-row.clientWidth;arws.forEach(function(b){b.disabled=b.dataset.dir<0?row.scrollLeft<=2:row.scrollLeft>=m-2})}
- arws.forEach(function(b){b.addEventListener("click",function(){var rm=matchMedia("(prefers-reduced-motion: reduce)").matches;row.scrollBy({left:(+b.dataset.dir)*row.clientWidth*.8,behavior:rm?"auto":"smooth"})})});
- if(row){row.addEventListener("scroll",arrows,{passive:true});addEventListener("resize",arrows)}
- fetch("/api/apple/home",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
-  if(d.sources!=null)set("sources",Number(d.sources).toLocaleString("en-US"));
-  var g=group((d.main||[]).filter(function(x){var t=x.title||"";return /^[\x20-\x7E]/.test(t)&&!/[\u2600-\u27BF\uD83C-\uDBFF]/.test(t)})),pick=[],per={};
-  g.forEach(function(x){if(pick.length<8&&(per[x.category]||0)<2){per[x.category]=(per[x.category]||0)+1;pick.push(x)}});
-  g.forEach(function(x){if(pick.length<8&&pick.indexOf(x)<0)pick.push(x)});
-  pick.sort(function(a,b){return b.rank-a.rank||b.n_families-a.n_families});
-  if(row)row.innerHTML=pick.length?pick.map(card).join(""):'<p class="bna-empty">The Wire is quiet right now.</p>';arrows();
-  if(d.kp){set("kp",Number(d.kp.value).toFixed(2)+"<small>/ 9</small>");set("kpd",d.kp.max24!=null?"24-hour high: Kp "+Math.round(d.kp.max24):"");set("kps","NOAA SWPC · "+esc(d.kp.t_et||et(d.kp.t)))}
-  if(d.quake){set("qm","M"+Number(d.quake.mag).toFixed(1));set("qp",esc(d.quake.place));set("qs","USGS · "+esc(d.quake.t_et||et(d.quake.t)))}
-  if(d.grid&&d.grid.total!=null){var k=d.grid.by_kind||{};set("gt",d.grid.total+"<small>items</small>");set("gd",(d.grid.top!=null?"Top rank "+d.grid.top+" · ":"")+(k.cyber||0)+" cyber advisories · "+(k.outage||0)+" outages");set("gs","As of "+esc(et(d.grid.generated)))}
-  if(d.generated)set("asof","Live data as of "+esc(et(d.generated))+".");
- }).catch(function(){if(row)row.innerHTML='<p class="bna-empty">Live data is unavailable right now. <a class="bna-lnk" href="/#wire">Open The Wire</a></p>'});
+ if(window.BNA){setTimeout(BNA.refresh,BNA.had?45000:0);setInterval(function(){if(!document.hidden)BNA.refresh()},120000)}
 })();
 /* Phase 3a: near-empty top bar. The bar keeps the wordmark and the menu button; The Wire, Sources, Free brief, alerts, search, theme and
    settings live in the menu's top row (search, Alerts, theme, Settings and Free brief were already there; The Wire + Sources are added
@@ -83,4 +55,50 @@
   var h=a.getAttribute("href")||"";if(h.charAt(0)=="#"||a.pathname!=location.pathname||!a.hash||a.hash=="#bn-menu")return;
   if(window.bnMenuClose)try{bnMenuClose(true)}catch(_){}setTimeout(function(){window.scrollTo(0,0)},0)});
  if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",go);else go();
+})();
+/* Light-mode legibility (AA): the restyled pages inherit many older text colors that were tuned for dark. In light mode only, after
+   render, every visible text color below 4.5:1 (3:1 for large text) against its real background is corrected in place: neutral or
+   yellow text becomes ink or white (never brown), colored text is darkened toward black keeping its hue. Yellow fills/rules are snapped
+   to the one brand yellow (#FFC21A). Maps, SVG and media are skipped; switching to dark restores the original colors. */
+(function(){
+ var d=document,R=d.documentElement,done=[],Y="rgb(255, 194, 26)",slow=false;
+ function on(){return R.getAttribute("data-theme")=="light"&&(R.classList.contains("bna-pg")||R.classList.contains("bna-home"))}
+ function rgb(s){var m=/rgba?\(([^)]+)\)/.exec(s||"");if(!m)return null;var p=m[1].split(/[\s,\/]+/).filter(Boolean).map(Number);return[p[0],p[1],p[2],p.length>3?p[3]:1]}
+ function lum(c){var a=[0,1,2].map(function(i){var v=c[i]/255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*a[0]+.7152*a[1]+.0722*a[2]}
+ function ratio(a,b){var x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)}
+ function mix(f,b){var a=f[3];return[f[0]*a+b[0]*(1-a),f[1]*a+b[1]*(1-a),f[2]*a+b[2]*(1-a),1]}
+ function hsl(c){var r=c[0]/255,g=c[1]/255,b=c[2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,s=mx==mn?0:(l>.5?(mx-mn)/(2-mx-mn):(mx-mn)/(mx+mn)),h=0;
+  if(mx!=mn){h=mx==r?(g-b)/(mx-mn)+(g<b?6:0):mx==g?(b-r)/(mx-mn)+2:(r-g)/(mx-mn)+4;h*=60}return[h,s,l]}
+ function yellow(c){var h=hsl(c);return h[0]>=38&&h[0]<=54&&h[1]>.6&&h[2]>.38}
+ var bgc=new Map();
+ function bgOf(e){var st=[],x=e;while(x&&x.nodeType==1){if(bgc.has(x)){var b0=bgc.get(x);if(!b0)return null;for(var i=st.length-1;i>=0;i--)b0=mix(st[i],b0);return b0}
+   var cs=getComputedStyle(x);if(cs.backgroundImage&&cs.backgroundImage!="none"&&!/gradient/.test(cs.backgroundImage)){bgc.set(x,null);return null}
+   var c=rgb(cs.backgroundColor);if(c&&c[3]>0){st.push(c);if(c[3]>=1)break}x=x.parentElement}
+  var b=[255,255,255,1];for(var j=st.length-1;j>=0;j--)b=mix(st[j],b);bgc.set(e,b);return b}
+ function css(c){return"rgb("+c.slice(0,3).map(Math.round).join(",")+")"}
+ function setp(e,p,v){done.push([e,p,e.style.getPropertyValue(p),e.style.getPropertyPriority(p)]);e.style.setProperty(p,v,"important")}
+ var SKIP=".leaflet-container,svg,canvas,video,iframe,#bn-menu,.bna-ch,script,style,noscript";
+ function roots(){var out=[];if(!d.body)return out;for(var c=d.body.firstElementChild;c;c=c.nextElementSibling){if(/^(SCRIPT|STYLE|NOSCRIPT)$/.test(c.tagName))continue;
+   if(c.tagName=="MAIN"||c.id=="bna_home"){if(getComputedStyle(c).display=="none")continue}out.push(c)}return out}
+ var queue=[],qi=0,running=false;
+ function fix(){if(!on())return;bgc=new Map();queue=[];qi=0;roots().forEach(function(r){var l=r.getElementsByTagName("*");queue.push(r);for(var i=0;i<l.length;i++)queue.push(l[i])});if(!running){running=true;step()}}
+ function step(dl){var t0=Date.now();while(qi<queue.length&&(dl?dl.timeRemaining()>2:Date.now()-t0<12)){var e=queue[qi++];one(e)}
+  if(qi<queue.length){window.requestIdleCallback?requestIdleCallback(step,{timeout:500}):setTimeout(step,30)}else running=false}
+ function one(e){if(!e.isConnected||e.closest(SKIP))return;
+   var has=false;for(var n=e.firstChild;n;n=n.nextSibling)if(n.nodeType==3&&n.nodeValue.trim()){has=true;break}
+   var cs=null;
+   if(!has){cs=getComputedStyle(e);var bc=rgb(cs.backgroundColor);if(bc&&bc[3]>.5&&yellow(bc)&&cs.backgroundColor!=Y&&!e.dataset.bnaY){e.dataset.bnaY=1;setp(e,"background-color","#FFC21A")}return}
+   var r=e.getBoundingClientRect();if(r.width<1||r.height<1)return;
+   cs=cs||getComputedStyle(e);var bcol=rgb(cs.backgroundColor);if(bcol&&bcol[3]>.5&&yellow(bcol)&&cs.backgroundColor!=Y){setp(e,"background-color","#FFC21A");bgc.delete(e)}
+   var fg=rgb(cs.color),bg=bgOf(e);if(!fg||!bg)return;var f=mix(fg,bg),fs=parseFloat(cs.fontSize),need=(fs>=24||(+cs.fontWeight>=700&&fs>=18.66))?3:4.5;
+   if(ratio(f,bg)>=need)return;e.dataset.bnaC=1;var h=hsl(f),light=lum(bg)>.4,out;
+   if(h[1]<.25||yellow(f)||!light){out=ratio([29,29,31],bg)>=ratio([255,255,255],bg)?[29,29,31]:[255,255,255]}
+   else{out=f.slice();for(var k=0;k<20&&ratio(out,bg)<need;k++)out=out.map(function(v,ix){return ix<3?v*.88:v})}
+   setp(e,"color",css(out))}
+ function undo(){while(done.length){var x=done.pop();x[0].style.removeProperty(x[1]);if(x[2])x[0].style.setProperty(x[1],x[2],x[3]);delete x[0].dataset.bnaC;delete x[0].dataset.bnaY}}
+ var t=0;function soon(ms){if(t)return;t=setTimeout(function(){t=0;var go=function(){try{fix()}catch(e){}};window.requestIdleCallback?requestIdleCallback(go,{timeout:1500}):go()},ms||900)}
+ function start(){soon(400);addEventListener("hashchange",function(){soon(700)});addEventListener("load",function(){soon(300)});
+  try{new MutationObserver(function(){soon(running?4000:1500)}).observe(d.body,{childList:true,subtree:true,attributes:true,attributeFilter:["class","hidden","open"]})}catch(e){}
+  try{new MutationObserver(function(){if(on())soon(100);else undo()}).observe(R,{attributes:true,attributeFilter:["data-theme"]})}catch(e){}}
+ if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",start);else start();
 })();
