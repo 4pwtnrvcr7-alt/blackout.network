@@ -106,3 +106,30 @@
   try{new MutationObserver(function(){if(on())soon(100);else undo()}).observe(R,{attributes:true,attributeFilter:["data-theme"]})}catch(e){}}
  if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",start);else start();
 })();
+/* Phase 3b+: fold secondary content, Apple style. Per page (see ON): the first panel stays open; every later panel folds to its title
+   (tap the title to open; nothing is removed). Very long lists show their first part with a "Show all" button. Pages are switched on
+   group by group via ON. Nothing here runs when BN_APPLE=0 (this file is not served then). */
+(function(){
+ var d=document,ON=[/^(wire|streams|noise|heatmap|trends|broadcasts|radio)$/];
+ function key(){var p=location.pathname,h=location.hash.replace(/^#/,"");return p=="/"?(h||"home"):p}
+ function on(){var k=key();return d.documentElement.classList.contains("bna-pg")&&ON.some(function(r){return r.test(k)})}
+ function mainEl(){var ms=d.querySelectorAll("body>main");for(var i=0;i<ms.length;i++){var r=ms[i].getBoundingClientRect();if(r.height>0&&getComputedStyle(ms[i]).display!="none")return ms[i]}return null}
+ function setOpen(p,open){p.classList.toggle("bna-shut",!open);var h=p.querySelector(":scope>h2,:scope>h3");if(h)h.setAttribute("aria-expanded",open?"true":"false");
+  if(open)setTimeout(function(){try{window.dispatchEvent(new Event("resize"))}catch(e){}},30)}
+ function fold(m){var ps=[].filter.call(m.querySelectorAll(":scope>section.pn,:scope>div>section.pn,:scope>div.pn"),function(p){return p.querySelector(":scope>h2")&&p.getBoundingClientRect().height>0||p.classList.contains("bna-fold")});
+  if(ps.length<2)return;
+  ps.forEach(function(p,i){if(i==0||p.dataset.bnaF)return;p.dataset.bnaF="1";var h=p.querySelector(":scope>h2");p.classList.add("bna-fold");
+   h.setAttribute("role","button");h.setAttribute("tabindex","0");var c=d.createElement("span");c.className="bna-chev";c.setAttribute("aria-hidden","true");h.appendChild(c);
+   h.addEventListener("click",function(e){if(e.target.closest("a,button,input,select,label,summary")&&!e.target.closest(".bna-chev"))return;setOpen(p,p.classList.contains("bna-shut"))});
+   h.addEventListener("keydown",function(e){if(e.target!==h)return;if(e.key=="Enter"||e.key==" "){e.preventDefault();setOpen(p,p.classList.contains("bna-shut"))}});
+   setOpen(p,false)})}
+ function clamp(m){[].forEach.call(m.querySelectorAll("ol,ul,div"),function(l){if(l.dataset.bnaC||l.closest(".bna-clamp,.bna-shut,details:not([open])"))return;
+   if(l.children.length<15||l.getBoundingClientRect().height<1800)return;var r=l.getBoundingClientRect();if(r.width<240)return;
+   l.dataset.bnaC="1";l.classList.add("bna-clamp");var b=d.createElement("button");b.type="button";b.className="bna-more";b.textContent="Show all";b.setAttribute("aria-expanded","false");
+   b.addEventListener("click",function(){var o=l.classList.toggle("bna-open");b.textContent=o?"Show less":"Show all";b.setAttribute("aria-expanded",o?"true":"false");if(!o)l.scrollIntoView({block:"start"})});
+   l.parentNode.insertBefore(b,l.nextSibling)})}
+ var t=0;function scan(){t=0;last=Date.now();if(!on())return;var m=mainEl();if(!m)return;try{fold(m);clamp(m)}catch(e){}}
+ var last=0,T0=Date.now();function soon(){if(t||Date.now()-T0>45000)return;t=setTimeout(scan,Math.max(400,1500-(Date.now()-last)))}
+ function go(){scan();addEventListener("hashchange",function(){setTimeout(scan,300)});new MutationObserver(soon).observe(d.body,{childList:true,subtree:true});setTimeout(scan,2500);setTimeout(scan,6000)}
+ if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",go);else go();
+})();

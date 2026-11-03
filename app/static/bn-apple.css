@@ -342,3 +342,16 @@ html[data-theme="light"] .fin-card .fin-nm b{color:#1D1D1F!important}html[data-t
 /* Promo buttons in dark mode: ink text leaked onto dark/yellow buttons */
 html:not([data-theme="light"]) .bng-btn,html:not([data-theme="light"]) .bng-btn span{color:#E6E9EE!important}
 html:not([data-theme="light"]) .bng-btn.bng-p,html:not([data-theme="light"]) .bng-btn.bng-p span{color:#1D1D1F!important}
+/* ---------- Phase 3b+: folded panels and long lists (Apple-style accordions and "Show all") ---------- */
+html.bna-pg .bna-fold>h2{cursor:pointer;display:flex!important;align-items:center;gap:12px;min-height:44px;margin:0!important;-webkit-user-select:none;user-select:none}
+html.bna-pg .bna-fold>h2:focus-visible{outline:2px solid var(--a-lk);outline-offset:4px;border-radius:8px}
+html.bna-pg .bna-fold>h2 .bna-chev{margin-left:auto;flex:none;width:28px;height:28px;border-radius:50%;background:var(--a-bg);position:relative}
+html.bna-pg .bna-fold>h2 .bna-chev::before{content:"";position:absolute;left:10px;top:8px;width:7px;height:7px;border-right:2px solid var(--a-ink2);border-bottom:2px solid var(--a-ink2);transform:rotate(45deg);transition:transform .2s var(--a-ease)}
+html.bna-pg .bna-fold:not(.bna-shut)>h2 .bna-chev::before{transform:translate(0,4px) rotate(-135deg)}
+html.bna-pg .bna-fold>h2{margin-bottom:0!important}
+html.bna-pg .bna-fold:not(.bna-shut)>h2{margin-bottom:16px!important}
+html.bna-pg .bna-fold.bna-shut>*:not(h2){display:none!important}
+html.bna-pg .bna-fold.bna-shut{padding-top:18px!important;padding-bottom:18px!important}
+html.bna-pg .bna-clamp:not(.bna-open){max-height:1400px!important;overflow:hidden!important;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)}
+html.bna-pg .bna-more{display:flex;margin:16px auto 4px;min-height:44px;padding:0 22px;align-items:center;border-radius:999px;border:1px solid var(--a-ln)!important;background:var(--a-sf)!important;color:var(--a-ink)!important;font:500 15px/1 Inter,system-ui,sans-serif;cursor:pointer}
+html.bna-pg .bna-more:hover{background:var(--a-sf2)!important}
