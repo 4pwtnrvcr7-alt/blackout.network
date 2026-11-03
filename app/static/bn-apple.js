@@ -38,7 +38,7 @@
    out.push({title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,q:isQuake(x),more:0})});return out}
  function card(x){var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"";
   return '<a class="bna-card bna-it'+(hi?" hi":"")+'" href="/#wire"><div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
-   '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+' source families'+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'}
+   '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'}
  function set(k,v){var e=H.querySelector('[data-bna="'+k+'"]');if(e)e.innerHTML=v}
  var row=document.getElementById("bna_row_latest"),arws=H.querySelectorAll(".bna-arw");
  function arrows(){if(!row)return;var m=row.scrollWidth-row.clientWidth;arws.forEach(function(b){b.disabled=b.dataset.dir<0?row.scrollLeft<=2:row.scrollLeft>=m-2})}
