@@ -154,6 +154,7 @@ def _bg_loop():
             except Exception: pass
         time.sleep(100)
 def _ensure_bg():
+    return   # background refresher disabled: on Render it never refreshed (snapshot froze); the API's own 60/90 s caches refresh on demand
     if _bg["on"]: return
     with _lock:
         if _bg["on"]: return
@@ -208,7 +209,5 @@ def handle_get(path, qs):
     if path == "/bn-apple.css": return _static("bn-apple.css", "text/css")
     if path == "/bn-apple.js": return _static("bn-apple.js", "application/javascript")
     if path in ("/api/apple/home", "/api/apple/dash"):
-        _ensure_bg(); v = (_cache if path.endswith("home") else _dcache)["v"]
-        if not v: v = home_data() if path.endswith("home") else dash_data()   # cold start fallback: compute once on request (as before)
-        return 200, v
+        return 200, home_data() if path.endswith("home") else dash_data()   # cached 60 s / 90 s; "/" embeds the last result
     return 404, {"error": "not found"}
