@@ -367,12 +367,23 @@ def _ensure_bg():
         if _bg["on"]: return
         _bg["on"] = True
     threading.Thread(target=_bg_loop, daemon=True, name="bna-snapshot").start()
-def _snap_js():
-    # Cold start (first "/" after a deploy): build the snapshot once, single-flight, so the first visitor never gets an empty page.
-    for c, f in ((_cache, home_data), (_dcache, dash_data)):
-        if not c["v"]:
+_cold = {"t": None}
+def _cold_kick():
+    """One-shot cold build (at most one thread ever running); the page never waits on it for more than 2 s."""
+    t = _cold["t"]
+    if t is not None and t.is_alive(): return t
+    def run():
+        for f in (home_data, dash_data):
             try: f()
             except Exception: pass
+    t = threading.Thread(target=run, name="bna-snap-cold", daemon=True); _cold["t"] = t; t.start()
+    return t
+def _snap_js():
+    # Cold start (first "/" after a deploy): kick the single-flight build and wait at most 2 s; if it is not ready the page
+    # ships without a snapshot and bn-apple-home.js fills it from /api/apple/home (never blocks on data).
+    if not _cache["v"] or not _dcache["v"]:
+        try: _cold_kick().join(2.0)
+        except Exception: pass
     try: js = open(os.path.join(BASE, "static", "bn-apple-home.js"), encoding="utf-8").read()
     except Exception: return ""
     dump = lambda v: json.dumps(v, separators=(",", ":"), default=str).replace("</", "<\\/") if v else "null"
