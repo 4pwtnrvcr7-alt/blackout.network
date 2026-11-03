@@ -99,7 +99,7 @@ function init(){
  // sidebar / bar links switch tabs in place
  function btn(k){return nav.querySelector('button[data-tab="'+k+'"]')}
  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[data-tab],.bn-primary a[data-tab]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
-  var k=a.dataset.tab;if(k.charAt(0)==="@")return;var b=btn(k);if(!b)return;e.preventDefault();if(!b.classList.contains("on"))b.click();
+  var k=a.dataset.tab;if(k.charAt(0)==="@")return;var b=btn(k);if(!b)return;e.preventDefault();if(a.hash&&a.hash!==location.hash)try{history.pushState(null,"",a.hash)}catch(_){}if(!b.classList.contains("on"))b.click();
   if(window.bnMenuClose)bnMenuClose(true);window.scrollTo(0,0);var h=document.getElementById("bn_ptitle");if(h){h.setAttribute("tabindex","-1");try{h.focus({preventScroll:true})}catch(_){}}});
  // ---- one tab order (kept for add-ons that read the strip); tabs not listed in sitenav.py go at the end of the first group
  function el(t){if(t.key==="@scoring")return document.getElementById("tab_howscore");

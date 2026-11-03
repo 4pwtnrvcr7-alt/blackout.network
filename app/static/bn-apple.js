@@ -25,7 +25,8 @@
  var H=document.getElementById("bna_home"),R=document.documentElement;if(!H)return;
  function onHome(){var h=location.hash;return !h||h=="#"||h=="#home"}
  function sync(){R.classList.toggle("bna-home",onHome())}
- addEventListener("hashchange",sync);sync();
+ addEventListener("hashchange",sync);addEventListener("popstate",sync);sync();
+ ["pushState","replaceState"].forEach(function(m){var o=history[m];if(!o)return;history[m]=function(){var r=o.apply(this,arguments);try{sync()}catch(e){}return r}});   // menu tab links change the hash via history (no hashchange event): keep the homepage/tab view in sync
  var CAT={"natural disaster":"Natural hazard","war/conflict":"Conflict","disease":"Health","political":"Politics","financial":"Markets","cyber":"Cyber","space weather":"Space weather"};
  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
  function et(z){if(!z)return"";var d=new Date(z);if(isNaN(d))return"";return d.toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET"}
@@ -77,5 +78,9 @@
   box.innerHTML='<span class="bna-mdot" aria-hidden="true"></span><span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
  function load(){fetch("/api/netstatus/alerts",{cache:"no-store"}).then(function(r){return r.json()}).then(alerts).catch(function(){})}
  function go(){tools();load();setInterval(load,300000)}
+ // same-page hash links in the menu (The Wire, network alert, other /#tab links without a data-tab handler): close the menu and go to the top
+ d.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[href]");if(!a||e.defaultPrevented||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
+  var h=a.getAttribute("href")||"";if(h.charAt(0)=="#"||a.pathname!=location.pathname||!a.hash||a.hash=="#bn-menu")return;
+  if(window.bnMenuClose)try{bnMenuClose(true)}catch(_){}setTimeout(function(){window.scrollTo(0,0)},0)});
  if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",go);else go();
 })();
