@@ -338,6 +338,7 @@ def _send(h, code, body, ctype="application/json", robots=False):
             import sys   # the already-loaded server module (render_app imports it; on the box it is __main__); never a fresh import
             srv = next((m for m in (sys.modules.get("server"), sys.modules.get("__main__")) if m is not None and hasattr(m, "ga_head")), None)
             if srv: b = srv.ga_head(b, ga=False)
+            if srv and hasattr(srv, "apple_assets"): b = srv.apple_assets(b)   # apple_style_v1 on /report-status (BN_APPLE=0 = off)
         except Exception: pass
     h.send_response(code); h.send_header("Content-Type", ctype + "; charset=utf-8"); h.send_header("Cache-Control", "no-store")
     h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "same-origin")

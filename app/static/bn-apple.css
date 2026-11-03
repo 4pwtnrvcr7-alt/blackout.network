@@ -183,3 +183,5 @@ html.bna-pg body>main.wrap,html.bna-pg body>.sc-wrap,html.bna-pg body>.nl-wrap,h
 html.bna-pg body:not(:has(.bn-top))>main#main>h1{margin-top:clamp(56px,8vw,120px)!important}
 /* light mode: amber warning notes (e.g. Local Resources) were dark-brown boxes with amber text (~2:1); make them a light amber note */
 html.bna-pg[data-theme="light"] .pn .warn{background:#FFF4E0!important;color:#6B3E00!important;border-color:#F0D9B0!important}
+/* /stats on phones: the one-word BLACKOUT.NETWORK title was cut off at 390px */
+@media (max-width:600px){html.bna-pg .st-hero h1{font-size:clamp(22px,7vw,28px)!important;overflow-wrap:anywhere}}

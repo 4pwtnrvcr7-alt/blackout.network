@@ -456,6 +456,16 @@ def version_assets(b):
             if j > 0: b = b[:j] + b'<script src="/bn-apple.js" defer></script>' + b[j:]
         return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
     except Exception: return b
+def apple_assets(b):   # apple_style_v1 for full pages that skip version_assets (/midterms, /stats: "text/html; charset=utf-8"; /report-status via reports._send). BN_APPLE=0 = off (unchanged bytes)
+    try:
+        lo = b[:6000].lower()
+        if os.environ.get("BN_APPLE", "1") != "0" and b"<html" in lo and b"/bn-apple.css" not in b:
+            k = b.find(b"</head>")
+            if k > 0: b = b[:k] + _addon_mod("apple_v1").head_tag() + b[k:]
+            j = b.rfind(b"</body>")
+            if j > 0: b = b[:j] + b'<script src="/bn-apple.js" defer></script>' + b[j:]
+        return b
+    except Exception: return b
 BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;window.__bnRetry=1;var o=location.origin;'
   b'addEventListener("error",function(e){var t=e.target;if(!t||t===window||!t.tagName)return;var tag=t.tagName,u=tag=="SCRIPT"?t.src:tag=="LINK"&&t.rel=="stylesheet"?t.href:"";'
   b'if(!u||u.indexOf(o)!==0)return;var n=+(t.getAttribute("data-bn-retry")||0);if(n>=2)return;setTimeout(function(){var c=document.createElement(tag);'
@@ -504,6 +514,7 @@ class H(BaseHTTPRequestHandler):
             try: b = display_links.rewrite_json(b.decode("utf-8")).encode("utf-8")
             except Exception: pass
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
+        if ctype.startswith("text/html; "): b = apple_assets(b)   # apple_style_v1 on /midterms and /stats
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
         if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
