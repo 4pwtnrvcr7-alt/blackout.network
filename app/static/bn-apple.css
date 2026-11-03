@@ -181,3 +181,5 @@ html.bna-pg .sc-card>h2,html.bna-pg .nl-card>h2,html.bna-pg main.wrap>section>h2
 html.bna-pg body>main.wrap,html.bna-pg body>.sc-wrap,html.bna-pg body>.nl-wrap,html.bna-pg body>main.st,html.bna-pg body>main.rs-main,html.bna-pg body>div.wrap,html.bna-pg body>main#main{max-width:calc(var(--a-max) + 2*var(--a-gut))!important;margin-left:auto!important;margin-right:auto!important;padding-left:var(--a-gut)!important;padding-right:var(--a-gut)!important;box-sizing:border-box}
 /* 404: same type as other pages, generous space */
 html.bna-pg body:not(:has(.bn-top))>main#main>h1{margin-top:clamp(56px,8vw,120px)!important}
+/* light mode: amber warning notes (e.g. Local Resources) were dark-brown boxes with amber text (~2:1); make them a light amber note */
+html.bna-pg[data-theme="light"] .pn .warn{background:#FFF4E0!important;color:#6B3E00!important;border-color:#F0D9B0!important}
