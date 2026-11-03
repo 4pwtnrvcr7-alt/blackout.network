@@ -79,6 +79,7 @@
   var b=[255,255,255,1];for(var j=st.length-1;j>=0;j--)b=mix(st[j],b);bgc.set(e,b);return b}
  function css(c){return"rgb("+c.slice(0,3).map(Math.round).join(",")+")"}
  function setp(e,p,v){done.push([e,p,e.style.getPropertyValue(p),e.style.getPropertyPriority(p)]);e.style.setProperty(p,v,"important")}
+ var DARKOK="[class*=bng],.bna-card,header,.bn-top,#bn-menu,.bn-drawer,.bng,.bng-bar,[class*=toast],[role=tooltip],[role=dialog],video,iframe,canvas,pre,code,.bna-ch,.leaflet-container,.maplibregl-map,.hm-map,[class*=player],[class*=modal]";
  var SKIP=".leaflet-container,svg,canvas,video,iframe,#bn-menu,.bna-ch,script,style,noscript";
  function roots(){var out=[];if(!d.body)return out;for(var c=d.body.firstElementChild;c;c=c.nextElementSibling){if(/^(SCRIPT|STYLE|NOSCRIPT)$/.test(c.tagName))continue;
    if(c.tagName=="MAIN"||c.id=="bna_home"){if(getComputedStyle(c).display=="none")continue}out.push(c)}return out}
@@ -89,6 +90,7 @@
  function one(e){if(!e.isConnected||e.closest(SKIP))return;
    var has=false;for(var n=e.firstChild;n;n=n.nextSibling)if(n.nodeType==3&&n.nodeValue.trim()){has=true;break}
    var cs=null;
+   if(e.nodeType==1&&!e.dataset.bnaD){var c0=getComputedStyle(e),b0=rgb(c0.backgroundColor);var f0=rgb(c0.color);if(b0&&b0[3]>.8&&lum(b0)<.03&&f0&&ratio(f0,b0)<4.5&&c0.backgroundImage=="none"&&!e.closest(DARKOK)&&!e.querySelector("img,picture,video,canvas")){var r0=e.getBoundingClientRect();if(r0.width>=120&&r0.height>=36){e.dataset.bnaD=1;setp(e,"background-color","#FFFFFF");bgc=new Map()}}}
    if(!has){cs=getComputedStyle(e);var bc=rgb(cs.backgroundColor);if(bc&&bc[3]>.5&&yb(bc)&&cs.backgroundColor!=Y&&!e.dataset.bnaY){e.dataset.bnaY=1;setp(e,"background-color","#FFC21A");if(e.children.length)setp(e,"color","#1D1D1F")}return}
    var r=e.getBoundingClientRect();if(r.width<1||r.height<1)return;
    cs=cs||getComputedStyle(e);var bcol=rgb(cs.backgroundColor);if(bcol&&bcol[3]>.5&&yb(bcol)&&cs.backgroundColor!=Y){setp(e,"background-color","#FFC21A");bgc.delete(e)}
@@ -97,7 +99,7 @@
    if(h[1]<.25||yb(f)||!light){out=ratio([29,29,31],bg)>=ratio([255,255,255],bg)?[29,29,31]:[255,255,255]}
    else{out=f.slice();for(var k=0;k<20&&ratio(out,bg)<need;k++)out=out.map(function(v,ix){return ix<3?v*.88:v})}
    setp(e,"color",css(out))}
- function undo(){while(done.length){var x=done.pop();x[0].style.removeProperty(x[1]);if(x[2])x[0].style.setProperty(x[1],x[2],x[3]);delete x[0].dataset.bnaC;delete x[0].dataset.bnaY}}
+ function undo(){while(done.length){var x=done.pop();x[0].style.removeProperty(x[1]);if(x[2])x[0].style.setProperty(x[1],x[2],x[3]);delete x[0].dataset.bnaC;delete x[0].dataset.bnaY;delete x[0].dataset.bnaD}}
  var t=0;function soon(ms){if(t)return;t=setTimeout(function(){t=0;var go=function(){try{fix()}catch(e){}};window.requestIdleCallback?requestIdleCallback(go,{timeout:1500}):go()},ms||900)}
  function start(){soon(400);addEventListener("hashchange",function(){soon(700)});addEventListener("load",function(){soon(300)});
   try{new MutationObserver(function(){soon(running?4000:1500)}).observe(d.body,{childList:true,subtree:true,attributes:true,attributeFilter:["class","hidden","open"]})}catch(e){}

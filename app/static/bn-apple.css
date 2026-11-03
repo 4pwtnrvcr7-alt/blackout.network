@@ -329,3 +329,16 @@ html[data-theme="light"] .bna-map .ring{stroke:var(--gl)}html[data-theme="light"
 @media (prefers-reduced-motion:reduce){.bna-map .ring{opacity:.4}}
 @media (min-width:1100px){.bna-grp[data-g="cf"] .bna-mgrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}.bna-grp[data-g="hl"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .bna-grp[data-g="el"] .bna-mv{font-size:clamp(20px,2vw,26px)}
+/* Market stress cards (t105u): hardcoded dark surface (#0f1318) leaked into light mode */
+html[data-theme="light"] #tab-finance .fin-stress,html[data-theme="light"] #tab-finance .fin-grp{background:#F5F5F7!important;border-color:rgba(0,0,0,.08)!important}
+html[data-theme="light"] .fin-st{background:#fff!important;border-color:rgba(0,0,0,.1)!important;color:#1D1D1F!important}
+html[data-theme="light"] .fin-st .fin-st-h,html[data-theme="light"] .fin-st .fin-st-h b{color:#1D1D1F!important}
+html[data-theme="light"] .fin-st .meta{color:#3A3A3C!important}
+html[data-theme="light"] .fin-st .fin-rule{color:#515154!important}
+html[data-theme="light"] .fin-st .fin-cite{color:#1D1D1F!important;text-decoration:underline;text-decoration-color:#FFC21A;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-theme="light"] .fin-st.fin-ok{border-left-color:#248A3D!important}html[data-theme="light"] .fin-st.fin-warn{border-left-color:#FFC21A!important}html[data-theme="light"] .fin-st.fin-bad{border-left-color:#D70015!important}
+html[data-theme="light"] .fin-card{background:#fff!important;border-color:rgba(0,0,0,.1)!important;color:#1D1D1F!important}
+html[data-theme="light"] .fin-card .fin-nm b{color:#1D1D1F!important}html[data-theme="light"] .fin-card .fin-sym{color:#515154!important}
+/* Promo buttons in dark mode: ink text leaked onto dark/yellow buttons */
+html:not([data-theme="light"]) .bng-btn,html:not([data-theme="light"]) .bng-btn span{color:#E6E9EE!important}
+html:not([data-theme="light"]) .bng-btn.bng-p,html:not([data-theme="light"]) .bng-btn.bng-p span{color:#1D1D1F!important}
