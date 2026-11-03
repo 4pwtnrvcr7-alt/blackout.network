@@ -370,3 +370,6 @@ html[data-theme="light"] .bna-gh p{color:#6E6E73}
 .bna-grp .bna-ms{color:var(--a-mu)}
 html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
 .bna-grp{margin-bottom:56px}
+@media (min-width:1100px){.bna-grp[data-g="cf"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bna-hl{margin:0 0 12px;padding-left:18px}.bna-hl li{margin:0 0 8px;line-height:1.4}.bna-hl small{color:var(--a-mu)}
+@media (min-width:1100px){.bna-grp[data-g="el"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}

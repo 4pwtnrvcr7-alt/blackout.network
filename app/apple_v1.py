@@ -198,6 +198,60 @@ def wire_groups(now):
             "food": dict(agg(lambda t, cat, loc: bool(fd.search(t))), label="Food and supply chain")}
     return {"conf": conf, "health": health, "hard": hard}
 
+# t106u: Nuclear threat (War group) and Election disputes (Elections group). Real Wire items only: confirmed stories plus single-source
+# watchlist items (marked as such), last 7 days, titles matched by keyword. Headlines shown are cleaned (no emoji, livestream or profane posts).
+_NUK = r"\b(nuclear (strike|strikes|attack|weapons?|war|threats?|test|tests|testing|warheads?|arsenal|plant|power plant|deterrent|doctrine|submarines?|missiles?|escalation|talks|program|programme|facility|facilities|sites?|deal|bomb|capable|forces|drills?|exercise|alert|advisory|warning)|nukes?\b|warheads?|icbms?\b|intercontinental ballistic|tactical nuclear|zaporizhzhia nuclear|znpp|chornobyl|chernobyl|doomsday clock|iaea|uranium enrichment|enriched uranium|enrich uranium|plutonium|dirty bomb|radiation leak|radioactive|new start|sarmat|burevestnik|oreshnik)"
+_ELC = r"\b(election|elections|ballot|ballots|vote|votes|voting|voter|voters|polls\b|polling|precincts?|recount|certification|canvass\w*|electoral|midterms?)\b"
+_DSP = (r"\b(lawsuits?|sue[sd]?|suing|court|judge|ruling|injunction|recount|certif\w*|challeng\w*|disput\w*|contested|fraud|intimidat\w*|suppress\w*|purg\w*|"
+        r"irregularit\w*|delay(ed|s)?|extended|extends?|long lines|glitch\w*|malfunction\w*|observers?|poll watchers?|monitors?|doj|justice department|bomb threats?|"
+        r"disinformation|misinformation|provisional|rejected|turned away|voter id|voter rolls?|redistrict\w*|gerrymander\w*|federal agents|ice agents|national guard|sanctions|evacuat\w*)\b"
+        r"|\b(rnc|dnc|democrats?|republicans?|gop|democratic party|republican party)\b.{0,40}\b(sues?|sued|files?|filed|lawsuit|challeng\w*|asks?|seeks?|demands?|deploys?|sends?|monitor\w*|court|requests?|urges?)\b")
+_FOREIGN = r"\b(india|delhi|pakistan|bangladesh|britain|british|u\.k\.|canada|canadian|brazil|mexico|nigeria|kenya|uganda|tanzania|cameroon|venezuela|argentina|philippines|japan|korea|taiwan|germany|france|italy|spain|poland|hungary|romania|moldova|serbia|turkey|israel|iran|iraq|russia|ukraine|belarus|nato)\b"
+_BAD = r"(\bf\W?u?c?k|\bf\*ck|\bshit|\bdamn|\[live\]|\blive:|\bwatch:|blueanon|\bmaga\b|^\W*(rt|breaking)\b)"
+def _clean_hl(t):
+    import re
+    t = re.sub(r"\s+", " ", t or "").strip()
+    if re.search(_BAD, t, re.I): return None
+    t = re.sub(r"^[^A-Za-z0-9\"'(]+", "", t)
+    if len(t) < 25 or re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", t) or re.match(r"^(www\.|https?:|#|@)", t): return None
+    if sum(ch.isupper() for ch in t) > 0.5 * sum(ch.isalpha() for ch in t): return None
+    try:
+        import site_page as SP; t = SP.clean_title(t)
+    except Exception: pass
+    return t[:160]
+def special_cards(now):
+    import re, sqlite3
+    c = sqlite3.connect(f"file:{BASE}/blackout.db?mode=ro", uri=True, timeout=5)
+    try:
+        cut = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 7 * 86400))
+        rows = c.execute("SELECT cluster_id, title, category, rank, first_seen, updated, watchlist FROM clusters WHERE watchlist IN (0,1,2) AND updated>=? "
+                         "ORDER BY updated DESC LIMIT 5000", (cut,)).fetchall()
+    finally: c.close()
+    day = lambda ts: time.strftime("%Y-%m-%d", time.gmtime(ts - 5 * 3600))
+    days = [day(now - i * 86400) for i in range(6, -1, -1)]
+    nk, ec, dp = re.compile(_NUK, re.I), re.compile(_ELC, re.I), re.compile(_DSP, re.I)
+    def agg(match):
+        d = {x: [0, 0] for x in days}; n24 = 0; mx = 0; conf24 = 0; latest = []; seen = set()
+        for cid, t, cat, rk, fs, up, wl in rows:
+            t = t or ""
+            if cat == "ufo/uap" or not match(t, wl): continue
+            ft = _iso(fs) or 0; ut = _iso(up) or 0; rk = int(rk or 0)
+            k = day(ft) if ft else None
+            if k in d: d[k][1 if rk >= 7 else 0] += 1
+            if ut >= now - 86400:
+                n24 += 1; mx = max(mx, rk); conf24 += (wl == 0)
+            if len(latest) < 3:
+                h = _clean_hl(t)
+                if h and h.lower()[:60] not in seen:
+                    seen.add(h.lower()[:60])
+                    latest.append({"title": h, "t": ut, "rank": rk, "single": wl != 0,
+                                   "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire"})
+        return {"n24": n24, "conf24": conf24, "n7": sum(a + b for a, b in d.values()), "max24": mx, "days": [[k] + d[k] for k in days], "latest": latest}
+    fr = re.compile(_FOREIGN, re.I)
+    # Nuclear: confirmed + single-source items. Disputes: also rank 0-1 items the feed suppresses (local polling-place reports are often rank 1).
+    return {"nuke": agg(lambda t, wl: wl in (0, 1) and bool(nk.search(t))),
+            "disp": agg(lambda t, wl: bool(ec.search(t)) and bool(dp.search(t)) and not fr.search(t))}
+
 def comms_card():
     import sqlite3
     srv = sys.modules.get("server"); ns = srv._addon_mod("netstatus")
@@ -244,8 +298,8 @@ def quake_map(big):
     _A0.update(key=key, map=m)
     return m
 
-BOARD = [("el", "Elections", "Midterms 2026, live on election night", [("el_next", "Polls closing", "/midterms"), ("el_sen", "Senate: closest races", "/midterms"), ("el_gov", "Governor: closest races", "/midterms"), ("el_house", "House: closest races", "/midterms")]),
-         ("cf", "War and conflict", "Stories on The Wire by region", [("c_il", "Israel, Gaza and region", "/#wire"), ("c_ir", "Iran", "/#wire"), ("c_ru", "Russia and Ukraine", "/#wire"), ("c_uk", "UK and London", "/#wire"), ("c_other", "Other conflict zones", "/#heatmap")]),
+BOARD = [("el", "Elections", "Midterms 2026, live on election night", [("el_next", "Polls closing", "/midterms"), ("el_sen", "Senate: closest races", "/midterms"), ("el_gov", "Governor: closest races", "/midterms"), ("el_house", "House: closest races", "/midterms"), ("el_disp", "Election disputes", "/#wire")]),
+         ("cf", "War and conflict", "Stories on The Wire by region", [("c_nuke", "Nuclear threat", "/#wire"), ("c_il", "Israel, Gaza and region", "/#wire"), ("c_ir", "Iran", "/#wire"), ("c_ru", "Russia and Ukraine", "/#wire"), ("c_uk", "UK and London", "/#wire"), ("c_other", "Other conflict zones", "/#heatmap")]),
          ("hl", "Health and outbreaks", "Outbreak reports on The Wire", [("h_ebola", "Ebola", "/#medical"), ("h_measles", "Measles", "/#medical"), ("h_other", "Other outbreaks", "/#medical")]),
          ("hd", "Hardship risks", "Power, communications, supply and order at home", [("grid", "U.S. power grid", "/#grid"), ("comms", "Phones, internet and cloud", "/#network"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Unrest in the U.S.", "/#wire")]),
          ("nh", "Natural hazards", "Earthquakes, space weather and severe weather", [("quake", "Earthquakes", "/#solar"), ("kp", "Geomagnetic storms", "/#solar"), ("wx", "Weather threats to power", "/#grid"), ("flare", "Solar flares", "/#solar")])]
@@ -349,6 +403,7 @@ def _dash_build():
     out["el"] = _r(None, lambda: elections_card(now))
     out.update(_r(None, lambda: wire_groups(now)) or {})
     out["comms"] = _r(None, comms_card)
+    out["spec"] = _r(None, lambda: special_cards(now))
     if out.get("quake") and (out["quake"].get("sig") or {}).get("lat") is not None: out["quake"]["map"] = _r(None, lambda: quake_map(out["quake"]["sig"]))
     return out
 
