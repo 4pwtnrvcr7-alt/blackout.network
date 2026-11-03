@@ -77,7 +77,7 @@ def home_html(sn):
 <div class="bna-arrows"><button type="button" class="bna-arw" data-dir="-1" aria-label="Scroll back" aria-controls="bna_row_latest">&lsaquo;</button><button type="button" class="bna-arw" data-dir="1" aria-label="Scroll forward" aria-controls="bna_row_latest">&rsaquo;</button></div></div>
 <div class="bna-row" id="bna_row_latest" tabindex="0" aria-label="Top of the Wire"><p class="bna-empty">Loading the Wire&hellip;</p></div>
 <p class="bna-wrap bna-more"><a class="bna-lnk" href="/#wire">Open The Wire</a></p></section>
-<section class="bna-sec" aria-labelledby="bna_h_now"><div class="bna-wrap bna-sech"><h2 id="bna_h_now">Threats right now. <span>Live readouts.</span></h2></div>
+<section class="bna-sec" aria-labelledby="bna_h_now"><div class="bna-wrap bna-sech"><h2 id="bna_h_now">Active Threat Monitoring</h2></div>
 <div class="bna-wrap bna-grid3" id="bna_now">
 <a class="bna-card bna-rd" href="/#solar"><p class="bna-k">Kp index</p><p class="bna-big" data-bna="kp">&ndash;</p><p class="bna-d" data-bna="kpd"></p><p class="bna-src" data-bna="kps"></p></a>
 <a class="bna-card bna-rd" href="/#solar"><p class="bna-k">Latest notable quake</p><p class="bna-big" data-bna="qm">&ndash;</p><p class="bna-d" data-bna="qp"></p><p class="bna-src" data-bna="qs"></p></a>

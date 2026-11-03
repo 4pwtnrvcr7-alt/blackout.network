@@ -146,7 +146,7 @@ function selItems(){const s=H.sel,L_=H.vis||[];if(!s)return[];if(s.type=="cc")re
 function sortA(L_){return L_.slice().sort((a,b)=>(b.rank-a.rank)||(Date.parse(b.t)-Date.parse(a.t)))}
 function accItem(x,opt){opt=opt||{};const id=(opt.pre||"")+x.id,open=(opt.set||H.open).has(id);
  const lk=(x.links||[]).map(l=>`<a href="${U(l.u)}" target=_blank rel="noopener noreferrer">${e_(l.s||"source")} ↗</a>`).join("")+(x.nlinks>5?`<span class=meta>+${x.nlinks-5} more on The Wire</span>`:"");
- const kv=[["Category",x.cat],["Rank / score",`${x.rank}/10 · ${x.score}/100`],["Confidence",`${x.conf||"—"} · ${x.n||1} report${x.n==1?"":"s"} from ${x.fam||1} source famil${x.fam==1?"y":"ies"}`],["Time",etF(x.t)+" ("+ago(x.t)+")"]];
+ const kv=[["Category",x.cat],["Rank / score",`${x.rank}/10 · ${x.score}/100`],["Confidence",`${x.conf||"—"} · ${x.n||1} report${x.n==1?"":"s"} from ${x.fam||1} source${x.fam==1?"":"s"}`],["Time",etF(x.t)+" ("+ago(x.t)+")"]];
  if(x.lat!=null)kv.push(["Place",x.place||"—"],["Precision",PREC[x.prec]||x.prec],["Located by",`${(H.d.labels.method||{})[x.m]||x.m}${x.md?" — "+x.md:""}`],["Geo confidence",x.gc||"—"],["Coordinates",`${(+x.lat).toFixed(3)}, ${(+x.lon).toFixed(3)}`]);
  if(x.ev)kv.push(["Evidence",x.ev]);
  if(x.reason)kv.push(["Why unlocated",x.reason]);if(x.cands&&x.cands.length)kv.push(["Candidates",x.cands.join(" · ")]);

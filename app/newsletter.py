@@ -556,7 +556,7 @@ def item_of(r, section, official=0, editorial=False):
     if editorial:
         conf = "UNCONFIRMED: single source, included under the editorial exception for a potential national- or civilizational-scale event"
     elif eff >= 2:
-        conf = f"Confirmed by {eff} independent source families ({', '.join(fams[:5])}{', …' if len(fams) > 5 else ''})" if fams else f"Confirmed by {eff} independent sources"
+        conf = f"Confirmed by {eff} independent source{'' if eff == 1 else 's'}"
     else:
         conf = f"Single {'official ' if official else ''}source ({', '.join(fams[:2]) or 'one outlet'})" + ("" if official else ", not independently confirmed")
     return {"cluster_id": r["cluster_id"], "section": section, "title": clean_title(r["title"]), "what": clean_title(_what(r)),
@@ -1241,7 +1241,7 @@ def trend_check(t, S=None):
     for i in sorted(ids):
         if i not in rows: return False, i, "story not found in blackout.db"
         if rows[i]["watchlist"]: return False, i, "story is on the watchlist"
-        if int(rows[i]["eff_families"] or 0) < 2: return False, i, f"story is unconfirmed ({int(rows[i]['eff_families'] or 0)} independent source families)"
+        if int(rows[i]["eff_families"] or 0) < 2: return False, i, f"story is unconfirmed ({int(rows[i]['eff_families'] or 0)} independent sources)"
     return True, None, ""
 
 def breaking_candidates(at=None, c=None, S=None):

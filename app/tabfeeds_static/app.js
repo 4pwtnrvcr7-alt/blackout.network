@@ -42,7 +42,7 @@ function badge(x){if(x.rank==null)return `<span class="tfx-rk un" title="Not sco
 function status(x){if(x.origin=="feed"&&x.rank==null)return x.official?`<span class="tfx-off" title="Official agency feed; not scored by the scanner">official feed</span>`:`<span class="unc">unconfirmed · single source</span>`;
  return x.list=="wire"?"":x.list=="watchlist"?`<span class="wl">Watchlist</span><span class="unc">unconfirmed</span>`:`<span class="unc" title="Low-signal item the scanner stores but keeps off The Wire and the Watchlist">off the Wire · unconfirmed</span>`}
 function row(k,x){const kinds=(ST[k].d||{}).kinds||{};const t=x.score!=null?LV(x.score):"l";
- const fam=x.n_families&&x.origin=="scanner"?` · ${x.n_items} report(s) from ${x.n_families} source famil${x.n_families==1?"y":"ies"}`:"";
+ const fam=x.n_families&&x.origin=="scanner"?` · ${x.n_families} source${x.n_families==1?"":"s"}`:"";
  const ev=x.event_time&&x.event_time!=x.first_seen?` · event ${E(ET(x.event_time))}`:"";
  const links=(x.links||[]).filter(l=>l&&l.url).map(l=>`<a href="${E(U(l.url))}" target="_blank" rel="noopener noreferrer">${E(l.source||"source")}</a>`).join(" · ")||"no source link";
  return `<div class="tfx-row ${x.rank!=null&&x.rank>=7?"h":t}">${x.score!=null?`<span class="sc ${t}" title="score 0–100">${E(x.score)}</span>`:""}${badge(x)}<span class="tfx-k">${E(kinds[x.kind]||x.kind)}</span><b>${E(x.title)}</b> ${status(x)}

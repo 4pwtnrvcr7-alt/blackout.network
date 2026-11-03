@@ -425,7 +425,7 @@ def pwa_head(b):
 # t338/t343: Render's free tier drops some of a page's ~40 parallel requests (502/503). (1) every same-origin JS/CSS URL in a page gets
 # ?v=<build> so Cloudflare and browsers can cache it for a year (Cache-Control immutable below) and the origin rarely sees asset requests;
 # (2) BN_RETRY_HEAD retries a failed script/stylesheet (twice, with backoff) and same-origin GET fetches that come back 502/503/504.
-_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons|bn-v3)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
+_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons|bn-v3|bn-apple)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
 _ASSET_V = {"t": 0, "v": b"0"}
 def asset_version():
     now = time.time()

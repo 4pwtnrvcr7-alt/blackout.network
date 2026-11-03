@@ -119,15 +119,15 @@ def _score_trace(S, rows, exs, rising_stored):
     if news_only:
         b = 15 if nf >= 3 else 8 if nf == 2 else 0
         why = "media-only cluster: +15 for 3+ outlets, +8 for 2"
-    elif nf >= 3: b = min(30, max(10, score * 0.6)); why = f"3+ independent families: min(30, max(10, 0.6 × {score}))"
-    elif nf == 2: b = min(20, max(8, score * 0.5)); why = f"2 independent families: min(20, max(8, 0.5 × {score}))"
-    else: why = "only 1 source family, so no bonus"
-    score += b; st.append(("Independent confirmation", f"+{b:g}", f"{nf} independent source famil{'y' if nf == 1 else 'ies'}; {why}"))
+    elif nf >= 3: b = min(30, max(10, score * 0.6)); why = f"3+ independent sources: min(30, max(10, 0.6 × {score}))"
+    elif nf == 2: b = min(20, max(8, score * 0.5)); why = f"2 independent sources: min(20, max(8, 0.5 × {score}))"
+    else: why = "only 1 source, so no bonus"
+    score += b; st.append(("Independent confirmation", f"+{b:g}", f"{nf} independent source{'' if nf == 1 else 's'}; {why}"))
     times = sorted(t for t in (S.parse_t(r["event_time"]) for r in rows) if t)
     from datetime import timedelta
     sp = 10 if (len(rows) >= 3 and nf >= 2 and times and (times[-1] - times[0]) <= timedelta(hours=3)) else 0
     span = f"{(times[-1] - times[0]).total_seconds() / 3600:.1f} h" if times else "n/a"
-    score += sp; st.append(("Speed of spread", f"+{sp}", f"3+ reports from 2+ families within 3 h? Reports span {span}"))
+    score += sp; st.append(("Speed of spread", f"+{sp}", f"3+ reports from 2+ sources within 3 h? Reports span {span}"))
     rb = (10 if nf >= 2 else 5) if rising_stored else 0
     score += rb; st.append(("Rising", f"+{rb}", "More reports in the last 3 h than in the 3–12 h before" if rising_stored else "not rising at last rescan"))
     conf = "High" if (nf >= 2 and official) or (nf == 1 and official) else "Medium" if nf >= 2 else "Low"
@@ -379,16 +379,16 @@ def _render():
       'source\'s own severity fields: earthquake magnitude, PAGER level, alert level, people affected, NOAA scale and pathogen type. '
       'A story starts at the <b>highest base</b> among its reports.</p><p class="means"><span class="lbl">What it means</span>A bigger quake, a red alert or more people exposed '
       'gives a higher starting point. Most rank rules are also about blast radius.</p></article>')
-    a('<article><h4>2 · Independent confirmation</h4><p class="how"><span class="lbl">How it\'s computed</span>Reports are grouped by source <b>family</b>: '
+    a('<article><h4>2 · Independent confirmation</h4><p class="how"><span class="lbl">How it\'s computed</span>Reports are grouped by <b>independent source</b>: '
       'the agency, the publisher domain or, for social posts, the primary source they cite. Uncited social posts and volume-surge signals never count.</p><ul>'
-      '<li>2 families: <code>+min(20, max(8, 0.5 × base))</code></li><li>3+ families: <code>+min(30, max(10, 0.6 × base))</code></li>'
+      '<li>2 sources: <code>+min(20, max(8, 0.5 × base))</code></li><li>3+ sources: <code>+min(30, max(10, 0.6 × base))</code></li>'
       '<li>Media-only: +8 for 2 outlets, +15 for 3+, and a maximum score of 70</li></ul>'
       '<p class="means"><span class="lbl">What it means</span>Two or more unrelated sources score high. The bonus grows with impact, so a confirmed minor event stays minor.</p></article>')
-    a('<article><h4>3 · Speed of spread</h4><p class="how"><span class="lbl">How it\'s computed</span><b>+10</b> if 3+ reports from 2+ families arrive within 3 hours. '
+    a('<article><h4>3 · Speed of spread</h4><p class="how"><span class="lbl">How it\'s computed</span><b>+10</b> if 3+ reports from 2+ sources arrive within 3 hours. '
       '<b>Rising</b> (3+ reports from 2+ sources in the last 3 h, more than the 3–12 h before, or a 2× keyword surge): <b>+10</b> if confirmed, otherwise +5. '
       'Rising and confirmed also adds <b>+1 rank</b>.</p><p class="means"><span class="lbl">What it means</span>A story spreading quickly across unrelated sources moves up.</p></article>')
     a('<article><h4>4 · Confidence caps</h4><p class="how"><span class="lbl">How it\'s computed</span>Confidence is <b>High</b> when an official source is present, '
-      '<b>Medium</b> for 2+ non-official families and <b>Low</b> for a single non-official source. Low means a maximum score of 45 and rank 4. '
+      '<b>Medium</b> for 2+ non-official sources and <b>Low</b> for a single non-official source. Low means a maximum score of 45 and rank 4. '
       'Media or social reports with no official source and no crisis wording max out at a score of 55. Rank caps are 6 with fewer than 3 outlets and 8 with 3+.</p>'
       '<p class="means"><span class="lbl">What it means</span>Rumors cannot climb the scale until something independent confirms them.</p></article>')
     a('<article><h4>5 · Category rules</h4><p class="how"><span class="lbl">How it\'s computed</span>These override the default rank:</p><ul>'
@@ -416,8 +416,8 @@ def _render():
     if wk:
         cl = wk["cl"]; lk = wk["link"] or {}
         a(f'<p style="margin:0 0 4px"><a href="{E(lk.get("url"))}" target="_blank" rel="noopener noreferrer"><b>{E(cl["title"])}</b></a></p>'
-          f'<p class="sm mu" style="margin:0">{E(cl["category"])} · first seen {E(_et(cl["first_seen"]))} · {wk["n"]} reports from {wk["nf"]} independent source '
-          f'famil{"y" if wk["nf"] == 1 else "ies"} ({E(", ".join(wk["eff"][:6]))}{"…" if len(wk["eff"]) > 6 else ""}) · confidence {E(wk["conf"])}</p>')
+          f'<p class="sm mu" style="margin:0">{E(cl["category"])} · first seen {E(_et(cl["first_seen"]))} · {wk["nf"]} independent source'
+          f'{"" if wk["nf"] == 1 else "s"} · confidence {E(wk["conf"])}</p>')
         a('<h3>Score (0–100)</h3><div class="steps">')
         for k, v, why in wk["sst"]:
             a(f'<div class="step"><b>{E(k)}</b><b>{E(v)}</b><span>{E(why)}</span></div>')
@@ -425,13 +425,13 @@ def _render():
         a('<h3>Rank (0–10)</h3><div class="steps">')
         for k, v, why in wk["rst"]:
             a(f'<div class="step"><b>{E(k)}</b><b>{E(v)}</b><span>{E(why)}</span></div>')
-        a(f'<div class="step tot"><b>Rank</b><b>{wk["rank"]}</b><span>{"rank " + str(pr) + "+ with " + str(wk["nf"]) + " independent sources, so it qualifies for an instant alert" if wk["pushes"] else "rank " + str(pr) + "+ but only " + str(wk["nf"]) + " source family, so it is shown on The Wire without an instant alert"}</span></div></div>')
+        a(f'<div class="step tot"><b>Rank</b><b>{wk["rank"]}</b><span>{"rank " + str(pr) + "+ with " + str(wk["nf"]) + " independent sources, so it qualifies for an instant alert" if wk["pushes"] else "rank " + str(pr) + "+ but only " + str(wk["nf"]) + " source, so it is shown on The Wire without an instant alert"}</span></div></div>')
         a('<p class="sm mu">This breakdown is recomputed live from the stored reports, and the page checks that it matches the scanner\'s own result exactly. '
-          'If no rank-7 story in the database matches, this section explains with a snapshot instead. Note: syndicated copies of one wire story on different domains count as separate families.</p>')
+          'If no rank-7 story in the database matches, this section explains with a snapshot instead. Note: syndicated copies of one wire story on different domains count as separate sources.</p>')
     else:
         a('<p class="sm"><span class="ill">snapshot</span> No current rank-7 story matched the live check, so this is a snapshot from Oct 31, 2026: '
-          '“Ebola outbreak in DR Congo approaches 5,000 deaths as US issues new travel rule” (CIDRAP plus 70 other independent families). '
-          'It had a base of 40 (CIDRAP 20 + 20 for outbreak keywords) and a confirmation bonus of +24 (3+ families: 0.6 × 40), for a score of <b>64</b>. '
+          '“Ebola outbreak in DR Congo approaches 5,000 deaths as US issues new travel rule” (CIDRAP plus 70 other independent sources). '
+          'It had a base of 40 (CIDRAP 20 + 20 for outbreak keywords) and a confirmation bonus of +24 (3+ sources: 0.6 × 40), for a score of <b>64</b>. '
           'The default rank was 5. The disease rule raised it to 6 (Ebola confirmed by 3+ independent sources) and then to <b>7</b> (multi-country wording). '
           'It qualifies for an instant alert.</p>')
     a('</section>')
@@ -441,7 +441,7 @@ def _render():
     a('<div><b>Watchlist (automatic)</b><br>A story with <b>Low</b> confidence (one non-official source) goes to the Watchlist instead of The Wire. Its score is capped at 45 and its rank at 4. '
       'If a second independent source confirms it on a later scan, it moves to The Wire automatically.</div>')
     a('<div><b>Hidden noise</b><br>Non-official stories ranked 0–1 are stored for the record. They are not shown on The Wire or the Watchlist.</div>')
-    a(f'<div><b>Instant alert</b><br>Sent once per story, only when it is on The Wire <b>and</b> ranked <b>{pr}+</b> <b>and</b> confirmed by <b>{ps}+</b> independent source families. '
+    a(f'<div><b>Instant alert</b><br>Sent once per story, only when it is on The Wire <b>and</b> ranked <b>{pr}+</b> <b>and</b> confirmed by <b>{ps}+</b> independent sources. '
       'A single-agency rank-7 alert, such as a lone GDACS red notice, shows on The Wire but does not trigger an instant alert.</div>')
     a('<div><b>UNCONFIRMED (editorial rule)</b><br>Unconfirmed items normally stay on the Watchlist. The hourly report may still mention one '
       'if a reviewer judges it a potential <b>8+</b> with a national or civilizational blast radius. It is then clearly labeled <b>UNCONFIRMED</b>. '

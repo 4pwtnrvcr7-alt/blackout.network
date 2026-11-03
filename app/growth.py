@@ -137,7 +137,7 @@ LLMS = f"""# {BRAND}
 > {BRAND} is a free early-warning threat monitor. We track outbreaks, earthquakes, space weather, severe weather, cyber attacks,
 > infrastructure outages and conflict, rank every story 0-10 with published rules, and link every report to its original source.
 
-Ranks are produced by published scoring rules and are confirmed by counting independent source families. The data is for research
+Ranks are produced by published scoring rules and are confirmed by counting independent sources. The data is for research
 and situational awareness only; it is not an official warning service. Follow official agencies for instructions in an emergency.
 
 ## Key sections

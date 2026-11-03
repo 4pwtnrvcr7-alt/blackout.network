@@ -181,7 +181,7 @@ RULE_DOC = [
   "Outlets and accounts in the editorial reliability table (sources_profiles.KNOWN) start at their listed value: wire services 9, major public broadcasters and papers 7–8, "
   "national outlets 6–7, state-run messaging 2–3. Automated relays of agency data start at the agency-relay value (7–8). Otherwise: an unlisted news outlet 5, "
   "an official government account on the political watch list 6, a party, campaign or family account 4, an unlisted social account 3, a Reddit community 2, anything else 1."),
- ("2 · Track record", "For non-agency sources with 5+ stored items: +1 if at least 50% of its items ended up in stories confirmed by 2+ independent source families; "
+ ("2 · Track record", "For non-agency sources with 5+ stored items: +1 if at least 50% of its items ended up in stories confirmed by 2+ independent sources; "
   "−1 if 10% or fewer did."),
  ("3 · Cites primary sources", "Unlisted social accounts only: +1 if at least 50% of their items link an outlet or agency that is in the reliability table (links to the account's own site or unknown sites don't count)."),
  ("4 · Thin history", "−1 for unlisted sources with fewer than 3 items seen within a single day (too little history to judge)."),
@@ -221,7 +221,7 @@ def rate(rec, by_name, by_dom):
     n = rec.get("n", 0)
     if not agency and n >= 5 and rec.get("confirmed") is not None:
         cs = rec["confirmed"]
-        if cs >= 0.5: r += 1; st.append(("Track record", "+1", f"{cs:.0%} of {n} items were in stories confirmed by 2+ independent families"))
+        if cs >= 0.5: r += 1; st.append(("Track record", "+1", f"{cs:.0%} of {n} items were in stories confirmed by 2+ independent sources"))
         elif cs <= 0.10: r -= 1; st.append(("Track record", "−1", f"only {cs:.0%} of {n} items were in independently confirmed stories"))
         else: st.append(("Track record", "0", f"{cs:.0%} of {n} items independently confirmed"))
     if typ in SOCIAL_TYPES and n >= 1 and not listed:

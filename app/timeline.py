@@ -37,7 +37,7 @@ def overview():
     return {"start": first, "now": iso(datetime.now(timezone.utc)), "total": total,
             "hours": [{"h": r["h"] + ":00:00Z", "n": r["n"], "high": r["high"] or 0, "max": r["mx"], "main": r["main"]} for r in rows],
             "snapshots": {"ok": len(ok), "failed": sum(1 for x in s.values() if x["status"] != "ok"), "bytes": du, "cap_bytes": 3 * 1024 ** 3, "worker_running": _alive(),
-                          "rule": "rank 4+ or 2+ source families; max 180/hour, 12 s apart; stops at 3 GB"}}
+                          "rule": "rank 4+ or 2+ sources; max 180/hour, 12 s apart; stops at 3 GB"}}
 def items(frm, to, limit=400):
     c = src()
     try: rows = [dict(r) for r in c.execute("""SELECT cluster_id,title,category,location,score,rank,confidence,families,links,event_time,first_seen,watchlist,eff_families,n_families,brief

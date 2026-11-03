@@ -69,7 +69,7 @@ def render(cid, since=""):
     eff = int(r.get("eff_families") or len(fams) or 0)
     watch = int(r.get("watchlist") or 0)
     conf = "Watchlist — unconfirmed (single source or social only)" if watch == 1 else ("Background" if watch == 2 else
-           f"Confirmed by {eff} independent source famil{'y' if eff == 1 else 'ies'}")
+           f"Confirmed by {eff} independent source{'' if eff == 1 else 's'}")
     seen = set(); rows = []
     for a in al:
         key = (a.get("source_url") or "") or (a.get("title") or "")
@@ -121,7 +121,7 @@ def render(cid, since=""):
             + upd + vhtml + elec
             + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
             + '<section class="card"><h2>How confident are we?</h2><p>'
-            + S.E(f"{len(rows)} report(s) from {eff} independent source famil{'y' if eff == 1 else 'ies'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
+            + S.E(f"{eff} independent source{'' if eff == 1 else 's'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
             + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></section>'
             + f'<section class="card"><h2>Timeline and sources</h2><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></section>'
             + '<section class="card" id="follow"><h2>☆ Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
