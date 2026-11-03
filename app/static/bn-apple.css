@@ -185,3 +185,21 @@ html.bna-pg body:not(:has(.bn-top))>main#main>h1{margin-top:clamp(56px,8vw,120px
 html.bna-pg[data-theme="light"] .pn .warn{background:#FFF4E0!important;color:#6B3E00!important;border-color:#F0D9B0!important}
 /* /stats on phones: the one-word BLACKOUT.NETWORK title was cut off at 390px */
 @media (max-width:600px){html.bna-pg .st-hero h1{font-size:clamp(22px,7vw,28px)!important;overflow-wrap:anywhere}}
+/* ---------- Phase 3a: near-empty top bar (wordmark + menu button); everything else lives in the menu ---------- */
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-primary,html:is(.bna-home,.bna-pg) .bn-tbar .bn-follows,html:is(.bna-home,.bna-pg) .bn-tbar .bnal-bell,
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-searchbtn,html:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar,html:is(.bna-home,.bna-pg) .bn-tbar .bn-gear{display:none!important}
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-burger{position:relative;min-width:44px;min-height:44px;display:inline-flex!important;align-items:center;justify-content:center;background:none!important;border:0!important;box-shadow:none!important}
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-burger .bn-bl{display:none!important}
+html:is(.bna-home,.bna-pg) .bn-burger .bna-dot{position:absolute;top:9px;right:8px;width:8px;height:8px;border-radius:50%;background:#FF3B30;box-shadow:0 0 0 2px var(--a-bg)}
+html:is(.bna-home,.bna-pg) #ns_gbanner{display:none!important}
+html:is(.bna-home,.bna-pg) .bna-mlinks{display:contents}
+html:is(.bna-home,.bna-pg) #bn-menu .bna-ml{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;color:var(--a-ink)!important;text-decoration:none;font-weight:500}
+html:is(.bna-home,.bna-pg) .bna-malert{display:flex;gap:10px;align-items:flex-start;margin:4px 0 12px;padding:12px 16px;border-radius:14px;background:var(--a-sf);color:var(--a-ink)!important;text-decoration:none;font:400 14px/1.45 Inter,system-ui,sans-serif}
+html:is(.bna-home,.bna-pg) .bna-malert b{font-weight:600}
+html:is(.bna-home,.bna-pg) .bna-malert .bna-mopen{color:var(--a-lk);white-space:nowrap;font-weight:500}
+html:is(.bna-home,.bna-pg) .bna-mdot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:#FF3B30}
+/* homepage opens straight into content: the hero is gone; the page h1 stays for screen readers */
+.bna-vh{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;margin:-1px!important;padding:0!important;border:0!important}
+html.bna-home #bna_home>.bna-sec:first-of-type{padding-top:clamp(28px,4vw,56px)!important}
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-acts{margin-left:auto!important}
+@media (max-width:767px){html:is(.bna-home,.bna-pg) .bn-m3 .bna-ml{order:4;padding:0 4px}}

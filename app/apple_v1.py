@@ -72,8 +72,7 @@ def home_html(sn):
         lis = "".join((f'<li><a href="{E(h)}">{E(l)}</a></li>' if h else f'<li class="bna-soon">{E(l)} <em>Soon</em></li>') for _k, l, h in items)
         cols += f'<div><h2>{E(label)}</h2><ul>{lis}</ul></div>'
     return f'''<div id="bna_home" class="bna" aria-label="Home">
-<section class="bna-hero bna-wrap"><h1 class="bna-lede">The fastest way to know what&rsquo;s happening.</h1>
-<p class="bna-links"><a class="bna-lnk" href="/sources"><b data-bna="sources">&ndash;</b> sources in the feed</a><a class="bna-lnk" href="/scoring">How we score</a></p></section>
+<h1 class="bna-vh">BLACKOUT.NETWORK</h1>
 <section class="bna-sec" aria-labelledby="bna_h_latest"><div class="bna-wrap bna-sech"><h2 id="bna_h_latest">The latest. <span>Ranked as it happens.</span></h2>
 <div class="bna-arrows"><button type="button" class="bna-arw" data-dir="-1" aria-label="Scroll back" aria-controls="bna_row_latest">&lsaquo;</button><button type="button" class="bna-arw" data-dir="1" aria-label="Scroll forward" aria-controls="bna_row_latest">&rsaquo;</button></div></div>
 <div class="bna-row" id="bna_row_latest" tabindex="0" aria-label="Top of the Wire"><p class="bna-empty">Loading the Wire&hellip;</p></div>

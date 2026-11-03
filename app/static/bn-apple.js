@@ -56,3 +56,26 @@
   if(d.generated)set("asof","Live data as of "+esc(et(d.generated))+".");
  }).catch(function(){if(row)row.innerHTML='<p class="bna-empty">Live data is unavailable right now. <a class="bna-lnk" href="/#wire">Open The Wire</a></p>'});
 })();
+/* Phase 3a: near-empty top bar. The bar keeps the wordmark and the menu button; The Wire, Sources, Free brief, alerts, search, theme and
+   settings live in the menu's top row (search, Alerts, theme, Settings and Free brief were already there; The Wire + Sources are added
+   here). Network alerts move from the page banner (#ns_gbanner, hidden by CSS) into the menu, with a small dot on the menu button. */
+(function(){
+ var d=document;
+ function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+ function txt(v){return v==null?"":typeof v=="string"||typeof v=="number"?String(v):Array.isArray(v)?v.map(txt).filter(Boolean).join(", "):typeof v=="object"?txt(v.src||v.name||v.label||v.title||v.status||""):""}
+ function tools(){var t=d.querySelector("#bn-menu .m3-tools");if(!t||t.querySelector(".bna-mlinks"))return t;
+  var w=d.createElement("span");w.className="bna-mlinks";w.innerHTML='<a class="m3-tl bna-ml" href="/#wire">The Wire</a><a class="m3-tl bna-ml" href="/sources">Sources</a>';
+  t.insertBefore(w,t.firstChild);return t}
+ function alerts(a){if(a&&a.data&&a.count==null)a=a.data;a=a||{};
+  var list=(Array.isArray(a.alerts)?a.alerts:[]).map(function(x){return typeof x=="object"&&x?[txt(x.src),typeof x.status=="string"?x.status:""].filter(Boolean).join(": "):txt(x)}).filter(Boolean);
+  var n=list.length?(+a.count||list.length):0,ph=d.querySelector("#bn-menu .bn-ph"),box=d.getElementById("bna_malert"),b=d.querySelector("header.bn-top .bn-burger");
+  if(b){var dot=b.querySelector(".bna-dot");if(n&&!dot){dot=d.createElement("span");dot.className="bna-dot";b.appendChild(dot)}if(!n&&dot)dot.remove();
+   if(n)b.setAttribute("aria-label","Open menu ("+n+" network alert"+(n>1?"s":"")+")");else b.setAttribute("aria-label","Open menu")}
+  if(!ph)return;if(!n){box&&box.remove();return}
+  if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/#network";ph.parentNode.insertBefore(box,ph.nextSibling);
+   box.addEventListener("click",function(){if(window.bnMenuClose)try{bnMenuClose(true)}catch(e){}})}
+  box.innerHTML='<span class="bna-mdot" aria-hidden="true"></span><span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
+ function load(){fetch("/api/netstatus/alerts",{cache:"no-store"}).then(function(r){return r.json()}).then(alerts).catch(function(){})}
+ function go(){tools();load();setInterval(load,300000)}
+ if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",go);else go();
+})();
