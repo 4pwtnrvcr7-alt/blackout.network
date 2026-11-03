@@ -249,6 +249,7 @@ BOARD = [("el", "Elections", "Midterms 2026, live on election night", [("el_next
          ("hl", "Health and outbreaks", "Outbreak reports on The Wire", [("h_ebola", "Ebola", "/#medical"), ("h_measles", "Measles", "/#medical"), ("h_other", "Other outbreaks", "/#medical")]),
          ("hd", "Hardship risks", "Power, communications, supply and order at home", [("grid", "U.S. power grid", "/#grid"), ("comms", "Phones, internet and cloud", "/#network"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Unrest in the U.S.", "/#wire")]),
          ("nh", "Natural hazards", "Earthquakes, space weather and severe weather", [("quake", "Earthquakes", "/#solar"), ("kp", "Geomagnetic storms", "/#solar"), ("wx", "Weather threats to power", "/#grid"), ("flare", "Solar flares", "/#solar")])]
+BOARD = [g for k in ("cf", "el", "hl", "hd", "nh") for g in BOARD if g[0] == k]   # t106u: War and conflict first
 def _board_html():
     def card(k, label, href):
         return (f'<article class="bna-card bna-mc" data-mc="{k}"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_{k}">'

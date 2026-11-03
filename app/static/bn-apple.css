@@ -355,3 +355,18 @@ html.bna-pg .bna-fold.bna-shut{padding-top:18px!important;padding-bottom:18px!im
 html.bna-pg .bna-clamp:not(.bna-open){max-height:1400px!important;overflow:hidden!important;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)}
 html.bna-pg .bna-more{display:flex;margin:16px auto 4px;min-height:44px;padding:0 22px;align-items:center;border-radius:999px;border:1px solid var(--a-ln)!important;background:var(--a-sf)!important;color:var(--a-ink)!important;font:500 15px/1 Inter,system-ui,sans-serif;cursor:pointer}
 html.bna-pg .bna-more:hover{background:var(--a-sf2)!important}
+/* t106u: threat board in the apple.com/store manner: plain white / graphite cards, no accent bars or dots, type-led hierarchy;
+   group colour now lives only inside the charts. */
+.bna-grp .bna-mc,html[data-theme="light"] .bna-grp .bna-mc,html[data-theme="light"] .bna-grp[data-g="hd"] .bna-mc{box-shadow:none;border:0}
+html[data-theme="light"] .bna-grp .bna-mc{box-shadow:0 2px 12px rgba(0,0,0,.06)}
+html:not([data-theme="light"]) .bna-grp .bna-mc{background:#1C1C1E}
+.bna-gh{border-top:0;padding-top:0;margin:0 0 18px;align-items:baseline}
+.bna-gh h3{font-size:clamp(22px,2.4vw,28px);font-weight:600;letter-spacing:-.015em;margin:0}
+.bna-gh h3 i{display:none!important}
+.bna-gh p{font-size:clamp(15px,1.6vw,19px);font-weight:500;color:var(--a-mu)}
+html[data-theme="light"] .bna-gh p{color:#6E6E73}
+.bna-grp .bna-mh .bna-k{font:600 14px/1.3 Inter,system-ui,sans-serif;letter-spacing:-.005em;text-transform:none;color:var(--a-ink)}
+.bna-grp .bna-mv{font-weight:600;letter-spacing:-.02em}
+.bna-grp .bna-ms{color:var(--a-mu)}
+html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
+.bna-grp{margin-bottom:56px}
