@@ -81,6 +81,187 @@ def _iso(t):
 def _r(c, f):
     try: return f()
     except Exception: return None
+# ---------------- widget board (t99u/t100u): elections, conflict regions, outbreaks, hardship, quake map. Read-only, in-process, cached with dash_data.
+def elections_card(now):
+    srv = sys.modules.get("server"); M = srv._addon_mod("midterms")
+    from datetime import datetime
+    b = M._base() or {}; off = M.official() or {}
+    import midterms_hub as MH
+    t = MH._poll_table() or {}
+    closes = []
+    for st in t.get("states") or []:
+        for c in st.get("closes") or []:
+            d = MH._dt(c.get("at_et"))
+            if d: closes.append((d.timestamp(), st["state"], st["name"], c.get("zone")))
+    closes.sort()
+    nxt = [c for c in closes if c[0] > now]
+    nt = nxt[0][0] if nxt else None
+    wave = sorted({c[2] + (" (" + c[3] + " time)" if c[3] else "") for c in nxt if c[0] == nt}) if nt else []
+    closed = len({c[1] for c in closes if c[0] <= now})
+    last = closes[-1][0] if closes else None
+    waves = []
+    for ts in sorted({c[0] for c in closes}):
+        waves.append([ts, len({c[1] for c in closes if c[0] == ts})])
+    feeds = (off.get("feeds") or {})
+    def live_for(r):
+        f = feeds.get(r.get("state")) or {}
+        for c in f.get("contests") or []:
+            if c.get("kind") == r.get("office") and (r.get("office") != "house" or c.get("district") == r.get("district")):
+                return c, f
+        return None, None
+    def lead(r):
+        c, f = live_for(r)
+        if c and (c.get("votes") or 0) > 0:
+            op = sorted([o for o in c.get("options") or [] if o.get("votes")], key=lambda o: -o["votes"])
+            if op:
+                tot = sum(o["votes"] for o in c.get("options") or []) or 1
+                m = (op[0]["votes"] - (op[1]["votes"] if len(op) > 1 else 0)) * 100.0 / tot
+                return {"name": op[0]["name"], "code": op[0].get("code"), "margin": round(m, 1), "rep": [c.get("reporting"), c.get("total_units"), c.get("unit")],
+                        "src": f.get("source"), "t": c.get("as_of") or f.get("as_of"), "won": bool(op[0].get("winner_by_state"))}
+        pc = [x for x in ((r.get("page") or {}).get("results") or {}).get("candidates") or [] if x.get("pct") is not None] or [x for x in r.get("candidates") or [] if x.get("pct") is not None]
+        if len(pc) >= 1:
+            pc = sorted(pc, key=lambda x: -float(x["pct"]))
+            return {"name": pc[0]["name"], "code": pc[0].get("code"), "margin": round(float(pc[0]["pct"]) - (float(pc[1]["pct"]) if len(pc) > 1 else 0), 1), "rep": None,
+                    "src": "Wikipedia (as published)", "t": b.get("built"), "won": any(x.get("winner") for x in r.get("candidates") or [])}
+        return None
+    def key(office, rows, k=4):
+        rows = [r for r in rows if r.get("office") == office and (r.get("consensus") or {}).get("v") is not None]
+        rows.sort(key=lambda r: (abs(float(r["consensus"]["v"])), r.get("label") or ""))
+        out = []
+        for r in rows[:k]:
+            pcl = MH._dt(r.get("poll_close"))
+            out.append({"label": r.get("label") if office != "house" else r.get("label"), "rating": (r.get("consensus") or {}).get("t"),
+                        "close": pcl.timestamp() if pcl else None, "lead": lead(r)})
+        return out
+    allr = (b.get("races") or []) + (b.get("house") or [])
+    return {"next": nt, "wave": wave[:8], "wave_n": len(wave), "closed": closed, "states": len({c[1] for c in closes}), "last": last, "waves": waves,
+            "first": closes[0][0] if closes else None,
+            "senate": key("senate", allr), "governor": key("governor", allr), "house": key("house", allr),
+            "t": (off.get("fetched") or b.get("built")), "night": bool(M.election_night())}
+
+_REG = [("il", "Israel and Gaza", r"\b(israel|israeli|gaza|idf|hamas|hezbollah|west bank|lebanon|houthi|yemen|netanyahu|tel aviv|jerusalem)"),
+        ("ir", "Iran", r"\b(iran|iranian|tehran|irgc|khamenei|araghchi)"),
+        ("ru", "Russia and Ukraine", r"\b(russia|russian|ukraine|ukrainian|kyiv|kiev|kharkiv|moscow|kremlin|putin|zelensk|donetsk|crimea|odesa)"),
+        ("uk", "UK and London", r"\b(uk|u\.k\.|britain|british|london|england|scotland|wales|met police|downing street)\b")]
+_HEALTH = [("ebola", "Ebola", r"\b(ebola|marburg)"), ("measles", "Measles", r"\bmeasles")]
+_DIS = r"\b(outbreak|virus|ebola|marburg|cholera|measles|influenza|h5n1|bird flu|avian flu|mpox|dengue|plague|pathogen|epidemic|pandemic|polio|tuberculosis|meningitis|anthrax|rift valley)"
+_US = r"\b(u\.s\.|us|usa|america|american|national guard|ice|fbi|dhs|capitol|washington|new york|chicago|los angeles|portland|minneapolis|texas|california|florida|state of emergency)\b"
+_UNREST = r"\b(protest|protesters|riot|unrest|curfew|clashes|national guard|martial law|looting|political violence|insurrection|shooting at|militia)"
+_FOOD = r"\b(food (shortage|supply|prices|bank|insecurity|recall)|supply chain|shortage|recall|grocery|snap benefits|snap\b|ports?\b strike|shipping (disruption|delays)|diesel|baby formula|egg prices|meat plant|rail strike|dockworkers)"
+
+def wire_groups(now):
+    import re, sqlite3
+    c = sqlite3.connect(f"file:{BASE}/blackout.db?mode=ro", uri=True, timeout=5)
+    try:
+        cut = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 7 * 86400))
+        rows = c.execute("SELECT cluster_id, title, category, location, rank, first_seen, updated FROM clusters WHERE watchlist=0 AND updated>=? ORDER BY updated DESC LIMIT 6000", (cut,)).fetchall()
+    finally: c.close()
+    def day(ts):
+        return time.strftime("%Y-%m-%d", time.gmtime(ts - 5 * 3600))
+    days = [day(now - i * 86400) for i in range(6, -1, -1)]
+    def agg(match):
+        n24 = 0; d = {x: [0, 0] for x in days}; top = None; mx = 0
+        for cid, t, cat, loc, rk, fs, up in rows:
+            if not match(t or "", cat or "", loc or ""): continue
+            ft = _iso(fs) or 0; ut = _iso(up) or 0; rk = int(rk or 0)
+            k = day(ft) if ft else None
+            if k in d: d[k][1 if rk >= 7 else 0] += 1
+            if ut >= now - 86400:
+                n24 += 1; mx = max(mx, rk)
+                ok = re.match(r"^[A-Za-z0-9\"'(]", t or "") and not re.match(r"^(www\.|https?:)", t or "") and not re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", t or "")
+                if ok and (top is None or (rk, ut) > (top[0], top[1])): top = (rk, ut, cid, t, loc)
+        n7 = sum(a + b for a, b in d.values())
+        tp = None
+        if top:
+            import site_page as SP
+            try: tt = SP.clean_title(top[3])
+            except Exception: tt = top[3]
+            tp = {"rank": top[0], "t": top[1], "url": f"/wire/{top[2]}" if re.match(r"^[0-9a-f]{16}$", top[2] or "") else "/#wire", "title": re.sub(r"\s+", " ", tt or "")[:150], "loc": top[4]}
+        return {"n24": n24, "n7": n7, "max24": mx, "days": [[k] + d[k] for k in days], "top": tp}
+    W = lambda t, cat: cat == "war/conflict" or (cat == "political" and re.search(r"\b(strike|missile|drone|attack|troops|war|military)", t.lower()))
+    conf = {}
+    used = []
+    for k, label, rx in _REG:
+        r = re.compile(rx, re.I); used.append(r)
+        conf[k] = dict(agg(lambda t, cat, loc, r=r: bool(W(t, cat)) and bool(r.search(t + " " + loc))), label=label)
+    conf["other"] = dict(agg(lambda t, cat, loc: bool(W(t, cat)) and not any(r.search(t + " " + loc) for r in used)), label="Other conflict zones")
+    dis = re.compile(_DIS, re.I)
+    H = lambda t, cat: (cat == "disease" and not re.search(r"\b(weather|storm|tornado|war) outbreak", t, re.I)) or (cat == "political" and dis.search(t))
+    health = {}
+    hused = []
+    for k, label, rx in _HEALTH:
+        r = re.compile(rx, re.I); hused.append(r)
+        health[k] = dict(agg(lambda t, cat, loc, r=r: bool(r.search(t)) and (cat in ("disease", "political", "war/conflict", "other"))), label=label)
+    health["other"] = dict(agg(lambda t, cat, loc: bool(H(t, cat)) and not any(r.search(t) for r in hused)), label="Other outbreaks")
+    un, us, fd = re.compile(_UNREST, re.I), re.compile(_US, re.I), re.compile(_FOOD, re.I)
+    hard = {"unrest": dict(agg(lambda t, cat, loc: cat in ("political", "war/conflict", "other") and bool(un.search(t)) and bool(us.search(t + " " + loc))), label="Unrest in the U.S."),
+            "food": dict(agg(lambda t, cat, loc: bool(fd.search(t))), label="Food and supply chain")}
+    return {"conf": conf, "health": health, "hard": hard}
+
+def comms_card():
+    import sqlite3
+    srv = sys.modules.get("server"); ns = srv._addon_mod("netstatus")
+    c = sqlite3.connect(f"file:{ns.NDB}?mode=ro", uri=True, timeout=5)
+    try:
+        lt = c.execute("SELECT MAX(ts) FROM checks WHERE kind!='isp'").fetchone()[0]
+        it = c.execute("SELECT MAX(ts) FROM checks WHERE kind='isp' AND grp='ISPs'").fetchone()[0]
+        rows = c.execute("SELECT src, grp, level, status FROM checks WHERE ts=? AND kind!='isp'", (lt,)).fetchall() if lt else []
+        isp = c.execute("SELECT src, grp, level, status FROM checks WHERE ts=? AND kind='isp' AND grp='ISPs'", (it,)).fetchall() if it else []
+    finally: c.close()
+    bad = lambda rs: [{"src": r[0], "level": r[2], "status": r[3]} for r in rs if (r[2] or 0) >= 2]
+    return {"isp_n": len(isp), "isp_bad": bad(isp), "isp": [r[0] for r in isp], "isp_t": it, "cloud_n": len(rows), "cloud_bad": bad(rows), "t": lt}
+
+_A0 = {"rings": None, "key": None, "map": None}
+def _world():
+    """Country outlines from the self-hosted admin0.geojson, reduced once to <=60 points per ring at 0.1 degree (a few hundred KB),
+    so the full GeoJSON is never kept in memory."""
+    if _A0["rings"] is None:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "heatmap_static", "admin0.geojson"), encoding="utf-8") as fh: feats = json.load(fh)["features"]
+        rings = []
+        for f in feats:
+            g = f.get("geometry") or {}; polys = g.get("coordinates") or []
+            if g.get("type") == "Polygon": polys = [polys]
+            for poly in polys:
+                ring = poly[0] if poly else []
+                if len(ring) < 4: continue
+                pts = tuple((round(x, 1), round(y, 1)) for x, y in ring[::max(1, len(ring) // 60)])
+                xs = [q[0] for q in pts]; ys = [q[1] for q in pts]
+                rings.append((min(xs), max(xs), min(ys), max(ys), pts))
+        feats = None; _A0["rings"] = rings
+    return _A0["rings"]
+def quake_map(big):
+    """Small inline SVG around the quake (equirectangular crop of country outlines, no tiles). One cached map, keyed by quake."""
+    if big.get("lat") is None: return None
+    lat, lon = float(big["lat"]), float(big["lon"]); key = (round(lat, 3), round(lon, 3))
+    if _A0["key"] == key: return _A0["map"]
+    w, h = 40.0, 22.0; x0, y1 = lon - w / 2, lat + h / 2
+    def P(x, y): return f"{(x - x0) * 300 / w:.0f} {(y1 - y) * 165 / h:.0f}"
+    paths = []
+    for mnx, mxx, mny, mxy, pts in _world():
+        if mxx < x0 - 5 or mnx > x0 + w + 5 or mxy < y1 - h - 5 or mny > y1 + 5: continue
+        paths.append("M" + "L".join(P(x, y) for x, y in pts) + "Z")
+    m = {"d": "".join(paths)[:9000], "x": round((lon - x0) * 300 / w), "y": round((y1 - lat) * 165 / h)}
+    _A0.update(key=key, map=m)
+    return m
+
+BOARD = [("el", "Elections", "Midterms 2026, live on election night", [("el_next", "Polls closing", "/midterms"), ("el_sen", "Senate: closest races", "/midterms"), ("el_gov", "Governor: closest races", "/midterms"), ("el_house", "House: closest races", "/midterms")]),
+         ("cf", "War and conflict", "Stories on The Wire by region", [("c_il", "Israel, Gaza and region", "/#wire"), ("c_ir", "Iran", "/#wire"), ("c_ru", "Russia and Ukraine", "/#wire"), ("c_uk", "UK and London", "/#wire"), ("c_other", "Other conflict zones", "/#heatmap")]),
+         ("hl", "Health and outbreaks", "Outbreak reports on The Wire", [("h_ebola", "Ebola", "/#medical"), ("h_measles", "Measles", "/#medical"), ("h_other", "Other outbreaks", "/#medical")]),
+         ("hd", "Hardship risks", "Power, communications, supply and order at home", [("grid", "U.S. power grid", "/#grid"), ("comms", "Phones, internet and cloud", "/#network"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Unrest in the U.S.", "/#wire")]),
+         ("nh", "Natural hazards", "Earthquakes, space weather and severe weather", [("quake", "Earthquakes", "/#solar"), ("kp", "Geomagnetic storms", "/#solar"), ("wx", "Weather threats to power", "/#grid"), ("flare", "Solar flares", "/#solar")])]
+def _board_html():
+    def card(k, label, href):
+        return (f'<article class="bna-card bna-mc" data-mc="{k}"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_{k}">'
+                f'<span class="bna-k">{E(label)}</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span>'
+                f'<span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button>'
+                f'<div class="bna-mx" id="bna_mx_{k}" hidden><div data-f="x"></div><a class="bna-lnk" href="{href}">See full page</a></div></article>')
+    out = ['<section class="bna-sec" id="bna_dash" aria-labelledby="bna_h_now"><div class="bna-wrap bna-sech"><h2 id="bna_h_now">Active Threat Monitoring</h2></div>']
+    for g, title, sub, cards in BOARD:
+        out.append(f'<div class="bna-wrap bna-grp" data-g="{g}" role="group" aria-labelledby="bna_g_{g}"><div class="bna-gh"><h3 id="bna_g_{g}"><i aria-hidden="true"></i>{E(title)}</h3><p>{E(sub)}</p></div>'
+                   f'<div class="bna-mgrid">' + "".join(card(*c) for c in cards) + '</div></div>')
+    out.append('</section>')
+    return "".join(out)
+
 def dash_data():
     return _single("dash", _dcache, 90, _dash_build)
 def _dash_build():
@@ -103,7 +284,10 @@ def _dash_build():
         big = max(day, key=lambda x: x["mag"]) if day else None
         lt = q.get("latest") or {}
         pick = big or lt
-        return {"n24": len(day), "classes": cls, "big": {k: pick.get(k) for k in ("mag", "place", "t", "tsunami", "url")} if pick else None,
+        wk = [x for x in lst if x.get("mag") is not None and float(x["mag"]) >= 5]
+        sig = max(wk, key=lambda x: _iso(x.get("t")) or 0) if wk else None
+        return {"n24": len(day), "classes": cls, "big": {k: pick.get(k) for k in ("mag", "place", "t", "tsunami", "url", "lat", "lon")} if pick else None,
+                "sig": {k: sig.get(k) for k in ("mag", "place", "t", "tsunami", "url", "lat", "lon")} if sig else None,
                 "week_n": q.get("count"), "src_t": max((x.get("t") for x in lst), default=None)}
     out["quake"] = _r(None, quake_card)
     def flare_card():
@@ -161,6 +345,10 @@ def _dash_build():
         days = [[r[0], r[1] or 0, r[2] or 0, r[3] or 0] for r in rows][-7:]   # ET calendar days (EST offset), today last
         return {"days": days, "total": sum(d[1] + d[2] + d[3] for d in days), "hi": sum(d[1] for d in days)}
     out["wire"] = _r(None, wire_card)
+    out["el"] = _r(None, lambda: elections_card(now))
+    out.update(_r(None, lambda: wire_groups(now)) or {})
+    out["comms"] = _r(None, comms_card)
+    if out.get("quake") and (out["quake"].get("sig") or {}).get("lat") is not None: out["quake"]["map"] = _r(None, lambda: quake_map(out["quake"]["sig"]))
     return out
 
 # Snapshot refresher: one background thread rebuilds the homepage snapshot every ~100 s from the same in-process data the APIs use.
@@ -211,8 +399,7 @@ def home_html(sn):
 <div class="bna-arrows"><button type="button" class="bna-arw" data-dir="-1" aria-label="Scroll back" aria-controls="bna_row_latest">&lsaquo;</button><button type="button" class="bna-arw" data-dir="1" aria-label="Scroll forward" aria-controls="bna_row_latest">&rsaquo;</button></div></div>
 <div class="bna-row" id="bna_row_latest" tabindex="0" aria-label="Top of the Wire"></div>
 <p class="bna-wrap bna-more"><a class="bna-lnk" href="/#wire">Open The Wire</a></p></section>
-<section class="bna-sec" id="bna_dash" aria-labelledby="bna_h_now"><div class="bna-wrap bna-sech"><h2 id="bna_h_now">Active Threat Monitoring</h2></div>
-<div class="bna-wrap bna-mgrid" id="bna_now"><article class="bna-card bna-mc" data-mc="kp"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_kp"><span class="bna-k">Geomagnetic storms</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_kp" hidden><div data-f="x"></div><a class="bna-lnk" href="/#solar">See full page</a></div></article><article class="bna-card bna-mc" data-mc="quake"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_quake"><span class="bna-k">Earthquakes</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_quake" hidden><div data-f="x"></div><a class="bna-lnk" href="/#solar">See full page</a></div></article><article class="bna-card bna-mc" data-mc="flare"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_flare"><span class="bna-k">Solar flares</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_flare" hidden><div data-f="x"></div><a class="bna-lnk" href="/#solar">See full page</a></div></article><article class="bna-card bna-mc" data-mc="wind"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_wind"><span class="bna-k">Solar wind</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_wind" hidden><div data-f="x"></div><a class="bna-lnk" href="/#solar">See full page</a></div></article><article class="bna-card bna-mc" data-mc="grid"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_grid"><span class="bna-k">U.S. power grid</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_grid" hidden><div data-f="x"></div><a class="bna-lnk" href="/#grid">See full page</a></div></article><article class="bna-card bna-mc" data-mc="wx"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_wx"><span class="bna-k">Weather threats to power</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_wx" hidden><div data-f="x"></div><a class="bna-lnk" href="/#grid">See full page</a></div></article><article class="bna-card bna-mc" data-mc="net"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_net"><span class="bna-k">Internet and cloud</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_net" hidden><div data-f="x"></div><a class="bna-lnk" href="/#network">See full page</a></div></article><article class="bna-card bna-mc" data-mc="wire"><button type="button" class="bna-mh" aria-expanded="false" aria-controls="bna_mx_wire"><span class="bna-k">The Wire this week</span><span class="bna-mv" data-f="v">&ndash;</span><span class="bna-ms" data-f="s"></span><span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button><div class="bna-mx" id="bna_mx_wire" hidden><div data-f="x"></div><a class="bna-lnk" href="/#wire">See full page</a></div></article></div></section>{_snap_js()}
+{_board_html()}{_snap_js()}
 <section class="bna-sec bna-wrap"><div class="bna-brief"><div><h2>The Free brief. <span>The day, ranked.</span></h2><p>The highest-ranked events of the day, in one email.</p></div>
 <a class="bna-btn" href="/newsletter">Get the Free brief</a></div><p class="bna-asof" data-bna="asof"></p></section>
 <footer class="bna-foot"><div class="bna-wrap"><nav class="bna-cols" aria-label="Site">{cols}</nav>

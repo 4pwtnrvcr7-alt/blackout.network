@@ -292,3 +292,40 @@ html[data-theme="light"].bna-pg .nsa-b .st{color:#1D1D1F!important}
 html[data-theme="light"].bna-pg :is(.nsa>.nsa-b,.ns-row,#tab-finance .fin-cl,#tab-bcast .clip,#tab-solar .ss-ah,#tab-solar .ssl-card,#tab-solar .ssl-q,#sq_top .sq-seg button,details.bn-acc>summary,.hm-ah,.wx-list [role=option]):is(:hover,:active,:focus){background:transparent!important;color:inherit}
 html[data-theme="light"].bna-pg .nsa.open>.nsa-b{background:transparent!important}
 html[data-theme="light"].bna-pg .nsa.open{background:#fff!important;border-color:rgba(0,0,0,.1)!important}
+/* Active Threat Monitoring board (t99u/t100u): grouped, one subtle hue per group, red only for high severity */
+.bna-grp{--g:#4AA3FF;--gf:rgba(74,163,255,.16);--gl:#0A5BD3;margin:0 auto 40px}
+.bna-grp[data-g="el"]{--g:#4AA3FF;--gf:rgba(74,163,255,.16);--gl:#0A5BD3;--gfl:rgba(10,91,211,.16)}
+.bna-grp[data-g="cf"]{--g:#B8B7FE;--gf:rgba(184,183,254,.16);--gl:#5B4BC4;--gfl:rgba(91,75,196,.16)}
+.bna-grp[data-g="hl"]{--g:#52C49A;--gf:rgba(82,196,154,.16);--gl:#0F7A55;--gfl:rgba(15,122,85,.16)}
+.bna-grp[data-g="hd"]{--g:#FFC21A;--gf:rgba(255,194,26,.14);--gl:#3A3A3C;--gfl:rgba(255,194,26,.55)}
+.bna-grp[data-g="nh"]{--g:#6DB2B5;--gf:rgba(109,178,181,.16);--gl:#1F6F73;--gfl:rgba(31,111,115,.16)}
+.bna-grp .bna-ch,.bna-grp .bna-mx{--a-ch:var(--g);--a-chf:var(--gf)}
+html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-ch,html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-mx{--a-ch:var(--gl);--a-chf:var(--gfl)}
+html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-ch .l{stroke:var(--gl)}
+html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-ch .b1{stroke:none}
+.bna-gh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding-top:6px;border-top:1px solid var(--a-ln,rgba(127,127,127,.2))}
+.bna-gh h3{margin:10px 0 0;font-size:19px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+.bna-gh h3 i{width:10px;height:10px;border-radius:50%;background:var(--g);flex:none}
+html[data-theme="light"] .bna-gh h3 i{background:var(--gl)}html[data-theme="light"] .bna-grp[data-g="hd"] .bna-gh h3 i{background:#FFC21A;box-shadow:0 0 0 1px #3A3A3C}
+.bna-gh p{margin:0;font-size:14px;color:var(--a-ink2,#86868B)}
+html[data-theme="light"] .bna-gh p{color:#515154}
+.bna-grp .bna-mc{box-shadow:inset 0 3px 0 var(--g)}
+html[data-theme="light"] .bna-grp .bna-mc{box-shadow:inset 0 3px 0 var(--gl)}
+html[data-theme="light"] .bna-grp[data-g="hd"] .bna-mc{box-shadow:inset 0 3px 0 #FFC21A}
+.bna-rl{list-style:none;margin:0;padding:0;font-size:13px;line-height:1.3}
+.bna-rl li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--a-ln,rgba(127,127,127,.18))}
+.bna-rl li:first-child{border-top:0}
+.bna-rl em{font-style:normal;color:var(--a-ink2,#86868B);margin-left:6px;font-size:12px}
+html[data-theme="light"] .bna-rl em,html[data-theme="light"] .bna-rl small{color:#515154}
+.bna-rl span:last-child{text-align:right}.bna-rl small{display:block;color:var(--a-ink2,#86868B);font-size:12px}
+.bna-ch svg.bna-map{height:120px;border-radius:12px;overflow:hidden!important}
+.bna-map .sea{fill:rgba(127,127,127,.08)}.bna-map .land{fill:rgba(127,127,127,.42);stroke:rgba(127,127,127,.6);stroke-width:.5}
+.bna-map .ring{fill:none;stroke:var(--g);stroke-width:1.5;opacity:.6}.bna-map .dot{fill:var(--g)}
+html[data-theme="light"] .bna-map .ring{stroke:var(--gl)}html[data-theme="light"] .bna-map .dot{fill:var(--gl)}
+.bna-mx .bna-ch,.bna-mx svg{max-width:100%}
+.bna-mx [data-f=x]>svg{display:block;width:100%;height:56px;margin:8px 0}
+.bna-mx svg .b0{fill:var(--a-b0)}.bna-mx svg .b1{fill:var(--a-ch)}.bna-mx svg .b2{fill:var(--a-red)}
+.bna-ms{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media (prefers-reduced-motion:reduce){.bna-map .ring{opacity:.4}}
+@media (min-width:1100px){.bna-grp[data-g="cf"] .bna-mgrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:16px}.bna-grp[data-g="hl"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.bna-grp[data-g="el"] .bna-mv{font-size:clamp(20px,2vw,26px)}

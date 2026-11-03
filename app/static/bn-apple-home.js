@@ -107,6 +107,72 @@
     x:x("<b>"+n(R.total)+"</b> stories reached The Wire in the last 7 days; "+n(R.hi)+" ranked 7 or higher.",
      "Every story we track gets a rank from 0 to 10 using published rules. Bars show stories per day: gray rank 0 to 3, yellow 4 to 6, red 7 and up.",
      "0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}else none("wire");
+  try{board(D)}catch(e){}
+ }
+
+ // ---- widget board groups (elections, conflict, health, hardship, quake map). Real data only; empty states say so plainly.
+ var LASTD=null,TK=null;
+ function hm(sec){sec=Math.max(0,Math.round(sec/60));var h=Math.floor(sec/60),m=sec%60;return h?h+"h "+(m<10?"0":"")+m+"m":m+" min"}
+ function tET(ts){return new Date(ts*1000).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})+" ET"}
+ function PN(c){return c=="D"?"D":c=="R"?"R":c?c:""}
+ function el(D){var E=D.el;if(!E){["el_next","el_sen","el_gov","el_house"].forEach(function(k){none(k)});return}
+  var now=Date.now()/1000,nt=E.next&&E.next>now?E.next:null;
+  if(!nt&&E.waves)E.waves.forEach(function(w){if(!nt&&w[0]>now)nt=w[0]});
+  var wave=nt===E.next?E.wave:[],first=E.first&&now<E.first;
+  var cols=(E.waves||[]).map(function(w){var d=new Date(w[0]*1000),l=d.toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).replace(":00","").replace(/ [AP]M/,"");return{v:w[0]<=now?[w[1]]:[0,w[1]],l:l}});
+  if(nt){put("el_next",{v:esc(hm(nt-now))+" <small>until "+(first?"first":"next")+" polls close</small>",
+    s:(wave&&wave.length?esc(wave.slice(0,3).join(", "))+(wave.length>3?" and "+(wave.length-3)+" more":"")+" at ":"Next closing at ")+esc(tET(nt))+" &middot; last polls close "+esc(tET(E.last))+" (in "+esc(hm(E.last-now))+")",
+    c:bars(cols,{labels:1}),t:"270toWin, NCSL &middot; "+E.closed+" of "+E.states+" states closed",
+    x:x((E.closed?"Polls have closed in <b>"+E.closed+"</b> of "+E.states+" states and D.C. ":"No polls have closed yet. ")+"The next closing is at <b>"+esc(tET(nt))+"</b>. The last polls close at "+esc(tET(E.last))+".",
+     "Scheduled poll closing times in Eastern Time for Election Day, Tuesday, November 3. Voters in line when polls close can still vote. Bars count states closing at each time; gray ones have closed.",
+     "Results start to come in after a state's polls close. Split-time-zone states close in two steps.")})}
+  else put("el_next",{v:"All polls closed",s:"Last polls closed at "+esc(tET(E.last))+". Counting continues.",c:bars(cols,{labels:1}),t:"270toWin, NCSL",
+    x:x("Every state's polls have closed. Counting can take days in some states.","Scheduled poll closing times in Eastern Time.","")});
+  [["el_sen","senate","Senate"],["el_gov","governor","Governor"],["el_house","house","House"]].forEach(function(z){var R=E[z[1]]||[];if(!R.length){none(z[0],"No rated races in the data.");return}
+   var have=R.filter(function(r){return r.lead}).length,
+    li=R.map(function(r){var L=r.lead,rt=esc(r.label)+'<em>'+esc(r.rating||"")+'</em>';
+     var right=L?'<b>'+esc(L.name.split(" ").slice(-1)[0])+" ("+PN(L.code)+")"+(L.won?" won":" +"+L.margin.toFixed(1))+'</b>'+(L.rep&&L.rep[1]?'<small>'+Math.round(100*L.rep[0]/L.rep[1])+"% of "+esc(L.rep[2]||"units")+" in</small>":""):'<small>'+(r.close&&r.close>now?"Polls close "+esc(tET(r.close)):"Results after polls close")+'</small>';
+     return '<li><span>'+rt+'</span><span>'+right+'</span></li>'}).join("");
+   put(z[0],{v:have?have+" of "+R.length+" <small>with early results</small>":"Results after polls close",
+    s:"Closest "+R.length+" races by forecaster ratings",c:'<ul class="bna-rl">'+li+'</ul>',t:"State results feeds, Wikipedia &middot; "+esc(et(E.t)),
+    x:x(have?"Leaders shown with their margin in points and the share of counties reporting, as published by the official state results feeds (or Wikipedia where no feed exists). We do not call races.":"No results yet. Each race shows its scheduled poll closing time.",
+     "The "+z[2]+" races that forecasters rate closest, using the consensus of published ratings. Margin is the leader's lead in percentage points.",
+     "Ratings: Tossup, Tilt, Lean, Likely, Safe.")})});
+ }
+ var DNS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+ function wg(k,o,def){if(!o){none(k);return}var tp=o.top;
+  var cols=(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}});
+  put(k,{v:o.n24?pl(o.n24,"story","stories")+" <small>in 24 hours</small>":"Quiet <small>in 24 hours</small>",sev:o.max24>=7,
+   s:tp?esc(tp.title):(o.n7?pl(o.n7,"story","stories")+" in 7 days, none in the last 24 hours":"No stories in 7 days"),
+   c:bars(cols,{labels:1}),t:"The Wire &middot; "+pl(o.n7,"story","stories")+" in 7 days",
+   x:x(tp?'Top story now (rank '+tp.rank+'/10): <a class="bna-lnk" href="'+esc(tp.url)+'">'+esc(tp.title)+'</a>, updated '+esc(et(tp.t))+".":"Nothing ranked in the last 24 hours.",
+    def+" Bars show stories per day for 7 days; red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}
+ function board(D){LASTD=D;el(D);
+  var C=D.conf||{},H=D.health||{},R=D.hard||{};
+  wg("c_il",C.il,"Conflict stories on The Wire that mention Israel, Gaza, Lebanon, Yemen or the Houthis.");
+  wg("c_ir",C.ir,"Conflict stories on The Wire that mention Iran.");
+  wg("c_ru",C.ru,"Conflict stories on The Wire that mention Russia or Ukraine.");
+  wg("c_uk",C.uk,"Conflict and security stories on The Wire that mention the UK or London.");
+  wg("c_other",C.other,"Conflict stories on The Wire from every other region.");
+  wg("h_ebola",H.ebola,"Stories on The Wire about Ebola (and the related Marburg virus).");
+  wg("h_measles",H.measles,"Stories on The Wire about measles.");
+  wg("h_other",H.other,"Other outbreak and disease stories on The Wire: cholera, dengue, bird flu, mpox and more.");
+  wg("food",R.food,"Stories on The Wire about food supply, shortages, recalls, shipping and supply chains.");
+  wg("unrest",R.unrest,"U.S. stories on The Wire about protests, riots, curfews or National Guard deployments.");
+  var M=D.comms;if(M){var bad=(M.isp_bad||[]).concat(M.cloud_bad||[]),N=D.net||{};
+   put("comms",{v:bad.length?pl(bad.length,"provider issue"):"All clear",sev:bad.length>=3,
+    s:(M.isp_bad&&M.isp_bad.length?esc(M.isp_bad.map(function(z){return z.src}).join(", "))+" reporting problems":"Carriers normal: "+esc((M.isp||[]).join(", ")))+(M.cloud_bad&&M.cloud_bad.length?" &middot; "+esc(M.cloud_bad.map(function(z){return z.src.replace(/ \(.*\)/,"")+": "+z.status}).join("; ")):""),
+    c:line(N.series||[],{lo:0,hi:3,from:"24 hours ago"}),t:"Provider status pages &middot; "+esc(et(M.t)),
+    x:x(bad.length?bad.map(function(z){return"<b>"+esc(z.src)+"</b>: "+esc(z.status)}).join("; ")+".":"Every monitored carrier, internet, cloud and DNS provider reports normal operation.",
+     "We check "+(M.isp_n||0)+" U.S. phone and home internet carriers and "+(M.cloud_n||0)+" cloud, DNS and app services every few minutes. The chart counts providers with a problem at each check.",
+     "Operational, Notice, Degraded, Major outage.")})}else none("comms");
+  var q=D.quake;if(q&&q.sig&&q.map){var C2=["Minor","Light","Moderate","Strong","Major","Great"],b=q.sig,m=+b.mag,ci=Math.min(5,Math.max(0,Math.floor(m)-3)),mp=q.map;
+   var map='<svg class="bna-map" viewBox="0 0 300 165" preserveAspectRatio="xMidYMid slice" focusable="false"><rect class="sea" width="300" height="165"/><path class="land" d="'+mp.d+'"/><circle class="ring" cx="'+mp.x+'" cy="'+mp.y+'" r="14"/><circle class="dot" cx="'+mp.x+'" cy="'+mp.y+'" r="4.5"/></svg>';
+   put("quake",{v:esc(C2[ci])+" <small>M"+m.toFixed(1)+"</small>",sev:m>=7,s:esc(b.place||"")+" &middot; "+esc(et(b.t)),c:map,t:"USGS &middot; "+pl(q.n24,"quake")+" M2.5+ in 24 hours",
+    x:x("The latest quake of magnitude 5 or more was <b>"+esc(C2[ci].toLowerCase())+"</b>, M"+m.toFixed(1)+", "+esc(b.place||"")+", at "+esc(et(b.t))+(b.tsunami?". USGS flagged it for tsunami review.":".")+" Last 24 hours by magnitude:</p>"+bars(q.classes.map(function(v,i){return{v:i>=4?[0,0,v]:[0,v],l:["<4","4","5","6","7","8+"][i]}}),{labels:1})+"<p>",
+     "Magnitude 5 and up is where quakes start to damage buildings and disrupt daily life. Each whole step is about 32 times more energy.",
+     "USGS classes: light 4 to 4.9, moderate 5 to 5.9, strong 6 to 6.9, major 7 to 7.9, great 8 and up.")})}
+  if(!TK)TK=setInterval(function(){if(!document.hidden&&LASTD)try{el(LASTD)}catch(e){}},30000);
  }
  function toggle(c,open){var b=c.querySelector(".bna-mh"),p=c.querySelector(".bna-mx");b.setAttribute("aria-expanded",open?"true":"false");p.hidden=!open;c.classList.toggle("bna-open",open)}
  S.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".bna-mh");if(!b)return;var c=b.closest(".bna-mc");toggle(c,b.getAttribute("aria-expanded")!="true")});
