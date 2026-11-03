@@ -368,7 +368,11 @@ def _ensure_bg():
         _bg["on"] = True
     threading.Thread(target=_bg_loop, daemon=True, name="bna-snapshot").start()
 def _snap_js():
-    _ensure_bg()
+    # Cold start (first "/" after a deploy): build the snapshot once, single-flight, so the first visitor never gets an empty page.
+    for c, f in ((_cache, home_data), (_dcache, dash_data)):
+        if not c["v"]:
+            try: f()
+            except Exception: pass
     try: js = open(os.path.join(BASE, "static", "bn-apple-home.js"), encoding="utf-8").read()
     except Exception: return ""
     dump = lambda v: json.dumps(v, separators=(",", ":"), default=str).replace("</", "<\\/") if v else "null"
