@@ -50,6 +50,9 @@ ROUTES = {
     "/sitenav.css": "sitenav",
     "/linkguard.js": "bn_extras",   # hides links the nightly link checker flagged dead (t338)
     "/bn-icons.js": "bn_extras",    # emoji -> SVG icons (Nov 1)
+    "/bn-apple.css": "apple_v1",     # apple_style_v1 phase 2 (Nov 3): minimal chrome + homepage; on by default; BN_APPLE=0 = off (-> 404)
+    "/bn-apple.js": "apple_v1",
+    "/api/apple": "apple_v1",
     "/bn-v3.css": "design_v3",      # design v3 phase 1: tokens, full-page menu, accordions (Nov 2)
     "/bn-v3.js": "design_v3",
     "/api/v3": "design_v3",         # /api/v3/wire: Top of mind + What's coming bands (data/top_of_mind.json, data/whats_coming.json)

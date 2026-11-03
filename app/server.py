@@ -180,6 +180,11 @@ def dashboard_page():
     except Exception:
         traceback.print_exc(); top = _DASH_FALLBACK
     b = b.replace(b"<!--BN_TOP-->", top, 1)
+    if os.environ.get("BN_APPLE", "1") != "0":   # apple_style_v1 homepage (apple_v1.py): shown on "/" with no tab hash; the dashboard stays below, hidden
+        try:
+            import sitenav
+            b = b.replace(b"<main id=\"tab-threat\">", _addon_mod("apple_v1").home_html(sitenav).encode("utf-8") + b"<main id=\"tab-threat\">", 1)
+        except Exception: traceback.print_exc()
     try:   # design v3: Top of mind + What's coming bands at the top of The Wire (hidden when their data files are missing)
         b = b.replace(b"<!--BN_V3_WIRE-->", _addon_mod("design_v3").wire_html().encode("utf-8"), 1)
     except Exception: traceback.print_exc()
@@ -444,6 +449,11 @@ def version_assets(b):
             if k > 0: b = b[:k] + b'<link rel="stylesheet" href="/bn-v3.css">' + b[k:]
             j = b.rfind(b"</body>")
             if j > 0: b = b[:j] + b'<script src="/bn-v3.js" defer></script>' + b[j:]
+        if os.environ.get("BN_APPLE", "1") != "0" and b"<html" in lo and b"/bn-apple.css" not in b:   # apple_style_v1 (apple_v1.py); on by default; BN_APPLE=0 = off
+            k = b.find(b"</head>")
+            if k > 0: b = b[:k] + _addon_mod("apple_v1").head_tag() + b[k:]
+            j = b.rfind(b"</body>")
+            if j > 0: b = b[:j] + b'<script src="/bn-apple.js" defer></script>' + b[j:]
         return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
     except Exception: return b
 BN_RETRY_HEAD = (b'<script>/*bnRetry*/(function(){if(window.__bnRetry)return;window.__bnRetry=1;var o=location.origin;'
