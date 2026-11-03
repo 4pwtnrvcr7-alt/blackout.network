@@ -422,6 +422,41 @@ WARMING = b"""<!doctype html><html><head><meta charset=utf-8><meta http-equiv=re
 <div style="text-align:center"><h1>blackout.network</h1><p>Signal over noise.</p>
 <p>Syncing the latest data&hellip; this page refreshes automatically.</p></div></body></html>"""
 
+# ---------- no-data relay (2026-11-03): a fresh instance never answers 503 to visitors ----------
+# During a deploy Render can route public traffic to the NEW instance before it has data (it waits for the handoff or the box
+# sync; on Nov 3 3:12 PM ET that took ~60 s of 503s). Until data arrives, page/API GETs are relayed to the public URL with a hop
+# header: the OLD instance (has data) answers normally; if the request lands back on a data-less instance it answers 421 at once
+# and we ask again. Bounded: 16 relays at a time, 3 tries, 6 s each, 4 MB cap. If the relay fails, "/" gets a 200 fallback page.
+_relay_sem = threading.BoundedSemaphore(16)
+RELAY_HOP = "X-BN-Relay"
+RELAY_MAX = 4 << 20
+RELAY_COPY = ("Content-Type", "Cache-Control", "ETag", "Last-Modified", "Vary", "Content-Language", "Location", "Content-Encoding", "Expires")
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k): return None
+_relay_opener = urllib.request.build_opener(_NoRedirect)
+def relay(h):
+    """Fetch h.path from the instance that has data. Returns (code, headers, body) or None."""
+    if not HANDOFF_URL or not _relay_sem.acquire(timeout=2): return None
+    try:
+        hdr = {RELAY_HOP: BOOT_ID, "User-Agent": h.headers.get("User-Agent", "blackout-relay/1.0")[:300]}
+        for k in ("Accept", "Accept-Language", "Accept-Encoding", "Cookie"):
+            if h.headers.get(k): hdr[k] = h.headers[k]
+        if os.environ.get("BN_INTERNAL_TOKEN"): hdr["X-BN-Internal"] = os.environ["BN_INTERNAL_TOKEN"]
+        for _ in range(3):
+            if has_data(): return None
+            try:
+                with _relay_opener.open(urllib.request.Request(HANDOFF_URL + h.path, headers=hdr), timeout=6) as r:
+                    code, hh, body = r.status, r.headers, r.read(RELAY_MAX + 1)
+            except urllib.error.HTTPError as e:
+                if e.code == 421: time.sleep(0.2); continue
+                code, hh, body = e.code, e.headers, e.read(RELAY_MAX + 1)
+            except Exception: return None
+            if len(body) > RELAY_MAX or code >= 500: return None
+            return code, [(k, hh[k]) for k in RELAY_COPY if hh.get(k)], body
+        return None
+    finally: _relay_sem.release()
+FALLBACK = WARMING.replace(b"content=20", b"content=8").replace(b"<h1>blackout.network</h1><p>Signal over noise.</p>", b"<h1>BLACKOUT.NETWORK</h1><p>Signal over noise.&trade;</p>").replace(b"Syncing the latest data&hellip;", b"Updating&hellip;")
+
 class RH(server.H):
     server_version = "Blackout/1.0"
     # Visitor counter env vars (analytics 2026-11-01): BN_INTERNAL_TOKEN (optional; our own tools send it as X-BN-Internal and those
@@ -482,7 +517,19 @@ class RH(server.H):
             finally: os.unlink(tmp)
             return self.send(200, data, "application/gzip")
         if not has_data():
-            if path in ("/", "/index.html"): return self.send(503, WARMING, "text/html")
+            if self.headers.get(RELAY_HOP): return self.send(421, {"error": "no data here", "boot_id": BOOT_ID})
+            if not path.startswith(("/internal/", "/api/report/", "/api/reports/")) and not (os.path.splitext(path)[1] and not path.endswith(".html")):
+                r = relay(self)
+                if r:
+                    code, hh, body = r
+                    self.send_response(code)
+                    for k, v in hh: self.send_header(k, v)
+                    self.send_header("Content-Length", str(len(body))); self.send_header("X-BN-Relayed", "1"); self.end_headers()
+                    if self.command != "HEAD": self.wfile.write(body)
+                    return
+            if path in ("/", "/index.html"):
+                self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(FALLBACK))); self.end_headers(); self.wfile.write(FALLBACK); return
             if path.startswith("/api/") and not path.startswith(("/api/report/", "/api/reports/")):   # problem reports work without synced data
                 return self.send(503, {"error": "warming up: waiting for the first data sync"})
         return super().do_GET()
