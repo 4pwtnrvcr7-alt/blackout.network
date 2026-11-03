@@ -70,6 +70,8 @@
  function hsl(c){var r=c[0]/255,g=c[1]/255,b=c[2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,s=mx==mn?0:(l>.5?(mx-mn)/(2-mx-mn):(mx-mn)/(mx+mn)),h=0;
   if(mx!=mn){h=mx==r?(g-b)/(mx-mn)+(g<b?6:0):mx==g?(b-r)/(mx-mn)+2:(r-g)/(mx-mn)+4;h*=60}return[h,s,l]}
  function yellow(c){var h=hsl(c);return h[0]>=38&&h[0]<=54&&h[1]>.6&&h[2]>.38}
+ function brown(c){var h=hsl(c);return h[0]>=20&&h[0]<=56&&h[1]>.45&&h[2]<.4&&h[2]>.08}
+ function yb(c){return yellow(c)||brown(c)}
  var bgc=new Map();
  function bgOf(e){var st=[],x=e;while(x&&x.nodeType==1){if(bgc.has(x)){var b0=bgc.get(x);if(!b0)return null;for(var i=st.length-1;i>=0;i--)b0=mix(st[i],b0);return b0}
    var cs=getComputedStyle(x);if(cs.backgroundImage&&cs.backgroundImage!="none"&&!/gradient/.test(cs.backgroundImage)){bgc.set(x,null);return null}
@@ -87,12 +89,12 @@
  function one(e){if(!e.isConnected||e.closest(SKIP))return;
    var has=false;for(var n=e.firstChild;n;n=n.nextSibling)if(n.nodeType==3&&n.nodeValue.trim()){has=true;break}
    var cs=null;
-   if(!has){cs=getComputedStyle(e);var bc=rgb(cs.backgroundColor);if(bc&&bc[3]>.5&&yellow(bc)&&cs.backgroundColor!=Y&&!e.dataset.bnaY){e.dataset.bnaY=1;setp(e,"background-color","#FFC21A")}return}
+   if(!has){cs=getComputedStyle(e);var bc=rgb(cs.backgroundColor);if(bc&&bc[3]>.5&&yb(bc)&&cs.backgroundColor!=Y&&!e.dataset.bnaY){e.dataset.bnaY=1;setp(e,"background-color","#FFC21A");if(e.children.length)setp(e,"color","#1D1D1F")}return}
    var r=e.getBoundingClientRect();if(r.width<1||r.height<1)return;
-   cs=cs||getComputedStyle(e);var bcol=rgb(cs.backgroundColor);if(bcol&&bcol[3]>.5&&yellow(bcol)&&cs.backgroundColor!=Y){setp(e,"background-color","#FFC21A");bgc.delete(e)}
+   cs=cs||getComputedStyle(e);var bcol=rgb(cs.backgroundColor);if(bcol&&bcol[3]>.5&&yb(bcol)&&cs.backgroundColor!=Y){setp(e,"background-color","#FFC21A");bgc.delete(e)}
    var fg=rgb(cs.color),bg=bgOf(e);if(!fg||!bg)return;var f=mix(fg,bg),fs=parseFloat(cs.fontSize),need=(fs>=24||(+cs.fontWeight>=700&&fs>=18.66))?3:4.5;
-   if(ratio(f,bg)>=need)return;e.dataset.bnaC=1;var h=hsl(f),light=lum(bg)>.4,out;
-   if(h[1]<.25||yellow(f)||!light){out=ratio([29,29,31],bg)>=ratio([255,255,255],bg)?[29,29,31]:[255,255,255]}
+   if(ratio(f,bg)>=need&&!brown(f))return;e.dataset.bnaC=1;var h=hsl(f),light=lum(bg)>.4,out;
+   if(h[1]<.25||yb(f)||!light){out=ratio([29,29,31],bg)>=ratio([255,255,255],bg)?[29,29,31]:[255,255,255]}
    else{out=f.slice();for(var k=0;k<20&&ratio(out,bg)<need;k++)out=out.map(function(v,ix){return ix<3?v*.88:v})}
    setp(e,"color",css(out))}
  function undo(){while(done.length){var x=done.pop();x[0].style.removeProperty(x[1]);if(x[2])x[0].style.setProperty(x[1],x[2],x[3]);delete x[0].dataset.bnaC;delete x[0].dataset.bnaY}}

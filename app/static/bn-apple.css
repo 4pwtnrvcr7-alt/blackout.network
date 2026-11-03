@@ -159,7 +159,7 @@ html.bna-pg .bna-dup>.meta{margin-top:0!important}
 /* (e) glyph icons dropped from headings and controls */
 html.bna-pg .bna-glyph{display:none!important}
 /* (c) Wire score badges: white on the darkened amber/green keeps 4.5:1 in light mode */
-html.bna-pg[data-theme="light"] .sc.m{color:#fff!important}
+html[data-theme="light"] .sc.m{background:#FFC21A!important;color:#1D1D1F!important}
 /* (d) Report a problem: between phone and wide desktop it sits at the end of the page (as on phone), so it never covers a card */
 @media (min-width:601px) and (max-width:1279px){html.bna-home .bnr-fab,html.bna-pg .bnr-fab{position:static!important;display:flex!important;margin:8px auto 28px!important;width:max-content!important;right:auto!important;bottom:auto!important;transform:none!important}
  html.bna-home body:has(.bnr-fab),html.bna-pg body:has(.bnr-fab){padding-bottom:0!important}}
@@ -248,3 +248,16 @@ html.bna-home[data-theme="light"]{--bn-brand:#FFC21A;--bn-brand-ink:#1D1D1F;--bn
 html[data-theme="light"] .bng-cta-k{color:#6E6E73!important}
 .bng-btn,.bng-btn span{color:#0B0D10!important}
 html[data-theme="light"] .bn-acc-st.warn{background:#FFC21A!important;color:#0B0D10!important}
+/* light-mode AA leftovers (c4aae97 sweep) */
+html[data-theme="light"] #tab-grid .gs-mfresh{background:rgba(255,255,255,.94)!important;color:#1D1D1F!important;border-color:rgba(0,0,0,.12)!important}
+html[data-theme="light"] #tab-grid .gs-mfresh span{color:#515154!important}
+html[data-theme="light"] .leaflet-control-attribution,html[data-theme="light"] .leaflet-control-attribution a{color:#1D1D1F!important}
+html[data-theme="light"] .leaflet-control-attribution{background:rgba(255,255,255,.9)!important}
+html[data-theme="light"] #tab-trends .tr-org.l{color:#0F6B3A!important}
+html[data-theme="light"] #tab-trends .tr-rk[style*="255, 77, 79"],html[data-theme="light"] #tab-trends .tr-rk[style*="#ff4d4f"],html[data-theme="light"] #tab-trends .tr-rk[style*="#FF4D4F"]{background:#D70015!important}
+html[data-theme="light"] #tab-noise .bn-seg button.on,html[data-theme="light"] #tab-noise .bn-seg button.on .meta{background:#FFC21A!important;color:#1D1D1F!important}
+html[data-theme="light"] .gs-card ul.gs-rs{color:#1D1D1F!important}
+html[data-theme="light"] .ssl-ic{color:#FFC21A!important;-webkit-text-stroke:.5px #3A3A3C}
+html[data-theme="light"] #ssl_mtabs button.on,html[data-theme="light"] #ssl_itabs button.on{background:#FFC21A!important;color:#1D1D1F!important;border-color:#FFC21A!important}
+html[data-theme="light"] #ssl_cards a.ssl-card,html[data-theme="light"] #sq_app .sq-badge{border-color:rgba(0,0,0,.12)!important}
+html[data-theme="light"] .gs-bad{color:#1D1D1F!important}
