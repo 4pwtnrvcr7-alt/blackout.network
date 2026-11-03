@@ -11,7 +11,13 @@
  function group(items){var out=[];items.forEach(function(x){
    if(isQuake(x)&&x.lat!=null){for(var i=0;i<out.length;i++){var y=out[i];if(y.q&&Math.abs(y.lat-x.lat)<1.5&&Math.abs(y.lon-x.lon)<1.5&&Math.abs(new Date(y.first_seen)-new Date(x.first_seen))<1296e5){y.more++;return}}}
    out.push({title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,q:isQuake(x),more:0})});return out}
- function card(x){var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"";
+ // Display-only category fix (t100u): the scanner's keyword order labels "governor declares emergency over flooding" Political.
+ // Hazard and outbreak terms outrank political ones here; the stored category is unchanged (proposed scanner fix: category_fix.patch).
+ var HZ=/\b(earthquake|tsunami|flood|flooding|flash flood|cyclone|hurricane|typhoon|tropical storm|winter storm|wildfire|volcan|eruption|landslide|drought|tornado|blizzard|severe weather|severe storms?)/i,
+  DZ=/\b(ebola|marburg|cholera|measles|influenza|h5n1|bird flu|avian flu|mpox|dengue|plague|epidemic|pandemic|polio|outbreak)/i,NO=/\b(war|weather|storm|tornado) outbreaks?\b/i,
+  WZ=/\b(missile|airstrike|strike|attack|troops|drone|military|war\b|bomb|shelling|invasion|ceasefire)/i;
+ function dcat(x){var c=x.category||"",t=x.title||"";if(c=="political"||c=="other"||(c=="war/conflict"&&!WZ.test(t))){if(DZ.test(t)&&!NO.test(t))return"disease";if(HZ.test(t))return"natural disaster"}return c}
+ function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"";
   return '<a class="bna-card bna-it'+(hi?" hi":"")+'" href="/#wire"><div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
    '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'}
  function set(k,v){var e=H.querySelector('[data-bna="'+k+'"]');if(e)e.innerHTML=v}
