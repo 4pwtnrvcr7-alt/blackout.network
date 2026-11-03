@@ -118,7 +118,7 @@ html.bna-pg details.bn-acc .bn-acc-ico,html.bna-pg details.bn-acc summary>svg:fi
 html.bna-pg .pn .wx-card,html.bna-pg .pn .gs-card,html.bna-pg .pn .ss-tile,html.bna-pg .pn .ss-stat,html.bna-pg .pn .ss-acc,html.bna-pg .pn .nsa,html.bna-pg .pn .gs-ev,html.bna-pg .pn .tfx-seg{border-radius:14px!important;box-shadow:none!important}
 html.bna-pg .tl-card{border-radius:14px!important}
 /* controls: pill buttons and chips, quiet fills */
-html.bna-pg body>main button:not(.leaflet-control *):not([class*="maplibre"]),html.bna-pg .cr button,html.bna-pg .wrap button{border-radius:999px}
+html.bna-pg body>main button:not(.leaflet-control *):not([class*="maplibre"]):not([aria-expanded]):not(.nsa-b):not(.ss-ah):not(.hm-ah),html.bna-pg .cr button:not([aria-expanded]),html.bna-pg .wrap button:not([aria-expanded]){border-radius:999px}
 html.bna-pg body>main input[type=text],html.bna-pg body>main input[type=search],html.bna-pg body>main input:not([type]),html.bna-pg body>main select,html.bna-pg .cr input,html.bna-pg .np input{border-radius:12px!important}
 /* event page (/wire/<id>) and the standalone pages share one column */
 html.bna-pg body>.wrap,html.bna-pg body>.cr,html.bna-pg body>.np,html.bna-pg .wrap.np{max-width:calc(var(--a-max) + 2*var(--a-gut))!important;margin-left:auto!important;margin-right:auto!important;padding-left:var(--a-gut)!important;padding-right:var(--a-gut)!important;box-sizing:border-box}
@@ -261,3 +261,29 @@ html[data-theme="light"] .ssl-ic{color:#FFC21A!important;-webkit-text-stroke:.5p
 html[data-theme="light"] #ssl_mtabs button.on,html[data-theme="light"] #ssl_itabs button.on{background:#FFC21A!important;color:#1D1D1F!important;border-color:#FFC21A!important}
 html[data-theme="light"] #ssl_cards a.ssl-card,html[data-theme="light"] #sq_app .sq-badge{border-color:rgba(0,0,0,.12)!important}
 html[data-theme="light"] .gs-bad{color:#1D1D1F!important}
+
+/* Tap and expand states (iPhone bug 1:38 PM ET): no tap flash, no dark sticky-hover pill on touch, no red ring on open rows.
+   Keyboard users keep a focus ring via :focus-visible only. */
+html,html *{-webkit-tap-highlight-color:transparent}
+html.bna-pg :is(button,summary,[role=button],a):focus:not(:focus-visible),html.bna-home :is(button,summary,[role=button],a):focus:not(:focus-visible){outline:none!important;box-shadow:none}
+html.bna-pg :is(button[aria-expanded],summary,.nsa-b,.ns-row,.ss-ah,.hm-ah):focus-visible{outline:2px solid #FFC21A!important;outline-offset:-2px;border-radius:inherit}
+html.bna-pg main button[aria-expanded],html.bna-pg .nsa>.nsa-b{border-radius:inherit}
+.nsa>.nsa-b{border-radius:8px}
+@media (hover:none){
+ html.bna-pg :is(.nsa>.nsa-b,.ns-row,#tab-finance .fin-cl,#tab-bcast .clip,#tab-solar .ss-ah,#tab-solar .ssl-card,#tab-solar .ssl-q,#sq_top .sq-seg button,details.bn-acc>summary,.hm-ah):hover{background:none!important}
+}
+@media (hover:hover){
+ html[data-theme="light"].bna-pg :is(.nsa>.nsa-b,.ns-row,#tab-finance .fin-cl,#tab-bcast .clip,#tab-solar .ss-ah,#tab-solar .ssl-card,#tab-solar .ssl-q,#sq_top .sq-seg button):hover{background:rgba(0,0,0,.04)!important}
+}
+html.bna-pg :is(.nsa>.nsa-b,.ns-row,details.bn-acc>summary,.ss-ah,.hm-ah):active{background:none}
+html.bna-pg .nsa.open{border-color:var(--a-ln,rgba(127,127,127,.25))!important}
+html.bna-pg .nsa.open .nsa-chev{color:var(--a-ink2,currentColor)!important}
+html[data-theme="light"].bna-pg .nsa{background:#fff!important;border-color:rgba(0,0,0,.08)}
+/* calmer status strips: thin rounded segments, muted no-data */
+html.bna-pg .nsa-up{gap:2px!important}html.bna-pg .nsa-up i{height:8px!important;border-radius:4px!important}
+html.bna-pg .ns-h{height:8px!important;gap:2px!important;align-items:stretch}html.bna-pg .ns-h i{border-radius:4px!important;min-width:2px}
+html.bna-pg .ns-h i{background:#2C2C2E}html[data-theme="light"].bna-pg .ns-h i{background:#E5E5EA}
+html.bna-pg .nsa-b .nm small{color:var(--a-ink2,#6E6E73)!important;letter-spacing:.06em}
+html[data-theme="light"].bna-pg .nsa-b .nm small{color:#515154!important}
+html[data-theme="light"].bna-pg .nsa-b .dt{color:#515154!important}
+html[data-theme="light"].bna-pg .nsa-b .st{color:#1D1D1F!important}
