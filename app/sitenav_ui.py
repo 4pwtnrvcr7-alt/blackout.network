@@ -43,7 +43,7 @@ I_X = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="15" heig
 # Sidebar sections (brand A "Signal" menu). Keys are sitenav.NAV keys. A NAV tab not listed here goes into the section of the
 # tab listed before it in NAV (so a new tab added next to Politics/Government lands in Politics & Government), else the first section.
 MENU = [
- ("Live", ["threat", "noise", "thread", "bcast", "streams", "radio", "trends", "heatmap"]),
+ ("Live", ["threat", "noise", "bcast", "streams", "radio", "trends", "heatmap"]),
  ("Threat categories", ["net", "grid", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "intel"]),
  ("Politics & Government", ["politics", "gov"]),
  ("Community", ["ranked", "@social", "@stats", "newsletter"]),
@@ -121,7 +121,7 @@ def topbar(sn, active="", ctl_html=""):
 MENU3 = [
  ("latest", "Latest", "The live feed, ranked as it happens.",
   [("threat", "The Wire"), ("streams", "Live TV & Radio"), ("noise", "Background Noise"), ("heatmap", "Heat Map"), ("trends", "Trends"),
-   ("thread", "The Thread"), ("bcast", "Broadcast transcripts"), ("radio", "Live Radio")]),
+   ("bcast", "Broadcast transcripts"), ("radio", "Live Radio")]),
  ("threats", "Threats", "Weather, space, grid and network risks.",
   [("weather", "Weather"), ("solar_seismic", "Solar & Seismic"), ("grid", "Energy Grid"), ("net", "Network Status"),
    ("starlink", "Starlink"), ("netnear", "Networks near me"), ("ai", "AI Threats"), ("@crime", "Crime")]),
@@ -146,7 +146,9 @@ M3_PV = {
  "community": '<a class="m3-trailer" href="/social"><span class="m3-k">Channel trailer</span><b class="m3-big" data-pv="sources-c">&ndash;</b><span class="m3-sm">sources, one feed</span></a>',
  "about": '<span class="m3-k">Sources in the feed</span><b class="m3-big" data-pv="sources">&ndash;</b><span class="m3-asof" data-pv="sources-asof"></span>',
 }
-M3_SOON = {"thread", "starlink", "netnear"}
+# Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
+M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near"}
+M3_SOON = set()
 
 def menu3_sections(sn):
     nav = {it[0]: it for g, its in sn.NAV for it in its}
@@ -164,8 +166,11 @@ def menu3_sections(sn):
         rows = []
         for key, label in its:
             it = nav.get(key)
-            if key in M3_SOON or not it or (len(it) > 5 and it[5]): rows.append((key, label, None))
-            else: rows.append((key, label, it[1] if it[1].startswith("/") else "/#" + it[1]))
+            hidden = bool(it and len(it) > 5 and it[5])
+            if key in M3_SOON or hidden: rows.append((key, label, None))
+            elif it: rows.append((key, label, it[1] if it[1].startswith("/") else "/#" + it[1]))
+            elif key in M3_HREF: rows.append((key, label, M3_HREF[key]))
+            else: rows.append((key, label, None))
         out.append((sid, name, desc, rows))
     return out
 

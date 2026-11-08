@@ -62,7 +62,7 @@ def _ro():
 STATIC_PAGES = [("/", "hourly", "1.0"), ("/newsletter", "daily", "0.9"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
                 ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/crime", "hourly", "0.8"), ("/network", "hourly", "0.8"),
                 ("/network/aws", "hourly", "0.7"), ("/network/azure", "hourly", "0.7"), ("/network/m365", "hourly", "0.7"), ("/network/gcp", "hourly", "0.7"),
-                ("/network/workspace", "hourly", "0.7"), ("/network/cloudflare", "hourly", "0.7"), ("/network/akamai", "hourly", "0.7"), ("/newsletter/sample", "daily", "0.5"),
+                ("/network/workspace", "hourly", "0.7"), ("/network/cloudflare", "hourly", "0.7"), ("/network/akamai", "hourly", "0.7"), ("/network/starlink", "hourly", "0.7"), ("/network/near", "weekly", "0.6"), ("/newsletter/sample", "daily", "0.5"),
                 ("/cookies", "yearly", "0.2"), ("/privacy-choices", "yearly", "0.2"),
                 ("/privacy", "yearly", "0.2"), ("/tos", "yearly", "0.2"),
                 ("/midterms", "hourly", "0.8"), ("/ready", "monthly", "0.7"), ("/map", "hourly", "0.6")]   # seo/ready-hub: Everyday Readiness guides   # seo/batch-2: /midterms is now a real server-rendered hub   # /map: global signal map
