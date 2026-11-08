@@ -703,54 +703,33 @@ def share_text(issue):
     """Plain-text part and the social fallback. Same lead as the brief."""
     return subject_for(issue) + "\n\n" + bluf(issue)
 
-def _focus_word(title, cat):
-    t = (title or "").lower()
-    for w in ("missile", "strike", "bridge", "tower", "earthquake", "quake", "flood", "hurricane", "wildfire",
-              "outbreak", "ransomware", "blackout", "protest", "court", "election", "border"):
-        if w in t: return "earthquake" if w == "quake" else w
-    return {"war/conflict": "conflict", "natural disaster": "hazard", "disease": "outbreak", "political": "government action",
-            "cyber": "cyber incident", "financial": "market move"}.get(cat, "report")
-
-def _fact_clause(title, where):
-    """Who, number, and place actually written on the story. No invented detail."""
+def _why_lead(title):
     t = re.sub(r"\s+", " ", title or "").strip()
-    who = re.findall(r"\b[A-Z]{3,}(?:['’]s)?\b", t)
-    strong = re.findall(r"\bM\s*\d+(?:\.\d+)?\b|\b\d[\d,]*(?:\.\d+)?\s*(?:km|mi|%)\b|\b\d[\d,]*\s*(?:dead|deaths|killed|injured)\b", t, re.I)
-    loc = (where or "").strip()
-    if re.search(r"not reported|^none$", loc, re.I): loc = ""
-    bits = []
-    if who: bits.append(f"{who[0].replace('’s', '').replace(chr(39) + 's', '')} is named")
-    if strong: bits.append(f"the headline states {strong[0]}")
-    if loc: bits.append(f"the place named is {loc.split('(')[0].strip()}")
-    if not bits: bits.append(f"the report says “{_cut(t, 90)}”")
-    sentence = bits[0]
-    if len(bits) > 1: sentence += ", and " + ", and ".join(bits[1:])
-    return sentence[:1].upper() + sentence[1:] + "."
+    t = re.sub(r"^[^\w(]+", "", t)
+    first = re.split(r"(?<=[.!?])\s+", t, maxsplit=1)[0].strip()
+    if first and first[-1] not in ".!?": first += "."
+    return _cut(first, 180)
 
 def why_it_matters(r, official=False, category=None):
-    """One line from this headline's own facts plus the category. Two stories in one issue must not share the sentence."""
+    """A plain sentence from the headline, then why the rank follows. No shared template across stories."""
     rk = int(r["rank"] or 0); name, scope = tier(rk)
     cat = category or r["category"] or "other"
     title = r["title"] or ""
-    try: where = r["location"] or ""
+    try: where = (r["location"] or "").strip()
     except Exception: where = ""
-    focus = _focus_word(title, cat)
-    facts = _fact_clause(title, where)
+    if re.search(r"not reported|^none$", where, re.I): where = ""
+    where = where.split("(")[0].strip()
+    hook = _cut(re.sub(r"^[^\w(]+", "", re.sub(r"\s+", " ", title)).strip(), 80).rstrip(".")
+    place = f" The reports put it in {where}." if where else ""
     if cat == "natural disaster":
-        gloss = f"For this {focus}, watch power and water outages, blocked roads, and supply gaps."
-    elif cat == "war/conflict":
-        gloss = f"For this {focus}, watch security, travel, and energy routes tied to the headline."
+        second = f"With “{hook}”, expect power and water outages, blocked roads, and supply gaps. It is ranked {name} ({rk}/10), {scope} scale.{place}"
     elif cat == "disease":
-        gloss = f"For this {focus}, watch the health-agency count and any travel notice."
-    elif cat == "political":
-        gloss = f"For this {focus}, watch security, travel, and markets."
+        second = f"“{hook}” is ranked {name} ({rk}/10). Follow the case count the health agency publishes.{place}"
     elif cat == "cyber":
-        gloss = f"For this {focus}, check whether a service you use is named."
-    elif cat == "financial":
-        gloss = f"For this {focus}, the question is savings, credit, and prices."
+        second = f"“{hook}” is ranked {name} ({rk}/10). Check whether a service you use is in that report.{place}"
     else:
-        gloss = CAT_WHY.get(cat, "Watch safety and services in the place named.")
-    out = [facts, gloss, f"Rated {name} ({rk}/10), {scope} scale."]
+        second = f"“{hook}” is why this is ranked {name} ({rk}/10), {scope} scale.{place}"
+    out = [second]
     m = re.search(r"([\d]+(?:\.\d+)?) million", f"{title} {r['brief'] or ''}")
     if m:
         try: out.append(f"The source estimates about {float(m.group(1)):g} million people affected.")
@@ -758,8 +737,8 @@ def why_it_matters(r, official=False, category=None):
     if official: out.append("An official agency is on record.")
     try: m3 = int(r["mentions_3h"] or 0); rising = int(r["rising"] or 0)
     except (KeyError, IndexError, TypeError, ValueError): m3, rising = 0, 0
-    if rising and m3 >= 2: out.append(f"Spreading: {m3} reports in the last 3 hours.")
-    return " ".join(out)
+    if rising and m3 >= 2: out.append(f"{m3} reports arrived in the last 3 hours.")
+    return re.sub(r"\s+", " ", " ".join(out)).strip()
 
 def _uniquify_why(issue):
     """If two cards would repeat the same line, the second names its own headline."""
@@ -1062,6 +1041,10 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries the matters lead (no separate "nothing confirmed" email)
     _uniquify_why(issue)
     issue["bluf"] = bluf(issue)
+    lead_ids = {it.get("cluster_id") for it in _story_pool(issue)[:3]}
+    for sec in ("near", "main", "politics", "notable", "updates", "follow", "developing"):
+        for it in issue.get(sec) or []:
+            it["lead"] = it.get("cluster_id") in lead_ids
     _attach_analysis(issue, at, c)
     return issue
 
@@ -1081,6 +1064,7 @@ def _attach_analysis(issue, at, c=None):
             for it in issue.get(sec) or []:
                 a = by.get(it.get("cluster_id"))
                 if a:
+                    it["analyst"] = a
                     if a.get("trajectory"): it["trajectory"] = a["trajectory"]
                     if a.get("trend_detail"): it["trend_detail"] = a["trend_detail"]
                     it["trend_from_history"] = bool(a.get("trend_from_history"))
@@ -1317,15 +1301,15 @@ def _item_html(it, links, c):
         import newsletter_art as ART
         kind = ART.event_kind(it.get("title"), it.get("category"))
         scene = ART.img(ART.scene_src(kind), f"Engraved {kind} illustration", 560, 315)
-        traj = it.get("trajectory") or ("Rising" if it.get("rising") else "Steady")
-        detail = it.get("trend_detail") or f"rank {int(it.get('rank') or 0)}/10"
-        if not it.get("trend_from_history") and (env().get("NEWSLETTER_SENDER") or "preview").strip().lower() == "preview":
-            detail = "trend data loading"
-        badge = ART.trend_badge_html(traj, detail)
     except Exception:
-        scene, badge = "", ""
+        scene = ""
     num = f'{it["map_n"]}. ' if it.get("map_n") else ""
-    H = [_CARD_O + scene + badge
+    try:
+        import newsletter_analysis as NA
+        block = NA.card_fragment(it.get("analyst"))
+    except Exception:
+        block = ""
+    H = [_CARD_O + scene
          + f'{_rank_badge(it)}{_kicker(it)}'
          f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]};text-decoration:none">{num}{E(_cut(it["title"], 200))}</a></div>']
     H.append(_visuals_html(it, url, c))
@@ -1342,17 +1326,15 @@ def _item_html(it, links, c):
                 f'<tr><td class="bnx bga" style="padding:3px 0 3px 10px;border-left:2px solid {PAL["sev"][1]};font:400 14px/1.45 {FB};color:{PAL["body"]}">'
                 f'<span class="bnm" style="color:{PAL["mu"]}">{E(fmt_et(x["when"], with_date=False))} · {E(x["source"])}{" · official" if x["official"] else ""}:</span> {E(x["title"])}</td></tr>'
                 for x in u["reports"]) + '</table>')
-        H.append(f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
-                 f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'
-                 f'<div>{_btn("Story timeline", u["timeline"])}{_follow_html(it, links, c)}</div>' + _CARD_C)
+        H.append(block or f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>')
+        H.append(f'<div>{_btn("Story timeline", u["timeline"])}{_follow_html(it, links, c)}</div>' + _CARD_C)
         return "".join(H)
     if it.get("what"):
         H.append(f'<p {_P}>{_lbl("BRIEF")} {E(it["what"])}</p>')
-    H.append(f'<p {_P}>{_lbl("WHERE")} {E(_where(it))} · {_lbl("WHEN")} {E(when_str(it["when"]))}</p>'
-             f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
-             f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>. '
-             f'<span class="bnm" style="color:{PAL["mu"]};font-size:13px">{it["n_items"] or 1} report{"s" if (it["n_items"] or 1) != 1 else ""}, score {it["score"]}/100, first seen {E(fmt_et(it["first_seen"]))}.</span></p>'
-             f'<div>{_btn("Full story &amp; sources", url)}{_follow_html(it, links, c)}</div>' + _CARD_C)
+    H.append(f'<p {_P}>{_lbl("WHERE")} {E(_where(it))} · {_lbl("WHEN")} {E(when_str(it["when"]))}</p>')
+    H.append(block or (f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
+                       f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'))
+    H.append(f'<div>{_btn("Full story &amp; sources", url)}{_follow_html(it, links, c)}</div>' + _CARD_C)
     return "".join(H)
 
 # Issue footer: distinct buttons. Inline styles only (email clients strip <style>).
@@ -1513,8 +1495,17 @@ def _text_item(it, n):
     else:
         if it.get("what"): T.append(f"   BRIEF: {it['what']}")
         T.append(f"   WHERE: {_where(it)} · WHEN: {when_str(it['when'])}")
-    T.append(f"   WHY IT MATTERS: {it['why']}")
-    T.append(f"   CONFIDENCE: {it['confidence']}.")
+    a_ = it.get("analyst") or {}
+    if a_:
+        T.append(f"   WHAT HAPPENED: {a_.get('what')}")
+        T.append(f"   {a_.get('analysis')}")
+        T.append(f"   TRAJECTORY: {a_.get('trajectory')}. {a_.get('outlook')}")
+        T.append(f"   CONFIDENCE: {a_.get('confidence')}. {a_.get('confidence_line')}")
+        for act in a_.get("actions") or []:
+            T.append(f"   WHAT TO DO: {act.get('action')} Guide: {act.get('name')} {act.get('url')}")
+    else:
+        T.append(f"   WHY IT MATTERS: {it['why']}")
+        T.append(f"   CONFIDENCE: {it['confidence']}.")
     return T
 
 def render(issue, links, c=None):
@@ -1557,9 +1548,12 @@ def render(issue, links, c=None):
     if issue.get("developing"):
         a(_sec_html("Still developing", "Logged before this brief's window. Shown so they are not mistaken for new leads."))
         for it in issue["developing"]:
-            a(f'<tr><td class="bnpad" style="padding:4px 20px 8px 20px;font:400 15px/1.5 {FB};color:{PAL["body"]}">'
-              f'R{int(it.get("rank") or 0)} <a href="{E(wire_url(it["cluster_id"], c=c))}" class="bnt" style="color:{PAL["tx"]};text-decoration:underline">{E(_cut(it["title"], 140))}</a>'
-              f' · first logged {E(fmt_et(it.get("first_seen")))}</td></tr>')
+            if it.get("lead"):
+                a(_item_html(it, links, c))
+            else:
+                a(f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:4px 20px 8px 20px;background:{PAL["bg"]};font:400 15px/1.5 {FB};color:{PAL["body"]}">'
+                  f'R{int(it.get("rank") or 0)} <a href="{E(wire_url(it["cluster_id"], c=c))}" class="bnt" style="color:{PAL["tx"]};text-decoration:underline">{E(_cut(it["title"], 140))}</a>'
+                  f' · first logged {E(fmt_et(it.get("first_seen")))}</td></tr>')
     if issue.get("updates"):
         a(_sec_html("Developing stories", "Stories from earlier briefs with new independent sources or a higher rank. Only what changed is shown.", "amber"))
         for it in issue["updates"]: a(_item_html(it, links, c))

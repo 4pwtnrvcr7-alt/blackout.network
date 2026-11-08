@@ -115,6 +115,13 @@ def _compare(issue, links):
     path = "/opt/cursor/artifacts/morning-brief-weather-politics.html"
     open(path, "w").write(page)
     print("compare", path, "weather", (weather.get("title") or "")[:70], "| political", (political.get("title") or "")[:70])
+    card = next((it for it in (issue.get("notable") or []) + (issue.get("main") or []) + (issue.get("politics") or []) if it.get("analyst")), None)
+    if card:
+        one = ('<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="dark">'
+               '<style>body{margin:0;background:#0B0C0F}</style></head><body bgcolor="#0B0C0F">'
+               f'<table width="680" role="presentation">{_card(card)}</table></body></html>')
+        open("/opt/cursor/artifacts/morning-brief-card.html", "w").write(one)
+        print("card", (card.get("title") or "")[:80])
 
 
 def _mirror_alerts(dest):

@@ -1,7 +1,7 @@
 """Analyst brief: history labels, syndication, trajectory, guides, render. No network, no email sent.
 Run: cd app && python3 -m unittest tests.test_newsletter_analysis -v
 """
-import json, os, socket, sqlite3, sys, tempfile, unittest
+import json, os, re, socket, sqlite3, sys, tempfile, unittest
 from datetime import datetime, timedelta, timezone
 TMP = tempfile.mkdtemp(prefix="nlanal_")
 for k, v in {"NEWSLETTER_DB": "nl.db", "NEWSLETTER_SRC_DB": "src.db", "NEWSLETTER_CONFIG": "nl_config.json",
@@ -267,7 +267,8 @@ class Render(unittest.TestCase):
                  "categories": "https://blackout.network/newsletter", "sources": "https://blackout.network/sources",
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _subj, html, text = NL.render(issue, links)
-        self.assertIn("Analyst brief", html)
+        self.assertGreaterEqual(html.count("WHAT HAPPENED"), len(an["items"]))
+        self.assertGreaterEqual(html.count("WHAT TO DO"), len(an["items"]))
         self.assertIn("Prepare › Water", html)
         self.assertIn("#water", html)
         self.assertIn("WHAT HAPPENED", html)
@@ -281,6 +282,22 @@ class Render(unittest.TestCase):
         self.assertIn("after collapsing repeated headlines", html)
         self.assertNotIn("not proof", html.lower())
         self.assertIn("ANALYST BRIEF", text)
+        self.assertGreaterEqual(text.count("WHAT HAPPENED"), len(an["items"]))
+        visible = re.sub(r'<div style="display:none.*?</div>', " ", html, count=1)
+        low = re.sub(r"<[^>]+>", " ", visible).lower()
+        for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):
+            self.assertNotIn(bad, low)
+        blocks = re.split(r"WHAT HAPPENED", visible)[1:]
+        seen = {}
+        dups = []
+        for i, block in enumerate(blocks):
+            plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", block))
+            for sent in re.findall(r"[A-Za-z][^.!?]{40,}[.!?]", plain):
+                s = sent.strip()
+                if s in seen and seen[s] != i and s not in dups:
+                    dups.append(s)
+                seen.setdefault(s, i)
+        self.assertEqual(dups, [], dups[:3])
         self.assertIn("Prepare › Water", text)
         self.assertIn("https://blackout.network/wire/a11ce00000000003", text)
         # sender mode untouched: preview, and render did not write an outbox message
@@ -419,6 +436,10 @@ class Topics(unittest.TestCase):
         _assert_no_empty_framing(self, subj, html, text, NL.share_text(issue))
         self.assertIn("Engraved", html)
         self.assertIn("UPTREND", html)
+        self.assertGreaterEqual(html.count("WHAT HAPPENED"), 5)
+        low = html.lower()
+        for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):
+            self.assertNotIn(bad, low)
         import newsletter_art as ART
         self.assertEqual(ART.event_kind("Supreme Court ruling on a speech mandate", "political"), "rights")
         self.assertEqual(ART.event_kind("Surveillance law expands warrantless collection", "political"), "surveillance")

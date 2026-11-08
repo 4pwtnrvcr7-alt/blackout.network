@@ -93,6 +93,12 @@ _COUNTY = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\s+County)\b")
 _BARS = "▁▂▃▄▅▆▇"
 
 
+def _cut_plain(s, n):
+    s = re.sub(r"\s+", " ", s or "").strip()
+    if len(s) <= n: return s
+    return s[:n - 1].rsplit(" ", 1)[0]
+
+
 def cost_per_issue():
     return {"llm_calls": LLM_CALLS_PER_ISSUE, "usd": COST_PER_ISSUE_USD, "note": LLM_NOTE}
 
@@ -337,7 +343,7 @@ def _guides(item, text):
         if g["id"] == "kit": continue
         if re.search(g["rx"], text or "", re.I) or cat in g.get("cats", set()):
             hits.append(g)
-    if not hits and int(item.get("rank") or 0) >= MIN_RANK:
+    if not hits:
         hits = [_GUIDES[-1]]
     # de-dupe, cap 2, keep water/power/aid/family order
     out, seen = [], set()
@@ -483,24 +489,25 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
         early, late = _half(alerts, at)
         ea, la = len(early), len(late)
         if ea == 0 and la == 0:
-            vol_line = "Report volume in our log: no reports in the last 24 hours. Volume alone does not set the danger reading."
+            vol_line = f"Report volume in our log: no reports in the last 24 hours. Volume alone does not set the danger reading for {_cut_plain(item.get('title') or '', 42)}."
         elif ea == 0:
             vol_line = (f"Report volume in our log: no reports in the first 12 hours of the window, then {la} in the second. "
-                        "Volume alone does not set the danger reading.")
+                        f"Volume alone does not set the danger reading for {_cut_plain(item.get('title') or '', 42)}.")
         elif la == 0:
             vol_line = (f"Report volume in our log: {ea} in the first 12 hours of the window, then none in the second. "
-                        "Volume alone does not set the danger reading.")
+                        f"Volume alone does not set the danger reading for {_cut_plain(item.get('title') or '', 42)}.")
         else:
             move = "rose" if la > ea else "fell" if la < ea else "held"
             vol_line = (f"Report volume in our log {move} from {ea} in the first 12 hours of the window to {la} in the second. "
-                        "Volume alone does not set the danger reading.")
+                        f"Volume alone does not set the danger reading for {_cut_plain(item.get('title') or '', 42)}.")
 
+    _tag = _cut_plain(re.sub(r"^[^\w(]+", "", item.get("title") or ""), 42)
     hist_bits = []
     for label, _h in WINDOWS:
         n = counts[label]
         hist_bits.append(f"{label}: not enough history" if n is None else f"{label}: {n} report" + ("" if n == 1 else "s"))
     if prior_rank is None:
-        prior_bit = "Prior rank in our send ledger: not enough history."
+        prior_bit = f"Prior rank in our send ledger ({_tag}): not enough history."
     elif int(prior_rank) != rk:
         prior_bit = f"Prior rank in our send ledger {'rose' if rk > int(prior_rank) else 'fell'} from {int(prior_rank)} to {rk}."
     else:
@@ -508,17 +515,19 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
 
     people = named_people(text)
     places = named_places(f"{item.get('title') or ''} {item.get('where') or ''} {item.get('location') or ''}")
+    subject = re.sub(r"\s+", " ", item.get("title") or "").strip()
+    subject = re.sub(r"^[^\w(]+", "", subject)
     driver = {
-        "war/conflict": "The reports describe the use of force.",
-        "political": "The reports describe a government action.",
-        "natural disaster": "The reports describe a natural hazard.",
-        "disease": "The reports describe cases of disease.",
-        "cyber": "The reports describe a disruption of a system.",
-        "space weather": "The reports describe a space-weather measurement.",
-        "financial": "The reports describe a market or banking event.",
-    }.get(item.get("category") or "", "The reports describe the event in the headline.")
+        "war/conflict": f"The reports describe the use of force in “{_cut_plain(subject, 90)}”.",
+        "political": f"The reports describe a government action in “{_cut_plain(subject, 90)}”.",
+        "natural disaster": f"The reports describe a natural hazard in “{_cut_plain(subject, 90)}”.",
+        "disease": f"The reports describe cases of disease in “{_cut_plain(subject, 90)}”.",
+        "cyber": f"The reports describe a system disruption in “{_cut_plain(subject, 90)}”.",
+        "space weather": f"The reports describe a space-weather measurement in “{_cut_plain(subject, 90)}”.",
+        "financial": f"The reports describe a market or banking event in “{_cut_plain(subject, 90)}”.",
+    }.get(item.get("category") or "", f"The reports describe “{_cut_plain(subject, 90)}”.")
     where = item.get("where") or item.get("location") or (places[0] if places else None)
-    who = ", ".join(people) if people else "No tracked public figure is named"
+    who = ", ".join(people) if people else ""
     officials = [a for a in leaders if a.get("official")]
     off_bit = ""
     if officials:
@@ -544,7 +553,7 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
         if echoes:
             conf_sentence += f" {len(echoes)} headline{'s' if len(echoes) != 1 else ''} appeared only as syndicated copies and {('are' if len(echoes) != 1 else 'is')} not independent confirmation."
         if copies:
-            conf_sentence += f" {copies} other report{'s' if copies != 1 else ''} repeat those headlines or the same outlet and are not extra confirmation."
+            conf_sentence += f" {copies} other report{'s' if copies != 1 else ''} on {_tag} repeat those headlines or the same outlet and are not extra confirmation."
     else:
         card_confidence = None
         card_unconfirmed = None
@@ -556,13 +565,14 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
                          + ". " + conf_detail)
 
     past_line = ""
+    tag = _cut_plain(subject, 48)
     if counts.get("7d") is None:
-        past_line = "Similar past events: not enough history."
+        past_line = f"Similar past events ({tag}): not enough history."
     elif not past:
         since = _fmt(coverage_start) if coverage_start else "the covered window"
-        past_line = f"Similar past events: none logged since {since}."
+        past_line = f"Similar past events ({tag}): none logged since {since}."
     else:
-        past_line = (f"Similar past event in our log: {past.get('title')}. Rank {past.get('rank')}/10, first logged {_fmt(past.get('t'))}. "
+        past_line = (f"A similar past event in our log ({tag}): {past.get('title')}. Rank {past.get('rank')}/10, first logged {_fmt(past.get('t'))}. "
                      f"This item is rank {rk}/10.")
 
     # What happened: one line, numbers that are actually on the item or the alerts
@@ -581,12 +591,12 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
     bits.append(f"rank {rk}/10")
     if headlines_known:
         bits.append(f"{len(real_leaders)} independent source{'s' if len(real_leaders) != 1 else ''} after collapsing repeated headlines")
-    happened = ". ".join(bits).rstrip(".") + "."
-    # keep it one line: collapse accidental double spaces
+    happened = "On the record for " + _tag + ": " + ", ".join(bits) + "."
     happened = re.sub(r"\s+", " ", happened)
 
-    analysis = (f"Analysis: {driver}" + (f" Place named: {where}." if where else "")
-                + f" Actors named: {who}." + off_bit + when + " "
+    who_bit = f" The reports name {who}." if who else ""
+    where_bit = f" The reports place it in {where}." if where else ""
+    analysis = (f"Analysis: {driver}{where_bit}{who_bit}{off_bit}{when} "
                 + "Scanner history " + "; ".join(hist_bits) + ". " + prior_bit + " "
                 + (vol_line + " " if vol_line else "")
                 + past_line)
@@ -652,16 +662,20 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
 
 
 def _pick(issue):
+    """Every story card, plus a Still developing item only when it is one of the three leads. No rank gate."""
     pool, seen = [], set()
     for sec in ("main", "follow", "updates", "politics", "near", "notable"):
         for it in issue.get(sec) or []:
             cid = it.get("cluster_id")
             if not cid or cid in seen: continue
-            if it.get("section") == "watchlist" or it.get("editorial"): continue
+            if it.get("section") == "watchlist": continue
             seen.add(cid); pool.append(it)
-    crit = [it for it in pool if int(it.get("rank") or 0) >= MIN_RANK]
-    crit.sort(key=lambda x: (-int(x.get("rank") or 0), -(int(x.get("score") or 0))))
-    return crit[:MAX_ITEMS], pool
+    for it in issue.get("developing") or []:
+        cid = it.get("cluster_id")
+        if not cid or cid in seen or not it.get("lead"): continue
+        seen.add(cid); pool.append(it)
+    pool.sort(key=lambda x: (-int(x.get("rank") or 0), -(int(x.get("score") or 0))))
+    return pool, pool
 
 
 def _patterns(pool):
@@ -770,7 +784,7 @@ def attach(issue, src_path, at, nl_path=None, base_url="https://blackout.network
     """Fill issue['analysis']. Reads scanner and newsletter DBs read-only. Never raises into the sender."""
     at = at or datetime.now(UTC)
     base = base_url or "https://blackout.network"
-    crit, pool = _pick(issue)
+    pool, _same = _pick(issue)
     patterns = _patterns(pool)
     coverage, alerts_available = None, False
     by_id = {}
@@ -780,13 +794,13 @@ def attach(issue, src_path, at, nl_path=None, base_url="https://blackout.network
             src = sqlite3.connect(f"file:{src_path}?mode=ro", uri=True, timeout=10)
             src.row_factory = sqlite3.Row
             coverage, alerts_available = _coverage_start(src)
-            ids = [it.get("cluster_id") for it in crit]
+            ids = [it.get("cluster_id") for it in pool]
             by_id = _load_alerts(src, ids)
     except sqlite3.Error:
         src = None
     items = []
     try:
-        for it in crit:
+        for it in pool:
             alerts = by_id.get(it.get("cluster_id")) or []
             past = _past_for(src, it, alerts, coverage, at) if src else None
             if past:
@@ -812,67 +826,47 @@ def _lbl(t):
     return f'<b style="font:600 11px {FH};letter-spacing:1px;color:{TX}">{t}</b> '
 
 
+def card_fragment(a):
+    """Compact analysis under one story card. The story heading is already above this block."""
+    if not a: return ""
+    try:
+        import newsletter_art as ART
+        traj = a.get("trajectory") or "Steady"
+        detail = a.get("trend_detail") or ""
+        badge = ART.trend_badge_html(traj, detail)
+        word = ART.trend_word(traj)
+    except Exception:
+        badge, word = "", a.get("trajectory") or "Steady"
+    acts = "".join(
+        _p(_lbl("WHAT TO DO") + _e(act["action"].rstrip(".")) + " for the report “" + _e(_cut_plain(a.get("title") or "", 70)) + '”. Guide: <a href="' + _e(act["url"]) + f'" style="color:{TX};text-decoration:underline">' + _e(act["name"]) + "</a>.")
+        for act in (a.get("actions") or []))
+    level = a.get("confidence") or ""
+    return (""
+        + _p(_lbl("WHAT HAPPENED") + _e(a.get("what") or ""))
+        + _p(_e(a.get("analysis") or ""))
+        + badge
+        + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
+        + _p(_lbl("CONFIDENCE") + _e(a.get("confidence_line") or level))
+        + acts)
+
+
 def html_section(analysis, base_url="https://blackout.network"):
+    """Patterns only. Each story's analysis is rendered on its own card."""
     if not analysis: return ""
     items = analysis.get("items") or []
     patterns = analysis.get("patterns") or []
     if not items and not patterns: return ""
-    base = (base_url or "https://blackout.network").rstrip("/")
-    try:
-        import newsletter_art as ART
-        src = ART.banner_src("Analyst brief")
-        plate = ART.img(src, "Section Analyst brief", 560, 220) if src else ""
-        plate += f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Analyst brief</div>'
-    except Exception:
-        plate = f'<div style="font:600 24px/1.2 {FH};color:{TX}">Analyst brief</div>'
-    parts = ['<tr><td class="bnpad" style="padding:28px 20px 8px 20px;text-align:left">'
-             + plate
-             + f'<div style="font:400 15px/1.5 {FB};color:{MU};margin-top:8px">Top rank-7 items. A window we do not have is marked “not enough history”. '
-             'Copies of one headline count as one source. Report volume is separate from the danger reading.</div></td></tr>']
     card_o = ('<tr><td class="bnpad" bgcolor="#0B0C0F" style="padding:6px 20px;background:#0B0C0F"><table role="presentation" bgcolor="' + SURF + '" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:' + SURF + '">'
               f'<tr><td bgcolor="{SURF}" style="padding:20px 22px;background:{SURF};color:{TX};border-radius:18px">')
     card_c = "</td></tr></table></td></tr>"
-    for it in items:
-        sp = it.get("spark") or {}
-        if sp.get("png") and sp.get("values") is not None:
-            b64 = base64.b64encode(sp["png"]).decode()
-            peak = max(sp.get("values") or [0])
-            img = (f'<img src="data:image/png;base64,{b64}" width="520" height="148" alt="Report counts, last { _e(sp.get("label") or "24h") }, shaded trend" '
-                   f'style="display:block;width:520px;max-width:100%;height:auto;border:0;margin:4px 0">')
-            spark = (f'{_p(_lbl("REPORT COUNTS") + img)}'
-                     f'{_p(_e(sp.get("bars") or "") + " " + _e(sp.get("arrow") or "") + " last " + _e(sp.get("label") or "") + f", peak {peak}. Volume is not a danger reading.")}')
-        else:
-            spark = _p(_lbl("REPORT COUNTS") + "not enough history")
-        srcs = " ".join(f'<a href="{_e(s["url"])}" style="color:{TX};text-decoration:underline">{_e(s["source"])}</a>' for s in it.get("sources") or [])
-        acts = "".join(
-            f'{_p(_lbl("WHAT TO DO") + _e(a["action"]) + " Guide: " + f"<a href=\"{_e(a['url'])}\" style=\"color:{TX};text-decoration:underline\">{_e(a['name'])}</a>.")}'
-            for a in it.get("actions") or [])
-        wire = it.get("wire") or (base + "/wire/" + str(it.get("cluster_id") or ""))
-        try:
-            import newsletter_art as ART
-            kind = ART.event_kind(it.get("title"), it.get("category"))
-            scene = ART.img(ART.scene_src(kind), f"Engraved {kind} illustration", 560, 315)
-            badge = ART.trend_badge_html(it.get("trajectory") or "Steady", it.get("trend_detail") or "")
-        except Exception:
-            scene, badge = "", ""
-        parts.append(card_o
-            + scene + badge
-            + f'<div style="margin:0 0 8px 0"><a href="{_e(wire)}" style="font:600 22px/1.25 {FH};color:{TX};text-decoration:none">{_e(it.get("title") or "")}</a></div>'
-            + _p(_lbl("WHAT HAPPENED") + _e(it.get("what") or ""))
-            + _p(_e(it.get("analysis") or ""))
-            + _p(_lbl("TRAJECTORY") + _e(it.get("trajectory") or "") + ". " + _e(it.get("outlook") or ""))
-            + _p(_e(it.get("confidence_line") or ""))
-            + spark + acts
-            + (_p(_lbl("SOURCES") + srcs) if srcs else "")
-            + f'<p style="margin:8px 0 0 0"><a href="{_e(wire)}" style="display:inline-block;background:{FILL};color:{INK};font:600 15px/1.2 {FH};text-decoration:none;border-radius:999px;padding:10px 16px">Full story &amp; sources</a></p>'
-            + card_c)
+    parts = []
     if patterns:
         rows = []
         for p in patterns:
             links = "; ".join(f'<a href="{_e(i["wire"])}" style="color:{TX};text-decoration:underline">R{int(i.get("rank") or 0)} {_e((i.get("title") or "")[:80])}</a>' for i in p["items"])
             kind = "Region" if p["kind"] == "region" else "Person"
             rows.append(_p(f"<b style=\"color:{TX}\">{_e(kind)}: {_e(p['name'])}</b> — {len(p['items'])} stories in this brief ({links}). "
-                           f"Analysis: the same {kind.lower()} is named across these separate clusters. Each item’s danger read is its own rank and sourced figures."))
+                           f"Analysis: {_e(p['name'])} is named across these separate clusters, and each item’s danger read stays its own rank and sourced figures."))
         try:
             import newsletter_art as ART
             psrc = ART.banner_src("Patterns")
@@ -891,7 +885,7 @@ def text_section(analysis, base_url="https://blackout.network"):
     items = analysis.get("items") or []
     patterns = analysis.get("patterns") or []
     if not items and not patterns: return []
-    T = ["ANALYST BRIEF", "Top rank-7 items. Missing history is marked 'not enough history'. Repeated headlines are one source. Volume is not a danger reading.", ""]
+    T = ["ANALYST BRIEF", "One block under each story. Missing history is marked 'not enough history'. Repeated headlines are one source. Volume is not a danger reading.", ""]
     for i, it in enumerate(items, 1):
         T.append(f"{i}. {it.get('title')}")
         T.append(f"   WHAT HAPPENED: {it.get('what')}")
