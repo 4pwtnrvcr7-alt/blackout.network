@@ -185,9 +185,13 @@ html.bna-pg body:not(:has(.bn-top))>main#main>h1{margin-top:clamp(56px,8vw,120px
 html.bna-pg[data-theme="light"] .pn .warn{background:#FFF4E0!important;color:#6B3E00!important;border-color:#F0D9B0!important}
 /* /stats on phones: the one-word BLACKOUT.NETWORK title was cut off at 390px */
 @media (max-width:600px){html.bna-pg .st-hero h1{font-size:clamp(22px,7vw,28px)!important;overflow-wrap:anywhere}}
-/* ---------- Phase 3a: near-empty top bar (wordmark + menu button); everything else lives in the menu ---------- */
+/* ---------- Phase 3a: top bar keeps the wordmark, the theme icon and the menu button; everything else lives in the menu ---------- */
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-primary,html:is(.bna-home,.bna-pg) .bn-tbar .bn-follows,html:is(.bna-home,.bna-pg) .bn-tbar .bnal-bell,
-html:is(.bna-home,.bna-pg) .bn-tbar .bn-searchbtn,html:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar,html:is(.bna-home,.bna-pg) .bn-tbar .bn-gear{display:none!important}
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-searchbtn,html:is(.bna-home,.bna-pg) .bn-tbar .bn-gear{display:none!important}
+/* same sun/moon button as the menu (data-bn-theme / bn_theme). 44px hit area, 20px glyph from .bn-ib, sits beside the menu button. */
+html.bn-js:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar{display:inline-flex!important;width:44px;min-width:44px;height:44px;min-height:44px;flex:none}
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar:hover{background:var(--bn-hover)}
+html:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar:focus-visible{outline:2px solid var(--bn-accent);outline-offset:-2px}
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-burger{position:relative;min-width:44px;min-height:44px;display:inline-flex!important;align-items:center;justify-content:center;background:none!important;border:0!important;box-shadow:none!important}
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-burger .bn-bl{display:none!important}
 html:is(.bna-home,.bna-pg) .bn-burger .bna-dot{position:absolute;top:9px;right:8px;width:8px;height:8px;border-radius:50%;background:#FF3B30;box-shadow:0 0 0 2px var(--a-bg)}
