@@ -69,7 +69,9 @@
 
   // ---------------- icons ----------------
   var BELL = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 1.8H4.4z"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M10 20.6a2.2 2.2 0 0 0 4 0"/></svg>';
-  var X = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>';
+  var X = '<span class="bnal-xb"><svg aria-hidden="true" focusable="false" viewBox="0 0 12 12"><path d="M2.2 2.2l7.6 7.6M9.8 2.2L2.2 9.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg></span>';
+  var CHECK = '<svg class="bnal-check" aria-hidden="true" focusable="false" viewBox="0 0 20 20"><path d="M4.2 10.4l3.6 3.6 8-8.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var CHEV = '<svg class="bnal-chev" aria-hidden="true" focusable="false" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var PAGEMENU = '<svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="-10 -10 20 20"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M-6.5 -4.5h13M-6.5 0h13M-6.5 4.5h8"/></svg>';
   var SHARE = '<svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="-10 -10 20 20"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="M0 -9v11M-4 -5l4-4 4 4M-6 -2h-1.5v10h15v-10h-1.5"/></svg>';
   function meter(r) {
@@ -107,20 +109,87 @@
   }
 
   // ---------------- panel ----------------
-  var el = null, lastFocus = null, opened = 0;
+  var el = null, lastFocus = null, opened = 0, saveSeq = 0;
   function closePanel() {
     if (!el) return; el.classList.remove("bnal-open"); document.documentElement.classList.remove("bnal-lock");
-    var x = el; setTimeout(function () { x.hidden = true; }, 200);
+    var x = el;
+    var delay = 340; try { if (matchMedia("(prefers-reduced-motion: reduce)").matches) delay = 0; } catch (e) {}
+    setTimeout(function () {
+      if (x.classList.contains("bnal-open")) return;
+      x.hidden = true;
+      var c = x.querySelector(".bnal-card"); if (c) c.style.transform = "";
+    }, delay);
     if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) {}
+  }
+  function setStatus(t) {
+    var n = el && el.querySelector(".bnal-status"); if (n) n.textContent = t || "";
+  }
+  function bindDrag(card) {
+    if (card.dataset.drag) return; card.dataset.drag = "1";
+    var sy = 0, y = 0, stt = 0, mode = 0, pid = 0;
+    function bodyEl() { return card.querySelector(".bnal-body"); }
+    card.addEventListener("pointerdown", function (e) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.target.closest("button, a, input, summary, textarea, select")) return;
+      var b = bodyEl(), chrome = e.target.closest(".bnal-grab, .bnal-head");
+      if (!chrome && b && b.scrollTop > 2) return;
+      mode = 1; pid = e.pointerId; sy = y = e.clientY; stt = Date.now();
+    });
+    card.addEventListener("pointermove", function (e) {
+      if (!mode || e.pointerId !== pid) return;
+      var dy = e.clientY - sy;
+      if (mode === 1) {
+        if (Math.abs(dy) < 8) return;
+        var b = bodyEl();
+        if (dy <= 0 || (!e.target.closest(".bnal-grab, .bnal-head") && b && b.scrollTop > 2)) { mode = 0; return; }
+        mode = 2; card.dataset.dragged = "1"; card.classList.add("bnal-dragging");
+        try { card.setPointerCapture(pid); } catch (err) {}
+      }
+      if (mode !== 2) return;
+      y = e.clientY; card.style.transform = "translateY(" + Math.max(0, dy) + "px)";
+      e.preventDefault();
+    }, { passive: false });
+    function end(e) {
+      if (!mode || (e && e.pointerId !== pid)) return;
+      var dy = y - sy, dt = Math.max(1, Date.now() - stt), was = mode; mode = 0;
+      if (was !== 2) return;
+      var dismiss = dy > 90 || (dy > 40 && dy / dt > 0.65);
+      card.classList.remove("bnal-dragging");
+      requestAnimationFrame(function () {
+        card.style.transform = "";
+        if (dismiss) closePanel();
+        setTimeout(function () { card.dataset.dragged = ""; }, 0);
+      });
+    }
+    card.addEventListener("pointerup", end);
+    card.addEventListener("pointercancel", end);
+    card.addEventListener("click", function (e) {
+      if (card.dataset.dragged === "1") { card.dataset.dragged = ""; e.preventDefault(); e.stopPropagation(); }
+    }, true);
   }
   function shell() {
     if (el) return el;
     el = document.createElement("div"); el.className = "bnal"; el.hidden = true;
-    el.innerHTML = '<div class="bnal-scrim" data-x></div><section class="bnal-card" role="dialog" aria-modal="true" aria-labelledby="bnal_h" tabindex="-1">'
-      + '<div class="bnal-head"><span class="bnal-hi">' + BELL + '</span><h2 id="bnal_h">Get alerts</h2><button type="button" class="bnal-x" data-x aria-label="Close">' + X + '</button></div>'
+    el.innerHTML = '<div class="bnal-scrim" data-x></div><section class="bnal-card" role="dialog" aria-modal="true" aria-labelledby="bnal_h" aria-describedby="bnal_st" tabindex="-1">'
+      + '<div class="bnal-grab" aria-hidden="true"></div>'
+      + '<div class="bnal-head"><div class="bnal-titles"><h2 id="bnal_h">Alerts</h2><p class="bnal-status" id="bnal_st"></p></div><button type="button" class="bnal-x" data-x aria-label="Close">' + X + '</button></div>'
       + '<div class="bnal-body"></div></section>';
     document.body.appendChild(el);
+    bindDrag(el.querySelector(".bnal-card"));
     el.addEventListener("click", function (e) { if (e.target.closest("[data-x]")) { e.preventDefault(); closePanel(); } });
+    el.addEventListener("change", function (e) {
+      var t = e.target; if (!t || !el.querySelector(".bnal-lv")) return;
+      if (t.name !== "bnal_lvl" && !(t.closest && t.closest(".bnal-cats"))) return;
+      if (el.querySelector("[data-bnal=on]")) return;   // not subscribed yet: Turn on alerts sends the choice
+      var ch = readChoices();
+      if (ch.none) {
+        say("Pick at least one category under More options.", "err");
+        if (t.type === "checkbox") t.checked = true;
+        return;
+      }
+      if (t.name === "bnal_lvl") setStatus(t.value === "all" ? "On, all ranked alerts" : "On, major alerts only");
+      saveChanges(null);
+    });
     el.addEventListener("keydown", function (e) {
       if (e.key === "Escape") { e.preventDefault(); closePanel(); return; }
       if (e.key !== "Tab") return;
@@ -136,17 +205,21 @@
   function choices(c, s) {
     var lvl = s.level || "major", cats = s.cats || [];
     var allOn = !cats.length;
-    var opt = function (k, title, r, sub) {
+    var opt = function (k, title, sub) {
       return '<label class="bnal-opt"><input type="radio" name="bnal_lvl" value="' + k + '"' + (lvl === k ? " checked" : "") + '>'
-        + '<span class="bnal-ot"><b>' + title + '</b><span class="bnal-om">' + meter(r) + '<span>' + sub + '</span></span></span></label>';
+        + '<span class="bnal-ot"><b>' + title + '</b><span class="bnal-om">' + sub + '</span></span>' + CHECK + '</label>';
     };
     var cl = (c.categories || []).map(function (x) {
       return '<label class="bnal-cat"><input type="checkbox" value="' + esc(x.key) + '"' + (allOn || cats.indexOf(x.key) >= 0 ? " checked" : "") + '><span>' + esc(x.label) + '</span></label>';
     }).join("");
     return '<fieldset class="bnal-lv"><legend class="bnal-sr">How many alerts</legend>'
-      + opt("major", "Major alerts only", 7, "Rank 7+ · usually a few a week")
-      + opt("all", "All ranked alerts", 5, "Rank 5+ · usually several a day") + '</fieldset>'
-      + (cl ? '<details class="bnal-more"><summary>More options</summary><p class="bnal-note">Alert me about:</p><div class="bnal-cats">' + cl + '</div></details>' : "");
+      + opt("major", "Major alerts only", "Rank 7+, a few a week")
+      + opt("all", "All ranked alerts", "Rank 5+, several a day") + '</fieldset>'
+      + (cl ? '<details class="bnal-more"><summary><span>More options</span>' + CHEV + '</summary><div class="bnal-moreb"><p class="bnal-note">Alert me about</p><div class="bnal-cats">' + cl + '</div></div></details>' : "");
+  }
+  function linkRow(kind, label) {
+    return '<button type="button" class="bnal-link' + (kind === "off" ? " bnal-stop" : "") + '" data-bnal="' + kind + '"'
+      + (kind === "sample" ? ' aria-expanded="false"' : "") + '>' + label + '</button>';
   }
   function readChoices() {
     var r = el.querySelector('input[name="bnal_lvl"]:checked');
@@ -163,43 +236,45 @@
     opts = opts || {};
     var c = { categories: [], live: false };
     var s = st();
-    if (E.inApp) return body('<p class="bnal-lead">This in-app browser can’t show alerts.</p><p class="bnal-note">Open <b>blackout.network</b> in Safari or Chrome, then tap the bell.</p>');
+    var msg = '<p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX;
+    if (E.inApp) { setStatus("Open in Safari or Chrome"); return body('<p class="bnal-lead">This in-app browser can’t show alerts.</p><p class="bnal-note">Open <b>blackout.network</b> in Safari or Chrome, then tap the bell.</p>'); }
     if (E.ios && !E.standalone) {
       var old = E.ver && E.ver < 16.4;
+      setStatus(old ? "Needs iOS 16.4 or newer" : "Home Screen app");
       return body('<p class="bnal-lead">On iPhone and iPad, alerts work from the Home Screen app.</p>'
         + (old ? '<p class="bnal-note bnal-warn">This needs iOS 16.4 or newer. Update iOS in Settings first.</p>' : "")
         + '<ol class="bnal-steps"><li><span class="bnal-n">1</span><span>Tap <b>Share</b> <span class="bnal-ki">' + SHARE + '</span> in Safari (on iOS 26, tap <span class="bnal-ki">' + PAGEMENU + '</span> at the left of the address bar first)</span></li>'
         + '<li><span class="bnal-n">2</span><span>Tap <b>Add to Home Screen</b></span></li>'
         + '<li><span class="bnal-n">3</span><span>Open <b>BLACKOUT</b> from your Home Screen and tap the bell ' + '<span class="bnal-ki">' + BELL + '</span></span></li></ol>'
         + IOS_ART
-        + '<div class="bnal-acts">' + (typeof BN.showInstallGuide === "function" ? '<button type="button" class="bnal-go" data-bnal="install">Show me how</button>' : "")
-        + '<button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
+        + (typeof BN.showInstallGuide === "function" ? '<button type="button" class="bnal-go" data-bnal="install">Show me how</button>' : "")
+        + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + msg);
     }
-    if (!E.api) return body('<p class="bnal-lead">This browser can’t show alerts.</p><p class="bnal-note">Use a current version of Chrome, Edge, Firefox, Samsung Internet or Safari.</p>' + '<div class="bnal-acts"><button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
+    if (!E.api) { setStatus("Not available in this browser"); return body('<p class="bnal-lead">This browser can’t show alerts.</p><p class="bnal-note">Use a current version of Chrome, Edge, Firefox, Samsung Internet or Safari.</p>' + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + msg); }
     if (Notification.permission === "denied") {
+      setStatus("Notifications are blocked");
       return body('<p class="bnal-lead">Notifications are blocked for this site.</p><p class="bnal-note">'
         + (E.android ? "Open your phone’s <b>Settings › Apps › " + (E.standalone ? "BLACKOUT" : "your browser") + " › Notifications</b>, allow them for blackout.network, then come back."
            : E.ios ? "Open <b>Settings › Notifications › BLACKOUT</b> and turn on <b>Allow Notifications</b>, then come back."
            : "Click the icon to the left of the address bar, set <b>Notifications</b> to <b>Allow</b>, then reload this page.")
-        + '</p>' + '<div class="bnal-acts"><button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
+        + '</p>' + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + msg);
     }
     getCfg().then(function (cf) {
       c = cf;
       var on = !!s.on && Notification.permission === "granted";
       var intro = opts.from === "install" ? '<p class="bnal-ok">You’re all set on your Home Screen. One more step:</p>' : "";
       if (on) {
-        body('<p class="bnal-lead"><span class="bnal-pill">● On</span> You’ll get ' + (s.level === "all" ? "all ranked alerts (rank 5+)" : "major alerts (rank 7+)") + '.</p>'
-          + soon(c) + choices(c, s)
-          + '<div class="bnal-acts"><button type="button" class="bnal-go" data-bnal="save">Save changes</button>'
-          + '<button type="button" class="bnal-2" data-bnal="testpush">Send me a test push</button>'
-          + '<button type="button" class="bnal-2" data-bnal="sample">Show a sample</button>'
-          + '<button type="button" class="bnal-off" data-bnal="off">Turn off alerts</button></div><p class="bnal-msg" role="status" aria-live="polite"></p>' + SAMPLE_BOX);
+        setStatus(s.level === "all" ? "On, all ranked alerts" : "On, major alerts only");
+        body(soon(c) + choices(c, s)
+          + '<div class="bnal-group">' + linkRow("testpush", "Send a test alert") + linkRow("sample", "See a sample") + '</div>'
+          + '<div class="bnal-group">' + linkRow("off", "Turn off alerts") + '</div>' + msg);
       } else {
+        setStatus("Off");
         body(intro + '<p class="bnal-lead">Major threats, the moment they’re confirmed. Free. Turn off any time.</p>' + soon(c) + choices(c, s)
-          + '<div class="bnal-acts"><button type="button" class="bnal-go bnal-big" data-bnal="on">' + BELL + '<span>Turn on alerts</span></button></div>'
+          + '<button type="button" class="bnal-go" data-bnal="on">Turn on alerts</button>'
           + '<p class="bnal-note">Your browser will ask to allow notifications. Tap <b>Allow</b>. Never more than ' + (c.max_per_hour || 6) + ' an hour.</p>'
           + '<p class="bnal-msg" role="status" aria-live="polite"></p>'
-          + '<div class="bnal-acts bnal-acts-2"><button type="button" class="bnal-2" data-bnal="sample">Show a sample alert</button></div>' + SAMPLE_BOX);
+          + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + SAMPLE_BOX);
       }
     });
   }
@@ -253,15 +328,32 @@
       }).catch(function (e) { return { perm: "granted", ok: false, error: (e && e.message) || "Something went wrong. Please try again." }; });
     });
   };
+  function restoreChoices() {
+    var s = st(), lvl = s.level === "all" ? "all" : "major", cats = s.cats || [], all = !cats.length;
+    [].forEach.call(el.querySelectorAll('input[name="bnal_lvl"]'), function (r) { r.checked = r.value === lvl; });
+    [].forEach.call(el.querySelectorAll(".bnal-cats input"), function (b) { b.checked = all || cats.indexOf(b.value) >= 0; });
+    if (s.on) setStatus(lvl === "all" ? "On, all ranked alerts" : "On, major alerts only");
+  }
   function saveChanges(btn) {
     var ch = readChoices();
     if (ch.none) { say("Pick at least one category under More options.", "err"); return; }
-    btn.disabled = true;
+    if (btn) btn.disabled = true;
+    var seq = ++saveSeq;
     getReg().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) {
+      if (seq !== saveSeq) return null;
       if (!sub) { save(null); render(); throw null; }
       return post("/api/alerts/subscribe", { sub: sub.toJSON(), level: ch.level, cats: ch.cats, test: isTest() });
-    }).then(function (j) { var s = st(); s.level = j.level; s.cats = j.cats; save(s); btn.disabled = false; say("Saved.", "ok"); })
-      .catch(function (e) { btn.disabled = false; if (e !== null) say((e && e.message) || "Couldn’t save. Please try again.", "err"); });
+    }).then(function (j) {
+      if (!j || seq !== saveSeq) return;
+      var s = st(); s.level = j.level; s.cats = j.cats; save(s);
+      if (btn) btn.disabled = false;
+      setStatus(j.level === "all" ? "On, all ranked alerts" : "On, major alerts only");
+      say("Saved.", "ok");
+    }).catch(function (e) {
+      if (seq !== saveSeq) return;
+      if (btn) btn.disabled = false;
+      if (e !== null) { say((e && e.message) || "Couldn’t save. Please try again.", "err"); restoreChoices(); }
+    });
   }
   function turnOff(btn) {
     btn.disabled = true;
@@ -294,18 +386,32 @@
       }).catch(function () { sampleP = null; return EXAMPLE; });
     return sampleP;
   }
+  function asList(v) {
+    if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { v = []; } }
+    return Array.isArray(v) ? v : [];
+  }
   function brief(it) {
-    var seen = {}, fam = (it.families || []).filter(function (f) {
+    var seen = {}, fam = asList(it && it.families).filter(function (f) {
+      if (f && typeof f === "object") f = f.name || f.label || "";
       var k = String(f || "").toLowerCase().replace(/^www\./, "").split(".")[0]; if (!f || f === "social" || seen[k]) return false; seen[k] = 1; return true; }).slice(0, 3);
-    var n = it.eff_families || fam.length;
-    return (it.location ? "Where: " + it.location + ". " : "")
+    fam = fam.map(function (f) { return (f && typeof f === "object") ? (f.name || f.label || "") : String(f); });
+    var n = (it && it.eff_families) || fam.length;
+    return (it && it.location ? "Where: " + it.location + ". " : "")
       + (n ? "Confirmed by " + n + " independent source" + (n === 1 ? "" : "s") + (fam.length ? ", including " + fam.join(", ") : "") + ". " : "")
-      + (it.score != null ? "Severity " + it.score + "/100. " : "")
+      + (it && it.score != null ? "Severity " + it.score + "/100. " : "")
       + "Open the alert page for the full brief and every source.";
   }
+  function linkOf(x) {
+    if (!x) return null;
+    if (typeof x === "string") return /^https?:\/\//i.test(x) ? { url: x, source: "" } : null;
+    if (typeof x === "object" && x.url) return x;
+    return null;
+  }
   function srcLink(it) {
-    var ls = it.links || [], l = ls.filter(function (x) { return x.url && !SOC.test(x.source || ""); })[0] || ls[0];
-    if (!l) return "";
+    var ls = asList(it && it.links), l = null, i, y;
+    for (i = 0; i < ls.length; i++) { y = linkOf(ls[i]); if (y && !SOC.test(y.source || "")) { l = y; break; } }
+    if (!l) { for (i = 0; i < ls.length; i++) { y = linkOf(ls[i]); if (y) { l = y; break; } } }
+    if (!l || !l.url) return "";
     var h = ""; try { h = new URL(l.url).hostname.replace(/^www\./, ""); } catch (e) {}
     return '<a class="bnal-src" href="' + esc(l.url) + '" target="_blank" rel="noopener nofollow">Source: ' + esc(l.source && !/^https?:/.test(l.source) ? l.source : h) + ' ↗</a>';
   }
@@ -323,13 +429,21 @@
       + '<div class="bnal-lk">' + srcLink(it) + (it.example ? "" : '<a class="bnal-open" href="' + url + '">Open the alert page →</a>') + '</div></article>'
       + '<p class="bnal-note">Real alerts arrive as a phone or desktop notification (top). Tap it to open the alert page.</p>';
   }
+  function showSample(box, it) {
+    var html; try { html = sampleHTML(it); } catch (err) { it = EXAMPLE; html = sampleHTML(EXAMPLE); }
+    box.innerHTML = html; box.setAttribute("data-ready", "1");
+    try {
+      var sc = box.closest(".bnal-body");
+      if (sc) sc.scrollTo({ top: Math.max(0, box.offsetTop - 8), behavior: "smooth" });
+    } catch (e) {}
+    return it;
+  }
   function sample(btn) {
     var box = el && el.querySelector(".bnal-sample"); if (!box) return;
-    if (!box.hidden && box.innerHTML) { box.hidden = true; if (btn) btn.setAttribute("aria-expanded", "false"); return; }
-    box.hidden = false; box.innerHTML = '<p class="bnal-note">Loading a sample…</p>'; if (btn) btn.setAttribute("aria-expanded", "true");
+    if (!box.hidden && box.getAttribute("data-ready") === "1") { box.hidden = true; box.setAttribute("data-ready", ""); if (btn) btn.setAttribute("aria-expanded", "false"); return; }
+    box.hidden = false; box.setAttribute("data-ready", ""); box.innerHTML = '<p class="bnal-note">Loading a sample…</p>'; if (btn) btn.setAttribute("aria-expanded", "true");
     getSample().then(function (it) {
-      box.innerHTML = sampleHTML(it);
-      try { box.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {}
+      it = showSample(box, it);
       if (E.api && Notification.permission === "granted" && !(E.ios && !E.standalone)) {
         getReg().then(function (r) {
           return r.showNotification("SAMPLE · " + (it.rank | 0) + "/10 · " + catLabel(it.category).toUpperCase(), { body: cleanT(it.title).slice(0, 180),
@@ -337,7 +451,7 @@
             data: { url: location.origin + (it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/#wire") } });
         }).then(function () { say("Sample shown below and sent to your notifications.", "ok"); }, function () { say("Sample shown below.", "ok"); });
       } else say("Sample shown below.", "ok");
-    });
+    }).catch(function () { showSample(box, EXAMPLE); say("Sample shown below.", "ok"); });
   }
   // "Send me a test push": a real push from our server through your browser's push service (Apple, Google, Mozilla, Microsoft)
   function testPush(btn) {
