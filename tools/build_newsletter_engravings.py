@@ -7,7 +7,7 @@ fire, flood, grid, cyber, sun) in the same ivory-and-gold crosshatch. Chrome pai
 SVG; Pillow keeps each PNG near 30–60 KB. The newsletter loads the PNGs. It does not
 need Chrome at send time.
 """
-import json, math, os, shutil, subprocess, tempfile
+import json, math, os, re, shutil, subprocess, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ART = os.path.join(ROOT, "app", "static", "bn-menu-art.json")
@@ -20,12 +20,26 @@ IVORY = "#E6E1D6"
 GOLD = "#FFC21A"
 
 
+def _thicken(inner):
+    """Menu strokes are hairlines meant for a huge screen. Email needs them bright and heavier."""
+    def op(m):
+        v = min(1.0, float(m.group(1)) + 0.55)
+        return f'stroke-opacity="{v:.2f}"'
+    def sw(m):
+        v = max(1.15, float(m.group(1)) * 1.7)
+        return f'stroke-width="{v:.2f}"'
+    inner = re.sub(r'stroke-opacity="([0-9.]+)"', op, inner)
+    inner = re.sub(r"stroke-opacity='([0-9.]+)'", op, inner)
+    return re.sub(r'stroke-width="([0-9.]+)"', sw, inner)
+
+
 def menu_svg(key, inner):
     acc = ACC[key]
+    inner = _thicken(inner)
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="640" height="440" viewBox="560 0 640 440">
 <rect x="560" y="0" width="640" height="440" fill="#0B0D10"/>
 <style>.m3-acc{{stroke:{acc}}} .m3-bg{{fill:#0B0D10;stroke:none}}</style>
-<g fill="none" stroke="{IVORY}" stroke-linecap="round" stroke-linejoin="round">{inner}</g>
+<g fill="none" stroke="#F4EFE4" stroke-linecap="round" stroke-linejoin="round">{inner}</g>
 </svg>'''
 
 
@@ -197,22 +211,32 @@ def scene_fire():
 
 
 def scene_flood():
+    """House in rising water. Walls, roof, and the water itself are crosshatched, not a single outline."""
     parts = []
-    # house
-    parts.append('<path d="M250 150 L320 96 L390 150 V280 H250 Z" stroke-width="1.5"/>')
-    parts.append('<path d="M300 200 H340 V280 H300 Z" stroke-width="1.1"/>')
-    parts.append('<path d="M268 168 H292 V192 H268 Z M348 168 H372 V192 H348 Z" stroke-width="1"/>')
-    for i in range(6):
-        parts.append(f'<path d="M258 {168+i*16} H382" stroke-width="0.45" stroke-opacity="0.35"/>')
-    # water
-    for i, y in enumerate(range(230, 340, 8)):
+    for i in range(18):
+        y = 36 + i * 8
         pts = []
-        for x in range(40, 610, 8):
-            yy = y + 5 * math.sin(x / 22.0 + i)
+        for x in range(36, 610, 8):
+            yy = y + 7 * math.sin(x / 32.0 + i * 0.35)
             pts.append(f"{x},{yy:.1f}")
-        col = GOLD if i == 0 else IVORY
-        op = 1 if i == 0 else 0.75
-        parts.append(f'<polyline points="{" ".join(pts)}" stroke="{col}" stroke-width="1" stroke-opacity="{op}"/>')
+        parts.append(f'<polyline points="{" ".join(pts)}" stroke-width="0.7" stroke-opacity="0.55"/>')
+    house = "M150 168 L320 70 L490 168 V300 H150 Z"
+    parts.append(clip_hatch("house", house, gap=6))
+    parts.append(f'<path d="{house}" stroke-width="1.7"/>')
+    parts.append('<path d="M210 70 L320 40 L430 70" stroke-width="1.2" stroke-opacity="0.8"/>')
+    for i in range(8):
+        parts.append(f'<path d="M168 {188+i*12} H472" stroke-width="0.55" stroke-opacity="0.45"/>')
+    parts.append('<path d="M250 214 H310 V300 H250 Z M360 188 H410 V228 H360 Z" stroke="#FFC21A" stroke-width="1.35"/>')
+    parts.append('<path d="M360 208 H410 M385 188 V228" stroke="#FFC21A" stroke-width="0.8"/>')
+    water = "M30 214 C 120 196, 200 236, 320 214 C 440 192, 520 236, 620 210 L 620 360 L 30 360 Z"
+    parts.append(clip_hatch("water", water, gap=5, angle="horiz"))
+    for i, y in enumerate(range(210, 348, 7)):
+        pts = []
+        for x in range(36, 610, 7):
+            yy = y + 6 * math.sin(x / 20.0 + i * 0.6)
+            pts.append(f"{x},{yy:.1f}")
+        col = "#FFC21A" if i == 0 else IVORY
+        parts.append(f'<polyline points="{" ".join(pts)}" stroke="{col}" stroke-width="1.05"/>')
     return frame("\n".join(parts))
 
 
@@ -398,6 +422,26 @@ def write_svgs():
             fh.write(fn())
 
 
+def _fill_frame(im):
+    """Crop to the ink and scale it so a sparse menu crop does not stay a black box."""
+    from PIL import Image
+    px = im.load()
+    w, h = im.size
+    xs, ys = [], []
+    for y in range(0, h, 2):
+        for x in range(0, w, 2):
+            r, g, b = px[x, y]
+            if r + g + b > 70:
+                xs.append(x); ys.append(y)
+    if len(xs) < 30: return None
+    pad = 16
+    box = (max(0, min(xs) - pad), max(0, min(ys) - pad), min(w, max(xs) + pad), min(h, max(ys) + pad))
+    cropped = im.crop(box)
+    tw = 640
+    th = max(200, min(380, int(cropped.height * (tw / max(1, cropped.width)))))
+    return cropped.resize((tw, th), Image.Resampling.LANCZOS)
+
+
 def rasterize(only=None):
     from PIL import Image
     chrome = shutil.which("google-chrome") or shutil.which("google-chrome-stable")
@@ -426,6 +470,7 @@ def rasterize(only=None):
             raise SystemExit(f"chrome did not write {raw}")
         im = Image.open(raw).convert("RGB")
         im = im.crop((0, 0, w, h)) if im.size[0] >= w and im.size[1] >= h else im.resize((w, h))
+        im = _fill_frame(im) or im
         # palette keeps the engraving (black, ivory, one accent) small
         for colors, scale in ((32, 1.0), (24, 1.0), (16, 1.0), (24, 0.8), (16, 0.72)):
             pic = im if scale == 1 else im.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)

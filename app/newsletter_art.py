@@ -428,16 +428,16 @@ _SCENE = {
     "storm": "scene-storm", "quake": "scene-quake", "flood": "scene-flood", "fire": "scene-fire",
     "outbreak": "scene-outbreak", "missile": "scene-missile", "conflict": "scene-conflict",
     "grid": "scene-grid", "cyber": "scene-cyber", "space": "scene-space",
-    "politics": "banner-politics", "financial": "banner-markets", "other": "banner-latest",
+    "politics": "banner-politics", "financial": "banner-markets", "other": "banner-threats",
     "rights": "scene-rights", "surveillance": "scene-surveillance", "protest": "scene-protest",
     "border": "scene-border",
 }
 _BANNER = {
     "Top threats": "banner-threats", "Analyst brief": "banner-threats",
-    "Politics & Government": "banner-politics", "Still developing": "banner-latest",
-    "Developing stories": "banner-latest", "Also notable": "banner-about",
-    "Watchlist: unconfirmed": "banner-about", "Patterns": "banner-community",
-    "Stories you follow": "banner-community", "Watch: new on BLACKOUT.NETWORK": "banner-latest",
+    "Politics & Government": "banner-politics", "Still developing": "banner-threats",
+    "Developing stories": "banner-community", "Also notable": "banner-markets",
+    "Watchlist: unconfirmed": "banner-community", "Patterns": "banner-community",
+    "Stories you follow": "banner-community", "Watch: new on BLACKOUT.NETWORK": "banner-prepare",
 }
 
 
@@ -460,10 +460,16 @@ def scene_src(kind):
 
 
 def banner_src(title):
+    """Engraved banner, or '' when the file is missing or too empty to show. Callers then use a text header."""
     if (title or "").startswith("Near you"): name = "banner-prepare"
-    elif (title or "").startswith("Crime"): name = "banner-about"
+    elif (title or "").startswith("Crime"): name = "banner-community"
     else: name = _BANNER.get(title, "banner-threats")
-    return _file_src(name) or plate_src(title)
+    path = os.path.join(ENGRAVED, name + ".png")
+    try:
+        if os.path.getsize(path) < 3500: return ""
+    except OSError:
+        return ""
+    return _file_src(name) or ""
 
 
 def trend_word(trajectory):

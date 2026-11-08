@@ -36,7 +36,7 @@ WINDOWS = (("24h", 24), ("7d", 24 * 7), ("30d", 24 * 30))
 
 # Email palette, same hexes as newsletter.PAL, so this module does not import newsletter (cycle).
 TX, MU, BODY = "#F5F5F7", "#A1A1A6", "#D2D2D7"
-SURF, LINE, AC, FILL, INK = "#16181C", "#2A2D33", "#FFC21A", "#FFC21A", "#0B0D10"
+SURF, LINE, AC, FILL, INK = "#16181C", "#2A2D33", "#FFC21A", "#FFC21A", "#0B0C0F"
 FB = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 FH = FB
 
@@ -634,6 +634,7 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
         "analysis": analysis,
         "trajectory": trajectory,
         "trend_detail": trend_detail,
+        "trend_from_history": bool(headlines_known),
         "category": item.get("category"),
         "outlook": outlook,
         "confidence": level,
@@ -819,7 +820,8 @@ def html_section(analysis, base_url="https://blackout.network"):
     base = (base_url or "https://blackout.network").rstrip("/")
     try:
         import newsletter_art as ART
-        plate = ART.img(ART.banner_src("Analyst brief"), "Section Analyst brief", 560, 385)
+        src = ART.banner_src("Analyst brief")
+        plate = ART.img(src, "Section Analyst brief", 560, 220) if src else ""
         plate += f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Analyst brief</div>'
     except Exception:
         plate = f'<div style="font:600 24px/1.2 {FH};color:{TX}">Analyst brief</div>'
@@ -827,8 +829,8 @@ def html_section(analysis, base_url="https://blackout.network"):
              + plate
              + f'<div style="font:400 15px/1.5 {FB};color:{MU};margin-top:8px">Top rank-7 items. A window we do not have is marked “not enough history”. '
              'Copies of one headline count as one source. Report volume is separate from the danger reading.</div></td></tr>']
-    card_o = ('<tr><td class="bnpad" style="padding:6px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
-              f'<tr><td style="padding:20px 22px;background:{SURF};border-radius:18px">')
+    card_o = ('<tr><td class="bnpad" bgcolor="#0B0C0F" style="padding:6px 20px;background:#0B0C0F"><table role="presentation" bgcolor="' + SURF + '" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:' + SURF + '">'
+              f'<tr><td bgcolor="{SURF}" style="padding:20px 22px;background:{SURF};color:{TX};border-radius:18px">')
     card_c = "</td></tr></table></td></tr>"
     for it in items:
         sp = it.get("spark") or {}
@@ -873,7 +875,8 @@ def html_section(analysis, base_url="https://blackout.network"):
                            f"Analysis: the same {kind.lower()} is named across these separate clusters. Each item’s danger read is its own rank and sourced figures."))
         try:
             import newsletter_art as ART
-            pplate = ART.img(ART.banner_src("Patterns"), "Section Patterns", 560, 385) + f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Patterns we’re watching</div>'
+            psrc = ART.banner_src("Patterns")
+            pplate = (ART.img(psrc, "Section Patterns", 560, 220) if psrc else "") + f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Patterns we’re watching</div>'
         except Exception:
             pplate = f'<div style="font:600 20px/1.2 {FH};color:{TX}">Patterns we’re watching</div>'
         parts.append('<tr><td class="bnpad" style="padding:22px 20px 6px 20px">' + pplate + '</td></tr>')

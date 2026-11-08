@@ -117,12 +117,39 @@ def _compare(issue, links):
     print("compare", path, "weather", (weather.get("title") or "")[:70], "| political", (political.get("title") or "")[:70])
 
 
+def _mirror_alerts(dest):
+    """Copy alert rows from a local blackout.db mirror when the preview machine has one. Real sends already read blackout.db."""
+    app = os.path.join(ROOT, "app")
+    cands = [os.environ.get("NEWSLETTER_ALERT_MIRROR") or "", os.path.join(app, "blackout.db"), os.path.join(app, "render_mirror", "blackout.db")]
+    srcp = next((p for p in cands if p and os.path.exists(p) and os.path.getsize(p) > 1000), None)
+    if not srcp: 
+        print("no alert mirror; preview trend badges say trend data loading")
+        return
+    import sqlite3
+    s = sqlite3.connect(f"file:{srcp}?mode=ro", uri=True); s.row_factory = sqlite3.Row
+    d = sqlite3.connect(dest)
+    try:
+        rows = s.execute("SELECT * FROM alerts").fetchall()
+    except Exception as ex:
+        print("mirror alerts unreadable", type(ex).__name__); s.close(); d.close(); return
+    cols = rows[0].keys() if rows else []
+    if cols:
+        q = ",".join("?" * len(cols))
+        for r in rows:
+            try: d.execute(f"INSERT OR REPLACE INTO alerts({','.join(cols)}) VALUES({q})", [r[c] for c in cols])
+            except Exception: pass
+        d.commit()
+    s.close(); d.close()
+    print(f"alert mirror {srcp} rows {len(rows)}")
+
+
 def main():
     live = False
     try:
         n, generated = _live_db(NL.P["src"])
         live = n > 0
         print(f"live clusters: {n} generated {generated}")
+        _mirror_alerts(NL.P["src"])
     except Exception as ex:
         print("live fetch failed, using fixture:", type(ex).__name__)
         NA.write_demo_db(NL.P["src"], AT)
@@ -144,8 +171,8 @@ def main():
             "Fixture Morning Brief. Nothing was emailed.")
     banner = ('<div style="background:#FFC21A;color:#0B0D10;font:600 14px/1.45 Inter,system-ui,sans-serif;padding:12px 16px">'
               + note + '</div>')
-    needle = '<body class="bnb" style="margin:0;padding:0;background:#0B0D10;-webkit-text-size-adjust:100%">'
-    html = html.replace(needle, needle + banner, 1)
+    needle = "<body "
+    html = html.replace(needle, banner + needle, 1)
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f: f.write(html)
     an = issue["analysis"]

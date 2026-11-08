@@ -175,6 +175,16 @@ class Bugs(unittest.TestCase):
         self.assertNotIn("shipping", why.lower())
         self.assertIn("power and water", why)
 
+    def test_why_lines_are_not_identical(self):
+        row = {"brief": "", "rank": 6, "category": "war/conflict", "mentions_3h": 0, "rising": 0}
+        a = NL.why_it_matters({**row, "title": "Iran's IRGC claims a 2,000 km ballistic missile range limit has been lifted", "location": "Iran"}, category="war/conflict")
+        b = NL.why_it_matters({**row, "title": "Strikes hit Kyiv's Northern Bridge with ballistic missiles", "location": "Kyiv"}, category="war/conflict")
+        self.assertNotEqual(a, b)
+        self.assertIn("IRGC", a)
+        self.assertIn("Kyiv", b)
+        self.assertNotIn("Armed conflict can escalate fast", a)
+        self.assertNotIn("Armed conflict can escalate fast", b)
+
     def test_summary_does_not_repeat_the_title(self):
         title = "M6.1 earthquake strikes off the coast of Japan"
         self.assertEqual(NL.summary_text(title, title), "")
@@ -297,6 +307,23 @@ class Render(unittest.TestCase):
         self.assertNotIn("Analyst brief", html)
         self.assertNotIn("WHAT HAPPENED", text)
         _assert_no_empty_framing(self, subj, html, text)
+        self.assertNotIn("Live cluster snapshot", html)
+        self.assertIn('content="dark"', html)
+        self.assertNotIn('content="dark light"', html)
+        self.assertIn('bgcolor="#0B0C0F"', html)
+        self.assertNotIn("background:#FFFFFF", html)
+        self.assertNotIn("background:#F5F5F7", html)
+
+    def test_preview_without_alert_history_labels_loading(self):
+        c = sqlite3.connect(NL.P["src"])
+        c.execute("DELETE FROM alerts"); c.commit(); c.close()
+        issue = self._issue()
+        links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                 "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+        _s, html, text = NL.render(issue, links)
+        self.assertIn("trend data loading", html)
+        self.assertNotIn("Live cluster snapshot", html)
+        self.assertIn("trend data loading", text)
 
     def test_mime_uses_cid_and_does_not_send(self):
         issue = self._issue()
