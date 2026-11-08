@@ -63,7 +63,9 @@ class Routes(unittest.TestCase):
             X_URL = "https://x.com/BlkoutNtw"
         page = apple_v1.home_html(SN)
         self.assertIn('id="bn_sig"', page)
-        self.assertLess(page.index("bn_sig"), page.index("bna_dash"))
+        # Nov 7 homepage rebuild puts Active Threat Monitoring first. The map stays on the page after The latest.
+        self.assertLess(page.index("bna_dash"), page.index("bna_h_latest"))
+        self.assertLess(page.index("bna_h_latest"), page.index("bn_sig"))
 
     def test_marker_rules(self):
         node = subprocess.run(["node", "-e", r'''
