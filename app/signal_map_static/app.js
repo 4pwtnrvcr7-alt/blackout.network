@@ -297,9 +297,9 @@
     });
     return q;
   }
-  function dotClass(c, dim) {
+  function dotClass(c, dim, hit) {
     var approx = !!(c && (c.exact === false || c.approximate || c.precision === "country"));
-    return "signal" + (approx ? " approx" : "") + (dim ? " dim" : "");
+    return "signal" + (approx ? " approx" : "") + (dim ? " dim" : "") + (hit ? " hit" : "");
   }
   function landStyle() {
     if (themeLight()) return { color: "#C5D0DC", weight: 0.7, fillColor: "#F7F9FB", fillOpacity: 1 };
@@ -509,7 +509,7 @@
       var q = text(query);
       results.textContent = "";
       if (!q) { closeResults(); return; }
-      var hits = topMatches(searchPool(), q, 6), i;
+      var hits = topMatches(searchPool(), q, 8), i;
       if (!hits.length) {
         var empty = document.createElement("p");
         empty.className = "bn-sig-none";
@@ -624,12 +624,12 @@
       listEl.appendChild(ul);
       listEl.hidden = false;
     }
-    function dotIcon(c, first, dim) {
+    function dotIcon(c, first, dim, hit) {
       var col = colorFor(catOf(c).id);
       var delay = first ? (Math.random() * 15).toFixed(3) + "s" : "";
       var icon = L.divIcon({
         className: "bn-sig-mk" + (first ? " bn-sig-enter" : " bn-sig-fade"),
-        html: '<div class="' + dotClass(c, dim) + '" style="color:' + col + '"></div>',
+        html: '<div class="' + dotClass(c, dim, hit) + '" style="color:' + col + '"></div>',
         iconSize: [12, 12], iconAnchor: [6, 6]
       });
       if (delay) icon.createIcon = function (old) {
@@ -639,7 +639,7 @@
       };
       return icon;
     }
-    function countIcon(n, members, dim) {
+    function countIcon(n, members, dim, hit) {
       var size = Math.min(40, 24 + Math.round(Math.log(n) / Math.LN2) * 2);
       var color = dominantColor(members);
       var neutral = color === neutralColor();
@@ -653,7 +653,7 @@
       }
       return L.divIcon({
         className: "bn-sig-cl",
-        html: '<div class="bn-count' + (dim ? " dim" : "") + '" style="width:' + size + 'px;height:' + size + 'px;background:' + bg + ';color:' + fg + ';border-color:' + bd + '">' + n + "</div>",
+        html: '<div class="bn-count' + (dim ? " dim" : "") + (hit ? " hit" : "") + '" style="width:' + size + 'px;height:' + size + 'px;background:' + bg + ';color:' + fg + ';border-color:' + bd + '">' + n + "</div>",
         iconSize: [size, size], iconAnchor: [size / 2, size / 2]
       });
     }
@@ -704,7 +704,8 @@
         var members = g.idx.map(function (ix) { return shown[ix]; });
         if (g.n === 1) {
           var c = members[0];
-          var marker = L.marker([+c.lat, +c.lon], { icon: dotIcon(c, first, query && !matches(c, query)), keyboard: false });
+          var missed = !!(query && !matches(c, query));
+          var marker = L.marker([+c.lat, +c.lon], { icon: dotIcon(c, first, missed, !!query && !missed), keyboard: false });
           onMarker(c, marker);
           marker.addTo(markers);
           return;
@@ -713,7 +714,8 @@
           var center = map.latLngToLayerPoint([+members[0].lat, +members[0].lon]);
           members.forEach(function (c, j) {
             var at = map.layerPointToLatLng(L.point(center.x + g.offsets[j].dx, center.y + g.offsets[j].dy));
-            var mk = L.marker(at, { icon: dotIcon(c, first, query && !matches(c, query)), keyboard: false });
+            var missed = !!(query && !matches(c, query));
+            var mk = L.marker(at, { icon: dotIcon(c, first, missed, !!query && !missed), keyboard: false });
             onMarker(c, mk);
             mk.addTo(markers);
           });
@@ -721,7 +723,8 @@
         }
         var lat = 0, lon = 0;
         members.forEach(function (c) { lat += +c.lat; lon += +c.lon; });
-        var cm = L.marker([lat / g.n, lon / g.n], { icon: countIcon(g.n, members, groupDim(members)), keyboard: false });
+        var missed = groupDim(members);
+        var cm = L.marker([lat / g.n, lon / g.n], { icon: countIcon(g.n, members, missed, !!query && !missed), keyboard: false });
         onCluster(members, cm);
         cm.addTo(markers);
       });

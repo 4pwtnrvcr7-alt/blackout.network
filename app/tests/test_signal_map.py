@@ -298,6 +298,7 @@ const out={
  neutral:B.neutralColor(false),
  dot:B.dotClass(item({exact:false,approximate:true,precision:"country"}),false),
  dotDim:B.dotClass(item({exact:true}),true),
+ dotHit:B.dotClass(item({exact:true}),false,true),
  ms:B.SEARCH_MS, key:B.CAT_KEY,
  saved:B.enabledFrom(JSON.stringify(["cyber","health"])),
  none:B.enabledFrom(JSON.stringify(B.CAT_IDS)),
@@ -340,6 +341,7 @@ console.log(JSON.stringify(out));
         self.assertEqual(got["neutral"], "#8B95A3")
         self.assertEqual(got["dot"], "signal approx")
         self.assertEqual(got["dotDim"], "signal dim")
+        self.assertEqual(got["dotHit"], "signal hit")
         self.assertEqual(got["ms"], 200)
         self.assertEqual(got["key"], "bn-sig-cats")
         self.assertNotIn("cyber", got["saved"])
@@ -354,6 +356,9 @@ console.log(JSON.stringify(out));
             self.assertIn(hexcolor, css)
             self.assertIn(hexcolor, js)
         self.assertIn("opacity:.72", css)
+        self.assertIn("opacity:.15", css)
+        self.assertIn(".bn-sig-search:focus-within", css)
+        self.assertIn(".signal.hit", css)
         self.assertIn("Math.random() * 15", js)
         self.assertIn("LOWER48", js)
         self.assertNotIn("0 0 8px", css)

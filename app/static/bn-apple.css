@@ -380,7 +380,7 @@ html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
 @media (min-width:1100px){.bna-grp[data-g="el"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* Global signal map card: size is reserved before its stylesheet loads, so the homepage does not jump.
    Search and the category row sit above the map, so the reserve is taller than the map alone. */
-#bn_sig{min-height:640px;border-radius:18px;background:#0b1220;overflow:hidden}
+#bn_sig{min-height:590px;border-radius:18px;background:#0b1220;overflow:hidden}
 #bn_sig_map{height:370px;background:#0b1220;touch-action:pan-y}
 html[data-theme="light"] #bn_sig,html[data-theme="light"] #bn_sig_map{background:#e7eef5}
-@media(max-width:600px){#bn_sig{min-height:600px}#bn_sig_map{height:320px}}
+@media(max-width:600px){#bn_sig{min-height:520px}#bn_sig_map{height:320px}}
