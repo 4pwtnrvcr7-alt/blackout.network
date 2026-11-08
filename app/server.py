@@ -624,7 +624,10 @@ class H(BaseHTTPRequestHandler):
             m = addon_for(u.path)
             if m and hasattr(m, "handle_stream"): return m.handle_stream(u.path, qs, self)   # long-lived add-on responses (SSE /api/stream)
             if m:
-                r = m.handle_get(u.path, qs)
+                import inspect
+                if "headers" in inspect.signature(m.handle_get).parameters:   # netpages: same-origin gate for IODA JSON
+                    r = m.handle_get(u.path, qs, headers={k.lower(): v for k, v in self.headers.items()})
+                else: r = m.handle_get(u.path, qs)
                 if not (r and r[0] == 404 and self.not_found_page(u.path)): return self.send(*r)
                 return
             if self.not_found_page(u.path): return
