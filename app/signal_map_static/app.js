@@ -183,30 +183,29 @@
     if (embed) box.style.touchAction = "pan-y";
     var map = L.map(box, {
       zoomControl: true, worldCopyJump: true, preferCanvas: true, attributionControl: true, maxZoom: MAX_Z,
+      zoomSnap: 0,
       dragging: !embed, scrollWheelZoom: !embed, touchZoom: !embed, doubleClickZoom: !embed, boxZoom: !embed, keyboard: !embed
     });
-    var framed = false;
-    function usZoom() {
-      var w = box.clientWidth, h = box.clientHeight;
-      if (w < 40 || h < 40) return 0;
-      // Narrow screens keep the whole country in frame. Desktop fills the view with the lower 48;
-      // a short card cannot use the full-page zoom without cutting the country in half.
-      if (w < 700) return h < 360 ? 2 : 3;
-      return h < 520 ? 4 : 5;
+    var usLocked = false;
+    var LOWER48 = [[24.5, -125], [49.5, -66.5]];
+    function fitUS() {
+      if ((box.clientWidth || 0) < 40 || (box.clientHeight || 0) < 40) return false;
+      framing++;
+      map.fitBounds(LOWER48, { animate: false, padding: [12, 12] });
+      framing--;
+      return true;
     }
     function frameUS() {
-      if (framed) return;
-      var z = usZoom();
-      if (!z) return;
-      map.setView([39, -98], z, { animate: false });
-      framed = true;
+      if (viewName !== "us" || usLocked) return;
+      fitUS();
     }
-    frameUS();
-    if (!framed) map.setView([39, -98], (window.innerWidth || 800) < 700 ? 3 : 4);
+    map.on("zoomstart", function () { if (!framing && viewName === "us") usLocked = true; });
+    map.on("dragstart", function () { if (!framing && viewName === "us") usLocked = true; });
     map.attributionControl.setPrefix("");
     map.attributionControl.addAttribution("Natural Earth");
     var world = null, markers = L.layerGroup().addTo(map), rows = [], armed = null, tip, hideT = 0, open = null;
     var viewName = "us", framing = 0, listEl = null, timer = 0;
+    frameUS();
 
     tip = document.createElement("div");
     tip.className = "bn-sig-tip";
@@ -391,25 +390,34 @@
       });
     }
     function onCluster(group, marker) {
-      marker.on("click", function (ev) {
+      var last = 0;
+      function activate(ev) {
         if (L.DomEvent) L.DomEvent.stop(ev);
+        var now = Date.now();
+        if (now - last < 450) return;
+        last = now;
+        var oe = (ev && ev.originalEvent) || {};
+        var touch = coarse || oe.pointerType === "touch" || oe.type === "touchend" || oe.type === "touchstart" || (oe.sourceCapabilities && oe.sourceCapabilities.firesTouchEvents);
         var bounds = L.latLngBounds(group.map(function (c) { return [+c.lat, +c.lon]; }));
         var country = group.every(function (c) { return c.precision === "country" || c.approximate; });
         var tiny = bounds.getNorthEast().distanceTo(bounds.getSouthWest()) < 40000;
-        framed = true;
-        if (!country && !tiny && map.getZoom() < map.getMaxZoom()) {
+        if (!touch && !country && !tiny && map.getZoom() < map.getMaxZoom()) {
+          usLocked = true;
           framing++;
           map.fitBounds(bounds, { maxZoom: map.getMaxZoom(), animate: false, padding: [36, 36] });
           framing--;
           return;
         }
         showList(group);
-      });
+      }
+      marker.on("click", activate);
+      marker.on("touchend", activate);
       marker.on("add", function () {
         var node = marker.getElement();
         if (!node) return;
         node.setAttribute("role", "button");
         node.setAttribute("aria-label", group.length + " stories. Open the list or zoom in.");
+        node.style.touchAction = "manipulation";
       });
     }
     function draw(first) {
@@ -448,17 +456,17 @@
       var focus = viewName === "us" ? tally.us : viewName === "conflicts" ? tally.conflicts : shown.length;
       var label = viewName === "us" ? " in the United States" : viewName === "conflicts" ? " war/conflict" : "";
       say(focus + label + " · " + shown.length + " " + noun + " on this view · dots follow rank");
-      setTimeout(function () { map.invalidateSize(); frameUS(); }, 60);
+      setTimeout(function () { refit(); }, 60);
     }
     function widthZoom(wide, narrow) { return (box.clientWidth || 800) < 700 ? narrow : wide; }
     function frame(name) {
       viewName = name === "world" || name === "conflicts" ? name : "us";
-      framed = true;
+      if (viewName === "us") usLocked = false;
       paintViews();
       framing++;
       if (viewName === "conflicts") map.fitBounds([[28, -8], [58, 64]], { animate: false, padding: [28, 28] });
       else if (viewName === "world") map.setView([20, 0], widthZoom(2, 1), { animate: false });
-      else map.setView([39, -98], usZoom() || widthZoom(4, 3), { animate: false });
+      else fitUS();
       framing--;
     }
     function fillTopics() {
@@ -521,8 +529,15 @@
         draw(false);
       });
     });
-    if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); frameUS(); if (open) show(open, L.latLng(+open.lat, +open.lon)); }).observe(box);
-    else window.addEventListener("resize", function () { map.invalidateSize(); frameUS(); });
+    function refit() {
+      framing++;
+      map.invalidateSize({ animate: false, pan: false });
+      framing--;
+      frameUS();
+      if (open) show(open, L.latLng(+open.lat, +open.lon));
+    }
+    if (window.ResizeObserver) new ResizeObserver(function () { refit(); }).observe(box);
+    else window.addEventListener("resize", function () { refit(); });
 
     fetch(GEO).then(function (r) { return r.json(); }).then(function (geo) {
       world = L.geoJSON(geo, { style: { color: "#364158", weight: 0.6, fillColor: "#192538", fillOpacity: 0.7 }, interactive: false }).addTo(map);
