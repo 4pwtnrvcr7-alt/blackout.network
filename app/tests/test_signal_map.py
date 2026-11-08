@@ -120,5 +120,42 @@ console.log(JSON.stringify(out));
         self.assertTrue(got["recent"])
         self.assertFalse(got["hidden"])
 
+class Place(unittest.TestCase):
+    def test_inference_skips_ambiguous_and_food(self):
+        import signal_place as P
+        self.assertEqual(P.infer("Thanksgiving turkey dinner leftovers"), None)
+        self.assertEqual(P.infer("Roast turkey sandwich"), None)
+        self.assertEqual(P.infer("Georgia"), None)
+        self.assertEqual(P.infer("Jordan said the plan would wait"), None)
+        self.assertEqual(P.infer("Russia and Ukraine say emergency alert apps were hit"), None)
+        japan = P.infer("Earthquake in Japan")
+        self.assertEqual(japan["precision"], "country")
+        self.assertEqual(japan["place"], "Japan")
+        coast = P.infer("A quake struck off the coast of Vanuatu")
+        self.assertEqual(coast["place"], "Vanuatu")
+        turkey = P.infer("Talks in Turkey on the grain deal")
+        self.assertEqual(turkey["place"], "Turkey")
+        nws = P.infer("Tornado Watch issued November 2 by NWS Norman OK")
+        self.assertEqual(nws["precision"], "city")
+        self.assertIn("Oklahoma", nws["place"])
+        utah = P.infer("Flooding in Southern Utah")
+        self.assertEqual(utah["precision"], "state")
+        self.assertIn("Utah", utah["place"])
+        hobbs = P.infer("Gov. Katie Hobbs declares a state of emergency as storms batter Arizona")
+        self.assertEqual(hobbs["precision"], "state")
+        self.assertIn("Arizona", hobbs["place"])
+
+    def test_points_add_inferred_and_hide_watchlist_two(self):
+        os.environ["BN_APPLE"] = "1"
+        body = signal_map.points_payload()
+        self.assertIn("points", body)
+        titles = " ".join(p["title"] for p in body["points"])
+        self.assertNotIn("HIDDEN should not plot", titles)
+        self.assertGreater(body["shown"], body["stored"])
+        self.assertGreater(body["inferred"], 0)
+        inferred = [p for p in body["points"] if p["exact"] is False]
+        self.assertTrue(all(p["watchlist"] in (0, 1) for p in body["points"]))
+        self.assertTrue(all(p["lat"] and p["lon"] for p in inferred))
+
 if __name__ == "__main__":
     unittest.main()

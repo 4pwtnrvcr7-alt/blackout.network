@@ -1,6 +1,6 @@
 /* Global signal map. Same Leaflet + Natural Earth drawing as Control panel v2.
-   Dots: /api/state main (watchlist 0) and watchlist (watchlist 1) only, and only rows that
-   already have coordinates. Red is rank 7-10 only. No tile servers. */
+   Dots: Wire and Watchlist only. Stored coordinates stay filled. Inferred places are hollow.
+   Red is rank 7-10 only. No tile servers. */
 (function (global) {
   "use strict";
   var GEO = "/api/signal/world.geojson";
@@ -23,7 +23,7 @@
     return true;
   }
   function dest(c) {
-    var id = String(c && c.cluster_id || "");
+    var id = String(c && (c.cluster_id || c.id) || "");
     if (/^[0-9a-f]{16}$/.test(id)) return { href: "/wire/" + id, ext: false };
     var links = (c && c.links) || [], i, u;
     for (i = 0; i < links.length; i++) {
@@ -105,6 +105,12 @@
       h.textContent = text(c.title) || "Untitled";
       s.textContent = "Rank " + b.r + "/10" + (time ? " · " + time : "");
       tip.appendChild(h); tip.appendChild(s);
+      if (c.exact === false) {
+        var n = document.createElement("span");
+        n.className = "approx";
+        n.textContent = "Approximate location, inferred from report";
+        tip.appendChild(n);
+      }
       tip.hidden = false;
       open = c;
       var p = map.latLngToContainerPoint(latlng), w = tip.offsetWidth, ht = tip.offsetHeight;
@@ -122,7 +128,11 @@
     }
     function onMarker(c, marker) {
       var b = band(c.rank), time = et(when(c));
-      function label() { return (text(c.title) || "Story") + ". Rank " + b.r + " of 10." + (time ? " " + time + "." : ""); }
+      function label() {
+        var s = (text(c.title) || "Story") + ". Rank " + b.r + " of 10." + (time ? " " + time + "." : "");
+        if (c.exact === false) s += " Approximate location, inferred from report.";
+        return s;
+      }
       marker.on("mouseover", function (ev) {
         var pt = ev && ev.originalEvent && ev.originalEvent.pointerType;
         if (pt === "touch") return;
@@ -165,14 +175,15 @@
       shown.forEach(function (c) {
         var b = band(c.rank);
         var marker = L.marker([+c.lat, +c.lon], {
-          icon: L.divIcon({ className: "bn-sig-mk", html: '<div class="signal" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] }),
+          icon: L.divIcon({ className: "bn-sig-mk", html: '<div class="signal' + (c.exact === false ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] }),
           keyboard: false
         });
         onMarker(c, marker);
         marker.addTo(markers);
       });
-      var noun = shown.length === 1 ? "record" : "records";
-      say(shown.length + " geocoded " + noun + " shown" + (rows.length > shown.length ? " of " + rows.length : "") + " · dots follow rank");
+      var inf = 0, noun = shown.length === 1 ? "record" : "records";
+      for (i = 0; i < shown.length; i++) if (shown[i].exact === false) inf++;
+      say(shown.length + " " + noun + " shown" + (rows.length > shown.length ? " of " + rows.length : "") + (inf ? " · " + inf + " approximate" : "") + " · dots follow rank");
       setTimeout(function () { map.invalidateSize(); }, 60);
     }
     function fillTopics() {
@@ -227,12 +238,8 @@
     }).catch(function () { say("World outline could not load. Dots still use real coordinates."); });
 
     readUrl();
-    fetch("/api/state", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("state"); return r.json(); }).then(function (S) {
-      var main = (S && S.main) || [], watch = (S && S.watchlist) || [], i;
-      rows = [];
-      for (i = 0; i < main.length; i++) rows.push(main[i]);
-      for (i = 0; i < watch.length; i++) rows.push(watch[i]);
-      rows = rows.filter(real);
+    fetch("/api/signal/points", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("points"); return r.json(); }).then(function (S) {
+      rows = ((S && S.points) || []).filter(real);
       fillTopics();
       readUrl();
       draw();

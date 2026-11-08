@@ -28,6 +28,9 @@ html[data-theme="light"] #bn_sig,html[data-theme="light"] #bn_sig_map{background
 .bn-sig-mk{background:none!important;border:0!important}
 .bn-sig-mk .signal{width:12px;height:12px;border:2px solid currentColor;background:currentColor;border-radius:50%;box-shadow:0 0 12px currentColor;position:relative}
 .bn-sig-mk .signal:after{content:"";display:block;position:absolute;inset:-7px;border:1px solid currentColor;border-radius:50%;animation:bn-sig-radar 2.8s ease-in-out infinite}
+.bn-sig-mk .signal.approx{background:transparent;border-style:dashed;box-shadow:none}
+.bn-sig-mk .signal.approx:after{animation:none;opacity:.85;border-style:dashed;inset:-5px}
+.bn-sig-tip span.approx{color:#c5d2e4}
 .bn-sig-mk:before{content:"";position:absolute;inset:-8px}
 @keyframes bn-sig-radar{0%{transform:scale(.5);opacity:.8}100%{transform:scale(2);opacity:0}}
 .bn-sig-tip{position:absolute;z-index:800;pointer-events:none;max-width:220px;padding:6px 8px;border-radius:6px;background:#152033ee;color:#dce6f8;font:12px/1.35 Inter,system-ui,sans-serif;box-shadow:0 6px 16px #00000055}
