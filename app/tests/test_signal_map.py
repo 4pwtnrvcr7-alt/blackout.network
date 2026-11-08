@@ -299,6 +299,9 @@ const out={
  dot:B.dotClass(item({exact:false,approximate:true,precision:"country"}),false),
  dotDim:B.dotClass(item({exact:true}),true),
  dotHit:B.dotClass(item({exact:true}),false,true),
+ mc:B.matchCount([item({title:"Measles in Texas",category:"disease"}),item({title:"Storm in Ohio",category:"natural disaster"}),item({title:"Measles clinic",category:"disease"})],"measles"),
+ mc0:B.matchCount([item({title:"Storm in Ohio",category:"natural disaster"})],"measles"),
+ mcAll:B.matchCount([item({title:"A"}),item({title:"B"})],""),
  ms:B.SEARCH_MS, key:B.CAT_KEY,
  saved:B.enabledFrom(JSON.stringify(["cyber","health"])),
  none:B.enabledFrom(JSON.stringify(B.CAT_IDS)),
@@ -342,6 +345,9 @@ console.log(JSON.stringify(out));
         self.assertEqual(got["dot"], "signal approx")
         self.assertEqual(got["dotDim"], "signal dim")
         self.assertEqual(got["dotHit"], "signal hit")
+        self.assertEqual(got["mc"], 2)
+        self.assertEqual(got["mc0"], 0)
+        self.assertEqual(got["mcAll"], 2)
         self.assertEqual(got["ms"], 200)
         self.assertEqual(got["key"], "bn-sig-cats")
         self.assertNotIn("cyber", got["saved"])
@@ -359,6 +365,10 @@ console.log(JSON.stringify(out));
         self.assertIn("opacity:.15", css)
         self.assertIn(".bn-sig-search:focus-within", css)
         self.assertIn(".signal.hit", css)
+        results_css = css[css.find(".bn-sig-results{"):css.find(".bn-sig-results{") + 420]
+        self.assertIn("background:#152033", results_css)
+        self.assertNotIn("sig-tip", results_css)
+        self.assertIn('html[data-theme="light"] .bn-sig-results{background:#ffffff', css)
         self.assertIn("Math.random() * 15", js)
         self.assertIn("LOWER48", js)
         self.assertNotIn("0 0 8px", css)

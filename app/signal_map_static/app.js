@@ -239,6 +239,12 @@
     for (i = 0; i < parts.length; i++) if (parts[i] && h.indexOf(parts[i]) < 0) return false;
     return true;
   }
+  function matchCount(members, q) {
+    var list = members || [], i, n = 0;
+    if (!text(q)) return list.length;
+    for (i = 0; i < list.length; i++) if (matches(list[i], q)) n++;
+    return n;
+  }
   function topMatches(list, q, n) {
     q = text(q).toLowerCase();
     if (!q) return [];
@@ -640,7 +646,8 @@
       return icon;
     }
     function countIcon(n, members, dim, hit) {
-      var size = Math.min(40, 24 + Math.round(Math.log(n) / Math.LN2) * 2);
+      var sized = n > 0 ? n : 1;
+      var size = Math.min(40, 24 + Math.round(Math.log(sized) / Math.LN2) * 2);
       var color = dominantColor(members);
       var neutral = color === neutralColor();
       var bg, fg, bd;
@@ -657,14 +664,9 @@
         iconSize: [size, size], iconAnchor: [size / 2, size / 2]
       });
     }
-    function groupDim(members) {
-      if (!query) return false;
-      var i;
-      for (i = 0; i < members.length; i++) if (matches(members[i], query)) return false;
-      return true;
-    }
-    function onCluster(group, marker) {
+    function onCluster(group, marker, shownN) {
       var last = 0;
+      var nLabel = shownN == null ? group.length : shownN;
       function activate(ev) {
         if (L.DomEvent) L.DomEvent.stop(ev);
         var now = Date.now();
@@ -690,7 +692,7 @@
         var node = marker.getElement();
         if (!node) return;
         node.setAttribute("role", "button");
-        node.setAttribute("aria-label", group.length + " stories. Open the list or zoom in.");
+        node.setAttribute("aria-label", (query ? nLabel + " matching " + (nLabel === 1 ? "story" : "stories") : group.length + " stories") + ". Open the list or zoom in.");
         node.style.touchAction = "manipulation";
       });
     }
@@ -721,11 +723,13 @@
           });
           return;
         }
-        var lat = 0, lon = 0;
+        var lat = 0, lon = 0, hits = [], mi;
         members.forEach(function (c) { lat += +c.lat; lon += +c.lon; });
-        var missed = groupDim(members);
-        var cm = L.marker([lat / g.n, lon / g.n], { icon: countIcon(g.n, members, missed, !!query && !missed), keyboard: false });
-        onCluster(members, cm);
+        var nShow = matchCount(members, query);
+        for (mi = 0; mi < members.length; mi++) if (!query || matches(members[mi], query)) hits.push(members[mi]);
+        var missed = !!(query && nShow === 0);
+        var cm = L.marker([lat / g.n, lon / g.n], { icon: countIcon(nShow, hits.length ? hits : members, missed, !!query && !missed), keyboard: false });
+        onCluster(members, cm, nShow);
         cm.addTo(markers);
       });
       var tally = paintCounts();
@@ -912,7 +916,7 @@
     mount: mount, band: band, real: real, dest: dest, pass: pass,
     conflict: conflict, inUS: inUS, clusterPlan: clusterPlan, FAN_MAX: FAN_MAX, SPIDER_PX: SPIDER_PX,
     catOf: catOf, CATS: CATS, CAT_IDS: CAT_IDS, colorFor: colorFor, matches: matches, topMatches: topMatches,
-    dominantColor: dominantColor, neutralColor: neutralColor, enabledFrom: enabledFrom, disabledFrom: disabledFrom,
+    dominantColor: dominantColor, neutralColor: neutralColor, matchCount: matchCount, enabledFrom: enabledFrom, disabledFrom: disabledFrom,
     viewCounts: viewCounts, dotClass: dotClass, SEARCH_MS: SEARCH_MS, CAT_KEY: CAT_KEY
   };
 })(typeof window !== "undefined" ? window : globalThis);
