@@ -165,6 +165,56 @@ class Rules(unittest.TestCase):
         self.assertIn("from 6", out["analysis"])  # prior rank in our ledger, a real stored number
 
 
+class Bugs(unittest.TestCase):
+    def test_quake_is_not_war(self):
+        title = "M6.1 earthquake strikes off the coast of Japan"
+        self.assertEqual(NL.display_category(title, "", "war/conflict"), "natural disaster")
+        row = {"title": title, "brief": "WHAT: " + title + ". WHERE: location not reported.", "rank": 6, "category": "war/conflict",
+               "mentions_3h": 0, "rising": 0}
+        why = NL.why_it_matters(row, category="natural disaster")
+        self.assertNotIn("shipping", why.lower())
+        self.assertIn("power and water", why)
+
+    def test_summary_does_not_repeat_the_title(self):
+        title = "M6.1 earthquake strikes off the coast of Japan"
+        self.assertEqual(NL.summary_text(title, title), "")
+        self.assertEqual(NL.summary_text(title, title + ". " + title), "")
+        self.assertIn("depth", NL.summary_text(title, title + ". The USGS page lists a depth of 40 km."))
+        glued = "Magnitude 6.1 Earthquake Strikes Off Japan's Eastern Coast Near Tokyo A magnitude 6.1 earthquake struck off Japan's eastern coast on November 6, 2026, according to the Japan Meteorological Agency"
+        self.assertEqual(NL.tighten_title(glued), "Magnitude 6.1 Earthquake Strikes Off Japan's Eastern Coast Near Tokyo")
+        self.assertNotIn("November 6", NL.summary_text(NL.tighten_title(glued), glued))
+
+    def test_headline_place_is_approximate(self):
+        hit = NL._place_from_headline("M6.1 earthquake strikes off the coast of Japan", "")
+        self.assertIsNotNone(hit)
+        self.assertIn("Japan", hit["place"])
+        row = {"cluster_id": "ab" * 8, "title": "Explosion reported in Riyadh overnight", "brief": "WHAT: Explosion reported in Riyadh overnight. WHERE: location not reported.",
+               "rank": 7, "score": 50, "category": "war/conflict", "eff_families": 2, "families": "[]", "links": "[]",
+               "n_items": 2, "lat": None, "lon": None, "location": "", "event_time": None, "first_seen": "2026-11-08T10:00:00Z",
+               "mentions_3h": 0, "rising": 0, "watchlist": 0}
+        it = NL.item_of(row, "main", 0)
+        self.assertTrue(it["approx"])
+        self.assertIn("Riyadh", it["where"])
+        self.assertIn("approximate", NL._where(it).lower())
+        self.assertIsNotNone(it["lat"])
+
+    def test_old_story_does_not_lead(self):
+        NA.write_demo_db(NL.P["src"], AT)
+        c = sqlite3.connect(NL.P["src"])
+        iso = "2026-11-05T12:00:00Z"
+        c.execute("""INSERT INTO clusters(cluster_id,title,category,location,lat,lon,event_time,first_seen,updated,score,confidence,
+                     n_items,n_families,families,links,watchlist,brief,high_at,rising,mentions_3h,eff_families,rank)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  ("a11ce00000000009", "Paraguay: President under investigation for bank failure", "financial", "Paraguay",
+                   None, None, iso, iso, "2026-11-08T11:00:00Z", 50, "Medium", 4, 4, "[]", "[]", 0,
+                   "WHAT: Paraguay: President under investigation for bank failure. WHERE: Paraguay.", "2026-11-08T11:00:00Z", 0, 1, 4, 7))
+        c.commit(); c.close()
+        issue = NL.build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=AT, since=AT - timedelta(hours=24), slot="morning")
+        lead = [it["cluster_id"] for sec in ("main", "politics", "notable") for it in issue.get(sec) or []]
+        self.assertNotIn("a11ce00000000009", lead)
+        self.assertIn("a11ce00000000009", [it["cluster_id"] for it in issue.get("developing") or []])
+
+
 class Render(unittest.TestCase):
     def setUp(self):
         NA.write_demo_db(NL.P["src"], AT)
@@ -224,6 +274,10 @@ class Render(unittest.TestCase):
         self.assertIn("Prepare › Water", text)
         self.assertIn("https://blackout.network/wire/a11ce00000000003", text)
         # sender mode untouched: preview, and render did not write an outbox message
+        self.assertLess(len(html.encode()), 1_500_000)
+        self.assertIn("Story map", html)
+        self.assertIn("Section Top threats", html)
+        self.assertIn("Signal over noise", html)
         self.assertEqual((NL.env().get("NEWSLETTER_SENDER") or "preview"), "preview")
         self.assertFalse(NL.cfg().get("live_sending_approved"))
 
@@ -248,9 +302,9 @@ class Render(unittest.TestCase):
         subj, html, text = NL.render(issue, links)
         msg = NL.build_mime("preview@outbox.invalid", subj, html, text, None, "issue")
         raw = msg.as_string()
-        self.assertIn("cid:bn-spark-1@blackout.network", raw)
+        self.assertIn("cid:bn-img-1@blackout.network", raw)
         self.assertNotIn("data:image/png;base64,", raw)
-        self.assertIn("Content-ID: <bn-spark-1@blackout.network>", raw)
+        self.assertIn("Content-ID: <bn-img-1@blackout.network>", raw)
         self.assertNotIn("RESEND_API_KEY", raw)
         self.assertNotIn("@mail.test", raw)
 

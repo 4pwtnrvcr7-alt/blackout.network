@@ -488,12 +488,67 @@ CAT_WHY = {
     "other": "Could affect safety, services or travel in the affected area.",
 }
 def tier(rank): return TIERS.get(max(0, min(10, int(rank or 0))), ("", ""))
-def why_it_matters(r, official=False):
+# Headline keywords win over a stored family default. "earthquake strikes" must not stay war/conflict
+# just because the war pattern sees the word "strike" first, or because the feed's default category is war.
+_PHYS_CAT = (
+    ("natural disaster", re.compile(r"\b(?:earthquakes?|quakes?|magnitude|tsunamis?|hurricanes?|typhoons?|tornado(?:es)?|flood(?:ing|s)?|wildfires?|volcan\w*|eruptions?|landslides?|severe thunderstorms?)\b|\bm\s*[4-9](?:\.\d)?\b", re.I)),
+    ("disease", re.compile(r"\b(?:outbreaks?|avian flu|bird flu|h5n1|ebola|marburg|cholera|measles|mpox|dengue|pandemic|epidemic|influenza)\b", re.I)),
+    ("space weather", re.compile(r"\b(?:geomagnetic|solar flares?|radiation storms?)\b|\bkp\s*[5-9]\b", re.I)),
+    ("cyber", re.compile(r"\b(?:ransomware|data breach|cyber[- ]?attacks?|ddos)\b", re.I)),
+)
+def display_category(title, brief, stored):
+    """Physical-event keywords in the headline beat the stored category (the family fallback)."""
+    text = f"{title or ''} {brief or ''}"
+    for cat, rx in _PHYS_CAT:
+        if rx.search(text): return cat
+    return stored or "other"
+
+def _same_line(a, b):
+    na, nb = norm_title(a), norm_title(b)
+    if not na or not nb: return False
+    return na == nb or na in nb or nb in na
+
+def summary_text(title, what):
+    """Drop a summary that only repeats the headline, and drop repeated sentences."""
+    what = re.sub(r"\s+", " ", (what or "")).strip()
+    if not what: return ""
+    title_n = norm_title(title)
+    if title_n and norm_title(what) == title_n: return ""
+    kept, seen = [], set()
+    for sent in re.split(r"(?<=[.!?])\s+", what):
+        n = norm_title(sent)
+        if not n or n in seen or n == title_n: continue
+        if title_n and (n in title_n or title_n in n) and abs(len(n) - len(title_n)) < 12: continue
+        A, B = set((title_n or "").split()), set(n.split())
+        if A and B and len(A & B) / min(len(A), len(B)) >= 0.6: continue
+        seen.add(n); kept.append(sent.strip())
+    return " ".join(kept).strip()
+
+def _place_from_headline(title, brief):
+    """Offline gazetteer read (signal_place). None when the headline does not name one place."""
+    try:
+        import signal_place
+        return signal_place.infer(signal_place.story_text(title or "", "", brief or ""))
+    except Exception:
+        return None
+
+def _logged_in_window(r, start, at):
+    """A story leads only when the event, and the moment we logged it, sit inside this issue's window.
+    A later rescore (high_at) is not a new lead. An event from before the window (Paraguay on Nov 6, in an
+    Nov 8 brief) goes to Still developing even if the scanner row was touched again."""
+    fs = parse_t(_row_get(r, "first_seen"))
+    ev = parse_t(_row_get(r, "event_time"))
+    if ev and at and ev > at + timedelta(minutes=10): ev = None
+    if ev and ev < start: return False
+    return fs is not None and start <= fs <= at
+
+def why_it_matters(r, official=False, category=None):
     """Deterministic 'why it matters' line built only from the item's own data: rank tier + scope (/scoring), the category's typical
     knock-on effects, an official-source flag, a population figure quoted by the source, and spread speed. Nothing is invented."""
     rk = int(r["rank"] or 0); name, scope = tier(rk)
+    cat = category or r["category"] or "other"
     out = [f"Rated {name} ({rk}/10), {scope} scale."]
-    out.append(CAT_WHY.get(r["category"] or "other", CAT_WHY["other"]))
+    out.append(CAT_WHY.get(cat, CAT_WHY["other"]))
     m = re.search(r"([\d]+(?:\.\d+)?) million", f"{r['title'] or ''} {r['brief'] or ''}")
     if m:
         try: out.append(f"The source estimates about {float(m.group(1)):g} million people affected.")
@@ -549,6 +604,21 @@ def clean_title(t):
     t = re.sub(r"\s+([.,;:!?])", r"\1", t); t = re.sub(r"(?<!\.)\.\.(?!\.)", ".", t)   # "million ." / "Moscow.." -> one full stop
     return t or re.sub(r"\s+", " ", t or "").strip()
 
+def tighten_title(t):
+    """A scanner title sometimes glues the headline to a second sentence that says the same thing. Keep the headline."""
+    t = clean_title(t)
+    words = re.findall(r"[A-Za-z0-9.]+", t)
+    if len(words) < 8: return t
+    key = " ".join(w.lower() for w in words[:3])
+    flat = re.sub(r"[^a-z0-9.]+", " ", t.lower())
+    first = flat.find(key)
+    second = flat.find(key, first + len(key) + 1) if first >= 0 else -1
+    if second < 24: return t
+    ratio = second / max(len(flat), 1)
+    cut = t.rfind(" ", 0, max(24, int(ratio * len(t)) + 1))
+    out = t[:cut].strip(" .") if cut > 24 else t
+    return re.sub(r"\s+[A-Z]$", "", out)
+
 def item_of(r, section, official=0, editorial=False):
     fams = _fams(r); eff = int(r["eff_families"] or 0)
     t = parse_t(r["event_time"]) or parse_t(r["first_seen"])
@@ -559,12 +629,24 @@ def item_of(r, section, official=0, editorial=False):
         conf = f"Confirmed by {eff} independent source{'' if eff == 1 else 's'}"
     else:
         conf = f"Single {'official ' if official else ''}source ({', '.join(fams[:2]) or 'one outlet'})" + ("" if official else ", not independently confirmed")
-    return {"cluster_id": r["cluster_id"], "section": section, "title": clean_title(r["title"]), "what": clean_title(_what(r)),
-            "where": (r["location"] or "").strip() or None, "lat": r["lat"], "lon": r["lon"], "when": t, "category": r["category"] or "other",
+    title = tighten_title(r["title"])
+    cat = display_category(title, r["brief"], r["category"] or "other")
+    what = summary_text(title, clean_title(_what(r)))
+    loc = (r["location"] or "").strip()
+    lat, lon, approx = r["lat"], r["lon"], False
+    if not loc or re.search(r"not (?:specified|reported|recorded)|unknown location", loc, re.I):
+        hit = _place_from_headline(title, r["brief"])
+        if hit:
+            loc, lat, lon, approx = hit["place"], hit["lat"], hit["lon"], True
+    elif lat is None or lon is None:
+        hit = _place_from_headline(f"{title} {loc}", "")
+        if hit: lat, lon = hit["lat"], hit["lon"]
+    return {"cluster_id": r["cluster_id"], "section": section, "title": title, "what": what,
+            "where": loc or None, "approx": approx, "lat": lat, "lon": lon, "when": t, "category": cat,
             "rank": int(r["rank"] or 0), "score": int(r["score"] or 0), "eff": eff, "families": fams, "confidence": conf,
             "unconfirmed": editorial or eff < 2, "official": bool(official), "editorial": editorial, "links": _links(r),
             "title_norm": norm_title(r["title"]), "first_seen": parse_t(r["first_seen"]), "n_items": int(_row_get(r, "n_items", 0) or 0),
-            "why": why_it_matters(r, official), "tier": tier(r["rank"])[0], "update": None, "breaking": False, "followed": False}
+            "why": why_it_matters(r, official, cat), "tier": tier(r["rank"])[0], "update": None, "breaking": False, "followed": False}
 
 # ---- developing stories: what is new in a cluster since a subscriber last got it
 def developments(S, cid, since):
@@ -713,17 +795,24 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         for _, dk, r in sorted(cand, key=lambda x: (x[0], x[1])):
             if len(near) >= 5 or r["cluster_id"] in seen_: continue
             seen_.add(r["cluster_id"])
+            if not _logged_in_window(r, start, at): continue
             if take(r):
                 it = item_of(r, "near", noff.get(r["cluster_id"], 0)); it["dist_km"] = dk; near.append(it)
     for r in erows:
         if len(main) < int(c["max_main_items"]) and take(r): main.append(item_of(r, "main", offi.get(r["cluster_id"], 0), editorial=True))
+    developing = []
     for r in rows:
+        if not _logged_in_window(r, start, at):
+            if int(r["rank"] or 0) >= int(c["notable_min_rank"]) and len(developing) < 5 and take(r):
+                developing.append(item_of(r, "developing", offi.get(r["cluster_id"], 0)))
+            continue
         if int(r["rank"] or 0) >= rmin and int(r["eff_families"] or 0) >= smin and len(main) < int(c["max_main_items"]) and take(r):
             main.append(item_of(r, "main", offi.get(r["cluster_id"], 0)))
     if len(main) < int(c["min_main_items"]):
         room = min(int(c["max_notable_items"]), int(c["min_main_items"]) - len(main))
         for r in rows:
             if len(notable) >= room: break
+            if not _logged_in_window(r, start, at): continue
             rk, ef = int(r["rank"] or 0), int(r["eff_families"] or 0)
             if r["cluster_id"] in used: continue
             ok = (ef >= 2) or (rk >= rmin and offi.get(r["cluster_id"]))   # confirmed rank 5-6, or a rank-7+ item from one official source
@@ -735,14 +824,17 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     main = [x for x in main if x["category"] != "political"]; notable = [x for x in notable if x["category"] != "political"]
     for r in rows:   # more confirmed political items (rank 5+, 2+ independent sources) for the Politics & Government section
         if len(politics) >= int(c.get("max_politics_items") or 4): break
-        if (r["category"] or "") == "political" and int(r["eff_families"] or 0) >= 2 and take(r): politics.append(item_of(r, "politics", offi.get(r["cluster_id"], 0)))
+        if not _logged_in_window(r, start, at): continue
+        if (r["category"] or "") == "political" and int(r["eff_families"] or 0) >= 2 and take(r):
+            it = item_of(r, "politics", offi.get(r["cluster_id"], 0))
+            if it["category"] == "political": politics.append(it)
     for it in politics: it["section"] = "politics"
     for it in follow_u + main + updates + notable + politics:
         it["breaking"] = it["cluster_id"] in brk; it["followed"] = it["cluster_id"] in follows
     if not allcats:   # personal relevance: chosen topics first within the same rank
         main.sort(key=lambda x: (-x["rank"], x["category"] not in ints))
     quiet = not main and not notable and not updates and not follow_u and not politics and not near
-    issue = {"near": near, "loc_label": (sub or {}).get("loc_label"), "main": main, "notable": notable, "watchlist": watch, "updates": updates, "follow": follow_u, "politics": politics, "quiet": quiet, "start": start,
+    issue = {"near": near, "loc_label": (sub or {}).get("loc_label"), "main": main, "notable": notable, "watchlist": watch, "updates": updates, "follow": follow_u, "politics": politics, "developing": developing, "quiet": quiet, "start": start,
              "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics or near), "rule": {"rank": rmin, "sources": smin}}
     issue["videos"] = videos_for(issue, c)
     issue["empty"] = issue["empty"] and not issue["videos"]
@@ -833,7 +925,13 @@ def _logo_html(c, size=48):
     """Masthead / footer mark: the BLACKOUT text wordmark only (no tile image), like the site's top bar. size>=44: masthead; smaller: footer
     lockup with BLACKOUT.NETWORK and the tagline."""
     if size >= 44:
-        return (f'<div class="bnt" style="font:600 17px/1.2 {FH};letter-spacing:2.4px;color:{PAL["tx"]}">BLACKOUT</div>')
+        try:
+            import newsletter_art as ART
+            mark = ART.img(ART.logo_src(), "BN BLACKOUT.NETWORK", 48, 48)
+        except Exception:
+            mark = ""
+        return (f'{mark}<div class="bnt" style="font:600 17px/1.2 {FH};letter-spacing:2.4px;color:{PAL["tx"]};margin-top:8px">BLACKOUT</div>'
+                f'<div class="bnm" style="font:400 13px/1.4 {FB};color:{PAL["mu"]};margin-top:2px">{E(TAGLINE)}</div>')
     return (f'<div class="bnt" style="font:600 12px/1.4 {FH};letter-spacing:1.6px;color:{PAL["tx"]}">BLACKOUT.NETWORK</div>'
             f'<div class="bnm" style="font:400 12px/1.5 {FB};color:{PAL["mu"]};margin-top:2px">{E(TAGLINE)}</div>')
 _LIGHT_CSS = ("@media (prefers-color-scheme: light){"
@@ -924,9 +1022,11 @@ def _btn(label, url, primary=True):
     return f'<a href="{E(url)}" class="{"bnp" if primary else "bng"}" style="{_BTN if primary else _BTN2}">{label}</a>'
 
 def _where(it):
-    w = it["where"] or "Location not reported"
-    if it["lat"] is not None and it["lon"] is not None and it["where"]:
-        try: w += f" (approx. {float(it['lat']):.2f}, {float(it['lon']):.2f})"
+    w = it.get("where") or ""
+    if not w: return "Location not reported"
+    if it.get("approx") and "approximate" not in w.lower(): w += " (approximate)"
+    if it.get("lat") is not None and it.get("lon") is not None and not it.get("approx"):
+        try: w += f" ({float(it['lat']):.2f}, {float(it['lon']):.2f})"
         except (TypeError, ValueError): pass
     return w
 
@@ -995,8 +1095,17 @@ def _visuals_html(it, url, c):
 def _item_html(it, links, c):
     url = wire_url(it["cluster_id"], c=c); u = it.get("update")
     conf_cls, conf_col = ("ta", PAL["sev"][1]) if it["unconfirmed"] else ("tg", PAL["sev"][0])
-    H = [_CARD_O + f'{_rank_badge(it)}{_kicker(it)}'
-         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{E(_cut(it["title"], 200))}</a></div>']
+    try:
+        import newsletter_art as ART
+        kind = ART.event_kind(it.get("title"), it.get("category"))
+        ico = ART.img(ART.icon_src(kind), f"Event {kind}", 40, 40)
+    except Exception:
+        ico = ""
+    num = f'{it["map_n"]}. ' if it.get("map_n") else ""
+    H = [_CARD_O + f'<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
+         f'<td width="48" valign="top" style="width:48px;padding:0 10px 0 0">{ico}</td>'
+         f'<td valign="top">{_rank_badge(it)}{_kicker(it)}'
+         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{num}{E(_cut(it["title"], 200))}</a></div></td></tr></table>']
     H.append(_visuals_html(it, url, c))
     if u:
         bits = []
@@ -1015,8 +1124,9 @@ def _item_html(it, links, c):
                  f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'
                  f'<div>{_btn("Story timeline", u["timeline"])}{_follow_html(it, links, c)}</div>' + _CARD_C)
         return "".join(H)
-    H.append(f'<p {_P}>{_lbl("BRIEF")} {E(it["what"])}</p>'
-             f'<p {_P}>{_lbl("WHERE")} {E(_where(it))} · {_lbl("WHEN")} {E(when_str(it["when"]))}</p>'
+    if it.get("what"):
+        H.append(f'<p {_P}>{_lbl("BRIEF")} {E(it["what"])}</p>')
+    H.append(f'<p {_P}>{_lbl("WHERE")} {E(_where(it))} · {_lbl("WHEN")} {E(when_str(it["when"]))}</p>'
              f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
              f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>. '
              f'<span class="bnm" style="color:{PAL["mu"]};font-size:13px">{it["n_items"] or 1} report{"s" if (it["n_items"] or 1) != 1 else ""}, score {it["score"]}/100, first seen {E(fmt_et(it["first_seen"]))}.</span></p>'
@@ -1101,10 +1211,51 @@ def _head_html(kicker, kcol, line2, rng):
 
 _SECCOL = {"#e6e9ee": ("bnt", PAL["tx"]), "green": ("bnt", PAL["tx"]), "amber": ("bnt", PAL["tx"]), "red": ("bnt", PAL["tx"])}
 def _sec_html(title, sub_, col="#e6e9ee"):
-    """Section title in the site's H2 voice: ink title, muted one-line explainer under it."""
-    cls, colv = _SECCOL.get(col, ("bnt", PAL["tx"]))
-    return (f'<tr><td class="bnpad" style="padding:40px 20px 10px 20px;text-align:left"><div class="{cls}" style="font:600 24px/1.2 {FH};letter-spacing:-0.4px;color:{colv}">{E(title)}</div>'
-            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:6px">{E(sub_)}</div></td></tr>')
+    """Engraved plate plus the one-line explainer. The plate is the section name; the line under it is the only prose."""
+    try:
+        import newsletter_art as ART
+        plate = ART.img(ART.plate_src(title), f"Section {title}", 560, 56)
+    except Exception:
+        plate = f'<div class="bnt" style="font:600 24px/1.2 {FH};color:{PAL["tx"]}">{E(title)}</div>'
+    return (f'<tr><td class="bnpad" style="padding:28px 20px 8px 20px;text-align:left">{plate}'
+            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:8px">{E(sub_)}</div></td></tr>')
+
+def _number_map(issue):
+    n = 1
+    for sec in ("near", "main", "politics", "notable", "updates", "follow"):
+        for it in issue.get(sec) or []:
+            it["map_n"] = n; n += 1
+
+def _map_html(issue):
+    pts = []
+    for sec in ("near", "main", "politics", "notable", "updates", "follow"):
+        for it in issue.get(sec) or []:
+            if it.get("lat") is None or it.get("lon") is None or not it.get("map_n"): continue
+            pts.append({"lon": it["lon"], "lat": it["lat"], "n": it["map_n"], "category": it.get("category"), "rank": it.get("rank")})
+    if not pts: return ""
+    try:
+        import newsletter_art as ART
+        src = ART.data_uri(ART.story_map(pts))
+    except Exception:
+        return ""
+    return ('<tr><td class="bnpad" style="padding:8px 20px 12px 20px">'
+            + ART.img(src, "Story map", 560, 280)
+            + f'<div class="bnm" style="font:400 12px/1.4 {FB};color:{PAL["mu"]};margin-top:6px">Where these stories name a place. Numbers match the stories. Inferred places are marked approximate.</div></td></tr>')
+
+def _category_chart_html(issue):
+    counts = {}
+    for sec in ("near", "main", "politics", "notable", "updates", "follow"):
+        for it in issue.get(sec) or []:
+            cat = it.get("category") or "other"
+            counts[cat] = counts.get(cat, 0) + 1
+    if not counts: return ""
+    try:
+        import newsletter_art as ART
+        raw = ART.category_bars(counts)
+        if not raw: return ""
+        return '<tr><td class="bnpad" style="padding:4px 20px 12px 20px">' + ART.img(ART.data_uri(raw), "Category chart", 560, 28 + 22 * min(6, len(counts))) + '</td></tr>'
+    except Exception:
+        return ""
 
 def _bluf_html(txt, label="BLUF"):
     return (f'<tr><td class="bnpad" style="padding:0 20px 8px 20px"><div class="bns bnt" style="background:{PAL["surf"]};border-radius:18px;'
@@ -1126,7 +1277,7 @@ def _text_item(it, n):
         T.append(f"   WHAT'S NEW since {fmt_et(u['since'])}: {' '.join(bits) or 'Updated.'}")
         for x in u["reports"]: T.append(f"   - {fmt_et(x['when'], with_date=False)} · {x['source']}: {x['title']}")
     else:
-        T.append(f"   BRIEF: {it['what']}")
+        if it.get("what"): T.append(f"   BRIEF: {it['what']}")
         T.append(f"   WHERE: {_where(it)} · WHEN: {when_str(it['when'])}")
     T.append(f"   WHY IT MATTERS: {it['why']}")
     T.append(f"   CONFIDENCE: {it['confidence']}.")
@@ -1139,7 +1290,10 @@ def render(issue, links, c=None):
     lab = slot_label(issue["slot"]); day = issue["end"].astimezone(ET).strftime("%A, %B %-d, %Y")
     if issue.get("label"): day = issue["label"]
     B = []; a = B.append
+    _number_map(issue)
     a(_bluf_html(issue["bluf"]))
+    a(_map_html(issue))
+    a(_category_chart_html(issue))
     _an = _analysis_html(issue, c)
     if _an: a(_an)
     _tv = next((v for v in (issue.get("videos") or []) if v.get("youtube_id")), None)
@@ -1172,6 +1326,12 @@ def render(issue, links, c=None):
     if vids:
         a(_sec_html("Watch: new on BLACKOUT.NETWORK", "Our latest video reports. Each one has a full written report with every source on its BLACKOUT.NETWORK page."))
         for s_ in vids: a(_video_html(s_, c, issue["slot"]))
+    if issue.get("developing"):
+        a(_sec_html("Still developing", "Logged before this brief's window. Shown so they are not mistaken for new leads."))
+        for it in issue["developing"]:
+            a(f'<tr><td class="bnpad" style="padding:4px 20px 8px 20px;font:400 15px/1.5 {FB};color:{PAL["body"]}">'
+              f'R{int(it.get("rank") or 0)} <a href="{E(wire_url(it["cluster_id"], c=c))}" class="bnt" style="color:{PAL["tx"]};text-decoration:underline">{E(_cut(it["title"], 140))}</a>'
+              f' · first logged {E(fmt_et(it.get("first_seen")))}</td></tr>')
     if issue.get("updates"):
         a(_sec_html("Developing stories", "Stories from earlier briefs with new independent sources or a higher rank. Only what changed is shown.", "amber"))
         for it in issue["updates"]: a(_item_html(it, links, c))
@@ -1212,6 +1372,11 @@ def render(issue, links, c=None):
     if vids:
         T.extend(["WATCH: NEW ON BLACKOUT.NETWORK", "=" * 30])
         for s_ in vids: T.extend(_video_text(s_, c, issue["slot"]))
+    if issue.get("developing"):
+        T += ["STILL DEVELOPING (logged before this window)", ""]
+        for it in issue["developing"]:
+            T.append(f"- R{int(it.get('rank') or 0)} {it['title']} (first logged {fmt_et(it.get('first_seen'))}) {wire_url(it['cluster_id'], c=c)}")
+        T.append("")
     if issue.get("updates"): tsec("Developing stories", issue["updates"])
     if issue["notable"]: tsec("Also notable", issue["notable"])
     if issue["watchlist"]:

@@ -323,7 +323,7 @@ def _bars(vals):
     return "".join(_BARS[min(6, int(round(v / mx * 6)))] for v in vals)
 
 
-def sparkline_png(vals, w=220, h=36):
+def sparkline_png(vals, w=280, h=52):
     """Small PNG bar chart. Returns None when there is no series (caller must not draw a zero line)."""
     if not vals or len(vals) < 2: return None
     bg, fg, grid = (22, 24, 28), (255, 194, 26), (42, 45, 51)
@@ -591,7 +591,7 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
     if mag is None: mag = _mag(item.get("title") or "", {})
     if mag: bits.append(f"M{mag:g}")
     title = re.sub(r"\s+", " ", item.get("title") or "").strip()
-    bits.append(title[:180] if not mag else title[:140])
+    # The card heading is already the headline. This line is only the figures that are not that headline.
     if deaths and deaths.get("late"): bits.append(f"{deaths['late'][1]} deaths in the latest report that states a figure")
     elif deaths and deaths.get("only"): bits.append(f"{deaths['only'][1]} death{'s' if deaths['only'][1] != 1 else ''} stated in the reports")
     elif deaths and deaths.get("early"): bits.append(f"{deaths['early'][1]} deaths stated in the reports")
@@ -818,9 +818,14 @@ def html_section(analysis, base_url="https://blackout.network"):
     patterns = analysis.get("patterns") or []
     if not items and not patterns: return ""
     base = (base_url or "https://blackout.network").rstrip("/")
+    try:
+        import newsletter_art as ART
+        plate = ART.img(ART.plate_src("Analyst brief"), "Section Analyst brief", 560, 56)
+    except Exception:
+        plate = f'<div style="font:600 24px/1.2 {FH};color:{TX}">Analyst brief</div>'
     parts = ['<tr><td class="bnpad" style="padding:28px 20px 8px 20px;text-align:left">'
-             f'<div style="font:600 24px/1.2 {FH};letter-spacing:-0.4px;color:{TX}">Analyst brief</div>'
-             f'<div style="font:400 15px/1.5 {FB};color:{MU};margin-top:6px">Top rank-7 items. A window we do not have is marked “not enough history”. '
+             + plate
+             + f'<div style="font:400 15px/1.5 {FB};color:{MU};margin-top:8px">Top rank-7 items. A window we do not have is marked “not enough history”. '
              'Copies of one headline count as one source. Report volume is separate from the danger reading.</div></td></tr>']
     card_o = ('<tr><td class="bnpad" style="padding:6px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
               f'<tr><td style="padding:20px 22px;background:{SURF};border-radius:18px">')
@@ -829,10 +834,11 @@ def html_section(analysis, base_url="https://blackout.network"):
         sp = it.get("spark") or {}
         if sp.get("png") and sp.get("values") is not None:
             b64 = base64.b64encode(sp["png"]).decode()
-            img = (f'<img src="data:image/png;base64,{b64}" width="220" height="36" alt="Report counts, last { _e(sp.get("label") or "24h") }" '
-                   f'style="display:block;width:220px;max-width:100%;height:auto;border:0;margin:4px 0">')
+            peak = max(sp.get("values") or [0])
+            img = (f'<img src="data:image/png;base64,{b64}" width="280" height="52" alt="Report counts, last { _e(sp.get("label") or "24h") }" '
+                   f'style="display:block;width:280px;max-width:100%;height:auto;border:0;margin:4px 0">')
             spark = (f'{_p(_lbl("REPORT COUNTS") + img)}'
-                     f'{_p(_e(sp.get("bars") or "") + " " + _e(sp.get("arrow") or "") + " " + _e(sp.get("label") or "") + " volume. Volume is not a danger reading.")}')
+                     f'{_p(_e(sp.get("bars") or "") + " " + _e(sp.get("arrow") or "") + " last " + _e(sp.get("label") or "") + f", peak {peak}. Volume is not a danger reading.")}')
         else:
             spark = _p(_lbl("REPORT COUNTS") + "not enough history")
         srcs = " ".join(f'<a href="{_e(s["url"])}" style="color:{TX};text-decoration:underline">{_e(s["source"])}</a>' for s in it.get("sources") or [])
@@ -840,8 +846,14 @@ def html_section(analysis, base_url="https://blackout.network"):
             f'{_p(_lbl("WHAT TO DO") + _e(a["action"]) + " Guide: " + f"<a href=\"{_e(a['url'])}\" style=\"color:{TX};text-decoration:underline\">{_e(a['name'])}</a>.")}'
             for a in it.get("actions") or [])
         wire = it.get("wire") or (base + "/wire/" + str(it.get("cluster_id") or ""))
+        try:
+            import newsletter_art as ART
+            gauge = ART.img(ART.data_uri(ART.trajectory_gauge(it.get("trajectory") or "Steady")), f"Trajectory {it.get('trajectory') or 'Steady'}", 168, 72)
+        except Exception:
+            gauge = ""
         parts.append(card_o
             + f'<div style="margin:0 0 8px 0"><a href="{_e(wire)}" style="font:600 18px/1.3 {FH};color:{TX};text-decoration:none">{_e(it.get("title") or "")}</a></div>'
+            + (f'<div style="margin:0 0 8px 0">{gauge}</div>' if gauge else "")
             + _p(_lbl("WHAT HAPPENED") + _e(it.get("what") or ""))
             + _p(_e(it.get("analysis") or ""))
             + _p(_lbl("TRAJECTORY") + _e(it.get("trajectory") or "") + ". " + _e(it.get("outlook") or ""))
@@ -857,8 +869,12 @@ def html_section(analysis, base_url="https://blackout.network"):
             kind = "Region" if p["kind"] == "region" else "Person"
             rows.append(_p(f"<b style=\"color:{TX}\">{_e(kind)}: {_e(p['name'])}</b> — {len(p['items'])} stories in this brief ({links}). "
                            f"Analysis: the same {kind.lower()} is named across these separate clusters. Each item’s danger read is its own rank and sourced figures."))
-        parts.append('<tr><td class="bnpad" style="padding:22px 20px 6px 20px">'
-                     f'<div style="font:600 20px/1.2 {FH};color:{TX}">Patterns we’re watching</div></td></tr>')
+        try:
+            import newsletter_art as ART
+            pplate = ART.img(ART.plate_src("Patterns"), "Section Patterns", 560, 56)
+        except Exception:
+            pplate = f'<div style="font:600 20px/1.2 {FH};color:{TX}">Patterns we’re watching</div>'
+        parts.append('<tr><td class="bnpad" style="padding:22px 20px 6px 20px">' + pplate + '</td></tr>')
         parts.append(card_o + "".join(rows) + card_c)
     elif items:
         parts.append(card_o + _p("Patterns we’re watching: no region or person is named in more than one story in this brief.") + card_c)
@@ -923,11 +939,11 @@ def write_demo_db(path, at):
         ("a11ce00000000002", "Trump says the Hormuz strikes will not change the Iran talks",
          "political", "Iran", 7, 45, 8, at - timedelta(hours=20), at - timedelta(hours=1)),
         ("a11ce00000000003", "Gov. Cox declares state of emergency after repeat flooding in Southern Utah",
-         "political", "Southern Utah", 7, 55, 8, at - timedelta(hours=30), at - timedelta(hours=2)),
+         "political", "Southern Utah", 7, 55, 8, at - timedelta(hours=16), at - timedelta(hours=2)),
         ("a11ce00000000004", "Yakima County, Washington, reports 2 more avian flu cases, 1 death",
-         "disease", "Yakima County, Washington", 7, 50, 2, at - timedelta(days=5), at - timedelta(hours=3)),
+         "disease", "Yakima County, Washington", 7, 50, 2, at - timedelta(hours=18), at - timedelta(hours=3)),
         ("a11ce00000000005", "M7.1 earthquake near Antofagasta, Chile, PAGER yellow",
-         "natural disaster", "Antofagasta, Chile", 7, 60, 3, at - timedelta(hours=36), at - timedelta(hours=3)),
+         "natural disaster", "Antofagasta, Chile", 7, 60, 3, at - timedelta(hours=20), at - timedelta(hours=3)),
         ("a11ce00000000006", "M6.8 earthquake near Antofagasta, Chile",
          "natural disaster", "Antofagasta, Chile", 6, 40, 1, at - timedelta(days=5), at - timedelta(days=5)),
     ]
@@ -978,14 +994,14 @@ def embed_sparklines(msg):
     part = msg.get_body(preferencelist=("html",))
     if part is None: return msg
     html = part.get_content()
-    if "data:image/png;base64," not in html or "Report counts" not in html: return msg
-    pat = re.compile(r'src="data:image/png;base64,([A-Za-z0-9+/=]+)"([^>]*alt="Report counts[^"]*")')
+    if "data:image/png;base64," not in html: return msg
+    pat = re.compile(r'src="data:image/png;base64,([A-Za-z0-9+/=]+)"')
     images = []
 
     def repl(m):
-        cid = f"bn-spark-{len(images) + 1}@blackout.network"
+        cid = f"bn-img-{len(images) + 1}@blackout.network"
         images.append((cid, base64.b64decode(m.group(1))))
-        return f'src="cid:{cid}"{m.group(2)}'
+        return f'src="cid:{cid}"'
 
     new = pat.sub(repl, html)
     if not images or new == html: return msg
