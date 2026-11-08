@@ -777,8 +777,26 @@ def _include_noted(issue):
             except Exception: pass
         for r in rows:
             issue["main"].append(item_of(r, "main", 0))
+        found = {r["cluster_id"] for r in rows}
+        for cid in missing:
+            if cid in found: continue
+            note = notes["by_id"].get(cid) or {}
+            if note.get("headline") or note.get("what_happened"):
+                issue["main"].append(_note_only_item(cid, note))
+                rows.append(cid)
     if rows or any(have.get(cid) == "main" for cid in noted):
         issue["quiet"] = False
+
+def _note_only_item(cid, note):
+    """A listed note whose cluster is no longer in the snapshot. Facts come from the note. No invented place, time, or rank."""
+    title = (note.get("headline") or note.get("title") or "Noted story").strip()
+    return {"cluster_id": cid, "section": "main", "title": title, "what": "",
+            "where": None, "approx": False, "lat": None, "lon": None, "when": None,
+            "category": display_category(title, "", "other"), "rank": None, "score": 0, "eff": 0,
+            "families": [], "confidence": "", "unconfirmed": False, "official": False, "editorial": False,
+            "links": [], "title_norm": norm_title(title), "first_seen": None, "n_items": 0,
+            "why": note.get("why_it_matters") or "", "tier": "", "update": None,
+            "breaking": False, "followed": False, "rising": False}
 
 def _uniquify_why(issue):
     """If two cards would repeat the same line, the second names its own headline."""
@@ -1149,11 +1167,13 @@ def _short(t, n=90): return _cut(re.sub(r"^[^\w(\"'“]+", "", t or "").strip() 
 # apple_v1 (Nov 3 2026): the email mirrors the minimal site (review/design/apple_style_v1/STYLE_GUIDE.md): text wordmark only, big clean
 # headline, quiet rounded cards with no borders, yellow pill buttons, red only for rank 7+. Dark stays the inline default; light via @media.
 PAL = {"bg": "#0B0C0F", "surf": "#16181C", "surf2": "#121418", "line": "#2A2D33", "tx": "#F5F5F7", "mu": "#A1A1A6", "ac": "#FFC21A", "ink": "#0B0C0F",
+       "band": "#1B2933", "meta": "#C4CDD2",
        "sev": ("#F5F5F7", "#FFC21A", "#C8102E"), "empty": "#2A2D33", "body": "#D2D2D7", "fill": "#FFC21A", "red": "#C8102E", "onred": "#FFFFFF"}
 PAL_LIGHT = {"bg": "#F5F5F7", "surf": "#FFFFFF", "surf2": "#FBFBFD", "line": "#D2D2D7", "tx": "#1D1D1F", "mu": "#6E6E73", "ac": "#8A6100", "ink": "#0B0D10",
              "sev": ("#1D1D1F", "#8A6100", "#C8102E"), "empty": "#D2D2D7", "body": "#424245", "fill": "#FFC21A", "red": "#C8102E", "onred": "#FFFFFF"}
-FB = "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"   # body
-FH = "Inter,-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif"  # headlines (600, tight)
+FB = "Inter,Arial,Helvetica,sans-serif"
+FH = "Inter,Arial,Helvetica,sans-serif"
+FACE = FB
 LOGO_ALT = "BLACKOUT.NETWORK"
 def logo_url(theme="dark", c=None):
     """Hosted master logo: logo V2-final tile (dark version; light version on a bordered white tile), solid background, built by tools/logo_v2_assets.py. New filename busts mail-client image caches. Served by social.py /social/thumb/."""
@@ -1188,7 +1208,8 @@ _DARK_LOCK = (
     f".bnr,.ta{{color:{PAL['ac']}!important}}"
     "}"
     "a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}"
-    "@media only screen and (max-width:480px){.bnh1{font-size:26px!important;line-height:1.15!important}.bnpad{padding-left:12px!important;padding-right:12px!important}.bncard{padding:20px 16px!important}}")
+    "@media only screen and (max-width:480px){.bnh1{font-size:28px!important;line-height:32px!important}.bnpad{padding-left:16px!important;padding-right:16px!important}}"
+    "@media only screen and (min-width:481px){.bnpad{padding-left:24px!important;padding-right:24px!important}}")
 def _head(title):
     return ('<!DOCTYPE html><html lang="en" xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<meta name="x-apple-disable-message-reformatting"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark">'
@@ -1259,10 +1280,10 @@ def _rank_badge(it):
     return meter_html(it["rank"], rank_from=u.get("rank_from"))
 
 _L = f"color:{PAL['tx']};text-decoration:underline"
-_BTN = (f"display:inline-block;background:{PAL['fill']};color:{PAL['ink']};font:600 15px/1.2 {FH};text-decoration:none;"
-        f"border-radius:999px;padding:12px 20px;margin:12px 8px 0 0;border:1px solid {PAL['fill']}")
-_BTN2 = (f"display:inline-block;background:{PAL['surf']};color:{PAL['tx']};font:600 15px/1.2 {FH};text-decoration:none;"
-         f"border-radius:999px;padding:12px 20px;margin:12px 8px 0 0;border:1px solid {PAL['line']}")
+_BTN = (f"display:inline-block;background:{PAL['fill']};color:{PAL['ink']};font:700 16px/20px {FACE};text-decoration:none;"
+        f"border-radius:999px;padding:12px 18px;margin:16px 8px 0 0;border:1px solid {PAL['fill']}")
+_BTN2 = (f"display:inline-block;background:{PAL['surf']};color:{PAL['tx']};font:700 16px/20px {FACE};text-decoration:none;"
+         f"border-radius:999px;padding:12px 18px;margin:16px 8px 0 0;border:1px solid {PAL['line']}")
 def _btn(label, url, primary=True):
     return f'<a href="{E(url)}" class="{"bnp" if primary else "bng"}" style="{_BTN if primary else _BTN2}">{label}</a>'
 
@@ -1337,24 +1358,71 @@ def _visuals_html(it, url, c):
                    f'<td style="font:700 14px/1.4 {FH}"><a href="{E(yt)}" class="bnt" style="{_L}">Watch the video</a></td></tr></table>')
     return "".join(out)
 
-def _item_html(it, links, c):
-    url = wire_url(it["cluster_id"], c=c); u = it.get("update")
-    conf_cls, conf_col = ("ta", PAL["sev"][1]) if it["unconfirmed"] else ("tg", PAL["sev"][0])
+_KIND_LABEL = {
+    "missile": "Missile", "conflict": "Conflict", "quake": "Earthquake", "storm": "Storm", "flood": "Flood",
+    "fire": "Fire", "outbreak": "Outbreak", "grid": "Power and grid", "cyber": "Cyber", "space": "Space weather",
+    "politics": "Politics", "financial": "Economy", "rights": "Rights", "surveillance": "Surveillance",
+    "protest": "Unrest", "border": "Border", "place": "Place", "other": "Report",
+}
+
+def _story_open():
+    return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:12px 16px;background:{PAL["bg"]}">'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAL["surf"]}" '
+            f'style="background:{PAL["surf"]}"><tr><td bgcolor="{PAL["surf"]}" style="padding:0;background:{PAL["surf"]}">')
+
+def _story_body():
+    return (f'</td></tr><tr><td class="bncard" bgcolor="{PAL["surf"]}" style="padding:12px 16px 16px 16px;background:{PAL["surf"]};'
+            f'color:{PAL["tx"]};word-break:break-word;overflow-wrap:anywhere">')
+
+def _band_html(it):
+    """Full-width header: symbol and the live facts share one row. No empty plate."""
+    kind, mark, rail = "other", "", PAL["ac"]
     try:
         import newsletter_art as ART
         kind = ART.event_kind(it.get("title"), it.get("category"))
-        scene = ART.img(ART.scene_src(kind), f"Engraved {kind} illustration", 560, 315)
+        mark = ART.img(ART.symbol_src(kind), "", 72, 72)
+        rail = ART.mark_hex(kind)
+        traj = it.get("trajectory") or (it.get("analyst") or {}).get("trajectory") or "Steady"
+        detail = it.get("trend_detail") or (it.get("analyst") or {}).get("trend_detail") or ""
+        trend = ART.trend_lozenge_html(traj, detail)
     except Exception:
-        scene = ""
+        trend = ""
+    label = _KIND_LABEL.get(kind) or (it.get("category") or "Report")
+    if it.get("rank") is None:
+        sev_html = ""
+    else:
+        rk = int(it.get("rank") or 0)
+        tier_name = it.get("tier") or tier(rk)[0]
+        sev = PAL["red"] if rk >= 7 else PAL["tx"]
+        sev_html = f'<div style="font:700 14px/19px {FACE};color:{sev};margin-top:4px">Rank {rk}/10 · {E(tier_name)}</div>'
+    flags = []
+    if it.get("breaking"): flags.append("Breaking")
+    if it.get("update"): flags.append("Update")
+    if it.get("editorial") or it.get("section") == "watchlist": flags.append("Unconfirmed")
+    flag = (" · " + " · ".join(flags)) if flags else ""
+    meta = []
+    if it.get("where"): meta.append(_where(it))
+    if it.get("when"): meta.append(when_str(it["when"]))
+    meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:8px">{E(" · ".join(meta))}</div>' if meta else "")
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAL["band"]}" style="background:{PAL["band"]}"><tr>'
+            f'<td width="4" bgcolor="{rail}" style="width:4px;background:{rail};font-size:0;line-height:0">&nbsp;</td>'
+            f'<td width="72" valign="middle" bgcolor="{PAL["band"]}" style="width:72px;padding:12px 0 12px 12px;background:{PAL["band"]}">{mark}</td>'
+            f'<td valign="middle" bgcolor="{PAL["band"]}" style="padding:12px 12px 12px 8px;background:{PAL["band"]};font-family:{FACE}">'
+            f'<div style="font:700 16px/20px {FACE};color:{PAL["tx"]}">{E(label)}{E(flag)}</div>'
+            f'{sev_html}'
+            f'{trend}{meta_html}</td></tr></table>')
+
+def _item_html(it, links, c):
+    url = wire_url(it["cluster_id"], c=c); u = it.get("update")
+    conf_cls, conf_col = ("ta", PAL["sev"][1]) if it["unconfirmed"] else ("tg", PAL["sev"][0])
     num = f'{it["map_n"]}. ' if it.get("map_n") else ""
     try:
         import newsletter_analysis as NA
         block = NA.card_fragment(it.get("analyst"))
     except Exception:
         block = ""
-    H = [_CARD_O + scene
-         + f'{_rank_badge(it)}{_kicker(it)}'
-         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]};text-decoration:none">{num}{E(_cut(it["title"], 200))}</a></div>']
+    H = [_story_open() + _band_html(it) + _story_body()
+         + f'<div style="margin:0"><a href="{E(url)}" class="bnt bnh1" style="font:700 24px/29px {FACE};color:{PAL["tx"]};text-decoration:none">{num}{E(it.get("title") or "")}</a></div>']
     H.append(_visuals_html(it, url, c))
     if u:
         bits = []
@@ -1369,14 +1437,13 @@ def _item_html(it, links, c):
                 f'<tr><td class="bnx bga" style="padding:3px 0 3px 10px;border-left:2px solid {PAL["sev"][1]};font:400 14px/1.45 {FB};color:{PAL["body"]}">'
                 f'<span class="bnm" style="color:{PAL["mu"]}">{E(fmt_et(x["when"], with_date=False))} · {E(x["source"])}{" · official" if x["official"] else ""}:</span> {E(x["title"])}</td></tr>'
                 for x in u["reports"]) + '</table>')
-        H.append(block or f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>')
+        H.append(f'<div style="margin-top:16px">{block}</div>' if block else f'<p style="margin:16px 0;font:400 17px/26px {FACE};color:{PAL["body"]}">{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>')
         H.append(f'<div>{_btn("Story timeline", u["timeline"])}{_follow_html(it, links, c)}</div>' + _CARD_C)
         return "".join(H)
-    if it.get("what"):
-        H.append(f'<p {_P}>{_lbl("BRIEF")} {E(it["what"])}</p>')
-    H.append(f'<p {_P}>{_lbl("WHERE")} {E(_where(it))} · {_lbl("WHEN")} {E(when_str(it["when"]))}</p>')
-    H.append(block or (f'<p {_P}>{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
-                       f'<p {_P}>{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'))
+    if it.get("what") and not block:
+        H.append(f'<p style="margin:8px 0 0 0;font:400 17px/26px {FACE};color:{PAL["body"]}">{E(it["what"])}</p>')
+    H.append(f'<div style="margin-top:16px">{block}</div>' if block else (f'<p style="margin:16px 0 0 0;font:400 17px/26px {FACE};color:{PAL["body"]}">{_lbl("WHY IT MATTERS")} {E(it["why"])}</p>'
+                       f'<p style="margin:16px 0 0 0;font:400 17px/26px {FACE};color:{PAL["body"]}">{_lbl("CONFIDENCE")} <span class="{conf_cls}" style="color:{conf_col}">{E(it["confidence"])}</span>.</p>'))
     H.append(f'<div>{_btn("Full story &amp; sources", url)}{_follow_html(it, links, c)}</div>' + _CARD_C)
     return "".join(H)
 
@@ -1422,20 +1489,21 @@ def utm_tag(html_, text, campaign):
     return h_, t_
 FORWARD_URL = "https://blackout.network/newsletter?utm_source=email&utm_medium=forward"
 def _follow_bar():
-    b = lambda lab, u: (f'<a href="{u}" class="bnt" style="display:inline-block;margin:0 8px 6px 0;padding:6px 12px;border:1px solid {PAL["line"]};'
-                        f'border-radius:999px;font:500 13px/1.2 {FH};color:{PAL["tx"]};text-decoration:none">{lab}</a>')
+    b = lambda lab, u: (f'<a href="{u}" class="bnt" style="display:inline-block;margin:0 8px 8px 0;padding:12px 16px;border:1px solid {PAL["line"]};'
+                        f'border-radius:999px;font:700 16px/20px {FACE};color:{PAL["tx"]};text-decoration:underline">{lab}</a>')
     return (f'<tr><td class="bnl bnpad" style="padding:4px 20px 14px 20px;text-align:left">'
             + b("Follow on X @BlkoutNtw", "https://x.com/BlkoutNtw") + b("YouTube @blkoutntw", "https://www.youtube.com/@blkoutntw") + '</td></tr>')
 def _shell(title, pre, head_html, body_rows, links, c, why_line):
-    """Common email frame: single column, 100% wide up to 640 px (phones get full width), table layout + inline CSS, left-aligned text."""
+    """One column, fluid to 600px. Outlook gets a fixed 600px wrapper. Phones use the full width."""
     addr, addr_html = _addr(c); mu = PAL["mu"]
     return (_head(title) + f'<body bgcolor="{PAL["bg"]}" class="bnb" style="margin:0;padding:0;background:{PAL["bg"]};color:{PAL["tx"]};-webkit-text-size-adjust:100%">'
             f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:{PAL["bg"]}">{E(pre)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>'
             f'<table role="presentation" class="bnb" bgcolor="{PAL["bg"]}" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAL["bg"]}"><tr><td bgcolor="{PAL["bg"]}" align="center" style="padding:0;background:{PAL["bg"]}">'
-            f'<table role="presentation" class="bnb" bgcolor="{PAL["bg"]}" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:{PAL["bg"]};'
-            f'font-family:{FB};color:{PAL["tx"]};text-align:left">'
-            + _sevbar() + head_html + _follow_bar() + "".join(body_rows) +
-            f'<tr><td bgcolor="{PAL["bg"]}" style="padding:40px 20px 0 20px;background:{PAL["bg"]};font-size:0;line-height:0">&nbsp;</td></tr>'
+            '<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->'
+            f'<table role="presentation" class="bnb" bgcolor="{PAL["bg"]}" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:{PAL["bg"]};'
+            f'font-family:{FACE};color:{PAL["tx"]};text-align:left">'
+            + _sevbar() + head_html + "".join(body_rows) + _follow_bar() +
+            f'<tr><td bgcolor="{PAL["bg"]}" style="padding:32px 16px 0 16px;background:{PAL["bg"]};font-size:0;line-height:0">&nbsp;</td></tr>'
             f'<tr><td class="bnl bnpad" bgcolor="{PAL["bg"]}" style="padding:22px 20px 8px 20px;background:{PAL["bg"]};border-top:1px solid {PAL["line"]};text-align:left">{_logo_html(c, 32)}</td></tr>'
             f'<tr><td class="bnm" bgcolor="{PAL["bg"]}" style="padding:8px 20px 4px 20px;background:{PAL["bg"]};font:400 12px/1.6 {FB};color:{mu};text-align:left">'
             f'<p style="margin:0 0 8px 0">{E(DISCLAIMER)} Every story links to its page on {BRAND}, where you can open each original source. '
@@ -1446,28 +1514,33 @@ def _shell(title, pre, head_html, body_rows, links, c, why_line):
             f'Get the free newsletter at <a href="https://blackout.network/newsletter" class="bnt" style="{_L}">blackout.network</a>.</p>'
             f'<p style="margin:0 0 8px 0">Know someone who should get this? <a href="{FORWARD_URL}" class="bnt" style="{_L}">Forward to a friend: blackout.network/newsletter</a></p>'
             f'<p style="margin:0">{BRAND} · {addr_html}</p></td></tr>'
-            + footer_buttons_html(links) + '</table></td></tr></table></body></html>')
+            + footer_buttons_html(links) + '</table>'
+            '<!--[if mso]></td></tr></table><![endif]-->'
+            '</td></tr></table></body></html>')
 
 def _head_html(kicker, kcol, line2, rng):
-    """Masthead: the BLACKOUT wordmark, then a big clean headline block (kicker, headline, data window). Breaking = red pill (rank 7+ only)."""
-    k = _pill(kicker) if kicker.upper().startswith("BREAKING") else f'<div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:{PAL["ac"]}">{E(kicker)}</div>'
-    return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:26px 20px 0 20px;background:{PAL["bg"]};text-align:left">{_logo_html(None, 48)}</td></tr>'
-            f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:44px 20px 22px 20px;background:{PAL["bg"]};text-align:left">{k}'
-            f'<div class="bnt bnh1" style="font:600 34px/1.12 {FH};letter-spacing:-0.8px;color:{PAL["tx"]};margin-top:10px">{E(line2)}</div>'
-            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:10px">{E(rng)}</div></td></tr>')
+    """Compact wordmark, edition, and a gold rule. About 90px before the lead."""
+    kicker_html = _pill(kicker) if kicker.upper().startswith("BREAKING") else E(kicker)
+    return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:16px 16px 12px 16px;background:{PAL["bg"]};text-align:left;font-family:{FACE}">'
+            f'<div style="font:700 26px/29px {FACE};color:{PAL["tx"]}">BLACKOUT.NETWORK</div>'
+            f'<div style="font:700 14px/19px {FACE};color:{PAL["ac"]};margin-top:4px">{kicker_html} · {E(line2)}</div>'
+            f'<div style="font:400 14px/19px {FACE};color:{PAL["mu"]};margin-top:2px">{E(TAGLINE)} {E(rng)}</div>'
+            f'<div style="height:2px;background:{PAL["ac"]};margin-top:12px;font-size:0;line-height:2px">&nbsp;</div></td></tr>')
 
 _SECCOL = {"#e6e9ee": ("bnt", PAL["tx"]), "green": ("bnt", PAL["tx"]), "amber": ("bnt", PAL["tx"]), "red": ("bnt", PAL["tx"])}
 def _sec_html(title, sub_, col="#e6e9ee"):
-    """Menu-scale engraved banner, then a large selectable section title."""
+    """Compact section row: a 36px symbol beside a live heading. No full-width plate."""
     try:
         import newsletter_art as ART
-        src = ART.banner_src(title)
-        plate = ART.img(src, f"Section {title}", 560, 220) if src else ""
+        mark = ART.img(ART.symbol_src(ART.section_kind(title)), f"Section {title}", 36, 36)
     except Exception:
-        plate = ""
-    return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:28px 20px 8px 20px;background:{PAL["bg"]};text-align:left">{plate}'
-            f'<div class="bnt" style="font:700 28px/1.15 {FH};color:{PAL["tx"]};margin-top:12px">{E(title)}</div>'
-            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:6px">{E(sub_)}</div></td></tr>')
+        mark = ""
+    sub = f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:2px">{E(sub_)}</div>' if sub_ else ""
+    return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:24px 16px 8px 16px;background:{PAL["bg"]};text-align:left">'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+            f'<td width="36" valign="middle" style="width:36px;padding:0 8px 0 0">{mark}</td>'
+            f'<td valign="middle" style="font:700 20px/25px {FACE};color:{PAL["tx"]}">{E(title)}{sub}</td>'
+            f'</tr></table></td></tr>')
 
 def _number_map(issue):
     n = 1
@@ -1512,18 +1585,18 @@ def _bluf_html(txt, label="HERE'S WHAT MATTERS"):
 
 def _matters_html(issue):
     if issue.get("notes_lead"):
-        bits = [f'<p class="bnt" style="margin:12px 0 0 0;font:400 16px/1.45 {FB};color:{PAL["tx"]}">{E(issue["notes_lead"])}</p>']
+        bits = [f'<p class="bnt" style="margin:12px 0 0 0;font:400 17px/26px {FACE};color:{PAL["tx"]}">{E(issue["notes_lead"])}</p>']
         return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:0 20px 8px 20px;background:{PAL["bg"]}">'
                 f'<div class="bns" style="background:{PAL["surf"]};border-radius:18px;padding:20px 22px;color:{PAL["tx"]}">'
-                f'<div class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]}">{MATTERS}.</div>{"".join(bits)}</div></td></tr>')
+                f'<div class="bnt bnh1" style="font:700 28px/32px {FACE};color:{PAL["tx"]}">{MATTERS}</div>{"".join(bits)}</div></td></tr>')
     bits = []
     for i, it in enumerate(_story_pool(issue)[:3], 1):
         why = _why_line(it)
-        bits.append(f'<p class="bnt" style="margin:12px 0 0 0;font:400 16px/1.45 {FB};color:{PAL["tx"]}"><b style="font-weight:600">{i}. {E(_short(it.get("title") or "", 140))}</b>'
+        bits.append(f'<p class="bnt" style="margin:12px 0 0 0;font:400 17px/26px {FACE};color:{PAL["tx"]}"><b style="font-weight:700">{i}. {E(it.get("title") or "")}</b>'
                     + (f' — {E(why)}' if why else "") + "</p>")
     return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:0 20px 8px 20px;background:{PAL["bg"]}">'
             f'<div class="bns" style="background:{PAL["surf"]};border-radius:18px;padding:20px 22px;color:{PAL["tx"]}">'
-            f'<div class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]}">{MATTERS}.</div>{"".join(bits)}</div></td></tr>')
+            f'<div class="bnt bnh1" style="font:700 28px/32px {FACE};color:{PAL["tx"]}">{MATTERS}</div>{"".join(bits)}</div></td></tr>')
 
 def window_str(a, b):
     hrs = (b - a).total_seconds() / 3600
@@ -1531,7 +1604,11 @@ def window_str(a, b):
 
 def _text_item(it, n):
     u = it.get("update"); T = []
-    tags = [f"RANK {it['rank']}/10 {it['tier'].upper()}", it["category"]] + (["BREAKING"] if it.get("breaking") else []) + (["UPDATE"] if u else []) + \
+    if it.get("rank") is None:
+        tags = ["NOTED", it["category"]]
+    else:
+        tags = [f"RANK {it['rank']}/10 {(it.get('tier') or '').upper()}", it["category"]]
+    tags += (["BREAKING"] if it.get("breaking") else []) + (["UPDATE"] if u else []) + \
            (["UNCONFIRMED"] if it["editorial"] or it["section"] == "watchlist" else [])
     T.append(f"{n}. [{' · '.join(tags)}] {_cut(it['title'], 200)}")
     if u:
@@ -1542,7 +1619,8 @@ def _text_item(it, n):
         for x in u["reports"]: T.append(f"   - {fmt_et(x['when'], with_date=False)} · {x['source']}: {x['title']}")
     else:
         if it.get("what"): T.append(f"   BRIEF: {it['what']}")
-        T.append(f"   WHERE: {_where(it)} · WHEN: {when_str(it['when'])}")
+        if it.get("where") or it.get("when"):
+            T.append(f"   WHERE: {_where(it)} · WHEN: {when_str(it['when'])}")
     a_ = it.get("analyst") or {}
     if a_:
         T.append(f"   WHAT HAPPENED: {a_.get('what')}")

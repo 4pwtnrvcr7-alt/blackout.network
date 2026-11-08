@@ -924,11 +924,11 @@ def _overlay_notes(issue, at, base):
 
 
 def _p(html):
-    return f'<p style="margin:0 0 8px 0;font:400 15px/1.55 {FB};color:{BODY}">{html}</p>'
+    return f'<p style="margin:0 0 16px 0;font:400 17px/26px {FB};color:{BODY}">{html}</p>'
 
 
 def _lbl(t):
-    return f'<b style="font:600 11px {FH};letter-spacing:1px;color:{TX}">{t}</b> '
+    return f'<span style="display:block;font:700 14px/19px {FH};color:{TX};margin:0 0 4px 0">{t}</span>'
 
 
 _TRAJ_IN = {"UPTREND": "Rising", "DOWNTREND": "Easing", "STEADY": "Steady", "Rising": "Rising", "Easing": "Easing", "Steady": "Steady"}
@@ -1000,7 +1000,7 @@ def card_fragment(a):
     """Compact analysis under one story card. Human notes are printed as written. The fallback is one short block."""
     if not a: return ""
     if a.get("from_note"):
-        badge, word = _badge(a)
+        _badge_html, word = _badge(a)
         guide = a.get("guide_name") or ""
         href = a.get("guide_url") or guide_href(guide)
         todo = _e(a.get("what_to_do") or "")
@@ -1015,12 +1015,11 @@ def card_fragment(a):
         return (""
             + _p(_lbl("WHAT HAPPENED") + _e(a.get("what") or ""))
             + _p(_lbl("ANALYSIS") + _e(a.get("analysis") or ""))
-            + badge
             + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
             + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "") + ((". " + _e(a.get("confidence_line"))) if a.get("confidence_line") else ""))
             + _p(_lbl("WHAT TO DO") + todo)
             + src_html)
-    badge, word = _badge(a)
+    _badge_html, word = _badge(a)
     key = _fallback_key(a)
     action, gname, gpath = _FALLBACK_DO.get(key, _FALLBACK_DO["conflict"])
     action = action if action.endswith(".") else action + "."
@@ -1032,7 +1031,6 @@ def card_fragment(a):
         + _p(_lbl("WHAT HAPPENED") + _e(what))
         + _p(_lbl("ANALYSIS") + _e(analysis))
         + hist
-        + badge
         + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
         + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "Low") + ".")
         + _p(_lbl("WHAT TO DO") + _e(action) + ' Guide: <a href="' + _e(href) + f'" style="color:{TX};text-decoration:underline">' + _e(gname) + "</a>."))
@@ -1050,8 +1048,15 @@ def html_section(analysis, base_url="https://blackout.network"):
     parts = []
     if analysis.get("notes_patterns"):
         rows = "".join(_p(_e(p)) for p in analysis["notes_patterns"])
-        parts.append('<tr><td class="bnpad" bgcolor="#0B0C0F" style="padding:22px 20px 6px 20px;background:#0B0C0F">'
-                     f'<div style="font:700 28px/1.15 {FH};color:{TX}">Patterns we’re watching</div></td></tr>')
+        try:
+            import newsletter_art as ART
+            mark = ART.img(ART.symbol_src("other"), "Section Patterns", 36, 36)
+            head = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+                    f'<td width="36" valign="middle" style="width:36px;padding:0 8px 0 0">{mark}</td>'
+                    f'<td valign="middle" style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</td></tr></table>')
+        except Exception:
+            head = f'<div style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</div>'
+        parts.append('<tr><td class="bnpad" bgcolor="#0B0C0F" style="padding:24px 16px 8px 16px;background:#0B0C0F">' + head + '</td></tr>')
         parts.append(card_o + rows + card_c)
         return "".join(parts)
     if patterns:
@@ -1063,10 +1068,12 @@ def html_section(analysis, base_url="https://blackout.network"):
                            f"Analysis: {_e(p['name'])} is named across these separate clusters, and each item’s danger read stays its own rank and sourced figures."))
         try:
             import newsletter_art as ART
-            psrc = ART.banner_src("Patterns")
-            pplate = (ART.img(psrc, "Section Patterns", 560, 220) if psrc else "") + f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Patterns we’re watching</div>'
+            mark = ART.img(ART.symbol_src(ART.section_kind("Patterns")), "Section Patterns", 36, 36)
+            pplate = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+                      f'<td width="36" valign="middle" style="width:36px;padding:0 8px 0 0">{mark}</td>'
+                      f'<td valign="middle" style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</td></tr></table>')
         except Exception:
-            pplate = f'<div style="font:600 20px/1.2 {FH};color:{TX}">Patterns we’re watching</div>'
+            pplate = f'<div style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</div>'
         parts.append('<tr><td class="bnpad" style="padding:22px 20px 6px 20px">' + pplate + '</td></tr>')
         parts.append(card_o + "".join(rows) + card_c)
     elif items:
