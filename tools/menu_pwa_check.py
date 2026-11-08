@@ -156,19 +156,20 @@ def check_phone(browser, base, check):
     safe = page.evaluate("() => getComputedStyle(document.documentElement).getPropertyValue('--bn-safe-top').trim()")
     check(safe == f"{SAFE}px", f"safe-area top override is {SAFE}px (got {safe})")
 
-    # header: hamburger, and the sun/moon toggle once it is allowed to show
+    # header: hamburger and the sun/moon toggle (shown in the bar on current main)
     burger = page.evaluate(HIT, "header.bn-top .bn-burger")
     header_pad = page.evaluate("() => getComputedStyle(document.querySelector('header.bn-top')).paddingTop")
     check(header_pad == f"{SAFE}px", f"header padding-top is the safe inset (got {header_pad})")
     check(burger["top"] >= SAFE - 0.5 and burger["hit"], f"hamburger below the status bar and hittable {burger}")
     check(burger["top"] < SAFE + 40, f"hamburger is not double-padded {burger}")
-    page.evaluate("""() => {
+    theme_shown = page.evaluate("""() => {
       const b = document.querySelector('header.bn-top .bn-theme-bar');
-      b.style.setProperty('display','inline-flex','important');
+      const cs = getComputedStyle(b);
+      return cs.display !== 'none' && cs.visibility !== 'hidden';
     }""")
+    check(theme_shown, "header sun/moon toggle is shown")
     theme = page.evaluate(HIT, "header.bn-top .bn-theme-bar")
     check(theme["top"] >= SAFE - 0.5 and theme["h"] >= 44 and theme["hit"], f"header sun/moon toggle below the status bar {theme}")
-    page.evaluate("() => document.querySelector('header.bn-top .bn-theme-bar').style.removeProperty('display')")
 
     open_menu(page)
     bar = page.evaluate(HIT, "#bn-menu .bn-mbar")
@@ -182,6 +183,14 @@ def check_phone(browser, base, check):
       return a && {text:a.textContent.trim(), href:a.getAttribute('href')};
     }""")
     check(home and home["text"] == "Home" and home["href"] == "/", f"Home is the first menu item {home}")
+    items = page.evaluate("""() => [...document.querySelectorAll('#bn-menu .m3-p li')].map(li => {
+      const a = li.querySelector('a');
+      return {text: li.textContent.replace(/\\s+/g,' ').trim(), href: a ? a.getAttribute('href') : '', soon: li.classList.contains('m3-soon')};
+    })""")
+    by = {it["text"].split(" SOON")[0].strip(): it for it in items}
+    check(not any(it["text"].startswith("The Thread") for it in items), f"The Thread is not in the menu {items}")
+    check(by.get("Starlink", {}).get("href") == "/network/starlink" and not by.get("Starlink", {}).get("soon"), f"Starlink is a live link {by.get('Starlink')}")
+    check(by.get("Networks near me", {}).get("href") == "/network/near" and not by.get("Networks near me", {}).get("soon"), f"Networks near me is a live link {by.get('Networks near me')}")
     menu_theme = page.evaluate(HIT, "#bn-menu .bn-theme-row")
     check(menu_theme["top"] >= SAFE - 0.5 and menu_theme["h"] >= 44, f"menu theme toggle below the inset {menu_theme}")
 
