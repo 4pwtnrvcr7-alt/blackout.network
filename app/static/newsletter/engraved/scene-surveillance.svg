@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<rect width="640" height="360" fill="#0B0D10"/>
+<g fill="none" stroke="#E6E1D6" stroke-linecap="round" stroke-linejoin="round">
+<rect x="14" y="14" width="612" height="332" stroke-width="1.2"/>
+<rect x="20" y="20" width="600" height="320" stroke="#FFC21A" stroke-width="0.6"/>
+<path d="M28 44 H92 M28 50 H70" stroke="#FFC21A" stroke-width="1.1"/>
+<path d="M548 316 H612 M570 310 H612" stroke="#FFC21A" stroke-width="1.1"/>
+<path d="M36 36 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 44 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 52 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 60 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 68 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 76 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 84 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 92 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 100 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 108 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 116 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 124 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 132 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 140 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 148 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 156 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 164 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 172 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 180 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 188 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 196 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 204 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 212 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 220 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 228 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 236 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 244 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 252 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 260 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 268 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 276 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 284 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 292 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 300 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 308 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 316 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M36 324 H604" stroke-width="0.45" stroke-opacity="0.35"/>
+<path d="M48 48 H120 M48 48 V110 M592 48 H520 M592 48 V110 M48 312 H120 M48 312 V250 M592 312 H520 M592 312 V250" stroke="#FFC21A" stroke-width="1.3"/>
+<path d="M110 176 C 236.0 12.800000000000011, 404.0 12.800000000000011, 530 176 C 404.0 339.2, 236.0 339.2, 110 176 Z" stroke-width="1.6"/>
+<clipPath id="eye"><path d="M110 176 C 236.0 12.800000000000011, 404.0 12.800000000000011, 530 176 C 404.0 339.2, 236.0 339.2, 110 176 Z"/></clipPath>
+<g clip-path="url(#eye)"><path d="M-84 16 L96 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-76 16 L104 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-68 16 L112 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-60 16 L120 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-52 16 L128 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-44 16 L136 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-36 16 L144 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-28 16 L152 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-20 16 L160 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-12 16 L168 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M-4 16 L176 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M4 16 L184 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M12 16 L192 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M20 16 L200 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M28 16 L208 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M36 16 L216 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M44 16 L224 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M52 16 L232 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M60 16 L240 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M68 16 L248 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M76 16 L256 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M84 16 L264 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M92 16 L272 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M100 16 L280 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M108 16 L288 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M116 16 L296 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M124 16 L304 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M132 16 L312 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M140 16 L320 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M148 16 L328 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M156 16 L336 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M164 16 L344 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M172 16 L352 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M180 16 L360 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M188 16 L368 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M196 16 L376 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M204 16 L384 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M212 16 L392 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M220 16 L400 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M228 16 L408 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M236 16 L416 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M244 16 L424 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M252 16 L432 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M260 16 L440 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M268 16 L448 336" stroke-width="0.6" stroke-opacity="0.7"/><path d="M276 16 L456 336" stroke-width="0.6" stroke-opacity="0.7"/></g>
+<circle cx="320" cy="176" r="62" stroke-width="1.3"/>
+<circle cx="320" cy="176" r="40" stroke-width="0.8" stroke-opacity="0.8"/>
+<circle cx="320" cy="176" r="16" stroke="#FFC21A" stroke-width="1.8"/>
+</g></svg>

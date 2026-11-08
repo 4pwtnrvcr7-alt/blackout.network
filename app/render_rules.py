@@ -32,6 +32,7 @@ RENDER_OWNED = [x for x in os.environ.get("BN_RENDER_OWNED", "votes.db,newslette
 # Box -> Render live data. Top-level *.db (snapshotted read-only), selected JSON state and generated media dirs.
 SYNC_DIRS = ["snapshots", "static/vsubs", "video_subs", "static/social", "data"]   # static/social: story thumbnails (t303); data: design v3 Wire band files (top_of_mind.json, whats_coming.json)
 SYNC_JSON = ["page_data.json", "config.json", "keywords.json", "arcs_settings.json", "tips.json", "newsletter_config.json",
+             "newsletter_analysis.json",
              "translate_glossary.json", "translate_langs.json", "sources*.json", "youtube*.json",
              "social_*.json", "webpush_config.json", "webpush_dead.json"]   # social_stories/social_youtube/social_x_posts.json (t303)
 # Code/static that hot-reloads on Render (add-ons re-import on mtime change; dashboard.html is read per request).
