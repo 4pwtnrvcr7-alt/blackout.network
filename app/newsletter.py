@@ -753,7 +753,42 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         except Exception: issue["crime"] = None
     issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries QUIET_LINE (no separate "nothing confirmed" email)
     issue["bluf"] = bluf(issue)
+    _attach_analysis(issue, at, c)
     return issue
+
+def _attach_analysis(issue, at, c=None):
+    """Analyst brief (what happened, analysis, trajectory, what to do). Read-only. A failure leaves the rest of the issue intact."""
+    try:
+        import newsletter_analysis as NA
+        NA.attach(issue, P["src"], at, P["db"], (c or cfg())["base_url"])
+        by = {x["cluster_id"]: x for x in (issue.get("analysis") or {}).get("items") or []}
+        for sec in ("main", "follow", "updates", "politics", "near", "notable"):
+            for it in issue.get(sec) or []:
+                a = by.get(it.get("cluster_id"))
+                if not a or not a.get("card_confidence"): continue
+                it["confidence"] = a["card_confidence"]
+                if a.get("card_unconfirmed") is not None: it["unconfirmed"] = a["card_unconfirmed"]
+    except Exception as ex:
+        log(f"analysis layer skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
+        issue["analysis"] = None
+
+def _analysis_html(issue, c):
+    an = issue.get("analysis")
+    if not an: return ""
+    try:
+        import newsletter_analysis as NA
+        return NA.html_section(an, (c or cfg())["base_url"])
+    except Exception:
+        return ""
+
+def _analysis_text(issue, c):
+    an = issue.get("analysis")
+    if not an: return []
+    try:
+        import newsletter_analysis as NA
+        return NA.text_section(an, (c or cfg())["base_url"])
+    except Exception:
+        return []
 
 def _short(t, n=90): return _cut(re.sub(r"^[^\w(\"'“]+", "", t or "").strip() or (t or ""), n)
 def bluf(issue):
@@ -1105,6 +1140,8 @@ def render(issue, links, c=None):
     if issue.get("label"): day = issue["label"]
     B = []; a = B.append
     a(_bluf_html(issue["bluf"]))
+    _an = _analysis_html(issue, c)
+    if _an: a(_an)
     _tv = next((v for v in (issue.get("videos") or []) if v.get("youtube_id")), None)
     if _tv:
         a(f'<tr><td class="bnl" style="padding:0 20px 12px 20px;font:700 15px/1.4 {FH}"><a href="https://www.youtube.com/shorts/{E(_tv["youtube_id"])}" class="bnt" style="{_L}">Watch today\'s top story</a></td></tr>')
@@ -1155,6 +1192,7 @@ def render(issue, links, c=None):
     why = f"You get this because you confirmed a subscription to the {BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage."
     html_ = _shell(subj, pre, _head_html(f"{lab.upper()} BRIEF", PAL["ac"], day, rng), B, links, c, why)
     T = [f"{BRAND} — {lab} Brief", TAGLINE, day, rng, "", f"BLUF: {issue['bluf']}", ""]
+    T.extend(_analysis_text(issue, c))
     def tsec(title, items):
         T.extend([title.upper(), "=" * len(title)])
         for i, it in enumerate(items, 1):
@@ -1293,6 +1331,12 @@ def render_breaking(items, links, at, c=None, trend=None):
     _tt = _short(top['title'], 140).rstrip(" .")
     pre = f"{top['tier']} ({top['rank']}/10): {_tt}. {top['confidence']}."
     B = [_bluf_html(pre)]
+    if items:
+        shell = {"main": items, "notable": [], "updates": [], "follow": [], "politics": [], "near": [], "watchlist": [],
+                 "start": at - timedelta(hours=6), "end": at, "slot": "breaking"}
+        _attach_analysis(shell, at, c)
+        frag = _analysis_html(shell, c)
+        if frag: B.append(frag)
     for it in items: B.append(_item_html(it, links, c))
     ids = {it["cluster_id"] for it in items}
     vids = [s_ for s_ in load_stories() if ids & set(s_.get("cluster_ids") or []) and (parse_t(s_.get("publish_at")) or at) <= at][:2]
@@ -1304,6 +1348,11 @@ def render_breaking(items, links, at, c=None, trend=None):
     why = f"You get breaking alerts because you subscribed to the {BRAND} newsletter. Turn them off under Manage, or unsubscribe below."
     html_ = _shell(subj, pre, _head_html("BREAKING ALERT", PAL["ac"], fmt_et(at), f"Data as of {fmt_et(at)} ({fmt_z(at)})"), B, links, c, why)
     T = [f"{BRAND} — BREAKING ALERT", TAGLINE, fmt_et(at), "", f"BLUF: {pre}", ""]
+    if items:
+        shell = {"main": items, "notable": [], "updates": [], "follow": [], "politics": [], "near": [], "watchlist": [],
+                 "start": at - timedelta(hours=6), "end": at, "slot": "breaking"}
+        _attach_analysis(shell, at, c)
+        T.extend(_analysis_text(shell, c))
     for i, it in enumerate(items, 1):
         T.extend(_text_item(it, i)); T.append(f"   Full story & sources: {wire_url(it['cluster_id'], c=c)}")
         T.append(f"   Follow this story: {follow_links(links.get('_row'), it['cluster_id'], c)['follow']}"); T.append("")
@@ -1389,6 +1438,11 @@ def build_mime(to, subject, html_, text, unsub_url=None, kind="issue", c=None, t
     m["X-Blackout-Kind"] = kind
     if kind != "issue": m["Auto-Submitted"] = "auto-generated"
     m.set_content(text); m.add_alternative(html_, subtype="html")
+    try:
+        import newsletter_analysis as NA
+        NA.embed_sparklines(m)
+    except Exception:
+        pass
     return m
 
 RESERVED = re.compile(r"(@|\.)(example\.(com|net|org)|test|invalid|localhost|example)$")
