@@ -26,6 +26,14 @@ FILES = {
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
           '<p class="bn-sig-sr">Low is rank 0 to 3, elevated is rank 4 to 6, and high is rank 7 to 10. Red is only rank 7 and above.</p>')
+# US is the default camera (Matt). World and Conflicts are explicit; counts fill in from the points payload.
+def views_html(active="us"):
+    def btn(name, label):
+        on = "true" if name == active else "false"
+        return f'<button type="button" data-view="{name}" aria-pressed="{on}">{label} <b data-n="{name}">0</b></button>'
+    return ('<div class="bn-sig-views" role="group" aria-label="Map view">'
+            + btn("us", "US") + btn("world", "World") + btn("conflicts", "Conflicts")
+            + '</div><p class="bn-sig-counts" aria-live="polite"></p>')
 
 # Homepage shell. The map library, stylesheet and world file load only when the card nears the viewport.
 HOME_BOOT = """<script>(function(){var el=document.getElementById("bn_sig");if(!el)return;
@@ -48,7 +56,8 @@ def home_section():
 <div class="bn-sig-cardhead"><div><h2 id="bn_sig_h">Global signal map</h2>
 <p class="bn-sig-note" id="bn_sig_note">Wire and Watchlist</p></div>
 <div class="bn-sig-side">{LEGEND}<a class="bn-sig-open" href="/map">Open the map</a></div></div>
-<div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map of Wire and Watchlist stories that already have coordinates. Open the map for filters."></div>
+<div class="bn-sig-tools">{views_html()}</div>
+<div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map of Wire and Watchlist stories. US is the starting view. World and Conflicts move the map."></div>
 </article></div></section>
 {HOME_BOOT}'''
 
@@ -59,6 +68,7 @@ def _pick(qs, key, allowed, default):
 def page(qs):
     rank = _pick(qs, "rank", ("", "0", "4", "7"), "")
     win = _pick(qs, "window", ("24", "72", "168"), "168")
+    view = _pick(qs, "view", ("us", "world", "conflicts"), "us")
     topic = (qs.get("topic") or [""])[0][:80]
     if topic and not re.fullmatch(r"[A-Za-z0-9 /&+\-]{1,80}", topic): topic = ""
     topic_opt = f'<option value="{E(topic)}" selected>{E(topic)}</option>' if topic else ""
@@ -88,6 +98,7 @@ def page(qs):
 <div class="bn-sig-bar"><div class="bn-sig-titles"><h1 id="bn_sig_h">Global signal map</h1>
 <p class="bn-sig-note" id="bn_sig_note">Wire and Watchlist</p></div>
 {LEGEND}
+<div class="bn-sig-tools">{views_html(view)}</div>
 <label>Topic <select id="bn_sig_topic" aria-label="Topic"><option value="">All topics</option>{topic_opt}</select></label>
 <label>Rank <select id="bn_sig_rank" aria-label="Rank">
 <option value=""{sel("", rank)}>All ranks</option>
@@ -138,29 +149,39 @@ def points_payload():
                    WHERE watchlist IN (0, 1) AND COALESCE(event_time, first_seen)>=?""", (cut,))]
         finally:
             c.close()
-    points, stored, inferred = [], 0, 0
+    points, stored, inferred, unmapped = [], 0, 0, 0
     for r in rows:
         if int(r.get("watchlist") or 0) not in (0, 1): continue
         try: links = json.loads(r.get("links") or "[]")
         except Exception: links = []
         if not isinstance(links, list): links = []
         coord = _stored_coord(r.get("lat"), r.get("lon"))
-        exact, place = True, ""
+        exact, place, precision, approximate = True, "", "point", False
         if coord:
             lat, lon = coord
             stored += 1
         else:
             hit = signal_place.infer(signal_place.story_text(r.get("title"), r.get("location"), r.get("brief")))
-            if not hit: continue
-            lat, lon, exact, place = hit["lat"], hit["lon"], False, hit.get("place") or ""
+            if not hit:
+                unmapped += 1
+                continue
+            lat, lon = hit["lat"], hit["lon"]
+            precision = hit.get("precision") or ""
+            place = hit.get("place") or ""
+            # Country and region centroids are approximate. A city placement is the incident, not a guess at the country.
+            approximate = bool(hit.get("approximate")) or precision in ("country", "region")
+            exact = not approximate
             inferred += 1
         points.append({
             "cluster_id": r.get("cluster_id"), "title": r.get("title") or "", "rank": int(r.get("rank") or 0),
             "category": r.get("category") or "", "event_time": r.get("event_time") or r.get("first_seen") or r.get("updated") or "",
-            "lat": lat, "lon": lon, "exact": exact, "place": place, "watchlist": int(r.get("watchlist") or 0),
+            "lat": lat, "lon": lon, "exact": exact, "place": place, "precision": precision,
+            "approximate": approximate, "watchlist": int(r.get("watchlist") or 0),
             "links": [{"url": (l or {}).get("url"), "source": (l or {}).get("source")} for l in links[:5] if isinstance(l, dict)],
         })
-    body = {"points": points, "stored": stored, "inferred": inferred, "shown": len(points)}
+    generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    body = {"points": points, "stored": stored, "inferred": inferred, "shown": len(points),
+            "unmapped": unmapped, "generated": generated}
     _POINTS.update(t=now, v=body)
     return body
 

@@ -40,7 +40,10 @@ def _pack(lat, lon, precision, place):
     if lat is None or lon is None: return None
     lat, lon = float(lat), float(lon)
     if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0): return None
-    return {"lat": round(lat, 4), "lon": round(lon, 4), "precision": precision, "place": place}
+    # Country and broad-region centroids are not where the incident happened.
+    approximate = precision in ("country", "region")
+    return {"lat": round(lat, 4), "lon": round(lon, 4), "precision": precision, "place": place,
+            "approximate": approximate}
 
 
 def _turkey_food(text):
@@ -174,10 +177,130 @@ def _region(text):
     return _pack(lat, lon, "region", label)
 
 
+# Incident cities beat a country mention. Longer names first so "Gaza City" wins over "Gaza".
+_INCIDENT_CITIES = (
+    ("gaza city", "PS", "gaza", "Gaza City"),
+    ("tel aviv", "IL", "tel aviv", "Tel Aviv"),
+    ("kharkiv", "UA", "kharkiv", "Kharkiv"),
+    ("odesa", "UA", "odesa", "Odesa"),
+    ("odessa", "UA", "odesa", "Odesa"),
+    ("kyiv", "UA", "kyiv", "Kyiv"),
+    ("kiev", "UA", "kyiv", "Kyiv"),
+    ("rafah", "PS", "rafah", "Rafah"),
+    ("beirut", "LB", "beirut", "Beirut"),
+    ("tehran", "IR", "tehran", "Tehran"),
+    ("gaza", "PS", "gaza", "Gaza"),
+)
+_ATTACK = re.compile(
+    r"\b(?:airstrikes?|air\s+strikes?|strikes?|struck|attacks?|attacked|bomb(?:ed|ing|s)?|"
+    r"shell(?:ed|ing)|missiles?|drones?|rockets?|blasts?|explosions?|barrages?|raids?|"
+    r"hits?|targeted|pounds|pounded|fires|fired)\b",
+    re.I)
+# The words after the verb. "on/in/at X" is the place that was hit, not the country that fired.
+_AFTER = re.compile(
+    r"^(?:\s+(?:on|in|at|over|against|into))?\s+(?:the\s+)?"
+    r"(?:(?:southern|northern|eastern|western|central)\s+)?"
+    r"([A-Za-z][A-Za-z.'\-]*(?:\s+[A-Za-z][A-Za-z.'\-]*){0,2})")
+
+
+def _city_at(cc, key, label):
+    """City centroid for one country, so Rafah is the Gaza Strip and Odessa is not Texas."""
+    G = geo.gaz()
+    idx = G.by_name_cc.get((key, cc))
+    if idx is None: return None
+    c = G.city(idx)
+    st = (G.admin1.get(c.get("a1") or "") or {}).get("name")
+    place = label + (", " + st if st and st.lower() not in label.lower() else "")
+    return _pack(c.get("lat"), c.get("lon"), "city", place)
+
+
+def _country_named(name):
+    G = geo.gaz()
+    refs = G.idx.get(geo.key_of(name)) or []
+    for kind, cc in refs:
+        if kind != "country": continue
+        ctry = G.countries.get(cc) or {}
+        lab = ctry.get("label")
+        if not lab: continue
+        return _pack(lab[0], lab[1], "country", ctry.get("name") or name)
+    return None
+
+
+def _incident_cities(text):
+    """Non-overlapping city hits, longest name first."""
+    found = []
+    for phrase, cc, key, label in _INCIDENT_CITIES:
+        for m in re.finditer(r"\b" + re.escape(phrase) + r"\b", text, re.I):
+            found.append((m.start(), m.end(), cc, key, label))
+    found.sort(key=lambda x: (x[0], -(x[1] - x[0])))
+    kept = []
+    for item in found:
+        if any(item[0] < k[1] and item[1] > k[0] for k in kept): continue
+        kept.append(item)
+    return kept
+
+
+def _incident(text):
+    """Prefer the place that was struck over the country that did it.
+
+    'Russian strike on Kyiv' is Kyiv, not Russia's centroid. 'White House says Russia
+    struck Kyiv' is still Kyiv, not Washington. A country target ('Israel strikes Iran')
+    stays at that country and is marked approximate.
+    """
+    if not text or not _ATTACK.search(text): return None
+    cities = _incident_cities(text)
+
+    def city_hit(start, end, name):
+        for a, b, cc, key, label in cities:
+            if a >= start and b <= end + 1 and geo.key_of(name).startswith(key[:4] if len(key) >= 4 else key):
+                return _city_at(cc, key, label)
+            if geo.key_of(name) == key or geo.key_of(name).startswith(key):
+                if not (b <= start or a >= end): return _city_at(cc, key, label)
+        # The captured phrase may be the city itself ("Kyiv", "Gaza City").
+        k = geo.key_of(name)
+        for phrase, cc, key, label in _INCIDENT_CITIES:
+            if k == phrase or k.startswith(phrase + " ") or phrase.startswith(k):
+                return _city_at(cc, key, label)
+        return None
+
+    for m in _ATTACK.finditer(text):
+        tail = text[m.end():m.end() + 48]
+        am = _AFTER.match(tail)
+        if not am: continue
+        name = am.group(1).strip()
+        # Drop a trailing verb/glue word the {0,2} span pulled in ("Kyiv kills").
+        parts = name.split()
+        while len(parts) > 1 and geo.nw(parts[-1]) in _PLACE_WORD | {"kills", "killed", "kill", "dead", "wounds", "wounded"}:
+            parts.pop()
+        name = " ".join(parts)
+        span_end = m.end() + am.end(1)
+        hit = city_hit(m.end(), span_end, name)
+        if hit: return hit
+        # Only treat it as a country when the headline did not also name an incident city.
+        if not cities:
+            hit = _country_named(name)
+            if hit: return hit
+    if cities:
+        # 'Kharkiv hit overnight' — the city is not the word immediately after the verb.
+        _a, _b, cc, key, label = cities[0]
+        # If several cities, prefer the one that follows a locative on/in/at.
+        best = cities[0]
+        for a, b, cc, key, label in cities:
+            window = text[max(0, a - 12):a]
+            if re.search(r"\b(?:on|in|at|over|near|into)\s+$", window, re.I):
+                best = (a, b, cc, key, label)
+                break
+        _a, _b, cc, key, label = best
+        return _city_at(cc, key, label)
+    return None
+
+
 def infer(text):
-    """-> {lat, lon, precision, place} or None. None means we are not sure."""
+    """-> {lat, lon, precision, place, approximate} or None. None means we are not sure."""
     text = (text or "").strip()
     if not text or _NOT_A_PLACE.search(text) and len(text) < 48: return None
+    hit = _incident(text)
+    if hit: return hit
     hit = _from_gazetteer(text)
     if hit: return hit
     hit = _nws(text)
