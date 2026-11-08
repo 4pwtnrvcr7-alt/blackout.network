@@ -1910,6 +1910,19 @@ def _http_json(url, payload, headers):
     req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "blackout.network-newsletter/1.0 (+https://blackout.network)", **headers})
     with urllib.request.urlopen(req, timeout=20) as r: return r.status, r.read(2000).decode("utf-8", "replace")
 
+def _inline_attachments(msg):
+    """Image parts with a Content-ID (from embed_sparklines), as Resend inline attachments. The HTML references them as cid:<id>."""
+    out = []
+    for part in msg.walk():
+        cid = part.get("Content-ID")
+        if not cid or part.get_content_maintype() != "image": continue
+        raw = part.get_payload(decode=True) or b""
+        if not raw: continue
+        out.append({"filename": part.get_filename() or (cid.strip("<>").split("@")[0] + ".png"),
+                    "content": base64.b64encode(raw).decode(), "content_id": cid.strip("<>"),
+                    "content_type": part.get_content_type()})
+    return out
+
 def deliver(msg, kind="issue", sid=None, force_preview=False):
     """Send one message with the effective sender. Returns (ok, mode, outbox_file|None, error|None)."""
     mode = "preview" if force_preview else sender_status(kind)["mode"]
@@ -1930,6 +1943,8 @@ def deliver(msg, kind="issue", sid=None, force_preview=False):
         elif mode == "resend":
             p = {"from": str(msg["From"]), "to": [to], "subject": str(msg["Subject"]), "html": html_, "text": text, "headers": hdrs}
             if msg["Reply-To"] or c.get("reply_to"): p["reply_to"] = str(msg["Reply-To"] or c["reply_to"])
+            att = _inline_attachments(msg)   # Nov 8: CID images (engravings, map, charts) must travel as Resend inline attachments
+            if att: p["attachments"] = att
             idem = {"Idempotency-Key": str(msg["X-BN-Idem"])} if msg["X-BN-Idem"] else {}
             code, body = _http_json("https://api.resend.com/emails", p, {"Authorization": "Bearer " + e["RESEND_API_KEY"], **idem})
             if code >= 300: raise RuntimeError(f"resend HTTP {code}: {body[:200]}")
