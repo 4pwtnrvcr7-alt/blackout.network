@@ -80,7 +80,9 @@ def apply_secrets(d):
         _write_secret(os.path.join(BASE, "ADMIN_PASSCODE.txt"), str(d["admin_passcode"]).strip() + "\n")
     ns = os.environ.get("NEWSLETTER_SECRET") or d.get("newsletter_secret")
     if ns:   # sender + provider keys come only from Render env vars (never synced, never logged); default stays preview
-        lines = [f"NEWSLETTER_SECRET={ns}", "NEWSLETTER_SENDER=" + (os.environ.get("NEWSLETTER_SENDER") or "preview").strip()]
+        snd = (os.environ.get("NEWSLETTER_SENDER") or "preview").strip()
+        if snd.lower() == "preview" and os.environ.get("RESEND_API_KEY"): snd = "resend"   # Nov 8 fix: a secrets sync must never silently drop live sending; live_sending_approved still gates
+        lines = [f"NEWSLETTER_SECRET={ns}", "NEWSLETTER_SENDER=" + snd]
         lines += [f"{k}={os.environ[k].strip()}" for k in MAIL_ENV_KEYS if os.environ.get(k)]
         _write_secret(os.environ["NEWSLETTER_ENV"], "\n".join(lines) + "\n")
 MAIL_ENV_KEYS = ("RESEND_API_KEY", "BREVO_API_KEY", "SENDGRID_API_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_SECURITY")
