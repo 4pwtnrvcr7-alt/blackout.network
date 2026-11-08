@@ -161,7 +161,9 @@ html.bn-js .bn-gear-row{display:flex!important}
  body .bn-pagehead h1.bn-ptitle{font-size:26px}
  body .bn-pagehead .bn-tabdesc{font-size:15px}
 }
-@media(max-width:380px){html.bn-js .bn-theme-bar{display:none!important}}   /* smallest phones: theme toggle stays in the sidebar */
+/* header theme icon stays visible at every width (the menu row uses the same data-bn-theme control) */
+.bn-tbar .bn-theme-bar{width:44px;min-width:44px;height:44px;min-height:44px}
+body header.bn-top.bn-f6 .bn-acts .bn-ib.bn-theme-bar{width:44px!important;min-width:44px}
 /* t357: "Follow us on" prefix is only shown by the bar fitter (sitenav.js) when it really fits; see the t357 block at the end */
 @media(min-width:1200px){
  .bn-primary{display:flex;align-items:center;gap:2px;margin-left:18px}

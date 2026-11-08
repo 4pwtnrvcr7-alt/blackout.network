@@ -29,9 +29,10 @@
  ["pushState","replaceState"].forEach(function(m){var o=history[m];if(!o)return;history[m]=function(){var r=o.apply(this,arguments);try{sync()}catch(e){}return r}});   // menu tab links change the hash via history (no hashchange event): keep the homepage/tab view in sync
  if(window.BNA){setTimeout(BNA.refresh,BNA.had?45000:0);setInterval(function(){if(!document.hidden)BNA.refresh()},120000)}
 })();
-/* Phase 3a: near-empty top bar. The bar keeps the wordmark and the menu button; The Wire, Sources, Free brief, alerts, search, theme and
+/* Phase 3a: the bar keeps the wordmark, the theme icon and the menu button. The Wire, Sources, Free brief, alerts, search and
    settings live in the menu's top row (search, Alerts, theme, Settings and Free brief were already there; The Wire + Sources are added
-   here). Network alerts move from the page banner (#ns_gbanner, hidden by CSS) into the menu, with a small dot on the menu button. */
+   here). The header theme button is the same data-bn-theme control as the menu row. Network alerts move from the page banner
+   (#ns_gbanner, hidden by CSS) into the menu, with a small dot on the menu button. */
 (function(){
  var d=document;
  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
