@@ -126,7 +126,7 @@
       if (d.ext) window.open(d.href, "_blank", "noopener");
       else location.href = d.href;
     }
-    function onMarker(c, marker) {
+    function onMarker(c, marker, delay) {
       var b = band(c.rank), time = et(when(c));
       function label() {
         var s = (text(c.title) || "Story") + ". Rank " + b.r + " of 10." + (time ? " " + time + "." : "");
@@ -155,6 +155,7 @@
         if (!node) return;
         node.setAttribute("role", "button");
         node.setAttribute("aria-label", label());
+        if (delay) node.style.setProperty("--bn-d", delay);
       });
     }
     function filters() {
@@ -167,18 +168,22 @@
       return f;
     }
     function say(s) { if (note) note.textContent = s; }
-    function draw() {
+    function draw(first) {
       markers.clearLayers();
       hide(); armed = null;
       var f = filters(), now = Date.now(), shown = [], i;
       for (i = 0; i < rows.length; i++) if (pass(rows[i], f, now)) shown.push(rows[i]);
       shown.forEach(function (c) {
         var b = band(c.rank);
-        var marker = L.marker([+c.lat, +c.lon], {
-          icon: L.divIcon({ className: "bn-sig-mk", html: '<div class="signal' + (c.exact === false ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] }),
-          keyboard: false
-        });
-        onMarker(c, marker);
+        var delay = first ? (Math.random() * 15).toFixed(3) + "s" : "";
+        var icon = L.divIcon({ className: "bn-sig-mk" + (first ? " bn-sig-enter" : " bn-sig-fade"), html: '<div class="signal' + (c.exact === false ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+        if (delay) icon.createIcon = function (old) {
+          var el = L.DivIcon.prototype.createIcon.call(this, old);
+          el.style.setProperty("--bn-d", delay);
+          return el;
+        };
+        var marker = L.marker([+c.lat, +c.lon], { icon: icon, keyboard: false });
+        onMarker(c, marker, delay);
         marker.addTo(markers);
       });
       var inf = 0, noun = shown.length === 1 ? "record" : "records";
@@ -226,7 +231,7 @@
     map.on("movestart", function () { if (!coarse) hide(); });
     ["#bn_sig_rank", "#bn_sig_topic", "#bn_sig_win"].forEach(function (id) {
       var n = el.querySelector(id);
-      if (n) n.addEventListener("change", function () { writeUrl(); draw(); });
+      if (n) n.addEventListener("change", function () { writeUrl(); draw(false); });
     });
     if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); if (open) show(open, L.latLng(+open.lat, +open.lon)); }).observe(box);
     else window.addEventListener("resize", function () { map.invalidateSize(); });
@@ -242,7 +247,7 @@
       rows = ((S && S.points) || []).filter(real);
       fillTopics();
       readUrl();
-      draw();
+      draw(true);
     }).catch(function () { say("Stories could not load. The map is the bundled world outline."); });
   }
 
