@@ -77,6 +77,61 @@
     return fallback(c);
   }
   function when(c) { return c.event_time || c.first_seen || c.updated || ""; }
+  function conflict(c) {
+    return String(c && c.category || "").toLowerCase() === "war/conflict";
+  }
+  function inUS(c) {
+    var cc = String(c && (c.cc || c.country) || "").toUpperCase();
+    if (cc === "US") return true;
+    var lat = +c.lat, lon = +c.lon;
+    if (lat >= 24.5 && lat <= 49.5 && lon >= -125 && lon <= -66.5) return true;
+    if (lat >= 51 && lat <= 72 && lon >= -170 && lon <= -129) return true;
+    if (lat >= 18.5 && lat <= 22.5 && lon >= -161 && lon <= -154) return true;
+    if (lat >= 17.5 && lat <= 18.6 && lon >= -67.5 && lon <= -65) return true;
+    return false;
+  }
+  var FAN_MAX = 8, SPIDER_PX = 28, CELL = 48, MAX_Z = 8;
+  function project(lat, lon, zoom) {
+    var s = 256 * Math.pow(2, zoom);
+    var x = ((+lon) + 180) / 360 * s;
+    var sl = Math.sin(Math.max(-89.9, Math.min(89.9, +lat)) * Math.PI / 180);
+    var y = (0.5 - Math.log((1 + sl) / (1 - sl)) / (4 * Math.PI)) * s;
+    return { x: x, y: y };
+  }
+  /* Screen grid, not a geographic radius. Country piles stay one count dot.
+     A ring is only for 8 or fewer non-country dots, and only 20–40 px across. */
+  function clusterPlan(items, zoom) {
+    var pts = [], i, p, k, buckets = {}, groups = [];
+    for (i = 0; i < items.length; i++) {
+      p = project(+items[i].lat, +items[i].lon, zoom);
+      pts.push({ i: i, c: items[i], x: p.x, y: p.y });
+    }
+    for (i = 0; i < pts.length; i++) {
+      k = Math.floor(pts[i].x / CELL) + ":" + Math.floor(pts[i].y / CELL);
+      if (!buckets[k]) buckets[k] = [];
+      buckets[k].push(pts[i]);
+    }
+    Object.keys(buckets).forEach(function (key) {
+      var g = buckets[key], n = g.length, country = true, j, spider = false, rad = 0, offsets = [];
+      for (j = 0; j < n; j++) {
+        if (!(g[j].c.precision === "country" || g[j].c.approximate)) country = false;
+      }
+      if (n > 1 && country) spider = false;
+      else if (n > 1 && n <= FAN_MAX) {
+        spider = true;
+        rad = Math.min(36, Math.max(20, 14 + n));
+        for (j = 0; j < n; j++) {
+          var ang = -Math.PI / 2 + (2 * Math.PI * j) / n;
+          offsets.push({ dx: Math.cos(ang) * rad, dy: Math.sin(ang) * rad });
+        }
+      }
+      groups.push({
+        n: n, spider: spider, country: n > 1 && country, radius: spider ? rad : 0,
+        idx: g.map(function (pt) { return pt.i; }), offsets: offsets
+      });
+    });
+    return groups;
+  }
   function pass(c, f, now) {
     if (!real(c)) return false;
     var r = band(c.rank).r;
@@ -84,6 +139,7 @@
     if (f.rank === "4" && (r < 4 || r > 6)) return false;
     if (f.rank === "0" && r > 3) return false;
     if (f.topic && c.category !== f.topic) return false;
+    if (f.conflict && !conflict(c)) return false;
     if (f.hours) {
       var t = Date.parse(when(c));
       if (!isFinite(t) || now - t > f.hours * 3600000) return false;
@@ -126,7 +182,7 @@
     box.style.removeProperty("background-color");
     if (embed) box.style.touchAction = "pan-y";
     var map = L.map(box, {
-      zoomControl: true, worldCopyJump: true, preferCanvas: true, attributionControl: true,
+      zoomControl: true, worldCopyJump: true, preferCanvas: true, attributionControl: true, maxZoom: MAX_Z,
       dragging: !embed, scrollWheelZoom: !embed, touchZoom: !embed, doubleClickZoom: !embed, boxZoom: !embed, keyboard: !embed
     });
     var framed = false;
@@ -150,6 +206,7 @@
     map.attributionControl.setPrefix("");
     map.attributionControl.addAttribution("Natural Earth");
     var world = null, markers = L.layerGroup().addTo(map), rows = [], armed = null, tip, hideT = 0, open = null;
+    var viewName = "us", framing = 0, listEl = null, timer = 0;
 
     tip = document.createElement("div");
     tip.className = "bn-sig-tip";
@@ -229,7 +286,7 @@
       });
     }
     function filters() {
-      var f = { rank: "", topic: "", hours: embed ? 168 : 168 };
+      var f = { rank: "", topic: "", hours: 168, conflict: viewName === "conflicts" };
       if (embed) return f;
       var rank = el.querySelector("#bn_sig_rank"), topic = el.querySelector("#bn_sig_topic"), win = el.querySelector("#bn_sig_win");
       f.rank = rank ? rank.value : "";
@@ -238,28 +295,171 @@
       return f;
     }
     function say(s) { if (note) note.textContent = s; }
+    function paintViews() {
+      el.querySelectorAll("[data-view]").forEach(function (b) {
+        b.setAttribute("aria-pressed", b.getAttribute("data-view") === viewName ? "true" : "false");
+      });
+    }
+    function activeRows(list, f, now) {
+      var out = [], i;
+      for (i = 0; i < list.length; i++) if (pass(list[i], f, now)) out.push(list[i]);
+      return out;
+    }
+    function paintCounts(shown) {
+      var f = filters(), now = Date.now();
+      var base = { rank: f.rank, topic: f.topic, hours: f.hours, conflict: false };
+      var all = activeRows(rows, base, now), us = [], war = [], i, cats = {};
+      for (i = 0; i < all.length; i++) {
+        if (inUS(all[i])) us.push(all[i]);
+        if (conflict(all[i])) war.push(all[i]);
+      }
+      el.querySelectorAll("[data-n]").forEach(function (n) {
+        var k = n.getAttribute("data-n");
+        n.textContent = String(k === "us" ? us.length : k === "conflicts" ? war.length : all.length);
+      });
+      var line = el.querySelector(".bn-sig-counts");
+      var focus = viewName === "us" ? us : viewName === "conflicts" ? war : all;
+      for (i = 0; i < focus.length; i++) {
+        var name = focus[i].category || "other";
+        cats[name] = (cats[name] || 0) + 1;
+      }
+      if (line) {
+        var names = Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; });
+        line.textContent = names.map(function (k) { return k + " " + cats[k]; }).join(" · ");
+      }
+      return { us: us.length, world: all.length, conflicts: war.length };
+    }
+    function closeList() {
+      if (listEl) { listEl.hidden = true; listEl.textContent = ""; }
+    }
+    function showList(group) {
+      if (!listEl) {
+        listEl = document.createElement("div");
+        listEl.className = "bn-sig-list";
+        listEl.setAttribute("role", "dialog");
+        listEl.setAttribute("aria-label", "Stories at this place");
+        box.appendChild(listEl);
+      }
+      listEl.textContent = "";
+      var head = document.createElement("div");
+      head.className = "bn-sig-list-h";
+      var title = document.createElement("b");
+      title.textContent = group.length + " stories";
+      var x = document.createElement("button");
+      x.type = "button";
+      x.className = "bn-sig-list-x";
+      x.setAttribute("aria-label", "Close");
+      x.textContent = "×";
+      x.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); closeList(); };
+      head.appendChild(title); head.appendChild(x);
+      listEl.appendChild(head);
+      var ul = document.createElement("div");
+      ul.className = "bn-sig-list-b";
+      group.forEach(function (c) {
+        var d = dest(c), row = document.createElement("button");
+        row.type = "button";
+        row.className = "bn-sig-list-i";
+        var t = document.createElement("b");
+        t.textContent = text(c.title) || "Untitled";
+        var s = document.createElement("span");
+        s.textContent = (c.place ? text(c.place) + " · " : "") + "Rank " + band(c.rank).r + "/10 · " + (d ? d.label : "");
+        row.appendChild(t); row.appendChild(s);
+        row.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); go(c); };
+        ul.appendChild(row);
+      });
+      listEl.appendChild(ul);
+      listEl.hidden = false;
+    }
+    function dotIcon(c, first) {
+      var b = band(c.rank);
+      var delay = first ? (Math.random() * 15).toFixed(3) + "s" : "";
+      var approx = c.exact === false || c.approximate || c.precision === "country";
+      var icon = L.divIcon({ className: "bn-sig-mk" + (first ? " bn-sig-enter" : " bn-sig-fade"), html: '<div class="signal' + (approx ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+      if (delay) icon.createIcon = function (old) {
+        var node = L.DivIcon.prototype.createIcon.call(this, old);
+        node.style.setProperty("--bn-d", delay);
+        return node;
+      };
+      return icon;
+    }
+    function countIcon(n) {
+      var size = Math.min(40, 24 + Math.round(Math.log(n) / Math.LN2) * 2);
+      return L.divIcon({
+        className: "bn-sig-cl",
+        html: '<div class="bn-count" style="width:' + size + 'px;height:' + size + 'px">' + n + "</div>",
+        iconSize: [size, size], iconAnchor: [size / 2, size / 2]
+      });
+    }
+    function onCluster(group, marker) {
+      marker.on("click", function (ev) {
+        if (L.DomEvent) L.DomEvent.stop(ev);
+        var bounds = L.latLngBounds(group.map(function (c) { return [+c.lat, +c.lon]; }));
+        var country = group.every(function (c) { return c.precision === "country" || c.approximate; });
+        var tiny = bounds.getNorthEast().distanceTo(bounds.getSouthWest()) < 40000;
+        framed = true;
+        if (!country && !tiny && map.getZoom() < map.getMaxZoom()) {
+          framing++;
+          map.fitBounds(bounds, { maxZoom: map.getMaxZoom(), animate: false, padding: [36, 36] });
+          framing--;
+          return;
+        }
+        showList(group);
+      });
+      marker.on("add", function () {
+        var node = marker.getElement();
+        if (!node) return;
+        node.setAttribute("role", "button");
+        node.setAttribute("aria-label", group.length + " stories. Open the list or zoom in.");
+      });
+    }
     function draw(first) {
       markers.clearLayers();
-      hide(); armed = null;
-      var f = filters(), now = Date.now(), shown = [], i;
-      for (i = 0; i < rows.length; i++) if (pass(rows[i], f, now)) shown.push(rows[i]);
-      shown.forEach(function (c) {
-        var b = band(c.rank);
-        var delay = first ? (Math.random() * 15).toFixed(3) + "s" : "";
-        var icon = L.divIcon({ className: "bn-sig-mk" + (first ? " bn-sig-enter" : " bn-sig-fade"), html: '<div class="signal' + (c.exact === false ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
-        if (delay) icon.createIcon = function (old) {
-          var el = L.DivIcon.prototype.createIcon.call(this, old);
-          el.style.setProperty("--bn-d", delay);
-          return el;
-        };
-        var marker = L.marker([+c.lat, +c.lon], { icon: icon, keyboard: false });
-        onMarker(c, marker, delay);
-        marker.addTo(markers);
+      hide(); closeList(); armed = null;
+      var f = filters(), now = Date.now(), shown = activeRows(rows, f, now), i;
+      var zoom = map.getZoom() || 2;
+      var plan = clusterPlan(shown, zoom);
+      plan.forEach(function (g) {
+        var members = g.idx.map(function (ix) { return shown[ix]; });
+        if (g.n === 1) {
+          var c = members[0];
+          var marker = L.marker([+c.lat, +c.lon], { icon: dotIcon(c, first), keyboard: false });
+          onMarker(c, marker, "");
+          marker.addTo(markers);
+          return;
+        }
+        if (g.spider) {
+          var center = map.latLngToLayerPoint([+members[0].lat, +members[0].lon]);
+          members.forEach(function (c, j) {
+            var at = map.layerPointToLatLng(L.point(center.x + g.offsets[j].dx, center.y + g.offsets[j].dy));
+            var mk = L.marker(at, { icon: dotIcon(c, first), keyboard: false });
+            onMarker(c, mk, "");
+            mk.addTo(markers);
+          });
+          return;
+        }
+        var lat = 0, lon = 0;
+        members.forEach(function (c) { lat += +c.lat; lon += +c.lon; });
+        var cm = L.marker([lat / g.n, lon / g.n], { icon: countIcon(g.n), keyboard: false });
+        onCluster(members, cm);
+        cm.addTo(markers);
       });
-      var inf = 0, noun = shown.length === 1 ? "record" : "records";
-      for (i = 0; i < shown.length; i++) if (shown[i].exact === false) inf++;
-      say(shown.length + " " + noun + " shown" + (rows.length > shown.length ? " of " + rows.length : "") + (inf ? " · " + inf + " approximate" : "") + " · dots follow rank");
+      var tally = paintCounts(shown);
+      var noun = shown.length === 1 ? "record" : "records";
+      var focus = viewName === "us" ? tally.us : viewName === "conflicts" ? tally.conflicts : shown.length;
+      var label = viewName === "us" ? " in the United States" : viewName === "conflicts" ? " war/conflict" : "";
+      say(focus + label + " · " + shown.length + " " + noun + " on this view · dots follow rank");
       setTimeout(function () { map.invalidateSize(); frameUS(); }, 60);
+    }
+    function widthZoom(wide, narrow) { return (box.clientWidth || 800) < 700 ? narrow : wide; }
+    function frame(name) {
+      viewName = name === "world" || name === "conflicts" ? name : "us";
+      framed = true;
+      paintViews();
+      framing++;
+      if (viewName === "conflicts") map.fitBounds([[28, -8], [58, 64]], { animate: false, padding: [28, 28] });
+      else if (viewName === "world") map.setView([20, 0], widthZoom(2, 1), { animate: false });
+      else map.setView([39, -98], usZoom() || widthZoom(4, 3), { animate: false });
+      framing--;
     }
     function fillTopics() {
       var sel = el.querySelector("#bn_sig_topic");
@@ -281,6 +481,7 @@
       if (rank && (q.rank === "0" || q.rank === "4" || q.rank === "7")) rank.value = q.rank;
       if (win && (q.window === "24" || q.window === "72" || q.window === "168")) win.value = q.window;
       if (topic && q.topic) topic.value = q.topic;
+      if (q.view === "world" || q.view === "conflicts" || q.view === "us") viewName = q.view;
     }
     function writeUrl() {
       if (embed) return;
@@ -289,19 +490,36 @@
       if (f.topic) p.set("topic", f.topic);
       if (f.rank) p.set("rank", f.rank);
       if (String(f.hours) !== "168") p.set("window", String(f.hours));
+      if (viewName && viewName !== "us") p.set("view", viewName);
       var s = p.toString();
       history.replaceState(null, "", s ? "?" + s : location.pathname);
     }
     map.on("click", function (e) {
       var t = e.originalEvent && e.originalEvent.target;
-      if (t && t.closest && t.closest("a,button,.leaflet-control,.bn-sig-tip,.bn-sig-mk")) return;
-      armed = null; hide();
+      if (t && t.closest && t.closest("a,button,.leaflet-control,.bn-sig-tip,.bn-sig-mk,.bn-sig-cl,.bn-sig-list,.bn-sig-views")) return;
+      armed = null; hide(); closeList();
       if (embed) location.href = "/map";
     });
     map.on("movestart", function () { if (!coarse) hide(); });
+    map.on("zoomend", function () { if (!framing && rows.length) draw(false); });
     ["#bn_sig_rank", "#bn_sig_topic", "#bn_sig_win"].forEach(function (id) {
       var n = el.querySelector(id);
       if (n) n.addEventListener("change", function () { writeUrl(); draw(false); });
+    });
+    el.querySelectorAll("[data-view]").forEach(function (b) {
+      b.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var name = b.getAttribute("data-view");
+        if (name !== "us" && name !== "world" && name !== "conflicts") return;
+        if (name === "conflicts") {
+          var topic = el.querySelector("#bn_sig_topic");
+          if (topic && topic.value && topic.value !== "war/conflict") topic.value = "";
+        }
+        frame(name);
+        writeUrl();
+        draw(false);
+      });
     });
     if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); frameUS(); if (open) show(open, L.latLng(+open.lat, +open.lon)); }).observe(box);
     else window.addEventListener("resize", function () { map.invalidateSize(); frameUS(); });
@@ -312,14 +530,21 @@
       map.invalidateSize();
     }).catch(function () { say("World outline could not load. Dots still use real coordinates."); });
 
+    function pull(first) {
+      fetch("/api/signal/points", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("points"); return r.json(); }).then(function (S) {
+        rows = ((S && S.points) || []).filter(real);
+        if (first) { fillTopics(); readUrl(); if (viewName !== "us") frame(viewName); }
+        draw(first);
+      }).catch(function () { if (first) say("Stories could not load. The map is the bundled world outline."); });
+    }
     readUrl();
-    fetch("/api/signal/points", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("points"); return r.json(); }).then(function (S) {
-      rows = ((S && S.points) || []).filter(real);
-      fillTopics();
-      readUrl();
-      draw(true);
-    }).catch(function () { say("Stories could not load. The map is the bundled world outline."); });
+    if (viewName !== "us") frame(viewName);
+    pull(true);
+    timer = setInterval(function () { pull(false); }, 300000);
   }
 
-  global.BNSignal = { mount: mount, band: band, real: real, dest: dest, pass: pass };
+  global.BNSignal = {
+    mount: mount, band: band, real: real, dest: dest, pass: pass,
+    conflict: conflict, inUS: inUS, clusterPlan: clusterPlan, FAN_MAX: FAN_MAX, SPIDER_PX: SPIDER_PX
+  };
 })(typeof window !== "undefined" ? window : globalThis);

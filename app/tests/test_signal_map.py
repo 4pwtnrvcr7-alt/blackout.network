@@ -166,5 +166,79 @@ class Place(unittest.TestCase):
         self.assertTrue(all(p["watchlist"] in (0, 1) for p in body["points"]))
         self.assertTrue(all(p["lat"] and p["lon"] for p in inferred))
 
+    def test_named_place_beats_the_actor_country(self):
+        import signal_place as P
+        kyiv = P.infer("White House says Russia struck Kyiv")
+        self.assertEqual(kyiv["place"], "Kyiv")
+        self.assertEqual(kyiv["precision"], "city")
+        self.assertFalse(kyiv["approximate"])
+        self.assertGreater(kyiv["lon"], 20)
+        gaza = P.infer("Israel strikes Gaza City")
+        self.assertIn("Gaza", gaza["place"])
+        self.assertEqual(gaza["cc"], "PS")
+        rafah = P.infer("Explosion in Rafah after Israeli strike")
+        self.assertEqual(rafah["place"], "Rafah")
+        self.assertAlmostEqual(rafah["lat"], 31.30, delta=0.05)
+        self.assertEqual(P.infer("Attack on Zaporizhzhia NPP")["precision"], "facility")
+        self.assertEqual(P.infer("Fighting in Khan Younis")["place"], "Khan Younis")
+        self.assertEqual(P.infer("Ships in the Strait of Hormuz")["precision"], "region")
+        iran = P.infer("Israel strikes Iran")
+        self.assertEqual(iran["precision"], "country")
+        self.assertTrue(iran["approximate"])
+        self.assertIsNone(P.infer("Russia and Ukraine say emergency alert apps were hit"))
+
+    def test_live_wire_fixture_places_more_specifically(self):
+        """Before, on this same live Wire pull: 432 unmapped, 473 country or region, 360 city or state."""
+        import signal_place as P
+        from collections import Counter
+        fixture = json.load(open(os.path.join(APP, "tests", "fixtures", "signal_live_wire.json"), encoding="utf-8"))
+        prec = Counter()
+        for row in fixture["items"]:
+            hit = P.infer(P.story_text(row.get("title") or "", row.get("location") or "", ""))
+            prec[None if not hit else hit["precision"]] += 1
+        specific = prec["city"] + prec["facility"] + prec["state"]
+        broad = prec["country"] + prec["region"]
+        self.assertGreater(len(fixture["items"]), 1200)
+        self.assertLess(prec[None], 360)
+        self.assertGreater(specific, 480)
+        self.assertLess(broad, 460)
+        self.assertGreater(specific, broad)
+
+class Cluster(unittest.TestCase):
+    def test_country_pile_is_one_dot_and_rings_stay_small(self):
+        node = subprocess.run(["node", "-e", r'''
+const fs=require("fs"), vm=require("vm");
+const ctx={};
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(process.argv[1],"utf8"), ctx);
+const B=ctx.BNSignal;
+function pile(n, lat, lon, extra){var a=[];for(var i=0;i<n;i++)a.push(Object.assign({lat:lat,lon:lon,precision:"country",approximate:true}, extra||{}));return a}
+const country=B.clusterPlan(pile(40, 39.54, -97.48), 2);
+const cities=B.clusterPlan(pile(6, 50.45, 30.52, {precision:"city", approximate:false}), 3);
+const many=B.clusterPlan(pile(30, 32.17, 54.93, {precision:"city", approximate:false}), 2);
+function far(g){var m=0;(g.offsets||[]).forEach(function(o){m=Math.max(m, Math.hypot(o.dx,o.dy))});return m}
+const out={
+ groups: country.length, spider: country[0].spider, n: country[0].n,
+ citySpider: cities[0].spider, cityR: far(cities[0]),
+ manySpider: many.some(function(g){return g.spider && g.n>8}),
+ manyR: Math.max.apply(null, many.map(far).concat([0])),
+ us: B.inUS({lat:39.5,lon:-98}), kyiv: B.inUS({lat:50.45,lon:30.52,cc:"UA"}),
+ uscc: B.inUS({lat:10,lon:10,cc:"US"})
+};
+console.log(JSON.stringify(out));
+''', JS], capture_output=True, text=True, check=True)
+        got = json.loads(node.stdout)
+        self.assertEqual(got["groups"], 1)
+        self.assertFalse(got["spider"])
+        self.assertEqual(got["n"], 40)
+        self.assertTrue(got["citySpider"])
+        self.assertLessEqual(got["cityR"], 40)
+        self.assertGreaterEqual(got["cityR"], 20)
+        self.assertFalse(got["manySpider"])
+        self.assertLessEqual(got["manyR"], 40)
+        self.assertTrue(got["us"])
+        self.assertFalse(got["kyiv"])
+        self.assertTrue(got["uscc"])
+
 if __name__ == "__main__":
     unittest.main()

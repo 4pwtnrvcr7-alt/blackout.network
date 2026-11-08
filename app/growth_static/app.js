@@ -90,17 +90,34 @@ function inlines(){if(subscribed()||isNL)return;var feed=document.getElementById
  document.querySelectorAll(".bng-inline-slot:not([data-done])").forEach(function(s){s.dataset.done=1;s.replaceWith(inlineBlock(s.dataset.src||"inline_story","Follow stories like this in your inbox"))})}
 function closePrompt(dismissed){var p=document.getElementById("bng_prompt");if(!p)return;if(dismissed)LS.s("bn_nl_dis",String(Date.now()));p.classList.remove("bng-in");setTimeout(function(){p.remove()},300);document.removeEventListener("keydown",escK)}
 function escK(e){if(e.key==="Escape")closePrompt(true)}
+function mapRoot(){return document.documentElement.classList.contains("bn-map-root")}
+function mapOnScreen(){
+ if(mapRoot())return true;
+ var el=document.getElementById("bn_sig");if(!el)return false;
+ var r=el.getBoundingClientRect();
+ return r.bottom>72&&r.top<window.innerHeight-24&&r.height>40}
+function showMapChip(){
+ if(document.getElementById("bng_mapchip")||subscribed()||isNL)return;
+ var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
+ var chip=document.createElement("aside");chip.id="bng_mapchip";chip.className="bng-mapchip";chip.setAttribute("role","region");chip.setAttribute("aria-label","Newsletter");
+ chip.innerHTML='<p class="bng-mapchip-t"><b>Finding this useful?</b> <span>The 7 AM / 7 PM brief, ranked and sourced.</span></p><a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=corner&utm_campaign=map">Get the brief</a><button type="button" class="bng-x" aria-label="Close">×</button>';
+ chip.querySelector(".bng-x").onclick=function(){LS.s("bn_nl_dis",String(Date.now()));chip.remove();document.body.classList.remove("bng-chip-on")};
+ document.body.classList.add("bng-chip-on");document.body.appendChild(chip)}
 var shown=false;function showPrompt(){if(shown||subscribed()||isNL||location.hash==="#newsletter")return;var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
- if(document.querySelector(".bnr-back"))return;shown=true;
+ if(document.querySelector(".bnr-back"))return;
+ if(mapRoot()){showMapChip();return}
+ if(mapOnScreen())return;
+ shown=true;
  var p=document.createElement("aside");p.id="bng_prompt";p.className="bng-prompt";p.setAttribute("role","dialog");p.setAttribute("aria-modal","false");p.setAttribute("aria-labelledby","bng_prompt_h");
  p.innerHTML='<button type="button" class="bng-x" aria-label="Close">×</button><div class="bng-cta-k">BLACKOUT.NETWORK BRIEF</div><h2 id="bng_prompt_h">Finding this useful?</h2><p>Get the 7 AM / 7 PM brief tailored to your area: every confirmed threat from the last 12 hours, ranked and sourced. Free.</p><div class="bng-nlbox"></div><p class="bng-fine">Double opt-in · one-click unsubscribe · <a href="/privacy">Privacy</a></p><button type="button" class="bng-no">No thanks</button>';
  document.body.appendChild(p);p.querySelector(".bng-x").onclick=function(){closePrompt(true)};p.querySelector(".bng-no").onclick=function(){closePrompt(true)};
  document.addEventListener("keydown",escK);mountForm(p.querySelector(".bng-nlbox"),"prompt");requestAnimationFrame(function(){p.classList.add("bng-in")});
  var b=document.getElementById("bng_bar");if(b){b.hidden=true;document.body.classList.remove("bng-bar-on")}}
 function promptTriggers(){if(subscribed()||isNL)return;var pv=(+LS.g("bn_pv")||0)+1;LS.s("bn_pv",String(pv));
+ if(mapRoot()){showMapChip();return}
  setTimeout(showPrompt,pv>=2?8000:50000);
- var onS=function(){var h=document.documentElement,max=h.scrollHeight-h.clientHeight;if(max>400&&h.scrollTop/max>=.5){removeEventListener("scroll",onS);showPrompt()}};addEventListener("scroll",onS,{passive:true})}
-function bar(){if(subscribed()||isNL||document.getElementById("bng_bar"))return;var d=+LS.g("bn_nl_bar")||0;if(Date.now()-d<WEEK)return;
+ var onS=function(){if(mapOnScreen())return;var h=document.documentElement,max=h.scrollHeight-h.clientHeight;if(max>400&&h.scrollTop/max>=.5){removeEventListener("scroll",onS);showPrompt()}};addEventListener("scroll",onS,{passive:true})}
+function bar(){if(subscribed()||isNL||mapRoot()||document.getElementById("bng_bar"))return;var d=+LS.g("bn_nl_bar")||0;if(Date.now()-d<WEEK)return;
  var b=document.createElement("div");b.id="bng_bar";b.className="bng-bar";b.setAttribute("role","region");b.setAttribute("aria-label","Newsletter");
  b.innerHTML='<span class="bng-bar-t"><b>Get the free brief</b><span class="bng-bar-s"> · 7 AM &amp; 7 PM ET, ranked and sourced</span></span><a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=sticky&utm_campaign=bar">Sign up</a><button type="button" class="bng-x" aria-label="Dismiss">×</button>';
  b.querySelector(".bng-x").onclick=function(){LS.s("bn_nl_bar",String(Date.now()));b.remove();document.body.classList.remove("bng-bar-on")};
@@ -111,6 +128,7 @@ function nlPage(){if(!isNL)return;var m=/[?&]utm_source=([A-Za-z0-9_-]{1,12})/.e
 function scan(){if(!ready)return;inlines();["feed","watch"].forEach(function(id){enhanceFeed(document.getElementById(id))});footer();signup();share()}
 function q(){var m=/[?&]q=([^&#]+)/.exec(location.search);if(!m||!window.bnMenuOpen)return;var v=decodeURIComponent(m[1].replace(/\+/g," ")).slice(0,120);
  window.bnMenuOpen({search:true});setTimeout(function(){var i=document.getElementById("bns_q");if(!i)return;i.value=v;i.dispatchEvent(new Event("input",{bubbles:true}));var f=i.closest("form");if(f&&f.requestSubmit)f.requestSubmit()},150)}
-function start(){fetch("/api/growth/data").then(function(r){return r.json()}).then(function(j){D=j||D}).catch(function(){}).then(function(){ready=true;scan()});
+function watchMap(){function sync(){document.documentElement.classList.toggle("bn-sig-visible",mapOnScreen())}sync();addEventListener("scroll",sync,{passive:true});var el=document.getElementById("bn_sig");if(el&&"IntersectionObserver"in window)new IntersectionObserver(sync,{threshold:[0,0.2]}).observe(el)}
+function start(){watchMap();fetch("/api/growth/data").then(function(r){return r.json()}).then(function(j){D=j||D}).catch(function(){}).then(function(){ready=true;scan()});
  var t=null;new MutationObserver(function(){if(t)return;t=setTimeout(function(){t=null;scan()},120)}).observe(document.body,{childList:true,subtree:true});setTimeout(q,600);nlPage();promptTriggers();bar()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start()})();

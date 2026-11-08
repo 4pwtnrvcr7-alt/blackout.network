@@ -4,7 +4,7 @@ Reads the bundled gazetteer already shipped with the heat map (heatmap_data/: co
 admin1, cities). No network calls, no API keys, no database writes. A story is placed only
 when one place wins cleanly. Ambiguous names (Georgia, Turkey-the-bird, person names) are skipped.
 """
-import re
+import os, re
 import geo
 
 # Food and other non-place uses of "Turkey". Whole words, checked around the match.
@@ -36,11 +36,14 @@ _PLACE_WORD = {"county", "parish", "city", "state", "province", "region", "river
 _TITLE_WORD = {"gov", "governor", "gen", "sen", "senator", "rep", "dr", "mr", "mrs", "ms", "pm", "president", "mayor", "minister", "judge"}
 
 
-def _pack(lat, lon, precision, place):
+def _pack(lat, lon, precision, place, cc=""):
     if lat is None or lon is None: return None
     lat, lon = float(lat), float(lon)
     if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0): return None
-    return {"lat": round(lat, 4), "lon": round(lon, 4), "precision": precision, "place": place}
+    # Country and broad-region centroids are approximate. A city, base or state is the place named.
+    approximate = precision in ("country", "region")
+    return {"lat": round(lat, 4), "lon": round(lon, 4), "precision": precision, "place": place,
+            "cc": cc or "", "approximate": approximate}
 
 
 def _turkey_food(text):
@@ -174,10 +177,178 @@ def _region(text):
     return _pack(lat, lon, "region", label)
 
 
+# Conflict and military places, including spellings the GeoNames extract misses.
+# level, lat, lon, cc, label. These win over a same-name city in the wrong country (Odessa, Texas).
+_CURATED = {
+    "kyiv": ("city", 50.4547, 30.5238, "UA", "Kyiv"),
+    "kiev": ("city", 50.4547, 30.5238, "UA", "Kyiv"),
+    "kharkiv": ("city", 49.9818, 36.2548, "UA", "Kharkiv"),
+    "odesa": ("city", 46.4857, 30.7438, "UA", "Odesa"),
+    "odessa": ("city", 46.4857, 30.7438, "UA", "Odesa"),
+    "donetsk": ("city", 48.023, 37.8022, "UA", "Donetsk"),
+    "kursk": ("city", 51.7269, 36.1846, "RU", "Kursk"),
+    "zaporizhzhia": ("city", 47.8517, 35.1171, "UA", "Zaporizhzhia"),
+    "zaporizhzhya": ("city", 47.8517, 35.1171, "UA", "Zaporizhzhia"),
+    "zaporizhia": ("city", 47.8517, 35.1171, "UA", "Zaporizhzhia"),
+    "zaporizhzhia npp": ("facility", 47.5062, 34.5856, "UA", "Zaporizhzhia NPP"),
+    "zaporizhzhia nuclear power plant": ("facility", 47.5062, 34.5856, "UA", "Zaporizhzhia NPP"),
+    "enerhodar": ("city", 47.4905, 34.662, "UA", "Enerhodar"),
+    "gaza": ("city", 31.5016, 34.4667, "PS", "Gaza"),
+    "gaza city": ("city", 31.5016, 34.4667, "PS", "Gaza City"),
+    "rafah": ("city", 31.2972, 34.2436, "PS", "Rafah"),
+    "khan younis": ("city", 31.3402, 34.3063, "PS", "Khan Younis"),
+    "khan yunis": ("city", 31.3402, 34.3063, "PS", "Khan Younis"),
+    "beirut": ("city", 33.8933, 35.5016, "LB", "Beirut"),
+    "tehran": ("city", 35.6944, 51.4215, "IR", "Tehran"),
+    "tel aviv": ("city", 32.0809, 34.7806, "IL", "Tel Aviv"),
+    "bandar abbas": ("city", 27.1865, 56.2808, "IR", "Bandar Abbas"),
+    "hodeidah": ("city", 14.7978, 42.9545, "YE", "Hodeidah"),
+    "al hudaydah": ("city", 14.7978, 42.9545, "YE", "Hodeidah"),
+    "strait of hormuz": ("region", 26.6, 56.3, "", "Strait of Hormuz"),
+    "taiwan strait": ("region", 24.5, 119.5, "", "Taiwan Strait"),
+    "red sea": ("region", 20.0, 38.5, "", "Red Sea"),
+    "south lebanon": ("region", 33.27, 35.38, "LB", "South Lebanon"),
+    "golan": ("region", 33.0, 35.75, "", "Golan"),
+    "golan heights": ("region", 33.0, 35.75, "", "Golan Heights"),
+    "gulf of oman": ("region", 24.5, 58.5, "", "Gulf of Oman"),
+    "komyshuvakha": ("city", 47.48, 35.53, "UA", "Komyshuvakha"),
+}
+# A demonym plus a base, territory or waters is the country, when no city was named.
+_DEMONYM_PLACE = {
+    "colombian": ("CO", "Colombia", 4.5709, -74.2973),
+    "brazilian": ("BR", "Brazil", -14.235, -51.9253),
+    "french": ("FR", "France", 46.2276, 2.2137),
+    "polish": ("PL", "Poland", 51.9194, 19.1451),
+    "lebanese": ("LB", "Lebanon", 33.8547, 35.8623),
+    "yemeni": ("YE", "Yemen", 15.5527, 48.5164),
+    "syrian": ("SY", "Syria", 34.8021, 38.9968),
+    "iraqi": ("IQ", "Iraq", 33.2232, 43.6793),
+}
+# Country names that are also people or US states. A bare mention is not a place.
+_AMBIG_COUNTRY = {"georgia", "jordan", "chad", "turkey", "guinea", "niger"}
+_CUES = {"in", "on", "at", "near", "outside", "into", "over", "around", "from",
+         "strikes", "struck", "strike", "attacks", "attack", "attacked", "bombed", "bombing"}
+_DIR = {"southern", "northern", "eastern", "western", "central", "south", "north", "east", "west"}
+_PLACES = {"t": 0.0, "v": None}
+
+def _gazetteer():
+    """Compact GeoNames extract (signal_places.json.gz) plus the curated list."""
+    import gzip, json, time
+    now = time.time()
+    if _PLACES["v"] is not None and now - _PLACES["t"] < 3600: return _PLACES["v"]
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signal_places.json.gz")
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        data = json.load(fh)
+    _PLACES.update(t=now, v=data)
+    return data
+
+def _tokens(text):
+    text = geo.fold(text or "")
+    out = []
+    for m in geo.TOK.finditer(text):
+        raw = m.group(0)
+        out.append((geo.nw(raw), raw[0].isupper() or raw.isupper()))
+    return out
+
+def _from_text(text):
+    """Most specific place the story actually names. City and base beat a country mention."""
+    raw = _OUTLET.sub(" ", text or "")
+    raw = _COAST.sub("in ", raw)
+    if _turkey_food(raw): raw = re.sub(r"\b[Tt]urkey\b", " ", raw)
+    if re.search(r"\bTexas\b|\bTX\b", raw) and re.search(r"\bOdessa\b", raw):
+        return _pack(31.8457, -102.3676, "city", "Odessa, Texas", "US")
+    toks = _tokens(raw)
+    if not toks: return None
+    G = _gazetteer()
+    cities, admin, countries = G["c"], G["a"], G["k"]
+    norms = [t[0] for t in toks]
+    caps = [t[1] for t in toks]
+    used = set()
+    hits = []
+    i = 0
+    while i < len(norms):
+        found = None
+        for n in (4, 3, 2, 1):
+            if i + n > len(norms): continue
+            key = " ".join(norms[i:i + n])
+            if key in _CURATED or key in cities or key in admin or key in countries:
+                prev = norms[i - 1] if i else ""
+                cue = prev in _CUES
+                if not (caps[i] or cue): continue
+                found = (n, key, cue)
+                break
+        if not found:
+            i += 1
+            continue
+        n, key, cue = found
+        i += n
+        if key in _AMBIG_COUNTRY and not cue and key not in _CURATED: continue
+        if key == "georgia" and not re.search(r"\b(?:Tbilisi|state of Georgia|Georgia,? USA|US state)\b", raw): continue
+        level = lat = lon = cc = label = pop = None
+        if key in _CURATED and not (key == "odessa" and re.search(r"\bTexas\b", raw)):
+            level, lat, lon, cc, label = _CURATED[key]
+            pop = 5000000
+        elif key in cities:
+            cands = cities[key]
+            if key == "rafah":
+                cands = [c for c in cands if c[2] == "PS"] or cands
+            ctx = {countries[k][2] for k in countries if k in norms}
+            pool = [c for c in cands if c[2] in ctx] or cands
+            pool = sorted(pool, key=lambda c: -c[3])
+            if len(pool) > 1 and not (pool[0][3] >= max(200000, 3 * pool[1][3])): continue
+            lat, lon, cc, pop, label = pool[0]
+            if key in admin and pop < 80000 and admin[key][2] == "US" and cc != "US":
+                lat, lon, cc, label = admin[key]
+                level, pop = "state", 0
+            else:
+                level = "city"
+        elif key in admin:
+            lat, lon, cc, label = admin[key]
+            level, pop = "state", 0
+            if key in countries and key in _AMBIG_COUNTRY: continue
+        elif key in countries:
+            lat, lon, cc, label = countries[key]
+            level, pop = "country", 0
+        if level is None: continue
+        prev = norms[i - n - 1] if i - n - 1 >= 0 else ""
+        if level == "city" and prev and prev not in _CUES and prev not in _DIR and prev not in _PLACE_WORD and prev not in _TITLE_WORD:
+            if i - n - 1 >= 0 and caps[i - n - 1] and prev not in countries and prev not in cities and prev not in admin:
+                continue
+        hits.append({"level": level, "lat": lat, "lon": lon, "cc": cc, "place": label, "pop": pop or 0, "cue": cue, "key": key})
+    if not hits:
+        for word, d in _DEMONYM_PLACE.items():
+            if re.search(r"\b" + word + r"\w*\s+(?:\w+\s+){0,2}(?:military\s+)?(?:base|territory|soil|waters)\b", raw, re.I):
+                return _pack(d[2], d[3], "country", d[1], d[0])
+        return None
+    rank = {"facility": 5, "city": 4, "state": 3, "region": 2, "country": 1}
+    specific = [h for h in hits if rank[h["level"]] >= 2]
+    if specific:
+        specific.sort(key=lambda h: (rank[h["level"]] + (3 if h["cue"] else 0), h["pop"]), reverse=True)
+        best = specific[0]
+        return _pack(best["lat"], best["lon"], best["level"], best["place"], best["cc"])
+    ccs = {}
+    for h in hits:
+        ccs.setdefault(h["cc"] or h["key"], []).append(h)
+    if len(ccs) != 1:
+        cued = [h for h in hits if h["cue"]]
+        cued_cc = {h["cc"] for h in cued}
+        if len(cued_cc) != 1: return None
+        h = cued[0]
+        if h["key"] in _AMBIG_COUNTRY and not h["cue"]: return None
+        return _pack(h["lat"], h["lon"], h["level"] if h["level"] != "city" else "country", h["place"], h["cc"])
+    h = hits[0]
+    if h["key"] in _AMBIG_COUNTRY and not h["cue"]: return None
+    return _pack(h["lat"], h["lon"], "country", h["place"], h["cc"])
+
+
 def infer(text):
-    """-> {lat, lon, precision, place} or None. None means we are not sure."""
+    """-> {lat, lon, precision, place, cc, approximate} or None. None means we are not sure."""
     text = (text or "").strip()
     if not text or _NOT_A_PLACE.search(text) and len(text) < 48: return None
+    hit = _nws(text)
+    if hit: return hit
+    hit = _from_text(text)
+    if hit: return hit
     hit = _from_gazetteer(text)
     if hit: return hit
     hit = _nws(text)
