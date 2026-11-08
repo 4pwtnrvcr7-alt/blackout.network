@@ -46,15 +46,16 @@
   if(b){var dot=b.querySelector(".bna-dot");if(n&&!dot){dot=d.createElement("span");dot.className="bna-dot";b.appendChild(dot)}if(!n&&dot)dot.remove();
    if(n)b.setAttribute("aria-label","Open menu ("+n+" network alert"+(n>1?"s":"")+")");else b.setAttribute("aria-label","Open menu")}
   if(!ph)return;if(!n){box&&box.remove();return}
-  if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/#network";ph.parentNode.insertBefore(box,ph.nextSibling);
-   box.addEventListener("click",function(){if(window.bnMenuClose)try{bnMenuClose(true)}catch(e){}})}
+  if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/#network";var anchor=ph.closest(".bn-mhead")||ph;anchor.parentNode.insertBefore(box,anchor.nextSibling);
+   box.addEventListener("click",function(e){if(!window.bnMenuClose)return;e.preventDefault();e.stopPropagation();try{bnMenuClose(true,{replace:"/#network"})}catch(err){}})}
   box.innerHTML='<span class="bna-mdot" aria-hidden="true"></span><span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
  function load(){fetch("/api/netstatus/alerts",{cache:"no-store"}).then(function(r){return r.json()}).then(alerts).catch(function(){})}
  function go(){tools();load();setInterval(load,300000)}
  // same-page hash links in the menu (The Wire, network alert, other /#tab links without a data-tab handler): close the menu and go to the top
  d.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[href]");if(!a||e.defaultPrevented||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
   var h=a.getAttribute("href")||"";if(h.charAt(0)=="#"||a.pathname!=location.pathname||!a.hash||a.hash=="#bn-menu")return;
-  if(window.bnMenuClose)try{bnMenuClose(true)}catch(_){}setTimeout(function(){window.scrollTo(0,0)},0)});
+  e.preventDefault();if(window.bnMenuClose)try{bnMenuClose(true,{replace:a.hash})}catch(_){}else try{history.pushState(null,"",a.hash)}catch(_){}
+  setTimeout(function(){window.scrollTo(0,0)},0)});
  if(d.readyState=="loading")d.addEventListener("DOMContentLoaded",go);else go();
 })();
 /* Light-mode legibility (AA): the restyled pages inherit many older text colors that were tuned for dark. In light mode only, after

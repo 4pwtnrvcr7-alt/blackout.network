@@ -21,6 +21,8 @@
  --bn-hover:rgba(255,255,255,.06);--bn-active:rgba(255,77,79,.10);--bn-scrim:rgba(0,0,0,.62);--bn-shadow:0 12px 40px rgba(0,0,0,.5);
  --bn-sev-lo:#2BB673;--bn-sev-md:#F5A524;--bn-sev-hi:#FF4D4F;--bn-seg-off:#252B33;
  --bn-rule-h:3px;--bn-icon:30px;
+ /* standalone / viewport-fit=cover: 0 in a browser tab, the status-bar inset when installed */
+ --bn-safe-top:env(safe-area-inset-top, 0px);
 }
 /* palette: brand A "Signal", light (WCAG AA on #F6F7F9: text 18:1, muted 5.6:1, brand red 4.6:1, link 5.6:1) */
 :root[data-theme="light"]{
@@ -96,6 +98,16 @@ html.bn-js .bn-drawer:target:not(.bn-open){visibility:hidden;pointer-events:none
 .bn-drawer:target .bn-panel,.bn-drawer.bn-open .bn-panel{transform:none}
 .bn-ph{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--bn-tbar-h);
  padding:0 calc(var(--bn-pad-x) - 8px) 0 var(--bn-pad-x);background:var(--bn-surface);border-bottom:1px solid var(--bn-line)}
+/* open menu: wordmark (home) + Close stay put, and sit below the status bar / notch */
+.bn-mbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box;
+ min-height:calc(var(--bn-tbar-h) + var(--bn-safe-top));padding:var(--bn-safe-top) max(calc(var(--bn-pad-x) - 8px),env(safe-area-inset-right)) 0 max(var(--bn-pad-x),env(safe-area-inset-left));
+ background:var(--bn-surface);border-bottom:1px solid var(--bn-line)}
+.bn-mbar .bn-logo{flex:1 1 auto;min-height:44px}
+.bn-mbar .bn-close{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;min-width:44px;min-height:44px;padding:0 10px;margin:0;border:0;border-radius:var(--bn-radius-sm);
+ background:transparent;color:var(--bn-text);cursor:pointer;text-decoration:none;font:500 14px/1 var(--bn-font-ui)}
+.bn-mbar .bn-close svg{width:20px;height:20px;display:block;flex:none}
+.bn-mbar .bn-close:hover{background:var(--bn-hover)}
+.bn-mhead .bn-ph,.bn-mbar + .bn-ph{position:relative;top:auto}
 .bn-dsearch{padding:14px var(--bn-pad-x) 2px}
 .bn-dfollow{display:flex;flex-direction:column;gap:0;padding:10px var(--bn-pad-x) 12px;border-top:1px solid var(--bn-line)}
 a.bn-follow.bn-follow-row{justify-content:flex-start;width:100%;padding:0;font-size:16px}
@@ -333,3 +345,10 @@ body header.bn-top.bn-f6{--bn-icon-w:31px}
 body header.bn-top.bn-f6 .bn-acts .bn-ib{width:31px!important}
 /* t397: the floating "report a problem" flag sat on top of the open Settings sheet (over the language picker) on phones */
 html:has(#bn_settings:not([hidden])) .bnr-fab{visibility:hidden}
+/* --bn-safe-top is env(safe-area-inset-top): 0 in a browser tab, the status-bar height when the site is
+   installed (viewport-fit=cover, black-translucent). The bar's own padding keeps the hamburger and the
+   theme toggle below the notch. In standalone, install-guide.css also pads the body; that would stack. */
+body header.bn-top{padding-top:var(--bn-safe-top)}
+@media (display-mode:standalone),(display-mode:fullscreen){
+ body:has(header.bn-top){padding-top:0!important}
+}

@@ -44,12 +44,17 @@ function init(){
   panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.setAttribute("aria-label","Site menu");panel.setAttribute("tabindex","-1");dr.setAttribute("aria-hidden","true");
   var focusables=function(){return $$('a[href],button:not([disabled]),input:not([disabled]),select,summary,[tabindex]:not([tabindex="-1"])',panel).filter(function(x){return x.offsetParent!==null||x===document.activeElement})};
   var setExp=function(v){$$('[aria-controls="bn-menu"]').forEach(function(b){b.setAttribute("aria-expanded",v?"true":"false")})};
+  var menuHist=false;
   window.bnMenuOpen=function(opts){opts=opts||{};if(dr.classList.contains("bn-open")){if(opts.search)focusSearch();return}lastFocus=document.activeElement;closePop();
    dr.classList.add("bn-open");dr.removeAttribute("aria-hidden");R.classList.add("bn-lock");setExp(true);
+   if(!menuHist){try{history.pushState({bnMenu:1},"");menuHist=true}catch(e){}}
    if(opts.search)focusSearch();else{var c=$(".bn-close",panel);(c||panel).focus({preventScroll:true})}};
-  window.bnMenuClose=function(noFocus){if(!dr.classList.contains("bn-open"))return;dr.classList.remove("bn-open");dr.setAttribute("aria-hidden","true");R.classList.remove("bn-lock");setExp(false);
-   if(location.hash==="#bn-menu")history.replaceState(null,"",location.pathname+location.search);
-   if(!noFocus){var f=lastFocus&&document.contains(lastFocus)&&lastFocus.offsetParent!==null?lastFocus:burger;if(f)try{f.focus({preventScroll:true})}catch(e){}}};
+  window.bnMenuClose=function(noFocus,opts){opts=opts||{};if(!dr.classList.contains("bn-open"))return false;dr.classList.remove("bn-open");dr.setAttribute("aria-hidden","true");R.classList.remove("bn-lock");setExp(false);
+   if(opts.replace){if(menuHist&&history.state&&history.state.bnMenu){try{history.replaceState(null,"",opts.replace)}catch(e){}}else try{history.pushState(null,"",opts.replace)}catch(e){}menuHist=false}
+   else if(menuHist&&!opts.fromPop&&history.state&&history.state.bnMenu){menuHist=false;try{history.back()}catch(e){}}
+   else{menuHist=false;if(location.hash==="#bn-menu")try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}}
+   if(!noFocus){var f=lastFocus&&document.contains(lastFocus)&&lastFocus.offsetParent!==null?lastFocus:burger;if(f)try{f.focus({preventScroll:true})}catch(e){}}return true};
+  addEventListener("popstate",function(){if(dr.classList.contains("bn-open"))bnMenuClose(false,{fromPop:true})});
   var focusSearch=function(){var i=document.getElementById("bns_q");if(i&&panel.contains(i)){i.focus();try{i.select()}catch(e){}}else{var c=$(".bn-close",panel);c&&c.focus()}};
   document.addEventListener("click",function(e){var t=e.target.closest&&e.target.closest("a,button");if(!t)return;
    if(t.matches(".bn-burger")){e.preventDefault();dr.classList.contains("bn-open")?bnMenuClose():bnMenuOpen();return}
@@ -99,8 +104,9 @@ function init(){
  // sidebar / bar links switch tabs in place
  function btn(k){return nav.querySelector('button[data-tab="'+k+'"]')}
  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[data-tab],.bn-primary a[data-tab]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
-  var k=a.dataset.tab;if(k.charAt(0)==="@")return;var b=btn(k);if(!b)return;e.preventDefault();if(a.hash&&a.hash!==location.hash)try{history.pushState(null,"",a.hash)}catch(_){}if(!b.classList.contains("on"))b.click();
-  if(window.bnMenuClose)bnMenuClose(true);window.scrollTo(0,0);var h=document.getElementById("bn_ptitle");if(h){h.setAttribute("tabindex","-1");try{h.focus({preventScroll:true})}catch(_){}}});
+  var k=a.dataset.tab;if(k.charAt(0)==="@")return;var b=btn(k);if(!b)return;e.preventDefault();
+  var dest=a.hash&&a.hash!==location.hash?a.hash:"";if(!(window.bnMenuClose&&bnMenuClose(true,dest?{replace:dest}:{}))&&dest)try{history.pushState(null,"",dest)}catch(_){}
+  if(!b.classList.contains("on"))b.click();window.scrollTo(0,0);var h=document.getElementById("bn_ptitle");if(h){h.setAttribute("tabindex","-1");try{h.focus({preventScroll:true})}catch(_){}}});
  // ---- one tab order (kept for add-ons that read the strip); tabs not listed in sitenav.py go at the end of the first group
  function el(t){if(t.key==="@scoring")return document.getElementById("tab_howscore");
   if(t.key.charAt(0)==="@"&&t.hash.charAt(0)==="/"){var id="tab_"+t.key.slice(1),a=document.getElementById(id);
