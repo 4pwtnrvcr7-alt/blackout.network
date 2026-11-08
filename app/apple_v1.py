@@ -312,7 +312,10 @@ def _board_html():
                 f'<div class="bna-mx" id="bna_mx_{k}" hidden><div data-f="x"></div><a class="bna-lnk" href="{href}">See full page</a></div></article>')
     out = ['<section class="bna-sec" id="bna_dash" aria-labelledby="bna_h_now"><div class="bna-wrap bna-sech"><h2 id="bna_h_now">Active Threat Monitoring</h2></div>']
     for g, title, sub, cards in BOARD:
-        out.append(f'<div class="bna-wrap bna-grp" data-g="{g}" role="group" aria-labelledby="bna_g_{g}"><div class="bna-gh"><h3 id="bna_g_{g}"><i aria-hidden="true"></i>{E(title)}</h3><p>{E(sub)}</p></div>'
+        links = ('<nav class="bna-group-links" aria-label="Nuclear reporting and preparedness">'
+                 '<a class="bna-lnk" href="/nuclear">Nuclear reporting</a>'
+                 '<a class="bna-lnk" href="/nuclear#prep">Nuclear Preparedness</a></nav>') if g == "cf" else ""
+        out.append(f'<div class="bna-wrap bna-grp" data-g="{g}" role="group" aria-labelledby="bna_g_{g}"><div class="bna-gh"><h3 id="bna_g_{g}"><i aria-hidden="true"></i>{E(title)}</h3><p>{E(sub)}</p>{links}</div>'
                    f'<div class="bna-mgrid">' + "".join(card(*c) for c in cards) + '</div></div>')
     out.append('</section>')
     return "".join(out)
@@ -474,12 +477,13 @@ def home_html(sn):
         cols += f'<div><h2>{E(label)}</h2><ul>{lis}</ul></div>'
     return f'''<div id="bna_home" class="bna" aria-label="Home">
 <h1 class="bna-vh">BLACKOUT.NETWORK</h1>
+{_board_html()}
 <section class="bna-sec" aria-labelledby="bna_h_latest"><div class="bna-wrap bna-sech"><h2 id="bna_h_latest">The latest. <span>Ranked as it happens.</span></h2>
 <div class="bna-arrows"><button type="button" class="bna-arw" data-dir="-1" aria-label="Scroll back" aria-controls="bna_row_latest">&lsaquo;</button><button type="button" class="bna-arw" data-dir="1" aria-label="Scroll forward" aria-controls="bna_row_latest">&rsaquo;</button></div></div>
 <div class="bna-row" id="bna_row_latest" tabindex="0" aria-label="Top of the Wire"></div>
 <p class="bna-wrap bna-more"><a class="bna-lnk" href="/#wire">Open The Wire</a></p></section>
 {_map_section()}
-{_board_html()}{_snap_js()}
+{_snap_js()}
 <section class="bna-sec bna-wrap"><div class="bna-brief"><div><h2>The Free brief. <span>The day, ranked.</span></h2><p>The highest-ranked events of the day, in one email.</p></div>
 <a class="bna-btn" href="/newsletter">Get the Free brief</a></div><p class="bna-asof" data-bna="asof"></p></section>
 <footer class="bna-foot"><div class="bna-wrap"><nav class="bna-cols" aria-label="Site">{cols}</nav>
