@@ -222,15 +222,27 @@ def story_map(points):
                     pix[y + dy][x + dx] = INK
         _text(pix, str(p.get("n") or ""), x - 3, y - 4, BG, 1)
         if cat not in legend: legend.append(cat)
-    # legend strip
-    lx = 8
+    # Legend under the map. Scale 4 is 28px tall; on a 390px phone the 640px image
+    # shows at about 358px, so the label is about 16px.
+    strip = 8 + 36 * 2
+    out = _blank(w, h + strip, BG)
+    for y in range(h):
+        out[y] = pix[y][:]
+    lx, row = 12, 0
     for cat in legend[:6]:
+        label = cat.replace("natural disaster", "disaster").replace("/", " ")[:16].upper()
+        need = 20 + len(label) * 24
+        if lx + need > w - 8:
+            row += 1
+            lx = 12
+            if row > 1: break
+        ly = h + 8 + row * 36
         col = CAT_COLOR.get(cat, MUTED)
-        for dy in range(6):
-            for dx in range(6):
-                if 0 <= 8 + dy < h and 0 <= lx + dx < w: pix[8 + dy][lx + dx] = col
-        lx = _text(pix, cat.replace("natural disaster", "disaster")[:18], lx + 10, 6, INK, 1) + 8
-    return png_bytes(pix)
+        for dy in range(16):
+            for dx in range(16):
+                if ly + dy < len(out) and lx + dx < w: out[ly + dy][lx + dx] = col
+        lx = _text(out, label, lx + 22, ly, INK, 4) + 18
+    return png_bytes(out)
 
 
 def section_plate(title):
@@ -334,6 +346,13 @@ def mark_hex(kind):
     return MARK.get(kind, MARK["other"])[1]
 
 
+def section_mark_html(kind, alt):
+    """40px navy panel, same treatment as a story icon, for a section heading."""
+    mark = img(symbol_src(kind), alt, 26, 26)
+    return (f'<td width="40" valign="middle" align="center" bgcolor="#121826" '
+            f'style="width:40px;background:#121826;border-radius:10px;padding:7px">{mark}</td>')
+
+
 def section_kind(title):
     t = title or ""
     if t.startswith("Near you") or t.startswith("Crime") or t.startswith("Watch:"): return "place"
@@ -407,19 +426,19 @@ def category_bars(counts):
     """counts: {category: n} for stories in this issue."""
     items = sorted(counts.items(), key=lambda kv: -kv[1])[:6]
     if not items: return None
-    w, h = 560, 28 + 22 * len(items)
+    w, h = 640, 40 + 36 * len(items)
     pix = _blank(w, h, (14, 16, 20))
-    _text(pix, "STORIES BY CATEGORY", 12, 6, GOLD, 1)
+    _text(pix, "STORIES BY CATEGORY", 12, 8, GOLD, 3)
     mx = max(n for _, n in items) or 1
     for i, (cat, n) in enumerate(items):
-        y = 24 + i * 22
-        _text(pix, cat.replace("natural disaster", "disaster")[:16], 8, y, INK, 1)
+        y = 40 + i * 36
+        _text(pix, cat.replace("natural disaster", "disaster").replace("/", " ")[:16], 8, y, INK, 3)
         col = CAT_COLOR.get(cat, MUTED)
         bw = int(280 * n / mx)
-        for dy in range(10):
-            for x in range(150, 150 + max(bw, 4)):
-                if x < w: pix[y + dy][x] = col
-        _text(pix, str(n), 150 + max(bw, 4) + 6, y, GOLD, 1)
+        for dy in range(14):
+            for x in range(250, 250 + max(bw, 6)):
+                if x < w - 36: pix[y + dy][x] = col
+        _text(pix, str(n), 250 + max(bw, 6) + 8, y, GOLD, 3)
     return png_bytes(pix)
 
 

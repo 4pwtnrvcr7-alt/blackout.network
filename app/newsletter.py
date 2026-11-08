@@ -1276,14 +1276,23 @@ def meter_html(rank, big=False, rank_from=None):
             f'<td style="padding:0 0 0 8px;white-space:nowrap;vertical-align:middle"><span class="bnt" style="font:600 {fs}px/1 {FH};color:{PAL["tx"]}">{rk}</span>'
             f'<span class="bnm" style="font:700 {round(fs * .62)}px/1 {FH};color:{PAL["mu"]}">/10</span>{chg}</td></tr></table>')
 
+def _shown_stories(issue):
+    """The order the cards are numbered in. Story 1 is the first of these."""
+    out = []
+    for sec in ("near", "main", "politics", "notable", "updates", "follow"):
+        out.extend(issue.get(sec) or [])
+    if out: return out
+    leads = [it for it in (issue.get("developing") or []) if it.get("lead")]
+    return leads or list(issue.get("developing") or []) or list(issue.get("watchlist") or [])
+
 def subject_for(issue):
-    """Names the top story. 'Evening Brief, Nov 8: Iran lifts missile range limit + 2 more'."""
+    """Names story 1, the first card, using its analyst-note headline when there is one."""
     d = issue["end"].astimezone(ET).strftime("%b %-d"); lab = slot_label(issue["slot"])
-    pool = _story_pool(issue)
-    if not pool:
+    shown = _shown_stories(issue)
+    if not shown:
         return f"{lab} Brief, {d}: {MATTERS}"
-    title = _cut(card_headline(pool[0]), 72).rstrip(" .")
-    extra = len(pool) - 1
+    title = _cut(card_headline(shown[0]), 72).rstrip(" .")
+    extra = len(_story_pool(issue)) - 1
     return f"{lab} Brief, {d}: {title}" + (f" + {extra} more" if extra else "")
 
 def follow_links(row, cid, c=None):
@@ -1580,17 +1589,17 @@ def _head_html(kicker, kcol, line2, rng):
 
 _SECCOL = {"#e6e9ee": ("bnt", PAL["tx"]), "green": ("bnt", PAL["tx"]), "amber": ("bnt", PAL["tx"]), "red": ("bnt", PAL["tx"])}
 def _sec_html(title, sub_, col="#e6e9ee"):
-    """Compact section row: a 36px symbol beside a live heading. No full-width plate."""
+    """Section row: the same navy panel as a story, smaller, beside a live heading."""
     try:
         import newsletter_art as ART
-        mark = ART.img(ART.symbol_src(ART.section_kind(title)), f"Section {title}", 36, 36)
+        mark = ART.section_mark_html(ART.section_kind(title), f"Section {title}")
     except Exception:
         mark = ""
     sub = f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:2px">{E(sub_)}</div>' if sub_ else ""
     return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:24px 16px 8px 16px;background:{PAL["bg"]};text-align:left">'
             f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
-            f'<td width="36" valign="middle" style="width:36px;padding:0 8px 0 0">{mark}</td>'
-            f'<td valign="middle" style="font:700 20px/25px {FACE};color:{PAL["tx"]}">{E(title)}{sub}</td>'
+            f'{mark}'
+            f'<td valign="middle" style="padding:0 0 0 10px;font:700 20px/25px {FACE};color:{PAL["tx"]}">{E(title)}{sub}</td>'
             f'</tr></table></td></tr>')
 
 def _number_map(issue):
@@ -1713,7 +1722,7 @@ def render(issue, links, c=None):
         a(_sec_html("Stories you follow", "Updates on stories you chose to follow: only what is new since your last brief.", "green"))
         for it in issue["follow"]: a(_item_html(it, links, c))
     if issue["main"]:
-        a(_sec_html("Top threats", f"New since your last brief. Rank {rr['rank']}+ and confirmed by {rr['sources']}+ independent sources, highest first."))
+        a(_sec_html("Top threats", "New since your last brief, highest rank first."))
         for it in issue["main"]: a(_item_html(it, links, c))
     if issue.get("politics"):
         a(_sec_html("Politics & Government", "Government actions, emergency declarations, sanctions and political crises, confirmed by 2+ independent sources."))

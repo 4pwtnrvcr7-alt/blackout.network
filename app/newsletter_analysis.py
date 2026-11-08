@@ -1081,10 +1081,10 @@ def html_section(analysis, base_url="https://blackout.network"):
         rows = "".join(_p(_e(p)) for p in analysis["notes_patterns"])
         try:
             import newsletter_art as ART
-            mark = ART.img(ART.symbol_src("other"), "Section Patterns", 36, 36)
+            mark = ART.section_mark_html("other", "Section Patterns")
             head = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
-                    f'<td width="36" valign="middle" style="width:36px;padding:0 8px 0 0">{mark}</td>'
-                    f'<td valign="middle" style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</td></tr></table>')
+                    f'{mark}'
+                    f'<td valign="middle" style="padding:0 0 0 10px;font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</td></tr></table>')
         except Exception:
             head = f'<div style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</div>'
         parts.append('<tr><td class="bnpad" bgcolor="#0B0C0F" style="padding:24px 16px 8px 16px;background:#0B0C0F">' + head + '</td></tr>')
@@ -1099,10 +1099,10 @@ def html_section(analysis, base_url="https://blackout.network"):
                            f"Analysis: {_e(p['name'])} is named across these separate clusters, and each item’s danger read stays its own rank and sourced figures."))
         try:
             import newsletter_art as ART
-            mark = ART.img(ART.symbol_src(ART.section_kind("Patterns")), "Section Patterns", 36, 36)
+            mark = ART.section_mark_html(ART.section_kind("Patterns"), "Section Patterns")
             pplate = (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
-                      f'<td width="36" valign="middle" style="width:36px;padding:0 8px 0 0">{mark}</td>'
-                      f'<td valign="middle" style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</td></tr></table>')
+                      f'{mark}'
+                      f'<td valign="middle" style="padding:0 0 0 10px;font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</td></tr></table>')
         except Exception:
             pplate = f'<div style="font:700 20px/25px {FH};color:{TX}">Patterns we’re watching</div>'
         parts.append('<tr><td class="bnpad" style="padding:22px 20px 6px 20px">' + pplate + '</td></tr>')
