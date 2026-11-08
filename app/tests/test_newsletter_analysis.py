@@ -612,6 +612,13 @@ class Topics(unittest.TestCase):
         self.assertEqual(ART.event_kind("Surveillance law expands warrantless collection", "political"), "surveillance")
         self.assertEqual(ART.event_kind("Mass protests over emergency powers", "political"), "protest")
         self.assertEqual(ART.event_kind("Border security surge at the southern border", "political"), "border")
+        self.assertEqual(ART.event_kind("North Korea tests a nuclear warhead", "war/conflict"), "nuclear")
+        self.assertEqual(ART.event_kind("Ballistic missile launch", "war/conflict"), "missile")
+        icon = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "newsletter", "icons")
+        self.assertTrue(os.path.exists(os.path.join(icon, "LICENSE")))
+        with open(os.path.join(icon, "missile.png"), "rb") as fh:
+            raw = fh.read()
+        self.assertEqual(raw[16:24], b"\x00\x00\x00\x90\x00\x00\x00\x90")  # 144×144
         root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "newsletter", "engraved")
         for name in ("banner-politics", "banner-threats", "scene-storm", "scene-rights", "scene-surveillance", "scene-protest", "scene-missile"):
             path = os.path.join(root, name + ".png")

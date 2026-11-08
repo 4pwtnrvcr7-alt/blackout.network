@@ -285,6 +285,8 @@ MARK = {
     "border": ((186, 176, 146), "#BAB092"),
     "place": ((244, 241, 232), "#F4F1E8"),
     "other": ((255, 194, 26), "#FFC21A"),
+    "nuclear": ((214, 176, 96), "#D6B060"),
+    "terror": ((196, 122, 96), "#C47A60"),
 }
 
 
@@ -319,113 +321,13 @@ def _ring(pix, cx, cy, r, color, w):
     _disk(pix, cx, cy, max(1, r - w), TILE)
 
 
+ICON_DIR = os.path.join(BASE, "static", "newsletter", "icons")
+
 def symbol_png(kind):
-    """144×144 symbol-only PNG. The mark fills the tile; the caller shows it at 72px."""
-    color, _hex = MARK.get(kind, MARK["other"])
-    pix = _blank(144, 144, TILE)
-    if kind == "missile":
-        x0, y0, x1, y1 = 46, 104, 96, 54
-        dx, dy = x1 - x0, y1 - y0
-        length = math.hypot(dx, dy) or 1
-        ux, uy = dx / length, dy / length
-        px, py, w = -uy, ux, 11
-        _poly(pix, [(x0 + px * w, y0 + py * w), (x0 - px * w, y0 - py * w),
-                    (x1 - px * w, y1 - py * w), (x1 + px * w, y1 + py * w)], color)
-        _poly(pix, [(x1 + px * w, y1 + py * w), (x1 + ux * 34, y1 + uy * 34), (x1 - px * w, y1 - py * w)], color)
-        _poly(pix, [(x0 + px * w, y0 + py * w), (x0 - ux * 6 + px * 30, y0 - uy * 6 + py * 30),
-                    (x0 - ux * 18 + px * w, y0 - uy * 18 + py * w)], color)
-        _poly(pix, [(x0 - px * w, y0 - py * w), (x0 - ux * 6 - px * 30, y0 - uy * 6 - py * 30),
-                    (x0 - ux * 18 - px * w, y0 - uy * 18 - py * w)], color)
-    elif kind == "conflict":
-        for y in (40, 72, 104):
-            _poly(pix, [(22, y - 16), (68, y - 16), (118, y), (68, y + 16), (22, y + 16), (46, y)], color)
-    elif kind == "politics":
-        _poly(pix, [(24, 54), (72, 18), (120, 54)], color)
-        for x in (34, 62, 90): _rect(pix, x, 54, x + 16, 116, color)
-        _rect(pix, 22, 116, 122, 128, color)
-    elif kind == "outbreak":
-        _rect(pix, 58, 18, 86, 126, color)
-        _rect(pix, 18, 58, 126, 86, color)
-    elif kind == "quake":
-        pts = [(16, 78), (40, 28), (62, 112), (86, 22), (108, 118), (130, 62)]
-        for a, b in zip(pts, pts[1:]): _thick(pix, a[0], a[1], b[0], b[1], color, 7)
-    elif kind == "storm":
-        _disk(pix, 52, 78, 28, color); _disk(pix, 84, 68, 34, color); _disk(pix, 108, 84, 22, color)
-        _rect(pix, 36, 86, 118, 108, color)
-    elif kind == "flood":
-        for i, y in enumerate((48, 78, 108)):
-            prev = None
-            band = []
-            for x in range(16, 129):
-                yy = y + int(math.sin((x + i * 18) / 9) * 8)
-                if prev: _thick(pix, prev[0], prev[1], x, yy, color, 5)
-                prev = (x, yy)
-            del band
-    elif kind == "fire":
-        _disk(pix, 56, 92, 30, color)
-        _disk(pix, 90, 94, 28, color)
-        _poly(pix, [(72, 14), (112, 100), (32, 100)], color)
-        _rect(pix, 40, 88, 104, 122, color)
-    elif kind == "grid":
-        _poly(pix, [(78, 12), (46, 74), (70, 74), (52, 132), (104, 60), (78, 60)], color)
-    elif kind == "cyber":
-        for cx, cy in ((40, 44), (104, 44), (72, 104)): _disk(pix, cx, cy, 16, color)
-        _thick(pix, 40, 44, 104, 44, color, 5)
-        _thick(pix, 40, 44, 72, 104, color, 5)
-        _thick(pix, 104, 44, 72, 104, color, 5)
-    elif kind == "space":
-        _ring(pix, 72, 72, 46, color, 6)
-        _disk(pix, 112, 40, 8, color)
-        _rect(pix, 104, 28, 120, 36, color)
-    elif kind == "financial":
-        _rect(pix, 24, 88, 48, 124, color)
-        _rect(pix, 60, 60, 84, 124, color)
-        _rect(pix, 96, 28, 120, 124, color)
-    elif kind == "rights":
-        _thick(pix, 24, 40, 120, 40, color, 4)
-        _poly(pix, [(72, 36), (58, 78), (86, 78)], color)
-        _thick(pix, 36, 40, 28, 78, color, 3)
-        _thick(pix, 108, 40, 116, 78, color, 3)
-        _disk(pix, 28, 96, 18, color); _disk(pix, 116, 96, 18, color)
-    elif kind == "surveillance":
-        _poly(pix, [(16, 72), (72, 36), (128, 72), (72, 108)], color)
-        _disk(pix, 72, 72, 16, TILE)
-        _disk(pix, 72, 72, 8, color)
-    elif kind == "protest":
-        for x in (36, 72, 108):
-            _disk(pix, x, 40, 12, color)
-            _poly(pix, [(x - 16, 124), (x - 10, 62), (x + 10, 62), (x + 16, 124)], color)
-    elif kind == "border":
-        _rect(pix, 22, 28, 38, 122, color)
-        _rect(pix, 106, 28, 122, 122, color)
-        _rect(pix, 22, 28, 122, 44, color)
-        _rect(pix, 22, 78, 122, 90, color)
-    elif kind == "place":
-        _disk(pix, 72, 52, 28, color)
-        _poly(pix, [(72, 126), (46, 68), (98, 68)], color)
-        _disk(pix, 72, 52, 10, TILE)
-    else:
-        _poly(pix, [(72, 16), (128, 72), (72, 128), (16, 72)], color)
-    return png_bytes(_emphasize(pix))
-
-
-def _emphasize(pix, fill=0.9):
-    """Scale the ink up so a 72px slot reads as a mark, not a speck in a corner."""
-    h, w = len(pix), len(pix[0])
-    ys = [y for y in range(h) if any(pix[y][x] != TILE for x in range(w))]
-    xs = [x for x in range(w) if any(pix[y][x] != TILE for y in range(h))]
-    if not xs or not ys: return pix
-    x0, x1, y0, y1 = min(xs), max(xs) + 1, min(ys), max(ys) + 1
-    cw, ch = max(1, x1 - x0), max(1, y1 - y0)
-    side = max(8, int(min(w, h) * fill))
-    out = _blank(w, h, TILE)
-    ox, oy = (w - side) // 2, (h - side) // 2
-    for y in range(side):
-        sy = min(h - 1, y0 + int(y * ch / side))
-        for x in range(side):
-            sx = min(w - 1, x0 + int(x * cw / side))
-            out[oy + y][ox + x] = pix[sy][sx]
-    return out
+    """144×144 Material Symbols glyph (2× for a 72px slot). Transparent, gold, no baked background."""
+    path = os.path.join(ICON_DIR, (kind if os.path.exists(os.path.join(ICON_DIR, kind + ".png")) else "other") + ".png")
+    with open(path, "rb") as fh:
+        return fh.read()
 
 
 def mark_hex(kind):
@@ -523,6 +425,8 @@ def category_bars(counts):
 
 def event_kind(title, category):
     t = (title or "").lower()
+    if re_nuclear(t): return "nuclear"
+    if re_terror(t): return "terror"
     if re_missile(t): return "missile"
     if re_quake(t): return "quake"
     if "flood" in t: return "flood"
@@ -545,6 +449,12 @@ def event_kind(title, category):
 
 
 def re_missile(t): return "missile" in t or "ballistic" in t
+def re_nuclear(t):
+    import re
+    return re.search(r"\b(?:nuclear|warhead|radioactive|atomic)\b", t) is not None
+def re_terror(t):
+    import re
+    return re.search(r"\b(?:terror(?:ist|ism)?|bombing)\b", t) is not None
 def re_quake(t):
     import re
     return re.search(r"earthquake|\bquake\b|\bmagnitude\b|\bm\s*[4-9](?:\.\d)?\b", t) is not None

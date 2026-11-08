@@ -1401,6 +1401,7 @@ _KIND_LABEL = {
     "fire": "Fire", "outbreak": "Outbreak", "grid": "Power and grid", "cyber": "Cyber", "space": "Space weather",
     "politics": "Politics", "financial": "Economy", "rights": "Rights", "surveillance": "Surveillance",
     "protest": "Unrest", "border": "Border", "place": "Place", "other": "Report",
+    "nuclear": "Nuclear", "terror": "Terror",
 }
 
 def _story_open():
@@ -1462,7 +1463,7 @@ def _band_html(it):
     meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:6px;white-space:nowrap">{E(_one_line(" · ".join(bits), 38))}</div>' if bits else "")
     band, panel = _mix(rail, "#12161A", 0.20), _mix(rail, "#1B2933", 0.55)
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{band}" style="background:{band}"><tr>'
-            f'<td width="104" valign="middle" align="center" bgcolor="{panel}" style="width:104px;background:{panel};padding:20px 8px">{mark}</td>'
+            f'<td width="104" valign="middle" align="center" bgcolor="{panel}" style="width:104px;background:{panel};padding:18px 12px;border-radius:18px">{mark}</td>'
             f'<td valign="middle" bgcolor="{band}" style="padding:16px 12px;background:{band};font-family:{FACE}">'
             f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
             f'<td valign="middle" style="font:700 16px/20px {FACE};color:{PAL["tx"]}">{E(label)}{E(flag)}</td>'
