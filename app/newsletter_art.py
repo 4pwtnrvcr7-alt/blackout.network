@@ -406,7 +406,26 @@ def symbol_png(kind):
         _disk(pix, 72, 52, 10, TILE)
     else:
         _poly(pix, [(72, 16), (128, 72), (72, 128), (16, 72)], color)
-    return png_bytes(pix)
+    return png_bytes(_emphasize(pix))
+
+
+def _emphasize(pix, fill=0.9):
+    """Scale the ink up so a 72px slot reads as a mark, not a speck in a corner."""
+    h, w = len(pix), len(pix[0])
+    ys = [y for y in range(h) if any(pix[y][x] != TILE for x in range(w))]
+    xs = [x for x in range(w) if any(pix[y][x] != TILE for y in range(h))]
+    if not xs or not ys: return pix
+    x0, x1, y0, y1 = min(xs), max(xs) + 1, min(ys), max(ys) + 1
+    cw, ch = max(1, x1 - x0), max(1, y1 - y0)
+    side = max(8, int(min(w, h) * fill))
+    out = _blank(w, h, TILE)
+    ox, oy = (w - side) // 2, (h - side) // 2
+    for y in range(side):
+        sy = min(h - 1, y0 + int(y * ch / side))
+        for x in range(side):
+            sx = min(w - 1, x0 + int(x * cw / side))
+            out[oy + y][ox + x] = pix[sy][sx]
+    return out
 
 
 def mark_hex(kind):
@@ -643,7 +662,7 @@ def trend_word(trajectory):
     return "STEADY"
 
 
-def trend_lozenge_html(trajectory, detail=""):
+def trend_lozenge_html(trajectory, detail="", inline=False):
     """Live-text trend badge. The word is the meaning; the colour only reinforces it."""
     word = trend_word(trajectory)
     if word == "UPTREND":
@@ -653,11 +672,13 @@ def trend_lozenge_html(trajectory, detail=""):
     else:
         bg, fg, arrow = "#3A3D44", "#F5F5F7", "→"
     face = "Inter,Arial,Helvetica,sans-serif"
+    pill = (f'<span style="display:inline-block;background:{bg};color:{fg};font:700 15px/20px {face};'
+            f'padding:6px 10px;border-radius:999px">{arrow}&nbsp;{word}</span>')
+    if inline: return pill
     extra = ""
     if detail:
         extra = f'<div style="font:400 14px/19px {face};color:#C4CDD2;margin-top:6px">{html.escape(detail)}</div>'
-    return (f'<div style="margin-top:8px"><span style="display:inline-block;background:{bg};color:{fg};'
-            f'font:700 15px/20px {face};padding:8px 12px;border-radius:999px">{arrow}&nbsp;{word}</span></div>{extra}')
+    return f'<div style="margin-top:8px">{pill}</div>{extra}'
 
 
 def trend_badge_html(trajectory, detail):

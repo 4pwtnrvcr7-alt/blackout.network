@@ -868,6 +868,42 @@ def tighten_title(t):
     out = t[:cut].strip(" .") if cut > 24 else t
     return re.sub(r"\s+[A-Z]$", "", out)
 
+_DANGLING = set("a an the of and or to in on for with from as at by into over after amid its their".split())
+
+def _fit_headline(t, n=90):
+    """One headline, at most n characters, cut on a word and not on a dangling fragment."""
+    t = clean_title(t)
+    t = re.split(r"\s+\|\s+|\s+->\s+|>>", t, maxsplit=1)[0].strip(" -|")
+    sent = re.match(r"^(.{20,}?[.!?])(?:\s|$)", t)
+    if sent and len(sent.group(1)) <= n:
+        t = sent.group(1).rstrip()
+    if len(t) > n:
+        chunk = t[:n + 1]
+        sp = chunk.rfind(" ")
+        t = chunk[:sp] if sp >= 24 else t[:n]
+        for sep in (", ", " as ", " while ", " after ", " and "):
+            idx = t.rfind(sep)
+            if idx >= 40:
+                t = t[:idx]
+                break
+    words = t.split()
+    while len(words) > 3 and words[-1].lower().strip(".,;:!?-") in _DANGLING:
+        words.pop()
+    return " ".join(words).rstrip(" .,;:-")
+
+def _first_sentence(t, n=150):
+    t = re.sub(r"\s+", " ", t or "").strip()
+    m = re.match(r"^(.+?[.!?])(?:\s|$)", t)
+    s = m.group(1).strip() if m else t
+    return s if len(s) <= n else _fit_headline(s, n)
+
+def card_headline(it):
+    """Analyst note headline when we have one. Otherwise a short headline, about three lines at 390px."""
+    note = (it.get("display_title") or "").strip()
+    if note:
+        return _fit_headline(note, 90)
+    return _fit_headline(it.get("title") or "", 90)
+
 def item_of(r, section, official=0, editorial=False):
     fams = _fams(r); eff = int(r["eff_families"] or 0)
     t = parse_t(r["event_time"]) or parse_t(r["first_seen"])
@@ -1130,6 +1166,8 @@ def _attach_analysis(issue, at, c=None):
                     if a.get("card_confidence"):
                         it["confidence"] = a["card_confidence"]
                         if a.get("card_unconfirmed") is not None: it["unconfirmed"] = a["card_unconfirmed"]
+                    if not a.get("takeaway") and it.get("why"):
+                        a["takeaway"] = _first_sentence(it["why"])
                 if not it.get("trend_from_history") and not (it.get("analyst") or {}).get("from_note") and preview:
                     it["trajectory"] = it.get("trajectory") or "Steady"
                     it["trend_detail"] = "trend data loading"
@@ -1244,7 +1282,7 @@ def subject_for(issue):
     pool = _story_pool(issue)
     if not pool:
         return f"{lab} Brief, {d}: {MATTERS}"
-    title = _cut(_short(pool[0].get("title") or "", 200), 72).rstrip(" .")
+    title = _cut(card_headline(pool[0]), 72).rstrip(" .")
     extra = len(pool) - 1
     return f"{lab} Brief, {d}: {title}" + (f" + {extra} more" if extra else "")
 
@@ -1374,19 +1412,37 @@ def _story_body():
     return (f'</td></tr><tr><td class="bncard" bgcolor="{PAL["surf"]}" style="padding:12px 16px 16px 16px;background:{PAL["surf"]};'
             f'color:{PAL["tx"]};word-break:break-word;overflow-wrap:anywhere">')
 
+def _mix(hex_color, toward="#12161A", t=0.22):
+    def parts(h):
+        h = (h or "#000000").lstrip("#")
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+    a, b = parts(hex_color), parts(toward)
+    m = tuple(int(a[i] * t + b[i] * (1 - t)) for i in range(3))
+    return "#{:02X}{:02X}{:02X}".format(*m)
+
+def _one_line(s, n=36):
+    s = re.sub(r"\s+", " ", s or "").strip()
+    if len(s) <= n: return s
+    cut = s[:n + 1].rsplit(" ", 1)[0].rstrip(" .,;:-")
+    return (cut or s[:n].rstrip()) + "…"
+
+def _band_when(d):
+    if not d: return ""
+    l = d.astimezone(ET)
+    return l.strftime("%b %-d, %-I:%M %p ") + (l.tzname() or "ET")
+
 def _band_html(it):
-    """Full-width header: symbol and the live facts share one row. No empty plate."""
-    kind, mark, rail = "other", "", PAL["ac"]
+    """Compact band: a bold symbol on a category-tinted panel, facts in a grid beside it."""
+    kind, mark, rail, trend = "other", "", PAL["ac"], ""
     try:
         import newsletter_art as ART
         kind = ART.event_kind(it.get("title"), it.get("category"))
         mark = ART.img(ART.symbol_src(kind), "", 72, 72)
         rail = ART.mark_hex(kind)
         traj = it.get("trajectory") or (it.get("analyst") or {}).get("trajectory") or "Steady"
-        detail = it.get("trend_detail") or (it.get("analyst") or {}).get("trend_detail") or ""
-        trend = ART.trend_lozenge_html(traj, detail)
+        trend = ART.trend_lozenge_html(traj, inline=True)
     except Exception:
-        trend = ""
+        pass
     label = _KIND_LABEL.get(kind) or (it.get("category") or "Report")
     if it.get("rank") is None:
         sev_html = ""
@@ -1400,17 +1456,18 @@ def _band_html(it):
     if it.get("update"): flags.append("Update")
     if it.get("editorial") or it.get("section") == "watchlist": flags.append("Unconfirmed")
     flag = (" · " + " · ".join(flags)) if flags else ""
-    meta = []
-    if it.get("where"): meta.append(_where(it))
-    if it.get("when"): meta.append(when_str(it["when"]))
-    meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:8px">{E(" · ".join(meta))}</div>' if meta else "")
-    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{PAL["band"]}" style="background:{PAL["band"]}"><tr>'
-            f'<td width="4" bgcolor="{rail}" style="width:4px;background:{rail};font-size:0;line-height:0">&nbsp;</td>'
-            f'<td width="72" valign="middle" bgcolor="{PAL["band"]}" style="width:72px;padding:12px 0 12px 12px;background:{PAL["band"]}">{mark}</td>'
-            f'<td valign="middle" bgcolor="{PAL["band"]}" style="padding:12px 12px 12px 8px;background:{PAL["band"]};font-family:{FACE}">'
-            f'<div style="font:700 16px/20px {FACE};color:{PAL["tx"]}">{E(label)}{E(flag)}</div>'
-            f'{sev_html}'
-            f'{trend}{meta_html}</td></tr></table>')
+    place = (it.get("where") or "").strip()
+    if place and it.get("approx") and "approx" not in place.lower(): place += " (approx.)"
+    bits = [b for b in (place, _band_when(it.get("when"))) if b]
+    meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:6px;white-space:nowrap">{E(_one_line(" · ".join(bits), 38))}</div>' if bits else "")
+    band, panel = _mix(rail, "#12161A", 0.20), _mix(rail, "#1B2933", 0.55)
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{band}" style="background:{band}"><tr>'
+            f'<td width="104" valign="middle" align="center" bgcolor="{panel}" style="width:104px;background:{panel};padding:20px 8px">{mark}</td>'
+            f'<td valign="middle" bgcolor="{band}" style="padding:16px 12px;background:{band};font-family:{FACE}">'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
+            f'<td valign="middle" style="font:700 16px/20px {FACE};color:{PAL["tx"]}">{E(label)}{E(flag)}</td>'
+            f'<td valign="middle" align="right" style="text-align:right;white-space:nowrap">{trend}</td></tr></table>'
+            f'{sev_html}{meta_html}</td></tr></table>')
 
 def _item_html(it, links, c):
     url = wire_url(it["cluster_id"], c=c); u = it.get("update")
@@ -1422,7 +1479,7 @@ def _item_html(it, links, c):
     except Exception:
         block = ""
     H = [_story_open() + _band_html(it) + _story_body()
-         + f'<div style="margin:0"><a href="{E(url)}" class="bnt bnh1" style="font:700 24px/29px {FACE};color:{PAL["tx"]};text-decoration:none">{num}{E(it.get("title") or "")}</a></div>']
+         + f'<div style="margin:0"><a href="{E(url)}" class="bnt bnh1" style="font:700 24px/29px {FACE};color:{PAL["tx"]};text-decoration:none">{num}{E(card_headline(it))}</a></div>']
     H.append(_visuals_html(it, url, c))
     if u:
         bits = []
@@ -1592,7 +1649,7 @@ def _matters_html(issue):
     bits = []
     for i, it in enumerate(_story_pool(issue)[:3], 1):
         why = _why_line(it)
-        bits.append(f'<p class="bnt" style="margin:12px 0 0 0;font:400 17px/26px {FACE};color:{PAL["tx"]}"><b style="font-weight:700">{i}. {E(it.get("title") or "")}</b>'
+        bits.append(f'<p class="bnt" style="margin:12px 0 0 0;font:400 17px/26px {FACE};color:{PAL["tx"]}"><b style="font-weight:700">{i}. {E(card_headline(it))}</b>'
                     + (f' — {E(why)}' if why else "") + "</p>")
     return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:0 20px 8px 20px;background:{PAL["bg"]}">'
             f'<div class="bns" style="background:{PAL["surf"]};border-radius:18px;padding:20px 22px;color:{PAL["tx"]}">'
@@ -1610,7 +1667,7 @@ def _text_item(it, n):
         tags = [f"RANK {it['rank']}/10 {(it.get('tier') or '').upper()}", it["category"]]
     tags += (["BREAKING"] if it.get("breaking") else []) + (["UPDATE"] if u else []) + \
            (["UNCONFIRMED"] if it["editorial"] or it["section"] == "watchlist" else [])
-    T.append(f"{n}. [{' · '.join(tags)}] {_cut(it['title'], 200)}")
+    T.append(f"{n}. [{' · '.join(tags)}] {card_headline(it)}")
     if u:
         bits = []
         if u["rank_from"] is not None and u["rank_from"] != u["rank_to"]: bits.append(f"Rank {u['rank_from']} -> {u['rank_to']}.")
@@ -3155,7 +3212,7 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
     return 404, {"error": "not found"}
 
 
-def render_preview_html(notes, out, at=None):
+def render_preview_html(notes, out, at=None, clean=False):
     """Write one preview HTML from the public cluster API plus an analyst notes file. Does not send."""
     import tempfile, urllib.request
     at = at or now()
@@ -3206,7 +3263,7 @@ def render_preview_html(notes, out, at=None):
              "categories": "https://blackout.network/newsletter", "sources": "https://blackout.network/sources",
              "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
     _subj, html, _text = render(issue, links)
-    if live:
+    if live and not clean:
         banner = ('<div style="background:#FFC21A;color:#0B0C0F;font:600 14px/1.45 Inter,system-ui,sans-serif;padding:12px 16px">'
                   'Preview only. Live cluster snapshot from blackout.network/api/state. Nothing was emailed.</div>')
         html = html.replace("<body ", banner + "<body ", 1)
@@ -3218,18 +3275,19 @@ def render_preview_html(notes, out, at=None):
 
 def _cli(argv):
     if len(argv) < 2 or argv[1] != "render-preview":
-        print("usage: python3 newsletter.py render-preview --notes FILE --out HTML", file=sys.stderr)
+        print("usage: python3 newsletter.py render-preview --notes FILE --out HTML [--clean]", file=sys.stderr)
         return 2
-    notes, out = None, None
+    notes, out, clean = None, None, False
     i = 2
     while i < len(argv):
         if argv[i] == "--notes" and i + 1 < len(argv): notes = argv[i + 1]; i += 2
         elif argv[i] == "--out" and i + 1 < len(argv): out = argv[i + 1]; i += 2
+        elif argv[i] == "--clean": clean = True; i += 1
         else: i += 1
     if not notes or not out:
-        print("usage: python3 newsletter.py render-preview --notes FILE --out HTML", file=sys.stderr)
+        print("usage: python3 newsletter.py render-preview --notes FILE --out HTML [--clean]", file=sys.stderr)
         return 2
-    return render_preview_html(notes, out)
+    return render_preview_html(notes, out, clean=clean)
 
 
 if __name__ == "__main__":

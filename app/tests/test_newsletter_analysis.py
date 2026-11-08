@@ -598,6 +598,8 @@ class Topics(unittest.TestCase):
         self.assertIn(NL.share_text(issue).split("\n", 1)[0], text)
         _assert_no_empty_framing(self, subj, html, text, NL.share_text(issue))
         self.assertIn('width="72"', html)
+        self.assertLessEqual(len(NL.card_headline({"title": "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles. As with the attack on the Southern Bridge, the missile penetrated the roadway completely. However, it remains unclear whether the damage is severe enough"})), 90)
+        self.assertEqual(NL.card_headline({"title": "raw scanner text that goes on and on", "display_title": "Russian ballistic missiles damage Kyiv's Northern Bridge"}), "Russian ballistic missiles damage Kyiv's Northern Bridge")
         self.assertIn("Section Top threats", html)
         self.assertNotIn('height="315"', html)
         self.assertIn("UPTREND", html)

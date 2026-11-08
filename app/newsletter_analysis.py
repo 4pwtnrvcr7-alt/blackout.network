@@ -916,7 +916,10 @@ def _overlay_notes(issue, at, base):
                 (issue.get("analysis") or {}).setdefault("items", []).append(packed)
                 slot = packed
             it["from_note"] = True
-            if note.get("why_it_matters"): it["why"] = note["why_it_matters"]
+            if note.get("headline"): it["display_title"] = note["headline"].strip()
+            if note.get("why_it_matters"):
+                it["why"] = note["why_it_matters"]
+                slot["takeaway"] = note["why_it_matters"].strip()
             it["trajectory"] = traj
             it["trend_detail"] = ""
             it["trend_from_history"] = True
@@ -924,11 +927,39 @@ def _overlay_notes(issue, at, base):
 
 
 def _p(html):
-    return f'<p style="margin:0 0 16px 0;font:400 17px/26px {FB};color:{BODY}">{html}</p>'
+    return f'<p style="margin:0 0 22px 0;font:400 17px/26px {FB};color:{BODY}">{html}</p>'
 
 
 def _lbl(t):
-    return f'<span style="display:block;font:700 14px/19px {FH};color:{TX};margin:0 0 4px 0">{t}</span>'
+    return f'<span style="display:block;font:700 14px/19px {FH};color:{TX};margin:0 0 8px 0">{t}</span>'
+
+
+def _dek(s, n=78):
+    """A short bold lead for ANALYSIS. One or two lines at phone width, cut on a word."""
+    s = re.sub(r"\s+", " ", s or "").strip()
+    if len(s) <= n: return s
+    head = s[:n + 1]
+    for sep in (", ", " as ", " while ", " after ", " and "):
+        idx = head.rfind(sep)
+        if idx >= 36:
+            return head[:idx].rstrip(" .,;:-")
+    sp = head.rfind(" ")
+    return (head[:sp] if sp >= 24 else s[:n]).rstrip(" .,;:-")
+
+
+def _analysis_block(text, takeaway):
+    lead = ""
+    dek = _dek(takeaway)
+    if dek:
+        lead = f'<b style="display:block;font:700 17px/26px {FB};color:{TX};margin:0 0 8px 0">{_e(dek)}</b>'
+    return _p(_lbl("ANALYSIS") + lead + _e(text or ""))
+
+
+def _traj_block(word, outlook, detail):
+    line = _e(word) + ". " + _e(outlook or "")
+    if detail:
+        line += " " + _e(detail)
+    return _p(_lbl("TRAJECTORY") + line)
 
 
 _TRAJ_IN = {"UPTREND": "Rising", "DOWNTREND": "Easing", "STEADY": "Steady", "Rising": "Rising", "Easing": "Easing", "Steady": "Steady"}
@@ -1014,8 +1045,8 @@ def card_fragment(a):
                 for u in srcs[:6]))
         return (""
             + _p(_lbl("WHAT HAPPENED") + _e(a.get("what") or ""))
-            + _p(_lbl("ANALYSIS") + _e(a.get("analysis") or ""))
-            + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
+            + _analysis_block(a.get("analysis") or "", a.get("takeaway") or "")
+            + _traj_block(word, a.get("outlook") or "", "")
             + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "") + ((". " + _e(a.get("confidence_line"))) if a.get("confidence_line") else ""))
             + _p(_lbl("WHAT TO DO") + todo)
             + src_html)
@@ -1029,9 +1060,9 @@ def card_fragment(a):
     analysis = a.get("analysis_short") or "The reports describe the event."
     return (""
         + _p(_lbl("WHAT HAPPENED") + _e(what))
-        + _p(_lbl("ANALYSIS") + _e(analysis))
+        + _analysis_block(analysis, a.get("takeaway") or "")
         + hist
-        + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
+        + _traj_block(word, a.get("outlook") or "", a.get("trend_detail") or "")
         + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "Low") + ".")
         + _p(_lbl("WHAT TO DO") + _e(action) + ' Guide: <a href="' + _e(href) + f'" style="color:{TX};text-decoration:underline">' + _e(gname) + "</a>."))
 
