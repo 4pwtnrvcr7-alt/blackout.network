@@ -1413,14 +1413,6 @@ def _story_body():
     return (f'</td></tr><tr><td class="bncard" bgcolor="{PAL["surf"]}" style="padding:12px 16px 16px 16px;background:{PAL["surf"]};'
             f'color:{PAL["tx"]};word-break:break-word;overflow-wrap:anywhere">')
 
-def _mix(hex_color, toward="#12161A", t=0.22):
-    def parts(h):
-        h = (h or "#000000").lstrip("#")
-        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-    a, b = parts(hex_color), parts(toward)
-    m = tuple(int(a[i] * t + b[i] * (1 - t)) for i in range(3))
-    return "#{:02X}{:02X}{:02X}".format(*m)
-
 def _one_line(s, n=36):
     s = re.sub(r"\s+", " ", s or "").strip()
     if len(s) <= n: return s
