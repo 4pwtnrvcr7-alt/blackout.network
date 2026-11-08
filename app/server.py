@@ -123,6 +123,25 @@ def api_state():
             "next_scan": scanner.iso(datetime.fromtimestamp(state["next_scan"], timezone.utc)) if state["next_scan"] else None,
             "scanning": state["scanning"], "settings": public_settings(), "public_url": pub}
 
+ITEM_TITLE_MAX = 200   # cap per headline (chars)
+ITEM_MAX_PER_CLUSTER = 12
+def api_state_items():
+    """Read-only companion to /api/state: each listed cluster's own items (headline, source, family, URL, published time).
+    Same cluster set as /api/state (top 150 main + top 150 watchlist, last 7 days). Newest first, capped per cluster.
+    Adds a new endpoint only; /api/state is unchanged."""
+    cut = scanner.iso(scanner.now() - timedelta(days=7)); out = {}
+    ids = [r["cluster_id"] for w in (0, 1) for r in q("SELECT cluster_id FROM clusters WHERE watchlist=? AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (w, cut))]
+    for i in range(0, len(ids), 200):
+        chunk = ids[i:i + 200]
+        rows = q(f"SELECT cluster_id, source, family, title, source_url, event_time, first_seen, official FROM alerts WHERE cluster_id IN ({','.join('?' * len(chunk))}) ORDER BY first_seen DESC", chunk)
+        for r in rows:
+            lst = out.setdefault(r["cluster_id"], [])
+            if len(lst) >= ITEM_MAX_PER_CLUSTER: continue
+            t = " ".join((r["title"] or "").split())
+            lst.append({"title": t[:ITEM_TITLE_MAX], "source": r["source"], "family": r["family"], "url": r["source_url"],
+                        "published": r["event_time"], "first_seen": r["first_seen"], "official": int(r["official"] or 0)})
+    return {"generated": scanner.iso(scanner.now()), "title_max": ITEM_TITLE_MAX, "per_cluster_max": ITEM_MAX_PER_CLUSTER, "items": out}
+
 # ---- add-on modules (Story Arcs, ...): separate files listed in addons.py, hot-reloaded on change ----
 import importlib
 _addon_mods = {}
@@ -592,6 +611,7 @@ class H(BaseHTTPRequestHandler):
             if u.path in ("/", "/index.html"):
                 return self.send(200, dashboard_page(), "text/html")
             if u.path == "/api/state": return self.send(200, api_state())
+            if u.path == "/api/state_items": return self.send(200, api_state_items())
             if u.path == "/api/health":
                 return self.send(200, {"ok": True, "scanning": state["scanning"], "last_scan": state["last_scan"], "interval_minutes": cfg()["interval_minutes"]})
             if u.path == "/api/settings": return self.send(200, public_settings())
