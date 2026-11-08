@@ -289,11 +289,14 @@ class Render(unittest.TestCase):
         self.assertEqual(issue["analysis"]["items"], [])
         links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
-        _s, html, text = NL.render(issue, links)
-        self.assertIn("No confirmed high-severity events", html)
+        subj, html, text = NL.render(issue, links)
+        self.assertIn("Here's what matters right now", subj)
+        self.assertIn("Here's what matters right now", html)
+        self.assertIn("Here's what matters right now", text)
         self.assertNotIn("WHAT HAPPENED", html)
         self.assertNotIn("Analyst brief", html)
         self.assertNotIn("WHAT HAPPENED", text)
+        _assert_no_empty_framing(self, subj, html, text)
 
     def test_mime_uses_cid_and_does_not_send(self):
         issue = self._issue()
@@ -302,11 +305,106 @@ class Render(unittest.TestCase):
         subj, html, text = NL.render(issue, links)
         msg = NL.build_mime("preview@outbox.invalid", subj, html, text, None, "issue")
         raw = msg.as_string()
-        self.assertIn("cid:bn-img-1@blackout.network", raw)
+        unfolded = raw.replace("=\n", "")
+        self.assertIn("cid:bn-img-1@blackout.network", unfolded)
         self.assertNotIn("data:image/png;base64,", raw)
         self.assertIn("Content-ID: <bn-img-1@blackout.network>", raw)
         self.assertNotIn("RESEND_API_KEY", raw)
         self.assertNotIn("@mail.test", raw)
+
+
+_EMPTY = ("no new rank-", "nothing new to report", "no confirmed high-severity", "nothing to report", "all quiet", "no rank-")
+
+def _assert_no_empty_framing(case, *blobs):
+    for blob in blobs:
+        low = (blob or "").lower()
+        for phrase in _EMPTY:
+            case.assertNotIn(phrase, low)
+
+
+class Topics(unittest.TestCase):
+    def setUp(self):
+        NA.write_demo_db(NL.P["src"], AT)
+
+    def _add(self, cid, title, cat, rank, eff, hours=4, loc=""):
+        c = sqlite3.connect(NL.P["src"])
+        iso = (AT - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        c.execute("""INSERT INTO clusters(cluster_id,title,category,location,lat,lon,event_time,first_seen,updated,score,confidence,
+                     n_items,n_families,families,links,watchlist,brief,high_at,rising,mentions_3h,eff_families,rank)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  (cid, title, cat, loc, None, None, iso, iso, iso, 40, "Medium", eff, eff, "[]", "[]", 0,
+                   f"WHAT: {title}. WHERE: {loc}.", iso, 0, 1, eff, rank))
+        c.commit(); c.close()
+
+    def _issue(self):
+        return NL.build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=AT, since=AT - timedelta(hours=24), slot="morning")
+
+    def test_topic_gate(self):
+        self.assertFalse(NL.topic_on_brief("M6.1 earthquake strikes off the coast of Japan", "", "natural disaster", "Japan", 6))
+        self.assertFalse(NL.topic_on_brief(
+            "Magnitude 6.1 Earthquake Strikes Off Japan's Eastern Coast Near Tokyo. No tsunami expected, the U.S. Geological Survey said.",
+            "", "war/conflict", "", 6))
+        self.assertTrue(NL.topic_on_brief("M7.1 earthquake near Antofagasta, Chile", "", "natural disaster", "Chile", 7))
+        self.assertTrue(NL.topic_on_brief("M5.6 earthquake near Los Angeles", "", "natural disaster", "Los Angeles, California", 6))
+        self.assertFalse(NL.topic_on_brief("M5.4 earthquake near Los Angeles", "", "natural disaster", "Los Angeles", 6))
+        self.assertFalse(NL.topic_on_brief("M5.6 earthquake off the coast of California", "", "natural disaster", "California", 6))
+        self.assertTrue(NL.topic_on_brief("M6.2 earthquake in Chile triggers a tsunami warning", "", "natural disaster", "Chile", 6))
+        self.assertFalse(NL.topic_on_brief("Winter storm warning for Denver", "", "natural disaster", "Denver", 6))
+        self.assertTrue(NL.topic_on_brief("Governor declares a state of emergency after flooding", "", "natural disaster", "Utah", 7))
+        self.assertFalse(NL.topic_on_brief("S&P 500 rises 0.4 percent", "", "financial", "", 6))
+        self.assertTrue(NL.topic_on_brief("Bank failure freezes withdrawals nationwide", "", "financial", "", 6))
+        self.assertTrue(NL.topic_on_brief("Supreme Court ruling on a speech mandate", "", "political", "", 6))
+        self.assertTrue(NL.topic_on_brief("Surveillance law expands warrantless collection", "", "political", "", 6))
+        self.assertTrue(NL.topic_on_brief("Mass protests over emergency powers", "", "political", "", 6))
+        self.assertTrue(NL.topic_on_brief("Border security surge at the southern border", "", "political", "", 6))
+        self.assertTrue(NL.topic_on_brief("AI hiring systems replace warehouse jobs", "", "other", "", 6))
+        self.assertFalse(NL.topic_on_brief("Local bakery opens on Main Street", "", "other", "", 6))
+        self.assertFalse(NL.topic_on_brief("Bomb cyclone warning for the coast", "", "natural disaster", "", 6))
+        self.assertLess(NL.topic_tier("Iran missile strike", "", "war/conflict"), NL.topic_tier("Supreme Court ruling on a speech mandate", "", "political"))
+        self.assertLess(NL.topic_tier("Supreme Court ruling on a speech mandate", "", "political"), NL.topic_tier("M7.1 earthquake near Chile", "", "natural disaster"))
+
+    def test_selection_order_and_exclusions(self):
+        self._add("bb11ce0000000001", "M6.1 earthquake strikes off the coast of Japan near Tokyo", "war/conflict", 6, 2, loc="Japan")
+        self._add("bb11ce0000000002", "Winter storm warning for Denver", "natural disaster", 6, 2, loc="Denver")
+        self._add("bb11ce0000000003", "M5.6 earthquake near Los Angeles", "natural disaster", 6, 2, loc="Los Angeles, California")
+        self._add("bb11ce0000000004", "Supreme Court ruling on a digital ID mandate", "other", 7, 2)
+        issue = self._issue()
+        slots = ("main", "politics", "notable", "developing", "near", "updates", "follow", "watchlist")
+        ids = [it["cluster_id"] for sec in slots for it in issue.get(sec) or []]
+        self.assertNotIn("bb11ce0000000001", ids)
+        self.assertNotIn("bb11ce0000000002", ids)
+        self.assertIn("bb11ce0000000003", [it["cluster_id"] for it in issue["notable"]])
+        main_ids = [it["cluster_id"] for it in issue["main"]]
+        self.assertLess(main_ids.index("a11ce00000000001"), main_ids.index("bb11ce0000000004"))
+        self.assertLess(main_ids.index("bb11ce0000000004"), main_ids.index("a11ce00000000005"))
+        blob = " ".join([issue["bluf"], issue["subject"] if "subject" in issue else ""])
+        self.assertNotIn("Japan", issue["bluf"])
+        self.assertNotIn("Winter storm", issue["bluf"])
+        self.assertIn("Here's what matters right now", issue["bluf"])
+        links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                 "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+        subj, html, text = NL.render(issue, links)
+        self.assertTrue(subj.startswith("Morning Brief, Nov 8: "))
+        self.assertIn("Iran missile", subj)
+        self.assertIn("+ ", subj)
+        self.assertIn("Here's what matters right now", html)
+        self.assertIn(NL.share_text(issue).split("\n", 1)[0], text)
+        _assert_no_empty_framing(self, subj, html, text, NL.share_text(issue))
+        self.assertIn("Engraved", html)
+        self.assertIn("UPTREND", html)
+        import newsletter_art as ART
+        self.assertEqual(ART.event_kind("Supreme Court ruling on a speech mandate", "political"), "rights")
+        self.assertEqual(ART.event_kind("Surveillance law expands warrantless collection", "political"), "surveillance")
+        self.assertEqual(ART.event_kind("Mass protests over emergency powers", "political"), "protest")
+        self.assertEqual(ART.event_kind("Border security surge at the southern border", "political"), "border")
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "newsletter", "engraved")
+        for name in ("banner-politics", "banner-threats", "scene-storm", "scene-rights", "scene-surveillance", "scene-protest", "scene-missile"):
+            path = os.path.join(root, name + ".png")
+            self.assertTrue(os.path.exists(path), path)
+            self.assertLess(os.path.getsize(path), 70_000)
+        self.assertLess(len(html.encode()), 1_500_000)
+        self.assertNotIn("tyranny", html.lower())
+        self.assertNotIn("attack on freedom", html.lower())
 
 
 if __name__ == "__main__":

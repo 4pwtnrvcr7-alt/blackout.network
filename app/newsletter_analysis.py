@@ -18,7 +18,7 @@ Rules encoded below:
   severity (PAGER, warning level) do.
 - Inferences are labeled "Analysis:". Guide actions name a Prepare guide that exists on the site.
 """
-import base64, json, os, re, sqlite3, struct, zlib
+import base64, hashlib, json, os, re, sqlite3, struct, zlib
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -323,28 +323,11 @@ def _bars(vals):
     return "".join(_BARS[min(6, int(round(v / mx * 6)))] for v in vals)
 
 
-def sparkline_png(vals, w=280, h=52):
-    """Small PNG bar chart. Returns None when there is no series (caller must not draw a zero line)."""
+def sparkline_png(vals, w=520, h=148):
+    """Wide shaded report-count chart. None when there is no series (caller must not draw a zero line)."""
     if not vals or len(vals) < 2: return None
-    bg, fg, grid = (22, 24, 28), (255, 194, 26), (42, 45, 51)
-    pix = [[bg for _ in range(w)] for _ in range(h)]
-    for x in range(w): pix[h - 6][x] = grid
-    mx = max(vals) or 1
-    gap = 3
-    bw = max(3, (w - gap * (len(vals) + 1)) // len(vals))
-    for i, v in enumerate(vals):
-        bh = int(round((h - 12) * (v / mx))) if v else 1
-        x0 = gap + i * (bw + gap)
-        for x in range(x0, min(w, x0 + bw)):
-            for y in range(h - 6 - bh, h - 6):
-                if 0 <= y < h: pix[y][x] = fg
-    raw = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in pix)
-
-    def chunk(tag, data):
-        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
-    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
-           + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
-    return png
+    import newsletter_art as ART
+    return ART.trend_chart(vals, label="24h")
 
 
 def _guides(item, text):
@@ -629,6 +612,20 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
         if len(sources) >= 4: break
 
     png = sparkline_png(buckets) if buckets else None
+    trend_bits = []
+    if prior_rank is not None and int(prior_rank) != rk:
+        dlt = rk - int(prior_rank)
+        trend_bits.append(f"{dlt:+d} rank · {int(prior_rank)}→{rk}")
+    def _pair(block):
+        if block and block.get("early") and block.get("late") and block["early"][1]:
+            return block["early"][1], block["late"][1]
+        return None
+    dp, cp = _pair(deaths), _pair(cases)
+    if dp and dp[0] and dp[1] != dp[0]:
+        trend_bits.append(f"{round((dp[1] - dp[0]) / dp[0] * 100):+d}% deaths")
+    elif cp and cp[0] and cp[1] != cp[0]:
+        trend_bits.append(f"{round((cp[1] - cp[0]) / cp[0] * 100):+d}% cases")
+    trend_detail = " · ".join(trend_bits) or f"rank {rk}/10"
     return {
         "cluster_id": item.get("cluster_id"),
         "title": title,
@@ -636,6 +633,8 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
         "what": happened,
         "analysis": analysis,
         "trajectory": trajectory,
+        "trend_detail": trend_detail,
+        "category": item.get("category"),
         "outlook": outlook,
         "confidence": level,
         "confidence_line": conf_sentence,
@@ -820,7 +819,8 @@ def html_section(analysis, base_url="https://blackout.network"):
     base = (base_url or "https://blackout.network").rstrip("/")
     try:
         import newsletter_art as ART
-        plate = ART.img(ART.plate_src("Analyst brief"), "Section Analyst brief", 560, 56)
+        plate = ART.img(ART.banner_src("Analyst brief"), "Section Analyst brief", 560, 385)
+        plate += f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Analyst brief</div>'
     except Exception:
         plate = f'<div style="font:600 24px/1.2 {FH};color:{TX}">Analyst brief</div>'
     parts = ['<tr><td class="bnpad" style="padding:28px 20px 8px 20px;text-align:left">'
@@ -835,8 +835,8 @@ def html_section(analysis, base_url="https://blackout.network"):
         if sp.get("png") and sp.get("values") is not None:
             b64 = base64.b64encode(sp["png"]).decode()
             peak = max(sp.get("values") or [0])
-            img = (f'<img src="data:image/png;base64,{b64}" width="280" height="52" alt="Report counts, last { _e(sp.get("label") or "24h") }" '
-                   f'style="display:block;width:280px;max-width:100%;height:auto;border:0;margin:4px 0">')
+            img = (f'<img src="data:image/png;base64,{b64}" width="520" height="148" alt="Report counts, last { _e(sp.get("label") or "24h") }, shaded trend" '
+                   f'style="display:block;width:520px;max-width:100%;height:auto;border:0;margin:4px 0">')
             spark = (f'{_p(_lbl("REPORT COUNTS") + img)}'
                      f'{_p(_e(sp.get("bars") or "") + " " + _e(sp.get("arrow") or "") + " last " + _e(sp.get("label") or "") + f", peak {peak}. Volume is not a danger reading.")}')
         else:
@@ -848,12 +848,14 @@ def html_section(analysis, base_url="https://blackout.network"):
         wire = it.get("wire") or (base + "/wire/" + str(it.get("cluster_id") or ""))
         try:
             import newsletter_art as ART
-            gauge = ART.img(ART.data_uri(ART.trajectory_gauge(it.get("trajectory") or "Steady")), f"Trajectory {it.get('trajectory') or 'Steady'}", 168, 72)
+            kind = ART.event_kind(it.get("title"), it.get("category"))
+            scene = ART.img(ART.scene_src(kind), f"Engraved {kind} illustration", 560, 315)
+            badge = ART.trend_badge_html(it.get("trajectory") or "Steady", it.get("trend_detail") or "")
         except Exception:
-            gauge = ""
+            scene, badge = "", ""
         parts.append(card_o
-            + f'<div style="margin:0 0 8px 0"><a href="{_e(wire)}" style="font:600 18px/1.3 {FH};color:{TX};text-decoration:none">{_e(it.get("title") or "")}</a></div>'
-            + (f'<div style="margin:0 0 8px 0">{gauge}</div>' if gauge else "")
+            + scene + badge
+            + f'<div style="margin:0 0 8px 0"><a href="{_e(wire)}" style="font:600 22px/1.25 {FH};color:{TX};text-decoration:none">{_e(it.get("title") or "")}</a></div>'
             + _p(_lbl("WHAT HAPPENED") + _e(it.get("what") or ""))
             + _p(_e(it.get("analysis") or ""))
             + _p(_lbl("TRAJECTORY") + _e(it.get("trajectory") or "") + ". " + _e(it.get("outlook") or ""))
@@ -871,7 +873,7 @@ def html_section(analysis, base_url="https://blackout.network"):
                            f"Analysis: the same {kind.lower()} is named across these separate clusters. Each item’s danger read is its own rank and sourced figures."))
         try:
             import newsletter_art as ART
-            pplate = ART.img(ART.plate_src("Patterns"), "Section Patterns", 560, 56)
+            pplate = ART.img(ART.banner_src("Patterns"), "Section Patterns", 560, 385) + f'<div style="font:700 28px/1.15 {FH};color:{TX};margin-top:12px">Patterns we’re watching</div>'
         except Exception:
             pplate = f'<div style="font:600 20px/1.2 {FH};color:{TX}">Patterns we’re watching</div>'
         parts.append('<tr><td class="bnpad" style="padding:22px 20px 6px 20px">' + pplate + '</td></tr>')
@@ -892,6 +894,11 @@ def text_section(analysis, base_url="https://blackout.network"):
         T.append(f"   WHAT HAPPENED: {it.get('what')}")
         T.append(f"   {it.get('analysis')}")
         T.append(f"   TRAJECTORY: {it.get('trajectory')}. {it.get('outlook')}")
+        try:
+            import newsletter_art as ART
+            T.append(f"   TREND: {ART.trend_word(it.get('trajectory'))} ({it.get('trend_detail') or ''})")
+        except Exception:
+            pass
         T.append(f"   {it.get('confidence_line')}")
         sp = it.get("spark") or {}
         if sp.get("values") is not None:
@@ -997,10 +1004,16 @@ def embed_sparklines(msg):
     if "data:image/png;base64," not in html: return msg
     pat = re.compile(r'src="data:image/png;base64,([A-Za-z0-9+/=]+)"')
     images = []
+    seen = {}
 
     def repl(m):
-        cid = f"bn-img-{len(images) + 1}@blackout.network"
-        images.append((cid, base64.b64decode(m.group(1))))
+        raw = base64.b64decode(m.group(1))
+        key = hashlib.sha256(raw).hexdigest()
+        cid = seen.get(key)
+        if not cid:
+            cid = f"bn-img-{len(images) + 1}@blackout.network"
+            seen[key] = cid
+            images.append((cid, raw))
         return f'src="cid:{cid}"'
 
     new = pat.sub(repl, html)

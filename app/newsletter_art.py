@@ -6,7 +6,7 @@ category legend. Section plates and event icons are monochrome line engravings i
 BLACKOUT gold-on-black palette. SVG sources for the icons live next to this module's
 drawings so the email can ship PNG, which Gmail and Outlook actually show.
 """
-import base64, json, math, os, struct, zlib
+import base64, html, json, math, os, struct, zlib
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WORLD = os.path.join(BASE, "signal_map_static", "world.geojson")
@@ -345,11 +345,18 @@ def event_kind(title, category):
     if re_fire(t): return "fire"
     if re_storm(t): return "storm"
     if re_disease(t): return "outbreak"
-    if re_grid(t): return "grid"
+    if re_grid(t) or re_supply(t): return "grid"
+    if re_surveil(t): return "surveillance"
+    if re_protest(t): return "protest"
+    if re_border(t): return "border"
+    if re_rights(t): return "rights"
     if re_cyber(t): return "cyber"
     if category == "war/conflict": return "conflict"
     if category == "disease": return "outbreak"
     if category == "natural disaster": return "storm"
+    if category == "political": return "politics"
+    if category == "space weather" or "solar flare" in t or "geomagnetic" in t: return "space"
+    if category == "financial": return "financial"
     return "other"
 
 
@@ -372,6 +379,21 @@ def re_grid(t):
 def re_cyber(t):
     import re
     return re.search(r"ransomware|cyber|hack(?:ed|ers)?|breach", t) is not None
+def re_surveil(t):
+    import re
+    return re.search(r"surveillance|privacy|censor|digital id|digital identity|cbdc|big tech|deplatform", t) is not None
+def re_protest(t):
+    import re
+    return re.search(r"protest|unrest|riot|uprising|demonstration", t) is not None
+def re_border(t):
+    import re
+    return re.search(r"border security|border patrol|southern border|northern border|port of entry", t) is not None
+def re_rights(t):
+    import re
+    return re.search(r"civil libert|constitution|free speech|first amendment|second amendment|due process|gun rights|gun control|supreme court|appeals court|court ruling|emergency powers|mandate|election integrity", t) is not None
+def re_supply(t):
+    import re
+    return re.search(r"supply chain|food supply|food shortage|fuel shortage|drinking water", t) is not None
 
 
 _ICON = {}
@@ -398,3 +420,110 @@ def logo_src():
 def img(src, alt, width, height):
     return (f'<img src="{src}" width="{width}" height="{height}" alt="{alt}" '
             f'style="display:block;width:{width}px;max-width:100%;height:auto;border:0">')
+
+
+ENGRAVED = os.path.join(BASE, "static", "newsletter", "engraved")
+_FILE = {}
+_SCENE = {
+    "storm": "scene-storm", "quake": "scene-quake", "flood": "scene-flood", "fire": "scene-fire",
+    "outbreak": "scene-outbreak", "missile": "scene-missile", "conflict": "scene-conflict",
+    "grid": "scene-grid", "cyber": "scene-cyber", "space": "scene-space",
+    "politics": "banner-politics", "financial": "banner-markets", "other": "banner-latest",
+    "rights": "scene-rights", "surveillance": "scene-surveillance", "protest": "scene-protest",
+    "border": "scene-border",
+}
+_BANNER = {
+    "Top threats": "banner-threats", "Analyst brief": "banner-threats",
+    "Politics & Government": "banner-politics", "Still developing": "banner-latest",
+    "Developing stories": "banner-latest", "Also notable": "banner-about",
+    "Watchlist: unconfirmed": "banner-about", "Patterns": "banner-community",
+    "Stories you follow": "banner-community", "Watch: new on BLACKOUT.NETWORK": "banner-latest",
+}
+
+
+def _file_src(name):
+    if name in _FILE: return _FILE[name]
+    path = os.path.join(ENGRAVED, name + ".png")
+    try:
+        with open(path, "rb") as fh: raw = fh.read()
+        if raw[:8] == b"\x89PNG\r\n\x1a\n":
+            _FILE[name] = data_uri(raw)
+            return _FILE[name]
+    except Exception:
+        pass
+    return None
+
+
+def scene_src(kind):
+    src = _file_src(_SCENE.get(kind) or _SCENE["other"])
+    return src or data_uri(event_icon(kind if kind in ("quake", "storm", "flood", "fire", "outbreak", "missile", "conflict", "grid", "cyber") else "other"))
+
+
+def banner_src(title):
+    if (title or "").startswith("Near you"): name = "banner-prepare"
+    elif (title or "").startswith("Crime"): name = "banner-about"
+    else: name = _BANNER.get(title, "banner-threats")
+    return _file_src(name) or plate_src(title)
+
+
+def trend_word(trajectory):
+    if trajectory == "Rising": return "UPTREND"
+    if trajectory == "Easing": return "DOWNTREND"
+    return "STEADY"
+
+
+def trend_badge_html(trajectory, detail):
+    """Full-width arrow badge. Colours are inline so a dark-mode client does not wash them out."""
+    word = trend_word(trajectory)
+    if word == "UPTREND":
+        bg, arrow, ac = "#C8102E", "▲", "#FFC21A"
+    elif word == "DOWNTREND":
+        bg, arrow, ac = "#146C43", "▼", "#D1FAE5"
+    else:
+        bg, arrow, ac = "#3A3D44", "→", "#E6E9EE"
+    detail = html.escape(detail or "")
+    face = "Arial,Helvetica,sans-serif"
+    return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0 14px 0"><tr>'
+            f'<td bgcolor="{bg}" style="background:{bg};border-radius:16px;padding:14px 18px">'
+            f'<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
+            f'<td valign="middle" style="font:700 64px/1 {face};color:{ac};padding:0 16px 0 0">{arrow}</td>'
+            f'<td valign="middle"><div style="font:700 22px/1.1 {face};letter-spacing:1.6px;color:#FFFFFF">{word}</div>'
+            f'<div style="font:600 16px/1.3 {face};color:#F5F5F7;margin-top:4px">{detail}</div>'
+            f'</td></tr></table></td></tr></table>')
+
+
+def trend_chart(vals, label="24h"):
+    """Wide report-count chart. The shade follows the series: amber-red when the later bars are higher, green when lower."""
+    if not vals or len(vals) < 2: return None
+    w, h = 520, 148
+    pix = _blank(w, h, BG)
+    k = max(1, len(vals) // 3)
+    a, b = sum(vals[:k]) / k, sum(vals[-k:]) / k
+    if b >= a * 1.34 and b >= a + 1:
+        fill, line, word = (120, 32, 40), (255, 120, 90), "UP"
+    elif a >= b * 1.34 and a >= b + 1:
+        fill, line, word = (18, 78, 52), (90, 200, 140), "DOWN"
+    else:
+        fill, line, word = (42, 46, 54), (190, 196, 204), "FLAT"
+    _text(pix, f"{label} {word}", 14, 8, line, 2)
+    top, bot = 40, 128
+    mx = max(vals) or 1
+    n = len(vals)
+    xs, ys = [], []
+    for i, v in enumerate(vals):
+        xs.append(18 + int(i * (w - 36) / (n - 1)))
+        ys.append(bot - int((bot - top) * (v / mx)))
+    for i in range(n - 1):
+        x0, x1 = xs[i], xs[i + 1]
+        span = max(1, x1 - x0)
+        for x in range(x0, min(w, x1 + 1)):
+            y = int(ys[i] + (ys[i + 1] - ys[i]) * ((x - x0) / span))
+            for yy in range(max(top, y), bot):
+                if (yy + x) % 2 == 0: pix[yy][x] = fill
+    for i in range(n - 1):
+        _line(pix, xs[i], ys[i], xs[i + 1], ys[i + 1], line)
+        _line(pix, xs[i], min(h - 1, ys[i] + 1), xs[i + 1], min(h - 1, ys[i + 1] + 1), line)
+    _hline(pix, bot, (90, 94, 102), 16, w - 16)
+    _text(pix, "EARLIER", 16, bot + 4, MUTED, 1)
+    _text(pix, "NOW", w - 36, bot + 4, MUTED, 1)
+    return png_bytes(pix)

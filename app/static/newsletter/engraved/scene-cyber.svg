@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+<rect width="640" height="360" fill="#0B0D10"/>
+<g fill="none" stroke="#E6E1D6" stroke-linecap="round" stroke-linejoin="round">
+<rect x="14" y="14" width="612" height="332" stroke-width="1.2"/>
+<rect x="20" y="20" width="600" height="320" stroke="#FFC21A" stroke-width="0.6"/>
+<path d="M28 44 H92 M28 50 H70" stroke="#FFC21A" stroke-width="1.1"/>
+<path d="M548 316 H612 M570 310 H612" stroke="#FFC21A" stroke-width="1.1"/>
+<rect x="70" y="54" width="500" height="250" rx="8" stroke-width="1.4"/>
+<path d="M90 78 H240 V96 H360 V78 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="78" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="96" r="3" stroke-width="0.9"/>
+<path d="M90 106 H240 V124 H360 V106 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="106" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="124" r="3" stroke-width="0.9"/>
+<path d="M90 134 H240 V152 H360 V134 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="134" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="152" r="3" stroke-width="0.9"/>
+<path d="M90 162 H240 V180 H360 V162 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="162" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="180" r="3" stroke-width="0.9"/>
+<path d="M90 190 H240 V208 H360 V190 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="190" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="208" r="3" stroke-width="0.9"/>
+<path d="M90 218 H240 V236 H360 V218 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="218" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="236" r="3" stroke-width="0.9"/>
+<path d="M90 246 H240 V264 H360 V246 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="246" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="264" r="3" stroke-width="0.9"/>
+<path d="M90 274 H240 V292 H360 V274 H550" stroke-width="0.7" stroke-opacity="0.85"/>
+<circle cx="240" cy="274" r="3" stroke="#FFC21A" stroke-width="1"/>
+<circle cx="360" cy="292" r="3" stroke-width="0.9"/>
+<rect x="250" y="120" width="140" height="110" stroke="#FFC21A" stroke-width="1.3"/>
+<path d="M234 128 L324 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M246 128 L336 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M258 128 L348 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M270 128 L360 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M282 128 L372 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M294 128 L384 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M306 128 L396 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M318 128 L408 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M330 128 L420 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M342 128 L432 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M354 128 L444 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M366 128 L456 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M378 128 L468 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M390 128 L480 222" stroke-width="0.55" stroke-opacity="0.7"/>
+<path d="M300 156 H340 V188 H300 Z" stroke-width="1.3"/>
+<path d="M292 156 V148 H348 V156" stroke="#FFC21A" stroke-width="1.4"/>
+</g></svg>

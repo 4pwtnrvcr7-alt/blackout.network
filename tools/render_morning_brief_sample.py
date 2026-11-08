@@ -79,6 +79,44 @@ def _live_db(path):
     return n, data.get("generated")
 
 
+def _card(it):
+    return NL._item_html(it, {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                               "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}, NL.cfg())
+
+
+def _compare(issue, links):
+    """One weather card and one political card, side by side, from the same render path."""
+    import newsletter_art as ART
+    pool = []
+    for sec in ("main", "politics", "notable", "developing", "near", "updates", "follow"):
+        pool.extend(issue.get(sec) or [])
+    political = next((it for it in pool if it.get("category") == "political" or ART.event_kind(it.get("title"), it.get("category")) in ("politics", "rights", "surveillance", "protest")), None)
+    weather = next((it for it in pool if ART.event_kind(it.get("title"), it.get("category")) in ("storm", "flood", "fire")), None)
+    if weather is None or political is None:
+        # The live brief drops routine weather. Pull a matching cluster from the snapshot for the illustration only.
+        c = __import__("sqlite3").connect(NL.P["src"])
+        rows = c.execute("SELECT * FROM clusters").fetchall()
+        c.close()
+        for r in rows:
+            it = NL.item_of(r, "main", 0)
+            kind = ART.event_kind(it.get("title"), it.get("category"))
+            if weather is None and kind in ("storm", "flood", "fire"):
+                weather = it
+            if political is None and (it.get("category") == "political" or kind in ("politics", "rights")):
+                political = it
+    if not weather or not political:
+        print("compare skipped", bool(weather), bool(political))
+        return
+    page = f'''<!doctype html><html><head><meta charset="utf-8"><style>body{{margin:0;background:#0B0D10;color:#F5F5F7;font-family:Inter,system-ui,sans-serif}}</style></head>
+<body><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td width="50%" valign="top" style="padding:12px"><div style="font:700 13px/1.3 system-ui;color:#FFC21A;padding:0 8px 8px">WEATHER CARD</div><table width="100%">{_card(weather)}</table></td>
+<td width="50%" valign="top" style="padding:12px"><div style="font:700 13px/1.3 system-ui;color:#FFC21A;padding:0 8px 8px">POLITICAL CARD</div><table width="100%">{_card(political)}</table></td>
+</tr></table></body></html>'''
+    path = "/opt/cursor/artifacts/morning-brief-weather-politics.html"
+    open(path, "w").write(page)
+    print("compare", path, "weather", (weather.get("title") or "")[:70], "| political", (political.get("title") or "")[:70])
+
+
 def main():
     live = False
     try:
@@ -118,7 +156,11 @@ def main():
         print(f"- R{it['rank']} {it['trajectory']} {it['confidence']} | {it['title'][:70]}")
     print("leads:", {s: len(issue.get(s) or []) for s in ("main", "politics", "notable", "developing", "watchlist")})
     print("html:", OUT, "bytes", len(html.encode()))
+    msg = NL.build_mime("preview@outbox.invalid", subj, html, _text, None, "issue")
+    mime_n = len(msg.as_bytes())
+    print("mime bytes", mime_n)
     print("sender:", NL.env().get("NEWSLETTER_SENDER") or "preview", "live_approved:", bool(NL.cfg().get("live_sending_approved")))
+    _compare(issue, links)
 
 
 if __name__ == "__main__":

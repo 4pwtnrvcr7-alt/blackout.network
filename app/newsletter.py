@@ -542,6 +542,167 @@ def _logged_in_window(r, start, at):
     if ev and ev < start: return False
     return fs is not None and start <= fs <= at
 
+# What the brief will lead with and fill with. A match here is a topic gate, not a judgment about the event.
+_MAG_RX = (
+    re.compile(r"\bmagnitude\s*([0-9]+(?:\.\d+)?)", re.I),
+    re.compile(r"\bm\s*([0-9]+(?:\.\d+)?)\b", re.I),
+    re.compile(r"\b([0-9]+(?:\.\d+)?)\s*[- ]magnitude\b", re.I),
+)
+_QUAKE_RX = re.compile(r"\b(?:earthquakes?|quakes?)\b|\bmagnitude\b|\bm\s*[0-9](?:\.\d+)?\b", re.I)
+_SEVERE_RX = re.compile(r"\b(?:killed|kills|deaths?|dead|casualt\w+|injur\w+|destroy\w+|damag\w+|collaps\w+|tsunamis?|\bmissing\b)\b", re.I)
+_OFFSHORE_RX = re.compile(r"\b(?:off the coast|offshore|at sea)\b", re.I)
+_US_RX = re.compile(
+    r"\b(?:Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|"
+    r"Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|"
+    r"New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|"
+    r"South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming|"
+    r"District of Columbia|D\.C\.|United States|U\.S\.)\b", re.I)
+_US_CITY_RX = re.compile(
+    r"\b(?:Los Angeles|San Francisco|San Diego|San Jose|Oakland|Sacramento|Seattle|Portland|Denver|Phoenix|Houston|Dallas|"
+    r"Austin|San Antonio|Chicago|Detroit|Minneapolis|St\. Louis|Atlanta|Miami|Tampa|Orlando|Boston|New York|Philadelphia|"
+    r"Baltimore|Washington|Pittsburgh|Cleveland|Columbus|Nashville|Memphis|New Orleans|Kansas City|Oklahoma City|"
+    r"Salt Lake|Las Vegas|Albuquerque|Honolulu|Anchorage|County)\b", re.I)
+_WEATHER_RX = re.compile(
+    r"\b(?:hurricanes?|typhoons?|tornado(?:es)?|flood(?:ing|s|ed)?|wildfires?|storms?|blizzard|heat\s*waves?|winter storms?|"
+    r"thunderstorms?|cyclones?|snowstorms?|weather warnings?|severe weather)\b", re.I)
+_PREP_RX = re.compile(
+    r"\b(?:state of emergency|emergency declaration|declares? (?:a )?(?:state of )?emergency|evacuations?|evacuated|"
+    r"disaster declaration|declared a disaster|shelter[- ]in[- ]place|boil[- ]water|preparedness)\b", re.I)
+_WMD_RX = re.compile(r"\b(?:missiles?|ballistic|icbm|nuclear|warheads?|\bwmd\b|chemical weapons?|biological weapons?)\b", re.I)
+_WAR_RX = re.compile(r"\b(?:airstrikes?|air ?strikes?|troops|invasion|shelling|artillery|drone strikes?|military|ceasefire|armed forces)\b", re.I)
+_TERROR_RX = re.compile(r"\b(?:terror(?:ist|ism|s)?|bombings?|car bomb|suicide bomb|hostages?|\bisis\b|al-qaeda|al qaeda)\b", re.I)
+_GOV_RX = re.compile(
+    r"\b(?:president|prime minister|premier|parliament|congress|senate|governor|white house|kremlin|elections?|sanctions|"
+    r"diplomat\w*|ministry|cabinet|geopolitic\w*|coup|impeach\w*|united nations|\bnato\b)\b", re.I)
+# Society and freedoms topics. Matching only decides inclusion and sort order. The brief copy stays the sourced facts.
+_RIGHTS_RX = re.compile(
+    r"\b(?:civil libert\w+|constitutional|constitution|free speech|first amendment|second amendment|censorship|censor(?:ed|ing|s)?|"
+    r"surveillance|privacy|digital id|digital identity|\bcbdc\b|central bank digital|gun rights|gun control|due process|"
+    r"government overreach|\boverreach\b|emergency powers|\bmandates?\b|election integrity|"
+    r"supreme court|appeals court|federal court|court ruling|court ruled|injunction|"
+    r"artificial intelligence|\bai\b|a\.i\.|big tech|deplatform\w*|content moderation|"
+    r"protests?|unrest|riots?|rioting|uprising|demonstrations?|"
+    r"border security|border patrol|southern border|northern border|port of entry|"
+    r"supply chain|food supply|food shortage|fuel shortage|drinking water|pipeline|"
+    r"bank (?:run|failure|collapse)|market crash|markets? (?:plunge|tumble|crash)|recession|currency crisis|hyperinflation|economic shock)\b",
+    re.I)
+_CYBER_RX = re.compile(r"\b(?:ransomware|cyber[- ]?attacks?|data breach|hack(?:ed|ers)?|\bddos\b)\b", re.I)
+_GRID_RX = re.compile(r"\b(?:blackouts?|power outages?|power grid|grid attack|electrical grid)\b", re.I)
+_DISEASE_RX = re.compile(r"\b(?:outbreaks?|pandemic|epidemic|avian flu|bird flu|h5n1|ebola|cholera|measles|mpox|dengue)\b", re.I)
+_MAJOR_RX = re.compile(r"\b(?:major|nationwide|infrastructure|pipeline|hospitals?|critical|\bmass\b)\b", re.I)
+_WARNING_RX = re.compile(r"\b(?:warnings?|watches|watch|advisories|advisory)\b", re.I)
+
+
+def _magnitudes(text):
+    out = []
+    for rx in _MAG_RX:
+        for m in rx.finditer(text or ""):
+            try: v = float(m.group(1))
+            except (TypeError, ValueError): continue
+            if 0 < v <= 10: out.append(v)
+    return out
+
+def _us_populated(text):
+    """A US state or city. A mention of the U.S. Geological Survey is not a US place."""
+    cleaned = re.sub(r"\bU\.S\. Geological Survey\b|\bUnited States Geological Survey\b|\bUSGS\b", " ", text or "", flags=re.I)
+    if not (_US_RX.search(cleaned) or _US_CITY_RX.search(cleaned)): return False
+    if _OFFSHORE_RX.search(cleaned) and not _US_CITY_RX.search(cleaned): return False
+    return True
+
+def _severe_event(text):
+    """Damage, casualties, or a tsunami threat. 'No tsunami' is not a threat."""
+    cleaned = re.sub(r"\bno\s+tsunamis?\b|\btsunamis?\s+(?:is\s+)?not\b|\bwithout\s+(?:a\s+)?tsunamis?\b", " ", text or "", flags=re.I)
+    return _SEVERE_RX.search(cleaned) is not None
+
+def _quake_ok(text):
+    """M7.0 or above, or damage, casualties, or a tsunami threat, or a US populated-area quake at M5.5 or above."""
+    mags = _magnitudes(text)
+    mag = max(mags) if mags else None
+    quake = _QUAKE_RX.search(text or "") or re.search(r"\btsunamis?\b", text or "", re.I)
+    if not quake: return False
+    if mag is not None and mag >= 7.0: return True
+    if _severe_event(text) and (_QUAKE_RX.search(text or "") or re.search(r"\btsunamis?\b", text or "", re.I)): return True
+    if mag is not None and mag >= 5.5 and _us_populated(text): return True
+    return False
+
+def controversy_topic(text):
+    """True when the headline is one of the society-and-freedoms topics. This only changes selection order."""
+    return _RIGHTS_RX.search(text or "") is not None
+
+def topic_on_brief(title, brief="", category="", location="", rank=0):
+    """Whether a story may occupy Top threats, Politics, Also notable, Still developing, or the BLUF.
+    Routine weather warnings stay out. Weather is included only as preparedness tied to a real threat,
+    or when the reports state damage or casualties and the item is not itself a warning. Earthquakes
+    follow _quake_ok. Other stories have to be a lead topic."""
+    shown = display_category(title, brief, category or "")
+    blob = f"{title or ''} {brief or ''} {location or ''}"
+    is_quake = _QUAKE_RX.search(blob) is not None
+    if is_quake: return _quake_ok(blob)
+    if controversy_topic(blob): return True
+    if _WMD_RX.search(blob) or shown == "war/conflict" or _WAR_RX.search(blob) or _TERROR_RX.search(blob): return True
+    if _WEATHER_RX.search(blob) or (shown == "natural disaster" and not is_quake):
+        if _PREP_RX.search(blob): return True
+        if _severe_event(blob) and not _WARNING_RX.search(blob): return True
+        return False
+    if shown == "political" or _GOV_RX.search(blob): return True
+    rk = int(rank or 0)
+    if (_CYBER_RX.search(blob) or shown == "cyber") and (rk >= 7 or _MAJOR_RX.search(blob)): return True
+    if _GRID_RX.search(blob) and (rk >= 7 or _MAJOR_RX.search(blob)): return True
+    if (shown == "disease" or _DISEASE_RX.search(blob)) and (rk >= 7 or _severe_event(blob) or re.search(r"outbreak|pandemic|epidemic", blob, re.I)):
+        return True
+    if _PREP_RX.search(blob): return True
+    return False
+
+def topic_tier(title, brief="", category="", location=""):
+    """Lower sorts first. War, missiles, and terror stay ahead of the society-topic boost, which sorts ahead of ordinary politics."""
+    blob = f"{title or ''} {brief or ''} {location or ''}"
+    if _WMD_RX.search(blob) or (category or "") == "war/conflict" or _WAR_RX.search(blob) or _TERROR_RX.search(blob): return 0
+    if controversy_topic(blob): return 1
+    if (category or "") == "political" or _GOV_RX.search(blob): return 2
+    if (category or "") in ("cyber", "disease") or _CYBER_RX.search(blob) or _GRID_RX.search(blob): return 3
+    return 4
+
+def _topic_sort_key(it):
+    return (-int(it.get("rank") or 0), topic_tier(it.get("title"), it.get("what") or "", it.get("category") or "", it.get("where") or ""), it.get("title") or "")
+
+def _on_brief_row(r):
+    return topic_on_brief(_row_get(r, "title", ""), _row_get(r, "brief", ""), _row_get(r, "category", ""), _row_get(r, "location", ""), int(_row_get(r, "rank", 0) or 0))
+
+def _story_pool(issue):
+    """Stories the brief selected. In-window items lead. Inside that, war and missiles, then the society-topic boost.
+    Older 'still developing' items come after, so a story from before this window cannot open the brief.
+    Watchlist only when nothing else qualified."""
+    def take(secs):
+        pool, seen = [], set()
+        for it in (it for sec in secs for it in (issue.get(sec) or [])):
+            cid = it.get("cluster_id") or id(it)
+            if cid in seen: continue
+            seen.add(cid); pool.append(it)
+        pool.sort(key=_topic_sort_key)
+        return pool
+    fresh = take(("main", "politics", "follow", "updates", "notable", "near"))
+    if fresh: return fresh + [it for it in take(("developing",)) if it.get("cluster_id") not in {x.get("cluster_id") for x in fresh}]
+    old = take(("developing",))
+    if old: return old
+    return take(("watchlist",))
+
+def _why_line(it):
+    return _cut(re.sub(r"\s+", " ", (it.get("why") or "")).strip(), 180)
+
+MATTERS = "Here's what matters right now"
+
+def bluf(issue):
+    """The opening line of the subject preheader, the BLUF, and the plain-text/social fallback. Names the top stories. Never an empty-state sentence."""
+    lines = [MATTERS + "."]
+    for i, it in enumerate(_story_pool(issue)[:3], 1):
+        why = _why_line(it)
+        lines.append(f"{i}. {_short(it.get('title') or '', 120)}" + (f" — {why}" if why else ""))
+    return " ".join(lines)
+
+def share_text(issue):
+    """Plain-text part and the social fallback. Same lead as the brief."""
+    return subject_for(issue) + "\n\n" + bluf(issue)
+
 def why_it_matters(r, official=False, category=None):
     """Deterministic 'why it matters' line built only from the item's own data: rank tier + scope (/scoring), the category's typical
     knock-on effects, an official-source flag, a population figure quoted by the source, and spread speed. Nothing is invented."""
@@ -646,7 +807,8 @@ def item_of(r, section, official=0, editorial=False):
             "rank": int(r["rank"] or 0), "score": int(r["score"] or 0), "eff": eff, "families": fams, "confidence": conf,
             "unconfirmed": editorial or eff < 2, "official": bool(official), "editorial": editorial, "links": _links(r),
             "title_norm": norm_title(r["title"]), "first_seen": parse_t(r["first_seen"]), "n_items": int(_row_get(r, "n_items", 0) or 0),
-            "why": why_it_matters(r, official, cat), "tier": tier(r["rank"])[0], "update": None, "breaking": False, "followed": False}
+            "why": why_it_matters(r, official, cat), "tier": tier(r["rank"])[0], "update": None, "breaking": False, "followed": False,
+            "rising": bool(int(_row_get(r, "rising", 0) or 0))}
 
 # ---- developing stories: what is new in a cluster since a subscriber last got it
 def developments(S, cid, since):
@@ -756,7 +918,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     follow_u, updates = [], []
     for r in trows:
         cid = r["cluster_id"]; followed = cid in follows; h0 = hist.get(cid)
-        if cid in collide: continue
+        if cid in collide or not _on_brief_row(r): continue
         if not followed:
             if not h0 or r["watchlist"] or int(r["rank"] or 0) < int(c["notable_min_rank"]): continue
             if not allcats and (r["category"] or "other") not in ints: continue
@@ -770,6 +932,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     updates = sorted(updates, key=keyf)[:int(c.get("max_update_items") or 5)]
     picked_titles = [x["title_norm"] for x in follow_u + updates]; used = {x["cluster_id"] for x in follow_u + updates}
     def take(r):
+        if not _on_brief_row(r): return False
         if r["cluster_id"] in hist or r["cluster_id"] in used or r["cluster_id"] in collide: return False
         if not allcats and (r["category"] or "other") not in ints and r["cluster_id"] not in follows: return False
         tn = norm_title(r["title"])
@@ -808,15 +971,13 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
             continue
         if int(r["rank"] or 0) >= rmin and int(r["eff_families"] or 0) >= smin and len(main) < int(c["max_main_items"]) and take(r):
             main.append(item_of(r, "main", offi.get(r["cluster_id"], 0)))
-    if len(main) < int(c["min_main_items"]):
-        room = min(int(c["max_notable_items"]), int(c["min_main_items"]) - len(main))
-        for r in rows:
-            if len(notable) >= room: break
-            if not _logged_in_window(r, start, at): continue
-            rk, ef = int(r["rank"] or 0), int(r["eff_families"] or 0)
-            if r["cluster_id"] in used: continue
-            ok = (ef >= 2) or (rk >= rmin and offi.get(r["cluster_id"]))   # confirmed rank 5-6, or a rank-7+ item from one official source
-            if ok and take(r): notable.append(item_of(r, "notable", offi.get(r["cluster_id"], 0)))
+    for r in rows:
+        if len(notable) >= int(c["max_notable_items"]): break
+        if not _logged_in_window(r, start, at): continue
+        rk, ef = int(r["rank"] or 0), int(r["eff_families"] or 0)
+        if r["cluster_id"] in used: continue
+        ok = (ef >= 2) or (rk >= rmin and offi.get(r["cluster_id"]))   # confirmed rank 5-6, or a rank-7+ item from one official source
+        if ok and take(r): notable.append(item_of(r, "notable", offi.get(r["cluster_id"], 0)))
     for r in (wrows if watchlist_enabled(c) else []):
         if len(watch) >= int(c["max_watchlist"]): break
         if take(r): watch.append(item_of(r, "watchlist"))
@@ -829,6 +990,10 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
             it = item_of(r, "politics", offi.get(r["cluster_id"], 0))
             if it["category"] == "political": politics.append(it)
     for it in politics: it["section"] = "politics"
+    main.sort(key=_topic_sort_key)
+    notable.sort(key=_topic_sort_key)
+    politics.sort(key=_topic_sort_key)
+    developing.sort(key=_topic_sort_key)
     for it in follow_u + main + updates + notable + politics:
         it["breaking"] = it["cluster_id"] in brk; it["followed"] = it["cluster_id"] in follows
     if not allcats:   # personal relevance: chosen topics first within the same rank
@@ -857,7 +1022,10 @@ def _attach_analysis(issue, at, c=None):
         for sec in ("main", "follow", "updates", "politics", "near", "notable"):
             for it in issue.get(sec) or []:
                 a = by.get(it.get("cluster_id"))
-                if not a or not a.get("card_confidence"): continue
+                if not a: continue
+                if a.get("trajectory"): it["trajectory"] = a["trajectory"]
+                if a.get("trend_detail"): it["trend_detail"] = a["trend_detail"]
+                if not a.get("card_confidence"): continue
                 it["confidence"] = a["card_confidence"]
                 if a.get("card_unconfirmed") is not None: it["unconfirmed"] = a["card_unconfirmed"]
     except Exception as ex:
@@ -883,26 +1051,6 @@ def _analysis_text(issue, c):
         return []
 
 def _short(t, n=90): return _cut(re.sub(r"^[^\w(\"'“]+", "", t or "").strip() or (t or ""), n)
-def bluf(issue):
-    """Bottom line up front: one or two sentences, built from the selected items only."""
-    m, u, f, n = issue["main"], issue.get("updates", []), issue.get("follow", []), issue["notable"]
-    rr = issue["rule"]; hrs = max(1, round((issue["end"] - issue["start"]).total_seconds() / 3600))
-    if issue.get("quiet"): return quiet_line(issue)
-    parts = []
-    if m:
-        top = m[0]
-        parts.append(f"{len(m)} confirmed rank-{rr['rank']}+ threat{'s' if len(m) != 1 else ''} in the last {hrs} h. "
-                     f"Top: {_short(top['title'])} (rank {top['rank']}, {top['category']}).")
-        if len(m) > 1: parts.append("Also: " + "; ".join(f"{_short(x['title'], 60)} (R{x['rank']})" for x in m[1:3]) + ".")
-    else:
-        parts.append(f"No new rank-{rr['rank']}+ confirmed threats in the last {hrs} h.")
-        if n: parts.append(f"Most significant: {_short(n[0]['title'])} (rank {n[0]['rank']}).")
-    dv = f + u
-    if dv:
-        ups = [x for x in dv if x["update"]["up"]]
-        parts.append(f"{len(dv)} developing stor{'ies' if len(dv) != 1 else 'y'} updated" + (f", {len(ups)} raised in rank" if ups else "") + ".")
-    if issue.get("videos"): parts.append(f"{len(issue['videos'])} new video report{'s' if len(issue['videos']) != 1 else ''} below.")
-    return " ".join(parts)
 
 # ------------------------------------------------------------------ rendering (HTML email: tables + inline CSS; plain-text alternative)
 # Brand: Signal (t324/t326u). Spec: /workspace/brand_concepts/A/README.md. Dark is the default (inline styles); a light variant is applied by the
@@ -972,15 +1120,14 @@ def meter_html(rank, big=False, rank_from=None):
             f'<span class="bnm" style="font:700 {round(fs * .62)}px/1 {FH};color:{PAL["mu"]}">/10</span>{chg}</td></tr></table>')
 
 def subject_for(issue):
+    """Names the top story. 'Evening Brief, Nov 8: Iran lifts missile range limit + 2 more'."""
     d = issue["end"].astimezone(ET).strftime("%b %-d"); lab = slot_label(issue["slot"])
-    pre = f"{BRAND} {lab} Brief, {d}: "
-    if issue["main"]:
-        top = issue["main"][0]; more = len(issue["main"]) - 1 + len(issue.get("updates", [])) + len(issue.get("follow", []))
-        return pre + f"R{top['rank']} {_cut(_short(top['title'], 200), 70)}" + (f" (+{more} more)" if more else "")
-    dv = issue.get("follow", []) + issue.get("updates", [])
-    if dv: return pre + f"UPDATE R{dv[0]['rank']} {_cut(_short(dv[0]['title'], 200), 64)}" + (f" (+{len(dv) - 1} more)" if len(dv) > 1 else "")
-    if issue["notable"]: return pre + f"no rank-{issue['rule']['rank']}+ confirmed threats; {len(issue['notable'])} notable"
-    return pre + "no confirmed high-severity events"
+    pool = _story_pool(issue)
+    if not pool:
+        return f"{lab} Brief, {d}: {MATTERS}"
+    title = _cut(_short(pool[0].get("title") or "", 200), 72).rstrip(" .")
+    extra = len(pool) - 1
+    return f"{lab} Brief, {d}: {title}" + (f" + {extra} more" if extra else "")
 
 def follow_links(row, cid, c=None):
     """One-click, no-login Follow / Unfollow links for one story (signed, purpose-bound, bound to the address). Previews without a
@@ -1098,14 +1245,16 @@ def _item_html(it, links, c):
     try:
         import newsletter_art as ART
         kind = ART.event_kind(it.get("title"), it.get("category"))
-        ico = ART.img(ART.icon_src(kind), f"Event {kind}", 40, 40)
+        scene = ART.img(ART.scene_src(kind), f"Engraved {kind} illustration", 560, 315)
+        traj = it.get("trajectory") or ("Rising" if it.get("rising") else "Steady")
+        detail = it.get("trend_detail") or f"rank {int(it.get('rank') or 0)}/10"
+        badge = ART.trend_badge_html(traj, detail)
     except Exception:
-        ico = ""
+        scene, badge = "", ""
     num = f'{it["map_n"]}. ' if it.get("map_n") else ""
-    H = [_CARD_O + f'<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
-         f'<td width="48" valign="top" style="width:48px;padding:0 10px 0 0">{ico}</td>'
-         f'<td valign="top">{_rank_badge(it)}{_kicker(it)}'
-         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 19px/1.3 {FH};color:{PAL["tx"]};text-decoration:none">{num}{E(_cut(it["title"], 200))}</a></div></td></tr></table>']
+    H = [_CARD_O + scene + badge
+         + f'{_rank_badge(it)}{_kicker(it)}'
+         f'<div style="margin:2px 0 10px 0"><a href="{E(url)}" class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]};text-decoration:none">{num}{E(_cut(it["title"], 200))}</a></div>']
     H.append(_visuals_html(it, url, c))
     if u:
         bits = []
@@ -1211,14 +1360,15 @@ def _head_html(kicker, kcol, line2, rng):
 
 _SECCOL = {"#e6e9ee": ("bnt", PAL["tx"]), "green": ("bnt", PAL["tx"]), "amber": ("bnt", PAL["tx"]), "red": ("bnt", PAL["tx"])}
 def _sec_html(title, sub_, col="#e6e9ee"):
-    """Engraved plate plus the one-line explainer. The plate is the section name; the line under it is the only prose."""
+    """Menu-scale engraved banner, then a large selectable section title."""
     try:
         import newsletter_art as ART
-        plate = ART.img(ART.plate_src(title), f"Section {title}", 560, 56)
+        plate = ART.img(ART.banner_src(title), f"Section {title}", 560, 385)
     except Exception:
-        plate = f'<div class="bnt" style="font:600 24px/1.2 {FH};color:{PAL["tx"]}">{E(title)}</div>'
+        plate = ""
     return (f'<tr><td class="bnpad" style="padding:28px 20px 8px 20px;text-align:left">{plate}'
-            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:8px">{E(sub_)}</div></td></tr>')
+            f'<div class="bnt" style="font:700 28px/1.15 {FH};color:{PAL["tx"]};margin-top:12px">{E(title)}</div>'
+            f'<div class="bnm" style="font:400 15px/1.5 {FB};color:{PAL["mu"]};margin-top:6px">{E(sub_)}</div></td></tr>')
 
 def _number_map(issue):
     n = 1
@@ -1257,9 +1407,18 @@ def _category_chart_html(issue):
     except Exception:
         return ""
 
-def _bluf_html(txt, label="BLUF"):
+def _bluf_html(txt, label="HERE'S WHAT MATTERS"):
     return (f'<tr><td class="bnpad" style="padding:0 20px 8px 20px"><div class="bns bnt" style="background:{PAL["surf"]};border-radius:18px;'
             f'padding:20px 22px;font:400 17px/1.5 {FB};color:{PAL["tx"]}"><div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:{PAL["ac"]};margin:0 0 6px 0">{label}</div>{E(txt)}</div></td></tr>')
+
+def _matters_html(issue):
+    bits = []
+    for i, it in enumerate(_story_pool(issue)[:3], 1):
+        why = _why_line(it)
+        bits.append(f'<p class="bnt" style="margin:12px 0 0 0;font:400 16px/1.45 {FB};color:{PAL["tx"]}"><b style="font-weight:600">{i}. {E(_short(it.get("title") or "", 140))}</b>'
+                    + (f' — {E(why)}' if why else "") + "</p>")
+    return (f'<tr><td class="bnpad" style="padding:0 20px 8px 20px"><div class="bns" style="background:{PAL["surf"]};border-radius:18px;padding:20px 22px">'
+            f'<div class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]}">{MATTERS}.</div>{"".join(bits)}</div></td></tr>')
 
 def window_str(a, b):
     hrs = (b - a).total_seconds() / 3600
@@ -1291,7 +1450,7 @@ def render(issue, links, c=None):
     if issue.get("label"): day = issue["label"]
     B = []; a = B.append
     _number_map(issue)
-    a(_bluf_html(issue["bluf"]))
+    a(_matters_html(issue))
     a(_map_html(issue))
     a(_category_chart_html(issue))
     _an = _analysis_html(issue, c)
@@ -1302,9 +1461,6 @@ def render(issue, links, c=None):
     if issue.get("near"):
         a(_sec_html(f"Near you — {issue.get('loc_label') or 'your area'}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country), highest rank first.", "green"))
         for it in issue["near"]: a(_item_html(it, links, c))
-    elif issue.get("loc_label") and not issue.get("quiet"):
-        a(_sec_html(f"Near you — {issue['loc_label']}", "Confirmed or official reports within about 300 km of your area (or anywhere in it, for a country).", "green"))
-        a(f'<tr><td style="padding:4px 20px 14px 20px;font:400 15px/1.55 {FB};color:{PAL["body"]}">All quiet near {E(issue["loc_label"])}: no confirmed or official reports in the last 24 hours.</td></tr>')
     if issue.get("crime"):
         cr = issue["crime"]
         a(_sec_html(f"Crime near you — {cr['label']}", f"Official statistics and recent police reports. Source: {cr['source']}."))
@@ -1316,9 +1472,6 @@ def render(issue, links, c=None):
     if issue["main"]:
         a(_sec_html("Top threats", f"New since your last brief. Rank {rr['rank']}+ and confirmed by {rr['sources']}+ independent sources, highest first."))
         for it in issue["main"]: a(_item_html(it, links, c))
-    elif not issue.get("quiet"):   # fully quiet: the BLUF already carries QUIET_LINE, so it is the only line
-        a(f'<tr><td style="padding:16px 20px"><div class="bns2 bnx" style="background:{PAL["surf2"]};border-radius:12px;padding:12px 14px;font:400 15px/1.55 {FB};color:{PAL["body"]}">'
-          f'{E(quiet_line(issue))}</div></td></tr>')
     if issue.get("politics"):
         a(_sec_html("Politics & Government", "Government actions, emergency declarations, sanctions and political crises, confirmed by 2+ independent sources."))
         for it in issue["politics"]: a(_item_html(it, links, c))
@@ -1351,7 +1504,7 @@ def render(issue, links, c=None):
     pre = issue["bluf"]
     why = f"You get this because you confirmed a subscription to the {BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage."
     html_ = _shell(subj, pre, _head_html(f"{lab.upper()} BRIEF", PAL["ac"], day, rng), B, links, c, why)
-    T = [f"{BRAND} — {lab} Brief", TAGLINE, day, rng, "", f"BLUF: {issue['bluf']}", ""]
+    T = [share_text(issue), "", day, rng, ""]
     T.extend(_analysis_text(issue, c))
     def tsec(title, items):
         T.extend([title.upper(), "=" * len(title)])
@@ -1361,13 +1514,11 @@ def render(issue, links, c=None):
             fl = follow_links(links.get("_row"), it["cluster_id"], c)
             T.append(f"   Unfollow: {fl['unfollow']}" if it.get("followed") and fl["unfollow"] else f"   Follow this story: {fl['follow']}")
             T.append("")
-    if not issue.get("near") and issue.get("loc_label") and not issue.get("quiet"): T += [f"NEAR YOU — {issue['loc_label'].upper()}", f"All quiet near {issue['loc_label']}: no confirmed or official reports in the last 24 hours.", ""]
     if issue.get("near"): tsec(f"Near you — {issue.get('loc_label') or 'your area'}", issue["near"])
     if issue.get("crime"):
         cr = issue["crime"]; T += [f"CRIME NEAR YOU — {cr['label'].upper()}"] + cr["lines"] + [f"Map and full numbers: {cr['url']}", ""]
     if issue.get("follow"): tsec("Stories you follow", issue["follow"])
     if issue["main"]: tsec("Top threats", issue["main"])
-    elif not issue.get("quiet"): T += [quiet_line(issue), ""]
     if issue.get("politics"): tsec("Politics & Government", issue["politics"])
     if vids:
         T.extend(["WATCH: NEW ON BLACKOUT.NETWORK", "=" * 30])
