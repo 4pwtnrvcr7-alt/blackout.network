@@ -1461,9 +1461,10 @@ def _band_html(it):
     if place and it.get("approx") and "approx" not in place.lower(): place += " (approx.)"
     bits = [b for b in (place, _band_when(it.get("when"))) if b]
     meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:6px;white-space:nowrap">{E(_one_line(" · ".join(bits), 38))}</div>' if bits else "")
-    band, panel = _mix(rail, "#12161A", 0.20), _mix(rail, "#1B2933", 0.55)
+    band, panel = "#121826", "#121826"
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{band}" style="background:{band}"><tr>'
-            f'<td width="104" valign="middle" align="center" bgcolor="{panel}" style="width:104px;background:{panel};padding:18px 12px;border-radius:18px">{mark}</td>'
+            f'<td width="2" bgcolor="{rail}" style="width:2px;background:{rail};font-size:0;line-height:0">&nbsp;</td>'
+            f'<td width="102" valign="middle" align="center" bgcolor="{panel}" style="width:102px;background:{panel};padding:18px 12px;border-radius:0 16px 16px 0">{mark}</td>'
             f'<td valign="middle" bgcolor="{band}" style="padding:16px 12px;background:{band};font-family:{FACE}">'
             f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>'
             f'<td valign="middle" style="font:700 16px/20px {FACE};color:{PAL["tx"]}">{E(label)}{E(flag)}</td>'

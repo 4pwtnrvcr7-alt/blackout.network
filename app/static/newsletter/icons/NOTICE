@@ -2,4 +2,7 @@ Material Symbols Rounded, filled
 Copyright Google LLC
 Licensed under the Apache License, Version 2.0. See LICENSE in this directory.
 
-The PNG files here are gold glyphs rendered from that font (fill 1, optical size 48, weight 500) for the newsletter. One family is used for every category and section mark.
+The PNG files here are glyphs from that font (fill 1, optical size 48, weight 500), drawn in #F2C14E for the newsletter. One family is used for every category and section mark.
+
+missile.png is the rocket_launch glyph with the exhaust puff and the porthole removed, so it reads as a solid projectile.
+nuclear.png is a geometric radiation trefoil (the public hazard symbol), drawn to the same optical size. It is not a second icon family.
