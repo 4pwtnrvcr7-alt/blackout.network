@@ -53,7 +53,11 @@ def starship(force=False):
 
 def starlink(force=False):
     def f():
-        t = B.http("https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=csv", timeout=40, accept="text/csv").decode("utf-8", "replace").splitlines()
+        t = None
+        try:   # share netstarlink.py's copy of the same CelesTrak file (one GROUP=starlink download per update per IP)
+            import netstarlink; t = netstarlink.gp_csv_text()
+        except Exception: t = None
+        t = (t or B.http("https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=csv", timeout=40, accept="text/csv").decode("utf-8", "replace")).splitlines()
         rows = [l for l in t[1:] if l.startswith("STARLINK")]
         if len(rows) < 1000: raise RuntimeError(f"CelesTrak returned only {len(rows)} rows")
         y = datetime.now(timezone.utc).year; this_year = sum(1 for l in rows if (l.split(",")[1] or "").startswith(str(y)))

@@ -6,6 +6,7 @@ Data, all keyless and official, fetched on request and cached in memory for 10 m
   Microsoft 365 consumer status API · Google Cloud incidents.json · Google Workspace incidents.json ·
   Cloudflare and Akamai Statuspage APIs (summary + incidents) · netstatus.db (this site's own 5-minute checks, read-only).
 Root causes are only shown when the provider's own report states one; otherwise "Unconfirmed / not yet disclosed".
+Starlink (/network/starlink) and "Networks near me" (/network/near) live in netstarlink.py, loaded below.
 Never touches scanner.py, scoring, push.py, jets.py, config.json or aviation_watch.py."""
 import html, json, math, os, re, sqlite3, threading, time, urllib.request, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -475,7 +476,7 @@ IC = {
  "msg": '<path d="M4 5h16v11H8l-4 4z"/>', "eye": '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
  "globe": '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
 }
-def ic(n, cls="np-ic"): return f'<svg class="{cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{IC.get(n, IC["unknown"])}</svg>'
+def ic(n, cls="np-ic"): return f'<svg class="{cls} icon-{n}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{IC.get(n, IC["unknown"])}</svg>'
 TILE = ('<svg class="np-tile" viewBox="0 0 1024 1024" aria-hidden="true"><rect x="8" y="8" width="1008" height="1008" rx="192" fill="#0B0D10" stroke="#2f3742" stroke-width="16"/><path fill="#FFFFFF" d="M527.26 681.57V342.43H606.23L755.93 523.16V342.43H849.92V681.57H770.95L621.25 500.84V681.57ZM279.21 681.57V612.29H349.46Q374.17 612.29 387.01 603.81Q399.84 595.33 399.84 577.89Q399.84 560.45 387.01 551.97Q374.17 543.49 349.46 543.49H279.21V477.12H334.93Q359.15 477.12 371.26 468.88Q383.37 460.65 383.37 444.17Q383.37 427.7 371.26 419.71Q359.15 411.71 334.93 411.71H279.21V342.43H347.52Q414.38 342.43 447.32 366.9Q480.27 391.37 480.27 431.09Q480.27 457.25 466.46 476.88Q454.56 493.79 434.38 504.58Q437.52 505.68 440.54 506.91Q467.19 517.81 481.96 538.4Q496.74 558.99 496.74 588.55Q496.74 632.63 461.13 657.1Q425.52 681.57 357.21 681.57Z"/><path fill="#C8102E" d="M180.86 342.43H262.25C266 342.43 269.04 345.47 269.04 349.22V392.63C269.04 396.37 266 399.41 262.25 399.41H180.86C177.12 399.41 174.08 396.37 174.08 392.63V349.22C174.08 345.47 177.12 342.43 180.86 342.43Z"/><path fill="#FFC21A" d="M180.86 483.51H262.25C266 483.51 269.04 486.55 269.04 490.3V533.7C269.04 537.45 266 540.49 262.25 540.49H180.86C177.12 540.49 174.08 537.45 174.08 533.7V490.3C174.08 486.55 177.12 483.51 180.86 483.51ZM180.86 412.97H262.25C266 412.97 269.04 416.01 269.04 419.76V463.17C269.04 466.91 266 469.95 262.25 469.95H180.86C177.12 469.95 174.08 466.91 174.08 463.17V419.76C174.08 416.01 177.12 412.97 180.86 412.97Z"/><path fill="#3FAE80" d="M180.86 624.59H262.25C266 624.59 269.04 627.63 269.04 631.37V674.78C269.04 678.53 266 681.57 262.25 681.57H180.86C177.12 681.57 174.08 678.53 174.08 674.78V631.37C174.08 627.63 177.12 624.59 180.86 624.59ZM180.86 554.05H262.25C266 554.05 269.04 557.09 269.04 560.83V604.24C269.04 607.99 266 611.03 262.25 611.03H180.86C177.12 611.03 174.08 607.99 174.08 604.24V560.83C174.08 557.09 177.12 554.05 180.86 554.05Z"/></svg>')   # logo V2-final tile (Nov 1 2026)
 def gauge(lv):
     c = LVC.get(lv, "#5b6573"); frac = {0: 1.0, 1: .7, 2: .45, 3: .2}.get(lv, 0); R_ = 44; L = 2 * math.pi * R_
@@ -597,6 +598,10 @@ CSS = """
 @media(max-width:900px){.np-grid2{grid-template-columns:1fr}.np-grid2>.np-sec{margin-bottom:14px}.np-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.np-hrow{grid-template-columns:auto minmax(0,1fr)}.np-hrow .np-gauge{display:none}.np-tile{width:44px;height:44px}.np-hero{padding:15px}.np-dwrap{grid-template-columns:1fr}.np-donut{margin:0 auto}.np-btn{flex:1 1 auto;justify-content:center}.np-kpi b{font-size:19px}}
 html[data-theme=light] .np-hero,html[data-theme=light] .np-sec,html[data-theme=light] .np-pv{background:#fff}html[data-theme=light] .np-tpl,html[data-theme=light] .np-tag,html[data-theme=light] .np-kpi{background:#f3f4f6}
+.np-hubq{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:0 0 14px;background:var(--pn,#12161b)}
+.np-hubq form{display:flex;gap:8px;flex:1 1 320px;margin:0}.np-hubq b{font-family:var(--bn-font-ui,Montserrat,sans-serif);font-size:15px;display:flex;gap:8px;align-items:center}
+.np-attr{font-size:12.5px;line-height:1.45;color:var(--mu,#8a94a3);margin:8px 0 0}.np-attr b{color:var(--tx,#e6e9ee)}
+@media(max-width:560px){.np-hubq form{flex-wrap:wrap}.np-hubq .np-btn{flex:1 1 100%;justify-content:center}}
 """
 JS = """<script>document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-copy]");if(!b)return;var el=document.getElementById(b.dataset.copy),t=el.innerText;
 (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){b.textContent="Copied";setTimeout(function(){b.textContent="Copy"},1800)}).catch(function(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r)})});
@@ -619,7 +624,7 @@ def render(slug):
     yr = [i for i in allinc if i.get("start") and (now - i["start"]).days <= 365]
     n90 = sum(1 for i in allinc if i.get("start") and (now - i["start"]).days <= 90)
     k_mon = f'{mon["pct"]:.2f}%' if mon.get("pct") is not None else "—"
-    hero = (f'<section class="np-hero"><div class="np-hrow">{TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div>'
+    hero = (f'<section class="np-hero page-header-band"><div class="np-hrow">{TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div>'
             f'<h1>{E(p["name"])} status <em>right now</em></h1><p>{E(p["what"])}</p></div>{gauge(lv)}</div>'
             f'<div class="np-kpis"><div class="np-kpi">{lvchip(lv)}<span>{E(("Official: " + d["indicator"]) if d.get("indicator") else (str(len(act)) + " active incident(s)" if act else "No active incidents in the official feed"))}</span>'
             + (f'<span>Our check: {E((mon.get("latest") or {}).get("status", ""))}</span>' if (mon.get("latest") or {}).get("level") else "") + '</div>'
@@ -693,7 +698,7 @@ def render(slug):
              + f'<li>{ic("phone")}<div><b>Phone support</b><small style="font-size:13px">{p["phone"]}</small></div></li>'
              + li("x", [(h, u, "Official account on X") for h, u in p["x"]]) + li("bell", [(t, u, "Get alerts") for t, u in p["subscribe"]]))
     sec_ln = f'<section class="np-sec"><h2>{ic("link")}Official links, contacts and alerts</h2><p class="np-sub">Every link checked before publishing. Phone numbers only where {E(p["name"])} publishes them.</p><ul class="np-links">{links}</ul></section>'
-    others = " · ".join(f'<a href="/network/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug)
+    others = " · ".join(f'<a href="/network/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug) + ' · <a href="/network/starlink">Starlink</a> · <a href="/network/near">Networks near me</a>'
     nl = ('<div class="np-nl"><div><b>Know about the next big outage first</b><div class="np-mu">The free BLACKOUT.NETWORK newsletter: major outages, threats and what to do. Follow us on YouTube and X too.</div></div>'
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=' + slug + '">Get the free newsletter</a></div>')
     body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/#net">Network Status</a> › <a href="/network">Providers</a> › {E(p["name"])}</p>'
@@ -716,20 +721,46 @@ def render(slug):
     return site_page.page(title, desc, body, f"/network/{slug}", active="net", jsonld=ld, og_type="website")
 
 def render_hub():
-    with ThreadPoolExecutor(7) as ex: bs = list(ex.map(lambda s: (s, brief(s)), ORDER))
+    with ThreadPoolExecutor(8) as ex:
+        fsl = ex.submit(sl_brief); bs = list(ex.map(lambda s: (s, brief(s)), ORDER)); slb = fsl.result()
     cards = []
     for s, b in bs:
         p = P[s]; lt = b.get("latest")
         cards.append(f'<a class="np-pv" href="/network/{s}"><h2>{ic(p["icon"])}{E(p["name"])}</h2>{lvchip(b["level"])}<p>{E(b["status"])}</p>'
                      + (f'<p class="np-mu">Latest: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else "") + f'{bars_weeks(b["weeks"])}<span class="np-mu">Full analysis →</span></a>')
+    lt = slb.get("latest")
+    try: attr = sl().ioda_credit_html(_sys_mod(), fmt_et(datetime.now(timezone.utc)))
+    except Exception: attr = ""
+    cards.append(f'<div class="np-pv"><a href="/network/starlink" style="display:flex;flex-direction:column;gap:6px;color:inherit;text-decoration:none"><h2>{ic("network")}Starlink</h2>{lvchip(slb["level"])}<p>{E(slb["status"])}</p>'
+                 + (f'<p class="np-mu">Latest signal: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else '<p class="np-mu">Satellite internet. Independent measurements (IODA); live constellation map.</p>')
+                 + (bars_weeks(slb["weeks"]) if slb.get("weeks") else "") + '<span class="np-mu">Status, satellites and speeds →</span></a>' + attr + '</div>')
     body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/#net">Network Status</a> › Providers</p>'
-            f'<section class="np-hero"><div class="np-hrow">{TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div><h1>Is the cloud down? <em>Provider by provider</em></h1>'
+            f'<section class="np-hero page-header-band"><div class="np-hrow">{TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div><h1>Is the cloud down? <em>Provider by provider</em></h1>'
             '<p>Live status, incident history, root causes and a what-to-do checklist for the clouds and networks most businesses run on. Official feeds; times in ET.</p></div></div></section>'
-            f'<div class="np-provs">{"".join(cards)}</div>{LEG}<p class="np-mu" style="margin-top:8px">Bars: incidents per week over the last 13 weeks from each official feed. <a href="/#net">See every network check</a>.</p></div><style>{CSS}</style>')
-    desc = "Is AWS, Azure, Microsoft 365, Google Cloud, Google Workspace, Cloudflare or Akamai down? Live status, incidents, root causes and what to do, from official feeds."
+            + HUBQ.replace("{pin}", ic("network")) + f'<div class="np-provs">{"".join(cards)}</div>{LEG}<p class="np-mu" style="margin-top:8px">Bars: incidents per week over the last 13 weeks from each official feed (Starlink: IODA outage signals). <a href="/#net">See every network check</a> · <a href="/network/near">Networks near me</a>.</p></div><style>{CSS}</style>')
+    desc = "Is AWS, Azure, Microsoft 365, Google Cloud, Google Workspace, Cloudflare, Akamai or Starlink down? Live status, incidents, root causes and what to do, plus a networks-near-me check."
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Cloud and network provider status", "url": SITE + "/network", "description": desc,
-          "hasPart": [{"@type": "WebPage", "name": f"{P[s]['name']} status", "url": f"{SITE}/network/{s}"} for s in ORDER]}
+          "hasPart": [{"@type": "WebPage", "name": f"{P[s]['name']} status", "url": f"{SITE}/network/{s}"} for s in ORDER] + [{"@type": "WebPage", "name": "Starlink status", "url": f"{SITE}/network/starlink"}]}
     return site_page.page("Is the cloud down? AWS, Azure, Microsoft 365, Google, Cloudflare status", desc, body, "/network", active="net", jsonld=ld, og_type="website")
+
+# ---------------------------------------------------------------- Starlink + Networks near me (netstarlink.py; reloaded when that file changes)
+_SLM = [None, None]
+def sl():
+    import importlib, sys as _sys
+    f = os.path.join(BASE, "netstarlink.py"); mt = os.path.getmtime(f)
+    if _SLM[0] != mt or _SLM[1] is None:
+        _SLM[1] = importlib.reload(_SLM[1]) if _SLM[1] is not None else (importlib.reload(_sys.modules["netstarlink"]) if "netstarlink" in _sys.modules else importlib.import_module("netstarlink"))
+        _SLM[0] = mt
+    return _SLM[1]
+def sl_brief():
+    try: return sl().brief(_sys_mod())
+    except Exception as e: return dict(slug="starlink", name="Starlink", level=-1, level_name=LVN[-1], status=f"Measurements unavailable ({type(e).__name__})", latest=None, weeks=[], page="/network/starlink")
+def _sys_mod():
+    import sys as _sys
+    return _sys.modules[__name__]
+HUBQ = ('<div class="np-hubq"><b>{pin}Networks near me</b><form action="/network/near" method="get" role="search"><label for="hub_q" class="np-mu" style="position:absolute;left:-9999px">ZIP code or city</label>'
+        '<input id="hub_q" name="where" placeholder="ZIP code or city, e.g. 32771" maxlength="120" style="flex:1 1 200px;min-width:0;font:500 15px/1.2 var(--bn-font-body,Inter,sans-serif);padding:10px 12px;border-radius:10px;border:1px solid var(--bd2,#2f3742);background:var(--bn-surface,#161b21);color:var(--tx,#e6e9ee)">'
+        '<button class="np-btn p" type="submit">Check status and weather</button></form></div>')
 
 # ---------------------------------------------------------------- accordion for the dashboard's Network Status tab (enhances #ns_list rows in place)
 ACC_JS = r"""(function(){
@@ -750,30 +781,42 @@ function css(){if(document.getElementById("nsa-css"))return;var s=document.creat
 ".nsa-sp{width:100%;height:46px;display:block}.nsa-cap{font-size:11px;color:var(--mu)}.nsa-up{display:flex;gap:3px;margin-top:4px}.nsa-up i{flex:1;height:18px;border-radius:3px}"+
 ".nsa-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.nsa-acts a{display:inline-flex;align-items:center;gap:6px;font:700 12.5px/1.1 Montserrat,system-ui,sans-serif;padding:8px 11px;border-radius:8px;text-decoration:none;border:1px solid var(--bd2,#2f3742);color:var(--tx)}.nsa-acts a.p{background:#c8102e;border-color:#c8102e;color:#fff}"+
 "@media(max-width:760px){.nsa>.nsa-b{grid-template-columns:12px minmax(0,1fr) 20px;row-gap:4px}.nsa-b .c3,.nsa-b .ns-h{grid-column:2/3}.nsa-b .nsa-chev{grid-row:1;grid-column:3}.nsa-in{grid-template-columns:1fr;padding:2px 10px 12px;gap:4px}.nsa-acts a{flex:1 1 auto;justify-content:center}}"+
-"@media(prefers-reduced-motion:reduce){.nsa-p,.nsa-chev{transition:none}}";document.head.appendChild(s)}
+"@media(prefers-reduced-motion:reduce){.nsa-p,.nsa-chev{transition:none}}.np-attr{font-size:11.5px;line-height:1.45;color:var(--mu);margin:8px 0 0}.np-attr a{color:inherit}";document.head.appendChild(s)}
 var CHEV='<svg class="nsa-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
 function spark(w){if(!w||!w.length)return"";var mx=1;w.forEach(function(x){if(x[0]>mx)mx=x[0]});var n=w.length,bw=260/n,o="";
  w.forEach(function(x,i){if(x[0]==null){o+='<rect x="'+(i*bw+2).toFixed(1)+'" y="26" width="'+(bw-4).toFixed(1)+'" height="14" rx="2" fill="none" stroke="#3a424d" stroke-dasharray="2 2"><title>No data in the feed for this week</title></rect>';return}
   var h=x[0]?6+30*x[0]/mx:3;o+='<rect x="'+(i*bw+2).toFixed(1)+'" y="'+(40-h).toFixed(1)+'" width="'+(bw-4).toFixed(1)+'" height="'+h.toFixed(1)+'" rx="2" fill="'+(x[0]?C[Math.max(1,Math.min(3,x[1]))]:"#2a313a")+'"><title>'+x[0]+' incident(s)</title></rect>'});
  return '<svg class="nsa-sp" viewBox="0 0 260 42" preserveAspectRatio="none" role="img" aria-label="Incidents per week, last 13 weeks">'+o+'</svg>'}
 function panel(b){var L=b.latest,h='<div class="nsa-in"><div>';
- h+='<h4>'+(b.active?"Active incident":"Latest incident in the official feed")+'</h4>';
- if(L){var tg=(L.regions||[]).slice(0,4).concat((L.services||[]).slice(0,5));h+='<div class="nsa-inc" style="--c:'+(C[L.sev]||C[1])+'"><b>'+esc(L.title)+'</b><span class="m">'+esc(L.start_et)+(L.end_et?' → '+esc(L.end_et):(b.active?(L.longrun?' · long-running, still open':' · ongoing'):''))+' · <a href="'+esc(L.url)+'" target="_blank" rel="noopener">official source</a></span>'+
+ h+='<h4>'+(b.latest_label||(b.active?"Active incident":"Latest incident in the official feed"))+'</h4>';
+ if(L){var tg=(L.regions||[]).slice(0,4).concat((L.services||[]).slice(0,5));h+='<div class="nsa-inc" style="--c:'+(C[L.sev]||C[1])+'"><b>'+esc(L.title)+'</b><span class="m">'+esc(L.start_et)+(L.end_et?' → '+esc(L.end_et):(b.active?(L.longrun?' · long-running, still open':' · ongoing'):''))+' · <a href="'+esc(L.url)+'" target="_blank" rel="noopener">'+esc(b.source_label||"official source")+'</a></span>'+
    (tg.length?'<div class="nsa-tags">'+tg.map(function(t){return'<span title="'+esc(t)+'">'+esc(t)+'</span>'}).join("")+'</div>':"")+(L.summary?'<p>'+esc(L.summary.slice(0,260))+(L.summary.length>260?"…":"")+'</p>':"")+
    '<p style="font-size:12px">'+(L.cause?'Cause per '+esc(L.cause.who)+': <b>'+esc(L.cause.name)+'</b>':'Cause: <b>Unconfirmed / not yet disclosed</b>')+'</p></div>'}
  else h+='<div class="nsa-inc" style="--c:'+C[0]+'"><b>No incidents listed in the official feed right now</b><span class="m">'+esc(b.coverage||"")+'</span></div>';
  h+='<h4>What to do now</h4><ul class="nsa-tips">'+b.tips.map(function(t){return"<li>"+esc(t)+"</li>"}).join("")+'</ul></div><div>';
- h+='<h4>Incidents per week · last 13 weeks</h4>'+spark(b.weeks)+'<div class="nsa-cap">From the official feed. '+esc((b.coverage||"").split(";")[0].split(". ")[0])+'</div>';
+ h+='<h4>'+(b.slug==="starlink"?"Outage signals per week":"Incidents per week")+' · last 13 weeks</h4>'+spark(b.weeks)+'<div class="nsa-cap">'+(b.weeks_note?esc(b.weeks_note):'From the official feed. '+esc((b.coverage||"").split(";")[0].split(". ")[0]))+'</div>'+(b.attribution_html||'');
  if(b.uptime7&&b.uptime7.length){h+='<h4>Our 5-minute checks'+(b.uptime_pct!=null?' · '+b.uptime_pct.toFixed(2)+'% clean':'')+'</h4><div class="nsa-up">'+b.uptime7.map(function(d){var c=d.pct>=99.5?C[0]:d.pct>=95?C[1]:C[3];return'<i style="background:'+c+'" title="'+esc(d.day)+': '+d.pct+'% of checks with no degraded or major status"></i>'}).join("")+'</div><div class="nsa-cap">One bar per day (ET), last 7 days.</div>'}
- h+='<div class="nsa-acts"><a class="p" href="'+esc(b.page)+'">Full analysis →</a><a href="'+esc(b.status_url)+'" target="_blank" rel="noopener">Official status</a><a href="'+esc(b.console[1])+'" target="_blank" rel="noopener">'+esc(b.console[0].split(" (")[0].split(" → ")[0])+'</a></div>';
+ h+='<div class="nsa-acts"><a class="p" href="'+esc(b.page)+'">'+(b.slug==="starlink"?"Status, satellites and speeds →":"Full analysis →")+'</a><a href="'+esc(b.status_url)+'" target="_blank" rel="noopener">Official status</a><a href="'+esc(b.console[1])+'" target="_blank" rel="noopener">'+esc(b.console[0].split(" (")[0].split(" → ")[0])+'</a></div>';
  return h+'</div></div>'}
 function load(slug,box){if(CACHE[slug]&&Date.now()-CACHE[slug].t<300000){box.innerHTML=panel(CACHE[slug].b);return}
  if(!box.innerHTML)box.innerHTML='<div class="nsa-in"><div class="nsa-cap">Loading the official feed…</div></div>';
  fetch("/api/network/"+slug+"/brief").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(b){CACHE[slug]={t:Date.now(),b:b};box.innerHTML=panel(b)}).catch(function(){box.innerHTML='<div class="nsa-in"><div class="nsa-cap">Could not load right now. <a href="/network/'+slug+'">Open the full page</a>.</div></div>'})}
 function toggle(w,force){var o=force!=null?force:!w.classList.contains("open"),slug=w.dataset.slug,b=w.querySelector(".nsa-b"),p=w.querySelector(".nsa-p");
  w.classList.toggle("open",o);b.setAttribute("aria-expanded",o?"true":"false");p.setAttribute("aria-hidden",o?"false":"true");if(o){OPEN[slug]=1;load(slug,p.firstChild)}else delete OPEN[slug]}
-function enhance(){var list=document.getElementById("ns_list");if(!list)return;css();
- list.querySelectorAll("h3").forEach(function(h){var t=h.textContent.trim();if((t==="Big cloud"||t==="DNS & CDN")&&!h.querySelector(".nsa-hub")){h.insertAdjacentHTML("beforeend",' <a class="nsa-hub" href="/network" style="float:right;font-size:11px;letter-spacing:.04em;color:#ff6b6e;text-decoration:none;text-transform:none">Provider pages &rarr;</a>')}});
+var SLB=null,SLT=0;
+function slRow(list){if(list.querySelector('.nsa[data-slug="starlink"],.ns-row[data-sl]'))return;var b=SLB,lv=b?b.level:null;
+ var row='<div class="ns-row" data-sl="1"><span class="d'+(lv!=null&&lv>=0?' ns-l'+lv:'')+'"></span><span>Starlink</span><span><span class=st>'+esc(b?b.status:"Loading independent measurements…")+'</span><span class=dt>Satellite internet · IODA measurements of AS14593</span></span><span class=ns-h></span></div>';
+ if(list.querySelector("details.bn-acc")){var block='<details class="bn-acc bn-acc-ns" id="acc-ns-satellite-internet" open><summary aria-expanded="true"><span class="bn-acc-t"><b>Satellite internet</b><small>Starlink</small></span></summary><div class="bn-acc-body"><h3>Satellite internet</h3>'+row+'</div></details>';
+  var dns=null,cloud=null;list.querySelectorAll("details.bn-acc").forEach(function(d){var h=d.querySelector("h3"),n=h&&h.firstChild,t=((n&&n.nodeType===3?n.textContent:h&&h.textContent)||"").trim();if(t==="DNS & CDN")dns=d;else if(t==="Big cloud")cloud=d});
+  var after=dns||cloud;if(after)after.insertAdjacentHTML("afterend",block);else list.insertAdjacentHTML("beforeend",block);return}
+ var hs=[].slice.call(list.querySelectorAll("h3")),afterH=null;hs.forEach(function(h){var n=h.firstChild,t=((n&&n.nodeType===3?n.textContent:h.textContent)||"").trim();if(t==="Big cloud"||t==="DNS & CDN")afterH=h});
+ var html='<h3>Satellite internet</h3>'+row,next=null;if(afterH){next=afterH.nextElementSibling;while(next&&next.tagName!=="H3")next=next.nextElementSibling}
+ if(next)next.insertAdjacentHTML("beforebegin",html);else list.insertAdjacentHTML("beforeend",html)}
+function slFetch(){if(Date.now()-SLT<300000)return;SLT=Date.now();fetch("/api/network/starlink/brief",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(b){SLB=b;CACHE.starlink={t:Date.now(),b:b};
+ var w=document.querySelector('.nsa[data-slug="starlink"]');if(w){var st=w.querySelector(".nsa-b .st"),d=w.querySelector(".nsa-b .d");if(st&&b.status)st.textContent=b.status;if(d&&b.level!=null&&b.level>=0)d.className="d ns-l"+b.level}
+ var row=document.querySelector(".ns-row[data-sl]");if(row){var st2=row.querySelector(".st");if(st2&&b.status)st2.textContent=b.status}}).catch(function(){})}
+function enhance(){var list=document.getElementById("ns_list");if(!list)return;css();if(list.querySelector(".ns-row")){slRow(list);slFetch()}
+ list.querySelectorAll("h3").forEach(function(h){if(h.querySelector(".nsa-hub"))return;var n=h.firstChild,t=((n&&n.nodeType===3?n.textContent:h.textContent)||"").trim();if(t==="Big cloud"||t==="DNS & CDN"){h.insertAdjacentHTML("beforeend",' <a class="nsa-hub" href="'+(t==="Big cloud"?"/network/near":"/network")+'" style="float:right;font-size:11px;letter-spacing:.04em;color:#ff6b6e;text-decoration:none;text-transform:none">'+(t==="Big cloud"?"Networks near me &rarr;":"Provider pages &rarr;")+'</a>')}});
  list.querySelectorAll(".ns-row").forEach(function(r){var nmEl=r.children[1],nm=(nmEl&&nmEl.textContent||"").trim(),slug=MAP[nm];if(!slug)return;
   var w=document.createElement("div");w.className="nsa";w.dataset.slug=slug;var id="nsa-p-"+slug;
   w.innerHTML='<button type="button" class="nsa-b" aria-expanded="false" aria-controls="'+id+'">'+r.children[0].outerHTML+'<span class="nm">'+esc(nm)+'<small>DETAILS &amp; WHAT TO DO</small></span><span class="c3">'+(r.children[2]?r.children[2].innerHTML:"")+'</span>'+(r.children[3]?r.children[3].outerHTML:"")+CHEV+'</button><div class="nsa-p" id="'+id+'" role="region" aria-hidden="true" aria-label="'+esc(nm)+' details"><div></div></div>';
@@ -781,10 +824,13 @@ function enhance(){var list=document.getElementById("ns_list");if(!list)return;c
 function watch(){var list=document.getElementById("ns_list");if(!list)return setTimeout(watch,600);enhance();var mo=new MutationObserver(function(){mo.disconnect();enhance();mo.observe(list,{childList:true})});mo.observe(list,{childList:true})}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",watch);else watch()})();"""
 
-def acc_js(): return ACC_JS.replace("__MAP__", json.dumps(SRC2SLUG)).encode()
+def acc_js(): return ACC_JS.replace("__MAP__", json.dumps(dict(SRC2SLUG, Starlink="starlink"))).encode()
 
-def handle_get(path, qs):
+def handle_get(path, qs, headers=None):
     p = path.rstrip("/") or "/"
+    if p in ("/network/starlink", "/network/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
+        r = sl().handle_get(p, qs or {}, _sys_mod(), headers)
+        if r is not None: return r
     if p == "/network": return 200, render_hub(), "text/html"
     m = re.fullmatch(r"/network/([a-z0-9]+)", p)
     if m and m.group(1) in P: return 200, render(m.group(1)), "text/html"
@@ -796,5 +842,7 @@ def handle_get(path, qs):
         d = data(m.group(1))
         return 200, {"slug": m.group(1), "active": [jsonable(i) for i in d.get("active", [])], "history": [jsonable(i) for i in d.get("history", [])[:60]],
                      "coverage": d.get("coverage"), "fetched": d.get("fetched"), "error": d.get("error")}
-    if p == "/api/network": return 200, {"providers": [{"slug": s, "name": P[s]["name"], "page": f"/network/{s}", "api": f"/api/network/{s}/brief"} for s in ORDER]}
+    if p == "/api/network": return 200, {"providers": [{"slug": s, "name": P[s]["name"], "page": f"/network/{s}", "api": f"/api/network/{s}/brief"} for s in ORDER]
+                                         + [{"slug": "starlink", "name": "Starlink", "page": "/network/starlink", "api": "/api/network/starlink/brief"}],
+                                         "near_me": {"page": "/network/near", "api": "/api/network/near?q=<ZIP or place>"}}
     return 404, {"error": "not found"}
