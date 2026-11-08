@@ -22,15 +22,59 @@
     if (lat === 0 && lon === 0) return false;
     return true;
   }
-  function dest(c) {
-    var id = String(c && (c.cluster_id || c.id) || "");
-    if (/^[0-9a-f]{16}$/.test(id)) return { href: "/wire/" + id, ext: false };
-    var links = (c && c.links) || [], i, u;
+  function blob(c) {
+    var links = (c && c.links) || [], i, parts = [c && c.category, c && c.title];
+    for (i = 0; i < links.length; i++) parts.push(links[i] && links[i].source);
+    return text(parts.join(" "));
+  }
+  function sourceName(link) {
+    var s = text(link && link.source).replace(/\s*\([^)]*\)\s*/g, " ").trim();
+    if (!s && link && link.url) {
+      s = String(link.url).replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0];
+    }
+    s = text(s) || "source";
+    return s.length > 48 ? s.slice(0, 48).trim() : s;
+  }
+  function httpLink(c) {
+    var links = (c && c.links) || [], i, u, l;
     for (i = 0; i < links.length; i++) {
-      u = links[i] && (links[i].url || links[i].u);
-      if (typeof u === "string" && /^https?:\/\//i.test(u)) return { href: u, ext: true };
+      l = links[i] || {};
+      u = l.url || l.u;
+      if (typeof u === "string" && /^https?:\/\//i.test(u)) return { url: u, name: sourceName(l) };
     }
     return null;
+  }
+  function tracker(c) {
+    var b = blob(c);
+    if (/\b(usgs|emsc|geofon|geonet|ingv|csn)\b/i.test(b) || /\b(earthquake|quake|seismic)\b/i.test(b))
+      return { href: "/#solar", ext: false, kind: "tracker", label: "Quakes on BLACKOUT.NETWORK ›" };
+    if (/\b(nws|noaa|meteoalarm)\b/i.test(b) || /weather\.gov/i.test(b))
+      return { href: "/#weather", ext: false, kind: "tracker", label: "Weather on BLACKOUT.NETWORK ›" };
+    if (/\bioda\b|internet outage/i.test(b))
+      return { href: "/network", ext: false, kind: "tracker", label: "Network status on BLACKOUT.NETWORK ›" };
+    if (/\b(swpc|space weather|solar flare|geomagnetic)\b/i.test(b))
+      return { href: "/#solar", ext: false, kind: "tracker", label: "Solar & Seismic on BLACKOUT.NETWORK ›" };
+    if (/\b(power grid|grid status)\b/i.test(b))
+      return { href: "/#grid", ext: false, kind: "tracker", label: "Energy grid on BLACKOUT.NETWORK ›" };
+    return null;
+  }
+  function fallback(c) {
+    var cat = String(c && c.category || ""), href = "/#wire";
+    if (cat === "natural disaster") href = "/#weather";
+    else if (cat === "space weather") href = "/#solar";
+    else if (cat === "political") href = "/#politics";
+    else if (cat === "financial") href = "/#finance";
+    return { href: href, ext: false, kind: "fallback", label: "Read on BLACKOUT.NETWORK ›" };
+  }
+  function dest(c) {
+    var id = String(c && (c.cluster_id || c.id) || "");
+    var page, ext;
+    if (/^[0-9a-f]{16}$/.test(id)) return { href: "/wire/" + id, ext: false, kind: "wire", label: "Read on BLACKOUT.NETWORK ›" };
+    page = tracker(c);
+    if (page) return page;
+    ext = httpLink(c);
+    if (ext) return { href: ext.url, ext: true, kind: "source", label: "Source: " + ext.name + " ›" };
+    return fallback(c);
   }
   function when(c) { return c.event_time || c.first_seen || c.updated || ""; }
   function pass(c, f, now) {
@@ -84,7 +128,25 @@
     var map = L.map(box, {
       zoomControl: true, worldCopyJump: true, preferCanvas: true, attributionControl: true,
       dragging: !embed, scrollWheelZoom: !embed, touchZoom: !embed, doubleClickZoom: !embed, boxZoom: !embed, keyboard: !embed
-    }).setView([18, 12], 2);
+    });
+    var framed = false;
+    function usZoom() {
+      var w = box.clientWidth, h = box.clientHeight;
+      if (w < 40 || h < 40) return 0;
+      // Narrow screens keep the whole country in frame. Desktop fills the view with the lower 48;
+      // a short card cannot use the full-page zoom without cutting the country in half.
+      if (w < 700) return h < 360 ? 2 : 3;
+      return h < 520 ? 4 : 5;
+    }
+    function frameUS() {
+      if (framed) return;
+      var z = usZoom();
+      if (!z) return;
+      map.setView([39, -98], z, { animate: false });
+      framed = true;
+    }
+    frameUS();
+    if (!framed) map.setView([39, -98], (window.innerWidth || 800) < 700 ? 3 : 4);
     map.attributionControl.setPrefix("");
     map.attributionControl.addAttribution("Natural Earth");
     var world = null, markers = L.layerGroup().addTo(map), rows = [], armed = null, tip, hideT = 0, open = null;
@@ -93,6 +155,8 @@
     tip.className = "bn-sig-tip";
     tip.hidden = true;
     tip.setAttribute("role", "tooltip");
+    tip.addEventListener("mouseenter", function () { clearTimeout(hideT); });
+    tip.addEventListener("mouseleave", hideSoon);
     box.appendChild(tip);
 
     function hide() { tip.hidden = true; open = null; }
@@ -111,6 +175,11 @@
         n.textContent = "Approximate location, inferred from report";
         tip.appendChild(n);
       }
+      var d = dest(c), a = document.createElement("a");
+      a.href = d.href;
+      a.textContent = d.label;
+      if (d.ext) { a.target = "_blank"; a.rel = "noopener"; }
+      tip.appendChild(a);
       tip.hidden = false;
       open = c;
       var p = map.latLngToContainerPoint(latlng), w = tip.offsetWidth, ht = tip.offsetHeight;
@@ -131,6 +200,7 @@
       function label() {
         var s = (text(c.title) || "Story") + ". Rank " + b.r + " of 10." + (time ? " " + time + "." : "");
         if (c.exact === false) s += " Approximate location, inferred from report.";
+        s += " " + dest(c).label;
         return s;
       }
       marker.on("mouseover", function (ev) {
@@ -189,7 +259,7 @@
       var inf = 0, noun = shown.length === 1 ? "record" : "records";
       for (i = 0; i < shown.length; i++) if (shown[i].exact === false) inf++;
       say(shown.length + " " + noun + " shown" + (rows.length > shown.length ? " of " + rows.length : "") + (inf ? " · " + inf + " approximate" : "") + " · dots follow rank");
-      setTimeout(function () { map.invalidateSize(); }, 60);
+      setTimeout(function () { map.invalidateSize(); frameUS(); }, 60);
     }
     function fillTopics() {
       var sel = el.querySelector("#bn_sig_topic");
@@ -233,8 +303,8 @@
       var n = el.querySelector(id);
       if (n) n.addEventListener("change", function () { writeUrl(); draw(false); });
     });
-    if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); if (open) show(open, L.latLng(+open.lat, +open.lon)); }).observe(box);
-    else window.addEventListener("resize", function () { map.invalidateSize(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { map.invalidateSize(); frameUS(); if (open) show(open, L.latLng(+open.lat, +open.lon)); }).observe(box);
+    else window.addEventListener("resize", function () { map.invalidateSize(); frameUS(); });
 
     fetch(GEO).then(function (r) { return r.json(); }).then(function (geo) {
       world = L.geoJSON(geo, { style: { color: "#364158", weight: 0.6, fillColor: "#192538", fillOpacity: 0.7 }, interactive: false }).addTo(map);

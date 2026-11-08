@@ -78,7 +78,7 @@ const out={
  r0:B.band(0).color, r3:B.band(3).color, r4:B.band(4).color, r6:B.band(6).color, r7:B.band(7).color, r10:B.band(10).color,
  zero:B.real(item({lat:0,lon:0})), eq:B.real(item({lat:0,lon:10})), nan:B.real(item({lat:null,lon:1})),
  wl2:B.real(item({watchlist:2})), wl1:B.real(item({watchlist:1})),
- ours:B.dest(item({})), ext:B.dest(item({cluster_id:"nope"})), bad:B.dest(item({cluster_id:"nope", links:[{url:"javascript:alert(1)"}]})),
+ ours:B.dest(item({})), ext:B.dest(item({cluster_id:"nope", title:"Talks", category:"political"})), bad:B.dest(item({cluster_id:"nope", title:"Note", category:"cyber", links:[{url:"javascript:alert(1)"}]})), trk:B.dest(item({cluster_id:"nope", title:"Quake south of Tokyo", category:"natural disaster", links:[{source:"USGS"}]})),
  hi:B.pass(item({rank:8}),{rank:"7",topic:"",hours:168},now),
  mid:B.pass(item({rank:5}),{rank:"7",topic:"",hours:168},now),
  band:B.pass(item({rank:5}),{rank:"4",topic:"",hours:168},now),
@@ -108,9 +108,18 @@ console.log(JSON.stringify(out));
         self.assertTrue(got["wl1"])
         self.assertEqual(got["ours"]["href"], "/wire/0123456789abcdef")
         self.assertFalse(got["ours"]["ext"])
+        self.assertEqual(got["ours"]["kind"], "wire")
+        self.assertIn("BLACKOUT.NETWORK", got["ours"]["label"])
         self.assertEqual(got["ext"]["href"], "https://example.com/a")
         self.assertTrue(got["ext"]["ext"])
-        self.assertIsNone(got["bad"])
+        self.assertEqual(got["ext"]["kind"], "source")
+        self.assertTrue(got["ext"]["label"].startswith("Source:"))
+        self.assertEqual(got["bad"]["href"], "/#wire")
+        self.assertFalse(got["bad"]["ext"])
+        self.assertEqual(got["bad"]["kind"], "fallback")
+        self.assertEqual(got["trk"]["href"], "/#solar")
+        self.assertEqual(got["trk"]["kind"], "tracker")
+        self.assertFalse(got["trk"]["ext"])
         self.assertTrue(got["hi"])
         self.assertFalse(got["mid"])
         self.assertTrue(got["band"])

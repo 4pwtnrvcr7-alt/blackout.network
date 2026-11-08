@@ -40,9 +40,11 @@ html[data-theme="light"] #bn_sig,html[data-theme="light"] #bn_sig_map{background
 .bn-sig-mk.bn-sig-enter{visibility:hidden;animation:bn-sig-arm 1ms step-start both;animation-delay:var(--bn-d,0s)}
 .bn-sig-mk.bn-sig-enter .signal{opacity:0;animation:bn-sig-in .7s ease-out both;animation-delay:var(--bn-d,0s)}
 .bn-sig-mk.bn-sig-fade .signal{opacity:0;animation:bn-sig-fade .3s ease-out both}
-.bn-sig-tip{position:absolute;z-index:800;pointer-events:none;max-width:220px;padding:6px 8px;border-radius:6px;background:#152033ee;color:#dce6f8;font:12px/1.35 Inter,system-ui,sans-serif;box-shadow:0 6px 16px #00000055}
+.bn-sig-tip{position:absolute;z-index:800;pointer-events:auto;max-width:240px;padding:6px 8px;border-radius:6px;background:#152033ee;color:#dce6f8;font:12px/1.35 Inter,system-ui,sans-serif;box-shadow:0 6px 16px #00000055}
 .bn-sig-tip b{display:block;font-weight:600;font-size:12px}
 .bn-sig-tip span{display:block;margin-top:2px;color:#8e9bb0;font-size:11px}
+.bn-sig-tip a{display:inline-block;margin-top:5px;color:#8ebaff;font-weight:600;text-decoration:none}
+.bn-sig-tip a:hover{color:#b6d4ff}
 @media (max-width:600px){
  .bn-sig-map{height:320px}
  .bn-sig-cardhead{align-items:flex-start}
