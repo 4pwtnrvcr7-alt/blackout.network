@@ -1,0 +1,59 @@
+/* Global signal map. Marker and land styling match Control panel v2 (style.css .signal / #map).
+   Rank colors: site high red only at rank 7-10. Low stays the panel blue, elevated the site amber. */
+.bn-sig{position:relative;background:#101722;border:1px solid #243044;border-radius:18px;overflow:hidden;color:#e5ecf7}
+html[data-theme="light"] #bn_sig,html[data-theme="light"] #bn_sig_map{background:#101722}
+.bn-sig-cardhead,.bn-sig-bar{display:flex;align-items:center;justify-content:space-between;gap:12px 18px;flex-wrap:wrap}
+.bn-sig-cardhead{padding:16px 16px 12px}
+.bn-sig h2,.bn-sig-bar h1{margin:0;color:#e5ecf7}
+.bn-sig h2{font:600 22px/1.2 Inter,system-ui,sans-serif;letter-spacing:-.02em}
+.bn-sig-bar h1{font:600 16px/1.2 Inter,system-ui,sans-serif;letter-spacing:-.01em}
+.bn-sig-note{margin:3px 0 0;color:#8e9bb0;font:11px/1.4 Inter,system-ui,sans-serif}
+.bn-sig-side{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap;justify-content:flex-end}
+.bn-sig-leg{margin:0;font-size:9px;letter-spacing:1.5px;font-weight:600;color:#8e9bb0;text-transform:uppercase}
+.bn-sig-leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 5px 1px 12px;vertical-align:middle;box-shadow:0 0 8px currentColor}
+.bn-sig-leg i:first-child{margin-left:0}
+.bn-sig-leg i.lo{background:#55b7ff;color:#55b7ff}
+.bn-sig-leg i.md{background:#F5A524;color:#F5A524}
+.bn-sig-leg i.hi{background:#FF4D4F;color:#FF4D4F}
+.bn-sig-sr,.bn-sig-skip{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);border:0}
+.bn-sig-skip:focus{position:fixed;left:12px;top:8px;width:auto;height:auto;margin:0;clip:auto;background:#152033;color:#e5ecf7;padding:8px 12px;z-index:20;border-radius:8px}
+.bn-sig-open{color:#8ebaff;text-decoration:none;font:600 13px/1 Inter,system-ui,sans-serif;min-height:44px;display:inline-flex;align-items:center}
+.bn-sig-open:hover{color:#b6d4ff}
+.bn-sig-map{height:370px;background:#0b1220;z-index:1;position:relative}
+.bn-sig[data-embed="1"] .bn-sig-map{touch-action:pan-y;cursor:pointer}
+.bn-sig .leaflet-container,.bn-map-page .leaflet-container{font-family:Inter,system-ui,sans-serif;background:#0b1220!important}
+.bn-sig .leaflet-overlay-pane,.bn-map-page .leaflet-overlay-pane{pointer-events:none}
+.leaflet-control-attribution{background:#182232dd!important;color:#91a0b3!important;font-size:8px!important}
+.leaflet-control-attribution a{color:#91a0b3!important}
+.bn-sig-mk{background:none!important;border:0!important}
+.bn-sig-mk .signal{width:12px;height:12px;border:2px solid currentColor;background:currentColor;border-radius:50%;box-shadow:0 0 12px currentColor;position:relative}
+.bn-sig-mk .signal:after{content:"";display:block;position:absolute;inset:-7px;border:1px solid currentColor;border-radius:50%;animation:bn-sig-radar 2.8s ease-in-out infinite}
+.bn-sig-mk:before{content:"";position:absolute;inset:-8px}
+@keyframes bn-sig-radar{0%{transform:scale(.5);opacity:.8}100%{transform:scale(2);opacity:0}}
+.bn-sig-tip{position:absolute;z-index:800;pointer-events:none;max-width:220px;padding:6px 8px;border-radius:6px;background:#152033ee;color:#dce6f8;font:12px/1.35 Inter,system-ui,sans-serif;box-shadow:0 6px 16px #00000055}
+.bn-sig-tip b{display:block;font-weight:600;font-size:12px}
+.bn-sig-tip span{display:block;margin-top:2px;color:#8e9bb0;font-size:11px}
+@media (max-width:600px){
+ .bn-sig-map{height:320px}
+ .bn-sig-cardhead{align-items:flex-start}
+}
+@media (prefers-reduced-motion:reduce){
+ .bn-sig-mk .signal:after{animation:none;opacity:.45}
+}
+
+/* Full page */
+html.bn-map-root .bng-foot{display:none!important}
+html.bn-map-root body>footer{flex:none;margin:0;padding:6px 14px calc(6px + env(safe-area-inset-bottom));background:#101722;color:#8e9bb0;font-size:12px;text-align:center}
+html.bn-map-root,html.bn-map-root body{height:100%;margin:0}
+html.bn-map-root body{display:flex;flex-direction:column;overflow:hidden;background:#090d14}
+.bn-map-page{flex:1;min-height:0;display:flex;flex-direction:column;background:#090d14}
+.bn-sig-bar{flex:none;padding:10px max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left));background:#101722;border-bottom:1px solid #243044;color-scheme:dark}
+.bn-sig-bar label{display:flex;flex-direction:column;gap:3px;font:600 10px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#8e9bb0}
+.bn-sig-bar select{font:16px/1.2 Inter,system-ui,sans-serif;text-transform:none;letter-spacing:0;color:#e5ecf7;background:#151e2d;border:1px solid #2e3d54;border-radius:7px;min-height:44px;padding:0 10px;max-width:100%}
+.bn-map-page .bn-sig-map{flex:1;height:auto;min-height:220px;touch-action:none}
+.bn-map-page .leaflet-bottom{margin-bottom:env(safe-area-inset-bottom)}
+@media (max-width:600px){
+ .bn-sig-bar{align-items:stretch}
+ .bn-sig-bar label{flex:1 1 140px}
+ .bn-sig-bar select{width:100%}
+}

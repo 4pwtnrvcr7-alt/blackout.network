@@ -27,6 +27,8 @@ ROUTES = {
     "/api/solar_seismic": "solar_seismic",
     "/api/solar_quake": "solar_quake",   # Solar–Earthquake Correlation Lab (t242), precomputed by tools/solar_quake_build.py
     "/api/heatmap": "heatmap",
+    "/map": "signal_map",             # Global signal map (Control panel v2 look): /map page. Not /maps (printable maps tab).
+    "/api/signal": "signal_map",      # /api/signal/app.js, leaflet, world.geojson. Dots come from /api/state, not a new feed.
     "/api/weather": "weather",
     "/api/trends": "trends",
     "/api/wire_history": "wire_history",   # Wire tab scrollable history + ARCHIVE items (t246)

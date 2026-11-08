@@ -454,6 +454,14 @@ def head_tag():
             b'f();addEventListener("hashchange",f)})()</script>'
             b'<link rel="stylesheet" href="/bn-apple.css">')
 
+def _map_section():
+    """Global signal map card. Failure here must not take the homepage down."""
+    try:
+        import signal_map
+        return signal_map.home_section()
+    except Exception:
+        return ""
+
 def home_html(sn):
     """Server-rendered homepage shell (static text + real links). Live numbers fill in from /api/apple/home."""
     try:
@@ -470,6 +478,7 @@ def home_html(sn):
 <div class="bna-arrows"><button type="button" class="bna-arw" data-dir="-1" aria-label="Scroll back" aria-controls="bna_row_latest">&lsaquo;</button><button type="button" class="bna-arw" data-dir="1" aria-label="Scroll forward" aria-controls="bna_row_latest">&rsaquo;</button></div></div>
 <div class="bna-row" id="bna_row_latest" tabindex="0" aria-label="Top of the Wire"></div>
 <p class="bna-wrap bna-more"><a class="bna-lnk" href="/#wire">Open The Wire</a></p></section>
+{_map_section()}
 {_board_html()}{_snap_js()}
 <section class="bna-sec bna-wrap"><div class="bna-brief"><div><h2>The Free brief. <span>The day, ranked.</span></h2><p>The highest-ranked events of the day, in one email.</p></div>
 <a class="bna-btn" href="/newsletter">Get the Free brief</a></div><p class="bna-asof" data-bna="asof"></p></section>

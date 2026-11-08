@@ -373,3 +373,7 @@ html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
 @media (min-width:1100px){.bna-grp[data-g="cf"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .bna-hl{margin:0 0 12px;padding-left:18px}.bna-hl li{margin:0 0 8px;line-height:1.4}.bna-hl small{color:var(--a-mu)}
 @media (min-width:1100px){.bna-grp[data-g="el"] .bna-mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* Global signal map card: size is reserved before its stylesheet loads, so the homepage does not jump. */
+#bn_sig{min-height:430px;border-radius:18px;background:#0b1220;overflow:hidden}
+#bn_sig_map{height:370px;background:#0b1220;touch-action:pan-y}
+@media(max-width:600px){#bn_sig{min-height:390px}#bn_sig_map{height:320px}}
