@@ -84,8 +84,8 @@ html.bna-home .bn-primary a[aria-current]::after,html.bna-home .bn-primary a[ari
 .bn-top .bn-logo{min-height:44px;display:inline-flex;align-items:center}
 .bn-top .bn-ib{min-width:44px;min-height:44px}
 .bna-fol a,.bna-legal a{min-width:44px;justify-content:center}
-/* Home already carries the Free brief band; the sticky bar and prompt would repeat it. Shown again on every tab. */
-html.bna-home #bng_bar,html.bna-home #bng_prompt{display:none!important}
+/* Home already carries the Free brief band, so the sticky bar stays off. The prompt waits until the signal map has scrolled out of view (growth.js sets bn-sig-visible while the map is on screen). */
+html.bna-home #bng_bar{display:none!important}
 html.bna-home body.bng-bar-on{padding-bottom:0!important}html.bna-home body.bng-bar-on .bnr-fab,html.bna-home body.bng-bar-on .bnig-toast{transform:none!important}
 /* Report a problem: quiet ghost pill in the bottom-right corner on desktop so it never sits over content (phone keeps it inline at the end). */
 @media(min-width:601px){html.bna-home .bnr-fab{left:auto!important;right:20px!important;bottom:20px!important;background:var(--a-bg)!important;border:1px solid var(--a-ln)!important;box-shadow:none!important;color:var(--a-mu)!important;opacity:.85;backdrop-filter:none!important;min-height:44px}
