@@ -538,7 +538,7 @@ class RH(server.H):
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/internal/sync/push": return self.send(*handle_push(self))
-        if path in ("/internal/newsletter/test", "/internal/newsletter/status"):   # t373: box-signed (BN_SYNC_SECRET HMAC) newsletter ops
+        if path in ("/internal/newsletter/test", "/internal/newsletter/status", "/internal/newsletter/send_now"):   # t373: box-signed (BN_SYNC_SECRET HMAC) newsletter ops
             self.body(); raw = getattr(self, "_raw", b"") or b""
             ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())
             if not ok: return self.send(403, {"error": why})
@@ -550,6 +550,18 @@ class RH(server.H):
                 return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
                                        "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"],
                                        "lookup": _nl_lookup(NL, d.get("email"))})
+            if path.endswith("/send_now"):   # Nov 8: owner-approved one-off send of a brief slot (e.g. a missed morning). Box-signed; once per key.
+                slot = d.get("slot") if d.get("slot") in ("morning", "evening") else None
+                tag = "".join(ch for ch in str(d.get("tag") or "manual") if ch.isalnum())[:20] or "manual"
+                if not slot: return self.send(400, {"error": "slot must be morning or evening"})
+                at = NL.now(); key = f"{at.astimezone(NL.ET).date().isoformat()}@{slot}-{tag}"
+                k = NL.db()
+                try:
+                    k.execute("INSERT INTO slot_runs(slot_key,slot_time,status,started,note) VALUES(?,?,?,?,?)", (key, NL.iso(at), "running", NL.iso(at), "manual send approved by owner")); k.commit()
+                except Exception as ex: k.close(); return self.send(409, {"error": f"already ran: {key}"})
+                k.close()
+                with NL._LOCK: st, agg = NL.run_slot(key, slot, at, NL.cfg())
+                return self.send(200, {"key": key, "status": st, "counts": agg, "sender_mode": NL.sender_status()["mode"]})
             return self.send(*NL.admin_action({"action": "test_send", "email": d.get("email"), "location": d.get("location")}))
         if path == "/api/hit":   # own visitor counter beacon (usage_stats.beacon): no cookies, no body beyond the page path, always 204
             self.body(); raw = getattr(self, "_raw", b"") or b""
