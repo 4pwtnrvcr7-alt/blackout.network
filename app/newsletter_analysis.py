@@ -592,6 +592,17 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
     if headlines_known:
         bits.append(f"{len(real_leaders)} independent source{'s' if len(real_leaders) != 1 else ''} after collapsing repeated headlines")
     happened = "On the record for " + _tag + ": " + ", ".join(bits) + "."
+    hint = " ".join(re.findall(r"[A-Za-z0-9]{3,}", re.sub(r"^[^\w(]+", "", item.get("title") or ""))[:3])
+    what_short = "On the record (" + (hint or "this report") + "): " + ", ".join(bits) + "."
+    plain_driver = {
+        "war/conflict": "The reports describe the use of force",
+        "political": "The reports describe a government action",
+        "natural disaster": "The reports describe a natural hazard",
+        "disease": "The reports describe cases of disease",
+        "cyber": "The reports describe a system disruption",
+        "financial": "The reports describe a market or banking event",
+    }.get(item.get("category") or "", "The reports describe the event")
+    analysis_short = f"{plain_driver}" + (f" in {where}" if where else "") + (f" ({hint})" if hint else "") + f", rank {rk}/10."
     happened = re.sub(r"\s+", " ", happened)
 
     who_bit = f" The reports name {who}." if who else ""
@@ -641,6 +652,8 @@ def analyze_item(item, alerts, at, coverage_start, alerts_available, prior_rank,
         "title": title,
         "rank": rk,
         "what": happened,
+        "what_short": what_short,
+        "analysis_short": analysis_short,
         "analysis": analysis,
         "trajectory": trajectory,
         "trend_detail": trend_detail,
@@ -815,7 +828,99 @@ def attach(issue, src_path, at, nl_path=None, base_url="https://blackout.network
                                                           "wire": base.rstrip("/") + f"/wire/{i.get('cluster_id')}"} for i in p["items"]]}
         for p in patterns], "cost": cost_per_issue(),
         "coverage_start": coverage.strftime("%Y-%m-%dT%H:%M:%SZ") if coverage else None}
+    _overlay_notes(issue, at, base)
     return issue["analysis"]
+
+
+def notes_path():
+    explicit = (os.environ.get("NEWSLETTER_ANALYSIS_JSON") or "").strip()
+    if explicit: return explicit
+    cfg = (os.environ.get("NEWSLETTER_CONFIG") or "").strip()
+    if cfg: return os.path.join(os.path.dirname(cfg), "newsletter_analysis.json")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "newsletter_analysis.json")
+
+
+def _norm_head(t):
+    stop = set("a an the of in on at to for and or by with from is are was were be after as amid over into its it this that new says said".split())
+    t = re.sub(r"https?://\S+", " ", (t or "").lower())
+    w = [x for x in re.findall(r"[^\W_]+", t) if x not in stop and len(x) > 1]
+    return " ".join(w[:24])
+
+
+def load_notes(path=None, at=None):
+    """Human notes. None when the file is missing, unreadable, or older than 18 hours."""
+    path = path or notes_path()
+    at = at or datetime.now(UTC)
+    try:
+        with open(path) as f: data = json.load(f)
+    except Exception:
+        return None
+    if not isinstance(data, dict): return None
+    gen = _parse(data.get("generated_at"))
+    if gen is None: return None
+    if gen > at + timedelta(minutes=10) or at - gen > timedelta(hours=18): return None
+    by_id, by_title = {}, {}
+    for key, val in (data.get("items") or {}).items():
+        if not isinstance(val, dict): continue
+        by_id[str(key)] = val
+        head = val.get("headline") or val.get("title")
+        if head: by_title[_norm_head(head)] = val
+        if " " in str(key): by_title[_norm_head(str(key))] = val
+    patterns = [p for p in (data.get("patterns") or []) if isinstance(p, str) and p.strip()]
+    return {"generated_at": gen, "by_id": by_id, "by_title": by_title,
+            "lead": (data.get("lead") or "").strip(), "patterns": patterns}
+
+
+def _overlay_notes(issue, at, base):
+    notes = load_notes(at=at)
+    if not notes:
+        issue.pop("notes_lead", None)
+        if issue.get("analysis"): issue["analysis"].pop("notes_patterns", None)
+        return
+    if notes["lead"]:
+        issue["notes_lead"] = notes["lead"]
+    if notes["patterns"] and issue.get("analysis") is not None:
+        issue["analysis"]["notes_patterns"] = notes["patterns"]
+    base = (base or "https://blackout.network").rstrip("/")
+    by = {str(x.get("cluster_id")): x for x in (issue.get("analysis") or {}).get("items") or []}
+    for sec in ("main", "follow", "updates", "politics", "near", "notable", "developing"):
+        for it in issue.get(sec) or []:
+            note = notes["by_id"].get(str(it.get("cluster_id") or ""))
+            if note is None:
+                note = notes["by_title"].get(_norm_head(it.get("title") or ""))
+            if not note: continue
+            traj = _TRAJ_IN.get(note.get("trajectory") or "STEADY", "Steady")
+            guide = note.get("guide") or ""
+            packed = {
+                "from_note": True,
+                "cluster_id": it.get("cluster_id"),
+                "title": it.get("title"),
+                "what": note.get("what_happened") or "",
+                "analysis": note.get("analysis") or "",
+                "outlook": note.get("outlook") or "",
+                "confidence": note.get("confidence") or "",
+                "confidence_line": note.get("confidence_why") or "",
+                "trajectory": traj,
+                "trend_detail": "",
+                "trend_from_history": True,
+                "what_to_do": note.get("what_to_do") or "",
+                "guide_name": _guide_label(guide),
+                "guide_url": guide_href(guide, base),
+                "sources": [u for u in (note.get("sources") or []) if isinstance(u, str) and u.startswith("http")],
+                "category": it.get("category"),
+            }
+            slot = by.get(str(it.get("cluster_id") or ""))
+            if slot is not None:
+                slot.clear(); slot.update(packed)
+            else:
+                (issue.get("analysis") or {}).setdefault("items", []).append(packed)
+                slot = packed
+            it["from_note"] = True
+            if note.get("why_it_matters"): it["why"] = note["why_it_matters"]
+            it["trajectory"] = traj
+            it["trend_detail"] = ""
+            it["trend_from_history"] = True
+            it["analyst"] = slot
 
 
 def _p(html):
@@ -826,28 +931,111 @@ def _lbl(t):
     return f'<b style="font:600 11px {FH};letter-spacing:1px;color:{TX}">{t}</b> '
 
 
-def card_fragment(a):
-    """Compact analysis under one story card. The story heading is already above this block."""
-    if not a: return ""
+_TRAJ_IN = {"UPTREND": "Rising", "DOWNTREND": "Easing", "STEADY": "Steady", "Rising": "Rising", "Easing": "Easing", "Steady": "Steady"}
+_FALLBACK_DO = {
+    "nuclear": ("Keep a radio and the household indoors until an official all-clear.", "Prepare › Home kit", "/ready#home-kit"),
+    "missile": ("Write one out-of-area contact and two meeting places.", "Prepare › Family plan", "/ready#family"),
+    "conflict": ("Write one out-of-area contact and two meeting places.", "Prepare › Family plan", "/ready#family"),
+    "outbreak": ("Check medicines, doses and allergies, and follow the health agency count.", "Prepare › First aid", "/ready#first-aid"),
+    "grid": ("Charge power banks and keep the fridge closed. Any generator stays outdoors.", "Prepare › Power outage", "/ready#power"),
+    "cyber": ("Change the password on any account the report names, and turn on a second factor.", "Prepare › Home kit", "/ready#home-kit"),
+    "rights": ("Save a copy of the ruling or the bill and the date it takes effect.", "Prepare › Home kit", "/ready#home-kit"),
+    "economy": ("List the payments due this week and keep a small cash reserve.", "Prepare › Home kit", "/ready#home-kit"),
+    "unrest": ("Agree on one out-of-area contact and two meeting places.", "Prepare › Family plan", "/ready#family"),
+    "quake": ("Drop, cover and hold on. Check the kit for medicines, doses and allergies.", "Prepare › First aid", "/ready#first-aid"),
+    "flood": ("Store one gallon of drinking water per person per day.", "Prepare › Water", "/ready#water"),
+    "storm": ("Store one gallon of drinking water per person per day and charge a light.", "Prepare › Water", "/ready#water"),
+}
+
+
+def _fallback_key(a):
+    t = (a.get("title") or "").lower()
+    cat = a.get("category") or ""
+    if "nuclear" in t or "warhead" in t: return "nuclear"
+    if "missile" in t or "ballistic" in t: return "missile"
+    if any(w in t for w in ("earthquake", "quake", "magnitude")): return "quake"
+    if "flood" in t: return "flood"
+    if any(w in t for w in ("hurricane", "typhoon", "tornado", "storm")): return "storm"
+    if any(w in t for w in ("outbreak", "flu", "epidemic", "pandemic")) or cat == "disease": return "outbreak"
+    if any(w in t for w in ("blackout", "power outage", "grid")): return "grid"
+    if any(w in t for w in ("ransomware", "cyber", "hack")) or cat == "cyber": return "cyber"
+    if any(w in t for w in ("protest", "unrest", "riot")): return "unrest"
+    if any(w in t for w in ("court", "censor", "speech", "surveillance", "privacy")): return "rights"
+    if cat == "financial": return "economy"
+    if cat == "war/conflict": return "conflict"
+    if cat == "natural disaster": return "storm"
+    return "conflict"
+
+
+def _guide_label(name):
+    n = re.sub(r"\s+", " ", (name or "").strip())
+    n = n.replace("Prepare >", "Prepare ›").replace("Prepare>", "Prepare ›")
+    if n and not n.lower().startswith("prepare"):
+        n = "Prepare › " + n
+    return n
+
+
+def guide_href(name, base="https://blackout.network"):
+    n = (name or "").lower().replace("prepare ›", " ").replace("prepare >", " ")
+    path = "/ready"
+    if "water" in n: path = "/ready#water"
+    elif "power" in n: path = "/ready#power"
+    elif "first aid" in n or "aid" in n: path = "/ready#first-aid"
+    elif "family" in n: path = "/ready#family"
+    elif "kit" in n or "home" in n: path = "/ready#home-kit"
+    return (base or "https://blackout.network").rstrip("/") + path
+
+
+def _badge(a):
     try:
         import newsletter_art as ART
         traj = a.get("trajectory") or "Steady"
         detail = a.get("trend_detail") or ""
-        badge = ART.trend_badge_html(traj, detail)
-        word = ART.trend_word(traj)
+        return ART.trend_badge_html(traj, detail), ART.trend_word(traj)
     except Exception:
-        badge, word = "", a.get("trajectory") or "Steady"
-    acts = "".join(
-        _p(_lbl("WHAT TO DO") + _e(act["action"].rstrip(".")) + " for the report “" + _e(_cut_plain(a.get("title") or "", 70)) + '”. Guide: <a href="' + _e(act["url"]) + f'" style="color:{TX};text-decoration:underline">' + _e(act["name"]) + "</a>.")
-        for act in (a.get("actions") or []))
-    level = a.get("confidence") or ""
+        return "", a.get("trajectory") or "Steady"
+
+
+def card_fragment(a):
+    """Compact analysis under one story card. Human notes are printed as written. The fallback is one short block."""
+    if not a: return ""
+    if a.get("from_note"):
+        badge, word = _badge(a)
+        guide = a.get("guide_name") or ""
+        href = a.get("guide_url") or guide_href(guide)
+        todo = _e(a.get("what_to_do") or "")
+        if guide:
+            todo += ' Guide: <a href="' + _e(href) + f'" style="color:{TX};text-decoration:underline">' + _e(_guide_label(guide)) + "</a>."
+        srcs = a.get("sources") or []
+        src_html = ""
+        if srcs:
+            src_html = _p(_lbl("SOURCES") + " ".join(
+                f'<a href="{_e(u)}" style="color:{TX};text-decoration:underline">{_e(u.split("/")[2] if "://" in u else u)}</a>'
+                for u in srcs[:6]))
+        return (""
+            + _p(_lbl("WHAT HAPPENED") + _e(a.get("what") or ""))
+            + _p(_lbl("ANALYSIS") + _e(a.get("analysis") or ""))
+            + badge
+            + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
+            + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "") + ((". " + _e(a.get("confidence_line"))) if a.get("confidence_line") else ""))
+            + _p(_lbl("WHAT TO DO") + todo)
+            + src_html)
+    badge, word = _badge(a)
+    key = _fallback_key(a)
+    action, gname, gpath = _FALLBACK_DO.get(key, _FALLBACK_DO["conflict"])
+    action = action if action.endswith(".") else action + "."
+    href = "https://blackout.network" + gpath
+    hist = "" if a.get("trend_from_history") else _p(_lbl("TREND HISTORY") + "Trend history: building.")
+    what = a.get("what_short") or "Rank on the record."
+    analysis = a.get("analysis_short") or "The reports describe the event."
     return (""
-        + _p(_lbl("WHAT HAPPENED") + _e(a.get("what") or ""))
-        + _p(_e(a.get("analysis") or ""))
+        + _p(_lbl("WHAT HAPPENED") + _e(what))
+        + _p(_lbl("ANALYSIS") + _e(analysis))
+        + hist
         + badge
         + _p(_lbl("TRAJECTORY") + _e(word) + ". " + _e(a.get("outlook") or ""))
-        + _p(_lbl("CONFIDENCE") + _e(a.get("confidence_line") or level))
-        + acts)
+        + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "Low") + ".")
+        + _p(_lbl("WHAT TO DO") + _e(action) + ' Guide: <a href="' + _e(href) + f'" style="color:{TX};text-decoration:underline">' + _e(gname) + "</a>."))
 
 
 def html_section(analysis, base_url="https://blackout.network"):
@@ -860,6 +1048,12 @@ def html_section(analysis, base_url="https://blackout.network"):
               f'<tr><td bgcolor="{SURF}" style="padding:20px 22px;background:{SURF};color:{TX};border-radius:18px">')
     card_c = "</td></tr></table></td></tr>"
     parts = []
+    if analysis.get("notes_patterns"):
+        rows = "".join(_p(_e(p)) for p in analysis["notes_patterns"])
+        parts.append('<tr><td class="bnpad" bgcolor="#0B0C0F" style="padding:22px 20px 6px 20px;background:#0B0C0F">'
+                     f'<div style="font:700 28px/1.15 {FH};color:{TX}">Patterns we’re watching</div></td></tr>')
+        parts.append(card_o + rows + card_c)
+        return "".join(parts)
     if patterns:
         rows = []
         for p in patterns:

@@ -426,7 +426,7 @@ ENGRAVED = os.path.join(BASE, "static", "newsletter", "engraved")
 _FILE = {}
 _SCENE = {
     "storm": "scene-storm", "quake": "scene-quake", "flood": "scene-flood", "fire": "scene-fire",
-    "outbreak": "scene-outbreak", "missile": "scene-missile", "conflict": "scene-conflict",
+    "outbreak": "scene-outbreak", "missile": "scene-missile", "conflict": "banner-threats",
     "grid": "scene-grid", "cyber": "scene-cyber", "space": "scene-space",
     "politics": "banner-politics", "financial": "banner-markets", "other": "banner-threats",
     "rights": "scene-rights", "surveillance": "scene-surveillance", "protest": "scene-protest",

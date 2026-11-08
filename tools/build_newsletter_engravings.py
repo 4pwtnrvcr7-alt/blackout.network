@@ -297,19 +297,19 @@ def scene_space():
 
 
 def scene_missile():
-    """Large launch vehicle. Replaces the smaller first drawing."""
+    """A missile in flight, nose to the upper right. A long body and fins, not a building."""
     parts = []
-    parts.append('<path d="M90 300 C 180 300, 240 70, 560 48" stroke="#FFC21A" stroke-width="1.5" stroke-dasharray="1.5 7"/>')
-    parts.append('<path d="M250 46 L310 110 L310 250 L190 250 L190 110 Z" stroke-width="1.7"/>')
-    for y in range(122, 246, 7):
-        parts.append(f'<path d="M198 {y} H302" stroke-width="0.7" stroke-opacity="0.85"/>')
-    parts.append('<path d="M190 168 H310 M190 214 H310" stroke-width="1.15"/>')
-    parts.append('<path d="M190 250 L150 310 H210 L190 250 M310 250 L350 310 H290 L310 250" stroke-width="1.4"/>')
-    for i in range(9):
-        y = 318 + i * 4
-        inset = i * 8
-        parts.append(f'<path d="M{214+inset} {y} H{286-inset}" stroke="#FFC21A" stroke-width="1" stroke-opacity="{0.9 - i*0.08:.2f}"/>')
-    parts.append('<path d="M40 312 H600" stroke-width="1.1"/>')
+    parts.append('<path d="M70 300 C 180 280, 280 200, 520 70" stroke="#FFC21A" stroke-width="1.4" stroke-dasharray="2 7"/>')
+    # body along the diagonal, drawn as a tapered quad
+    body = "M150 250 L470 78 L500 96 L188 278 Z"
+    parts.append(clip_hatch("mbody", body, gap=5))
+    parts.append(f'<path d="{body}" stroke-width="1.7"/>')
+    parts.append('<path d="M470 78 L530 48 L500 96 Z" stroke="#FFC21A" stroke-width="1.6"/>')
+    parts.append('<path d="M168 268 L120 300 L188 250 Z" stroke-width="1.4"/>')
+    parts.append('<path d="M200 292 L150 330 L214 270 Z" stroke-width="1.3"/>')
+    for i in range(7):
+        y = 300 + i * 6
+        parts.append(f'<path d="M{150+i*4} {y} H{190-i*3}" stroke="#FFC21A" stroke-width="1.1" stroke-opacity="{0.9-i*0.1:.2f}"/>')
     return frame("\n".join(parts))
 
 

@@ -276,10 +276,10 @@ class Render(unittest.TestCase):
         self.assertGreaterEqual(html.count("Full story"), 5)
         self.assertIn("data:image/png;base64,", html)
         self.assertIn("Patterns", html)
-        self.assertIn("not enough history", html)
+        self.assertNotIn("not enough history", html)
         self.assertNotIn("30d: 0", html)
         self.assertNotIn("Confirmed by 8 independent", html)
-        self.assertIn("after collapsing repeated headlines", html)
+        self.assertTrue(any("after collapsing repeated headlines" in (it.get("card_confidence") or "") for it in an["items"]))
         self.assertNotIn("not proof", html.lower())
         self.assertIn("ANALYST BRIEF", text)
         self.assertGreaterEqual(text.count("WHAT HAPPENED"), len(an["items"]))
@@ -288,12 +288,15 @@ class Render(unittest.TestCase):
         for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):
             self.assertNotIn(bad, low)
         blocks = re.split(r"WHAT HAPPENED", visible)[1:]
+        shared_actions = {a[0].rstrip(".") for a in NA._FALLBACK_DO.values()}
         seen = {}
         dups = []
         for i, block in enumerate(blocks):
             plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", block))
             for sent in re.findall(r"[A-Za-z][^.!?]{40,}[.!?]", plain):
                 s = sent.strip()
+                if any(act in s for act in shared_actions):
+                    continue
                 if s in seen and seen[s] != i and s not in dups:
                     dups.append(s)
                 seen.setdefault(s, i)
@@ -364,6 +367,166 @@ def _assert_no_empty_framing(case, *blobs):
         low = (blob or "").lower()
         for phrase in _EMPTY:
             case.assertNotIn(phrase, low)
+
+
+class Notes(unittest.TestCase):
+    def setUp(self):
+        NA.write_demo_db(NL.P["src"], AT)
+        self.notes = os.path.join(TMP, "newsletter_analysis.json")
+        os.environ["NEWSLETTER_ANALYSIS_JSON"] = self.notes
+
+    def tearDown(self):
+        os.environ.pop("NEWSLETTER_ANALYSIS_JSON", None)
+        if os.path.exists(self.notes): os.remove(self.notes)
+
+    def _write(self, generated, items, lead="", patterns=None):
+        with open(self.notes, "w") as f:
+            json.dump({"generated_at": generated, "items": items, "lead": lead, "patterns": patterns or []}, f)
+
+    def _issue(self):
+        return NL.build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=AT, since=AT - timedelta(hours=24), slot="morning")
+
+    def test_note_overlays_exact_text_and_badge(self):
+        self._write(AT.strftime("%Y-%m-%dT%H:%M:%SZ"), {
+            "a11ce00000000001": {
+                "what_happened": "Eighteen people were killed near Hormuz.",
+                "analysis": "The death toll in the later reports is higher than the first count.",
+                "trajectory": "UPTREND",
+                "outlook": "The danger stays elevated for the next day.",
+                "confidence": "High",
+                "confidence_why": "Three outlets reported it independently.",
+                "what_to_do": "Agree on one out-of-area contact tonight.",
+                "guide": "Prepare > Family plan",
+                "why_it_matters": "A higher death toll at Hormuz is the change that matters.",
+            }
+        }, lead="Hormuz is the story to read first.", patterns=["Hormuz appears in more than one report."])
+        issue = self._issue()
+        self.assertEqual(issue["notes_lead"], "Hormuz is the story to read first.")
+        self.assertIn("Hormuz is the story to read first.", issue["bluf"])
+        hit = next(it for it in issue["main"] if it["cluster_id"] == "a11ce00000000001")
+        self.assertTrue(hit["analyst"]["from_note"])
+        self.assertEqual(hit["analyst"]["what"], "Eighteen people were killed near Hormuz.")
+        self.assertEqual(hit["trajectory"], "Rising")
+        links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                 "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+        _s, html, _t = NL.render(issue, links)
+        self.assertIn("Eighteen people were killed near Hormuz.", html)
+        self.assertIn("Agree on one out-of-area contact tonight.", html)
+        self.assertIn("Hormuz appears in more than one report.", html)
+        self.assertIn("UPTREND", html)
+        self.assertNotIn("is named.", html.lower())
+
+    def test_stale_notes_are_ignored(self):
+        self._write((AT - timedelta(hours=19)).strftime("%Y-%m-%dT%H:%M:%SZ"), {
+            "a11ce00000000001": {"what_happened": "STALE NOTE SHOULD NOT APPEAR", "analysis": "old",
+                                 "trajectory": "STEADY", "outlook": "old", "confidence": "Low",
+                                 "confidence_why": "old", "what_to_do": "old", "guide": "Prepare > Water",
+                                 "why_it_matters": "old"}
+        })
+        issue = self._issue()
+        self.assertNotIn("notes_lead", issue)
+        html_bits = " ".join((it.get("analyst") or {}).get("what") or "" for sec in ("main", "politics", "notable") for it in issue.get(sec) or [])
+        self.assertNotIn("STALE NOTE", html_bits)
+
+    def test_headline_match_when_ids_differ(self):
+        self._write(AT.strftime("%Y-%m-%dT%H:%M:%SZ"), {
+            "different-id": {
+                "headline": "Iran missile strike near the Strait of Hormuz kills 18, Trump says he is watching",
+                "what_happened": "Matched by headline, not by id.",
+                "analysis": "Same event, new cluster id.",
+                "trajectory": "STEADY", "outlook": "Holds.", "confidence": "Medium",
+                "confidence_why": "Two outlets.", "what_to_do": "Pick a meeting place.",
+                "guide": "Prepare > Family plan", "why_it_matters": "The toll is the fact.",
+            }
+        })
+        issue = self._issue()
+        hit = next(it for it in issue["main"] if it["cluster_id"] == "a11ce00000000001")
+        self.assertEqual(hit["analyst"]["what"], "Matched by headline, not by id.")
+
+    def test_fallback_is_short(self):
+        os.environ.pop("NEWSLETTER_ANALYSIS_JSON", None)
+        if os.path.exists(self.notes): os.remove(self.notes)
+        issue = self._issue()
+        links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                 "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+        _s, html, _t = NL.render(issue, links)
+        blocks = re.split(r"WHAT HAPPENED", html)[1:]
+        self.assertGreaterEqual(len(blocks), 1)
+        for block in blocks:
+            self.assertLessEqual(block.lower().count("not enough history"), 1)
+            self.assertNotIn("for the report", block.lower())
+            self.assertNotIn("is named", block.lower())
+        self.assertIn("Prepare ›", html)
+        import render_rules
+        self.assertIn("newsletter_analysis.json", render_rules.SYNC_JSON)
+
+    def test_noted_cluster_is_included_and_sources_link_to_ready(self):
+        c = sqlite3.connect(NL.P["src"])
+        iso = (AT - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        c.execute("""INSERT INTO clusters(cluster_id,title,category,location,lat,lon,event_time,first_seen,updated,score,confidence,
+                     n_items,n_families,families,links,watchlist,brief,high_at,rising,mentions_3h,eff_families,rank)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  ("a6272da62f181f19", "Local bakery opens on Main Street", "other", "Town", None, None, iso, iso, iso,
+                   40, "Low", 2, 2, "[]", "[]", 0, "WHAT: Local bakery opens on Main Street.", iso, 0, 0, 2, 6))
+        c.commit(); c.close()
+        self._write(AT.strftime("%Y-%m-%dT%H:%M:%SZ"), {
+            "a6272da62f181f19": {
+                "headline": "House GOP leaders brace for enough defections to impeach Defense Secretary Hegseth",
+                "what_happened": "House leaders expect enough votes to impeach the defense secretary.",
+                "analysis": "The vote would test Congress against the cabinet.",
+                "trajectory": "UPTREND", "outlook": "A floor vote is likely within days.",
+                "confidence": "Medium", "confidence_why": "Axios reporting, not a published whip count.",
+                "what_to_do": "Read the resolution text before the vote.",
+                "guide": "Prepare › Home kit",
+                "why_it_matters": "The vote tests whether Congress can rein in a cabinet officer.",
+                "sources": ["https://www.axios.com/2026/11/08/pete-hegseth-impeachment-house-republicans-massie"],
+            }
+        })
+        issue = self._issue()
+        ids = [it["cluster_id"] for sec in ("main", "politics", "notable") for it in issue.get(sec) or []]
+        self.assertIn("a6272da62f181f19", ids)
+        hit = next(it for sec in ("main", "politics", "notable") for it in issue.get(sec) or [] if it["cluster_id"] == "a6272da62f181f19")
+        self.assertEqual(hit["analyst"]["what"], "House leaders expect enough votes to impeach the defense secretary.")
+        self.assertTrue(hit["analyst"]["guide_url"].endswith("/ready#home-kit"))
+        self.assertNotIn("/prepare", hit["analyst"]["guide_url"])
+        links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                 "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+        _s, html, _t = NL.render(issue, links)
+        self.assertIn("https://www.axios.com/2026/11/08/pete-hegseth-impeachment-house-republicans-massie", html)
+        self.assertIn("Prepare › Home kit", html)
+        self.assertIn("#home-kit", html)
+        self.assertNotIn("/prepare", html)
+
+    def test_older_noted_cluster_is_a_full_card(self):
+        c = sqlite3.connect(NL.P["src"])
+        old = (AT - timedelta(hours=40)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        seen = (AT - timedelta(hours=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        c.execute("""INSERT INTO clusters(cluster_id,title,category,location,lat,lon,event_time,first_seen,updated,score,confidence,
+                     n_items,n_families,families,links,watchlist,brief,high_at,rising,mentions_3h,eff_families,rank)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  ("98fdd3f9a50d90a8", "Russian missiles hit Kyiv bridge", "war/conflict", "Kyiv", None, None, old, seen, seen,
+                   80, "High", 6, 4, "[]", "[]", 0, "WHAT: Russian missiles hit Kyiv bridge.", seen, 0, 0, 4, 7))
+        c.commit(); c.close()
+        self._write(AT.strftime("%Y-%m-%dT%H:%M:%SZ"), {
+            "98fdd3f9a50d90a8": {
+                "headline": "Russian ballistic missiles damage Kyiv's Northern Bridge",
+                "what_happened": "Overnight, Russia fired 36 ballistic missiles at Kyiv and hit the Northern Bridge.",
+                "analysis": "The campaign is aimed at the lines that feed the capital.",
+                "trajectory": "UPTREND", "outlook": "More strikes on power and transport are likely within 72 hours.",
+                "confidence": "High", "confidence_why": "Kyiv city government and the Ukrainian Air Force.",
+                "what_to_do": "Charge a power bank and keep a battery radio within reach.",
+                "guide": "Prepare › Power outage",
+                "why_it_matters": "A capital's power and bridges are the systems people rely on.",
+            }
+        })
+        issue = self._issue()
+        self.assertTrue(any(it["cluster_id"] == "98fdd3f9a50d90a8" for it in issue["main"]))
+        self.assertFalse(any(it["cluster_id"] == "98fdd3f9a50d90a8" for it in issue.get("developing") or []))
+        links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+                 "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+        _s, html, _t = NL.render(issue, links)
+        self.assertIn("Overnight, Russia fired 36 ballistic missiles at Kyiv and hit the Northern Bridge.", html)
+        self.assertIn("#power", html)
 
 
 class Topics(unittest.TestCase):

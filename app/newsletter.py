@@ -12,7 +12,7 @@ Data:   reads blackout.db ONLY via file:blackout.db?mode=ro; writes only newslet
 Never changes scanner.py, scoring, push.py, jets.py or config.json. Sending is 'preview' (outbox files, no network) unless a provider
 is configured in newsletter.env AND newsletter_config.json has live_sending_approved=true AND a mailing address is set.
 """
-import os, re, json, time, hmac, html, base64, hashlib, secrets, sqlite3, threading, subprocess, csv, io, smtplib, ssl, traceback
+import os, re, json, sys, time, hmac, html, base64, hashlib, secrets, sqlite3, threading, subprocess, csv, io, smtplib, ssl, traceback
 import urllib.request, urllib.parse
 from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
@@ -740,6 +740,46 @@ def why_it_matters(r, official=False, category=None):
     if rising and m3 >= 2: out.append(f"{m3} reports arrived in the last 3 hours.")
     return re.sub(r"\s+", " ", " ".join(out)).strip()
 
+def _include_noted(issue):
+    """A cluster listed in a fresh analyst-notes file is shown even when the topic filter would skip it."""
+    try:
+        import newsletter_analysis as NA
+        notes = NA.load_notes(at=issue.get("end"))
+    except Exception:
+        return
+    if not notes: return
+    noted = [cid for cid in notes["by_id"] if " " not in str(cid)]
+    have = {}
+    for sec in ("near", "main", "politics", "notable", "updates", "follow", "developing", "watchlist"):
+        for it in issue.get(sec) or []:
+            if it.get("cluster_id"): have[it["cluster_id"]] = sec
+    # A listed cluster that only survived as a one-line "still developing" row becomes a full card.
+    for cid in noted:
+        sec = have.get(cid)
+        if sec not in ("developing", "watchlist"): continue
+        kept = [it for it in issue.get(sec) or [] if it.get("cluster_id") != cid]
+        moved = [it for it in issue.get(sec) or [] if it.get("cluster_id") == cid]
+        issue[sec] = kept
+        for it in moved:
+            it["section"] = "main"
+            issue["main"].append(it)
+        have[cid] = "main"
+    missing = [cid for cid in noted if cid not in have]
+    rows = []
+    if missing:
+        S = src()
+        try:
+            rows = S.execute(f"SELECT * FROM clusters WHERE cluster_id IN ({','.join('?' * len(missing))})", missing).fetchall()
+        except Exception:
+            rows = []
+        finally:
+            try: S.close()
+            except Exception: pass
+        for r in rows:
+            issue["main"].append(item_of(r, "main", 0))
+    if rows or any(have.get(cid) == "main" for cid in noted):
+        issue["quiet"] = False
+
 def _uniquify_why(issue):
     """If two cards would repeat the same line, the second names its own headline."""
     seen = set()
@@ -1039,6 +1079,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
             issue["crime"] = _crime.brief_for(dict(sub))
         except Exception: issue["crime"] = None
     issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries the matters lead (no separate "nothing confirmed" email)
+    _include_noted(issue)
     _uniquify_why(issue)
     issue["bluf"] = bluf(issue)
     lead_ids = {it.get("cluster_id") for it in _story_pool(issue)[:3]}
@@ -1071,9 +1112,11 @@ def _attach_analysis(issue, at, c=None):
                     if a.get("card_confidence"):
                         it["confidence"] = a["card_confidence"]
                         if a.get("card_unconfirmed") is not None: it["unconfirmed"] = a["card_unconfirmed"]
-                if not it.get("trend_from_history") and preview:
+                if not it.get("trend_from_history") and not (it.get("analyst") or {}).get("from_note") and preview:
                     it["trajectory"] = it.get("trajectory") or "Steady"
                     it["trend_detail"] = "trend data loading"
+        if issue.get("notes_lead"):
+            issue["bluf"] = MATTERS + ". " + issue["notes_lead"]
     except Exception as ex:
         log(f"analysis layer skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
         issue["analysis"] = None
@@ -1468,6 +1511,11 @@ def _bluf_html(txt, label="HERE'S WHAT MATTERS"):
             f'padding:20px 22px;font:400 17px/1.5 {FB};color:{PAL["tx"]}"><div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:{PAL["ac"]};margin:0 0 6px 0">{label}</div>{E(txt)}</div></td></tr>')
 
 def _matters_html(issue):
+    if issue.get("notes_lead"):
+        bits = [f'<p class="bnt" style="margin:12px 0 0 0;font:400 16px/1.45 {FB};color:{PAL["tx"]}">{E(issue["notes_lead"])}</p>']
+        return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:0 20px 8px 20px;background:{PAL["bg"]}">'
+                f'<div class="bns" style="background:{PAL["surf"]};border-radius:18px;padding:20px 22px;color:{PAL["tx"]}">'
+                f'<div class="bnt" style="font:600 22px/1.25 {FH};color:{PAL["tx"]}">{MATTERS}.</div>{"".join(bits)}</div></td></tr>')
     bits = []
     for i, it in enumerate(_story_pool(issue)[:3], 1):
         why = _why_line(it)
@@ -3012,3 +3060,84 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
         if not admin_ok(d): return 401, {"error": "Admin session expired. Unlock again."}
         return admin_action(d)
     return 404, {"error": "not found"}
+
+
+def render_preview_html(notes, out, at=None):
+    """Write one preview HTML from the public cluster API plus an analyst notes file. Does not send."""
+    import tempfile, urllib.request
+    at = at or now()
+    os.environ["NEWSLETTER_ANALYSIS_JSON"] = os.path.abspath(notes)
+    tmp = tempfile.mkdtemp(prefix="nlpreview_")
+    src = os.path.join(tmp, "src.db")
+    os.environ["NEWSLETTER_SRC_DB"] = src
+    P["src"] = src
+    live = False
+    try:
+        req = urllib.request.Request("https://blackout.network/api/state", headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=40) as r:
+            data = json.load(r)
+        rows = list(data.get("main") or []) + list(data.get("watchlist") or [])
+        c = sqlite3.connect(src)
+        c.executescript("""
+        CREATE TABLE alerts(id TEXT PRIMARY KEY, source TEXT, family TEXT, title TEXT, category TEXT, source_url TEXT,
+          event_time TEXT, lat REAL, lon REAL, location TEXT, base INTEGER, official INTEGER, extra TEXT,
+          first_seen TEXT, last_seen TEXT, cluster_id TEXT);
+        CREATE TABLE clusters(cluster_id TEXT PRIMARY KEY, title TEXT, category TEXT, location TEXT, lat REAL, lon REAL,
+          event_time TEXT, first_seen TEXT, updated TEXT, score INTEGER, confidence TEXT, n_items INTEGER, n_families INTEGER,
+          families TEXT, links TEXT, watchlist INTEGER, brief TEXT, high_at TEXT, rising INTEGER, mentions_3h INTEGER,
+          eff_families INTEGER, rank INTEGER, pushed_at TEXT);
+        CREATE TABLE scans(id INTEGER PRIMARY KEY, started TEXT, finished TEXT, trigger TEXT, fetched INTEGER, new_items INTEGER, ok_sources INTEGER, failed_sources INTEGER, error TEXT);
+        """)
+        for it in rows:
+            cid = it.get("cluster_id")
+            if not cid: continue
+            fs = it.get("first_seen") or it.get("event_time")
+            fams = it.get("families") if isinstance(it.get("families"), list) else []
+            links = it.get("links") if isinstance(it.get("links"), list) else []
+            c.execute("""INSERT OR REPLACE INTO clusters(cluster_id,title,category,location,lat,lon,event_time,first_seen,updated,score,confidence,
+                         n_items,n_families,families,links,watchlist,brief,high_at,rising,mentions_3h,eff_families,rank)
+                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                      (cid, it.get("title"), it.get("category") or "other", it.get("location"), it.get("lat"), it.get("lon"),
+                       it.get("event_time"), fs, it.get("updated") or fs, int(it.get("score") or 0), it.get("confidence") or "",
+                       int(it.get("n_items") or 0), int(it.get("n_families") or it.get("eff_families") or 0),
+                       json.dumps(fams), json.dumps(links), int(it.get("watchlist") or 0), it.get("brief"),
+                       it.get("high_at"), int(it.get("rising") or 0), int(it.get("mentions_3h") or 0),
+                       int(it.get("eff_families") or 0), int(it.get("rank") or 0)))
+        c.commit(); c.close()
+        live = True
+    except Exception as ex:
+        print("live fetch failed:", type(ex).__name__, file=sys.stderr)
+        return 1
+    issue = build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=at, since=at - timedelta(hours=24), slot="morning")
+    links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
+             "categories": "https://blackout.network/newsletter", "sources": "https://blackout.network/sources",
+             "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
+    _subj, html, _text = render(issue, links)
+    if live:
+        banner = ('<div style="background:#FFC21A;color:#0B0C0F;font:600 14px/1.45 Inter,system-ui,sans-serif;padding:12px 16px">'
+                  'Preview only. Live cluster snapshot from blackout.network/api/state. Nothing was emailed.</div>')
+        html = html.replace("<body ", banner + "<body ", 1)
+    os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
+    with open(out, "w") as f: f.write(html)
+    print(out, len(html.encode()))
+    return 0
+
+
+def _cli(argv):
+    if len(argv) < 2 or argv[1] != "render-preview":
+        print("usage: python3 newsletter.py render-preview --notes FILE --out HTML", file=sys.stderr)
+        return 2
+    notes, out = None, None
+    i = 2
+    while i < len(argv):
+        if argv[i] == "--notes" and i + 1 < len(argv): notes = argv[i + 1]; i += 2
+        elif argv[i] == "--out" and i + 1 < len(argv): out = argv[i + 1]; i += 2
+        else: i += 1
+    if not notes or not out:
+        print("usage: python3 newsletter.py render-preview --notes FILE --out HTML", file=sys.stderr)
+        return 2
+    return render_preview_html(notes, out)
+
+
+if __name__ == "__main__":
+    sys.exit(_cli(sys.argv))
