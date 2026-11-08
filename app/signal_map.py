@@ -2,7 +2,7 @@
 
 Draws the Control panel v2 map: Leaflet, the bundled Natural Earth world.geojson, and the same
 .signal dots (panel/app.js renderMap, panel/style.css). The panel's OpenFreeMap / MapLibre tile
-layer is not used, so there is no tile server and no API key.
+layer is not used, so there is no tile server and no API key. Dots are colored by category.
 
 Dots are Wire and Watchlist stories (watchlist 0 and 1). A stored coordinate is used when
 the row has one. Otherwise a place is inferred offline from the headline and location text
@@ -24,8 +24,27 @@ FILES = {
     "world.geojson": "application/json",
 }
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
-LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
-          '<p class="bn-sig-sr">Low is rank 0 to 3, elevated is rank 4 to 6, and high is rank 7 to 10. Red is only rank 7 and above.</p>')
+# Mapped buckets for the chip row. Colors live in signal_map_static/app.js so the dots and the chips share one palette.
+CATS = (("health", "Health"), ("weather", "Weather"), ("conflict", "Conflict"), ("quake", "Quake"),
+        ("solar", "Solar"), ("grid", "Grid"), ("cyber", "Cyber"), ("nuclear", "Nuclear"),
+        ("politics", "Politics"), ("other", "Other"))
+SR = ('<p class="bn-sig-sr">Dots are colored by category. Rank stays in the story popup. '
+      'An approximate place is a solid dot. Category choices are saved on this device.</p>')
+
+def cats_html():
+    btns = ['<button type="button" data-cat="all" aria-pressed="true">All</button>',
+            '<button type="button" data-cat="none" aria-pressed="false">None</button>']
+    for cid, label in CATS:
+        btns.append(f'<button type="button" data-cat="{cid}" aria-pressed="true"><i aria-hidden="true"></i>{label}</button>')
+    return '<div class="bn-sig-cats" role="group" aria-label="Categories">' + "".join(btns) + "</div>"
+
+def search_html():
+    return ('<div class="bn-sig-find"><form class="bn-sig-search" role="search" action="#">'
+            '<label class="bn-sig-sr" for="bn_sig_q">Search stories</label>'
+            '<input id="bn_sig_q" type="search" placeholder="Search stories" autocomplete="off" spellcheck="false" '
+            'enterkeyhint="search" aria-autocomplete="list" aria-controls="bn_sig_results" aria-expanded="false">'
+            '<button type="button" class="bn-sig-clear" hidden aria-label="Clear search">\u00d7</button></form>'
+            '<div id="bn_sig_results" class="bn-sig-results" role="listbox" hidden></div></div>')
 
 def views_html(active="us"):
     def btn(name, label):
@@ -55,7 +74,10 @@ def home_section():
 <article class="bn-sig" id="bn_sig" data-embed="1">
 <div class="bn-sig-cardhead"><div><h2 id="bn_sig_h">Global signal map</h2>
 <p class="bn-sig-note" id="bn_sig_note">Wire and Watchlist</p></div>
-<div class="bn-sig-side">{LEGEND}<a class="bn-sig-open" href="/map">Open the map</a></div></div>
+<div class="bn-sig-side"><a class="bn-sig-open" href="/map">Open the map</a></div></div>
+{search_html()}
+{cats_html()}
+{SR}
 <div class="bn-sig-tools">{views_html()}</div>
 <div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map of Wire and Watchlist stories. US is the starting view."></div>
 </article></div></section>
@@ -97,7 +119,9 @@ def page(qs):
 <div id="bn_map_page" class="bn-map-page" data-embed="0">
 <div class="bn-sig-bar"><div class="bn-sig-titles"><h1 id="bn_sig_h">Global signal map</h1>
 <p class="bn-sig-note" id="bn_sig_note">Wire and Watchlist</p></div>
-{LEGEND}
+{search_html()}
+{cats_html()}
+{SR}
 <div class="bn-sig-tools">{views_html(view)}</div>
 <label>Topic <select id="bn_sig_topic" aria-label="Topic"><option value="">All topics</option>{topic_opt}</select></label>
 <label>Rank <select id="bn_sig_rank" aria-label="Rank">
