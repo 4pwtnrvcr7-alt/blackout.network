@@ -951,8 +951,10 @@ def _analysis_block(text, takeaway):
 
 def _traj_block(word, outlook, detail):
     line = _e(word) + ". " + _e(outlook or "")
-    if detail:
-        line += " " + _e(detail)
+    if detail:   # t1134: the badge detail ("rank 5/10", "trend data loading") is a phrase; print it as a full sentence
+        d = re.sub(r"\s+", " ", str(detail)).strip().rstrip(".")
+        if d and d.lower() not in (outlook or "").lower():
+            line += " Trend: " + _e(d) + "."
     return _p(_lbl("TRAJECTORY") + line)
 
 

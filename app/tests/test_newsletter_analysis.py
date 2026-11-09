@@ -674,3 +674,13 @@ class HeadlineTruncationT1134(unittest.TestCase):
         self.assertTrue(QA.check("Morning Brief", good, "", [full])["ok"], QA.check("Morning Brief", good, "", [full]))
         r = QA.check("x", '<a href="x" class="bnt bnh1" style="">House vote on Hegseth expected this</a>', "", [])
         self.assertFalse(r["ok"])
+
+
+class TrajectoryDetailT1134(unittest.TestCase):
+    def test_detail_is_a_sentence(self):
+        import newsletter_analysis as NA, newsletter_qa as QA
+        html_ = NA._traj_block("STEADY", "Over the next 24-72 hours the danger holds at rank 5/10. No change across the reports we have.", "rank 5/10")
+        self.assertNotIn("rank 5/10</p>", html_)
+        html_ = NA._traj_block("STEADY", "Danger holds.", "trend data loading")
+        self.assertIn("Trend: trend data loading.", html_)
+        self.assertTrue(QA.check("s", html_, "", [])["ok"], QA.check("s", html_, "", []))
