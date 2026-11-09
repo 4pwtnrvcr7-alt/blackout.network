@@ -176,48 +176,92 @@ def elections_card(now):
 _REG = [("il", "Israel and Gaza", r"\b(israel|israeli|gaza|idf|hamas|hezbollah|west bank|lebanon|houthi|yemen|netanyahu|tel aviv|jerusalem)"),
         ("ir", "Iran", r"\b(iran|iranian|tehran|irgc|khamenei|araghchi)"),
         ("ru", "Russia and Ukraine", r"\b(russia|russian|ukraine|ukrainian|kyiv|kiev|kharkiv|moscow|kremlin|putin|zelensk|donetsk|crimea|odesa)"),
-        ("uk", "UK and London", r"\b(uk|u\.k\.|britain|british|london|england|scotland|wales|met police|downing street)\b")]
+        ("uk", "UK and London", r"\b(uk|u\.k\.|united kingdom|britain|british|london|england|scotland|wales|met police|downing street|keir starmer|starmer|westminster|whitehall)\b")]
 _HEALTH = [("ebola", "Ebola", r"\b(ebola|marburg)"), ("measles", "Measles", r"\bmeasles")]
 _DIS = r"\b(outbreak|virus|ebola|marburg|cholera|measles|influenza|h5n1|bird flu|avian flu|mpox|dengue|plague|pathogen|epidemic|pandemic|polio|tuberculosis|meningitis|anthrax|rift valley)"
-_US = r"\b(u\.s\.|us|usa|america|american|national guard|ice|fbi|dhs|capitol|washington|new york|chicago|los angeles|portland|minneapolis|texas|california|florida|state of emergency)\b"
-_UNREST = r"\b(protest|protesters|riot|unrest|curfew|clashes|national guard|martial law|looting|political violence|insurrection|shooting at|militia)"
-_FOOD = r"\b(food (shortage|supply|prices|bank|insecurity|recall)|supply chain|shortage|recall|grocery|snap benefits|snap\b|ports?\b strike|shipping (disruption|delays)|diesel|baby formula|egg prices|meat plant|rail strike|dockworkers)"
+_US = r"\b(u\.s\.a?\.?|united states|america|american|national guard|" \
+         r"washington(,? d\.?c\.?)?|new york|nyc|chicago|los angeles|l\.a\.|portland|minneapolis|seattle|denver|atlanta|detroit|boston|philadelphia|dallas|houston|phoenix|miami|charlotte|baltimore|san francisco|" \
+         r"texas|california|florida|arizona|utah|ohio|georgia|michigan|pennsylvania|oregon|minnesota|colorado|illinois|nevada|wisconsin|north carolina|south carolina|virginia|maryland|new jersey|" \
+         r"trump|biden|desantis|fbi|dhs|\bice\b|capitol|pentagon|white house|congress|state of emergency)\b"
+_US_FOREIGN = r"\b(france|french|poland|polish|ecuador|ghana|bangladesh|germany|frankfurt|italy|italian|india|delhi|moldova|paraguay|britain|british|london|england|scotland|canada|mexico|brazil|nigeria|kenya|israel|iran|russia|ukraine|china|japan|korea|taiwan|spain|portugal|greece|turkey|pakistan|philippines|indonesia|thailand|australia|chile|argentina|colombia|peru|venezuela|haiti|cuba|egypt|sudan|ethiopia|lebanon|syria|iraq|yemen|saudi|uae|madagascar|kazakhstan|senegal|sahel)\b"
+_UNREST = (r"\b(protest(?:ers|ing|s)?|riot(?:ers|ing|s)?|unrest|curfews?|clash(?:es)?|crackdowns?|"
+           r"national guard|martial law|looting|political violence|insurrection|militia|"
+           r"demonstration(?:s)?|demonstrators?|general strike|coups?|anti-government|"
+           r"tear[ -]?gas|water cannons?|barricades?|civil (?:unrest|disorder)|"
+           r"troop(?:s)? deploy(?:ed|ment|s)?|deploy(?:ed|s|ment)? (?:troops|soldiers|national guard)|"
+           r"mass (?:protest|gathering|rally)|uprisings?|revolts?)\b")
+_FOOD = r"\b(food (shortage|supply|prices|bank|insecurity|recall)|supply chain|grocery|snap benefits|\bsnap\b|ports? strike|shipping (disruption|delays)|diesel shortage|baby formula|infant formula|egg prices|meat plant|rail strike|dockworkers)\b"
+_QUAKEISH = r"\b(earthquake|magnitude\s*\d|m\s*\d+(?:\.\d+)?\s*(?:earthquake|quake)|seismic)\b"
+# UK/London: conflict + security (cyber attacks, protests, terror). "united kingdom" was missing from the old regex.
 
 def wire_groups(now):
     import re, sqlite3
     c = sqlite3.connect(f"file:{BASE}/blackout.db?mode=ro", uri=True, timeout=5)
     try:
         cut = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 7 * 86400))
-        rows = c.execute("SELECT cluster_id, title, category, location, rank, first_seen, updated FROM clusters WHERE watchlist=0 AND updated>=? ORDER BY updated DESC LIMIT 6000", (cut,)).fetchall()
+        rows = c.execute(
+            "SELECT cluster_id, title, category, location, rank, first_seen, updated, n_families "
+            "FROM clusters WHERE watchlist=0 AND updated>=? ORDER BY updated DESC LIMIT 6000", (cut,)
+        ).fetchall()
     finally: c.close()
     def day(ts):
         return time.strftime("%Y-%m-%d", time.gmtime(ts - 5 * 3600))
     days = [day(now - i * 86400) for i in range(6, -1, -1)]
+    quakeish = re.compile(_QUAKEISH, re.I)
+    def _story(cid, t, loc, rk, fam):
+        import site_page as SP
+        try: tt = SP.clean_title(t)
+        except Exception: tt = t
+        tt = re.sub(r"\s+", " ", tt or "").strip()
+        if (not tt or re.match(r"^(www\.|https?:)", tt) or re.search(r"youtube\.com/shorts|threads\.com", tt)
+                or re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", tt)):
+            return None
+        return {
+            "rank": int(rk or 0),
+            "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire",
+            "title": tt[:140],
+            "loc": loc,
+            "src": f"{int(fam)} source{'s' if int(fam or 0) != 1 else ''}" if fam else "The Wire",
+        }
     def agg(match):
         n24 = 0; d = {x: [0, 0] for x in days}; top = None; mx = 0
-        for cid, t, cat, loc, rk, fs, up in rows:
-            if not match(t or "", cat or "", loc or ""): continue
+        stories = {x: [] for x in days}; seen_d = {x: set() for x in days}
+        for cid, t, cat, loc, rk, fs, up, fam in rows:
+            t = t or ""; cat = cat or ""; loc = loc or ""
+            if not match(t, cat, loc): continue
             ft = _iso(fs) or 0; ut = _iso(up) or 0; rk = int(rk or 0)
             k = day(ft) if ft else None
-            if k in d: d[k][1 if rk >= 7 else 0] += 1
+            if k in d:
+                d[k][1 if rk >= 7 else 0] += 1
+                st = _story(cid, t, loc, rk, fam)
+                if st and st["title"].lower()[:60] not in seen_d[k] and len(stories[k]) < 14:
+                    seen_d[k].add(st["title"].lower()[:60]); stories[k].append(st)
             if ut >= now - 86400:
                 n24 += 1; mx = max(mx, rk)
-                ok = re.match(r"^[A-Za-z0-9\"'(]", t or "") and not re.match(r"^(www\.|https?:)", t or "") and not re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", t or "")
-                if ok and (top is None or (rk, ut) > (top[0], top[1])): top = (rk, ut, cid, t, loc)
+                ok = re.match(r"^[A-Za-z0-9\"'(]", t) and not re.match(r"^(www\.|https?:)", t) and not re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", t)
+                if ok and (top is None or (rk, ut) > (top[0], top[1])): top = (rk, ut, cid, t, loc, fam)
         n7 = sum(a + b for a, b in d.values())
         tp = None
         if top:
-            import site_page as SP
-            try: tt = SP.clean_title(top[3])
-            except Exception: tt = top[3]
-            tp = {"rank": top[0], "t": top[1], "url": f"/wire/{top[2]}" if re.match(r"^[0-9a-f]{16}$", top[2] or "") else "/#wire", "title": re.sub(r"\s+", " ", tt or "")[:150], "loc": top[4]}
-        return {"n24": n24, "n7": n7, "max24": mx, "days": [[k] + d[k] for k in days], "top": tp}
-    W = lambda t, cat: cat == "war/conflict" or (cat == "political" and re.search(r"\b(strike|missile|drone|attack|troops|war|military)", t.lower()))
+            st = _story(top[2], top[3], top[4], top[0], top[5] if len(top) > 5 else None)
+            if st: tp = {"rank": top[0], "t": top[1], "url": st["url"], "title": st["title"], "loc": top[4]}
+        return {"n24": n24, "n7": n7, "max24": mx, "days": [[k] + d[k] for k in days],
+                "stories": {k: stories[k] for k in days}, "top": tp}
+    def W(t, cat):
+        if quakeish.search(t): return False
+        return cat == "war/conflict" or (cat == "political" and re.search(r"\b(strike|missile|drone|attack|troops|war|military)", t.lower()))
     conf = {}
     used = []
     for k, label, rx in _REG:
         r = re.compile(rx, re.I); used.append(r)
-        conf[k] = dict(agg(lambda t, cat, loc, r=r: bool(W(t, cat)) and bool(r.search(t + " " + loc))), label=label)
+        if k == "uk":
+            # Conflict + security for UK/London (cyber attacks, protests, terror) — not UFO/disease
+            sec = re.compile(r"\b(protest|riot|unrest|terror|attack|strike|missile|drone|troops|war|military|cyber|bomb|stab|knife|curfew|clash|crackdown|security|emergency)\b", re.I)
+            conf[k] = dict(agg(lambda t, cat, loc, r=r, sec=sec: bool(r.search(t + " " + loc)) and not quakeish.search(t) and (
+                (cat == "war/conflict") or (cat in ("political", "cyber") and (W(t, cat) or sec.search(t)))
+            )), label=label)
+        else:
+            conf[k] = dict(agg(lambda t, cat, loc, r=r: bool(W(t, cat)) and bool(r.search(t + " " + loc))), label=label)
     conf["other"] = dict(agg(lambda t, cat, loc: bool(W(t, cat)) and not any(r.search(t + " " + loc) for r in used)), label="Other conflict zones")
     dis = re.compile(_DIS, re.I)
     H = lambda t, cat: (cat == "disease" and not re.search(r"\b(weather|storm|tornado|war) outbreak", t, re.I)) or (cat == "political" and dis.search(t))
@@ -227,10 +271,31 @@ def wire_groups(now):
         r = re.compile(rx, re.I); hused.append(r)
         health[k] = dict(agg(lambda t, cat, loc, r=r: bool(r.search(t)) and (cat in ("disease", "political", "war/conflict", "other"))), label=label)
     health["other"] = dict(agg(lambda t, cat, loc: bool(H(t, cat)) and not any(r.search(t) for r in hused)), label="Other outbreaks")
-    un, us, fd = re.compile(_UNREST, re.I), re.compile(_US, re.I), re.compile(_FOOD, re.I)
-    hard = {"unrest": dict(agg(lambda t, cat, loc: cat in ("political", "war/conflict", "other") and bool(un.search(t)) and bool(us.search(t + " " + loc))), label="Unrest in the U.S."),
+    un, us, foreign, fd = re.compile(_UNREST, re.I), re.compile(_US, re.I), re.compile(_US_FOREIGN, re.I), re.compile(_FOOD, re.I)
+    def is_us(t, loc):
+        blob = f"{t} {loc}"
+        if us.search(blob):
+            # Foreign country named without a US marker in the title -> world
+            if foreign.search(blob) and not us.search(t):
+                return False
+            return True
+        return False
+    def unrest_match(t, cat, loc):
+        if cat not in ("political", "war/conflict", "other"): return False
+        return bool(un.search(t))
+    # Combined civil-unrest card + US/World splits (same 7-day bars on the combined set)
+    unrest_all = dict(agg(unrest_match), label="Civil unrest")
+    us_only = dict(agg(lambda t, cat, loc: unrest_match(t, cat, loc) and is_us(t, loc)))
+    ww_only = dict(agg(lambda t, cat, loc: unrest_match(t, cat, loc) and not is_us(t, loc)))
+    unrest_all["us"] = {"n24": us_only["n24"], "n7": us_only["n7"], "max24": us_only["max24"], "top": us_only["top"]}
+    unrest_all["world"] = {"n24": ww_only["n24"], "n7": ww_only["n7"], "max24": ww_only["max24"], "top": ww_only["top"]}
+    # Prefer a clean world/US top for the subtitle when combined top is junk
+    if not unrest_all.get("top"):
+        unrest_all["top"] = (ww_only.get("top") if (ww_only.get("n24") or 0) >= (us_only.get("n24") or 0) else us_only.get("top")) or ww_only.get("top") or us_only.get("top")
+    hard = {"unrest": unrest_all,
             "food": dict(agg(lambda t, cat, loc: bool(fd.search(t))), label="Food and supply chain")}
     return {"conf": conf, "health": health, "hard": hard}
+
 
 # t106u: Nuclear threat (War group) and Election disputes (Elections group). Real Wire items only: confirmed stories plus single-source
 # watchlist items (marked as such), last 7 days, titles matched by keyword. Headlines shown are cleaned (no emoji, livestream or profane posts).
@@ -335,7 +400,7 @@ def quake_map(big):
 BOARD = [("el", "Elections", "Midterms 2026, live on election night", [("el_next", "Polls closing", "/midterms"), ("el_sen", "Senate: closest races", "/midterms"), ("el_gov", "Governor: closest races", "/midterms"), ("el_house", "House: closest races", "/midterms"), ("el_disp", "Election disputes", "/#wire")]),
          ("cf", "War and conflict", "Stories on The Wire by region", [("c_nuke", "Nuclear threat", "/#wire"), ("c_il", "Israel, Gaza and region", "/#wire"), ("c_ir", "Iran", "/#wire"), ("c_ru", "Russia and Ukraine", "/#wire"), ("c_uk", "UK and London", "/#wire"), ("c_other", "Other conflict zones", "/#heatmap")]),
          ("hl", "Health and outbreaks", "Outbreak reports on The Wire", [("h_ebola", "Ebola", "/#medical"), ("h_measles", "Measles", "/#medical"), ("h_other", "Other outbreaks", "/#medical")]),
-         ("hd", "Hardship risks", "Power, communications, supply and order at home", [("grid", "U.S. power grid", "/#grid"), ("comms", "Phones, internet and cloud", "/#network"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Unrest in the U.S.", "/#wire")]),
+         ("hd", "Hardship risks", "Power, communications, supply and civil order", [("grid", "U.S. power grid", "/#grid"), ("comms", "Phones, internet and cloud", "/#network"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Civil unrest", "/#wire")]),
          ("nh", "Natural hazards", "Earthquakes, space weather and severe weather", [("quake", "Earthquakes", "/#solar"), ("kp", "Geomagnetic storms", "/#solar"), ("wx", "Weather threats to power", "/#grid"), ("flare", "Solar flares", "/#solar")])]
 BOARD = [g for k in ("cf", "el", "hl", "hd", "nh") for g in BOARD if g[0] == k]   # t106u: War and conflict first
 def _board_html():

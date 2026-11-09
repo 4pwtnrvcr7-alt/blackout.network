@@ -399,3 +399,20 @@ html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
 .bna-fol a:focus-visible{outline:2px solid var(--a-y);outline-offset:2px}
 html[data-theme="light"] .bna-it:not(.hi) .bna-fol a{color:#0B0D10;background:rgba(255,194,26,.16)}
 html[data-theme="light"] .bna-it:not(.hi) .bna-fol a:hover{background:var(--a-y)}
+
+/* civil-unrest day bars */
+.bna-bars{position:relative;isolation:isolate}
+.bna-barhit{position:absolute;left:0;right:0;top:0;height:64px;display:grid;gap:0;pointer-events:none;z-index:2}
+.bna-barday{pointer-events:auto;appearance:none;background:transparent;border:0;padding:0;margin:0;cursor:pointer;border-radius:4px;min-height:44px}
+.bna-barday:disabled{cursor:default;opacity:.35}
+.bna-barday:focus-visible{outline:2px solid var(--a-ch);outline-offset:-2px}
+.bna-barday.on{background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px var(--a-ch)}
+html[data-theme="light"] .bna-barday.on{background:rgba(0,0,0,.06)}
+.bna-day{list-style:none;margin:10px 0 0;padding:0}
+.bna-day li{padding:10px 0;border-top:1px solid var(--a-ln2);display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
+.bna-day li:first-child{border-top:0;padding-top:0}
+.bna-day .bna-lnk{flex:1 1 100%;font-weight:600;color:var(--a-ink);text-decoration:none}
+.bna-day .bna-lnk:hover{text-decoration:underline}
+.bna-rkchip{flex:none;font-size:11px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:999px;background:var(--a-ln2);color:var(--a-ink2)}
+.bna-rkchip.red{background:rgba(255,107,107,.18);color:#FF6B6B}
+html[data-theme="light"] .bna-rkchip.red{background:rgba(176,14,40,.12);color:#B00E28}
