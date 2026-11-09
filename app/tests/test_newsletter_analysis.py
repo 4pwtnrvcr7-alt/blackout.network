@@ -598,7 +598,8 @@ class Topics(unittest.TestCase):
         self.assertIn(NL.share_text(issue).split("\n", 1)[0], text)
         _assert_no_empty_framing(self, subj, html, text, NL.share_text(issue))
         self.assertIn('width="72"', html)
-        self.assertLessEqual(len(NL.card_headline({"title": "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles. As with the attack on the Southern Bridge, the missile penetrated the roadway completely. However, it remains unclear whether the damage is severe enough"})), 90)
+        self.assertEqual(NL.card_headline({"title": "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles. As with the attack on the Southern Bridge, the missile penetrated the roadway completely. However, it remains unclear whether the damage is severe enough"}),
+                         "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles")   # t1134: first whole sentence
         self.assertEqual(NL.card_headline({"title": "raw scanner text that goes on and on", "display_title": "Russian ballistic missiles damage Kyiv's Northern Bridge"}), "Russian ballistic missiles damage Kyiv's Northern Bridge")
         self.assertIn("Section Top threats", html)
         self.assertNotIn('height="315"', html)
@@ -631,3 +632,45 @@ class Topics(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class HeadlineTruncationT1134(unittest.TestCase):
+    """Live 7 AM Nov 9 brief: every ANALYSIS lead and several card headlines were cut mid-sentence."""
+    def test_dek_never_cut(self):
+        import newsletter_analysis as NA
+        w = "It shows Washington is still hitting targets around the strait even while it says it wants a deal, which keeps oil and shipping on edge."
+        self.assertEqual(NA._dek(w), w)
+        self.assertIn(w, NA._analysis_block("Body.", w))
+
+    def test_note_headline_printed_whole(self):
+        import newsletter as NL
+        for h in ("Three chained Ivanti VPN zero-days give attackers root access; next federal deadline Nov. 13",
+                  "House returns with a forced vote on impeaching Defense Secretary Hegseth expected this week",
+                  "Bird flu kills a Yakima County dairy-exposed resident as the Washington cluster grows to three"):
+            self.assertEqual(NL.card_headline({"title": "raw", "display_title": h}), h)
+
+    def test_scanner_title_cut_is_visible(self):
+        import newsletter as NL
+        t = "word " * 60
+        out = NL.card_headline({"title": t})
+        self.assertTrue(out.endswith("\u2026"))
+        self.assertEqual(NL.card_headline({"title": "Strike hits port; deadline Nov. 13"}), "Strike hits port; deadline Nov. 13")
+
+    def test_first_sentence_whole(self):
+        import newsletter as NL
+        s = "The U.S. Treasury told Baghdad on Nov. 9 to shut all but two crossings with Iran, which officials there say would cost Iraq billions in lost trade every year. More later."
+        self.assertEqual(NL._first_sentence(s), s.split(" More later.")[0])
+
+    def test_qa_gate_blocks_cut_leads(self):
+        import newsletter_qa as QA
+        full = "Mass shootings are rare in Poland, and this one hit one of Europe's busiest tourist squares on a weekend afternoon."
+        bad = ('<a href="x" class="bnt bnh1" style="">1. Krakow gunman dies</a><p><span style="display:block;font:700">ANALYSIS</span>'
+               '<b style="display:block;font:700">Mass shootings are rare in Poland, and this one hit one of Europe\'s busiest</b>Body text.</p>')
+        r = QA.check("Morning Brief", bad, "", [full])
+        self.assertFalse(r["ok"])
+        self.assertTrue(any("busiest" in b for b in r["blockers"]))
+        good = bad.replace("Europe\'s busiest</b>", "Europe\'s busiest tourist squares on a weekend afternoon.</b>")
+        self.assertTrue(QA.check("Morning Brief", good, "", [full])["ok"], QA.check("Morning Brief", good, "", [full]))
+        r = QA.check("x", '<a href="x" class="bnt bnh1" style="">House vote on Hegseth expected this</a>', "", [])
+        self.assertFalse(r["ok"])

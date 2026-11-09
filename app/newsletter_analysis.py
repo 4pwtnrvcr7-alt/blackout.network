@@ -94,9 +94,10 @@ _BARS = "▁▂▃▄▅▆▇"
 
 
 def _cut_plain(s, n):
+    """Shorten on a word, with a visible ellipsis so a cut never reads as a finished thought (t1134)."""
     s = re.sub(r"\s+", " ", s or "").strip()
     if len(s) <= n: return s
-    return s[:n - 1].rsplit(" ", 1)[0]
+    return s[:n - 1].rsplit(" ", 1)[0].rstrip(" ,;:-") + "\u2026"
 
 
 def cost_per_issue():
@@ -934,17 +935,10 @@ def _lbl(t):
     return f'<span style="display:block;font:700 14px/19px {FH};color:{TX};margin:0 0 8px 0">{t}</span>'
 
 
-def _dek(s, n=78):
-    """A short bold lead for ANALYSIS. One or two lines at phone width, cut on a word."""
-    s = re.sub(r"\s+", " ", s or "").strip()
-    if len(s) <= n: return s
-    head = s[:n + 1]
-    for sep in (", ", " as ", " while ", " after ", " and "):
-        idx = head.rfind(sep)
-        if idx >= 36:
-            return head[:idx].rstrip(" .,;:-")
-    sp = head.rfind(" ")
-    return (head[:sp] if sp >= 24 else s[:n]).rstrip(" .,;:-")
+def _dek(s, n=None):
+    """Bold lead for ANALYSIS: the analyst's why-it-matters line, printed whole. It is never cut on a character or word
+    count, because a cut lead reads as a broken sentence (t1134: live 7 AM Nov 9 brief). n is ignored, kept for callers."""
+    return re.sub(r"\s+", " ", s or "").strip()   # printed as written; newsletter_qa blocks a send if it is not a full sentence
 
 
 def _analysis_block(text, takeaway):

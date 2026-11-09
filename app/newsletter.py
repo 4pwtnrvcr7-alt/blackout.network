@@ -696,7 +696,7 @@ def bluf(issue):
     lines = [MATTERS + "."]
     for i, it in enumerate(_story_pool(issue)[:3], 1):
         why = _why_line(it)
-        lines.append(f"{i}. {_short(it.get('title') or '', 120)}" + (f" — {why}" if why else ""))
+        lines.append(f"{i}. {card_headline(it)}" + (f" — {why}" if why else ""))   # t1134: same complete headline as the card
     return " ".join(lines)
 
 def share_text(issue):
@@ -869,40 +869,70 @@ def tighten_title(t):
     return re.sub(r"\s+[A-Z]$", "", out)
 
 _DANGLING = set("a an the of and or to in on for with from as at by into over after amid its their".split())
+# Abbreviations that end in a full stop but never end a sentence ("Nov. 13", "U.S. forces", "Dr. Smith").
+_ABBR = re.compile(r"(?:\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mr|Mrs|Ms|Dr|St|Sen|Rep|Gov|Gen|Lt|Col|Sgt|Capt|Adm|Jr|Sr|No|Vol|vs|approx|est|Inc|Corp|Ltd|Co)|\b(?:[A-Z]\.){1,3}[A-Z]?)\.$")
 
-def _fit_headline(t, n=90):
-    """One headline, at most n characters, cut on a word and not on a dangling fragment."""
+def _sentences(t):
+    """Split on real sentence ends only: a stop that is not part of an abbreviation, then a space and a capital/quote/digit."""
+    t = re.sub(r"\s+", " ", t or "").strip()
+    out, start = [], 0
+    for m in re.finditer(r"[.!?][\"'\u201d\u2019)]?(?=\s+[A-Z0-9\"'\u201c\u2018(])", t):
+        chunk = t[start:m.end()]
+        if m.group(0)[0] == "." and _ABBR.search(chunk.rstrip("\"'\u201d\u2019)")):
+            continue
+        out.append(chunk.strip()); start = m.end()
+    if t[start:].strip(): out.append(t[start:].strip())
+    return out
+
+def _strip_stop(t):
+    """Headline style drops a closing full stop, but never the stop of an abbreviation such as "Nov." or "U.S."."""
+    t = t.rstrip(" ,;:-")
+    if t.endswith(".") and not t.endswith("...") and not _ABBR.search(t):
+        t = t[:-1].rstrip()
+    return t
+
+def _fit_headline(t, n=140):
+    """One headline. Never sliced mid-sentence without saying so: the first full sentence when it fits, else the whole
+    title when it fits, else cut on a word with an ellipsis (an explicit, visible cut). (t1134 fix)"""
     t = clean_title(t)
     t = re.split(r"\s+\|\s+|\s+->\s+|>>", t, maxsplit=1)[0].strip(" -|")
-    sent = re.match(r"^(.{20,}?[.!?])(?:\s|$)", t)
-    if sent and len(sent.group(1)) <= n:
-        t = sent.group(1).rstrip()
-    if len(t) > n:
-        chunk = t[:n + 1]
-        sp = chunk.rfind(" ")
-        t = chunk[:sp] if sp >= 24 else t[:n]
-        for sep in (", ", " as ", " while ", " after ", " and "):
-            idx = t.rfind(sep)
-            if idx >= 40:
-                t = t[:idx]
-                break
-    words = t.split()
+    sents = _sentences(t)
+    if len(sents) > 1 and len(sents[0]) >= 20 and len(sents[0]) <= n:
+        t = sents[0]
+    if len(t) <= n:
+        return _strip_stop(t)
+    words = t[:n].split()[:-1] if not t[n:n + 1].isspace() else t[:n].split()
     while len(words) > 3 and words[-1].lower().strip(".,;:!?-") in _DANGLING:
         words.pop()
-    return " ".join(words).rstrip(" .,;:-")
+    return " ".join(words).rstrip(" .,;:-") + "\u2026"
 
-def _first_sentence(t, n=150):
-    t = re.sub(r"\s+", " ", t or "").strip()
-    m = re.match(r"^(.+?[.!?])(?:\s|$)", t)
-    s = m.group(1).strip() if m else t
-    return s if len(s) <= n else _fit_headline(s, n)
+def _first_sentence(t, n=None):
+    """The first complete sentence, never cut. n is kept for old callers and ignored. (t1134 fix)"""
+    sents = _sentences(t)
+    s = sents[0] if sents else ""
+    if s and s[-1] not in ".!?\u2026\"'\u201d\u2019)":
+        s += "."
+    return s
 
 def card_headline(it):
-    """Analyst note headline when we have one. Otherwise a short headline, about three lines at 390px."""
+    """Analyst note headline exactly as written (the builder owns its length). Otherwise the scanner title, whole when it
+    fits, with a visible ellipsis when it does not. (t1134 fix: no more silent clause/word cuts.)"""
     note = (it.get("display_title") or "").strip()
     if note:
-        return _fit_headline(note, 90)
-    return _fit_headline(it.get("title") or "", 90)
+        return _strip_stop(clean_title(note))
+    return _fit_headline(it.get("title") or "", 140)
+
+def _subject_title(t, n=72):
+    """Subject-line story name: whole headline when it fits, else its first complete clause, else a word cut with an ellipsis."""
+    t = _strip_stop(t)
+    if len(t) <= n: return t
+    for sep in ("; ", ": ", ", ", " as ", " while ", " after "):
+        idx = t.find(sep)
+        if 30 <= idx <= n:
+            head = t[:idx].rstrip(" ,;:-")
+            if head.split()[-1].lower() not in _DANGLING:
+                return head
+    return _cut(t, n)
 
 def item_of(r, section, official=0, editorial=False):
     fams = _fams(r); eff = int(r["eff_families"] or 0)
@@ -1291,7 +1321,7 @@ def subject_for(issue):
     shown = _shown_stories(issue)
     if not shown:
         return f"{lab} Brief, {d}: {MATTERS}"
-    title = _cut(card_headline(shown[0]), 72).rstrip(" .")
+    title = _subject_title(card_headline(shown[0]), 72)
     extra = len(_story_pool(issue)) - 1
     return f"{lab} Brief, {d}: {title}" + (f" + {extra} more" if extra else "")
 
@@ -1461,7 +1491,11 @@ def _band_html(it):
     place = (it.get("where") or "").strip()
     if place and it.get("approx") and "approx" not in place.lower(): place += " (approx.)"
     bits = [b for b in (place, _band_when(it.get("when"))) if b]
-    meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:6px;white-space:nowrap">{E(_one_line(" · ".join(bits), 38))}</div>' if bits else "")
+    joined = " · ".join(bits)
+    if len(joined) > 38 and len(bits) == 2:   # t1134: place and time on two lines instead of cutting the time to "6:19 PM…"
+        meta_html = "".join(f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:{6 if i == 0 else 0}px;white-space:nowrap">{E(_one_line(b, 38))}</div>' for i, b in enumerate(bits))
+    else:
+        meta_html = (f'<div style="font:400 14px/19px {FACE};color:{PAL["meta"]};margin-top:6px;white-space:nowrap">{E(_one_line(joined, 38))}</div>' if bits else "")
     band, panel = "#121826", "#121826"
     return (f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{band}" style="background:{band}"><tr>'
             f'<td width="2" bgcolor="{rail}" style="width:2px;background:{rail};font-size:0;line-height:0">&nbsp;</td>'
@@ -2399,6 +2433,12 @@ def _send_one(k, srow, sub, key, slot, at, c):
     if issue["empty"]:   # never send an empty email
         k.execute("UPDATE sends SET status='skipped_empty', sent_at=? WHERE id=?", (iso(now()), srow["id"])); k.commit(); return "skipped"
     L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
+    qa = qa_gate(issue, subj, hb, tx, c)
+    if qa is not None and not qa["ok"]:   # t1134: never mail a brief with cut-off headlines or leads
+        err = ("QA gate blocked send: " + " | ".join(qa["blockers"][:5]))[:300]
+        k.execute("UPDATE sends SET status='blocked_qa', error=?, attempts=attempts+1 WHERE id=?", (err, srow["id"]))
+        k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,subject,error) VALUES(?,?,?,?,?,?,?)", (iso(now()), "issue", sub["id"], "qa", "blocked_qa", subj, err))
+        k.commit(); log(f"issue {key} to subscriber #{sub['id']} BLOCKED by QA gate ({len(qa['blockers'])} problems): {err}", "error"); return "blocked"
     msg = build_mime(sub["email"], subj, hb, tx, L["unsubscribe"], "issue", c, tracked="stop_tracking" in L)
     msg["X-BN-Idem"] = f"bn-{key}-{sub['id']}"   # Resend Idempotency-Key: a restored/stale DB can never double-send this slot
     ok, mode, f, err = deliver(msg, "issue", sub["id"])
@@ -2416,6 +2456,20 @@ def _send_one(k, srow, sub, key, slot, at, c):
     k.execute("UPDATE sends SET status=?, attempts=?, next_retry=?, error=?, mode=? WHERE id=?", ("gave_up" if final else "failed", att, nr, err, mode, srow["id"]))
     k.execute("INSERT INTO mail_log(ts,kind,subscriber_id,mode,status,subject,error) VALUES(?,?,?,?,?,?,?)", (t, "issue", sub["id"], mode, "failed", subj, err))
     k.commit(); log(f"issue {key} to subscriber #{sub['id']} failed (attempt {att}): {err}", "error"); return "failed"
+
+def qa_gate(issue, subj, html_, text, c=None):
+    """Pre-send truncation check (newsletter_qa). Config "qa_gate": "block" (default) | "warn" | "off". None when off/unavailable."""
+    mode = str(((c or {}).get("qa_gate")) or "block").lower()
+    if mode == "off": return None
+    try:
+        import newsletter_qa as QA
+        r = QA.check(subj, html_, text, QA.sources_from_issue(issue))
+    except Exception as ex:   # a broken gate must not silently pass: block, and say why
+        r = {"ok": False, "blockers": [f"QA gate error: {type(ex).__name__}: {ex}"[:200]], "warnings": []}
+    if r["warnings"]: log(f"QA gate warnings: {' | '.join(r['warnings'][:5])}"[:600], "qa")
+    if mode == "warn" and not r["ok"]:
+        log(f"QA gate (warn mode) would block: {' | '.join(r['blockers'][:5])}"[:600], "qa"); return dict(r, ok=True)
+    return r
 
 def run_slot(key, slot, at, c):
     k = db()
@@ -2443,9 +2497,9 @@ def run_slot(key, slot, at, c):
                           (iso(now() + timedelta(minutes=c["retry_backoff_minutes"][0])), str(ex)[:300], srow["id"])); k.commit()
         agg = {r["status"]: r["n"] for r in k.execute("SELECT status, COUNT(*) n FROM sends WHERE slot_key=? GROUP BY status", (key,))}
         pending = agg.get("queued", 0) + agg.get("failed", 0) + agg.get("sending", 0)
-        status = "running" if pending else ("done_with_errors" if (agg.get("gave_up") or agg.get("uncertain")) else "done")
+        status = "running" if pending else ("done_with_errors" if (agg.get("gave_up") or agg.get("uncertain") or agg.get("blocked_qa")) else "done")
         k.execute("UPDATE slot_runs SET status=?, n_targets=?, n_sent=?, n_failed=?, n_skipped=?, finished=? WHERE slot_key=?",
-                  (status, sum(agg.values()), agg.get("sent", 0), agg.get("gave_up", 0) + agg.get("failed", 0) + agg.get("uncertain", 0),
+                  (status, sum(agg.values()), agg.get("sent", 0), agg.get("gave_up", 0) + agg.get("failed", 0) + agg.get("uncertain", 0) + agg.get("blocked_qa", 0),
                    agg.get("skipped_empty", 0) + agg.get("skipped_inactive", 0), None if pending else iso(now()), key))
         k.commit(); return status, agg
     finally: k.close()
@@ -3266,6 +3320,9 @@ def render_preview_html(notes, out, at=None, clean=False):
              "categories": "https://blackout.network/newsletter", "sources": "https://blackout.network/sources",
              "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
     _subj, html, _text = render(issue, links)
+    qa = qa_gate(issue, _subj, html, _text, {"qa_gate": "block"})
+    print("QA gate:", "PASS" if qa["ok"] else f"BLOCK ({len(qa['blockers'])})", file=sys.stderr)
+    for b in qa["blockers"] + ["warning: " + w for w in qa["warnings"]]: print("  -", b, file=sys.stderr)
     if live and not clean:
         banner = ('<div style="background:#FFC21A;color:#0B0C0F;font:600 14px/1.45 Inter,system-ui,sans-serif;padding:12px 16px">'
                   'Preview only. Live cluster snapshot from blackout.network/api/state. Nothing was emailed.</div>')
