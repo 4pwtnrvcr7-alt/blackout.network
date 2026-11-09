@@ -271,27 +271,30 @@ def wire_groups(now):
         r = re.compile(rx, re.I); hused.append(r)
         health[k] = dict(agg(lambda t, cat, loc, r=r: bool(r.search(t)) and (cat in ("disease", "political", "war/conflict", "other"))), label=label)
     health["other"] = dict(agg(lambda t, cat, loc: bool(H(t, cat)) and not any(r.search(t) for r in hused)), label="Other outbreaks")
-    un, us, foreign, fd = re.compile(_UNREST, re.I), re.compile(_US, re.I), re.compile(_US_FOREIGN, re.I), re.compile(_FOOD, re.I)
-    def is_us(t, loc):
-        blob = f"{t} {loc}"
-        if us.search(blob):
-            # Foreign country named without a US marker in the title -> world
-            if foreign.search(blob) and not us.search(t):
-                return False
-            return True
-        return False
-    def unrest_match(t, cat, loc):
-        if cat not in ("political", "war/conflict", "other"): return False
-        return bool(un.search(t))
-    # Combined civil-unrest card + US/World splits (same 7-day bars on the combined set)
-    unrest_all = dict(agg(unrest_match), label="Civil unrest")
-    us_only = dict(agg(lambda t, cat, loc: unrest_match(t, cat, loc) and is_us(t, loc)))
-    ww_only = dict(agg(lambda t, cat, loc: unrest_match(t, cat, loc) and not is_us(t, loc)))
-    unrest_all["us"] = {"n24": us_only["n24"], "n7": us_only["n7"], "max24": us_only["max24"], "top": us_only["top"]}
-    unrest_all["world"] = {"n24": ww_only["n24"], "n7": ww_only["n7"], "max24": ww_only["max24"], "top": ww_only["top"]}
-    # Prefer a clean world/US top for the subtitle when combined top is junk
-    if not unrest_all.get("top"):
-        unrest_all["top"] = (ww_only.get("top") if (ww_only.get("n24") or 0) >= (us_only.get("n24") or 0) else us_only.get("top")) or ww_only.get("top") or us_only.get("top")
+    fd = re.compile(_FOOD, re.I)
+    # Civil unrest: Wire stories that pass the strict unrest filter + supplemental world news feeds (unrest_feeds.py), deduped by event.
+    import unrest_feeds as UF
+    def wire_pick(match):
+        out = []
+        for cid, t, cat, loc, rk, fs, up, fam in rows:
+            t = t or ""; cat = cat or ""; loc = loc or ""
+            tt = UF.clean_headline(t)
+            if len(tt) < 20 or re.match(r"^(www\.|https?:|#|@)", tt) or re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", tt) or quakeish.search(tt): continue
+            if not match(tt, cat, loc): continue
+            ft = _iso(fs) or 0; ut = _iso(up) or ft
+            out.append({"title": tt, "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire", "t": ft or ut, "ut": ut,
+                        "rank": int(rk or 0), "n": int(fam or 0), "loc": loc, "us": UF.is_us(tt, loc)})
+        return out
+    w_un = wire_pick(lambda t, cat, loc: cat in ("political", "war/conflict", "other", "crime") and UF.is_unrest(t))
+    unrest_all = _r(None, lambda: UF.combine(w_un, UF.events("u", now), days, day, now, "Civil unrest", split_us=True))
+    if not unrest_all:
+        unrest_all = dict(agg(lambda t, cat, loc: cat in ("political", "war/conflict", "other") and UF.is_unrest(t)), label="Civil unrest")
+    # UK and London: Wire conflict stories naming the UK + Wire/feeds security stories (terror, protest/disorder, cyber attacks, state threats)
+    ukr = re.compile(dict((k, rx) for k, _, rx in _REG)["uk"], re.I)
+    w_uk = wire_pick(lambda t, cat, loc: (cat == "war/conflict" and bool(W(t, cat)) and bool(ukr.search(t + " " + loc)))
+                     or (cat in ("political", "cyber", "crime", "other") and UF.is_uk(t, False)))
+    uk = _r(None, lambda: UF.combine(w_uk, UF.events("uk", now), days, day, now, "UK and London"))
+    if uk: conf["uk"] = uk
     hard = {"unrest": unrest_all,
             "food": dict(agg(lambda t, cat, loc: bool(fd.search(t))), label="Food and supply chain")}
     return {"conf": conf, "health": health, "hard": hard}

@@ -23,6 +23,7 @@ class WireGroups(unittest.TestCase):
         rows = [
             ("a"*16, "France sees fresh mass protests as police move to block banned rally", "political", None, "2026-11-08T12:00:00Z", "2026-11-08T12:00:00Z", 5, 4),
             ("b"*16, "How the new Charlotte curfew for minors could impact parents", "political", "Charlotte, NC", "2026-11-08T10:00:00Z", "2026-11-08T10:00:00Z", 3, 3),
+            ("k"*16, "Protesters clash with police outside ICE facility in Portland, Oregon", "political", "Portland, OR", "2026-11-08T10:30:00Z", "2026-11-08T10:30:00Z", 4, 3),
             ("c"*16, "Shops looted in Frankfurt as riots erupt in Germany after protests", "political", None, "2026-11-07T12:00:00Z", "2026-11-07T12:00:00Z", 4, 2),
             ("d"*16, "Breaking News British couple in Krakow recall seeing 250 people running after shooting", "political", None, "2026-11-08T11:00:00Z", "2026-11-08T11:00:00Z", 2, 1),
             ("e"*16, "From California Milk to Nara Cans: The Supply Chain Behind the Second Infant Formula Botulism Scare", "disease", None, "2026-11-08T09:00:00Z", "2026-11-08T09:00:00Z", 2, 2),
@@ -39,8 +40,10 @@ class WireGroups(unittest.TestCase):
         g = A.wire_groups(NOW)
         u = g["hard"]["unrest"]
         self.assertEqual(u["label"], "Civil unrest")
-        self.assertGreaterEqual(u["n7"], 4)          # FR, Charlotte, Frankfurt, Italy (+ maybe more)
-        self.assertGreaterEqual(u["us"]["n7"], 1)    # Charlotte
+        self.assertGreaterEqual(u["n7"], 4)          # FR, Portland, Frankfurt, Italy (+ maybe more)
+        self.assertGreaterEqual(u["us"]["n7"], 1)    # Portland (minors' curfew is excluded)
+        alltitles = [x["title"] for v in u["stories"].values() for x in v]
+        self.assertFalse(any("curfew for minors" in x for x in alltitles))
         self.assertGreaterEqual(u["world"]["n7"], 2) # FR, Frankfurt, Italy
         self.assertIn("stories", u)
         # day stories present for a day with counts
