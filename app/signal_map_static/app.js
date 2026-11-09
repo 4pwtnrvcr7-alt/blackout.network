@@ -168,7 +168,8 @@
     if (!el || el.getAttribute("data-map")) return;
     if (!(global.L && L.map)) {
       var missing = el.querySelector(".bn-sig-note");
-      if (missing) missing.textContent = "The map library could not load.";
+      /* the homepage preview stays up with its dots; never show a failure line over them */
+      if (missing) missing.textContent = el.querySelector(".bn-sig-pre circle") ? "Top stories shown. Open the map for every dot." : "The map library could not load.";
       return;
     }
     el.setAttribute("data-map", "1");
@@ -556,16 +557,21 @@
         rows = ((S && S.points) || []).filter(real);
         if (first) { fillTopics(); readUrl(); if (viewName !== "us") frame(viewName); }
         draw(first);
-      }).catch(function () { if (first) say("Stories could not load. The map is the bundled world outline."); });
+        if (first && note && note.getAttribute("data-done")) say(note.getAttribute("data-done"));
+      }).catch(function () {
+        if (!first) return;
+        if (seedN) { say("Top stories shown. Updating\u2026"); setTimeout(function () { pull(true); }, 20000); }
+        else say("Stories could not load. The map is the bundled world outline.");
+      });
     }
     readUrl();
     if (viewName !== "us") frame(viewName);
     /* Homepage speed (Nov 8): the page carries the top dots inline (#bn_sig_seed). Draw them now, then load the rest. */
-    var seedEl = el.querySelector("#bn_sig_seed"), seed = [];
+    var seedEl = el.querySelector("#bn_sig_seed"), seed = [], seedN = 0;
     if (seedEl) { try { seed = (JSON.parse(seedEl.textContent || "[]") || []).filter(real); } catch (e) { seed = []; } }
     if (seed.length) {
       seed.forEach(function (c) { if (c.cluster_id) seedIds[c.cluster_id] = 1; });
-      rows = seed; draw(false);
+      rows = seed; seedN = seed.length; draw(false);
     }
     pull(true);
     timer = setInterval(function () { pull(false); }, 300000);

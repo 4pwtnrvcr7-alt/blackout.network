@@ -210,6 +210,7 @@ def links():
     out = {}
     for cid, s in ((d or {}).get("stories") or {}).items():
         if not CID_RE.match(str(cid)) or not isinstance(s, dict): continue
+        if s.get("policy_ok") is not True: continue          # box topic policy (fails closed when missing)
         hid = set(s.get("hidden") or [])
         x = s.get("x_url") if s.get("x_ok") and "x" not in hid and X_RE.match(str(s.get("x_url") or "")) else None
         yt = s.get("yt_url") if s.get("yt_ok") and "yt" not in hid and YT_RE.match(str(s.get("yt_url") or "")) else None
@@ -217,6 +218,25 @@ def links():
         out[cid] = {"x": x, "yt": yt, "posted_at": s.get("posted_at"), "story": None if "site" in hid else f"/wire/{cid}"}
     _LC.update(m=m, v=out)
     return out
+
+# Mirror of the social topic policy for the two rules Matt called out (box: /workspace/launch/social/weather_policy.py).
+# The box sets policy_ok per story; this second check uses the event's current title so a quake or weather story is never
+# linked or pinned even if an older social_links.json lacks the flag.
+_WX = re.compile(r"\b(?:weather|storms?|hurricanes?|typhoons?|cyclones?|tornado(?:es|s)?|flood(?:ing|s| warning)?|heat advisory|heat ?wave|winter storm|"
+                 r"forecast(?:s|ing)?|NWS|rain(?:fall)?|snow(?:fall)?|blizzard|deep freeze|cold snap|freeze warning|wind advisory|thunderstorm|drought|"
+                 r"(?:wind|freeze|frost|flood|winter|gale|spray|surf|fire weather|heat|storm) (?:warning|watch|advisory))\b", re.I)
+_QK = re.compile(r"\b(?:earthquakes?|quake|seismic|magnitude)\b|\bM\s*[4-9]\.\d", re.I)
+_QIMPACT = re.compile(r"\b(?:significant|major|severe|widespread) (?:damage|destruction)\b|\b(?:[1-9]\d* (?:dead|deaths|killed|injured)|fatalities|casualties reported|tsunami (?:warning|threat))\b", re.I)
+_QNEG = re.compile(r"\b(?:no|without|zero|not any)\b.{0,35}(?:damage|casualties|fatalities|tsunami|deaths|killed|injured)", re.I)
+_QUS = re.compile(r"\b(?:Los Angeles|San Francisco|San Diego|Seattle|Portland, Oregon|Anchorage|Honolulu|Salt Lake City|San Juan, Puerto Rico)\b", re.I)
+def topic_ok(title):
+    """False for routine weather / NWS products and for quakes below M7 without real damage, a tsunami threat, or M5.5+ in a populated US area."""
+    t = str(title or "")
+    if _WX.search(t) or nws(t): return False
+    if _QK.search(t):
+        m = re.search(r"\b(?:M\s*|magnitude\s*)(\d(?:\.\d)?)", t, re.I); mag = float(m.group(1)) if m else 0
+        return mag >= 7 or bool(_QIMPACT.search(t) and not _QNEG.search(t)) or (mag >= 5.5 and bool(_QUS.search(t)))
+    return True
 
 def links_mtime():
     try: return os.path.getmtime(F_LINKS)
@@ -230,7 +250,7 @@ def attach(evs, now=None):
         for cid in e.get("cluster_ids") or [e.get("cluster_id")]:
             s = L.get(cid)
             if s and (best is None or (_ts(s.get("posted_at")) or 0) > (_ts(best.get("posted_at")) or 0)): best = dict(s, cluster_id=cid)
-        if best:
+        if best and topic_ok(e.get("title")):
             e["social"] = {"x": best["x"], "yt": best["yt"], "posted_at": best.get("posted_at"), "story": best.get("story")}
             t = _ts(best.get("posted_at"))
             e["posted"] = bool(t and now - t <= PIN_HOURS * 3600)

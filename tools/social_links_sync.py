@@ -6,7 +6,9 @@ cluster id, drops X posts listed in x_deletions.jsonl, and verifies every link b
   X        https://publish.twitter.com/oembed?url=<post>  -> 200 means the post is up (404 = deleted/unavailable)
   YouTube  https://www.youtube.com/oembed?url=<video>     -> 200 means public/unlisted and playable (401/403/404 = not)
   Site     https://blackout.network/wire/<cluster_id>     -> 200
-Only links that returned 200 are marked ok. The result is written to <BN_BOX>/social_links.json and pushed to Render over
+Only links that returned 200 are marked ok, and each story is run through the current social topic policy
+(weather_policy.weather_reason): stories that fail it (minor quakes, routine weather, NWS products...) get policy_ok=false and
+the site neither links nor pins them, even if they were posted in the past. The result is written to <BN_BOX>/social_links.json and pushed to Render over
 the signed sync channel (render_sync.push, file pattern social_*.json). Secrets are read by render_sync and never printed.
 
 Hook (posting pipeline, after a successful publish):  import social_links_sync as SLS; S['social_links'] = SLS.after_slot(dry=a.dry)
@@ -79,6 +81,19 @@ def collect(days=7):
     for v in out.values(): v.pop("_xt", None); v.pop("_yt", None)
     return out, sorted(deleted)
 
+def policy(headline):
+    """Current social topic policy (the posting pipeline's weather_policy.weather_reason, imported read-only).
+    Returns (ok, reason). Fails closed: if the policy can't be loaded, nothing is pinned or linked."""
+    try:
+        if SOCIAL not in sys.path: sys.path.insert(0, SOCIAL)
+        dwb, sys.dont_write_bytecode = sys.dont_write_bytecode, True     # don't write .pyc into the social pipeline's folder
+        try: from weather_policy import weather_reason
+        finally: sys.dont_write_bytecode = dwb
+        why = weather_reason({"title": headline or ""})
+        return why is None, why
+    except Exception as e:
+        return False, f"policy unavailable: {type(e).__name__}"
+
 def verify(stories, force=False):
     try: cache = json.load(open(CACHE))
     except Exception: cache = {}
@@ -100,7 +115,8 @@ def verify(stories, force=False):
         cx = (cache.get(f"x:{s['x_url']}") or {}).get("code") if s.get("x_url") else None
         cy = (cache.get(f"yt:{s['yt_url']}") or {}).get("code") if s.get("yt_url") else None
         cs = (cache.get(f"site:{cid}") or {}).get("code")
-        res[cid] = dict(s, x_ok=cx == 200, yt_ok=cy == 200, x_code=cx, yt_code=cy, site_code=cs, checked_at=now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        pok, why = policy(s.get("headline"))
+        res[cid] = dict(s, policy_ok=pok, policy_reason=why, x_ok=cx == 200, yt_ok=cy == 200, x_code=cx, yt_code=cy, site_code=cs, checked_at=now().strftime("%Y-%m-%dT%H:%M:%SZ"),
                         hidden=([] if cs == 200 else ["site"]))
     return res, len(jobs)
 
@@ -138,7 +154,8 @@ def run(days=7, do_push=True, force=False):
     changed = write(res, deleted)
     out = {"stories": len(res), "x_ok": sum(1 for s in res.values() if s["x_ok"]), "yt_ok": sum(1 for s in res.values() if s["yt_ok"]),
            "x_bad": sorted(c for c, s in res.items() if s.get("x_url") and not s["x_ok"]), "yt_bad": sorted(c for c, s in res.items() if s.get("yt_url") and not s["yt_ok"]),
-           "site_bad": sorted(c for c, s in res.items() if s["site_code"] != 200), "checked_now": checked, "changed": changed, "file": OUT}
+           "site_bad": sorted(c for c, s in res.items() if s["site_code"] != 200),
+           "policy_rejected": {c: s["policy_reason"] for c, s in sorted(res.items()) if not s["policy_ok"]}, "checked_now": checked, "changed": changed, "file": OUT}
     if do_push and (changed or force):
         try: out["push"] = push()
         except Exception as e: out["push"] = {"pushed": False, "error": f"{type(e).__name__}: {str(e)[:160]}"}

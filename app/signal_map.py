@@ -27,10 +27,11 @@ E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
           '<p class="bn-sig-sr">Low is rank 0 to 3, elevated is rank 4 to 6, and high is rank 7 to 10. Red is only rank 7 and above.</p>')
 
-def views_html(active="us"):
+def views_html(active="us", counts=None):
+    counts = counts or {}
     def btn(name, label):
         on = "true" if name == active else "false"
-        return f'<button type="button" data-view="{name}" aria-pressed="{on}">{label} <b data-n="{name}">0</b></button>'
+        return f'<button type="button" data-view="{name}" aria-pressed="{on}">{label} <b data-n="{name}">{int(counts.get(name) or 0)}</b></button>'
     return ('<div class="bn-sig-views" role="group" aria-label="Map view">'
             + btn("us", "US") + btn("world", "World") + btn("conflicts", "Conflicts")
             + '</div><p class="bn-sig-counts" aria-live="polite"></p>')
@@ -46,29 +47,34 @@ function css(h){var l=document.createElement("link");l.rel="stylesheet";l.href=h
 function js(src,fn){var s=document.createElement("script");s.src=src;s.onload=fn;s.onerror=fn;document.head.appendChild(s)}
 function load(){if(el.getAttribute("data-on"))return;el.setAttribute("data-on","1");
 css("/api/signal/app.css");if(!(window.L&&L.map))css("/api/signal/leaflet.css");
-function boot(){js("/api/signal/app.js",function(){if(window.BNSignal)BNSignal.mount(el);
-else{var n=document.getElementById("bn_sig_note");if(n)n.textContent="The map could not load.";}})}
+function boot(){js("/api/signal/app.js",function(){if(window.BNSignal&&window.L&&L.map)return BNSignal.mount(el);fail()})}
 if(window.L&&L.map)boot();else js("/api/signal/leaflet.js",boot)}
+var tries=0;function fail(){var n=document.getElementById("bn_sig_note");if(tries++<2){el.removeAttribute("data-on");setTimeout(load,4000*tries);return}
+if(n)n.textContent=el.querySelector(".bn-sig-pre circle")?"Top stories shown. Open the map for every dot.":"The map could not load."}
 if(window.requestIdleCallback)requestIdleCallback(load,{timeout:1500});else setTimeout(load,300);
 if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting})){io.disconnect();load()}},{rootMargin:"600px"});io.observe(el)}})();</script>"""
 
 def home_section():
     """Homepage card. Clicking the map (not a dot) opens /map. First dots are inline (seed JSON + SVG preview); the rest load after."""
-    seed, svg = "", ""
+    seed, svg, counts, note = "", "", {}, "Wire and Watchlist"
     try:
         pts = seed_points()
         if pts:
+            # the view buttons show the preview set's counts until the live map has loaded every dot
+            counts = {"us": sum(1 for p in pts if _in_us(p)), "world": len(pts),
+                      "conflicts": sum(1 for p in pts if str(p.get("category") or "").lower() == "war/conflict")}
+            note = "Loading live map\u2026"
             import json as _json
             seed = '<script type="application/json" id="bn_sig_seed">' + _json.dumps(pts, separators=(",", ":")).replace("</", "<\\/") + "</script>"
             svg = preview_svg(pts)
     except Exception:
-        seed, svg = "", ""
+        seed, svg, counts, note = "", "", {}, "Wire and Watchlist"
     return f'''<section class="bna-sec" aria-labelledby="bn_sig_h"><div class="bna-wrap">
 <article class="bn-sig" id="bn_sig" data-embed="1">
 <div class="bn-sig-cardhead"><div><h2 id="bn_sig_h">Global signal map</h2>
-<p class="bn-sig-note" id="bn_sig_note">Wire and Watchlist</p></div>
+<p class="bn-sig-note" id="bn_sig_note" data-done="Wire and Watchlist" aria-live="polite">{note}</p></div>
 <div class="bn-sig-side">{LEGEND}<a class="bn-sig-open" href="/map">Open the map</a></div></div>
-<div class="bn-sig-tools">{views_html()}</div>
+<div class="bn-sig-tools">{views_html(counts=counts)}</div>
 <div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map of Wire and Watchlist stories. US is the starting view." style="background:#0b1220;position:relative;overflow:hidden">{svg}</div>
 {seed}</article></div></section>
 {HOME_BOOT}'''

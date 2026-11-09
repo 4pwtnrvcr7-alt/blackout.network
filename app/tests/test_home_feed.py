@@ -49,6 +49,7 @@ class Links(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp(); H.F_LINKS = os.path.join(self.d, "social_links.json"); H._LC.update(m=None, v={})
     def write(self, stories):
+        for v in stories.values(): v.setdefault("policy_ok", True)
         json.dump({"version": 1, "stories": stories}, open(H.F_LINKS, "w")); os.utime(H.F_LINKS, (time.time() + len(stories), time.time() + len(stories)))
     def test_only_verified_links(self):
         self.write({"a" * 16: {"x_url": "https://x.com/BlkoutNtw/status/2117653441124221070", "x_ok": True, "yt_url": "https://www.youtube.com/shorts/RONKwjR71EU", "yt_ok": False, "posted_at": "2026-11-08T23:00:00Z"},
@@ -62,5 +63,22 @@ class Links(unittest.TestCase):
         self.write({"b" * 16: {"x_url": "https://x.com/BlkoutNtw/status/2117653441124221070", "x_ok": True, "posted_at": "2026-11-09T01:00:00Z"}})
         ev = H.attach(H.events([C("a" * 16, "Paraguay: President under investigation for bank failure", 7, 9), C("b" * 16, "Paraguay Bank Failure", 7, 7)], now=NOW), now=NOW)
         self.assertEqual(len(ev), 1); self.assertTrue(ev[0]["posted"]); self.assertTrue(ev[0]["social"]["x"].endswith("2117653441124221070"))
+
+    def test_policy_gate(self):
+        # box policy reject (or missing flag) -> no links, no pin
+        self.write({"e" * 16: {"x_url": XS + "2117653441124221072", "x_ok": True, "posted_at": "2026-11-09T01:00:00Z", "policy_ok": False},
+                    "f" * 16: {"x_url": XS + "2117653441124221073", "x_ok": True, "posted_at": "2026-11-09T01:00:00Z", "policy_ok": None}})
+        self.assertEqual(H.links(), {})
+    def test_topic_mirror_blocks_minor_quake_and_weather(self):
+        self.write({"1" * 16: {"x_url": XS + "2117653441124221074", "x_ok": True, "posted_at": "2026-11-09T01:00:00Z"},
+                    "2" * 16: {"x_url": XS + "2117653441124221075", "x_ok": True, "posted_at": "2026-11-09T01:00:00Z"},
+                    "3" * 16: {"x_url": XS + "2117653441124221076", "x_ok": True, "posted_at": "2026-11-09T01:00:00Z"}})
+        ev = H.attach([{"cluster_id": "1" * 16, "cluster_ids": ["1" * 16], "title": "GEOFON: M5.0 earthquake Southern Mid-Atlantic Ridge"},
+                       {"cluster_id": "2" * 16, "cluster_ids": ["2" * 16], "title": "High Wind Warning issued November 7 at 9:50AM PST until November 7 at 6:00PM PST by NWS Reno NV"},
+                       {"cluster_id": "3" * 16, "cluster_ids": ["3" * 16], "title": "M7.4 earthquake off Kamchatka triggers tsunami warning"}], now=NOW)
+        self.assertEqual([bool(e.get("posted")) for e in ev], [False, False, True])
+        self.assertNotIn("social", ev[0]); self.assertNotIn("social", ev[1])
+        self.assertTrue(H.topic_ok("Ebola in DR Congo: deaths pass 5,000")); self.assertFalse(H.topic_ok("M6.1 earthquake off East Coast of Honshu, Japan"))
+        self.assertTrue(H.topic_ok("M5.8 earthquake near Los Angeles")); self.assertTrue(H.topic_ok("M6.2 quake: 12 killed, major damage in Herat"))
 
 if __name__ == "__main__": unittest.main()

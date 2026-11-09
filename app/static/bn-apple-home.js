@@ -43,8 +43,8 @@
  function renderHome(d){
   if(d.sources!=null)set("sources",Number(d.sources).toLocaleString("en-US"));
   var g=group((d.main||[]).filter(function(x){var t=x.title||"";return /^[\x20-\x7E]/.test(t)&&!/[\u2600-\u27BF\uD83C-\uDBFF]/.test(t)})),pick=[],per={},N=10;
-  // Stories posted on X/YouTube in the last day lead the row (newest first, max 3); then the highest-ranked events, max 2 per topic at first.
-  g.filter(function(x){return x.posted}).sort(function(a,b){return String((b.social||{}).posted_at||"").localeCompare(String((a.social||{}).posted_at||""))}).slice(0,3).forEach(function(x){pick.push(x)});
+  // Stories posted on X/YouTube in the last day that pass the topic policy lead the row (highest rank first, then newest; max 3); then the highest-ranked events, max 2 per topic at first.
+  g.filter(function(x){return x.posted}).sort(function(a,b){return (b.rank||0)-(a.rank||0)||String((b.social||{}).posted_at||"").localeCompare(String((a.social||{}).posted_at||""))}).slice(0,3).forEach(function(x){pick.push(x)});
   var lead=pick.length;
   g.forEach(function(x){if(pick.length<N&&pick.indexOf(x)<0&&(per[x.category]||0)<2){per[x.category]=(per[x.category]||0)+1;pick.push(x)}});
   g.forEach(function(x){if(pick.length<N&&pick.indexOf(x)<0)pick.push(x)});
