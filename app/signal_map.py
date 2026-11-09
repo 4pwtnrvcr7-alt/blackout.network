@@ -252,6 +252,7 @@ def points_payload():
 def _build_points():
     import json, sqlite3, time
     from datetime import datetime, timezone, timedelta
+    from collections import defaultdict
     now = time.time()
     import signal_place
     path = os.path.join(BASE, "blackout.db")
@@ -268,45 +269,93 @@ def _build_points():
         finally:
             c.close()
     import geo
-    points, stored, inferred, unmapped = [], 0, 0, 0
+    # Pass 1: resolve each story. Country-only rows are held so we can spread them across real cities.
+    drafted, stored, inferred, unmapped, unverified = [], 0, 0, 0, 0
+    country_only = defaultdict(list)   # cc -> [index into drafted]
     for r in rows:
         if int(r.get("watchlist") or 0) not in (0, 1): continue
         try: links = json.loads(r.get("links") or "[]")
         except Exception: links = []
         if not isinstance(links, list): links = []
+        story = signal_place.story_text(r.get("title"), r.get("location"), r.get("brief"))
+        named = signal_place.named_countries(story)
+        prefer = named[0] if len(named) == 1 else None
+        hit = signal_place.infer(story, prefer_cc=prefer)
         coord = _stored_coord(r.get("lat"), r.get("lon"))
-        hit = signal_place.infer(signal_place.story_text(r.get("title"), r.get("location"), r.get("brief")))
         specific = hit and hit.get("precision") in ("city", "facility", "state", "region")
-        # A named city or base beats a stored country centroid. A real nearby coordinate stays.
+        # Stored coord must sit inside the story's country when we know one.
+        expected_cc = (hit or {}).get("cc") or prefer
+        if coord and expected_cc and not signal_place.in_country(coord[0], coord[1], expected_cc):
+            coord = None
+        # A named city or base beats a stored country centroid far away.
         if coord and specific and geo.hav(coord[0], coord[1], hit["lat"], hit["lon"]) > 200:
             coord = None
         exact, place, precision, approximate, cc = True, "", "point", False, ""
-        if coord and not (specific and coord is None):
+        lat = lon = None
+        if coord:
             lat, lon = coord
+            # Final PIP gate on stored coords too.
+            if expected_cc and not signal_place.in_country(lat, lon, expected_cc):
+                unverified += 1
+                continue
             stored += 1
-            if hit and not specific:
-                place, cc = hit.get("place") or "", hit.get("cc") or ""
+            if hit:
+                place, cc = hit.get("place") or "", hit.get("cc") or expected_cc or ""
+                if not specific:
+                    precision = hit.get("precision") or "point"
+                    approximate = bool(hit.get("approximate")) or precision in ("country", "region")
+                    exact = not approximate
+            elif expected_cc:
+                cc = expected_cc
         elif hit:
             lat, lon = hit["lat"], hit["lon"]
             precision = hit.get("precision") or ""
             place = hit.get("place") or ""
-            cc = hit.get("cc") or ""
+            cc = hit.get("cc") or expected_cc or ""
             approximate = bool(hit.get("approximate")) or precision in ("country", "region")
             exact = not approximate
+            # PIP gate: never plot a point outside the story's country.
+            if cc and not signal_place.in_country(lat, lon, cc):
+                unverified += 1
+                continue
             inferred += 1
         else:
-            unmapped += 1
+            # Could name a country but not a safe pin → unverified; else unmapped.
+            if named:
+                unverified += 1
+            else:
+                unmapped += 1
             continue
-        points.append({
+        entry = {
             "cluster_id": r.get("cluster_id"), "title": r.get("title") or "", "rank": int(r.get("rank") or 0),
             "category": r.get("category") or "", "event_time": r.get("event_time") or r.get("first_seen") or r.get("updated") or "",
             "lat": lat, "lon": lon, "exact": exact, "place": place, "precision": precision,
             "approximate": approximate, "cc": cc, "watchlist": int(r.get("watchlist") or 0),
             "links": [{"url": (l or {}).get("url"), "source": (l or {}).get("source")} for l in links[:5] if isinstance(l, dict)],
-        })
+        }
+        ix = len(drafted)
+        drafted.append(entry)
+        if precision == "country" and cc:
+            country_only[cc].append(ix)
+    # Pass 2: country-only stories sharing a country → distinct real cities (no ring / no shared centroid).
+    for cc, indexes in country_only.items():
+        total = len(indexes)
+        for n, ix in enumerate(indexes):
+            row = drafted[ix]
+            placed = signal_place.place_in_country(cc, story_id=str(row.get("cluster_id") or ix), index=n, total=total)
+            if not placed: continue
+            if not signal_place.in_country(placed["lat"], placed["lon"], cc):
+                continue
+            row["lat"], row["lon"] = placed["lat"], placed["lon"]
+            row["place"] = placed.get("place") or row["place"]
+            row["approximate"] = True
+            row["exact"] = False
+            row["precision"] = "country"
+            row["cc"] = cc
+    points = drafted
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     body = {"points": points, "stored": stored, "inferred": inferred, "shown": len(points),
-            "unmapped": unmapped, "generated": generated}
+            "unmapped": unmapped, "unverified": unverified, "generated": generated}
     _POINTS.update(t=now, v=body)
     return body
 

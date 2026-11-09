@@ -90,7 +90,7 @@
     if (lat >= 17.5 && lat <= 18.6 && lon >= -67.5 && lon <= -65) return true;
     return false;
   }
-  var FAN_MAX = 8, SPIDER_PX = 28, CELL = 48, MAX_Z = 8;
+  var FAN_MAX = 0, SPIDER_PX = 0, CELL = 48, MAX_Z = 8;
   function project(lat, lon, zoom) {
     var s = 256 * Math.pow(2, zoom);
     var x = ((+lon) + 180) / 360 * s;
@@ -98,8 +98,8 @@
     var y = (0.5 - Math.log((1 + sl) / (1 - sl)) / (4 * Math.PI)) * s;
     return { x: x, y: y };
   }
-  /* Screen grid, not a geographic radius. Country piles stay one count dot.
-     A ring is only for 8 or fewer non-country dots, and only 20–40 px across. */
+  /* Screen grid clustering. Never fan into a ring — n>1 is always a count badge.
+     Backend already spreads country-only stories across real cities inside the border. */
   function clusterPlan(items, zoom) {
     var pts = [], i, p, k, buckets = {}, groups = [];
     for (i = 0; i < items.length; i++) {
@@ -112,22 +112,13 @@
       buckets[k].push(pts[i]);
     }
     Object.keys(buckets).forEach(function (key) {
-      var g = buckets[key], n = g.length, country = true, j, spider = false, rad = 0, offsets = [];
+      var g = buckets[key], n = g.length, country = true, j;
       for (j = 0; j < n; j++) {
         if (!(g[j].c.precision === "country" || g[j].c.approximate)) country = false;
       }
-      if (n > 1 && country) spider = false;
-      else if (n > 1 && n <= FAN_MAX) {
-        spider = true;
-        rad = Math.min(36, Math.max(20, 14 + n));
-        for (j = 0; j < n; j++) {
-          var ang = -Math.PI / 2 + (2 * Math.PI * j) / n;
-          offsets.push({ dx: Math.cos(ang) * rad, dy: Math.sin(ang) * rad });
-        }
-      }
       groups.push({
-        n: n, spider: spider, country: n > 1 && country, radius: spider ? rad : 0,
-        idx: g.map(function (pt) { return pt.i; }), offsets: offsets
+        n: n, spider: false, country: n > 1 && country, radius: 0,
+        idx: g.map(function (pt) { return pt.i; }), offsets: []
       });
     });
     return groups;
@@ -435,16 +426,6 @@
           var marker = L.marker([+c.lat, +c.lon], { icon: dotIcon(c, first), keyboard: false });
           onMarker(c, marker, "");
           marker.addTo(markers);
-          return;
-        }
-        if (g.spider) {
-          var center = map.latLngToLayerPoint([+members[0].lat, +members[0].lon]);
-          members.forEach(function (c, j) {
-            var at = map.layerPointToLatLng(L.point(center.x + g.offsets[j].dx, center.y + g.offsets[j].dy));
-            var mk = L.marker(at, { icon: dotIcon(c, first), keyboard: false });
-            onMarker(c, mk, "");
-            mk.addTo(markers);
-          });
           return;
         }
         var lat = 0, lon = 0;
