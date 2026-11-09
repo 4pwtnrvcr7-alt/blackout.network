@@ -81,7 +81,13 @@
   if(!out)out='<path class="r" d="M0 '+(H-1)+'H'+W+'"/>';
   var lab=o.labels?'<span class="bna-cx bna-cl" style="grid-template-columns:repeat('+cols.length+',1fr)">'+cols.map(function(c){return"<i>"+esc(c.l||"")+"</i>"}).join("")+"</span>":
    '<span class="bna-cx"><i>'+esc(o.from||"")+'</i><i>'+esc(o.to||"Now")+'</i></span>';
-  return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" focusable="false">'+out+'</svg>'+lab}
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" focusable="false" aria-hidden="true">'+out+'</svg>';
+  if(!o.days)return svg+lab;
+  // Transparent hit targets over each day column (touch + mouse + keyboard)
+  var hits='<div class="bna-barhit" role="tablist" aria-label="Stories by day" style="grid-template-columns:repeat('+cols.length+',1fr)">'+
+    cols.map(function(c,i){var n=(c.v||[]).reduce(function(a,b){return a+b},0),day=o.days[i]||"";
+     return '<button type="button" role="tab" class="bna-barday" data-day="'+esc(day)+'" aria-selected="false" aria-label="'+(c.l||"Day")+', '+n+' stor'+(n==1?"y":"ies")+(n?", show list":", none")+'"'+(n?"":" disabled")+'></button>'}).join("")+"</div>";
+  return '<div class="bna-bars">'+svg+hits+lab+"</div>"}
  function x(now,def,lv){return '<p><b>Now.</b> '+now+'</p><p><b>What it is.</b> '+def+'</p>'+(lv?'<p><b>Levels.</b> '+lv+'</p>':"")}
  var GW=["Quiet","Minor storm","Moderate storm","Strong storm","Severe storm","Extreme storm"];
  function render(D){
@@ -167,13 +173,29 @@
      "Ratings: Tossup, Tilt, Lean, Likely, Safe.")})});
  }
  var DNS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
- function wg(k,o,def){if(!o){none(k);return}var tp=o.top;
+ function dayList(o,day){var list=(o.stories&&o.stories[day])||[],dn="";
+  try{dn=new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}catch(e){dn=day}
+  if(!list.length)return '<p><b>'+esc(dn)+'.</b> No stories this day.</p>';
+  return '<p><b>'+esc(dn)+'.</b> '+list.length+' on The Wire.</p><ul class="bna-day">'+list.map(function(z){
+    return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <span class="bna-rkchip'+(z.rank>=7?" red":"")+'">'+z.rank+'/10</span> <small>'+esc(z.src||"The Wire")+'</small></li>'}).join("")+"</ul>"}
+ function wg(k,o,def){if(!o){none(k);return}var tp=o.top,c=card(k);if(c)c._bnaO=o;
+  var dayKeys=(o.days||[]).map(function(z){return z[0]});
   var cols=(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}});
-  put(k,{v:o.n24?pl(o.n24,"story","stories")+" <small>in 24 hours</small>":"Quiet <small>in 24 hours</small>",sev:o.max24>=7,
-   s:tp?esc(tp.title):(o.n7?pl(o.n7,"story","stories")+" in 7 days, none in the last 24 hours":"No stories in 7 days"),
-   c:bars(cols,{labels:1}),t:"The Wire &middot; "+pl(o.n7,"story","stories")+" in 7 days",
+  var vline=o.n24?pl(o.n24,"story","stories")+" <small>in 24 hours</small>":"Quiet <small>in 24 hours</small>";
+  if(k==="unrest"&&(o.us||o.world)){
+    var U=o.us||{},W=o.world||{};
+    vline="U.S. "+(U.n24||0)+" · World "+(W.n24||0)+" <small>in 24 hours</small>";
+  }
+  var sline=tp?esc(tp.title):(o.n7?pl(o.n7,"story","stories")+" in 7 days, none in the last 24 hours":"No stories in 7 days");
+  if(k==="unrest"&&(o.us||o.world)){
+    var U2=o.us||{},W2=o.world||{};
+    sline="U.S. "+pl(U2.n7||0,"story","stories")+" · World "+pl(W2.n7||0,"story","stories")+" in 7 days"+(tp?": "+esc(tp.title):"");
+  }
+  put(k,{v:vline,sev:o.max24>=7||(o.us&&o.us.max24>=7)||(o.world&&o.world.max24>=7),
+   s:sline,
+   c:bars(cols,{labels:1,days:dayKeys}),t:"The Wire &middot; "+pl(o.n7,"story","stories")+" in 7 days",
    x:x(tp?'Top story now (rank '+tp.rank+'/10): <a class="bna-lnk" href="'+esc(tp.url)+'">'+esc(tp.title)+'</a>, updated '+esc(et(tp.t))+".":"Nothing ranked in the last 24 hours.",
-    def+" Bars show stories per day for 7 days; red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}
+    def+" Tap a day bar for that day's stories. Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}
  function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <small>'+esc(et(z.t))+(z.single?" &middot; single source":"")+'</small></li>'}).join("")}
  function spc(D){var S=D.spec||{},N=S.nuke,P=S.disp;
   function cols(o){return(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}})}
@@ -193,13 +215,13 @@
   wg("c_il",C.il,"Conflict stories on The Wire that mention Israel, Gaza, Lebanon, Yemen or the Houthis.");
   wg("c_ir",C.ir,"Conflict stories on The Wire that mention Iran.");
   wg("c_ru",C.ru,"Conflict stories on The Wire that mention Russia or Ukraine.");
-  wg("c_uk",C.uk,"Conflict and security stories on The Wire that mention the UK or London.");
+  wg("c_uk",C.uk,"Conflict and security stories on The Wire that mention the UK, London or Britain — including cyber attacks and protests.");
   wg("c_other",C.other,"Conflict stories on The Wire from every other region.");
   wg("h_ebola",H.ebola,"Stories on The Wire about Ebola (and the related Marburg virus).");
   wg("h_measles",H.measles,"Stories on The Wire about measles.");
   wg("h_other",H.other,"Other outbreak and disease stories on The Wire: cholera, dengue, bird flu, mpox and more.");
   wg("food",R.food,"Stories on The Wire about food supply, shortages, recalls, shipping and supply chains.");
-  wg("unrest",R.unrest,"U.S. stories on The Wire about protests, riots, curfews or National Guard deployments.");
+  wg("unrest",R.unrest,"Stories on The Wire about protests, riots, clashes, curfews, crackdowns, strikes, coups or troop deployments — U.S. and world.");
   var M=D.comms;if(M){var bad=(M.isp_bad||[]).concat(M.cloud_bad||[]),N=D.net||{};
    put("comms",{v:bad.length?pl(bad.length,"provider issue"):"All clear",sev:bad.length>=3,
     s:(M.isp_bad&&M.isp_bad.length?esc(M.isp_bad.map(function(z){return z.src}).join(", "))+" reporting problems":"Carriers normal: "+esc((M.isp||[]).join(", ")))+(M.cloud_bad&&M.cloud_bad.length?" &middot; "+esc(M.cloud_bad.map(function(z){return z.src.replace(/ \(.*\)/,"")+": "+z.status}).join("; ")):""),
@@ -216,7 +238,25 @@
   if(!TK)TK=setInterval(function(){if(!document.hidden&&LASTD)try{el(LASTD)}catch(e){}},30000);
  }
  function toggle(c,open){var b=c.querySelector(".bna-mh"),p=c.querySelector(".bna-mx");b.setAttribute("aria-expanded",open?"true":"false");p.hidden=!open;c.classList.toggle("bna-open",open)}
- S.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".bna-mh");if(!b)return;var c=b.closest(".bna-mc");toggle(c,b.getAttribute("aria-expanded")!="true")});
+ function pickDay(c,day){
+   var o=c._bnaO||{},prev=c.getAttribute("data-day"),open=c.classList.contains("bna-open");
+   if(prev===day&&open){toggle(c,false);c.removeAttribute("data-day");
+    c.querySelectorAll(".bna-barday").forEach(function(b){b.setAttribute("aria-selected","false");b.classList.remove("on")});return}
+   c.setAttribute("data-day",day);
+   c.querySelectorAll(".bna-barday").forEach(function(b){var on=b.getAttribute("data-day")===day;b.setAttribute("aria-selected",on?"true":"false");b.classList.toggle("on",on)});
+   var xel=c.querySelector('[data-f="x"]');if(xel)xel.innerHTML=dayList(o,day)+x(
+    ((o.top)?'Top overall: <a class="bna-lnk" href="'+esc(o.top.url)+'">'+esc(o.top.title)+'</a>.':""),
+    "Bars count Wire stories per day for 7 days. Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
+   toggle(c,true)}
+ S.addEventListener("click",function(e){
+  var dayBtn=e.target.closest&&e.target.closest(".bna-barday");
+  if(dayBtn){e.preventDefault();e.stopPropagation();var c=dayBtn.closest(".bna-mc");if(c&&dayBtn.getAttribute("data-day"))pickDay(c,dayBtn.getAttribute("data-day"));return}
+  var b=e.target.closest&&e.target.closest(".bna-mh");if(!b)return;var c=b.closest(".bna-mc");
+  if(c&&c.getAttribute("data-day")&&b.getAttribute("aria-expanded")==="true"){c.removeAttribute("data-day");c.querySelectorAll(".bna-barday").forEach(function(x){x.setAttribute("aria-selected","false");x.classList.remove("on")})}
+  toggle(c,b.getAttribute("aria-expanded")!="true")});
+ S.addEventListener("keydown",function(e){var b=e.target.closest&&e.target.closest(".bna-barday");if(!b)return;
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();b.click()}
+  if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();var all=[].slice.call(S.querySelectorAll(".bna-barday:not([disabled])")),i=all.indexOf(b),n=e.key==="ArrowRight"?i+1:i-1;if(all[n])all[n].focus()}});
  return render;
  })();
  function get(u,f){return fetch(u,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){if(j&&!j.pending)f(j)}).catch(function(){})}
