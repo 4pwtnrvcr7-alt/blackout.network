@@ -247,7 +247,7 @@
    c.querySelectorAll(".bna-barday").forEach(function(b){var on=b.getAttribute("data-day")===day;b.setAttribute("aria-selected",on?"true":"false");b.classList.toggle("on",on)});
    var xel=c.querySelector('[data-f="x"]');if(xel)xel.innerHTML=dayList(o,day)+x(
     ((o.top)?'Top overall: <a class="bna-lnk" href="'+esc(o.top.url)+'"'+(o.top.ext?' target="_blank" rel="noopener"':"")+'>'+esc(o.top.title)+'</a>.':""),
-    (o.src?"Bars count stories per day for 7 days from The Wire plus world news feeds (AP, Reuters, BBC, Guardian and other major outlets), one entry per event. Outlet count shows how many outlets reported it.":"Bars count Wire stories per day for 7 days.")+" Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
+    (o.src?"Bars count stories per day for 7 days from The Wire plus world news feeds (BBC, Guardian, Sky, Al Jazeera and other major outlets), one entry per event. Outlet count shows how many outlets reported it.":"Bars count Wire stories per day for 7 days.")+" Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
    toggle(c,true)}
  S.addEventListener("click",function(e){
   var dayBtn=e.target.closest&&e.target.closest(".bna-barday");
