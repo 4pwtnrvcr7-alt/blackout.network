@@ -237,12 +237,30 @@ _DEMONYM_PLACE = {
     "israeli": ("IL", "Israel", 31.0461, 34.8516),
     "palestinian": ("PS", "Palestine", 31.9522, 35.2332),
     "iranian": ("IR", "Iran", 32.4279, 53.688),
+    "north korean": ("KP", "North Korea", 39.0392, 125.7625),
+    "south korean": ("KR", "South Korea", 37.5665, 126.978),
+    "chinese": ("CN", "China", 35.8617, 104.1954),
+    "american": ("US", "United States", 39.8283, -98.5795),
 }
 # Country names that are also people or US states. A bare mention is not a place.
 _AMBIG_COUNTRY = {"georgia", "jordan", "chad", "turkey", "guinea", "niger"}
 _CUES = {"in", "on", "at", "near", "outside", "into", "over", "around", "from",
          "strikes", "struck", "strike", "attacks", "attack", "attacked", "bombed", "bombing"}
 _DIR = {"southern", "northern", "eastern", "western", "central", "south", "north", "east", "west"}
+# Bare "North"/"South" before a nationality adjective is not Cameroon's North region.
+_NATIONALITY_TAIL = {
+    "korean", "koreans", "vietnamese", "african", "american", "americans", "european", "asian",
+    "chinese", "russian", "russians", "iranian", "iranians", "israeli", "israelis", "ukrainian",
+    "ukrainians", "yemeni", "syrian", "iraqi", "lebanese",
+}
+# Demonym + weapon/launch: the event belongs to that country, even if another country "tracked" it.
+_DEMONYM_EVENT = re.compile(
+    r"\b(north korean|south korean|iranian|israeli|russian|ukrainian|chinese|yemeni|syrian|iraqi|"
+    r"lebanese|american|palestinian)\b(?:\s+[\w'-]+){0,5}\s+"
+    r"(?:missile|missiles|rocket|rockets|warhead|warheads|launch|launched|test|tested|testing|"
+    r"strike|strikes|struck|attack|attacks|attacked|drone|drones|nuclear|ballistic)",
+    re.I,
+)
 _PLACES = {"t": 0.0, "v": None}
 
 def _gazetteer():
@@ -300,6 +318,10 @@ def _from_text(text, prefer_cc=None):
             i += 1
             continue
         n, key, cue = found
+        # "North Korean missile" — do not take admin "North" (Cameroon) or "South" (etc.).
+        if key in _DIR and i + n < len(norms) and norms[i + n] in _NATIONALITY_TAIL:
+            i += 1
+            continue
         i += n
         if key in _CITY_BLOCK: continue
         if key in _AMBIG_COUNTRY and not cue and key not in _CURATED: continue
@@ -423,6 +445,9 @@ def named_countries(text):
             i += 1
             continue
         n, key = found
+        if key in _DIR and i + n < len(norms) and norms[i + n] in _NATIONALITY_TAIL:
+            i += 1
+            continue
         i += n
         cc = countries[key][2]
         if cc and cc not in seen:
@@ -594,10 +619,51 @@ def _verify_or_repair(hit, text, prefer_cc=None):
     return None
 
 
+def demonym_event_country(text):
+    """ISO2 for 'North Korean missile launch' etc., or None."""
+    m = _DEMONYM_EVENT.search(text or "")
+    if not m: return None
+    key = m.group(1).lower()
+    d = _DEMONYM_PLACE.get(key)
+    return d[0] if d else None
+
+
+def _demonym_overrides_reporter(text, event_cc):
+    """True when another country only appears as reporter ('South Korea JCS tracked North Korean launch')."""
+    if not event_cc: return False
+    m = _DEMONYM_EVENT.search(text or "")
+    if not m: return False
+    named = named_countries(text)
+    others = [c for c in named if c != event_cc]
+    if not others: return False
+    head = (text or "")[:m.start()]
+    if re.search(
+        r"\b(?:says?|said|tracked|announced|reports?|reported|jcs|ministry|pentagon|"
+        r"officials?|spokesperson|monitor(?:ed|s)?)\b",
+        head, re.I,
+    ):
+        return True
+    # "... North Korean launch detected/tracked by Japan"
+    if re.search(
+        r"\b(?:detected|tracked|announced|reported|monitored|observed)\s+by\b",
+        text or "", re.I,
+    ):
+        return True
+    return False
+
+
 def infer(text, prefer_cc=None):
     """-> {lat, lon, precision, place, cc, approximate} or None. None means we are not sure."""
     text = (text or "").strip()
     if not text or _NOT_A_PLACE.search(text) and len(text) < 48: return None
+    # Nationality adjective on a weapon/launch: use that country when it is the only place,
+    # or when the other country is only a reporter that tracked/announced it.
+    event_cc = demonym_event_country(text)
+    if event_cc:
+        named = named_countries(text)
+        others = [c for c in named if c != event_cc]
+        if not others or _demonym_overrides_reporter(text, event_cc):
+            prefer_cc = event_cc
     hit = _nws(text)
     if hit: return _verify_or_repair(hit, text, prefer_cc)
     hit = _from_text(text, prefer_cc=prefer_cc)
@@ -620,7 +686,10 @@ def infer(text, prefer_cc=None):
             return _verify_or_repair(hit, text, prefer_cc) or hit
     hit = _region(text)
     if hit: return hit
-    # Last resort: a single named country → capital (still PIP-checked).
+    # Demonym-event country (North Korean launch) or a single named country → capital.
+    if prefer_cc:
+        cap = capital_of(prefer_cc)
+        if cap: return dict(cap, approximate=True, precision="country")
     named = named_countries(text)
     if len(named) == 1:
         cap = capital_of(named[0])
