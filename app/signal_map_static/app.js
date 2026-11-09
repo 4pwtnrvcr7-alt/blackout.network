@@ -204,7 +204,7 @@
     map.attributionControl.setPrefix("");
     map.attributionControl.addAttribution("Natural Earth");
     var world = null, markers = L.layerGroup().addTo(map), rows = [], armed = null, tip, hideT = 0, open = null;
-    var viewName = "us", framing = 0, listEl = null, timer = 0;
+    var viewName = "us", framing = 0, listEl = null, timer = 0, seedIds = {};
     frameUS();
 
     tip = document.createElement("div");
@@ -371,9 +371,10 @@
     }
     function dotIcon(c, first) {
       var b = band(c.rank);
+      if (seedIds[c.cluster_id]) first = false;          /* first batch (inline seed): shown at once, never re-animated */
       var delay = first ? (Math.random() * 15).toFixed(3) + "s" : "";
       var approx = c.exact === false || c.approximate || c.precision === "country";
-      var icon = L.divIcon({ className: "bn-sig-mk" + (first ? " bn-sig-enter" : " bn-sig-fade"), html: '<div class="signal' + (approx ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
+      var icon = L.divIcon({ className: "bn-sig-mk" + (seedIds[c.cluster_id] ? "" : first ? " bn-sig-enter" : " bn-sig-fade"), html: '<div class="signal' + (approx ? " approx" : "") + '" style="color:' + b.color + '"></div>', iconSize: [12, 12], iconAnchor: [6, 6] });
       if (delay) icon.createIcon = function (old) {
         var node = L.DivIcon.prototype.createIcon.call(this, old);
         node.style.setProperty("--bn-d", delay);
@@ -457,6 +458,11 @@
       var label = viewName === "us" ? " in the United States" : viewName === "conflicts" ? " war/conflict" : "";
       say(focus + label + " · " + shown.length + " " + noun + " on this view · dots follow rank");
       setTimeout(function () { refit(); }, 60);
+      if (shown.length) dropPreview();
+    }
+    function dropPreview() {
+      var pre = box.querySelector(".bn-sig-pre");
+      if (pre && pre.parentNode) requestAnimationFrame(function () { if (pre.parentNode) pre.parentNode.removeChild(pre); });
     }
     function widthZoom(wide, narrow) { return (box.clientWidth || 800) < 700 ? narrow : wide; }
     function frame(name) {
@@ -554,6 +560,13 @@
     }
     readUrl();
     if (viewName !== "us") frame(viewName);
+    /* Homepage speed (Nov 8): the page carries the top dots inline (#bn_sig_seed). Draw them now, then load the rest. */
+    var seedEl = el.querySelector("#bn_sig_seed"), seed = [];
+    if (seedEl) { try { seed = (JSON.parse(seedEl.textContent || "[]") || []).filter(real); } catch (e) { seed = []; } }
+    if (seed.length) {
+      seed.forEach(function (c) { if (c.cluster_id) seedIds[c.cluster_id] = 1; });
+      rows = seed; draw(false);
+    }
     pull(true);
     timer = setInterval(function () { pull(false); }, 300000);
   }

@@ -382,3 +382,20 @@ html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
 #bn_sig{min-height:430px;border-radius:18px;background:#0b1220;overflow:hidden}
 #bn_sig_map{height:370px;background:#0b1220;touch-action:pan-y}
 @media(max-width:600px){#bn_sig{min-height:390px}#bn_sig_map{height:320px}}
+/* Homepage row (Nov 8): each card is an <article>; the card body links to the story page and, when we posted the story,
+   a "Follow this story" bar links to the X post, the YouTube Short and the story page (checked links only). */
+.bna-it .bna-cardlnk{display:flex;flex-direction:column;flex:1 1 auto;color:inherit;text-decoration:none;min-height:0}
+@media (hover:hover){article.bna-card:hover{transform:translateY(-2px)}}
+@media (prefers-reduced-motion:reduce){article.bna-card:hover{transform:none}}
+.bna-it{text-align:left}
+.bna-pstw{margin:0 0 10px;line-height:1}
+.bna-pst{display:inline-block;font-size:11px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--a-y);color:var(--a-on-y);font-weight:700;letter-spacing:.02em}
+.bna-fol{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--a-ln)}
+.bna-it.hi .bna-fol{border-top-color:#2A2D33}
+.bna-fol span{flex:0 0 100%;font:600 12px/1.2 Inter,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--a-mu)}
+.bna-it.hi .bna-fol span{color:var(--a-hi-mu)}
+.bna-fol a{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--a-y);color:var(--a-y);font:600 14px/1 Inter,sans-serif;text-decoration:none}
+.bna-fol a:hover{background:var(--a-y);color:var(--a-on-y)}
+.bna-fol a:focus-visible{outline:2px solid var(--a-y);outline-offset:2px}
+html[data-theme="light"] .bna-it:not(.hi) .bna-fol a{color:#0B0D10;background:rgba(255,194,26,.16)}
+html[data-theme="light"] .bna-it:not(.hi) .bna-fol a:hover{background:var(--a-y)}

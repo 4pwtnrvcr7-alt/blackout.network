@@ -35,8 +35,13 @@ def views_html(active="us"):
             + btn("us", "US") + btn("world", "World") + btn("conflicts", "Conflicts")
             + '</div><p class="bn-sig-counts" aria-live="polite"></p>')
 
-# Homepage shell. The map library, stylesheet and world file load only when the card nears the viewport.
+# Homepage shell. The page ships a first batch of dots (inline JSON + a static SVG preview drawn server-side, so dots show on first
+# paint). The map library starts loading as soon as the page is idle (no longer only when the card nears the viewport); the card
+# coming into view starts it at once. The rest of the dots then load in the background.
 HOME_BOOT = """<script>(function(){var el=document.getElementById("bn_sig");if(!el)return;
+var pre=el.querySelector(".bn-sig-pre");if(pre){var vb=pre.viewBox&&pre.viewBox.baseVal;function sz(){var r=pre.getBoundingClientRect();if(!vb||!r.width)return;
+var k=Math.min((r.width)/vb.width,(r.height)/vb.height)||1;pre.querySelectorAll("circle").forEach(function(c){c.setAttribute("r",(6/k).toFixed(3))});
+pre.querySelectorAll("path").forEach(function(p){p.style.strokeWidth=(.6/k).toFixed(3)})}sz();addEventListener("resize",sz)}
 function css(h){var l=document.createElement("link");l.rel="stylesheet";l.href=h;document.head.appendChild(l)}
 function js(src,fn){var s=document.createElement("script");s.src=src;s.onload=fn;s.onerror=fn;document.head.appendChild(s)}
 function load(){if(el.getAttribute("data-on"))return;el.setAttribute("data-on","1");
@@ -44,22 +49,96 @@ css("/api/signal/app.css");if(!(window.L&&L.map))css("/api/signal/leaflet.css");
 function boot(){js("/api/signal/app.js",function(){if(window.BNSignal)BNSignal.mount(el);
 else{var n=document.getElementById("bn_sig_note");if(n)n.textContent="The map could not load.";}})}
 if(window.L&&L.map)boot();else js("/api/signal/leaflet.js",boot)}
-function go(){if(window.requestIdleCallback)requestIdleCallback(load,{timeout:1200});else setTimeout(load,250)}
-if(!("IntersectionObserver" in window)){go();return}
-var io=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting})){io.disconnect();go()}},{rootMargin:"160px"});
-io.observe(el)})();</script>"""
+if(window.requestIdleCallback)requestIdleCallback(load,{timeout:1500});else setTimeout(load,300);
+if("IntersectionObserver" in window){var io=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting})){io.disconnect();load()}},{rootMargin:"600px"});io.observe(el)}})();</script>"""
 
 def home_section():
-    """Homepage card. Clicking the map (not a dot) opens /map. The script does not fetch until the card is near view."""
+    """Homepage card. Clicking the map (not a dot) opens /map. First dots are inline (seed JSON + SVG preview); the rest load after."""
+    seed, svg = "", ""
+    try:
+        pts = seed_points()
+        if pts:
+            import json as _json
+            seed = '<script type="application/json" id="bn_sig_seed">' + _json.dumps(pts, separators=(",", ":")).replace("</", "<\\/") + "</script>"
+            svg = preview_svg(pts)
+    except Exception:
+        seed, svg = "", ""
     return f'''<section class="bna-sec" aria-labelledby="bn_sig_h"><div class="bna-wrap">
 <article class="bn-sig" id="bn_sig" data-embed="1">
 <div class="bn-sig-cardhead"><div><h2 id="bn_sig_h">Global signal map</h2>
 <p class="bn-sig-note" id="bn_sig_note">Wire and Watchlist</p></div>
 <div class="bn-sig-side">{LEGEND}<a class="bn-sig-open" href="/map">Open the map</a></div></div>
 <div class="bn-sig-tools">{views_html()}</div>
-<div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map of Wire and Watchlist stories. US is the starting view."></div>
-</article></div></section>
+<div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map of Wire and Watchlist stories. US is the starting view." style="background:#0b1220;position:relative;overflow:hidden">{svg}</div>
+{seed}</article></div></section>
 {HOME_BOOT}'''
+
+# ---------------------------------------------------------------- first batch of dots (homepage speed, Nov 8)
+SEED_US, SEED_WORLD = 30, 15
+US_VIEW = (24.5, -125.0, 49.5, -66.5)          # the same LOWER48 bounds app.js fits on load (padding 12 px)
+
+def _in_us(p):
+    if str(p.get("cc") or "").upper() == "US": return True
+    lat, lon = float(p["lat"]), float(p["lon"])
+    return (24.5 <= lat <= 49.5 and -125 <= lon <= -66.5) or (51 <= lat <= 72 and -170 <= lon <= -129) or (18.5 <= lat <= 22.5 and -161 <= lon <= -154) or (17.5 <= lat <= 18.6 and -67.5 <= lon <= -65)
+
+def seed_points():
+    """Top dots for the first paint: the 30 highest-ranked US dots (the starting view) and the 15 highest-ranked elsewhere,
+    last 7 days, newest first within a rank. Small (about 10 KB); the rest arrive from /api/signal/points."""
+    import time as _t
+    body = _points_cached(wait=1.5)
+    if not body: return []
+    from datetime import datetime as _dt, timezone as _tz
+    cut = _t.time() - 7 * 86400
+    def ts(p):
+        try: return _dt.strptime(str(p.get("event_time") or "")[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=_tz.utc).timestamp()
+        except Exception: return 0
+    pts = [p for p in body.get("points") or [] if p.get("lat") is not None and ts(p) >= cut]
+    pts.sort(key=lambda p: (-(p.get("rank") or 0), -ts(p)))
+    us = [p for p in pts if _in_us(p)][:SEED_US]; world = [p for p in pts if not _in_us(p)][:SEED_WORLD]
+    keep = ("cluster_id", "title", "rank", "category", "event_time", "lat", "lon", "exact", "place", "precision", "approximate", "cc", "watchlist")
+    return [dict({k: p.get(k) for k in keep}, links=(p.get("links") or [])[:1]) for p in us + world]
+
+def _merc(lat, lon):
+    import math
+    s = math.sin(max(-85.0, min(85.0, lat)) * math.pi / 180)
+    return (lon + 180) / 360 * 360, (0.5 - math.log((1 + s) / (1 - s)) / (4 * math.pi)) * 360
+
+_OUTLINE = {"v": None}
+def _outline():
+    """World outline paths clipped to the US starting view, projected like Leaflet (Web Mercator). Built once."""
+    if _OUTLINE["v"] is None:
+        import json as _json
+        x0, y0 = _merc(US_VIEW[2] + 12, US_VIEW[1] - 20); x1, y1 = _merc(US_VIEW[0] - 12, US_VIEW[3] + 20)
+        with open(os.path.join(STATIC, "world.geojson"), encoding="utf-8") as fh: feats = _json.load(fh)["features"]
+        out = []
+        for f in feats:
+            g = f.get("geometry") or {}; polys = g.get("coordinates") or []
+            if g.get("type") == "Polygon": polys = [polys]
+            for poly in polys:
+                for ring in poly[:1]:
+                    pts = [_merc(la, lo) for lo, la in ring]
+                    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
+                    if max(xs) < x0 or min(xs) > x1 or max(ys) < y0 or min(ys) > y1: continue
+                    out.append("M" + "L".join(f"{x:.2f} {y:.2f}" for x, y in pts) + "Z")
+        _OUTLINE["v"] = "".join(out)
+    return _OUTLINE["v"]
+
+def preview_svg(pts):
+    """Static first-paint map: the US view with the seed dots, drawn exactly where Leaflet will put them. app.js removes it
+    once the live map has drawn its first dots. Decorative (the live map carries the accessible labels)."""
+    x0, y0 = _merc(US_VIEW[2], US_VIEW[1]); x1, y1 = _merc(US_VIEW[0], US_VIEW[3])
+    col = lambda r: "#FF4D4F" if r >= 7 else "#F5A524" if r >= 4 else "#55b7ff"
+    dots = []
+    for p in pts:
+        if not _in_us(p): continue
+        x, y = _merc(float(p["lat"]), float(p["lon"]))
+        if not (x0 - 1 <= x <= x1 + 1 and y0 - 1 <= y <= y1 + 1): continue
+        ap = p.get("exact") is False or p.get("approximate") or p.get("precision") == "country"
+        dots.append(f'<circle cx="{x:.2f}" cy="{y:.2f}" r="0.6" fill="{col(int(p.get("rank") or 0))}"' + (' fill-opacity=".72" stroke="#0b1220" stroke-width=".08"' if ap else "") + "/>")
+    return (f'<svg class="bn-sig-pre" aria-hidden="true" focusable="false" viewBox="{x0:.2f} {y0:.2f} {x1 - x0:.2f} {y1 - y0:.2f}" preserveAspectRatio="xMidYMid meet" '
+            'style="position:absolute;left:12px;top:12px;width:calc(100% - 24px);height:calc(100% - 24px);overflow:visible;pointer-events:none">'
+            f'<path d="{_outline()}" fill="#192538" fill-opacity=".7" stroke="#364158" stroke-width=".05"/>{"".join(dots)}</svg>')
 
 def _pick(qs, key, allowed, default):
     v = (qs.get(key) or [default])[0]
@@ -128,13 +207,46 @@ def _stored_coord(lat, lon):
     return round(lat, 4), round(lon, 4)
 
 _POINTS = {"t": 0.0, "v": None}
+import threading as _th
+_PLOCK = _th.Lock(); _PREB = {"t": None}
+
+def _points_rebuild():
+    if not _PLOCK.acquire(blocking=False): return
+    try: _build_points()
+    except Exception: pass
+    finally: _PLOCK.release()
+
+def _kick():
+    t = _PREB["t"]
+    if t is not None and t.is_alive(): return t
+    t = _th.Thread(target=_points_rebuild, name="bn-sig-points", daemon=True); _PREB["t"] = t; t.start()
+    return t
+
+def _points_cached(wait=0.0):
+    """Last points payload without blocking a page: stale copies are served while one background build refreshes them."""
+    import time
+    v = _POINTS["v"]
+    if v is not None:
+        if time.time() - _POINTS["t"] >= 30: _kick()
+        return v
+    t = _kick()
+    if wait and t is not None: t.join(wait)
+    return _POINTS["v"]
 
 def points_payload():
-    """Read-only. Same Wire and Watchlist rows the public feed shows, plus offline inferred dots."""
+    """Read-only. Same Wire and Watchlist rows the public feed shows, plus offline inferred dots.
+    Fresh for 30 s; after that the last copy is returned at once while one background build refreshes it (was: every
+    request after 30 s rebuilt it inline, about 1 s on Render)."""
+    v = _points_cached()
+    if v is not None: return v
+    with _PLOCK:
+        if _POINTS["v"] is not None: return _POINTS["v"]
+        return _build_points()
+
+def _build_points():
     import json, sqlite3, time
     from datetime import datetime, timezone, timedelta
     now = time.time()
-    if _POINTS["v"] is not None and now - _POINTS["t"] < 30: return _POINTS["v"]
     import signal_place
     path = os.path.join(BASE, "blackout.db")
     rows = []

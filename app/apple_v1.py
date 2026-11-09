@@ -20,7 +20,10 @@ def _body(r):
     return b if isinstance(b, dict) else None
 
 def _slim(x):
-    return {k: x.get(k) for k in ("cluster_id", "title", "category", "location", "lat", "lon", "rank", "n_families", "updated", "first_seen")}
+    d = {k: x.get(k) for k in ("cluster_id", "title", "category", "location", "lat", "lon", "rank", "n_families", "updated", "first_seen")}
+    for k in ("grouped", "social", "posted"):   # home_feed: duplicates collapsed into one event; verified social links
+        if x.get(k): d[k] = x[k]
+    return d
 
 # Memory (Render limit, 1:27 PM ET): caches are single-flight. Only one thread rebuilds a stale snapshot; every other request gets the
 # last one immediately (or waits for the first build). Before, each concurrent request at expiry rebuilt its own copy (api_state,
@@ -45,14 +48,43 @@ def _sources_total(srv):
     _src.update(t=time.time(), n=(c or {}).get("total")); c = None
     return _src["n"]
 def home_data():
+    try:   # a new social_links.json (pushed by the box right after a posting slot) refreshes the homepage at once
+        import home_feed
+        lm = home_feed.links_mtime()
+        if _cache.get("lm") != lm: _cache["t"] = 0; _cache["lm"] = lm
+    except Exception: pass
     return _single("home", _cache, 60, _home_build)
+
+def _posted_rows(ids):
+    """Clusters we posted in the last day that are not in the top 150 (read-only)."""
+    import sqlite3
+    ids = [i for i in ids if len(i) == 16 and all(ch in "0123456789abcdef" for ch in i)][:6]
+    if not ids: return []
+    c = sqlite3.connect(f"file:{BASE}/blackout.db?mode=ro", uri=True, timeout=5); c.row_factory = sqlite3.Row
+    try: return [dict(r) for r in c.execute(f"SELECT cluster_id, title, category, location, lat, lon, rank, n_families, updated, first_seen, event_time "
+                                             f"FROM clusters WHERE cluster_id IN ({','.join('?' * len(ids))}) AND watchlist IN (0,1)", ids)]
+    finally: c.close()
+
+def _events(main):
+    """One card per real event (home_feed.events), with verified 'Follow this story' links; stories posted in the last day are included."""
+    import home_feed as HF
+    ev = HF.attach(HF.events(main, limit=40))
+    try:
+        extra = HF.attach(HF.events(_posted_rows(HF.posted_missing(ev)), limit=6))
+        ev = [e for e in extra if e.get("posted")] + ev
+    except Exception: pass
+    return ev
 def _home_build():
     srv = sys.modules.get("server"); out = {"generated": None, "main": [], "counts": {}, "kp": None, "quake": None, "grid": None, "sources": None}
     try:
         st = srv.api_state(); out["generated"] = st.get("generated")
         main = st.get("main") or []
         for x in main: out["counts"][x.get("category") or "other"] = out["counts"].get(x.get("category") or "other", 0) + 1
-        out["main"] = [_slim(x) for x in sorted(main, key=lambda x: (-(x.get("rank") or 0), -(x.get("n_families") or 0)))[:40]]
+        try: out["main"] = [_slim(x) for x in _events(main)]
+        except Exception: out["main"] = [_slim(x) for x in sorted(main, key=lambda x: (-(x.get("rank") or 0), -(x.get("n_families") or 0)))[:40]]
+        try:
+            import home_feed as HF; out["slots_et"] = HF.SLOTS_ET
+        except Exception: pass
         out["wire_total"] = len(main)
     except Exception: pass
     try:

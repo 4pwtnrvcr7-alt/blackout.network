@@ -10,28 +10,47 @@
  // Same-event quakes (one quake reported by several agencies) collapse into one card: same category, within 1.5 degrees and 36 h.
  function group(items){var out=[];items.forEach(function(x){
    if(isQuake(x)&&x.lat!=null){for(var i=0;i<out.length;i++){var y=out[i];if(y.q&&Math.abs(y.lat-x.lat)<1.5&&Math.abs(y.lon-x.lon)<1.5&&Math.abs(new Date(y.first_seen)-new Date(x.first_seen))<1296e5){y.more++;return}}}
-   out.push({title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,q:isQuake(x),more:0})});return out}
+   out.push({cluster_id:x.cluster_id,title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,social:x.social,posted:x.posted,q:isQuake(x),more:0})});return out}
  // Display-only category fix (t100u): the scanner's keyword order labels "governor declares emergency over flooding" Political.
  // Hazard and outbreak terms outrank political ones here; the stored category is unchanged (proposed scanner fix: category_fix.patch).
  var HZ=/\b(earthquake|tsunami|flood|flooding|flash flood|cyclone|hurricane|typhoon|tropical storm|winter storm|wildfire|volcan|eruption|landslide|drought|tornado|blizzard|severe weather|severe storms?)/i,
   DZ=/\b(ebola|marburg|cholera|measles|influenza|h5n1|bird flu|avian flu|mpox|dengue|plague|epidemic|pandemic|polio|outbreak)/i,NO=/\b(war|weather|storm|tornado) outbreaks?\b/i,
   WZ=/\b(missile|airstrike|strike|attack|troops|drone|military|war\b|bomb|shelling|invasion|ceasefire)/i;
  function dcat(x){var c=x.category||"",t=x.title||"";if(c=="political"||c=="other"||(c=="war/conflict"&&!WZ.test(t))){if(DZ.test(t)&&!NO.test(t))return"disease";if(HZ.test(t))return"natural disaster"}return c}
- function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"";
-  return '<a class="bna-card bna-it'+(hi?" hi":"")+'" href="/#wire"><div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
-   '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'}
+ function sid(x){return /^[0-9a-f]{16}$/.test(x.cluster_id||"")?x.cluster_id:""}
+ function okx(u){return /^https:\/\/(x|twitter)\.com\/BlkoutNtw\/status\/\d{5,25}$/i.test(u||"")}
+ function oky(u){return /^https:\/\/(www\.)?youtube\.com\/(shorts\/|watch\?v=)[A-Za-z0-9_\-]{11}$/.test(u||"")}
+ // "Follow this story": only links that passed the box link check (HTTP 200, deleted posts skipped) and the server passed on.
+ function follow(x){var s=x.social||{},id=sid(x),a=[];
+  if(okx(s.x))a.push('<a href="'+esc(s.x)+'" target="_blank" rel="noopener" aria-label="Follow this story on X">X</a>');
+  if(oky(s.yt))a.push('<a href="'+esc(s.yt)+'" target="_blank" rel="noopener" aria-label="Watch this story on YouTube">YouTube</a>');
+  if(!a.length)return"";if(id&&s.story!==null)a.push('<a href="/wire/'+id+'">Story page</a>');
+  return '<div class="bna-fol"><span>Follow this story</span>'+a.join("")+'</div>'}
+ function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"",id=sid(x),fo=follow(x);
+  return '<article class="bna-card bna-it'+(hi?" hi":"")+(fo?" bna-has-fol":"")+'"><a class="bna-cardlnk" href="'+(id?"/wire/"+id:"/#wire")+'">'+(x.posted?'<p class="bna-pstw"><b class="bna-pst">On our channels</b></p>':'')+'<div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
+   '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'+fo+'</article>'}
  function set(k,v){var e=H.querySelector('[data-bna="'+k+'"]');if(e)e.innerHTML=v}
  var row=document.getElementById("bna_row_latest"),arws=H.querySelectorAll(".bna-arw");
  function arrows(){if(!row)return;var m=row.scrollWidth-row.clientWidth;arws.forEach(function(b){b.disabled=b.dataset.dir<0?row.scrollLeft<=2:row.scrollLeft>=m-2})}
  arws.forEach(function(b){b.addEventListener("click",function(){var rm=matchMedia("(prefers-reduced-motion: reduce)").matches;row.scrollBy({left:(+b.dataset.dir)*row.clientWidth*.8,behavior:rm?"auto":"smooth"})})});
  if(row){row.addEventListener("scroll",arrows,{passive:true});addEventListener("resize",arrows)}
+ // Refresh right after each social posting slot (8, 11 AM, 2, 4, 8, 10 PM ET) so the story we just posted shows here; normal live updates continue.
+ var SLOTT=0;
+ function nextSlot(sl){try{var f=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(new Date()),o={};
+  f.forEach(function(p){o[p.type]=+p.value});var now=o.hour*3600+o.minute*60+o.second,best=null;
+  sl.forEach(function(s){var p=s.split(":"),t=(+p[0])*3600+(+p[1])*60+240,dt=t-now;if(dt<=0)dt+=86400;if(best===null||dt<best)best=dt});
+  if(best===null)return 0;return setTimeout(function(){SLOTT=0;if(window.BNA)BNA.refresh()},best*1000)}catch(e){return 0}}
  function renderHome(d){
   if(d.sources!=null)set("sources",Number(d.sources).toLocaleString("en-US"));
-  var g=group((d.main||[]).filter(function(x){var t=x.title||"";return /^[\x20-\x7E]/.test(t)&&!/[\u2600-\u27BF\uD83C-\uDBFF]/.test(t)})),pick=[],per={};
-  g.forEach(function(x){if(pick.length<8&&(per[x.category]||0)<2){per[x.category]=(per[x.category]||0)+1;pick.push(x)}});
-  g.forEach(function(x){if(pick.length<8&&pick.indexOf(x)<0)pick.push(x)});
-  pick.sort(function(a,b){return b.rank-a.rank||b.n_families-a.n_families});
+  var g=group((d.main||[]).filter(function(x){var t=x.title||"";return /^[\x20-\x7E]/.test(t)&&!/[\u2600-\u27BF\uD83C-\uDBFF]/.test(t)})),pick=[],per={},N=10;
+  // Stories posted on X/YouTube in the last day lead the row (newest first, max 3); then the highest-ranked events, max 2 per topic at first.
+  g.filter(function(x){return x.posted}).sort(function(a,b){return String((b.social||{}).posted_at||"").localeCompare(String((a.social||{}).posted_at||""))}).slice(0,3).forEach(function(x){pick.push(x)});
+  var lead=pick.length;
+  g.forEach(function(x){if(pick.length<N&&pick.indexOf(x)<0&&(per[x.category]||0)<2){per[x.category]=(per[x.category]||0)+1;pick.push(x)}});
+  g.forEach(function(x){if(pick.length<N&&pick.indexOf(x)<0)pick.push(x)});
+  var rest=pick.slice(lead).sort(function(a,b){return b.rank-a.rank||b.n_families-a.n_families});pick=pick.slice(0,lead).concat(rest);
   var hh=pick.length?pick.map(card).join(""):'<p class="bna-empty">The Wire is quiet right now.</p>';if(row&&hh!==lastRow){lastRow=hh;row.innerHTML=hh;arrows()}
+  if(d.slots_et&&!SLOTT)SLOTT=nextSlot(d.slots_et);
   if(d.generated)set("asof","Live data as of "+esc(et(d.generated))+".");
  }
  var renderDash=(function(){
