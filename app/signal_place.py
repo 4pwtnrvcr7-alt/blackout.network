@@ -29,7 +29,10 @@ _NOT_A_PLACE = re.compile(r"location not (specified|reported|recorded)|unknown l
 _OUTLET = re.compile(r"\b(?:FRANCE\s*24|BBC News|BBC|CNN Indonesia|CNN|Reuters|Al Jazeera|Sky News|New York Times|Washington Post|Wall Street Journal)\b", re.I)
 # City names that are also ordinary or product words. A bare hit is not enough.
 _CITY_BLOCK = {"university", "college", "center", "centre", "dongfeng", "normal", "memorial", "hope", "enterprise",
-               "africa", "asia", "europe", "america", "pacific", "atlantic", "arctic", "caribbean", "midwest"}
+               "africa", "asia", "europe", "america", "pacific", "atlantic", "arctic", "caribbean", "midwest",
+               "bank", "senate", "congress", "parliament", "ministry", "police", "army", "navy", "airport",
+               "hospital", "clinic", "school", "church", "prison", "jail", "market", "station", "bridge",
+               "failure", "collapse", "protest", "protests", "arrest", "impeach", "impeaches", "impeached"}
 _MASS = re.compile(r"\bMass(?=\s+(?:protests?|shootings?|casualt\w*|graves?|arrests?|demonstrations?|layoffs?|exodus|migration|killings?|deaths?|funerals?|graves?))", re.I)
 _PLACE_WORD = {"county", "parish", "city", "state", "province", "region", "river", "island", "islands", "bay", "gulf",
                "coast", "valley", "oblast", "prefecture", "district", "beach", "mountains", "mountain"}
@@ -62,19 +65,21 @@ def _centroid(ch):
         name = c.get("name") or ch.get("text") or ""
         st = (G.admin1.get(c.get("a1") or "") or {}).get("name")
         label = name + (", " + st if st else "")
-        return _pack(c.get("lat"), c.get("lon"), "city", label.strip(", "))
+        return _pack(c.get("lat"), c.get("lon"), "city", label.strip(", "), c.get("cc") or ch.get("cc") or "")
     if ch.get("level") == "state":
         a = G.admin1.get(ch.get("a1") or "") or {}
         lab = a.get("label")
         if not lab: return None
-        cc = (G.countries.get(ch.get("cc") or "") or {}).get("name")
+        iso = ch.get("cc") or (ch.get("a1") or "").split(".")[0]
+        cname = (G.countries.get(iso) or {}).get("name")
         label = a.get("name") or ch.get("text") or ""
-        if cc and cc not in label: label = f"{label}, {cc}"
-        return _pack(lab[0], lab[1], "state", label)
-    ctry = G.countries.get(ch.get("cc") or "") or {}
+        if cname and cname not in label: label = f"{label}, {cname}"
+        return _pack(lab[0], lab[1], "state", label, iso or "")
+    iso = ch.get("cc") or ""
+    ctry = G.countries.get(iso) or {}
     lab = ctry.get("label")
     if not lab: return None
-    return _pack(lab[0], lab[1], "country", ctry.get("name") or ch.get("text") or "")
+    return _pack(lab[0], lab[1], "country", ctry.get("name") or ch.get("text") or "", iso)
 
 
 def _prep(text):
@@ -161,10 +166,10 @@ def _nws(text):
     state = (G.admin1.get(a1) or {}).get("name") or postal
     if len(cities) == 1 and cities[0].get("pop", 0) >= 20000:
         c = cities[0]
-        return _pack(c["lat"], c["lon"], "city", f"{c['name']}, {state}")
+        return _pack(c["lat"], c["lon"], "city", f"{c['name']}, {state}", "US")
     lab = (G.admin1.get(a1) or {}).get("label")
     if not lab: return None
-    return _pack(lab[0], lab[1], "state", state)
+    return _pack(lab[0], lab[1], "state", state, "US")
 
 
 def _region(text):
@@ -223,6 +228,15 @@ _DEMONYM_PLACE = {
     "yemeni": ("YE", "Yemen", 15.5527, 48.5164),
     "syrian": ("SY", "Syria", 34.8021, 38.9968),
     "iraqi": ("IQ", "Iraq", 33.2232, 43.6793),
+    "paraguayan": ("PY", "Paraguay", -23.4425, -58.4438),
+    "chilean": ("CL", "Chile", -35.6751, -71.543),
+    "argentine": ("AR", "Argentina", -38.4161, -63.6167),
+    "argentinian": ("AR", "Argentina", -38.4161, -63.6167),
+    "ukrainian": ("UA", "Ukraine", 48.3794, 31.1656),
+    "russian": ("RU", "Russia", 61.524, 105.3188),
+    "israeli": ("IL", "Israel", 31.0461, 34.8516),
+    "palestinian": ("PS", "Palestine", 31.9522, 35.2332),
+    "iranian": ("IR", "Iran", 32.4279, 53.688),
 }
 # Country names that are also people or US states. A bare mention is not a place.
 _AMBIG_COUNTRY = {"georgia", "jordan", "chad", "turkey", "guinea", "niger"}
@@ -250,7 +264,7 @@ def _tokens(text):
         out.append((geo.nw(raw), raw[0].isupper() or raw.isupper()))
     return out
 
-def _from_text(text):
+def _from_text(text, prefer_cc=None):
     """Most specific place the story actually names. City and base beat a country mention."""
     raw = _OUTLET.sub(" ", text or "")
     raw = _COAST.sub("in ", raw)
@@ -263,12 +277,17 @@ def _from_text(text):
     cities, admin, countries = G["c"], G["a"], G["k"]
     norms = [t[0] for t in toks]
     caps = [t[1] for t in toks]
-    used = set()
+    # Countries / demonyms named in the story — used to keep city hits inside the right border.
+    named_cc = set(prefer_cc or []) if isinstance(prefer_cc, (list, set, tuple)) else ({prefer_cc} if prefer_cc else set())
+    named_cc |= {countries[k][2] for k in countries if k in norms}
+    for word, d in _DEMONYM_PLACE.items():
+        if re.search(r"\b" + word + r"\w*\b", raw, re.I):
+            named_cc.add(d[0])
     hits = []
     i = 0
     while i < len(norms):
         found = None
-        for n in (4, 3, 2, 1):
+        for n in (6, 5, 4, 3, 2, 1):
             if i + n > len(norms): continue
             key = " ".join(norms[i:i + n])
             if key in _CURATED or key in cities or key in admin or key in countries:
@@ -282,6 +301,7 @@ def _from_text(text):
             continue
         n, key, cue = found
         i += n
+        if key in _CITY_BLOCK: continue
         if key in _AMBIG_COUNTRY and not cue and key not in _CURATED: continue
         if key == "georgia" and not re.search(r"\b(?:Tbilisi|state of Georgia|Georgia,? USA|US state)\b", raw): continue
         level = lat = lon = cc = label = pop = None
@@ -292,8 +312,12 @@ def _from_text(text):
             cands = cities[key]
             if key == "rafah":
                 cands = [c for c in cands if c[2] == "PS"] or cands
-            ctx = {countries[k][2] for k in countries if k in norms}
-            pool = [c for c in cands if c[2] in ctx] or cands
+            ctx = set(named_cc) or {countries[k][2] for k in countries if k in norms}
+            pool = [c for c in cands if c[2] in ctx] if ctx else list(cands)
+            if not pool and named_cc:
+                # City name exists, but not inside the story's country — skip, do not plot abroad.
+                continue
+            if not pool: pool = list(cands)
             pool = sorted(pool, key=lambda c: -c[3])
             if len(pool) > 1 and not (pool[0][3] >= max(200000, 3 * pool[1][3])): continue
             lat, lon, cc, pop, label = pool[0]
@@ -306,10 +330,14 @@ def _from_text(text):
             lat, lon, cc, label = admin[key]
             level, pop = "state", 0
             if key in countries and key in _AMBIG_COUNTRY: continue
+            if named_cc and cc and cc not in named_cc: continue
         elif key in countries:
             lat, lon, cc, label = countries[key]
             level, pop = "country", 0
         if level is None: continue
+        # Person names ("President Santiago Peña") are not cities.
+        if level == "city" and _neighbor_person(label or key, raw): continue
+        if level == "city" and _neighbor_person(key.title(), raw): continue
         prev = norms[i - n - 1] if i - n - 1 >= 0 else ""
         if level == "city" and prev and prev not in _CUES and prev not in _DIR and prev not in _PLACE_WORD and prev not in _TITLE_WORD:
             if i - n - 1 >= 0 and caps[i - n - 1] and prev not in countries and prev not in cities and prev not in admin:
@@ -317,15 +345,37 @@ def _from_text(text):
         hits.append({"level": level, "lat": lat, "lon": lon, "cc": cc, "place": label, "pop": pop or 0, "cue": cue, "key": key})
     if not hits:
         for word, d in _DEMONYM_PLACE.items():
-            if re.search(r"\b" + word + r"\w*\s+(?:\w+\s+){0,2}(?:military\s+)?(?:base|territory|soil|waters)\b", raw, re.I):
+            if re.search(r"\b" + word + r"\w*\s+(?:\w+\s+){0,2}(?:military\s+)?(?:base|territory|soil|waters|president|leader|government)\b", raw, re.I):
                 return _pack(d[2], d[3], "country", d[1], d[0])
         return None
     rank = {"facility": 5, "city": 4, "state": 3, "region": 2, "country": 1}
+    # Prefer a city/state inside a named country when one exists (Paraguay ≠ Santiago, Chile).
+    # Do NOT drop a clearly named foreign city when the other country is only an actor
+    # ("Russia struck Kyiv" must stay Kyiv).
     specific = [h for h in hits if rank[h["level"]] >= 2]
+    if named_cc:
+        in_named = [h for h in specific if h.get("cc") in named_cc]
+        if in_named: specific = in_named
     if specific:
         specific.sort(key=lambda h: (rank[h["level"]] + (3 if h["cue"] else 0), h["pop"]), reverse=True)
         best = specific[0]
         return _pack(best["lat"], best["lon"], best["level"], best["place"], best["cc"])
+    # Two+ countries and no city/state → do not guess which one (Russia and Ukraine …).
+    country_hits = [h for h in hits if h["level"] == "country"]
+    if named_cc:
+        country_hits = [h for h in country_hits if h.get("cc") in named_cc] or country_hits
+    country_ccs = {h.get("cc") for h in country_hits if h.get("cc")}
+    if len(country_ccs) > 1:
+        cued = [h for h in country_hits if h["cue"]]
+        cued_cc = {h["cc"] for h in cued if h.get("cc")}
+        if len(cued_cc) != 1: return None
+        h = cued[0]
+        if h["key"] in _AMBIG_COUNTRY and not h["cue"]: return None
+        return _pack(h["lat"], h["lon"], "country", h["place"], h["cc"])
+    if len(country_ccs) == 1:
+        h = country_hits[0]
+        if h["key"] in _AMBIG_COUNTRY and not h["cue"]: return None
+        return _pack(h["lat"], h["lon"], "country", h["place"], h["cc"])
     ccs = {}
     for h in hits:
         ccs.setdefault(h["cc"] or h["key"], []).append(h)
@@ -341,26 +391,241 @@ def _from_text(text):
     return _pack(h["lat"], h["lon"], "country", h["place"], h["cc"])
 
 
-def infer(text):
+def named_countries(text):
+    """ISO2 codes the story clearly names (multi-word countries + demonyms). Empty if none."""
+    raw = _OUTLET.sub(" ", text or "")
+    if _turkey_food(raw): raw = re.sub(r"\b[Tt]urkey\b", " ", raw)
+    G = _gazetteer()
+    countries = G["k"]
+    toks = _tokens(raw)
+    norms = [t[0] for t in toks]
+    caps = [t[1] for t in toks]
+    out = []
+    seen = set()
+    i = 0
+    while i < len(norms):
+        found = None
+        for n in (6, 5, 4, 3, 2, 1):
+            if i + n > len(norms): continue
+            key = " ".join(norms[i:i + n])
+            if key not in countries: continue
+            prev = norms[i - 1] if i else ""
+            cue = prev in _CUES
+            if not (caps[i] or cue): continue
+            if key in _AMBIG_COUNTRY and not cue:
+                if key == "georgia" and not re.search(r"\b(?:Tbilisi|state of Georgia|Georgia,? USA|US state)\b", raw):
+                    continue
+                if key != "georgia":
+                    continue
+            found = (n, key)
+            break
+        if not found:
+            i += 1
+            continue
+        n, key = found
+        i += n
+        cc = countries[key][2]
+        if cc and cc not in seen:
+            seen.add(cc); out.append(cc)
+    for word, d in _DEMONYM_PLACE.items():
+        if re.search(r"\b" + word + r"\w*\b", raw, re.I) and d[0] not in seen:
+            seen.add(d[0]); out.append(d[0])
+    return out
+
+
+
+def pip_country(lat, lon):
+    """Natural Earth admin-0 ISO2 for a coordinate, or None."""
+    try:
+        cc, _a1 = geo.gaz().pip(float(lat), float(lon))
+        return cc
+    except Exception:
+        return None
+
+
+# Natural Earth admin-0 assigns some disputed places to a neighbour (Gaza→IL).
+_PIP_ACCEPT = {
+    "PS": {"PS", "IL"}, "IL": {"IL", "PS"},
+    "TW": {"TW", "CN"}, "CN": {"CN", "TW"},
+    "XK": {"XK", "RS"}, "RS": {"RS", "XK"},
+    "EH": {"EH", "MA"}, "MA": {"MA", "EH"},
+}
+
+def in_country(lat, lon, cc):
+    if not cc: return True
+    got = pip_country(lat, lon)
+    if not got: return True   # ocean / missing poly: do not reject
+    got, cc = got.upper(), cc.upper()
+    if got == cc: return True
+    return got in _PIP_ACCEPT.get(cc, ())
+
+
+_CAP_CACHE = {}
+
+def capital_of(cc):
+    """Capital city pack for a country, else the country centroid pack, else None."""
+    cc = (cc or "").upper()
+    if not cc: return None
+    if cc in _CAP_CACHE: return _CAP_CACHE[cc]
+    G = geo.gaz()
+    ctry = G.countries.get(cc) or {}
+    name = (ctry.get("capital") or "").strip()
+    hit = None
+    if name:
+        key = geo.key_of(name)
+        # Prefer PPLC from heatmap cities.json
+        for row in G.cities:
+            if row[4] != cc: continue
+            if geo.key_of(row[0]) == key or geo.key_of(row[1] or "") == key or key in {geo.key_of(a) for a in (row[8] or [])}:
+                if row[7] == "PPLC" or hit is None:
+                    hit = _pack(row[2], row[3], "city", f"{row[0]}, {ctry.get('name') or cc}", cc)
+                    if row[7] == "PPLC": break
+    if hit is None:
+        lab = ctry.get("label")
+        if lab:
+            hit = _pack(lab[0], lab[1], "country", ctry.get("name") or cc, cc)
+    _CAP_CACHE[cc] = hit
+    return hit
+
+
+_CITIES_CACHE = {}
+
+def cities_of(cc, min_pop=25000, limit=25):
+    """Largest populated places inside a country (offline GeoNames extract).
+
+    Drops cities Natural Earth admin-0 puts outside the border (Crimea/Sevastopol,
+    El Paso edge cases) so country-only distribution never plots abroad.
+    """
+    cc = (cc or "").upper()
+    if not cc: return []
+    key = (cc, int(min_pop), int(limit))
+    if key in _CITIES_CACHE: return _CITIES_CACHE[key]
+    G = geo.gaz()
+    cand = []
+    for row in G.cities:
+        if row[4] != cc: continue
+        pop = int(row[6] or 0)
+        if pop < min_pop: continue
+        cand.append((pop, float(row[2]), float(row[3]), row[0]))
+    cand.sort(reverse=True)
+    # PIP only the largest candidates until we have `limit` keepers (border/disputed drops are rare).
+    keep = []
+    for pop, lat, lon, name in cand:
+        if not in_country(lat, lon, cc): continue
+        keep.append({"lat": lat, "lon": lon, "place": name, "pop": pop, "cc": cc})
+        if len(keep) >= limit: break
+    _CITIES_CACHE[key] = keep
+    return keep
+
+
+def place_in_country(cc, story_id="", index=0, total=1):
+    """Country-only placement: capital when alone; otherwise a distinct real city (deterministic)."""
+    cc = (cc or "").upper()
+    if not cc: return None
+    cities = cities_of(cc, min_pop=15000, limit=40)
+    if not cities:
+        return capital_of(cc)
+    if total <= 1:
+        cap = capital_of(cc)
+        if cap and cap.get("precision") == "city":
+            return dict(cap, approximate=True, precision="country")
+        c0 = cities[0]
+        return _pack(c0["lat"], c0["lon"], "country", f"{c0['place']}, {cc}", cc)
+    import hashlib
+    # Round-robin by index so N stories get N distinct cities when the pool allows it.
+    pool_n = min(len(cities), max(int(total), 8))
+    pool = cities[:pool_n]
+    slot = int(index) % len(pool)
+    if int(total) > len(pool):
+        digest = hashlib.sha1(f"{cc}:{story_id}:{index}".encode()).hexdigest()
+        slot = int(digest[:8], 16) % len(pool)
+    c0 = pool[slot]
+    return _pack(c0["lat"], c0["lon"], "country", f"{c0['place']}, {cc}", cc)
+
+
+def _verify_or_repair(hit, text, prefer_cc=None):
+    """PIP-check the hit against the country that owns the place. Re-geocode on failure; else None."""
+    if not hit: return None
+    if hit.get("precision") == "region" and not hit.get("cc"):
+        return hit
+    named = named_countries(text)
+    # Specific places keep their own country (Kyiv stays UA even when Russia is named).
+    # Country-only hits, or ambiguous ones, use the story's named country.
+    if hit.get("precision") in ("city", "facility", "state") and hit.get("cc"):
+        expected = hit["cc"]
+    elif prefer_cc:
+        expected = prefer_cc
+    elif hit.get("cc") and (not named or hit["cc"] in named):
+        expected = hit["cc"]
+    elif len(named) == 1:
+        expected = named[0]
+    else:
+        expected = hit.get("cc")
+    if not expected:
+        if hit.get("precision") in ("city", "facility", "state"):
+            if hit.get("cc"):
+                return hit if in_country(hit["lat"], hit["lon"], hit["cc"]) else None
+            # NWS / gazetteer hits with no ISO yet: keep and fill cc from Natural Earth when possible.
+            pip = pip_country(hit["lat"], hit["lon"])
+            return dict(hit, cc=pip or "") if pip or hit.get("precision") in ("city", "state") else None
+        return hit if hit.get("precision") == "region" else None
+    if in_country(hit["lat"], hit["lon"], expected):
+        if not hit.get("cc"): hit = dict(hit, cc=expected)
+        return hit
+    # Wrong country for this hit: if the story names one country, snap to that country's capital.
+    # If the hit was a specific place that PIP rejected, drop it (do not silently move Kyiv to Russia).
+    if hit.get("precision") in ("city", "facility", "state"):
+        # One more try: a same-name place inside expected / prefer / named.
+        target = prefer_cc or (named[0] if len(named) == 1 else None)
+        if target and target != expected:
+            retry = _from_text(text, prefer_cc=target)
+            if retry and in_country(retry["lat"], retry["lon"], retry.get("cc") or target):
+                # Keep the place's own cc (Gaza stays PS even when Israel is the actor).
+                return retry
+        return None
+    target = prefer_cc or (named[0] if len(named) == 1 else expected)
+    retry = _from_text(text, prefer_cc=target)
+    if retry and in_country(retry["lat"], retry["lon"], target):
+        return dict(retry, cc=target)
+    cap = capital_of(target)
+    if cap and in_country(cap["lat"], cap["lon"], target):
+        label = (geo.gaz().countries.get(target) or {}).get("name") or target
+        return _pack(cap["lat"], cap["lon"], "country", label, target)
+    return None
+
+
+def infer(text, prefer_cc=None):
     """-> {lat, lon, precision, place, cc, approximate} or None. None means we are not sure."""
     text = (text or "").strip()
     if not text or _NOT_A_PLACE.search(text) and len(text) < 48: return None
     hit = _nws(text)
-    if hit: return hit
-    hit = _from_text(text)
-    if hit: return hit
+    if hit: return _verify_or_repair(hit, text, prefer_cc)
+    hit = _from_text(text, prefer_cc=prefer_cc)
+    if hit:
+        fixed = _verify_or_repair(hit, text, prefer_cc)
+        if fixed: return fixed
     hit = _from_gazetteer(text)
-    if hit: return hit
-    hit = _nws(text)
-    if hit: return hit
+    if hit:
+        fixed = _verify_or_repair(hit, text, prefer_cc)
+        if fixed: return fixed
     if re.search(r"\bWhite House\b", text):
-        return _pack(38.8977, -77.0365, "city", "Washington, District of Columbia")
+        hit = _pack(38.8977, -77.0365, "city", "Washington, District of Columbia", "US")
+        return _verify_or_repair(hit, text, prefer_cc) or hit
     if re.search(r"\bWashington\s+State\b|\bstate of Washington\b|\bCounty,\s+Washington\b", text):
         geo.gaz()
         a1 = geo.US_POSTAL.get("WA")
         lab = (geo.gaz().admin1.get(a1) or {}).get("label") if a1 else None
-        if lab: return _pack(lab[0], lab[1], "state", "Washington, United States")
-    return _region(text)
+        if lab:
+            hit = _pack(lab[0], lab[1], "state", "Washington, United States", "US")
+            return _verify_or_repair(hit, text, prefer_cc) or hit
+    hit = _region(text)
+    if hit: return hit
+    # Last resort: a single named country → capital (still PIP-checked).
+    named = named_countries(text)
+    if len(named) == 1:
+        cap = capital_of(named[0])
+        if cap: return dict(cap, approximate=True, precision="country")
+    return None
 
 
 def story_text(title, location="", brief=""):

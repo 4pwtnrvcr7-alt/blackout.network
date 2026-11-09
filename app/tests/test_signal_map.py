@@ -199,13 +199,14 @@ class Place(unittest.TestCase):
         specific = prec["city"] + prec["facility"] + prec["state"]
         broad = prec["country"] + prec["region"]
         self.assertGreater(len(fixture["items"]), 1200)
+        # PIP country verification drops wrong-country cities; country-only pins are intentional.
         self.assertLess(prec[None], 360)
-        self.assertGreater(specific, 480)
-        self.assertLess(broad, 460)
-        self.assertGreater(specific, broad)
+        self.assertGreater(specific, 380)
+        self.assertLess(broad, 560)
+        self.assertGreater(specific + broad, 800)
 
 class Cluster(unittest.TestCase):
-    def test_country_pile_is_one_dot_and_rings_stay_small(self):
+    def test_clusters_never_fan_into_a_ring(self):
         node = subprocess.run(["node", "-e", r'''
 const fs=require("fs"), vm=require("vm");
 const ctx={};
@@ -220,8 +221,9 @@ function far(g){var m=0;(g.offsets||[]).forEach(function(o){m=Math.max(m, Math.h
 const out={
  groups: country.length, spider: country[0].spider, n: country[0].n,
  citySpider: cities[0].spider, cityR: far(cities[0]),
- manySpider: many.some(function(g){return g.spider && g.n>8}),
+ manySpider: many.some(function(g){return g.spider}),
  manyR: Math.max.apply(null, many.map(far).concat([0])),
+ fanMax: B.FAN_MAX,
  us: B.inUS({lat:39.5,lon:-98}), kyiv: B.inUS({lat:50.45,lon:30.52,cc:"UA"}),
  uscc: B.inUS({lat:10,lon:10,cc:"US"})
 };
@@ -231,14 +233,54 @@ console.log(JSON.stringify(out));
         self.assertEqual(got["groups"], 1)
         self.assertFalse(got["spider"])
         self.assertEqual(got["n"], 40)
-        self.assertTrue(got["citySpider"])
-        self.assertLessEqual(got["cityR"], 40)
-        self.assertGreaterEqual(got["cityR"], 20)
+        self.assertFalse(got["citySpider"])
+        self.assertEqual(got["cityR"], 0)
         self.assertFalse(got["manySpider"])
-        self.assertLessEqual(got["manyR"], 40)
+        self.assertEqual(got["manyR"], 0)
+        self.assertEqual(got["fanMax"], 0)
         self.assertTrue(got["us"])
         self.assertFalse(got["kyiv"])
         self.assertTrue(got["uscc"])
+
+class PinVerify(unittest.TestCase):
+    def test_paraguay_lands_inside_paraguay(self):
+        import signal_place as P
+        for title in (
+            "JUST IN - Paraguay's Senate impeaches President Santiago Peña, convicting him of corruption",
+            "Paraguay Bank Failure",
+            "Impeached Paraguay leader charged over shock collapse of bank",
+            "Ousted Paraguayan president placed under house arrest after bank collapse",
+            "Mass protests over Ueno Bank collapse topple Paraguay's president",
+        ):
+            hit = P.infer(title)
+            self.assertIsNotNone(hit, title)
+            self.assertEqual(hit["cc"], "PY", title)
+            self.assertTrue(P.in_country(hit["lat"], hit["lon"], "PY"), (title, hit))
+            self.assertNotEqual(hit.get("place"), "Santiago")
+            self.assertNotEqual(hit.get("place"), "Bogota")
+
+    def test_ten_country_only_stories_spread_not_ring(self):
+        import signal_place as P, math
+        pts = [P.place_in_country("PY", story_id=f"story-{i}", index=i, total=10) for i in range(10)]
+        self.assertEqual(len(pts), 10)
+        coords = [(p["lat"], p["lon"]) for p in pts]
+        self.assertEqual(len(set(coords)), 10)
+        for p in pts:
+            self.assertTrue(P.in_country(p["lat"], p["lon"], "PY"), p)
+        cx = sum(a for a, _ in coords) / len(coords)
+        cy = sum(b for _, b in coords) / len(coords)
+        radii = [math.hypot(a - cx, b - cy) for a, b in coords]
+        self.assertGreater(max(radii) - min(radii), 0.3)
+        one = P.place_in_country("PY", story_id="only", index=0, total=1)
+        self.assertTrue(P.in_country(one["lat"], one["lon"], "PY"))
+        self.assertAlmostEqual(one["lat"], -25.2865, delta=0.2)
+
+    def test_kyiv_not_pulled_to_actor_country(self):
+        import signal_place as P
+        kyiv = P.infer("White House says Russia struck Kyiv")
+        self.assertEqual(kyiv["place"], "Kyiv")
+        self.assertEqual(kyiv["cc"], "UA")
+        self.assertTrue(P.in_country(kyiv["lat"], kyiv["lon"], "UA"))
 
 if __name__ == "__main__":
     unittest.main()
