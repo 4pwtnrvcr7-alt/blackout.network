@@ -26,6 +26,11 @@ CID_RE = re.compile(r"^[0-9a-f]{16}$")
 SLOTS_ET = ["08:00", "11:00", "14:00", "16:00", "20:00", "22:00"]
 PIN_HOURS = 24          # a posted story stays pinned at the front of the row this long
 PIN_MAX = 3
+# Latest-row freshness (Matt, Nov 8): keep the homepage in step with the 6x-daily social schedule.
+LATEST_FRESH_H = 48     # prefer events updated within this window
+LATEST_WIDEN_H = 72     # if fewer than 6 qualify, widen to this; never older
+LATEST_STALE_H = 24     # an item older than this cannot outrank a fresher item of equal or rank-1 lower
+LATEST_MIN = 6
 
 def _ts(iso):
     try: return datetime.strptime(str(iso)[:19].replace(" ", "T"), "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).timestamp()
@@ -225,18 +230,76 @@ def links():
 _WX = re.compile(r"\b(?:weather|storms?|hurricanes?|typhoons?|cyclones?|tornado(?:es|s)?|flood(?:ing|s| warning)?|heat advisory|heat ?wave|winter storm|"
                  r"forecast(?:s|ing)?|NWS|rain(?:fall)?|snow(?:fall)?|blizzard|deep freeze|cold snap|freeze warning|wind advisory|thunderstorm|drought|"
                  r"(?:wind|freeze|frost|flood|winter|gale|spray|surf|fire weather|heat|storm) (?:warning|watch|advisory))\b", re.I)
+_FLOOD = re.compile(r"\bflood(?:ing|s)?\b", re.I)
+_FLOOD_IMPACT = re.compile(r"\b(?:deaths?|dead|killed|fatalit\w*|evacuat\w*|"
+                           r"state of emergency|emergency declaration|declared (?:a )?state of emergency|"
+                           r"federal (?:disaster|emergency)|national (?:disaster|emergency)|disaster declaration)\b", re.I)
 _QK = re.compile(r"\b(?:earthquakes?|quake|seismic|magnitude)\b|\bM\s*[4-9]\.\d", re.I)
 _QIMPACT = re.compile(r"\b(?:significant|major|severe|widespread) (?:damage|destruction)\b|\b(?:[1-9]\d* (?:dead|deaths|killed|injured)|fatalities|casualties reported|tsunami (?:warning|threat))\b", re.I)
 _QNEG = re.compile(r"\b(?:no|without|zero|not any)\b.{0,35}(?:damage|casualties|fatalities|tsunami|deaths|killed|injured)", re.I)
 _QUS = re.compile(r"\b(?:Los Angeles|San Francisco|San Diego|Seattle|Portland, Oregon|Anchorage|Honolulu|Salt Lake City|San Juan, Puerto Rico)\b", re.I)
-def topic_ok(title):
-    """False for routine weather / NWS products and for quakes below M7 without real damage, a tsunami threat, or M5.5+ in a populated US area."""
-    t = str(title or "")
-    if _WX.search(t) or nws(t): return False
-    if _QK.search(t):
-        m = re.search(r"\b(?:M\s*|magnitude\s*)(\d(?:\.\d)?)", t, re.I); mag = float(m.group(1)) if m else 0
-        return mag >= 7 or bool(_QIMPACT.search(t) and not _QNEG.search(t)) or (mag >= 5.5 and bool(_QUS.search(t)))
+# Evergreen SEO / health-reference explainers: keep off the latest row unless an active outbreak with 2+ sources.
+_EXPLAINER = re.compile(r"(?::\s*Causes?,\s*(?:symptoms?,\s*)?(?:warning signs|signs and what|treatment)|"
+                        r"\bCauses?,\s*(?:warning )?signs\b|"
+                        r"\bWhat is\b|\bHow to\b|"
+                        r"\b(?:\d+|Top)\s+(?:ways|tips|things|reasons|signs|causes)\b|"
+                        r"\blisticles?\b|\bsymptoms and treatment\b|\bwarning signs and what you can do\b)", re.I)
+_OUTBREAK = re.compile(r"\b(?:outbreak|epidemic|pandemic|cluster of|ebola|marburg|h5n1|h9n2|avian|bird flu|measles|cholera|mpox|polio)\b", re.I)
+
+def topic_ok(title, summary=""):
+    """False for routine weather / NWS products and for quakes below M7 without real damage, a tsunami threat, or M5.5+ in a populated US area.
+    Floods are allowed only with deaths, evacuations, or a federal/state emergency declaration in the title/summary."""
+    title = str(title or ""); blob = (title + " " + str(summary or "")).strip()
+    if nws(title): return False
+    if _FLOOD.search(blob) and _FLOOD_IMPACT.search(blob): return True
+    if _WX.search(blob): return False
+    if _QK.search(blob):
+        m = re.search(r"\b(?:M\s*|magnitude\s*)(\d(?:\.\d)?)", blob, re.I); mag = float(m.group(1)) if m else 0
+        return mag >= 7 or bool(_QIMPACT.search(blob) and not _QNEG.search(blob)) or (mag >= 5.5 and bool(_QUS.search(blob)))
     return True
+
+def explainer_junk(item):
+    """True for evergreen explainer / health-reference / SEO titles, unless an active outbreak with 2+ sources."""
+    t = str((item or {}).get("title") or "")
+    if not _EXPLAINER.search(t): return False
+    if int((item or {}).get("n_families") or 0) >= 2 and _OUTBREAK.search(t): return False
+    return True
+
+def row_ok(item):
+    """Latest-row gate: topic policy (same rules as pins) plus explainer junk filter."""
+    if not item: return False
+    summ = " ".join(str(item.get(k) or "") for k in ("summary", "location", "category"))
+    if not topic_ok(item.get("title"), summ): return False
+    if explainer_junk(item): return False
+    return True
+
+def _updated(x):
+    return _ts((x or {}).get("updated")) or _ts((x or {}).get("first_seen")) or 0
+
+def _cmp_latest(a, b, now):
+    """Rank desc, then recency; a >24h-old item cannot outrank a fresher item of equal or rank-1 lower."""
+    ra, rb = int(a.get("rank") or 0), int(b.get("rank") or 0)
+    ua, ub = _updated(a), _updated(b)
+    stale_a, stale_b = (now - ua) > LATEST_STALE_H * 3600, (now - ub) > LATEST_STALE_H * 3600
+    if stale_a != stale_b:
+        # Stale can lead only when its rank is at least 2 higher than the fresher card.
+        if stale_a:  # a stale, b fresh
+            return -1 if ra >= rb + 2 else 1
+        return 1 if rb >= ra + 2 else -1  # b stale, a fresh
+    if ra != rb: return -1 if ra > rb else 1
+    if ua != ub: return -1 if ua > ub else 1
+    return 0
+
+def latest(items, now=None, limit=40):
+    """Homepage 'The latest' row: deduped events, topic+junk filtered, 48h freshness (widen to 72h if <6), recency-biased sort."""
+    from functools import cmp_to_key
+    now = now or time.time()
+    ev = [e for e in events(items, now=now, limit=max(limit * 4, 80)) if row_ok(e)]
+    pool = [e for e in ev if _updated(e) >= now - LATEST_FRESH_H * 3600]
+    if len(pool) < LATEST_MIN:
+        pool = [e for e in ev if _updated(e) >= now - LATEST_WIDEN_H * 3600]
+    pool.sort(key=cmp_to_key(lambda a, b: _cmp_latest(a, b, now)))
+    return pool[:limit]
 
 def links_mtime():
     try: return os.path.getmtime(F_LINKS)

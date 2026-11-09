@@ -81,4 +81,110 @@ class Links(unittest.TestCase):
         self.assertTrue(H.topic_ok("Ebola in DR Congo: deaths pass 5,000")); self.assertFalse(H.topic_ok("M6.1 earthquake off East Coast of Honshu, Japan"))
         self.assertTrue(H.topic_ok("M5.8 earthquake near Los Angeles")); self.assertTrue(H.topic_ok("M6.2 quake: 12 killed, major damage in Herat"))
 
+
+class LatestRow(unittest.TestCase):
+    """Freshness, topic policy on the whole row, explainer junk, recency-biased sort (Matt Nov 8)."""
+    TUCKER = "Tucker Carlson claims Donald Trump could order a nuclear attack on Iran's Pickaxe Mountain nuclear research site at the behest of Israel"
+    GOUT = "Gout: Causes, warning signs and what you can do"
+    def test_freshness_48h_then_72h_never_older(self):
+        # NOW is 2026-11-09 03:00 UTC-ish; Tucker (Nov 3) is >72h and must never appear
+        items = [C("a"*16, "Paraguay: President under investigation for bank failure", 7, 9, t="2026-11-08T12:00:00Z"),
+                 C("b"*16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, 4, "disease", t="2026-11-09T01:00:00Z"),
+                 C("c"*16, self.TUCKER, 8, 3, t="2026-11-03T20:25:25Z"),
+                 C("d"*16, "Belize declares state of emergency over deadly gang violence", 7, 5, t="2026-11-06T12:00:00Z"),  # ~63h: only in 72h widen
+                 C("e"*16, "Massive ballistic missile strike on Ukraine medical facility in Kharkiv", 6, 4, t="2026-11-08T20:00:00Z"),
+                 C("f"*16, "IRGC threatens further strikes on energy infrastructure in the Gulf", 6, 3, t="2026-11-08T18:00:00Z"),
+                 C("g"*16, "Cyber attack on US power grid infrastructure under investigation", 5, 2, t="2026-11-08T16:00:00Z"),
+                 C("h"*16, "Houthi drones strike commercial tanker in the Red Sea shipping lane", 5, 2, t="2026-11-08T14:00:00Z"),
+                 C("i"*16, "Venezuela opposition leader faces new sanctions from the United States", 5, 2, t="2026-11-08T10:00:00Z")]
+        # with plenty of 48h items, 65h Belize must stay out
+        row = H.latest(items, now=NOW, limit=20)
+        titles = [e["title"] for e in row]
+        self.assertNotIn(self.TUCKER, titles)
+        self.assertTrue(any("Paraguay" in t for t in titles))
+        self.assertFalse(any("Belize" in t for t in titles))
+        # drop most 48h items so widen-to-72h kicks in; Tucker (5+ days) still out
+        sparse = [C("b"*16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, 4, "disease", t="2026-11-09T01:00:00Z"),
+                  C("d"*16, "Belize declares state of emergency over deadly gang violence", 7, 5, t="2026-11-06T12:00:00Z"),
+                  C("c"*16, self.TUCKER, 8, 3, t="2026-11-03T20:25:25Z"),
+                  C("h"*16, "Ousted Paraguayan president placed under house arrest after bank collapse", 5, 3, t="2026-11-06T18:00:00Z"),
+                  C("i"*16, "Venezuela opposition leader faces new sanctions from the United States", 5, 2, t="2026-11-06T20:00:00Z"),
+                  C("j"*16, "Houthi drones strike commercial tanker in the Red Sea shipping lane", 6, 3, t="2026-11-06T22:00:00Z")]
+        row2 = H.latest(sparse, now=NOW, limit=20)
+        titles2 = [e["title"] for e in row2]
+        self.assertNotIn(self.TUCKER, titles2)
+        self.assertTrue(any("Belize" in t for t in titles2))
+        for e in row2:
+            age_h = (NOW - H._updated(e)) / 3600
+            self.assertLessEqual(age_h, H.LATEST_WIDEN_H + 0.01)
+    def test_recency_bias_stale_cannot_outrank_fresher(self):
+        # rank-8 item 30h old must not beat a rank-7 item that is fresh (rank-1 lower)
+        stale = C("1"*16, "Paraguay: President under investigation for bank failure", 8, 9, t="2026-11-07T20:00:00Z")  # ~31h
+        fresh = C("2"*16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, 4, "disease", t="2026-11-09T01:00:00Z")
+        # filler so 48h pool is used
+        more = [C("3"*16, "Massive ballistic missile strike on Ukraine medical facility in Kharkiv", 6, 4, t="2026-11-08T20:00:00Z"),
+                C("4"*16, "IRGC threatens further strikes on energy infrastructure in the Gulf", 6, 3, t="2026-11-08T18:00:00Z"),
+                C("5"*16, "Cyber attack on US power grid infrastructure under investigation", 5, 2, t="2026-11-08T16:00:00Z"),
+                C("6"*16, "Houthi drones strike commercial tanker in the Red Sea shipping lane", 5, 2, t="2026-11-08T14:00:00Z")]
+        row = H.latest([stale, fresh] + more, now=NOW, limit=20)
+        ids = [e["cluster_id"] for e in row]
+        self.assertLess(ids.index("2"*16), ids.index("1"*16))
+        # but rank-8 stale CAN beat rank-6 fresh (gap of 2)
+        low = C("7"*16, "Venezuela opposition leader faces new sanctions from the United States", 6, 2, t="2026-11-09T01:00:00Z")
+        row2 = H.latest([stale, low] + more, now=NOW, limit=20)
+        ids2 = [e["cluster_id"] for e in row2]
+        self.assertLess(ids2.index("1"*16), ids2.index("7"*16))
+    def test_topic_policy_on_latest_row(self):
+        items = [C("1"*16, "Flood Warning issued November 8 at 8:11PM CST until November 11 at 1:00PM CST by NWS Corpus Christi TX", 7, 1, "natural disaster", "Nueces, TX", t="2026-11-08T20:00:00Z"),
+                 C("2"*16, "GEOFON: M5.0 earthquake Southern Mid-Atlantic Ridge", 6, 3, "natural disaster", t="2026-11-09T01:00:00Z"),
+                 C("3"*16, "Heavy rain and flooding expected across central Texas this weekend", 6, 2, "natural disaster", t="2026-11-09T01:00:00Z"),
+                 C("4"*16, "Gov. Cox declares state of emergency after repeat flooding in Southern Utah", 7, 17, t="2026-11-09T02:00:00Z"),
+                 C("5"*16, "M7.4 earthquake off Kamchatka triggers tsunami warning", 8, 5, "natural disaster", t="2026-11-09T01:30:00Z"),
+                 C("6"*16, "Paraguay: President under investigation for bank failure", 7, 9, t="2026-11-08T12:00:00Z"),
+                 C("7"*16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, 4, "disease", t="2026-11-09T01:00:00Z")]
+        row = H.latest(items, now=NOW, limit=20)
+        titles = [e["title"] for e in row]
+        self.assertFalse(any("Flood Warning" in t for t in titles))
+        self.assertFalse(any("Mid-Atlantic" in t for t in titles))
+        self.assertFalse(any("Heavy rain" in t for t in titles))
+        self.assertTrue(any("Cox declares" in t for t in titles))
+        self.assertTrue(any("Kamchatka" in t for t in titles))
+        self.assertTrue(H.topic_ok("Gov. Cox declares state of emergency after repeat flooding in Southern Utah"))
+        self.assertFalse(H.topic_ok("Heavy rain and flooding expected across central Texas this weekend"))
+    def test_explainer_junk_gout_and_patterns(self):
+        items = [C("1"*16, self.GOUT, 5, 4, "disease", t="2026-11-09T01:00:00Z"),
+                 C("2"*16, "What is martial law and how does it work in the United States", 6, 3, t="2026-11-09T01:00:00Z"),
+                 C("3"*16, "How to prepare your home for a long power outage this winter", 6, 2, t="2026-11-09T01:00:00Z"),
+                 C("4"*16, "Ebola outbreak in DR Congo: causes, warning signs doctors are watching", 7, 5, "disease", t="2026-11-09T01:00:00Z"),
+                 C("5"*16, "Paraguay: President under investigation for bank failure", 7, 9, t="2026-11-08T12:00:00Z"),
+                 C("6"*16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, 4, "disease", t="2026-11-09T01:00:00Z"),
+                 C("7"*16, "Massive ballistic missile strike on Ukraine medical facility in Kharkiv", 6, 4, t="2026-11-08T20:00:00Z"),
+                 C("8"*16, "IRGC threatens further strikes on energy infrastructure in the Gulf", 6, 3, t="2026-11-08T18:00:00Z")]
+        self.assertTrue(H.explainer_junk({"title": self.GOUT, "n_families": 4}))
+        self.assertTrue(H.explainer_junk({"title": "What is martial law and how does it work in the United States", "n_families": 3}))
+        self.assertFalse(H.explainer_junk({"title": "Ebola outbreak in DR Congo: causes, warning signs doctors are watching", "n_families": 5}))
+        row = H.latest(items, now=NOW, limit=20)
+        titles = [e["title"] for e in row]
+        self.assertNotIn(self.GOUT, titles)
+        self.assertFalse(any(t.startswith("What is") for t in titles))
+        self.assertFalse(any(t.startswith("How to") for t in titles))
+        self.assertTrue(any("Ebola outbreak" in t for t in titles))
+        # exact Tucker title from live Nov 3 card must be rejected by freshness even at rank 8
+        with_tucker = items + [C("t"*16, self.TUCKER, 8, 3, t="2026-11-03T20:25:25Z")]
+        row2 = H.latest(with_tucker, now=NOW, limit=20)
+        self.assertFalse(any("Tucker Carlson" in e["title"] for e in row2))
+    def test_latest_keeps_dedupe(self):
+        items = [C("a"*16, "Paraguay: President under investigation for bank failure", 7, 9, t="2026-11-08T12:00:00Z"),
+                 C("b"*16, "Paraguay Bank Failure", 7, 7, t="2026-11-08T12:00:00Z"),
+                 C("c"*16, "Ousted Paraguayan president placed under house arrest after bank collapse", 5, 9, t="2026-11-08T14:00:00Z"),
+                 C("d"*16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, 4, "disease", t="2026-11-09T01:00:00Z"),
+                 C("e"*16, "Massive ballistic missile strike on Ukraine medical facility in Kharkiv", 6, 4, t="2026-11-08T20:00:00Z"),
+                 C("f"*16, "IRGC threatens further strikes on energy infrastructure in the Gulf", 6, 3, t="2026-11-08T18:00:00Z"),
+                 C("g"*16, "Houthi drones strike commercial tanker in the Red Sea shipping lane", 5, 2, t="2026-11-08T16:00:00Z")]
+        row = H.latest(items, now=NOW, limit=20)
+        # one Paraguay event only
+        para = [e for e in row if "Paraguay" in e["title"] or "Paraguayan" in e["title"]]
+        self.assertEqual(len(para), 1)
+        self.assertGreaterEqual(para[0]["grouped"], 2)
+
 if __name__ == "__main__": unittest.main()

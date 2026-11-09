@@ -66,12 +66,14 @@ def _posted_rows(ids):
     finally: c.close()
 
 def _events(main):
-    """One card per real event (home_feed.events), with verified 'Follow this story' links; stories posted in the last day are included."""
+    """One card per real event (home_feed.latest), topic/junk/freshness gated; stories posted in the last day are included."""
     import home_feed as HF
-    ev = HF.attach(HF.events(main, limit=40))
+    ev = HF.attach(HF.latest(main, limit=40))
     try:
-        extra = HF.attach(HF.events(_posted_rows(HF.posted_missing(ev)), limit=6))
-        ev = [e for e in extra if e.get("posted")] + ev
+        extra = HF.attach(HF.latest(_posted_rows(HF.posted_missing(ev)), limit=6))
+        pins = [e for e in extra if e.get("posted")]
+        have = {e.get("cluster_id") for e in pins}
+        ev = pins + [e for e in ev if e.get("cluster_id") not in have]
     except Exception: pass
     return ev
 def _home_build():
