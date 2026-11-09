@@ -13,6 +13,7 @@ Vendored in signal_map_static/: Leaflet 1.9.4 (BSD-2-Clause) and Natural Earth 1
 """
 import os, re
 import html as _html
+import threading as _th
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "signal_map_static")
@@ -88,13 +89,21 @@ def _in_us(p):
     lat, lon = float(p["lat"]), float(p["lon"])
     return (24.5 <= lat <= 49.5 and -125 <= lon <= -66.5) or (51 <= lat <= 72 and -170 <= lon <= -129) or (18.5 <= lat <= 22.5 and -161 <= lon <= -154) or (17.5 <= lat <= 18.6 and -67.5 <= lon <= -65)
 
-def seed_points():
-    """Top dots for the first paint: the 30 highest-ranked US dots (the starting view) and the 15 highest-ranked elsewhere,
-    last 7 days, newest first within a rank. Small (about 10 KB); the rest arrive from /api/signal/points."""
+_SEED = {"t": 0.0, "v": None}
+_SEED_LOCK = _th.Lock()
+
+def _seed_path():
+    """Persisted verified seed so a fresh worker can inline dots before the full points rebuild finishes."""
+    d = os.environ.get("BN_STATE_DIR") or os.path.join(BASE, "data")
+    try: os.makedirs(d, exist_ok=True)
+    except Exception: d = "/tmp"
+    return os.path.join(d, "signal_seed.json")
+
+def _slice_seed(body):
+    """Top 30 US + 15 world from an already-verified points payload. Never re-geocodes."""
     import time as _t
-    body = _points_cached(wait=1.5)
-    if not body: return []
     from datetime import datetime as _dt, timezone as _tz
+    if not body: return []
     cut = _t.time() - 7 * 86400
     def ts(p):
         try: return _dt.strptime(str(p.get("event_time") or "")[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=_tz.utc).timestamp()
@@ -104,6 +113,63 @@ def seed_points():
     us = [p for p in pts if _in_us(p)][:SEED_US]; world = [p for p in pts if not _in_us(p)][:SEED_WORLD]
     keep = ("cluster_id", "title", "rank", "category", "event_time", "lat", "lon", "exact", "place", "precision", "approximate", "cc", "watchlist")
     return [dict({k: p.get(k) for k in keep}, links=(p.get("links") or [])[:1]) for p in us + world]
+
+def _publish_seed(pts):
+    """Memory + disk. Disk lets the next cold worker serve dots without waiting on PIP over every Wire row."""
+    import json as _json, time as _t
+    pts = list(pts or [])
+    _SEED.update(t=_t.time(), v=pts)
+    try:
+        p = _seed_path(); tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            _json.dump({"t": _SEED["t"], "points": pts}, fh, separators=(",", ":"))
+        os.replace(tmp, p)
+    except Exception:
+        pass
+    return pts
+
+def _load_seed_disk():
+    import json as _json
+    try:
+        with open(_seed_path(), encoding="utf-8") as fh:
+            data = _json.load(fh)
+        pts = data.get("points") if isinstance(data, dict) else None
+        if isinstance(pts, list) and pts:
+            _SEED.update(t=float(data.get("t") or 0), v=pts)
+            return pts
+    except Exception:
+        pass
+    return None
+
+def seed_points():
+    """Top dots for the first paint: the 30 highest-ranked US dots (the starting view) and the 15 highest-ranked elsewhere,
+    last 7 days, newest first within a rank. Small (about 10 KB); the rest arrive from /api/signal/points.
+
+    Seed is precomputed when the verified points cache rebuilds (and persisted to disk). The homepage never waits on
+    point-in-polygon / gazetteer over the full Wire — that work stays on the background rebuild."""
+    import time as _t
+    pts = _SEED["v"]
+    if pts is None:
+        pts = _load_seed_disk()
+    # Stale or missing full payload: refresh in the background; still serve the last seed immediately.
+    body = _points_cached(wait=0)
+    if body is None or (_t.time() - _POINTS["t"] >= 30):
+        _kick()
+    if pts is not None:
+        return pts
+    # Absolute cold (new worker, empty disk): build a small verified seed once, then let the full rebuild catch up.
+    with _SEED_LOCK:
+        if _SEED["v"] is not None:
+            return _SEED["v"]
+        body = _points_cached(wait=0)
+        if body:
+            return _publish_seed(_slice_seed(body))
+        try:
+            fast = _build_points(limit=150)  # same verify path, capped rows
+            return _SEED["v"] or _slice_seed(fast)
+        except Exception:
+            _kick()
+            return []
 
 def _merc(lat, lon):
     import math
@@ -213,7 +279,6 @@ def _stored_coord(lat, lon):
     return round(lat, 4), round(lon, 4)
 
 _POINTS = {"t": 0.0, "v": None}
-import threading as _th
 _PLOCK = _th.Lock(); _PREB = {"t": None}
 
 def _points_rebuild():
@@ -249,7 +314,8 @@ def points_payload():
         if _POINTS["v"] is not None: return _POINTS["v"]
         return _build_points()
 
-def _build_points():
+def _build_points(limit=None):
+    """Rebuild verified points. limit=N builds only the top N by rank (cold seed path); None = full Wire window."""
     import json, sqlite3, time
     from datetime import datetime, timezone, timedelta
     from collections import defaultdict
@@ -262,10 +328,14 @@ def _build_points():
         c = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=8)
         c.row_factory = sqlite3.Row
         try:
-            rows = [dict(r) for r in c.execute(
-                """SELECT cluster_id, title, category, location, lat, lon, event_time, first_seen, updated,
+            q = """SELECT cluster_id, title, category, location, lat, lon, event_time, first_seen, updated,
                           rank, links, watchlist, brief FROM clusters
-                   WHERE watchlist IN (0, 1) AND COALESCE(event_time, first_seen)>=?""", (cut,))]
+                   WHERE watchlist IN (0, 1) AND COALESCE(event_time, first_seen)>=?
+                   ORDER BY rank DESC, COALESCE(event_time, first_seen) DESC"""
+            if limit:
+                rows = [dict(r) for r in c.execute(q + " LIMIT ?", (cut, int(limit)))]
+            else:
+                rows = [dict(r) for r in c.execute(q, (cut,))]
         finally:
             c.close()
     import geo
@@ -356,7 +426,12 @@ def _build_points():
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     body = {"points": points, "stored": stored, "inferred": inferred, "shown": len(points),
             "unmapped": unmapped, "unverified": unverified, "generated": generated}
-    _POINTS.update(t=now, v=body)
+    # A capped seed build must not overwrite the full points cache (homepage API needs every pin).
+    if not limit:
+        _POINTS.update(t=now, v=body)
+    _publish_seed(_slice_seed(body if not limit else {"points": points}))
+    if limit:
+        _kick()  # finish the full verified set in the background
     return body
 
 def handle_get(path, qs):

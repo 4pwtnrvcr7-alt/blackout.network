@@ -531,6 +531,11 @@ def _cold_kick():
     t = _cold["t"]
     if t is not None and t.is_alive(): return t
     def run():
+        try:
+            import signal_map
+            signal_map._kick()  # verified points + seed; must not block "/"
+        except Exception:
+            pass
         for f in (home_data, dash_data):
             try: f()
             except Exception: pass

@@ -299,5 +299,37 @@ class PinVerify(unittest.TestCase):
         israel = P.infer("Iranian missile strikes hit northern Israel")
         self.assertEqual(israel["cc"], "IL")
 
+class SeedSpeed(unittest.TestCase):
+    def test_seed_points_never_waits_on_full_build(self):
+        """Homepage seed must come from cache/disk (or a capped verified build), never join the full PIP rebuild."""
+        import time
+        signal_map._SEED.update(t=0, v=None)
+        signal_map._POINTS.update(t=0, v=None)
+        # Wipe disk seed for this process so we exercise the cold path.
+        try:
+            os.remove(signal_map._seed_path())
+        except FileNotFoundError:
+            pass
+        waits = []
+        real_cached = signal_map._points_cached
+        def wrap(wait=0.0):
+            waits.append(wait)
+            return real_cached(wait=0)  # force no wait even if caller regresses
+        signal_map._points_cached = wrap
+        try:
+            t0 = time.time()
+            pts = signal_map.seed_points()
+            elapsed = time.time() - t0
+        finally:
+            signal_map._points_cached = real_cached
+        self.assertTrue(all(w == 0 for w in waits), waits)
+        self.assertLess(elapsed, 2.0)  # capped verified seed, not full 7-day PIP
+        self.assertIsInstance(pts, list)
+        if pts:
+            self.assertLessEqual(len(pts), signal_map.SEED_US + signal_map.SEED_WORLD)
+            html = signal_map.home_section()
+            self.assertIn("bn-sig-pre", html)
+            self.assertIn("bn_sig_seed", html)
+
 if __name__ == "__main__":
     unittest.main()
