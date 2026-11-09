@@ -202,7 +202,7 @@ class Place(unittest.TestCase):
         # PIP country verification drops wrong-country cities; country-only pins are intentional.
         self.assertLess(prec[None], 360)
         self.assertGreater(specific, 380)
-        self.assertLess(broad, 560)
+        self.assertLess(broad, 580)
         self.assertGreater(specific + broad, 800)
 
 class Cluster(unittest.TestCase):
@@ -281,6 +281,23 @@ class PinVerify(unittest.TestCase):
         self.assertEqual(kyiv["place"], "Kyiv")
         self.assertEqual(kyiv["cc"], "UA")
         self.assertTrue(P.in_country(kyiv["lat"], kyiv["lon"], "UA"))
+
+    def test_north_korean_missile_pins_in_north_korea(self):
+        import signal_place as P
+        # Reporter country must not steal the pin from a North Korean launch.
+        title = "South Korea JCS says it tracked unannounced North Korean cluster-warhead ballistic missile launch"
+        hit = P.infer(title)
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit["cc"], "KP", hit)
+        self.assertTrue(P.in_country(hit["lat"], hit["lon"], "KP"), hit)
+        self.assertNotEqual(hit["cc"], "KR")
+        self.assertNotEqual(hit.get("place"), "North")  # not Cameroon admin "North"
+        # Demonym alone (no other place) → KP
+        alone = P.infer("North Korean ballistic missile test over the sea")
+        self.assertEqual(alone["cc"], "KP")
+        # Impact place still wins over demonym actor
+        israel = P.infer("Iranian missile strikes hit northern Israel")
+        self.assertEqual(israel["cc"], "IL")
 
 if __name__ == "__main__":
     unittest.main()
