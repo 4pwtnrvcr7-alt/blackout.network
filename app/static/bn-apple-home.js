@@ -176,8 +176,9 @@
  function dayList(o,day){var list=(o.stories&&o.stories[day])||[],dn="";
   try{dn=new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}catch(e){dn=day}
   if(!list.length)return '<p><b>'+esc(dn)+'.</b> No stories this day.</p>';
-  return '<p><b>'+esc(dn)+'.</b> '+list.length+' on The Wire.</p><ul class="bna-day">'+list.map(function(z){
-    return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <span class="bna-rkchip'+(z.rank>=7?" red":"")+'">'+z.rank+'/10</span> <small>'+esc(z.src||"The Wire")+'</small></li>'}).join("")+"</ul>"}
+  return '<p><b>'+esc(dn)+'.</b> '+pl(list.length,"story","stories")+(o.src?"":" on The Wire")+'.</p><ul class="bna-day">'+list.map(function(z){
+    var ext=z.ext?' target="_blank" rel="noopener"':"";
+    return '<li><a class="bna-lnk" href="'+esc(z.url)+'"'+ext+'>'+esc(z.title)+(z.ext?' <span class="bna-ext" aria-label="opens the original article">&#8599;</span>':"")+'</a> <span class="bna-rkchip'+(z.rank>=7?" red":"")+'">'+z.rank+'/10</span> <small>'+esc(z.src||"The Wire")+'</small></li>'}).join("")+"</ul>"}
  function wg(k,o,def){if(!o){none(k);return}var tp=o.top,c=card(k);if(c)c._bnaO=o;
   var dayKeys=(o.days||[]).map(function(z){return z[0]});
   var cols=(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}});
@@ -189,12 +190,12 @@
   var sline=tp?esc(tp.title):(o.n7?pl(o.n7,"story","stories")+" in 7 days, none in the last 24 hours":"No stories in 7 days");
   if(k==="unrest"&&(o.us||o.world)){
     var U2=o.us||{},W2=o.world||{};
-    sline="U.S. "+pl(U2.n7||0,"story","stories")+" · World "+pl(W2.n7||0,"story","stories")+" in 7 days"+(tp?": "+esc(tp.title):"");
+    sline="U.S. "+(U2.n7||0)+" · World "+(W2.n7||0)+" in 7 days"+(tp?": "+esc(tp.title):"");
   }
   put(k,{v:vline,sev:o.max24>=7||(o.us&&o.us.max24>=7)||(o.world&&o.world.max24>=7),
    s:sline,
-   c:bars(cols,{labels:1,days:dayKeys}),t:"The Wire &middot; "+pl(o.n7,"story","stories")+" in 7 days",
-   x:x(tp?'Top story now (rank '+tp.rank+'/10): <a class="bna-lnk" href="'+esc(tp.url)+'">'+esc(tp.title)+'</a>, updated '+esc(et(tp.t))+".":"Nothing ranked in the last 24 hours.",
+   c:bars(cols,{labels:1,days:dayKeys}),t:esc(o.src||"The Wire")+" &middot; "+pl(o.n7,"story","stories")+" in 7 days",
+   x:x(tp?'Top story now (rank '+tp.rank+'/10): <a class="bna-lnk" href="'+esc(tp.url)+'"'+(tp.ext?' target="_blank" rel="noopener"':"")+'>'+esc(tp.title)+'</a>, updated '+esc(et(tp.t))+".":"Nothing ranked in the last 24 hours.",
     def+" Tap a day bar for that day's stories. Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}
  function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <small>'+esc(et(z.t))+(z.single?" &middot; single source":"")+'</small></li>'}).join("")}
  function spc(D){var S=D.spec||{},N=S.nuke,P=S.disp;
@@ -215,13 +216,13 @@
   wg("c_il",C.il,"Conflict stories on The Wire that mention Israel, Gaza, Lebanon, Yemen or the Houthis.");
   wg("c_ir",C.ir,"Conflict stories on The Wire that mention Iran.");
   wg("c_ru",C.ru,"Conflict stories on The Wire that mention Russia or Ukraine.");
-  wg("c_uk",C.uk,"Conflict and security stories on The Wire that mention the UK, London or Britain — including cyber attacks and protests.");
+  wg("c_uk",C.uk,"Conflict and security stories about the UK and London from The Wire and major outlets (BBC, Guardian, Sky News and others): terror, protests and disorder, cyber attacks and state threats.");
   wg("c_other",C.other,"Conflict stories on The Wire from every other region.");
   wg("h_ebola",H.ebola,"Stories on The Wire about Ebola (and the related Marburg virus).");
   wg("h_measles",H.measles,"Stories on The Wire about measles.");
   wg("h_other",H.other,"Other outbreak and disease stories on The Wire: cholera, dengue, bird flu, mpox and more.");
   wg("food",R.food,"Stories on The Wire about food supply, shortages, recalls, shipping and supply chains.");
-  wg("unrest",R.unrest,"Stories on The Wire about protests, riots, clashes, curfews, crackdowns, strikes, coups or troop deployments — U.S. and world.");
+  wg("unrest",R.unrest,"Protests, riots, clashes, curfews, crackdowns, general strikes, coups and troop deployments in the U.S. and worldwide, from The Wire and major outlets. One entry per event.");
   var M=D.comms;if(M){var bad=(M.isp_bad||[]).concat(M.cloud_bad||[]),N=D.net||{};
    put("comms",{v:bad.length?pl(bad.length,"provider issue"):"All clear",sev:bad.length>=3,
     s:(M.isp_bad&&M.isp_bad.length?esc(M.isp_bad.map(function(z){return z.src}).join(", "))+" reporting problems":"Carriers normal: "+esc((M.isp||[]).join(", ")))+(M.cloud_bad&&M.cloud_bad.length?" &middot; "+esc(M.cloud_bad.map(function(z){return z.src.replace(/ \(.*\)/,"")+": "+z.status}).join("; ")):""),
@@ -245,8 +246,8 @@
    c.setAttribute("data-day",day);
    c.querySelectorAll(".bna-barday").forEach(function(b){var on=b.getAttribute("data-day")===day;b.setAttribute("aria-selected",on?"true":"false");b.classList.toggle("on",on)});
    var xel=c.querySelector('[data-f="x"]');if(xel)xel.innerHTML=dayList(o,day)+x(
-    ((o.top)?'Top overall: <a class="bna-lnk" href="'+esc(o.top.url)+'">'+esc(o.top.title)+'</a>.':""),
-    "Bars count Wire stories per day for 7 days. Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
+    ((o.top)?'Top overall: <a class="bna-lnk" href="'+esc(o.top.url)+'"'+(o.top.ext?' target="_blank" rel="noopener"':"")+'>'+esc(o.top.title)+'</a>.':""),
+    (o.src?"Bars count stories per day for 7 days from The Wire plus world news feeds (AP, Reuters, BBC, Guardian and other major outlets), one entry per event. Outlet count shows how many outlets reported it.":"Bars count Wire stories per day for 7 days.")+" Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
    toggle(c,true)}
  S.addEventListener("click",function(e){
   var dayBtn=e.target.closest&&e.target.closest(".bna-barday");
