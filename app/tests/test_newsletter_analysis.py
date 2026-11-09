@@ -684,3 +684,13 @@ class TrajectoryDetailT1134(unittest.TestCase):
         html_ = NA._traj_block("STEADY", "Danger holds.", "trend data loading")
         self.assertIn("Trend: trend data loading.", html_)
         self.assertTrue(QA.check("s", html_, "", [])["ok"], QA.check("s", html_, "", []))
+
+
+class QAGateFalsePositivesT1134(unittest.TestCase):
+    def test_whole_first_sentence_and_quoted_title_pass(self):
+        import newsletter_qa as QA
+        why = "\u201cCanada announces fresh Russia-related sanctions\u201d is why this is ranked Significant (5/10), regional or national scale. The reports put it in Canada."
+        h = ('<a href="x" class="bnt bnh1" style="">1. Canada announces fresh Russia-related sanctions</a><p><span style="display:block;font:700">ANALYSIS</span>'
+             '<b style="display:block;font:700">\u201cCanada announces fresh Russia-related sanctions\u201d is why this is ranked Significant (5/10), regional or national scale.</b>Body.</p>')
+        r = QA.check("s", h, "", [why, "Canada announces fresh Russia-related sanctions"], ["Canada announces fresh Russia-related sanctions"])
+        self.assertTrue(r["ok"], r)

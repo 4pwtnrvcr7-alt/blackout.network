@@ -57,6 +57,7 @@ def _dangling(s):
 def _prefix_of(shown, sources):
     """shown is a strict, cut-short prefix of some longer source string (and does not say so with an ellipsis)."""
     if not shown or shown.rstrip().endswith(("\u2026", "...")): return None
+    if shown.rstrip().endswith(TERMINAL[:3]): return None   # a whole sentence that opens a longer text is not a cut
     a = _norm(shown)
     if len(a) < 12: return None
     for src in sources or ():
@@ -82,22 +83,23 @@ def extract(html_):
     return {"headlines": heads, "top": tops, "deks": deks, "labelled": labelled}
 
 
-def check(subject, html_, text="", sources=()):
+def check(subject, html_, text="", sources=(), title_sources=None):
     B, W = [], []
     ex = extract(html_)
     src = [s for s in (sources or ()) if isinstance(s, str) and s.strip()]
+    tsrc = src if title_sources is None else [s for s in title_sources if isinstance(s, str) and s.strip()]
     for kind, items in (("headline", ex["headlines"]), ("top-3 headline", ex["top"])):
         for t in items:
             d = _dangling(t)
             if d: B.append(f"{kind} ends on dangling word '{d}': {t!r}")
-            p = _prefix_of(t, src)
+            p = _prefix_of(t, tsrc)
             if p: B.append(f"{kind} is a cut-short prefix of {p[:120]!r}: {t!r}")
             if t.endswith("\u2026"): W.append(f"{kind} shortened with a visible ellipsis: {t!r}")
     for t in ex["deks"]:
         if not t.endswith(TERMINAL): B.append(f"ANALYSIS lead has no terminal punctuation: {t!r}")
         d = _dangling(t)
         if d: B.append(f"ANALYSIS lead ends on dangling word '{d}': {t!r}")
-        p = _prefix_of(t.rstrip("."), src)
+        p = _prefix_of(t, src)
         if p: B.append(f"ANALYSIS lead is a cut-short prefix of {p[:120]!r}: {t!r}")
     for lab, t in ex["labelled"]:
         if not t: B.append(f"{lab} paragraph is empty"); continue
@@ -131,6 +133,16 @@ def check(subject, html_, text="", sources=()):
             if d: W.append(f"text block ends on '{d}' with no punctuation (check): ...{t[-100:]!r}")
     if not ex["headlines"]: W.append("no story headlines found in HTML (layout changed? gate could not read cards)")
     return {"ok": not B, "blockers": B, "warnings": W, "counts": {k: len(v) for k, v in ex.items()}}
+
+
+def titles_from_issue(issue):
+    """Full headline strings only (analyst headline, raw title): a card headline is compared with these, not with body text."""
+    out = []
+    for key in ("main", "updates", "follow", "politics", "notable", "developing", "watchlist"):
+        for it in issue.get(key) or []:
+            for f in ("display_title", "title"):
+                if it.get(f): out.append(str(it[f]))
+    return out
 
 
 def sources_from_issue(issue):

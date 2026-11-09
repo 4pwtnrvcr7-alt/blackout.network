@@ -932,6 +932,7 @@ def _subject_title(t, n=72):
             head = t[:idx].rstrip(" ,;:-")
             if head.split()[-1].lower() not in _DANGLING:
                 return head
+    if len(t) <= 100: return t   # whole headline beats a visible cut; the mail app trims long subjects itself
     return _cut(t, n)
 
 def item_of(r, section, official=0, editorial=False):
@@ -2463,7 +2464,7 @@ def qa_gate(issue, subj, html_, text, c=None):
     if mode == "off": return None
     try:
         import newsletter_qa as QA
-        r = QA.check(subj, html_, text, QA.sources_from_issue(issue))
+        r = QA.check(subj, html_, text, QA.sources_from_issue(issue), QA.titles_from_issue(issue))
     except Exception as ex:   # a broken gate must not silently pass: block, and say why
         r = {"ok": False, "blockers": [f"QA gate error: {type(ex).__name__}: {ex}"[:200]], "warnings": []}
     if r["warnings"]: log(f"QA gate warnings: {' | '.join(r['warnings'][:5])}"[:600], "qa")
