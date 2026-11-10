@@ -345,6 +345,12 @@ body header.bn-top.bn-f6{--bn-icon-w:31px}
 body header.bn-top.bn-f6 .bn-acts .bn-ib{width:31px!important}
 /* t397: the floating "report a problem" flag sat on top of the open Settings sheet (over the language picker) on phones */
 html:has(#bn_settings:not([hidden])) .bnr-fab{visibility:hidden}
+/* Settings panel lives in the header (z-bar 2000) but the menu drawer is 2600; lift the header
+   (and the portaled pop) while the panel is open so it is not covered on phones. */
+html.bn-settings-open header.bn-top,html:has(#bn_settings:not([hidden])) header.bn-top{z-index:calc(var(--bn-z-drawer) + 200)}
+html.bn-settings-open .bn-pop,html:has(#bn_settings:not([hidden])) .bn-pop{z-index:calc(var(--bn-z-drawer) + 210)}
+/* Apple homepage hides the header gear at every width; keep the in-menu Settings row visible. */
+html.bna-home .bn-gear-row,html.bna-pg .bn-gear-row{display:flex!important}
 /* --bn-safe-top is env(safe-area-inset-top): 0 in a browser tab, the status-bar height when the site is
    installed (viewport-fit=cover, black-translucent). The bar's own padding keeps the hamburger and the
    theme toggle below the notch. In standalone, install-guide.css also pads the body; that would stack. */

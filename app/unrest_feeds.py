@@ -1,4 +1,4 @@
-"""Supplemental world-news feeds for the homepage Civil unrest and UK and London widgets (site-side only).
+"""Supplemental world-news feeds for the homepage Civil unrest, UK and London, and Food and supply chain widgets (site-side only).
 
 The Wire (scanner) carries few protest/UK-security stories, so these two widgets also read keyless public feeds:
 GDELT DOC 2.0 (artlist), Google News RSS search (outlet-attributed), and direct RSS from public broadcasters/major papers.
@@ -220,6 +220,29 @@ def _rss(xml_text, feed_domain=None):
                     "direct": not src})
     return out
 
+
+# ------------------------------------------------------------------ food / supply-chain matching (homepage Food card; also used on The Wire widget)
+# Keep "recall" as a noun phrase only: "couple recall seeing 250 people running" is not a food recall.
+_FOOD = re.compile(
+    r"\b(food (shortage|supply|prices?|bank|insecurity|recall|crisis|rationing|aid)|"
+    r"supply chain|"
+    r"grocery (prices?|shortage|stores?|recall)?|"
+    r"(?:product|mass|voluntary|nationwide|food) recalls?|"
+    r"foodborne|"
+    r"snap benefits|\bsnap\b|"
+    r"ports? (strike|congestion|delays?|backlog)|dockers?|dockworkers|"
+    r"shipping (disruption|delays?|lanes?|traffic)|"
+    r"(diesel|fuel) shortage|baby formula|infant formula|egg prices|meat ?plants?|rail strike|"
+    r"grain (export|shortage|prices?|shipments?)|wheat (export|shortage|prices?)|fertiliz?ers?|"
+    r"famine|hunger crisis|"
+    r"strait of hormuz|"
+    r"hormuz.{0,40}(tanker|shipping|oil|trade|cargo)|"
+    r"(tanker|shipping|oil|trade|cargo).{0,40}hormuz)\b", re.I)
+_RECALL_VERB = re.compile(r"\brecalls?\s+(seeing|that|how|when|the (?:moment|day|time))\b", re.I)
+def is_food(t):
+    if not t or _RECALL_VERB.search(t): return False
+    return bool(_FOOD.search(t))
+
 UNREST_Q = ['(protest OR protesters OR riot OR rioters OR clashes OR "tear gas") when:7d',
             '(curfew OR crackdown OR "general strike" OR coup OR "martial law" OR "national guard") when:7d',
             '(protest OR protesters OR riot OR clashes) when:1d',
@@ -233,6 +256,11 @@ UK_Q = ['(London OR UK OR Britain) (terror OR riot OR protest OR stabbing OR "cy
         '(London OR UK OR Britain) (terror OR riot OR protest OR "cyber attack" OR "Met Police") when:1d',
         '(UK OR Britain OR British) ("national security" OR spy OR espionage OR sabotage OR "state threat" OR drones OR ransomware OR "cyber attack") when:7d',
         '(London OR Manchester OR Birmingham OR Glasgow) (police OR "armed police") (stabbing OR shooting OR attack OR evacuated OR "critical incident" OR violence) when:7d']
+FOOD_Q = [
+    '("supply chain" OR "food shortage" OR "food recall" OR "grocery prices" OR "infant formula" OR "baby formula") when:7d',
+    '("grain export" OR fertilizer OR "port congestion" OR "shipping disruption" OR "dock workers" OR "rail strike") when:7d',
+    '("Strait of Hormuz" OR Hormuz) (tanker OR shipping OR oil OR cargo OR trade) when:7d',
+]
 GN = "https://news.google.com/rss/search?q={q}&hl={hl}&gl={gl}&ceid={gl}:{hl0}"
 RSS = [  # (url, domain, kinds, uk_feed)
     ("https://feeds.bbci.co.uk/news/world/rss.xml", "bbc.co.uk", "u", False),
@@ -252,7 +280,8 @@ RSS = [  # (url, domain, kinds, uk_feed)
 ]
 GDELT_Q = [("u", '(protest OR protesters OR riot OR clashes OR curfew OR crackdown OR "general strike" OR coup OR "martial law" OR "national guard")', "24h"),
            ("u", '(protest OR protesters OR riot OR clashes OR curfew OR crackdown OR "general strike" OR coup OR "martial law" OR "national guard")', "7d"),
-           ("uk", '(London OR Britain OR "Met Police") (protest OR riot OR terror OR stabbing OR cyberattack OR disorder)', "7d")]
+           ("uk", '(London OR Britain OR "Met Police") (protest OR riot OR terror OR stabbing OR cyberattack OR disorder)', "7d"),
+           ("food", '("supply chain" OR "food shortage" OR "food recall" OR "infant formula" OR "grain export" OR fertilizer OR "port congestion" OR Hormuz)', "7d")]
 _gd = {"next": 0.0, "last": 0.0}
 def _gdelt(q, span):
     if time.time() < _gd["next"]: raise RuntimeError("GDELT backing off after rate limit")
@@ -289,6 +318,12 @@ def fetch_all(log=None):
         time.sleep(3); run(f"Google News {gl}: " + q[:30], "u", lambda q=q, hl=hl, gl=gl: _rss(_gn(GN.format(q=urllib.parse.quote(q), hl=hl, gl=gl, hl0="en"))))
     for q in UK_Q:
         time.sleep(3); run("Google News UK: " + q[:40], "uk", lambda q=q: _rss(_gn(GN.format(q=urllib.parse.quote(q), hl="en-GB", gl="GB", hl0="en"))))
+    for q in FOOD_Q:
+        time.sleep(3); run("Google News food: " + q[:40], "food", lambda q=q: _rss(_gn(GN.format(q=urllib.parse.quote(q), hl="en-US", gl="US", hl0="en"))))
+    # World RSS items can also be food/supply-chain stories (same fetch, second kind)
+    for it in list(items):
+        if it.get("kind") == "u" and not it.get("uk_feed"):
+            items.append({**it, "kind": "food"})
     for kind, q, span in GDELT_Q:
         run(f"GDELT DOC 2.0 ({kind}, {span})", kind, lambda q=q, s=span: _gdelt(q, s))
     return items, status
@@ -340,7 +375,12 @@ def build_events(items, kind, now, horizon=7 * 86400):
         if not t or t < now - horizon or t > now + 3600: continue
         title = clean_headline(it.get("title"), name)
         if len(title) < 25: continue
-        ok = is_unrest(title) if kind == "u" else is_uk(title, it.get("uk_feed") or (it.get("via", "").startswith("Google News UK") and dom in UK_DOMAINS
+        if kind == "u":
+            ok = is_unrest(title)
+        elif kind == "food":
+            ok = is_food(title)
+        else:
+            ok = is_uk(title, it.get("uk_feed") or (it.get("via", "").startswith("Google News UK") and dom in UK_DOMAINS
                                                                                 and bool(UK_LOCAL.search(title))))
         if not ok: continue
         keep.append({"title": title, "url": it.get("url"), "direct": bool(it.get("direct")), "domain": dom, "outlet": name, "t": t, "tok": _toks(title), "pr": _props(title), "bi": _bi(title)})
@@ -446,7 +486,7 @@ if __name__ == "__main__":
     import sys
     v = refresh()
     for s in v["status"]: print(("OK  " if s["ok"] else "ERR ") + s["src"], s.get("n", ""), s.get("err", ""), f'{s["ms"]}ms')
-    for k in ("u", "uk"):
+    for k in ("u", "uk", "food"):
         ev = build_events(v["raw"], k, time.time())
         print("\n==", k, len(ev), "events")
         for e in sorted(ev, key=lambda e: -e["t"])[:60]:

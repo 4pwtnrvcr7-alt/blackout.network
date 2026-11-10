@@ -83,7 +83,12 @@ class Events(unittest.TestCase):
         try: self.assertEqual(U.events("u"), [])   # empty cache: no network on the request path, no exception
         finally: U._load = old
 
-if __name__ == "__main__": unittest.main()
+
+    def test_is_food_matches_supply_and_ignores_recall_verb(self):
+        self.assertTrue(U.is_food("From California Milk to Nara Cans: The Supply Chain Behind the Second Infant Formula Botulism Scare"))
+        self.assertTrue(U.is_food("Egypt holds fertilizer and grain shipments after Red Sea disruption"))
+        self.assertTrue(U.is_food("Tanker reports explosion while leaving Strait of Hormuz"))
+        self.assertFalse(U.is_food("Breaking News British couple in Krakow recall seeing 250 people running after shooting"))
 
 class Gdelt(unittest.TestCase):
     def test_parse_and_429_backoff(self):
@@ -99,3 +104,5 @@ class Gdelt(unittest.TestCase):
             with self.assertRaises(RuntimeError): U._gdelt("protest", "24h")
             self.assertGreater(U._gd["next"], time.time() + 3000)   # backs off ~1 h
         finally: U._get = old; U._gd.update(next=0, last=0)
+
+if __name__ == "__main__": unittest.main()

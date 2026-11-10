@@ -104,11 +104,17 @@
  function m3data(p){var now=Date.now();if(M3.busy||now-M3.t<300000)return;M3.busy=true;M3.t=now;var stamp=[];
   var done=0,fin=function(){if(++done<6)return;M3.busy=false;var st=$("#m3_stamp",p);if(st)st.textContent=stamp.length?"As of "+etFmt(new Date().toISOString())+" · "+stamp.join(" · "):""};
   var sec=function(k){return $('[data-pvsec="'+k+'"]',p)};
-  J("/api/state").then(function(S){var x=sec("latest");if(S&&S.main&&S.main.length&&x){var top=S.main.reduce(function(a,b){return (+b.rank||0)>(+a.rank||0)?b:a},S.main[0]),rk=Math.max(0,Math.min(10,Math.round(+top.rank||0)));
+  function fillWire(S){var x=sec("latest");if(S&&S.main&&S.main.length&&x){var top=S.main.reduce(function(a,b){return (+b.rank||0)>(+a.rank||0)?b:a},S.main[0]),rk=Math.max(0,Math.min(10,Math.round(+top.rank||0)));
     put(x,"wire-title",String(top.title||"").split(" | ")[0]);var m=pv(x,"wire-meter");
     if(m){var segs="";for(var i=0;i<10;i++)segs+='<i class="'+(i<rk?(i>=6?"on hot":"on"):"")+'"></i>';m.innerHTML='<span>Rank <b>'+rk+'</b>/10</span><span class="m3-segs" aria-hidden="true">'+segs+'</span>';m.setAttribute("role","img");m.setAttribute("aria-label","Rank "+rk+" of 10")}
     put(x,"wire-asof",(top.n_families?top.n_families+" source families · ":"")+"updated "+etFmt(top.updated));stamp.push("Wire "+etTime(top.updated))}
-   else if(x)put(x,"wire-title","The Wire: latest item unavailable right now");fin()});
+   else if(x)put(x,"wire-title","The Wire: latest item unavailable right now")}
+  function withTimeout(p,ms){return Promise.race([p,new Promise(function(res){setTimeout(function(){res(null)},ms)})])}
+  /* Prefer the slim /api/apple/home (a few KB) over /api/state (~500 KB), which can hang the "Loading the latest ranked item" placeholder on phones. */
+  withTimeout(J("/api/apple/home"),8000).then(function(H){
+    if(H&&H.main&&H.main.length){fillWire(H);fin();return}
+    return withTimeout(J("/api/state"),8000).then(function(S){fillWire(S);fin()});
+  }).catch(function(){fillWire(null);fin()});
   J("/api/solar_seismic").then(function(S){var x=sec("threats");if(S&&x){var kp=S.now&&S.now.kp;if(kp&&kp.value!=null){count(pv(x,"kp"),+kp.value,2);stamp.push("Kp period from "+etTime(kp.t))}
     var q=(S.quakes_notable||[])[0];if(q){count(pv(x,"quake"),+q.mag,1,"M");put(x,"quake-place",q.place);stamp.push("quake "+etTime(q.t))}
     put(x,"threats-asof",kp?"NOAA SWPC · USGS · "+etFmt(S.generated):"")}fin()});

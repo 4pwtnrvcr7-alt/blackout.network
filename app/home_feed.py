@@ -266,11 +266,20 @@ def explainer_junk(item):
     return True
 
 def row_ok(item):
-    """Latest-row gate: topic policy (same rules as pins) plus explainer junk filter."""
+    """Latest-row gate: topic policy (same rules as pins) plus explainer / entertainment junk filter."""
     if not item: return False
     summ = " ".join(str(item.get(k) or "") for k in ("summary", "location", "category"))
     if not topic_ok(item.get("title"), summ): return False
     if explainer_junk(item): return False
+    try:
+        import story_display as SD
+        if SD.is_entertainment_junk(item.get("title") or ""): return False
+        item["category"] = SD.display_category(item.get("title") or "", item.get("category"))
+        if not (item.get("location") or "").strip():
+            loc = SD.place_from_headline(item.get("title") or "")
+            if loc: item["location"] = loc
+    except Exception:
+        pass
     return True
 
 def _updated(x):

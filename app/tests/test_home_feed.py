@@ -187,4 +187,15 @@ class LatestRow(unittest.TestCase):
         self.assertEqual(len(para), 1)
         self.assertGreaterEqual(para[0]["grouped"], 2)
 
+
+    def test_entertainment_movie_review_off_latest_row(self):
+        title = ("Wild Horse Nine - watched this today and loved it. It's a dark comedy about two CIA agents "
+                 "in Chile right before the military coup in 1973. It has a stellar cast")
+        self.assertFalse(H.row_ok({"title": title, "category": "political", "n_families": 2, "rank": 6}))
+    def test_illness_strikes_recategorized_on_row(self):
+        item = {"title": "Mystery Illness Strikes California Marathon Runners", "category": "war/conflict", "n_families": 5, "rank": 7}
+        self.assertTrue(H.row_ok(item))
+        self.assertEqual(item["category"], "disease")
+        self.assertEqual(item["location"], "California")
+
 if __name__ == "__main__": unittest.main()

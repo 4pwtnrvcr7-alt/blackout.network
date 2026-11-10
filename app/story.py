@@ -48,7 +48,13 @@ def load(cid):
         r = c.execute("SELECT * FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
         if not r: return None, []
         al = c.execute("SELECT source,family,title,source_url,first_seen,official,location FROM alerts WHERE cluster_id=? ORDER BY first_seen, official DESC LIMIT 400", (cid,)).fetchall()
-        return dict(r), [dict(a) for a in al]
+        cl, items = dict(r), [dict(a) for a in al]
+        try:
+            import story_display as SD
+            cl = SD.apply(cl)
+        except Exception:
+            pass
+        return cl, items
     finally: c.close()
 
 def videos_for(cid):

@@ -32,6 +32,7 @@ class WireGroups(unittest.TestCase):
             ("h"*16, "Russian drone targets rescuers at Komyshuvakha site where 55 died in airstrikes", "war/conflict", None, "2026-11-08T06:00:00Z", "2026-11-08T06:00:00Z", 6, 8),
             ("i"*16, "United Kingdom deploys extra police in London ahead of mass protest", "political", "London", "2026-11-08T05:00:00Z", "2026-11-08T05:00:00Z", 4, 3),
             ("j"*16, "Italy braces for mass protests, strikes against Meloni government", "political", None, "2026-11-08T04:00:00Z", "2026-11-08T04:00:00Z", 2, 2),
+            ("m"*16, "Egypt holds fertilizer and grain shipments after Red Sea disruption", "other", None, "2026-11-08T03:00:00Z", "2026-11-08T03:00:00Z", 3, 2),
         ]
         seed(self.db, rows)
     def tearDown(self):
@@ -53,7 +54,7 @@ class WireGroups(unittest.TestCase):
     def test_food_ignores_recall_verb(self):
         g = A.wire_groups(NOW)
         f = g["hard"]["food"]
-        self.assertEqual(f["n7"], 1)  # infant formula supply chain only
+        self.assertGreaterEqual(f["n7"], 2)  # infant formula supply chain + fertilizer/grain
         self.assertNotIn("Krakow", (f.get("top") or {}).get("title") or "")
     def test_quake_not_in_conflict_other(self):
         g = A.wire_groups(NOW)

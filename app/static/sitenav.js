@@ -50,7 +50,8 @@ function init(){
    if(!menuHist){try{history.pushState({bnMenu:1},"");menuHist=true}catch(e){}}
    if(opts.search)focusSearch();else{var c=$(".bn-close",panel);(c||panel).focus({preventScroll:true})}};
   window.bnMenuClose=function(noFocus,opts){opts=opts||{};if(!dr.classList.contains("bn-open"))return false;dr.classList.remove("bn-open");dr.setAttribute("aria-hidden","true");R.classList.remove("bn-lock");setExp(false);
-   if(opts.replace){if(menuHist&&history.state&&history.state.bnMenu){try{history.replaceState(null,"",opts.replace)}catch(e){}}else try{history.pushState(null,"",opts.replace)}catch(e){}menuHist=false}
+   if(opts.noHist){if(menuHist){menuHist=false;try{history.replaceState(null,"",location.pathname+location.search+((location.hash&&location.hash!=="#bn-menu")?location.hash:""))}catch(e){}}}
+   else if(opts.replace){if(menuHist&&history.state&&history.state.bnMenu){try{history.replaceState(null,"",opts.replace)}catch(e){}}else try{history.pushState(null,"",opts.replace)}catch(e){}menuHist=false}
    else if(menuHist&&!opts.fromPop&&history.state&&history.state.bnMenu){menuHist=false;try{history.back()}catch(e){}}
    else{menuHist=false;if(location.hash==="#bn-menu")try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}}
    if(!noFocus){var f=lastFocus&&document.contains(lastFocus)&&lastFocus.offsetParent!==null?lastFocus:burger;if(f)try{f.focus({preventScroll:true})}catch(e){}}return true};
@@ -60,7 +61,7 @@ function init(){
    if(t.matches(".bn-burger")){e.preventDefault();dr.classList.contains("bn-open")?bnMenuClose():bnMenuOpen();return}
    if(t.matches(".bn-searchbtn")){e.preventDefault();bnMenuOpen({search:true});return}
    if(t.matches(".bn-close,.bn-scrim")){e.preventDefault();bnMenuClose();return}
-   if(t.matches(".bn-gear-row")){e.preventDefault();bnMenuClose(true);openPop(t);return}});
+   if(t.matches(".bn-gear-row")){e.preventDefault();e.stopPropagation();bnMenuClose(true,{noHist:true});openPop(t);return}});
   dr.addEventListener("keydown",function(e){if(!dr.classList.contains("bn-open"))return;
    if(e.key==="Escape"){var p=$("#bns_pop.on");if(p&&p.contains(document.activeElement))return;e.preventDefault();bnMenuClose();return}
    if(e.key!=="Tab")return;var f=focusables();if(!f.length)return;var a=f[0],z=f[f.length-1];
@@ -85,8 +86,15 @@ function init(){
 
  /* ---------------- settings popover ---------------- */
  var pop=document.getElementById("bn_settings"),gear=$(".bn-gear"),popFrom=null;
- function openPop(from){if(!pop)return;popFrom=from||gear;pop.hidden=false;gear&&gear.setAttribute("aria-expanded","true");var f=$("button,select,input,a[href]",pop);(f||pop).focus&&setTimeout(function(){try{(f||pop).focus({preventScroll:true})}catch(e){}},0)}
- function closePop(back){if(!pop||pop.hidden)return;pop.hidden=true;gear&&gear.setAttribute("aria-expanded","false");if(back&&popFrom&&popFrom.offsetParent!==null)popFrom.focus()}
+ function openPop(from){if(!pop)return;popFrom=from||gear;
+  if(pop.parentNode!==document.body){pop._bnHome=pop.parentNode;document.body.appendChild(pop)}
+  document.documentElement.classList.add("bn-settings-open");
+  pop.hidden=false;gear&&gear.setAttribute("aria-expanded","true");(from||gear)&& (from||gear).setAttribute("aria-expanded","true");
+  var f=$("button,select,input,a[href]",pop);(f||pop).focus&&setTimeout(function(){try{(f||pop).focus({preventScroll:true})}catch(e){}},0)}
+ function closePop(back){if(!pop||pop.hidden)return;pop.hidden=true;document.documentElement.classList.remove("bn-settings-open");
+  gear&&gear.setAttribute("aria-expanded","false");popFrom&&popFrom.setAttribute&&popFrom.setAttribute("aria-expanded","false");
+  if(pop._bnHome){try{pop._bnHome.appendChild(pop)}catch(e){}pop._bnHome=null}
+  if(back&&popFrom&&popFrom.offsetParent!==null)popFrom.focus()}
  if(pop){pop.setAttribute("tabindex","-1");
   gear&&gear.addEventListener("click",function(e){e.preventDefault();pop.hidden?openPop(gear):closePop(true)});
   document.addEventListener("pointerdown",function(e){if(!pop.hidden&&!pop.contains(e.target)&&!(gear&&gear.contains(e.target))&&!e.target.closest(".bn-gear-row"))closePop()},true);

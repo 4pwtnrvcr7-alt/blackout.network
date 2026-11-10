@@ -221,7 +221,7 @@
   wg("h_ebola",H.ebola,"Stories on The Wire about Ebola (and the related Marburg virus).");
   wg("h_measles",H.measles,"Stories on The Wire about measles.");
   wg("h_other",H.other,"Other outbreak and disease stories on The Wire: cholera, dengue, bird flu, mpox and more.");
-  wg("food",R.food,"Stories on The Wire about food supply, shortages, recalls, shipping and supply chains.");
+  wg("food",R.food,"Stories on The Wire plus world news feeds about food supply, shortages, recalls, shipping, grain, fertilizer and supply chains.");
   wg("unrest",R.unrest,"Protests, riots, clashes, curfews, crackdowns, general strikes, coups and troop deployments in the U.S. and worldwide, from The Wire and major outlets. One entry per event.");
   var M=D.comms;if(M){var bad=(M.isp_bad||[]).concat(M.cloud_bad||[]),N=D.net||{};
    put("comms",{v:bad.length?pl(bad.length,"provider issue"):"All clear",sev:bad.length>=3,

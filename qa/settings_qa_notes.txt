@@ -1,0 +1,4 @@
+menu open class=bn-drawer bn-m3
+wire-title after menu open: 'Loading the latest ranked item'
+settings row visible=True box={'x': 172.03125, 'y': 33.5625, 'width': 64.171875, 'height': 21}
+after click hidden_attr= is_visible=False box=None meta={'parent': 'HEADER', 'hidden': True, 'htmlClass': 'bn-js bna-home', 'z': 'auto', 'display': 'none', 'visibility': 'visible', 'headerZ': 'auto', 'drawerZ': 'auto', 'drawerOpen': 'bn-drawer bn-m3'}

@@ -189,6 +189,8 @@ html.bna-pg[data-theme="light"] .pn .warn{background:#FFF4E0!important;color:#6B
 /* ---------- Phase 3a: top bar keeps the wordmark, the theme icon and the menu button; everything else lives in the menu ---------- */
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-primary,html:is(.bna-home,.bna-pg) .bn-tbar .bn-follows,html:is(.bna-home,.bna-pg) .bn-tbar .bnal-bell,
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-searchbtn,html:is(.bna-home,.bna-pg) .bn-tbar .bn-gear{display:none!important}
+/* In-menu Settings must stay tappable; the header gear is hidden on this chrome. */
+html:is(.bna-home,.bna-pg) .bn-gear-row{display:flex!important}
 /* same sun/moon button as the menu (data-bn-theme / bn_theme). 44px hit area, 20px glyph from .bn-ib, sits beside the menu button. */
 html.bn-js:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar{display:inline-flex!important;width:44px;min-width:44px;height:44px;min-height:44px;flex:none}
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-theme-bar:hover{background:var(--bn-hover)}

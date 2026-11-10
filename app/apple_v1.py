@@ -295,8 +295,11 @@ def wire_groups(now):
                      or (cat in ("political", "cyber", "crime", "other") and UF.is_uk(t, False)))
     uk = _r(None, lambda: UF.combine(w_uk, UF.events("uk", now), days, day, now, "UK and London"))
     if uk: conf["uk"] = uk
-    hard = {"unrest": unrest_all,
-            "food": dict(agg(lambda t, cat, loc: bool(fd.search(t))), label="Food and supply chain")}
+    w_food = wire_pick(lambda t, cat, loc: UF.is_food(t))
+    food = _r(None, lambda: UF.combine(w_food, UF.events("food", now), days, day, now, "Food and supply chain"))
+    if not food:
+        food = dict(agg(lambda t, cat, loc: UF.is_food(t) or bool(fd.search(t))), label="Food and supply chain")
+    hard = {"unrest": unrest_all, "food": food}
     return {"conf": conf, "health": health, "hard": hard}
 
 

@@ -98,9 +98,19 @@ def q(sql, args=()):
     finally: c.close()
 
 def clusters_out(rows):
+    try:
+        import story_display as SD
+    except Exception:
+        SD = None
+    out = []
     for r in rows:
         r["families"] = json.loads(r["families"] or "[]"); r["links"] = json.loads(r["links"] or "[]")
-    return rows
+        if SD:
+            r = SD.apply(r)
+            if not SD.visible(r):
+                continue
+        out.append(r)
+    return out
 
 def api_state():
     cut = scanner.iso(scanner.now() - timedelta(days=7))
@@ -112,6 +122,11 @@ def api_state():
     trend = q("""SELECT substr(COALESCE(event_time, first_seen),1,10) d, MAX(score) mx, ROUND(AVG(score),1) avg,
                SUM(score>=?) high FROM clusters WHERE COALESCE(event_time, first_seen)>=? AND watchlist=0 GROUP BY d ORDER BY d""", (scanner.HIGH, cut))
     geo = q("SELECT lat, lon, score, title, category, watchlist FROM clusters WHERE lat IS NOT NULL AND COALESCE(event_time, first_seen)>=?", (cut,))
+    try:
+        import story_display as SD
+        geo = [SD.apply(r) for r in geo if SD.visible(r)]
+    except Exception:
+        pass
     health = q("SELECT * FROM source_health ORDER BY ok DESC, name")
     scans = q("SELECT * FROM scans ORDER BY id DESC LIMIT 10")
     pub = ""
