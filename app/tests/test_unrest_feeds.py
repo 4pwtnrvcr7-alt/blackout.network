@@ -89,6 +89,10 @@ class Events(unittest.TestCase):
         self.assertTrue(U.is_food("Egypt holds fertilizer and grain shipments after Red Sea disruption"))
         self.assertTrue(U.is_food("Tanker reports explosion while leaving Strait of Hormuz"))
         self.assertFalse(U.is_food("Breaking News British couple in Krakow recall seeing 250 people running after shooting"))
+        self.assertTrue(U.is_food("East Coast dockworkers go on strike after contract talks stall"))
+        self.assertTrue(U.is_food("East Coast dock workers go on strike after contract talks stall"))
+        self.assertFalse(U.is_food("Docker security advisory (AV26-1123)"))
+
 
 class Gdelt(unittest.TestCase):
     def test_parse_and_429_backoff(self):

@@ -230,7 +230,7 @@ _FOOD = re.compile(
     r"(?:product|mass|voluntary|nationwide|food) recalls?|"
     r"foodborne|"
     r"snap benefits|\bsnap\b|"
-    r"ports? (strike|congestion|delays?|backlog)|dockers?|dockworkers|"
+    r"ports? (strike|congestion|delays?|backlog)|dockworkers|dock workers|"
     r"shipping (disruption|delays?|lanes?|traffic)|"
     r"(diesel|fuel) shortage|baby formula|infant formula|egg prices|meat ?plants?|rail strike|"
     r"grain (export|shortage|prices?|shipments?)|wheat (export|shortage|prices?)|fertiliz?ers?|"
