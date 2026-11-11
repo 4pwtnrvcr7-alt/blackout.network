@@ -267,11 +267,11 @@ class Render(unittest.TestCase):
                  "categories": "https://blackout.network/newsletter", "sources": "https://blackout.network/sources",
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _subj, html, text = NL.render(issue, links)
-        self.assertGreaterEqual(html.count("WHAT HAPPENED"), len(an["items"]))
+        # Nov 10 2026: auto template "On the record / The reports describe" is omitted, so
+        # WHAT HAPPENED is not required on every card; story links and guides still are.
         self.assertGreaterEqual(html.count("WHAT TO DO"), len(an["items"]))
         self.assertIn("Prepare › Water", html)
         self.assertIn("#water", html)
-        self.assertIn("WHAT HAPPENED", html)
         self.assertIn("TRAJECTORY", html)
         self.assertGreaterEqual(html.count("Full story"), 5)
         self.assertIn("data:image/png;base64,", html)
@@ -282,7 +282,6 @@ class Render(unittest.TestCase):
         self.assertTrue(any("after collapsing repeated headlines" in (it.get("card_confidence") or "") for it in an["items"]))
         self.assertNotIn("not proof", html.lower())
         self.assertIn("ANALYST BRIEF", text)
-        self.assertGreaterEqual(text.count("WHAT HAPPENED"), len(an["items"]))
         visible = re.sub(r'<div style="display:none.*?</div>', " ", html, count=1)
         low = re.sub(r"<[^>]+>", " ", visible).lower()
         for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):
@@ -604,7 +603,7 @@ class Topics(unittest.TestCase):
         self.assertIn("Section Top threats", html)
         self.assertNotIn('height="315"', html)
         self.assertIn("UPTREND", html)
-        self.assertGreaterEqual(html.count("WHAT HAPPENED"), 5)
+        # Template-filler WHAT HAPPENED copy is omitted (Nov 10 2026 brief quality rules).
         low = html.lower()
         for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):
             self.assertNotIn(bad, low)

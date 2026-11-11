@@ -132,6 +132,35 @@ def check(subject, html_, text="", sources=(), title_sources=None):
             d = _dangling(t)
             if d: W.append(f"text block ends on '{d}' with no punctuation (check): ...{t[-100:]!r}")
     if not ex["headlines"]: W.append("no story headlines found in HTML (layout changed? gate could not read cards)")
+    try:
+        import story_gates as SG
+        for kind, items in (("headline", ex["headlines"]), ("top-3 headline", ex["top"])):
+            for t in items:
+                if t and not SG.is_english_headline(t):
+                    B.append(f"{kind} is not English (translate or drop): {t!r}")
+                if t and SG.is_hard_blocked({"title": t}):
+                    B.append(f"{kind} is a hard-blocked story (French SMIC / minimum wage): {t!r}")
+        for lab, t in ex["labelled"]:
+            lab_u = (lab or "").upper()
+            if lab_u in ("WHAT HAPPENED", "ANALYSIS") and t:
+                what = t if lab_u == "WHAT HAPPENED" else ""
+                anal = t if lab_u == "ANALYSIS" else ""
+                if SG.is_template_filler(what, anal, ""):
+                    B.append(f"{lab} is template filler (restates headline or rank, no real facts): ...{t[:140]!r}")
+        body_txt = text or ""
+        if SG.is_hard_blocked({"title": body_txt, "body": body_txt}):
+            B.append("hard-blocked French SMIC / minimum-wage story appears in the text part")
+        for ln in body_txt.splitlines():
+            L = ln.strip()
+            if L.startswith("WHAT HAPPENED:") and SG.is_template_filler(L.split(":", 1)[-1], "", ""):
+                B.append(f"text part WHAT HAPPENED is template filler: ...{L[15:140]!r}")
+            if L.lower().startswith("analysis:") and SG.is_template_filler("", L.split(":", 1)[-1], ""):
+                B.append(f"text part Analysis is template filler: ...{L[9:140]!r}")
+            m = re.match(r"^\d+\.\s+\[.*?\]\s+(.*)$", L)
+            if m and not SG.is_english_headline(m.group(1)):
+                B.append(f"text part headline is not English (translate or drop): {m.group(1)!r}")
+    except Exception as err:
+        W.append(f"story_gates QA check skipped: {type(err).__name__}: {err}"[:200])
     return {"ok": not B, "blockers": B, "warnings": W, "counts": {k: len(v) for k, v in ex.items()}}
 
 

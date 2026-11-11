@@ -942,6 +942,12 @@ def _dek(s, n=None):
 
 
 def _analysis_block(text, takeaway):
+    text = (text or "").strip()
+    takeaway = (takeaway or "").strip()
+    if re.search(r"is why this is ranked\b", takeaway, re.I):
+        takeaway = ""
+    if not text and not takeaway:
+        return ""
     lead = ""
     dek = _dek(takeaway)
     if dek:
@@ -1052,15 +1058,31 @@ def card_fragment(a):
     action = action if action.endswith(".") else action + "."
     href = "https://blackout.network" + gpath
     hist = "" if a.get("trend_from_history") else _p(_lbl("TREND HISTORY") + "Trend history: building.")
-    what = a.get("what_short") or "Rank on the record."
-    analysis = a.get("analysis_short") or "The reports describe the event."
-    return (""
-        + _p(_lbl("WHAT HAPPENED") + _e(what))
-        + _analysis_block(analysis, a.get("takeaway") or "")
-        + hist
-        + _traj_block(word, a.get("outlook") or "", a.get("trend_detail") or "")
-        + _p(_lbl("CONFIDENCE") + _e(a.get("confidence") or "Low") + ".")
-        + _p(_lbl("WHAT TO DO") + _e(action) + ' Guide: <a href="' + _e(href) + f'" style="color:{TX};text-decoration:underline">' + _e(gname) + "</a>."))
+    what = (a.get("what_short") or "").strip()
+    analysis = (a.get("analysis_short") or "").strip()
+    # Never invent "On the record" / "The reports describe the event" filler,
+    # and never fall back to the long history-boilerplate writeup.
+    try:
+        import story_gates as SG
+        if SG.is_template_filler(what, analysis, a.get("title") or ""):
+            what, analysis = "", ""
+    except Exception:
+        if what.lower().startswith("on the record") or analysis.lower().startswith("the reports describe"):
+            what, analysis = "", ""
+    parts = []
+    if what:
+        parts.append(_p(_lbl("WHAT HAPPENED") + _e(what)))
+    if analysis or a.get("takeaway"):
+        parts.append(_analysis_block(analysis, a.get("takeaway") or ""))
+    if hist:
+        parts.append(hist)
+    if a.get("outlook") or a.get("trend_detail") or word:
+        parts.append(_traj_block(word, a.get("outlook") or "", a.get("trend_detail") or ""))
+    if a.get("confidence"):
+        parts.append(_p(_lbl("CONFIDENCE") + _e(a.get("confidence")) + ((". " + _e(a.get("confidence_line"))) if a.get("confidence_line") else "")))
+    if action:
+        parts.append(_p(_lbl("WHAT TO DO") + _e(action) + ' Guide: <a href="' + _e(href) + f'" style="color:{TX};text-decoration:underline">' + _e(gname) + "</a>."))
+    return "".join(parts)
 
 
 def html_section(analysis, base_url="https://blackout.network"):

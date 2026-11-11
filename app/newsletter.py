@@ -573,7 +573,7 @@ _WAR_RX = re.compile(r"\b(?:airstrikes?|air ?strikes?|troops|invasion|shelling|a
 _TERROR_RX = re.compile(r"\b(?:terror(?:ist|ism|s)?|bombings?|car bomb|suicide bomb|hostages?|\bisis\b|al-qaeda|al qaeda)\b", re.I)
 _GOV_RX = re.compile(
     r"\b(?:president|prime minister|premier|parliament|congress|senate|governor|white house|kremlin|elections?|sanctions|"
-    r"diplomat\w*|ministry|cabinet|geopolitic\w*|coup|impeach\w*|united nations|\bnato\b)\b", re.I)
+    r"diplomat\w*|ministry|cabinet|geopolitic\w*|coup(?!\s+de\s+pouce)|impeach\w*|united nations|\bnato\b)\b", re.I)
 # Society and freedoms topics. Matching only decides inclusion and sort order. The brief copy stays the sourced facts.
 _RIGHTS_RX = re.compile(
     r"\b(?:civil libert\w+|constitutional|constitution|free speech|first amendment|second amendment|censorship|censor(?:ed|ing|s)?|"
@@ -666,7 +666,13 @@ def _topic_sort_key(it):
     return (-int(it.get("rank") or 0), topic_tier(it.get("title"), it.get("what") or "", it.get("category") or "", it.get("where") or ""), it.get("title") or "")
 
 def _on_brief_row(r):
-    return topic_on_brief(_row_get(r, "title", ""), _row_get(r, "brief", ""), _row_get(r, "category", ""), _row_get(r, "location", ""), int(_row_get(r, "rank", 0) or 0))
+    item = {"cluster_id": _row_get(r, "cluster_id", ""), "title": _row_get(r, "title", ""),
+            "brief": _row_get(r, "brief", ""), "category": _row_get(r, "category", ""),
+            "location": _row_get(r, "location", ""), "rank": int(_row_get(r, "rank", 0) or 0)}
+    import story_gates as SG
+    if SG.selection_block_reason(item):
+        return False
+    return topic_on_brief(item["title"], item["brief"], item["category"], item["location"], item["rank"])
 
 def _story_pool(issue):
     """Stories the brief selected. In-window items lead. Inside that, war and missiles, then the society-topic boost.
@@ -1172,6 +1178,18 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         for it in issue.get(sec) or []:
             it["lead"] = it.get("cluster_id") in lead_ids
     _attach_analysis(issue, at, c)
+    try:
+        import story_gates as SG
+        SG.prune_issue(issue)
+    except Exception as ex:
+        log(f"story_gates prune skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
+    issue["bluf"] = bluf(issue)
+    if issue.get("notes_lead"):
+        issue["bluf"] = MATTERS + ". " + issue["notes_lead"]
+    lead_ids = {it.get("cluster_id") for it in _story_pool(issue)[:3]}
+    for sec in ("near", "main", "politics", "notable", "updates", "follow", "developing"):
+        for it in issue.get(sec) or []:
+            it["lead"] = it.get("cluster_id") in lead_ids
     return issue
 
 def _attach_analysis(issue, at, c=None):
@@ -1718,12 +1736,21 @@ def _text_item(it, n):
             T.append(f"   WHERE: {_where(it)} · WHEN: {when_str(it['when'])}")
     a_ = it.get("analyst") or {}
     if a_:
-        T.append(f"   WHAT HAPPENED: {a_.get('what')}")
-        T.append(f"   {a_.get('analysis')}")
-        T.append(f"   TRAJECTORY: {a_.get('trajectory')}. {a_.get('outlook')}")
-        T.append(f"   CONFIDENCE: {a_.get('confidence')}. {a_.get('confidence_line')}")
+        if a_.get("what"):
+            T.append(f"   WHAT HAPPENED: {a_.get('what')}")
+        if a_.get("analysis"):
+            T.append(f"   {a_.get('analysis')}")
+        traj = (a_.get("trajectory") or "").strip()
+        outl = (a_.get("outlook") or "").strip()
+        if traj or outl:
+            T.append(f"   TRAJECTORY: {traj}{('. ' + outl) if outl else '.'}")
+        conf = (a_.get("confidence") or "").strip()
+        cline = (a_.get("confidence_line") or "").strip()
+        if conf or cline:
+            T.append(f"   CONFIDENCE: {conf}{('. ' + cline) if cline else '.'}")
         for act in a_.get("actions") or []:
-            T.append(f"   WHAT TO DO: {act.get('action')} Guide: {act.get('name')} {act.get('url')}")
+            if act.get("action"):
+                T.append(f"   WHAT TO DO: {act.get('action')} Guide: {act.get('name')} {act.get('url')}")
     else:
         T.append(f"   WHY IT MATTERS: {it['why']}")
         T.append(f"   CONFIDENCE: {it['confidence']}.")
