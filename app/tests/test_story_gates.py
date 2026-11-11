@@ -92,6 +92,60 @@ class StoryGatesTests(unittest.TestCase):
         self.assertEqual([it["cluster_id"] for it in issue["politics"]], ["9e63d729bb63212d"])
         self.assertEqual([x["cluster_id"] for x in issue["analysis"]["items"]], ["9e63d729bb63212d"])
 
+
+    def test_commemoration_dropped_even_with_facts_threats_kept(self):
+        """Wreath/anniversary/memorial ceremonies drop even with fact-bearing analysis.
+        Real current-threat items must not be affected."""
+        wreath = {
+            "cluster_id": "wilm1898",
+            "title": "Wreath ceremony honors the 128th anniversary of Wilmington's 1898 coup and massacre",
+            "category": "political", "rank": 5,
+            "analyst": {
+                "what": "Wilmington held a wreath ceremony marking the 128th anniversary of the 1898 coup and massacre.",
+                "analysis": "The ceremony recalled the 1898 coup that overthrew the city's government and killed dozens of Black residents.",
+            },
+        }
+        today = {
+            "cluster_id": "tih1",
+            "title": "Today in History: a bomb killed 241 US service members in Beirut in 1983",
+            "category": "war", "rank": 6,
+            "analyst": {
+                "what": "On this date in 1983, a bomb killed 241 US service members in Beirut.",
+                "analysis": "The attack remains one of the deadliest days for US forces since World War II.",
+            },
+        }
+        kasparov = {
+            "cluster_id": "9e63d729bb63212d",
+            "title": "Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.",
+            "category": "political", "rank": 7, "from_note": True,
+            "analyst": {"from_note": True,
+                        "what": "Kasparov canceled a Berlin appearance after security services warned of a Russian assassination threat.",
+                        "analysis": "When a US-based dissident cannot safely visit a European capital, it shows how far Russia's covert operations are believed to reach."},
+        }
+        iran = {
+            "cluster_id": "fridge1",
+            "title": "France summons Iran's ambassador and seeks EU sanctions over a cyberattack that sabotaged fridges in 700 supermarkets",
+            "category": "cyber", "rank": 7,
+            "analyst": {
+                "what": "France summoned Iran's ambassador after a cyberattack sabotaged refrigerators in about 700 supermarkets.",
+                "analysis": "An IRGC-linked unit is blamed for hitting grocery cold chains far from any battlefield.",
+            },
+        }
+        self.assertEqual(SG.item_drop_reason(wreath), "historical commemoration, not a current threat")
+        self.assertEqual(SG.item_drop_reason(today), "historical commemoration, not a current threat")
+        self.assertIsNone(SG.item_drop_reason(kasparov))
+        self.assertIsNone(SG.item_drop_reason(iran))
+        issue = {"politics": [wreath, kasparov], "main": [today, iran], "analysis": {"items": [
+            {"cluster_id": "wilm1898"}, {"cluster_id": "tih1"},
+            {"cluster_id": "9e63d729bb63212d"}, {"cluster_id": "fridge1"},
+        ]}}
+        dropped = SG.prune_issue(issue)
+        drop_ids = {d[1] for d in dropped}
+        self.assertEqual(drop_ids, {"wilm1898", "tih1"})
+        self.assertEqual([it["cluster_id"] for it in issue["politics"]], ["9e63d729bb63212d"])
+        self.assertEqual([it["cluster_id"] for it in issue["main"]], ["fridge1"])
+        self.assertEqual({x["cluster_id"] for x in issue["analysis"]["items"]}, {"9e63d729bb63212d", "fridge1"})
+
     def test_prep_unaffected(self):
         self.assertIsNone(SG.selection_block_reason({"kind": "prep", "title": SMIC}))
 

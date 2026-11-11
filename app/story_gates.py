@@ -372,23 +372,35 @@ def scrub_filler(item) -> None:
             item["analyst"]["takeaway"] = ""
 
 
+_COMMEMORATION_RX = re.compile(
+    r"^today in history\b|^on this day\b|\b\d+(?:st|nd|rd|th)\s+anniversary\b|"
+    r"wreath ceremon(?:y|ies)\b|memorial ceremon(?:y|ies)\b",
+    re.I,
+)
+
+
+def is_historical_commemoration(title: str) -> bool:
+    """Wreath ceremonies, Nth-anniversary memorials, Today in History — not a current threat."""
+    return bool(_COMMEMORATION_RX.search(title or ""))
+
+
 def item_drop_reason(item) -> str | None:
-    """Selection blocks always drop. Template filler is stripped so it cannot appear; the item
-    stays when it otherwise qualified, unless the writeup is a fake analyst note or a
-    'Today in History' style non-current item with no real facts."""
+    """Selection blocks always drop. Historical commemorations drop even when the writeup has
+    facts. Template filler is stripped so it cannot appear; the item stays when it otherwise
+    qualified, unless the writeup is a fake analyst note."""
     why = selection_block_reason(item)
     if why:
         return why
     if not isinstance(item, dict):
         return None
     what, analysis, title, from_note = _displayed_writeup(item)
+    if is_historical_commemoration(title):
+        return "historical commemoration, not a current threat"
     if not is_template_filler(what, analysis, title, from_note=from_note):
         return None
     # A notes file that itself copied the template should not ship.
     if from_note:
         return "template-filler analysis (restates headline or rank, no real facts)"
-    if re.search(r"^today in history\b|^on this day\b|\b\d+(?:st|nd|rd|th)\s+anniversary\b|wreath ceremony honors", title or "", re.I):
-        return "historical commemoration, not a current threat"
     salvage = (item.get("what") or "").strip()
     if fact_bearing(salvage, "", title) or headline_has_facts(title) or title.strip():
         scrub_filler(item)
