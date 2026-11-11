@@ -401,6 +401,8 @@ class Notes(unittest.TestCase):
         }, lead="Hormuz is the story to read first.", patterns=["Hormuz appears in more than one report."])
         issue = self._issue()
         self.assertEqual(issue["notes_lead"], "Hormuz is the story to read first.")
+        self.assertEqual(issue["notes_ids"][0], "a11ce00000000001")
+        self.assertIn("Hormuz", NL.subject_for(issue))
         self.assertIn("Hormuz is the story to read first.", issue["bluf"])
         hit = next(it for it in issue["main"] if it["cluster_id"] == "a11ce00000000001")
         self.assertTrue(hit["analyst"]["from_note"])
@@ -424,6 +426,7 @@ class Notes(unittest.TestCase):
         })
         issue = self._issue()
         self.assertNotIn("notes_lead", issue)
+        self.assertNotIn("notes_ids", issue)
         html_bits = " ".join((it.get("analyst") or {}).get("what") or "" for sec in ("main", "politics", "notable") for it in issue.get(sec) or [])
         self.assertNotIn("STALE NOTE", html_bits)
 
@@ -693,3 +696,79 @@ class QAGateFalsePositivesT1134(unittest.TestCase):
              '<b style="display:block;font:700">\u201cCanada announces fresh Russia-related sanctions\u201d is why this is ranked Significant (5/10), regional or national scale.</b>Body.</p>')
         r = QA.check("s", h, "", [why, "Canada announces fresh Russia-related sanctions"], ["Canada announces fresh Russia-related sanctions"])
         self.assertTrue(r["ok"], r)
+
+
+class SubjectNotesTopStory(unittest.TestCase):
+    """The subject must follow notes-file order when a fresh notes file is on the issue."""
+
+    def _issue(self, main, notes_ids=None, notes_lead=None):
+        issue = {"slot": "morning", "end": datetime(2026, 11, 11, 14, 5, tzinfo=UTC),
+                 "near": [], "main": main, "politics": [], "notable": [], "updates": [], "follow": []}
+        if notes_ids is not None:
+            issue["notes_ids"] = notes_ids
+        if notes_lead:
+            issue["notes_lead"] = notes_lead
+        return issue
+
+    def _story(self, cid, title, rank=7, display_title=None):
+        it = {"cluster_id": cid, "title": title, "section": "main", "rank": rank,
+              "category": "political", "what": "", "why": ""}
+        if display_title:
+            it["display_title"] = display_title
+        return it
+
+    def test_subject_uses_notes_top_story_not_first_card(self):
+        # Reproduces the Nov 11 9:05 AM issue: Kasparov sorted first in Top threats,
+        # while the notes file listed Hegseth, then Bessent.
+        kasparov = self._story(
+            "9e63d729bb63212d",
+            "Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.",
+            display_title="Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.")
+        hegseth = self._story(
+            "a6272da62f181f19",
+            "The House votes 211-204 to shelve the Hegseth impeachment, and Massie turns to a war powers vote.",
+            rank=None,
+            display_title="The House votes 211-204 to shelve the Hegseth impeachment, and Massie turns to a war powers vote.")
+        bessent = self._story(
+            "00a04c2af934f1f2",
+            "Bessent moves to a military base over Iranian threats, a day after US charges three Iran-backed operatives.",
+            rank=None,
+            display_title="Bessent moves to a military base over Iranian threats, a day after US charges three Iran-backed operatives.")
+        issue = self._issue(
+            [kasparov, hegseth, bessent],
+            notes_ids=["a6272da62f181f19", "00a04c2af934f1f2", "9e63d729bb63212d"],
+            notes_lead="The House shelved the impeachment, and Treasury Secretary Bessent moved to a military base after Iranian threats.")
+        subj = NL.subject_for(issue)
+        self.assertIn("The House votes 211-204 to shelve the Hegseth impeachment", subj)
+        self.assertNotIn("Kasparov", subj)
+        self.assertTrue(subj.startswith("Morning Brief, Nov 11:"))
+
+    def test_subject_skips_notes_id_missing_from_issue(self):
+        bessent = self._story(
+            "00a04c2af934f1f2",
+            "Bessent moves to a military base over Iranian threats, a day after US charges three Iran-backed operatives.",
+            display_title="Bessent moves to a military base over Iranian threats, a day after US charges three Iran-backed operatives.")
+        kasparov = self._story(
+            "9e63d729bb63212d",
+            "Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.",
+            display_title="Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.")
+        issue = self._issue(
+            [kasparov, bessent],
+            notes_ids=["missing-first", "00a04c2af934f1f2", "9e63d729bb63212d"])
+        subj = NL.subject_for(issue)
+        self.assertIn("Bessent moves to a military base over Iranian threats", subj)
+        self.assertNotIn("Kasparov", subj)
+
+    def test_subject_falls_back_to_first_card_without_notes(self):
+        kasparov = self._story(
+            "9e63d729bb63212d",
+            "Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.",
+            display_title="Garry Kasparov cancels a Berlin appearance after security services warn of a Russian assassination threat.")
+        bessent = self._story(
+            "00a04c2af934f1f2",
+            "Bessent moves to a military base over Iranian threats.",
+            display_title="Bessent moves to a military base over Iranian threats.")
+        issue = self._issue([kasparov, bessent])
+        subj = NL.subject_for(issue)
+        self.assertIn("Garry Kasparov cancels a Berlin appearance", subj)
+

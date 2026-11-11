@@ -1334,13 +1334,33 @@ def _shown_stories(issue):
     leads = [it for it in (issue.get("developing") or []) if it.get("lead")]
     return leads or list(issue.get("developing") or []) or list(issue.get("watchlist") or [])
 
+def _notes_top_shown(issue):
+    """When a fresh notes file is on the issue, the first listed story that is actually in this brief."""
+    order = issue.get("notes_ids") or ()
+    if not order:
+        return None
+    have = {}
+    for it in _shown_stories(issue):
+        cid = it.get("cluster_id")
+        if cid and cid not in have:
+            have[cid] = it
+    for cid in order:
+        if cid in have:
+            return have[cid]
+    return None
+
 def subject_for(issue):
-    """Names story 1, the first card, using its analyst-note headline when there is one."""
+    """Names story 1 using its analyst-note headline when there is one.
+
+    When a fresh notes file exists, the subject uses the first notes-file story
+    that is actually in this issue, not whichever card sorted first by rank or section.
+    """
     d = issue["end"].astimezone(ET).strftime("%b %-d"); lab = slot_label(issue["slot"])
     shown = _shown_stories(issue)
     if not shown:
         return f"{lab} Brief, {d}: {MATTERS}"
-    title = _subject_title(card_headline(shown[0]), 72)
+    lead = _notes_top_shown(issue) or shown[0]
+    title = _subject_title(card_headline(lead), 72)
     extra = len(_story_pool(issue)) - 1
     return f"{lab} Brief, {d}: {title}" + (f" + {extra} more" if extra else "")
 

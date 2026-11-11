@@ -876,8 +876,10 @@ def _overlay_notes(issue, at, base):
     notes = load_notes(at=at)
     if not notes:
         issue.pop("notes_lead", None)
+        issue.pop("notes_ids", None)
         if issue.get("analysis"): issue["analysis"].pop("notes_patterns", None)
         return
+    issue["notes_ids"] = [cid for cid in notes["by_id"] if " " not in str(cid)]
     if notes["lead"]:
         issue["notes_lead"] = notes["lead"]
     if notes["patterns"] and issue.get("analysis") is not None:
