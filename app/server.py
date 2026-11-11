@@ -8,6 +8,7 @@ import scanner
 import push
 import jets
 import display_links
+import et_days
 
 BASE = scanner.BASE
 CONFIG = f"{BASE}/config.json"
@@ -113,14 +114,18 @@ def clusters_out(rows):
     return out
 
 def api_state():
-    cut = scanner.iso(scanner.now() - timedelta(days=7))
+    now = scanner.now()
+    days7 = et_days.et_last_days(7, now)
+    cut = scanner.iso(et_days.et_window_start(7, now))
     main = clusters_out(q("SELECT * FROM clusters WHERE watchlist=0 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (cut,)))
     watch = clusters_out(q("SELECT * FROM clusters WHERE watchlist=1 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (cut,)))
     nwatch = q("SELECT COUNT(*) n FROM clusters WHERE watchlist=1")[0]["n"]
-    vol = q("""SELECT substr(COALESCE(event_time, first_seen),1,10) d, category, COUNT(*) n FROM clusters
-               WHERE COALESCE(event_time, first_seen)>=? GROUP BY d, category ORDER BY d""", (cut,))
-    trend = q("""SELECT substr(COALESCE(event_time, first_seen),1,10) d, MAX(score) mx, ROUND(AVG(score),1) avg,
-               SUM(score>=?) high FROM clusters WHERE COALESCE(event_time, first_seen)>=? AND watchlist=0 GROUP BY d ORDER BY d""", (scanner.HIGH, cut))
+    # Volume + severity trend: ET calendar days ending today, never future event_time dates
+    # (the old substr(...,1,10) used the UTC date prefix and a rolling 168h window, so the
+    # home-page "7 days" charts showed Nov 4 through Nov 14 on Nov 11).
+    raw = q("""SELECT COALESCE(event_time, first_seen) t, category, score, watchlist FROM clusters
+               WHERE COALESCE(event_time, first_seen)>=?""", (cut,))
+    vol, trend = et_days.bucket_volume_trend(raw, days7, scanner.HIGH)
     geo = q("SELECT lat, lon, score, title, category, watchlist FROM clusters WHERE lat IS NOT NULL AND COALESCE(event_time, first_seen)>=?", (cut,))
     try:
         import story_display as SD

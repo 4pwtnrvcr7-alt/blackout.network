@@ -6,6 +6,7 @@ Serves /bn-apple.css, /bn-apple.js and /api/apple/home (a slim same-origin summa
 /api/grid and /api/sources/catalog, built in-process so the homepage never downloads the full payloads).
 Nothing here is invented: every number comes from those endpoints, with its own timestamp."""
 import os, sys, json, time, html, threading
+import et_days
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 ENABLED = lambda: os.environ.get("BN_APPLE", "1") != "0"
@@ -205,8 +206,8 @@ def wire_groups(now):
         ).fetchall()
     finally: c.close()
     def day(ts):
-        return time.strftime("%Y-%m-%d", time.gmtime(ts - 5 * 3600))
-    days = [day(now - i * 86400) for i in range(6, -1, -1)]
+        return et_days.et_day(ts)
+    days = et_days.et_last_days(7, now)
     quakeish = re.compile(_QUAKEISH, re.I)
     def _story(cid, t, loc, rk, fam):
         import site_page as SP
@@ -332,8 +333,8 @@ def special_cards(now):
         rows = c.execute("SELECT cluster_id, title, category, rank, first_seen, updated, watchlist FROM clusters WHERE watchlist IN (0,1,2) AND updated>=? "
                          "ORDER BY updated DESC LIMIT 5000", (cut,)).fetchall()
     finally: c.close()
-    day = lambda ts: time.strftime("%Y-%m-%d", time.gmtime(ts - 5 * 3600))
-    days = [day(now - i * 86400) for i in range(6, -1, -1)]
+    day = et_days.et_day
+    days = et_days.et_last_days(7, now)
     nk, ec, dp = re.compile(_NUK, re.I), re.compile(_ELC, re.I), re.compile(_DSP, re.I)
     def agg(match):
         d = {x: [0, 0] for x in days}; n24 = 0; mx = 0; conf24 = 0; latest = []; seen = set()

@@ -441,12 +441,13 @@ function render(){
  if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);bnBaseLayer(map,{maxZoom:10});markers=L.layerGroup().addTo(map)}
  heatDirty=true;if($("map").offsetWidth)drawHeat();
  markers.clearLayers();S.geo.filter(g=>g.score>=35).forEach(g=>L.circleMarker([g.lat,g.lon],{radius:4+g.score/12,color:COL[g.category],weight:1,fillOpacity:.6}).bindPopup(`<b>${g.score}</b> ${esc(g.title)}`).addTo(markers));
- // charts
- const days=[...new Set(S.volume.map(v=>v.d).concat(S.trend.map(t=>t.d)))].sort();
+ // charts: exactly 7 ET calendar days ending today (from S.generated). Ignore future
+ // or stray dates the API might still send; do not union raw volume/trend date keys.
+ const days=(function(endIso){const et=new Intl.DateTimeFormat("en-CA",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"}).format(endIso?new Date(endIso):new Date());const p=et.split("-").map(Number),utc=Date.UTC(p[0],p[1]-1,p[2],12),out=[];for(let i=6;i>=0;i--)out.push(new Date(utc-i*864e5).toISOString().slice(0,10));return out})(S.generated);
  const ds=CATS.map(c=>({label:c,backgroundColor:COL[c],data:days.map(d=>(S.volume.find(v=>v.d==d&&v.category==c)||{n:0}).n)}));
  const opt={responsive:true,plugins:{legend:{labels:{color:"#ccc",boxWidth:10}}},scales:{x:{stacked:true,ticks:{color:"#999"}},y:{stacked:true,ticks:{color:"#999"},grid:{color:"#222"}}}};
  if(volC){volC.data.labels=days;volC.data.datasets=ds;volC.update()}else volC=new Chart($("vol"),{type:"bar",data:{labels:days,datasets:ds},options:opt});
- const tl=S.trend.map(t=>t.d),td=[{label:"max",data:S.trend.map(t=>t.mx),borderColor:"#ff4d4f"},{label:"avg",data:S.trend.map(t=>t.avg),borderColor:"#faad14"},{label:"# high",data:S.trend.map(t=>t.high),borderColor:"#4aa3ff"}];
+ const tl=days,td=[{label:"max",data:days.map(d=>(S.trend.find(t=>t.d==d)||{mx:0}).mx),borderColor:"#ff4d4f"},{label:"avg",data:days.map(d=>(S.trend.find(t=>t.d==d)||{avg:0}).avg),borderColor:"#faad14"},{label:"# high",data:days.map(d=>(S.trend.find(t=>t.d==d)||{high:0}).high),borderColor:"#4aa3ff"}];
  const o2={responsive:true,plugins:{legend:{labels:{color:"#ccc",boxWidth:10}}},scales:{x:{ticks:{color:"#999"}},y:{min:0,ticks:{color:"#999"},grid:{color:"#222"}}}};
  if(trC){trC.data.labels=tl;trC.data.datasets=td;trC.update()}else trC=new Chart($("trend"),{type:"line",data:{labels:tl,datasets:td},options:o2});
  if(!settingsLoaded){applySettings(S.settings);settingsLoaded=true}
