@@ -133,8 +133,10 @@ def headline(item) -> str:
         v = item.get(k)
         if v:
             return str(v)
-    sub = item.get("candidate") or item.get("youtube") or {}
-    if isinstance(sub, dict):
+    # Do not fall back to {}. An empty dict is still a dict, so that used to
+    # recurse forever (x_post calls require_allowed({text, purpose}) with no title).
+    sub = item.get("candidate") or item.get("youtube")
+    if isinstance(sub, dict) and sub is not item:
         return headline(sub)
     return str(item.get("text") or item.get("body") or "")
 
@@ -148,7 +150,7 @@ def cluster_ids(item) -> set[str]:
         if v and isinstance(v, (str, int)):
             out.add(str(v))
     sub = item.get("candidate")
-    if isinstance(sub, dict):
+    if isinstance(sub, dict) and sub is not item:
         out |= cluster_ids(sub)
     return out
 
