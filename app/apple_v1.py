@@ -337,21 +337,32 @@ def special_cards(now):
     nk, ec, dp = re.compile(_NUK, re.I), re.compile(_ELC, re.I), re.compile(_DSP, re.I)
     def agg(match):
         d = {x: [0, 0] for x in days}; n24 = 0; mx = 0; conf24 = 0; latest = []; seen = set()
+        stories = {x: [] for x in days}; seen_d = {x: set() for x in days}; top = None
         for cid, t, cat, rk, fs, up, wl in rows:
             t = t or ""
             if cat == "ufo/uap" or not match(t, wl): continue
             ft = _iso(fs) or 0; ut = _iso(up) or 0; rk = int(rk or 0)
             k = day(ft) if ft else None
-            if k in d: d[k][1 if rk >= 7 else 0] += 1
+            h = _clean_hl(t)
+            st = None
+            if h:
+                st = {"title": h, "t": ut, "rank": rk, "single": wl != 0,
+                      "src": "single source" if wl != 0 else "The Wire",
+                      "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire"}
+            if k in d:
+                d[k][1 if rk >= 7 else 0] += 1
+                if st and st["title"].lower()[:60] not in seen_d[k] and len(stories[k]) < 14:
+                    seen_d[k].add(st["title"].lower()[:60]); stories[k].append(st)
+                    if top is None or (rk, ut) > (top["rank"], top.get("t") or 0):
+                        top = st
             if ut >= now - 86400:
                 n24 += 1; mx = max(mx, rk); conf24 += (wl == 0)
-            if len(latest) < 3:
-                h = _clean_hl(t)
-                if h and h.lower()[:60] not in seen:
-                    seen.add(h.lower()[:60])
-                    latest.append({"title": h, "t": ut, "rank": rk, "single": wl != 0,
-                                   "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire"})
-        return {"n24": n24, "conf24": conf24, "n7": sum(a + b for a, b in d.values()), "max24": mx, "days": [[k] + d[k] for k in days], "latest": latest}
+            if st and len(latest) < 3 and st["title"].lower()[:60] not in seen:
+                seen.add(st["title"].lower()[:60])
+                latest.append(st)
+        return {"n24": n24, "conf24": conf24, "n7": sum(a + b for a, b in d.values()), "max24": mx,
+                "days": [[k] + d[k] for k in days], "latest": latest,
+                "stories": {k: stories[k] for k in days}, "top": top}
     fr = re.compile(_FOREIGN, re.I)
     # Nuclear: confirmed + single-source items. Disputes: also rank 0-1 items the feed suppresses (local polling-place reports are often rank 1).
     return {"nuke": agg(lambda t, wl: wl in (0, 1) and bool(nk.search(t))),

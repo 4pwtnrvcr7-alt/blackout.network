@@ -200,17 +200,18 @@
  function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <small>'+esc(et(z.t))+(z.single?" &middot; single source":"")+'</small></li>'}).join("")}
  function spc(D){var S=D.spec||{},N=S.nuke,P=S.disp;
   function cols(o){return(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}})}
-  if(N){var lv=N.max24>=8?"High":(N.max24>=6||N.conf24>=3)?"Elevated":N.n24?"Watch":"Low",tp=(N.latest||[])[0];
-   put("c_nuke",{v:lv+" <small>"+pl(N.n24,"item")+" in 24 hours</small>",sev:N.max24>=7,s:tp?esc(tp.title):"No nuclear-related items in 7 days",c:bars(cols(N),{labels:1}),
+  function dayKeys(o){return(o.days||[]).map(function(z){return z[0]})}
+  if(N){var lv=N.max24>=8?"High":(N.max24>=6||N.conf24>=3)?"Elevated":N.n24?"Watch":"Low",tp=(N.latest||[])[0],cn=card("c_nuke");if(cn)cn._bnaO=N;
+   put("c_nuke",{v:lv+" <small>"+pl(N.n24,"item")+" in 24 hours</small>",sev:N.max24>=7,s:tp?esc(tp.title):"No nuclear-related items in 7 days",c:bars(cols(N),{labels:1,days:dayKeys(N)}),
     t:"The Wire &middot; "+pl(N.n7,"item")+" in 7 days",
     x:'<p><b>Latest.</b></p><ul class="bna-hl">'+(hl3(N)||"<li>Nothing in 7 days.</li>")+'</ul>'+x(pl(N.n24,"item")+" in the last 24 hours ("+N.conf24+" confirmed by 2+ sources), highest rank "+N.max24+"/10.",
-     "Wire items about nuclear strikes or threats, warheads, ICBMs, tactical weapons, nuclear tests, Zaporizhzhia and other plant risks, and the Doomsday Clock. Single-source items are marked.",
+     "Wire items about nuclear strikes or threats, warheads, ICBMs, tactical weapons, nuclear tests, Zaporizhzhia and other plant risks, and the Doomsday Clock. Single-source items are marked. Tap a day bar for that day's stories. Red marks rank 7 and up.",
      "High: an item ranked 8+ in 24 hours. Elevated: rank 6+ or 3+ confirmed items. Watch: any item. Low: none. Our wording, from Wire ranks; not an official alert level.")})}else none("c_nuke");
-  if(P){var tq=(P.latest||[])[0];
-   put("el_disp",{v:P.n24?pl(P.n24,"report")+" <small>in 24 hours</small>":"Quiet <small>in 24 hours</small>",sev:P.max24>=7,s:tq?esc(tq.title):"No reports in 7 days",c:bars(cols(P),{labels:1}),
+  if(P){var tq=(P.latest||[])[0],cp=card("el_disp");if(cp)cp._bnaO=P;
+   put("el_disp",{v:P.n24?pl(P.n24,"report")+" <small>in 24 hours</small>":"Quiet <small>in 24 hours</small>",sev:P.max24>=7,s:tq?esc(tq.title):"No reports in 7 days",c:bars(cols(P),{labels:1,days:dayKeys(P)}),
     t:"The Wire &middot; "+pl(P.n7,"report")+" in 7 days",
     x:'<p><b>Latest 3.</b></p><ul class="bna-hl">'+(hl3(P)||"<li>Nothing in 7 days.</li>")+'</ul>'+x(pl(P.n24,"report")+" in the last 24 hours.",
-     "U.S. reports about polling places, vote counting, certification, lawsuits, recounts, voter access, and Democratic or Republican party legal and monitoring actions. Single-source items are marked; check the linked sources.","")})}else none("el_disp")}
+     "U.S. reports about polling places, vote counting, certification, lawsuits, recounts, voter access, and Democratic or Republican party legal and monitoring actions. Single-source items are marked; check the linked sources. Tap a day bar for that day's stories. Red marks rank 7 and up.","")})}else none("el_disp")}
  function board(D){LASTD=D;el(D);spc(D);
   var C=D.conf||{},H=D.health||{},R=D.hard||{};
   wg("c_il",C.il,"Conflict stories on The Wire that mention Israel, Gaza, Lebanon, Yemen or the Houthis.");
