@@ -384,10 +384,13 @@ def is_historical_commemoration(title: str) -> bool:
     return bool(_COMMEMORATION_RX.search(title or ""))
 
 
-def item_drop_reason(item) -> str | None:
+def item_drop_reason(item, notes_active: bool = False) -> str | None:
     """Selection blocks always drop. Historical commemorations drop even when the writeup has
-    facts. Template filler is stripped so it cannot appear; the item stays when it otherwise
-    qualified, unless the writeup is a fake analyst note."""
+    facts. When a fresh analyst-notes file is in play, late stories with no note and a
+    template WHAT HAPPENED line ("On the record for...") are dropped so filler cannot
+    block the whole issue at the QA gate. A fact-bearing scanner summary can salvage
+    the card. Without notes, the historic keep-and-scrub rule still applies so a
+    noteless brief is not emptied."""
     why = selection_block_reason(item)
     if why:
         return why
@@ -396,11 +399,25 @@ def item_drop_reason(item) -> str | None:
     what, analysis, title, from_note = _displayed_writeup(item)
     if is_historical_commemoration(title):
         return "historical commemoration, not a current threat"
-    if not is_template_filler(what, analysis, title, from_note=from_note):
-        return None
-    # A notes file that itself copied the template should not ship.
-    if from_note:
+    # QA flags WHAT HAPPENED with is_template_filler(what, "", ""). Analysis boilerplate
+    # can hide that filler if we only judge the combined writeup.
+    what_line_filler = is_template_filler(what, "", "", from_note=False)
+    writeup_filler = is_template_filler(what, analysis, title, from_note=from_note)
+    if from_note and (what_line_filler or writeup_filler):
         return "template-filler analysis (restates headline or rank, no real facts)"
+    if notes_active and not from_note and what_line_filler:
+        salvage = (item.get("what") or "").strip()
+        if salvage and fact_bearing(salvage, "", title) and not is_template_filler(salvage, "", title, from_note=False):
+            a = item.get("analyst") or {}
+            a["what"] = salvage
+            a["analysis"] = a.get("analysis") if fact_bearing("", a.get("analysis") or "", title) else ""
+            a["what_short"] = ""
+            a["analysis_short"] = ""
+            item["analyst"] = a
+            return None
+        return "template-filler analysis (no analyst note; writeup restates headline or rank)"
+    if not writeup_filler:
+        return None
     salvage = (item.get("what") or "").strip()
     if fact_bearing(salvage, "", title) or headline_has_facts(title) or title.strip():
         scrub_filler(item)
@@ -416,10 +433,14 @@ def prune_issue(issue) -> list:
     dropped = []
     if not isinstance(issue, dict):
         return dropped
+    notes_active = bool(issue.get("notes_lead")) or any(
+        bool(it.get("from_note") or (it.get("analyst") or {}).get("from_note"))
+        for sec in _SECTIONS for it in (issue.get(sec) or []) if isinstance(it, dict)
+    )
     for sec in _SECTIONS:
         kept = []
         for it in issue.get(sec) or []:
-            why = item_drop_reason(it)
+            why = item_drop_reason(it, notes_active=notes_active)
             if why:
                 dropped.append((sec, str(it.get("cluster_id") or ""), headline(it)[:160], why))
             else:

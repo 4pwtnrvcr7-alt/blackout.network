@@ -146,7 +146,50 @@ class StoryGatesTests(unittest.TestCase):
         self.assertEqual([it["cluster_id"] for it in issue["main"]], ["fridge1"])
         self.assertEqual({x["cluster_id"] for x in issue["analysis"]["items"]}, {"9e63d729bb63212d", "fridge1"})
 
+    def test_unnoted_filler_dropped_even_with_fact_headline(self):
+        """A late story with no analyst note and template WHAT HAPPENED is dropped,
+        even when the headline itself states a death or other fact. Keeping it used
+        to ship filler and block the whole issue at the QA gate (Nov 11 morning)."""
+        indiana = {
+            "cluster_id": "33fdb1b760f2e54a",
+            "title": "Man killed in southeastern Indiana home explosion, fire",
+            "category": "war/conflict",
+            "rank": 5,
+            "analyst": {
+                "what": "On the record for Man killed in southeastern Indiana home explosion, fire: rank 5/10, 0 independent sources after collapsing repeated headlines.",
+                "analysis": "The reports describe the use of force in Indiana (Man killed in southeastern Indiana home). Cluster first seen Nov 11. Scanner history 24h: not enough history.",
+            },
+        }
+        self.assertIsNone(SG.item_drop_reason(indiana))  # no notes file in play: historic keep
+        self.assertIsNotNone(SG.item_drop_reason(indiana, notes_active=True))
+        self.assertIn("no analyst note", SG.item_drop_reason(indiana, notes_active=True))
+        # A fact-bearing scanner summary can still salvage the card when notes are active.
+        salvaged = dict(indiana)
+        salvaged["what"] = "A man was killed when a home exploded and caught fire in southeastern Indiana early Wednesday, Nov. 11, local officials said."
+        salvaged["analyst"] = dict(indiana["analyst"])
+        self.assertIsNone(SG.item_drop_reason(salvaged, notes_active=True))
+        self.assertNotIn("On the record", (salvaged.get("analyst") or {}).get("what") or "")
+        noted = {
+            "cluster_id": "noted1",
+            "title": "Treasury Secretary Bessent moved to a military base after an Iranian threat.",
+            "category": "political", "rank": 7, "from_note": True,
+            "analyst": {"from_note": True,
+                        "what": "Treasury Secretary Scott Bessent moved to a military base after an Iranian threat against his life.",
+                        "analysis": "The war's risk is now reaching US officials at home."},
+        }
+        # give salvaged its own id so prune can keep it
+        salvaged["cluster_id"] = "keep1"
+        issue = {"notes_lead": "Today is Veterans Day. Thank you to everyone who has served.",
+                 "notable": [indiana], "main": [noted, salvaged], "analysis": {"items": [
+            {"cluster_id": "33fdb1b760f2e54a"}, {"cluster_id": "keep1"}, {"cluster_id": "noted1"},
+        ]}}
+        dropped = SG.prune_issue(issue)
+        self.assertTrue(any(d[1] == "33fdb1b760f2e54a" for d in dropped))
+        self.assertEqual([it["cluster_id"] for it in issue["notable"]], [])
+        self.assertEqual([it["cluster_id"] for it in issue["main"]], ["noted1", "keep1"])
+
     def test_prep_unaffected(self):
+
         self.assertIsNone(SG.selection_block_reason({"kind": "prep", "title": SMIC}))
 
 if __name__ == "__main__":
