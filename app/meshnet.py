@@ -25,7 +25,8 @@ SITE = "https://blackout.network"; BRAND = "BLACKOUT.NETWORK"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 FILES = {"app.js": "application/javascript; charset=utf-8", "app.css": "text/css; charset=utf-8", "device.js": "application/javascript; charset=utf-8",
          "lib.js": "application/javascript; charset=utf-8", "chat.js": "application/javascript; charset=utf-8", "share.js": "application/javascript; charset=utf-8",
-         "grid-panel.js": "application/javascript; charset=utf-8", "LICENSES.txt": "text/plain; charset=utf-8"}
+         "grid-panel.js": "application/javascript; charset=utf-8", "LICENSES.txt": "text/plain; charset=utf-8",
+         "build_lib.sh": "text/plain; charset=utf-8"}
 IOS_APP = "https://apps.apple.com/us/app/meshtastic/id1586432531"
 ANDROID_APP = "https://play.google.com/store/apps/details?id=com.geeksville.mesh"
 WEB_CLIENT = "https://client.meshtastic.org/"
@@ -54,7 +55,7 @@ def signal():
     feed = d.get("feed") or {}
     sig = d.get("signals") or [] if feed.get("ok") else []
     for s in sig: s["rank"] = min(int(s.get("rank") or 4), 5); s["list"] = "watchlist"; s["single_source"] = True; s["confirmed"] = False
-    return {"source": "BLACKOUT.NETWORK mesh drop-off watch (MeshMap.net / Meshtastic public MQTT)", "single_source": True,
+    return {"source": "BLACKOUT.NETWORK off-grid network drop-off watch (MeshMap.net public node data)", "single_source": True,
             "max_rank": 5, "generated": d.get("generated"), "feed_ok": bool(feed.get("ok")), "baseline_ready": bool(feed.get("baseline_ready")),
             "signals": sig, "how": f"{SITE}/mesh#how"}
 
@@ -72,8 +73,8 @@ def public_feed():
         return {"enabled": False, "messages": [], "note": "The public read-only feed is switched off while we confirm permission to use it. Connect your own radio to read and send."}
     with _FL:
         if _F["v"] is not None and time.time() - _F["t"] < 30: return _F["v"]
-        out = {"enabled": True, "messages": [], "source": "Meshtastic Map by Liam Cottle (meshtastic.liamcottle.net), public MQTT, default LongFast channel",
-               "source_url": "https://meshtastic.liamcottle.net/", "note": "Public default-channel broadcasts uplinked to the Meshtastic public MQTT server. Read-only. Not stored."}
+        out = {"enabled": True, "messages": [], "source": "Public mesh map by Liam Cottle, default LongFast channel",
+               "source_url": "https://meshtastic.liamcottle.net/", "note": "Public default-channel broadcasts uplinked to the public MQTT server. Read-only. Not stored."}
         try:
             r = urllib.request.urlopen(urllib.request.Request(FEED_URL, headers={"User-Agent": "BLACKOUT.NETWORK mesh chat (+https://blackout.network/mesh/chat)", "Accept": "application/json"}), timeout=12)
             rows = (json.loads(r.read(2_000_000)) or {}).get("text_messages") or []
@@ -103,13 +104,13 @@ def _top():
         except Exception: pass
     return f'<header class="bn-hd"><a href="/" style="color:inherit;text-decoration:none;font-weight:800">BLACKOUT</a></header>'
 TITLES = {
-    "mesh": ("Meshtastic mesh network map: live public nodes | BLACKOUT.NETWORK", "A live map of public Meshtastic nodes worldwide, centered on Central Florida, with a drop-off watch that flags regions where nodes go quiet."),
-    "mesh-chat": ("Meshtastic live mesh chat from your own radio | BLACKOUT.NETWORK", "Read and send Meshtastic channel messages from your own radio over Bluetooth or USB, right in the browser. Nothing is sent from our servers."),
-    "mesh-guide": ("Meshtastic when the grid goes down: off-grid setup guide | BLACKOUT.NETWORK", "How to set up Meshtastic for a grid-down emergency: hardware, the US 915 MHz band, the app, channels, solar power, etiquette and the rules for unlicensed and ham use."),
+    "mesh": ("Off-grid network map: live public mesh radios | BLACKOUT.NETWORK", "A live map of public off-grid mesh radios worldwide, centered on Central Florida, with a drop-off watch that flags regions where radios go quiet."),
+    "mesh-chat": ("Network chat from your own radio | BLACKOUT.NETWORK", "Read and send mesh channel messages from your own LoRa radio over Bluetooth or USB, right in the browser. Nothing is sent from our servers."),
+    "mesh-guide": ("Off-grid setup guide: text messaging when the grid goes down | BLACKOUT.NETWORK", "How to set up a LoRa mesh radio for a grid-down emergency: hardware, the US 915 MHz band, the app, channels, solar power, etiquette and the rules for unlicensed and ham use."),
 }
-SUBNAV = [("mesh", "/mesh", "Map"), ("mesh-chat", "/mesh/chat", "Live chat"), ("mesh-guide", "/mesh/guide", "Off-grid guide")]
+SUBNAV = [("mesh", "/mesh", "Network map"), ("mesh-chat", "/mesh/chat", "Network chat"), ("mesh-guide", "/mesh/guide", "Setup guide")]
 def _subnav(cur):
-    return '<nav class="mx-sub" aria-label="Mesh pages">' + "".join(
+    return '<nav class="mx-sub" aria-label="Off-grid network pages">' + "".join(
         f'<a class="mx-sl" href="{h}"' + (' aria-current="page"' if k == cur else "") + f'>{E(l)}</a>' for k, h, l in SUBNAV) + '</nav>'
 I = {
  "mesh": '<path d="M5 19l7-14 7 14M8.5 12h7"/><circle cx="12" cy="5" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/>',
@@ -129,9 +130,8 @@ def page(key, path, body, scripts=()):
             '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}</style></head><body>'
             '<a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>' + _top() +
             f'<main class="mx" id="main">{body}</main>'
-            '<footer class="mx-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/#grid">Energy Grid</a> · <a href="/mesh">Mesh map</a> · '
-            '<a href="/mesh/chat">Mesh chat</a> · <a href="/mesh/guide">Off-grid guide</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a><br>'
-            'Meshtastic® is a registered trademark of Meshtastic LLC. BLACKOUT.NETWORK is not affiliated with or endorsed by the Meshtastic project. '
+            '<footer class="mx-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/#grid">Energy Grid</a> · <a href="/mesh">Off-grid network map</a> · '
+            '<a href="/mesh/chat">Network chat</a> · <a href="/mesh/guide">Off-grid setup guide</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/tos#acknowledgments">Credits</a><br>'
             'Research only: not an official warning service.</footer>' + js + '</body></html>').encode("utf-8")
 
 # ---------------------------------------------------------------- /mesh
@@ -141,15 +141,15 @@ def map_page():
     cnt = s.get("counts") or {}
     stat = ("Waiting for the first sync" if not s.get("ok") else
             f'{cnt.get("total", 0):,} nodes on the map · {cnt.get("active", 0):,} heard in the last hour')
-    hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("mesh")} MESH NETWORK · LIVE</div>'
-            '<h1>Meshtastic nodes, worldwide</h1>'
-            '<p class="mx-dek">Meshtastic radios send text over license-free LoRa and keep working when the power grid and cell service are down. '
-            'This map shows public nodes heard through the Meshtastic public MQTT server, starting with Central Florida.</p>'
+    hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("mesh")} OFF-GRID NETWORK · LIVE</div>'
+            '<h1>Off-grid network map</h1>'
+            '<p class="mx-dek">Small LoRa mesh radios send text with no license and keep working when the power grid and cell service are down. '
+            'This map shows public radios heard through the open-source mesh project\'s public MQTT server, starting with Central Florida.</p>'
             f'<div class="mx-stats" id="mx_stats" aria-live="polite">{E(stat)}</div>{_subnav("mesh")}</section>')
     mapc = ('<section class="mx-card mx-mapcard"><div class="mx-maphead"><h2>Live node map</h2><div class="mx-seg" role="group" aria-label="Map view">'
             '<button type="button" data-view="cfl" aria-pressed="true">Central Florida</button><button type="button" data-view="us" aria-pressed="false">U.S.</button>'
             '<button type="button" data-view="world" aria-pressed="false">World</button></div></div>'
-            '<div class="mx-map" id="mx_map" role="region" aria-label="Map of public Meshtastic nodes"><noscript><p class="mx-mu">The map needs JavaScript.</p></noscript></div>'
+            '<div class="mx-map" id="mx_map" role="region" aria-label="Map of public mesh radios"><noscript><p class="mx-mu">The map needs JavaScript.</p></noscript></div>'
             '<div class="mx-legend"><span><i class="d d-r"></i>Router / repeater</span><span><i class="d d-c"></i>Client</span><span><i class="d d-o"></i>Not heard in 1 h+</span>'
             '<span><i class="ring"></i>Watch area</span></div>'
             '<p class="mx-mu mx-small" id="mx_fresh"></p></section>')
@@ -159,7 +159,7 @@ def map_page():
              'Single source, unconfirmed.</p><div id="mx_watch_list" class="mx-wl"><p class="mx-mu">Loading…</p></div></div></section>')
     how = ('<section class="mx-card mx-how" id="how"><h2>How this works</h2><ul>'
            '<li><b>Data:</b> <a href="https://meshmap.net/" target="_blank" rel="noopener">MeshMap.net</a> publishes the nodes heard by the official '
-           f'<a href="{D}/software/integrations/mqtt/" target="_blank" rel="noopener">Meshtastic public MQTT server</a>. We read that public snapshot once every 10 minutes. '
+           f'<a href="{D}/software/integrations/mqtt/" target="_blank" rel="noopener">public MQTT server</a> run by the open-source mesh project. We read that public snapshot once every 10 minutes. '
            'Only nodes whose owners turned on position sharing and MQTT (or that were heard by such a node) appear, so this is a sample of the mesh, not all of it.</li>'
            '<li><b>Privacy:</b> positions are rounded to about 1 km (the public server already blurs default-channel positions), and we show only a short name, role and hardware. '
            'No node IDs, long names, telemetry or messages are kept.</li>'
@@ -169,20 +169,21 @@ def map_page():
            '<li><b>What a flag means:</b> gateway nodes need power and internet to reach MQTT, so a drop can point to a local power or internet outage. It can also be a gateway '
            'or MQTT problem. Flags are single-source watchlist items, never more than rank 5, and are not confirmed until other sources agree.</li>'
            '<li>Map tiles: <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> '
-           'data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>.</li></ul></section>')
-    cta = ('<section class="mx-grid2"><a class="mx-card mx-link" href="/mesh/chat">' + icon("radio") + '<b>Live mesh chat</b><span>Connect your own radio and read or send channel messages in the browser.</span></a>'
+           'data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>.</li>'
+           '<li>Software and data credits: <a href="/tos#acknowledgments">Credits</a>.</li></ul></section>')
+    cta = ('<section class="mx-grid2"><a class="mx-card mx-link" href="/mesh/chat">' + icon("radio") + '<b>Network chat</b><span>Connect your own radio and read or send channel messages in the browser.</span></a>'
            '<a class="mx-card mx-link" href="/mesh/guide">' + icon("sun") + '<b>Off-grid setup guide</b><span>Hardware, the 915 MHz band, channels, solar power and etiquette.</span></a></section>')
     return page("mesh", "/mesh", hero + mapc + focus + cta + how, ["/api/mesh/app.js?v=1"])
 
 # ---------------------------------------------------------------- /mesh/chat
 def chat_page():
-    hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("radio")} MESH CHAT</div><h1>Live mesh chat</h1>'
-            '<p class="mx-dek">Connect your own Meshtastic radio to read your channels and send messages over the mesh. '
+    hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("radio")} NETWORK CHAT</div><h1>Network chat</h1>'
+            '<p class="mx-dek">Connect your own LoRa mesh radio to read your channels and send messages over the mesh. '
             'Your browser talks to your radio directly. Messages stay on this page and are gone when you close it.</p>' + _subnav("mesh-chat") + '</section>')
     support = ('<section class="mx-card mx-note" id="mx_support"><h2>' + icon("info") + ' Works in Chrome and Edge</h2>'
                '<p>Bluetooth and USB connections work in Chrome or Edge on a computer and in Chrome on Android. They do not work in Safari or on iPhone and iPad (Apple does not allow it). '
-               f'On iPhone, use the official <a href="{IOS_APP}" target="_blank" rel="noopener">Meshtastic app</a> to reply. Android: <a href="{ANDROID_APP}" target="_blank" rel="noopener">Meshtastic on Google Play</a>. '
-               f'Official web client: <a href="{WEB_CLIENT}" target="_blank" rel="noopener">client.meshtastic.org</a>.</p><p class="mx-mu" id="mx_support_status"></p></section>')
+               f'On iPhone, use the free official companion app (<a href="{IOS_APP}" target="_blank" rel="noopener">App Store</a>) to reply. Android: <a href="{ANDROID_APP}" target="_blank" rel="noopener">companion app on Google Play</a>. '
+               f'Or use the official <a href="{WEB_CLIENT}" target="_blank" rel="noopener">web client</a>.</p><p class="mx-mu" id="mx_support_status"></p></section>')
     conn = ('<section class="mx-card" id="mx_conn"><h2>Your radio</h2><div class="mx-row">'
             f'<button type="button" class="mx-btn mx-pri" id="mx_bt" disabled>{icon("bt")} Connect by Bluetooth</button>'
             f'<button type="button" class="mx-btn" id="mx_usb" disabled>{icon("usb")} Connect by USB</button>'
@@ -207,14 +208,14 @@ def _src(label, path):
     url = path if path.startswith("http") else D + path
     return f'<a href="{E(url)}" target="_blank" rel="noopener">{E(label)}</a>'
 def guide_page():
-    hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("sun")} OFF-GRID GUIDE</div><h1>Meshtastic when the grid goes down</h1>'
+    hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("sun")} OFF-GRID GUIDE</div><h1>Off-grid setup guide</h1>'
             '<p class="mx-dek">A small LoRa radio paired with your phone can send text messages for miles with no cell towers, Wi-Fi or power grid. '
-            'Here is how to set one up before you need it. Every step links to the official Meshtastic documentation.</p>' + _subnav("mesh-guide") + '</section>')
+            'Here is how to set one up before you need it. Every step links to the official documentation of the open-source mesh project.</p>' + _subnav("mesh-guide") + '</section>')
     toc = [("what", "What it is"), ("hardware", "Hardware"), ("band", "US 915 MHz band"), ("app", "App setup"), ("channels", "Channels"),
            ("power", "Power and solar"), ("etiquette", "Etiquette"), ("legal", "Legal: unlicensed vs. ham"), ("drill", "Before the grid goes down")]
     nav = '<nav class="mx-card mx-toc" aria-label="On this page"><b>On this page</b><ol>' + "".join(f'<li><a href="#{i}">{E(t)}</a></li>' for i, t in toc) + '</ol></nav>'
     S = []
-    S.append(('what', 'What it is', f'''<p>Meshtastic is free, open-source firmware for small LoRa radios. Each radio pairs with a phone or computer and relays messages for the others,
+    S.append(('what', 'What it is', f'''<p>These radios run free, open-source mesh firmware (credited in our <a href="/tos#acknowledgments">Acknowledgments</a>). Each radio pairs with a phone or computer and relays messages for the others,
 so a group of radios forms a <b>mesh</b>: a message hops from node to node (3 hops by default, up to 7) until it reaches everyone. It needs no cell service, internet or license
 for normal use. It sends short text, positions and sensor readings, not voice. Sources: {_src("Introduction", "/introduction/")}, {_src("Mesh algorithm", "/overview/mesh-algo/")}, {_src("LoRa configuration", "/configuration/radio/lora/")}.</p>'''))
     S.append(('hardware', 'Hardware', f'''<p>Pick a supported board from the official {_src("supported devices list", "/hardware/devices/")}. The common types:</p><ul>
@@ -246,21 +247,20 @@ to stretch a small battery or solar supply, so use it only on a fixed relay node
 <li>Leave the hop limit at 3 unless your area really needs more.</li>
 <li>Do not set very short position or telemetry intervals; the defaults are chosen to keep the channel clear.</li>
 <li>Do not send private details on the public LongFast channel.</li></ul><p>Source: {_src("Configuration tips", "/configuration/tips/")}, {_src("LoRa configuration: hop limit", "/configuration/radio/lora/")}.</p>'''))
-    S.append(('legal', 'Legal: unlicensed vs. ham', f'''<p><b>Unlicensed (default):</b> in the US, Meshtastic runs in the 902–928 MHz ISM band with no license, within the firmware's region power limits and using
+    S.append(('legal', 'Legal: unlicensed vs. ham', f'''<p><b>Unlicensed (default):</b> in the US, the firmware runs in the 902–928 MHz ISM band with no license, within the firmware's region power limits and using
 legal antennas for your device. Encryption is allowed in this mode.</p>
 <p><b>Licensed amateur (ham) mode:</b> a licensed operator can turn on the licensed setting with their call sign as the long name. The official FAQ notes this allows more transmit power
 in the US (up to 10 W, 47 CFR 97.313(j)) and higher-gain antennas, but <b>encryption is not allowed</b> (FCC Part 97.113(a)(4)), the call sign is sent at least every 10 minutes
-(Part 97.119(a)), and licensed and unlicensed nodes cannot talk to each other. Sources: {_src("FAQ: Amateur radio (ham)", "/faq/")}, {_src("User configuration", "/configuration/radio/user/")}, {_src("Meshtastic legal", "/legal/")}.</p>
+(Part 97.119(a)), and licensed and unlicensed nodes cannot talk to each other. Sources: {_src("FAQ: Amateur radio (ham)", "/faq/")}, {_src("User configuration", "/configuration/radio/user/")}, {_src("Project legal notes", "/legal/")}.</p>
 <p class="mx-mu">This is general information, not legal advice. Check the current FCC rules for your setup.</p>'''))
     S.append(('drill', 'Before the grid goes down', '''<ol><li>Set up every radio now, while you still have internet for firmware and app updates.</li>
 <li>Agree on a private channel and a check-in time with your family or group, and practice once a month.</li>
 <li>Charge everything, keep a power bank and a small solar panel with the radios, and label which radio is whose.</li>
-<li>Find your local Meshtastic group and see who is already on the air near you on our <a href="/mesh">mesh map</a>.</li>
+<li>Find your local mesh group and see who is already on the air near you on our <a href="/mesh">mesh map</a>.</li>
 <li>Write down the basics (region US, preset, channel name) on paper in case a radio needs a reset.</li></ol>'''))
     body = "".join(f'<section class="mx-card mx-art" id="{i}"><h2>{E(t)}</h2>{h}</section>' for i, t, h in S)
-    note = ('<p class="mx-mu mx-small">Meshtastic® is a registered trademark of Meshtastic LLC. Meshtastic software components are released under various licenses, '
-            'see GitHub for details. No warranty is provided - use at your own risk. This guide is independent, is not endorsed by the Meshtastic project, and links to the official '
-            'documentation at meshtastic.org. We do not sell radios or use affiliate links.</p>')
+    note = ('<p class="mx-mu mx-small">This guide is independent and links to the official project documentation. '
+            'We do not sell radios or use affiliate links. <a href="/tos#acknowledgments">Credits</a></p>')
     return page("mesh-guide", "/mesh/guide", hero + '<div class="mx-guide">' + nav + '<div>' + body + note + '</div></div>')
 
 # ---------------------------------------------------------------- static + routes

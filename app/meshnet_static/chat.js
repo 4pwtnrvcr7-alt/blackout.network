@@ -10,9 +10,9 @@ function start(){var B=window.BNMesh;if(!B)return;var sup=B.support();
  if(sup.any){st.textContent="This browser can connect to a radio"+(sup.bt&&sup.serial?" by Bluetooth or USB.":sup.bt?" by Bluetooth.":" by USB.");
   $("#mx_bt").disabled=!sup.bt;$("#mx_usb").disabled=!sup.serial;if(!sup.bt)$("#mx_bt").title="Bluetooth is not available in this browser";if(!sup.serial)$("#mx_usb").title="USB is not available in this browser"}
  else{document.documentElement.classList.add("mx-nodev");
-  st.innerHTML=sup.ios?'This iPhone or iPad cannot connect a radio from a web page. You can read the public feed below; to reply, use the <a href="'+B.IOS_APP+'" target="_blank" rel="noopener">Meshtastic app</a>.'
-   :'This browser cannot connect to a radio. Use Chrome or Edge, or the official Meshtastic app. You can still read the public feed below.';
-  $("#mx_text").placeholder="Replying needs the Meshtastic app, or Chrome or Edge";$("#mx_cstat").textContent="Not available in this browser."}
+  st.innerHTML=sup.ios?'This iPhone or iPad cannot connect a radio from a web page. You can read the public feed below; to reply, use the free official <a href="'+B.IOS_APP+'" target="_blank" rel="noopener">companion app</a>.'
+   :'This browser cannot connect to a radio. Use Chrome or Edge, or the official companion app. You can still read the public feed below.';
+  $("#mx_text").placeholder="Replying needs the companion app, or Chrome or Edge";$("#mx_cstat").textContent="Not available in this browser."}
  B.on("status",function(s){var t={connecting:"Connecting… pick your radio in the browser prompt.",configuring:"Connected. Reading channels…",ready:"Connected.",disconnected:"Not connected."}[s]||s;
   $("#mx_cstat").textContent=t;var on=s==="ready"||s==="configuring";$("#mx_disc").hidden=!on;$("#mx_bt").hidden=on;$("#mx_usb").hidden=on;
   $("#mx_text").disabled=!on;$("#mx_ch").disabled=!on;upd();if(on&&M.length===0)$("#mx_msgs").innerHTML='<li class="mx-mu mx-empty">Connected. New messages on your channels show up here.</li>'});

@@ -40,3 +40,9 @@ The app deep links follow the official docs: `meshtastic:///messages` (iOS, open
 ## Tests
 - 32 tests pass (test_meshnet: 12, test_signal_map, test_story_report), run in a throwaway server copy.
 - py_compile and `node --check` are clean on all new and edited files.
+
+## White-label update (Nov 12, 2026)
+- Public labels: "Off-grid Network" (menu), "Off-grid network map" (/mesh), "Network chat" (/mesh/chat), "Off-grid setup guide" (/mesh/guide), button "Push to Mesh". No separate brand name; the brand is BLACKOUT.NETWORK.
+- No visible "Meshtastic" text on /mesh, /mesh/chat, /mesh/guide, the Push to Mesh modal or the Energy Grid panel (test_white_label_no_visible_brand). Store and doc link URLs still point to the official project.
+- All required notices live in Terms section "Acknowledgments" (/tos#acknowledgments): trademark statement, non-affiliation line, GPL-3.0 notice with corresponding-source links (github.com/meshtastic/js, /api/mesh/build_lib.sh, /api/mesh/LICENSES.txt), MeshMap.net and map-tile credits. Mesh pages link to it with a small "Credits" link.
+- Kept elsewhere because the license requires it next to the code or on the map: the GPL banner and legal comments inside /api/mesh/lib.js, /api/mesh/LICENSES.txt, and the OpenStreetMap/OpenMapTiles attribution on the map itself.

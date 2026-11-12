@@ -7,7 +7,7 @@ import html
 import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 EFFECTIVE = "October 31, 2026"
-UPDATED = {"privacy": "November 2, 2026"}   # seo/batch-1 GA4 go-live (Nov 1) + newsletter open/click measurement disclosure (#email-tracking)
+UPDATED = {"privacy": "November 2, 2026", "tos": "November 12, 2026"}   # seo/batch-1 GA4 go-live (Nov 1) + newsletter open/click measurement disclosure (#email-tracking)
 CONTACT = "hello@blackout.network"
 MAIL = f'<a href="mailto:{CONTACT}">{CONTACT}</a>'
 
@@ -29,7 +29,7 @@ nav.toc b{display:block;font-size:12px;color:var(--mu);text-transform:uppercase;
 nav.toc ol{margin:0;padding-left:22px;columns:2;column-gap:28px}nav.toc li{font-size:13.5px;margin:2px 0;break-inside:avoid}
 nav.toc a{text-decoration:none}nav.toc a:hover{text-decoration:underline}
 table.ck{width:100%;border-collapse:collapse;margin:8px 0 12px;font-size:14px}table.ck th,table.ck td{border:1px solid var(--bd);padding:6px 8px;text-align:left;vertical-align:top}
-section{background:var(--pn);border:1px solid var(--bd);border-radius:var(--radius);padding:16px 18px;margin:0 0 14px;scroll-margin-top:12px}
+section{background:var(--pn);border:1px solid var(--bd);border-radius:var(--radius);padding:16px 18px;margin:0 0 14px;scroll-margin-top:84px}
 h2{font-size:17px;margin:0 0 8px}h3{font-size:13px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 4px}
 p{margin:0 0 10px}ul{margin:0 0 10px;padding-left:22px}li{margin:3px 0}
 .caps{text-transform:uppercase;font-size:13.5px;letter-spacing:.01em}
@@ -392,6 +392,20 @@ proceeding.</p>"""),
 provisions will remain in full force and effect. Our failure to enforce any right or provision is not a waiver of it. These Terms, together
 with our <a href="/privacy">Privacy Policy</a>, are the entire agreement between you and us regarding the Site and supersede any prior
 agreements on that subject. You may not assign these Terms; we may assign them without restriction. Headings are for convenience only.</p>"""),
+("acknowledgments", "Acknowledgments", """
+<p>The off-grid network pages (<a href="/mesh">network map</a>, <a href="/mesh/chat">network chat</a>, <a href="/mesh/guide">setup guide</a>) and the Push to Mesh
+button work with LoRa radios running the open-source <a href="https://meshtastic.org/" target="_blank" rel="noopener">Meshtastic®</a> firmware and apps.
+Meshtastic® is a registered trademark of Meshtastic LLC. Meshtastic software components are released under various licenses, see
+<a href="https://github.com/meshtastic" target="_blank" rel="noopener">GitHub</a> for details. No warranty is provided - use at your own risk.
+This site is not affiliated with or endorsed by the Meshtastic project.</p>
+<p><b>Open-source software.</b> Network chat and Push to Mesh load an unmodified build of @meshtastic/core 2.6.7, @meshtastic/transport-web-bluetooth 0.1.5
+and @meshtastic/transport-web-serial 0.2.5, licensed under the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GNU General Public License v3.0</a>,
+with bundled MIT-licensed code (crc, Strongly Typed Events). Corresponding source: <a href="https://github.com/meshtastic/js" target="_blank" rel="noopener">github.com/meshtastic/js</a>
+(the exact versions are on npm) and our build script, <a href="/api/mesh/build_lib.sh">build_lib.sh</a>. License notices: <a href="/api/mesh/LICENSES.txt">LICENSES.txt</a>.
+Those components are not covered by the ownership and copying limits in section 7; their own licenses apply.</p>
+<p><b>Data.</b> Public node positions on the network map come from <a href="https://meshmap.net/" target="_blank" rel="noopener">MeshMap.net</a>.
+Map tiles: <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a>,
+data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>.</p>"""),
 ("contact", "Contact", f"""
 <p>Questions about these Terms can be sent to the operator of blackout.network at {MAIL}, or by mail to BLACKOUT.NETWORK · PO Box 1228, Lake Mary, FL 32746.</p>"""),
 ]

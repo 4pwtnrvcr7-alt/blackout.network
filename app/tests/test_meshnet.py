@@ -35,8 +35,24 @@ class Pages(unittest.TestCase):
     def test_guide_cites_official_docs(self):
         h = meshnet.handle_get("/mesh/guide", {})[1].decode()
         for u in ("meshtastic.org/docs/configuration/radio/lora/", "meshtastic.org/docs/faq/", "meshtastic.org/docs/configuration/radio/channels/",
-                  "meshtastic.org/docs/configuration/radio/power/", "902–928 MHz", "97.313(j)", "registered trademark of Meshtastic LLC"):
+                  "meshtastic.org/docs/configuration/radio/power/", "902–928 MHz", "97.313(j)", "/tos#acknowledgments"):
             self.assertIn(u, h)
+    def test_white_label_no_visible_brand(self):
+        import re as _re
+        for path in ("/mesh", "/mesh/chat", "/mesh/guide"):
+            h = meshnet.handle_get(path, {})[1].decode()
+            vis = _re.sub(r"<script.*?</script>|<style.*?</style>", " ", h, flags=_re.S)
+            vis = _re.sub(r"<[^>]+>", " ", vis)
+            self.assertNotIn("meshtastic", vis.lower(), path)
+            self.assertIn('href="/tos#acknowledgments"', h, path)
+    def test_tos_acknowledgments(self):
+        import legal
+        h = legal.handle_get("/tos", {})[1].decode()
+        self.assertIn('id="acknowledgments"', h)
+        for t in ("Meshtastic® is a registered trademark of Meshtastic LLC. Meshtastic software components are released under various licenses",
+                  "not affiliated with or endorsed by the Meshtastic project", "gpl-3.0", "/api/mesh/build_lib.sh", "/api/mesh/LICENSES.txt", "MeshMap.net", "OpenStreetMap contributors"):
+            self.assertIn(t, h)
+        self.assertEqual(meshnet.handle_get("/api/mesh/build_lib.sh", {})[0], 200)
     def test_chat_page_support_notice(self):
         h = meshnet.handle_get("/mesh/chat", {})[1].decode()
         self.assertIn("Chrome or Edge", h); self.assertIn("apps.apple.com/us/app/meshtastic/id1586432531", h); self.assertIn('maxlength="200"', h)

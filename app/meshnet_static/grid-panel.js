@@ -13,11 +13,11 @@ async function build(){var M=host();if(!M||M.querySelector("#mxg"))return;
  var el=document.createElement("section");el.className="mxg";el.id="mxg";el.innerHTML='<h3>Mesh network drop-offs</h3><p class="mu">Loading…</p>';
  var top=M.querySelector("#gs_top");if(top&&top.parentNode)top.parentNode.insertBefore(el,top.nextSibling);else M.insertBefore(el,M.firstChild);
  var d;try{d=await (await fetch("/api/mesh/summary",{cache:"no-store"})).json()}catch(e){d={ok:false}}
- if(!d.ok){el.innerHTML='<h3>Mesh network drop-offs</h3><p class="mu">Waiting for the first sync. <a href="/mesh">Open the mesh map</a>.</p>';return}
+ if(!d.ok){el.innerHTML='<h3>Mesh network drop-offs</h3><p class="mu">Waiting for the first sync. <a href="/mesh">Open the off-grid network map</a>.</p>';return}
  var f=d.feed||{},sig=d.signals||[],grid=(d.regions||[]).filter(function(r){return r.kind==="grid"}).sort(function(a,b){return (b.silent_pct||0)-(a.silent_pct||0)});
  var flagged={};sig.forEach(function(s){flagged[s.region]=s});
- el.innerHTML='<h3>Mesh network drop-offs</h3><p class="mu">Meshtastic gateway nodes need power and internet. When many regular nodes in one grid section go quiet at once it can point to an outage. '+
-  'Single source (MeshMap.net / Meshtastic public MQTT), unconfirmed, never above rank 5. '+(f.baseline_ready?(f.ok?"":"<b>Data source delayed: watch paused.</b> "):"Baseline still building. ")+'<a href="/mesh">Mesh map</a></p><div class="g">'+
+ el.innerHTML='<h3>Mesh network drop-offs</h3><p class="mu">Mesh gateway radios need power and internet. When many regular nodes in one grid section go quiet at once it can point to an outage. '+
+  'Single source (MeshMap.net public node data), unconfirmed, never above rank 5. '+(f.baseline_ready?(f.ok?"":"<b>Data source delayed: watch paused.</b> "):"Baseline still building. ")+'<a href="/mesh">Off-grid network map</a></p><div class="g">'+
   grid.map(function(r){var s=flagged[r.id];return '<div class="c'+(s?" w":"")+'">'+(s?'<span class="pill">WATCHLIST · RANK '+s.rank+'</span>':'')+'<b>'+esc(r.name)+'</b>'+
    r.total+' nodes · '+r.active+' heard in 1 h'+(r.regular>=10?'<br>'+r.silent+' of '+r.regular+' regular quiet ('+Math.round((r.silent_pct||0)*100)+'%)':'')+'</div>'}).join("")+'</div>'}
 function tick(){if(location.hash.indexOf("#grid")===0||host()&&host().offsetParent)build()}

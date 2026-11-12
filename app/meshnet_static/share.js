@@ -27,7 +27,7 @@ async function open(wrap){css();var B=await dev();var sup=B.support();
  var text=compose(B,wrap.dataset.text,wrap.dataset.url);
  var sc=document.createElement("div");sc.className="mxs-scrim";sc.innerHTML='<div class="mxs" role="dialog" aria-modal="true" aria-labelledby="mxs_t">'+
   '<button type="button" class="x" aria-label="Close">×</button><h2 id="mxs_t">Push to Mesh</h2>'+
-  '<p class="mu">Send this story to a Meshtastic channel from <b>your own radio</b>. Review it first. BLACKOUT.NETWORK never sends anything to the mesh.</p>'+
+  '<p class="mu">Send this story to a mesh channel from <b>your own radio</b>. Review it first. BLACKOUT.NETWORK never sends anything to the mesh.</p>'+
   '<label class="mu" for="mxs_txt">Message (edit if you like)</label><textarea id="mxs_txt" maxlength="400">'+esc(text)+'</textarea>'+
   '<div class="row"><span class="cnt" id="mxs_cnt"></span></div>'+
   (sup.any?('<hr><div class="row" id="mxs_conn">'+(sup.bt?'<button type="button" data-k="bt">Connect by Bluetooth</button>':'')+(sup.serial?'<button type="button" data-k="usb">Connect by USB</button>':'')+'</div>'+
@@ -36,13 +36,13 @@ async function open(wrap){css();var B=await dev();var sup=B.support();
    '<div class="row"><button type="button" class="pri" id="mxs_send" disabled>Send to mesh</button><button type="button" id="mxs_cancel">Cancel</button>'+
    '<span class="sp"></span><button type="button" id="mxs_copy">Copy text</button></div>'+
    '<p class="mu">One message every 30 seconds, at most 5 in 10 minutes. The default channel is public.</p>')
-  :('<hr><p class="st" id="mxs_st">'+(sup.ios?'Safari on iPhone and iPad cannot talk to a radio from a web page. Share or copy the text, then paste it into a channel in the Meshtastic app.'
-     :'This browser cannot talk to a radio from a web page. Share or copy the text, then paste it into a channel in the Meshtastic app, or use Chrome or Edge.')+'</p>'+
+  :('<hr><p class="st" id="mxs_st">'+(sup.ios?'Safari on iPhone and iPad cannot talk to a radio from a web page. Share or copy the text, then paste it into a channel in the companion app.'
+     :'This browser cannot talk to a radio from a web page. Share or copy the text, then paste it into a channel in the companion app, or use Chrome or Edge.')+'</p>'+
    '<div class="row">'+(navigator.share?'<button type="button" class="pri" id="mxs_share">Share…</button>':'')+'<button type="button" id="mxs_copy"'+(navigator.share?'':' class="pri"')+'>Copy text</button></div>'+
-   '<div class="row">'+(sup.ios?'<a class="b" href="'+B.IOS_OPEN+'">Open Meshtastic</a><a class="b" href="'+B.IOS_APP+'" target="_blank" rel="noopener">Get the app (App Store)</a>'
-     :sup.android?'<a class="b" id="mxs_and" href="#">Open in Meshtastic</a><a class="b" href="'+B.ANDROID_APP+'" target="_blank" rel="noopener">Get the app (Google Play)</a>'
+   '<div class="row">'+(sup.ios?'<a class="b" href="'+B.IOS_OPEN+'">Open the app</a><a class="b" href="'+B.IOS_APP+'" target="_blank" rel="noopener">Get the app (App Store)</a>'
+     :sup.android?'<a class="b" id="mxs_and" href="#">Open in the app</a><a class="b" href="'+B.ANDROID_APP+'" target="_blank" rel="noopener">Get the app (Google Play)</a>'
      :'<a class="b" href="'+B.IOS_APP+'" target="_blank" rel="noopener">App Store</a><a class="b" href="'+B.ANDROID_APP+'" target="_blank" rel="noopener">Google Play</a>')+'</div>'+
-   '<p class="mu">Tip: in the Meshtastic app, open Messages, pick a channel, then paste.</p>'))+'</div>';
+   '<p class="mu">Tip: in the companion app, open Messages, pick a channel, then paste.</p>'))+'</div>';
  document.body.appendChild(sc);var q=function(s){return sc.querySelector(s)};var ta=q("#mxs_txt"),prev=document.activeElement;
  function close(){sc.remove();document.removeEventListener("keydown",key);try{prev&&prev.focus()}catch(e){}}
  function key(e){if(e.key==="Escape")close()}document.addEventListener("keydown",key);

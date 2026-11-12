@@ -47,7 +47,7 @@ function view(k){S.view=k;$$(".mx-seg button").forEach(function(b){b.setAttribut
  if(S.map){var v=VIEWS[k];S.map.jumpTo({center:v.center,zoom:v.zoom})}}
 function panels(){var d=S.d||{};var reg={};(d.regions||[]).forEach(function(r){reg[r.id]=r});var f=d.feed||{};
  var st=$("#mx_stats");if(st&&d.counts)st.textContent=(d.counts.total||0).toLocaleString()+" nodes on the map · "+(d.counts.active||0).toLocaleString()+" heard in the last hour";
- var fr=$("#mx_fresh");if(fr)fr.innerHTML=d.generated?("Updated "+esc(etTime(d.generated))+" · source <a href=\"https://meshmap.net/\" target=\"_blank\" rel=\"noopener\">MeshMap.net</a> (Meshtastic public MQTT)"+(f.ok?"":" · <b>data source delayed: drop-off watch paused</b>")):"Waiting for the first sync.";
+ var fr=$("#mx_fresh");if(fr)fr.innerHTML=d.generated?("Updated "+esc(etTime(d.generated))+" · source <a href=\"https://meshmap.net/\" target=\"_blank\" rel=\"noopener\">MeshMap.net</a>"+(f.ok?"":" · <b>data source delayed: drop-off watch paused</b>")):"Waiting for the first sync.";
  var c=reg[d.focus||"area:cfl"]||{};var kv=$$("#mx_focus_kv b");
  if(kv.length===3){kv[0].textContent=c.total!=null?c.total:"–";kv[1].textContent=c.active!=null?c.active:"–";
   var num=c.regular>=10&&c.silent_pct!=null;kv[2].textContent=num?(c.silent+" of "+c.regular):(f.baseline_ready?"Too few to judge":"Baseline building");kv[2].classList.toggle("mx-kt",!num)}

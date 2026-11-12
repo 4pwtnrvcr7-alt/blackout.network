@@ -148,7 +148,7 @@ and situational awareness only; it is not an official warning service. Follow of
 - [Sources]({SITE}/sources): every source we use, with item counts and a 0-10 confidence rating
 - [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
 - [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
-- [Mesh network]({SITE}/mesh): live map of public Meshtastic nodes, mesh chat from your own radio, and an off-grid setup guide ({SITE}/mesh/guide)
+- [Off-grid network map]({SITE}/mesh): live map of public LoRa mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
 - [Videos & posts]({SITE}/social): our YouTube and X updates, each with a sourced story page
 - [Public stats]({SITE}/stats): our open traffic and audience numbers
 
@@ -187,7 +187,7 @@ def share_html(url, text, campaign="story"):
     return (f'<div class="bng-share" data-url="{E(url)}" data-text="{E(text[:200])}"><span class="bng-share-l">Share</span>'
             f'<a class="bng-sb" href="{E(intent)}" target="_blank" rel="noopener">Post on X</a>'
             f'<button type="button" class="bng-sb bng-copy">Copy link</button><button type="button" class="bng-sb bng-native" hidden>Share…</button>'
-            f'<button type="button" class="bng-sb bng-mesh" hidden aria-haspopup="dialog" title="Send this story to a Meshtastic channel from your own radio">Push to Mesh</button></div>')
+            f'<button type="button" class="bng-sb bng-mesh" hidden aria-haspopup="dialog" title="Send this story to a mesh channel from your own radio">Push to Mesh</button></div>')
 
 def people_html(text):
     ps = people_in(text)
