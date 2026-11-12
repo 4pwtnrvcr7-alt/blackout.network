@@ -63,6 +63,9 @@ ROUTES = {
     "/fonts": "sitenav",            # self-hosted Montserrat + Inter woff2 (OFL), t323
     "/scoring": "scoring",
     "/about/scoring": "scoring",
+    "/welcome": "welcome",          # first-visit onboarding (t1305u); static page
+    "/welcome.js": "welcome",
+    "/welcome.css": "welcome",
     "/privacy": "legal",            # Privacy Policy (t270), static page, served during warm-up
     "/privacy-policy": "legal",
     "/tos": "legal",                # Terms of Service (t270)

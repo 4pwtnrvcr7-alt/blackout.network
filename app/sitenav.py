@@ -150,6 +150,9 @@ PAGES = {
  "report-status": ("", "Check a problem report | BLACKOUT.NETWORK",
                    "Check the status of a problem you reported to BLACKOUT.NETWORK using your report ID: whether it was received, reviewed or fixed, with no account needed.",
                    "Look up a problem you reported with its report ID and see whether it was received, reviewed or fixed."),
+ "welcome": ("welcome", "Start here | BLACKOUT.NETWORK",
+             "A brief overview of BLACKOUT.NETWORK: a free early-warning threat monitor, what we are trying to do, and the tools on this site. Not official alerts.",
+             "A brief overview of this site, what we are trying to do, and the tools you can use."),
 }
 
 def tabs():
