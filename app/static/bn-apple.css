@@ -234,6 +234,11 @@ html[data-theme="light"] .bna-ch .b1{stroke:#3A3A3C;stroke-width:.75;vector-effe
 .bna-cx{display:flex;justify-content:space-between;margin-top:6px;font-size:11px;line-height:1.2;color:var(--a-mu)}
 .bna-cx i{font-style:normal}
 .bna-cl{display:grid;text-align:center}
+.bna-cht{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--a-ink2);margin:8px 0 2px}
+.bna-cn{display:grid;text-align:center;font-size:11px;font-weight:700;line-height:1.2;color:var(--a-ink2);margin:0 0 2px}
+.bna-cn i{font-style:normal}
+.bna-cax{display:block;text-align:center;font-size:11px;color:var(--a-mu);margin-top:2px}
+.bna-qwk{margin:8px 0 0;font-size:13px;line-height:1.4;color:var(--a-ink2)}
 .bna-mf{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
 .bna-mf .bna-src{padding:0;margin:0}
 .bna-chev{flex:none;width:28px;height:28px;border-radius:50%;background:var(--a-ln2);position:relative}

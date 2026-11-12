@@ -74,7 +74,8 @@
    ref=o.ref!=null&&f(o.ref)<=hi&&f(o.ref)>=lo?'<path class="r" d="M0 '+Y(f(o.ref)).toFixed(1)+'H'+W+'"/>':"";
   return '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" focusable="false">'+ref+'<path class="a" d="'+dd+'L'+X(last[0]).toFixed(1)+' '+H+'L'+X(pts[0][0]).toFixed(1)+' '+H+'Z"/><path class="l" d="'+dd+'"/></svg>'+
    '<span class="bna-cx"><i>'+esc(o.from||"")+'</i><i>'+esc(o.to||"Now")+'</i></span>'}
- function bars(cols,o){o=o||{};if(!cols.length)return"";var mx=Math.max.apply(0,cols.map(function(c){return c.v.reduce(function(a,b){return a+b},0)}))||1,
+ function barTot(c){return (c.v||[]).reduce(function(a,b){return a+b},0)}
+ function bars(cols,o){o=o||{};if(!cols.length)return"";var mx=Math.max.apply(0,cols.map(barTot))||1,
    bw=W/cols.length,g=Math.min(6,bw*.28),out="";
   cols.forEach(function(c,i){var y=H,ww=Math.min(Math.max(1,bw-g),34),x=(i*bw+(bw-ww)/2).toFixed(1),w=ww.toFixed(1);c.v.forEach(function(v,j){if(!v)return;var h=Math.max(1.5,v/mx*(H-4));y-=h;
    out+='<rect class="b'+j+'" x="'+x+'" y="'+y.toFixed(1)+'" width="'+w+'" height="'+h.toFixed(1)+'" rx="1.5"/>'})});
@@ -82,12 +83,20 @@
   var lab=o.labels?'<span class="bna-cx bna-cl" style="grid-template-columns:repeat('+cols.length+',1fr)">'+cols.map(function(c){return"<i>"+esc(c.l||"")+"</i>"}).join("")+"</span>":
    '<span class="bna-cx"><i>'+esc(o.from||"")+'</i><i>'+esc(o.to||"Now")+'</i></span>';
   var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" focusable="false" aria-hidden="true">'+out+'</svg>';
-  if(!o.days)return svg+lab;
+  var title=o.title?'<span class="bna-cht">'+esc(o.title)+"</span>":"";
+  var counts=o.counts?'<span class="bna-cx bna-cn" style="grid-template-columns:repeat('+cols.length+',1fr)">'+cols.map(function(c){return"<i>"+barTot(c)+"</i>"}).join("")+"</span>":"";
+  var axis=o.axis?'<span class="bna-cax">'+esc(o.axis)+"</span>":"";
+  var cap=o.caption||"";
+  if(!o.days)return title+counts+svg+lab+axis+cap;
   // Transparent hit targets over each day column (touch + mouse + keyboard)
   var hits='<div class="bna-barhit" role="tablist" aria-label="Stories by day" style="grid-template-columns:repeat('+cols.length+',1fr)">'+
-    cols.map(function(c,i){var n=(c.v||[]).reduce(function(a,b){return a+b},0),day=o.days[i]||"";
+    cols.map(function(c,i){var n=barTot(c),day=o.days[i]||"";
      return '<button type="button" role="tab" class="bna-barday" data-day="'+esc(day)+'" aria-selected="false" aria-label="'+(c.l||"Day")+', '+n+' stor'+(n==1?"y":"ies")+(n?", show list":", none")+'"'+(n?"":" disabled")+'></button>'}).join("")+"</div>";
-  return '<div class="bna-bars">'+svg+hits+lab+"</div>"}
+  return '<div class="bna-bars">'+title+counts+svg+hits+lab+axis+cap+"</div>"}
+ function quakeCols(q){return (q.classes||[]).map(function(v,i){return{v:i>=4?[0,0,v]:[0,v],l:["<4","4","5","6","7","8+"][i]}})}
+ function weekBig(q){var w=q&&q.week_big,m=w&&w.mag!=null?+w.mag:NaN;if(!isFinite(m))return"";var place=String(w.place||"").trim();
+  return '<p class="bna-qwk">Biggest this week: M'+m.toFixed(1)+(place?", "+esc(place):"")+"</p>"}
+ function quakeBars(q){return bars(quakeCols(q),{labels:1,counts:1,title:"24 hours",axis:"Magnitude",caption:weekBig(q)})}
  function x(now,def,lv){return '<p><b>Now.</b> '+now+'</p><p><b>What it is.</b> '+def+'</p>'+(lv?'<p><b>Levels.</b> '+lv+'</p>':"")}
  var GW=["Quiet","Minor storm","Moderate storm","Strong storm","Severe storm","Extreme storm"];
  function render(D){
@@ -99,10 +108,10 @@
      "G1 minor (Kp 5), G2 moderate (6), G3 strong (7), G4 severe (8), G5 extreme (9). G3 and up can disrupt power grids, GPS and radio.")})}else none("kp");
   var q=D.quake;if(q){var C=["Minor","Light","Moderate","Strong","Major","Great"],b=q.big,m=b?+b.mag:null,ci=m==null?0:Math.min(5,Math.max(0,Math.floor(m)-3));
    put("quake",{v:b?esc(C[ci])+" <small>M"+m.toFixed(1)+"</small>":"None",sev:m>=7,s:b?esc(b.place||"")+" &middot; "+esc(et(b.t)):"No quakes M2.5+ in 24 hours",
-    c:bars(q.classes.map(function(v,i){return{v:i>=4?[0,0,v]:[0,v],l:["<4","4","5","6","7","8+"][i]}}),{labels:1}),t:"USGS &middot; "+pl(q.n24,"quake")+" M2.5+ in 24 hours",
+    c:quakeBars(q),t:"USGS &middot; "+pl(q.n24,"quake")+" M2.5+ in 24 hours",
     x:x(b?"The strongest quake in the last 24 hours was <b>"+esc(C[ci].toLowerCase())+"</b>, magnitude "+m.toFixed(1)+", "+esc(b.place||"")+", at "+esc(et(b.t))+(b.tsunami?". USGS flagged it for tsunami review.":"."):"No quakes of magnitude 2.5 or more were recorded in the last 24 hours.",
      "Magnitude measures the energy a quake releases. Each whole step is about 32 times more energy. The chart counts the last 24 hours of quakes by magnitude.",
-     "USGS classes: minor 3 to 3.9, light 4 to 4.9, moderate 5 to 5.9, strong 6 to 6.9, major 7 to 7.9, great 8 and up.")})}else none("quake");
+     "USGS classes: minor 3 to 3.9, light 4 to 4.9, moderate 5 to 5.9, strong 6 to 6.9, major 7 to 7.9, great 8 and up.")+quakeBars(q)})}else none("quake");
   var f=D.flare;if(f&&f.cls){var L=String(f.cls).charAt(0),FW={A:"Quiet",B:"Quiet",C:"Minor flares",M:"Strong flares",X:"Major flares"}[L]||"Quiet",cnt=f.count||{};
    put("flare",{v:esc(FW),sev:L=="X",s:"X-ray level "+esc(f.cls)+" &middot; this week "+pl((cnt.C||0),"C flare")+", "+(cnt.M||0)+" M, "+(cnt.X||0)+" X",
     c:line(f.series,{f:function(v){return Math.log(v)/Math.LN10},lo:-7,hi:-5,ref:1e-5,from:"72 hours ago"}),t:"NOAA GOES &middot; "+esc(f.t_et||""),
@@ -234,9 +243,9 @@
   var q=D.quake;if(q&&q.sig&&q.map){var C2=["Minor","Light","Moderate","Strong","Major","Great"],b=q.sig,m=+b.mag,ci=Math.min(5,Math.max(0,Math.floor(m)-3)),mp=q.map;
    var map='<svg class="bna-map" viewBox="0 0 300 165" preserveAspectRatio="xMidYMid slice" focusable="false"><rect class="sea" width="300" height="165"/><path class="land" d="'+mp.d+'"/><circle class="ring" cx="'+mp.x+'" cy="'+mp.y+'" r="14"/><circle class="dot" cx="'+mp.x+'" cy="'+mp.y+'" r="4.5"/></svg>';
    put("quake",{v:esc(C2[ci])+" <small>M"+m.toFixed(1)+"</small>",sev:m>=7,s:esc(b.place||"")+" &middot; "+esc(et(b.t)),c:map,t:"USGS &middot; "+pl(q.n24,"quake")+" M2.5+ in 24 hours",
-    x:x("The latest quake of magnitude 5 or more was <b>"+esc(C2[ci].toLowerCase())+"</b>, M"+m.toFixed(1)+", "+esc(b.place||"")+", at "+esc(et(b.t))+(b.tsunami?". USGS flagged it for tsunami review.":".")+" Last 24 hours by magnitude:</p>"+bars(q.classes.map(function(v,i){return{v:i>=4?[0,0,v]:[0,v],l:["<4","4","5","6","7","8+"][i]}}),{labels:1})+"<p>",
+    x:x("The latest quake of magnitude 5 or more was <b>"+esc(C2[ci].toLowerCase())+"</b>, M"+m.toFixed(1)+", "+esc(b.place||"")+", at "+esc(et(b.t))+(b.tsunami?". USGS flagged it for tsunami review.":"."),
      "Magnitude 5 and up is where quakes start to damage buildings and disrupt daily life. Each whole step is about 32 times more energy.",
-     "USGS classes: light 4 to 4.9, moderate 5 to 5.9, strong 6 to 6.9, major 7 to 7.9, great 8 and up.")})}
+     "USGS classes: light 4 to 4.9, moderate 5 to 5.9, strong 6 to 6.9, major 7 to 7.9, great 8 and up.")+quakeBars(q)})}
   if(!TK)TK=setInterval(function(){if(!document.hidden&&LASTD)try{el(LASTD)}catch(e){}},30000);
  }
  // Drawer motion (t1276u): open and close slide the panel's height with ease-in-out while the content fades and settles.

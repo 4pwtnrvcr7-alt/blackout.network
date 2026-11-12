@@ -400,6 +400,18 @@ def _world():
                 rings.append((min(xs), max(xs), min(ys), max(ys), pts))
         feats = None; _A0["rings"] = rings
     return _A0["rings"]
+def week_big_quake(q, lst):
+    """Biggest quake this week from now.quake.biggest (USGS week feed) or the 2.5_week map list. None if empty."""
+    keys = ("mag", "place", "t", "tsunami", "url")
+    wb = (q or {}).get("biggest")
+    if wb and wb.get("mag") is not None:
+        return {k: wb.get(k) for k in keys}
+    rows = [x for x in (lst or []) if x.get("mag") is not None]
+    if not rows:
+        return None
+    pick = max(rows, key=lambda x: float(x["mag"]))
+    return {k: pick.get(k) for k in keys}
+
 def quake_map(big):
     """Small inline SVG around the quake (equirectangular crop of country outlines, no tiles). One cached map, keyed by quake."""
     if big.get("lat") is None: return None
@@ -460,6 +472,7 @@ def _dash_build():
         sig = max(wk, key=lambda x: _iso(x.get("t")) or 0) if wk else None
         return {"n24": len(day), "classes": cls, "big": {k: pick.get(k) for k in ("mag", "place", "t", "tsunami", "url", "lat", "lon")} if pick else None,
                 "sig": {k: sig.get(k) for k in ("mag", "place", "t", "tsunami", "url", "lat", "lon")} if sig else None,
+                "week_big": week_big_quake(q, lst),
                 "week_n": q.get("count"), "src_t": max((x.get("t") for x in lst), default=None)}
     out["quake"] = _r(None, quake_card)
     def flare_card():
