@@ -239,6 +239,14 @@ html[data-theme="light"] .bna-ch .b1{stroke:#3A3A3C;stroke-width:.75;vector-effe
 .bna-chev{flex:none;width:28px;height:28px;border-radius:50%;background:var(--a-ln2);position:relative}
 .bna-chev::before{content:"";position:absolute;left:10px;top:8px;width:7px;height:7px;border-right:2px solid var(--a-ink2);border-bottom:2px solid var(--a-ink2);transform:rotate(45deg);transition:transform .2s var(--a-ease)}
 .bna-mc.bna-open .bna-chev::before{transform:translate(0,4px) rotate(-135deg)}
+/* Drawer motion (t1276u): height + padding ease-in-out, content fades and settles; JS sets the pixel heights. */
+.bna-mc{--a-drw:cubic-bezier(.65,0,.35,1)}
+.bna-mx{box-sizing:border-box}
+.bna-mx.bna-dz{overflow:hidden;will-change:height;transition:height .38s var(--a-drw),padding .38s var(--a-drw),opacity .3s var(--a-drw),border-color .38s var(--a-drw)}
+.bna-mx.bna-dz>*{transition:transform .38s var(--a-drw)}
+.bna-mx.bna-dz0{padding-top:0;padding-bottom:0;opacity:0;border-top-color:transparent}
+.bna-mx.bna-dz0>*{transform:translateY(-10px)}
+.bna-mc .bna-chev::before{transition:transform .38s var(--a-drw)}
 .bna-mx{padding:2px 22px 20px;border-top:1px solid var(--a-ln2);font-size:14px;line-height:1.5;color:var(--a-ink2)}
 .bna-mx p{margin:12px 0 0}.bna-mx b{color:var(--a-ink);font-weight:600}
 .bna-mx .bna-lnk{margin-top:4px}

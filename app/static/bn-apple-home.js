@@ -239,17 +239,33 @@
      "USGS classes: light 4 to 4.9, moderate 5 to 5.9, strong 6 to 6.9, major 7 to 7.9, great 8 and up.")})}
   if(!TK)TK=setInterval(function(){if(!document.hidden&&LASTD)try{el(LASTD)}catch(e){}},30000);
  }
- function toggle(c,open){var b=c.querySelector(".bna-mh"),p=c.querySelector(".bna-mx");b.setAttribute("aria-expanded",open?"true":"false");p.hidden=!open;c.classList.toggle("bna-open",open)}
+ // Drawer motion (t1276u): open and close slide the panel's height with ease-in-out while the content fades and settles.
+ // Interrupt-safe (a second tap reverses from the current height), animates content swaps while open (day bars),
+ // ends at height:auto so live refreshes reflow normally, and is instant under prefers-reduced-motion.
+ var DMS=380,RM=window.matchMedia?window.matchMedia("(prefers-reduced-motion: reduce)"):null;
+ function dDone(p,g,open){if(p._bnaG!==g)return;clearTimeout(p._bnaT);p.classList.remove("bna-dz","bna-dz0");p.style.height="";if(!open)p.hidden=true}
+ function drawer(p,open,from){var g=(p._bnaG||0)+1;p._bnaG=g;clearTimeout(p._bnaT);
+  if(RM&&RM.matches||!p.animate&&!("transition" in p.style)){p.classList.remove("bna-dz","bna-dz0");p.style.height="";p.hidden=!open;return}
+  var wasHidden=p.hidden,cur=wasHidden?0:(from!=null?from:p.getBoundingClientRect().height);
+  p.hidden=false;p.classList.remove("bna-dz","bna-dz0");p.style.height="";
+  var to=open?p.getBoundingClientRect().height:0;
+  if(Math.abs(to-cur)<1){dDone(p,g,open);return}
+  if(wasHidden)p.classList.add("bna-dz0");p.style.height=cur+"px";void p.offsetHeight;
+  p.classList.add("bna-dz");void p.offsetHeight;p.classList.toggle("bna-dz0",!open);p.style.height=to+"px";
+  var end=function(e){if(e&&(e.target!==p||e.propertyName!=="height"))return;p.removeEventListener("transitionend",end);dDone(p,g,open)};
+  p.addEventListener("transitionend",end);p._bnaT=setTimeout(end,DMS+120)}
+ function toggle(c,open,from){var b=c.querySelector(".bna-mh"),p=c.querySelector(".bna-mx");b.setAttribute("aria-expanded",open?"true":"false");c.classList.toggle("bna-open",open);drawer(p,open,from)}
  function pickDay(c,day){
    var o=c._bnaO||{},prev=c.getAttribute("data-day"),open=c.classList.contains("bna-open");
    if(prev===day&&open){toggle(c,false);c.removeAttribute("data-day");
     c.querySelectorAll(".bna-barday").forEach(function(b){b.setAttribute("aria-selected","false");b.classList.remove("on")});return}
    c.setAttribute("data-day",day);
    c.querySelectorAll(".bna-barday").forEach(function(b){var on=b.getAttribute("data-day")===day;b.setAttribute("aria-selected",on?"true":"false");b.classList.toggle("on",on)});
+   var px=c.querySelector(".bna-mx"),h0=open&&px&&!px.hidden?px.getBoundingClientRect().height:null;
    var xel=c.querySelector('[data-f="x"]');if(xel)xel.innerHTML=dayList(o,day)+x(
     ((o.top)?'Top overall: <a class="bna-lnk" href="'+esc(o.top.url)+'"'+(o.top.ext?' target="_blank" rel="noopener"':"")+'>'+esc(o.top.title)+'</a>.':""),
     (o.src?"Bars count stories per day for 7 days from The Wire plus world news feeds (BBC, Guardian, Sky, Al Jazeera and other major outlets), one entry per event. Outlet count shows how many outlets reported it.":"Bars count Wire stories per day for 7 days.")+" Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
-   toggle(c,true)}
+   toggle(c,true,h0)}
  S.addEventListener("click",function(e){
   var dayBtn=e.target.closest&&e.target.closest(".bna-barday");
   if(dayBtn){e.preventDefault();e.stopPropagation();var c=dayBtn.closest(".bna-mc");if(c&&dayBtn.getAttribute("data-day"))pickDay(c,dayBtn.getAttribute("data-day"));return}
