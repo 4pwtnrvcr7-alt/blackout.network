@@ -1,0 +1,8 @@
+/api/mesh/lib.js is an unmodified esbuild bundle of these GPL-3.0-only packages (browser shims for the Node modules os/path/util used by tslog):
+  @meshtastic/core 2.6.7                     https://github.com/meshtastic/js https://www.npmjs.com/package/@meshtastic/core
+  @meshtastic/transport-web-bluetooth 0.1.5  https://github.com/meshtastic/js
+  @meshtastic/transport-web-serial 0.2.5     https://github.com/meshtastic/js
+  plus code those packages already bundle or depend on (crc, MIT; Strongly Typed Events, MIT); license notices are kept at the end of lib.js.
+Corresponding source: the exact package versions above on npm, plus the 5-line entry file and shims in tools/meshtastic/build_lib.sh in our repo.
+GNU General Public License v3.0: https://www.gnu.org/licenses/gpl-3.0.html
+Meshtastic® is a registered trademark of Meshtastic LLC. Meshtastic software components are released under various licenses, see GitHub for details. No warranty is provided - use at your own risk.

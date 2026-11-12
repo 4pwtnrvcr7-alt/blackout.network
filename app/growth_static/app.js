@@ -50,7 +50,11 @@ function thanks(el){if(!el||el.dataset.bngThanks)return;el.dataset.bngThanks=1;v
  el.parentNode.insertBefore(d,el.nextSibling)}
 function signup(){document.querySelectorAll(".nl-result.ok").forEach(function(r){var p=r.querySelector("p");if(p)thanks(p)});
  document.querySelectorAll(".nl-msg.ok").forEach(function(m){if(m.textContent.trim().length>8){thanks(m);markSub()}})}
-function share(){document.querySelectorAll(".bng-share .bng-native[hidden]").forEach(function(b){if(navigator.share)b.hidden=false})}
+function share(){document.querySelectorAll(".bng-share .bng-native[hidden]").forEach(function(b){if(navigator.share)b.hidden=false});
+ document.querySelectorAll(".bng-share .bng-mesh[hidden]").forEach(function(b){b.hidden=false})}   // Push to Mesh (meshnet.py): own-radio send, or copy/share for the Meshtastic app
+var meshP=null;function meshShare(w){if(!meshP)meshP=new Promise(function(ok,no){var s=document.createElement("script");s.src="/api/mesh/share.js?v=1";s.onload=ok;s.onerror=function(){meshP=null;no()};document.head.appendChild(s)});
+ meshP.then(function(){window.BNMeshShare&&window.BNMeshShare.open(w)})}
+document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".bng-mesh");if(!b)return;meshShare(b.closest(".bng-share"))});
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".bng-copy,.bng-native");if(!b)return;var w=b.closest(".bng-share"),u=w.dataset.url,t=w.dataset.text;
  if(b.classList.contains("bng-copy")){var done=function(){var o=b.textContent;b.textContent="Copied ✓";setTimeout(function(){b.textContent=o},1600)};
   if(navigator.clipboard)navigator.clipboard.writeText(u).then(done,function(){prompt("Copy this link:",u)});else prompt("Copy this link:",u)}

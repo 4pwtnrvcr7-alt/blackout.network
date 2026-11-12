@@ -91,6 +91,8 @@ ROUTES = {
     "/api/ai": "aithreats",          # tab #ai (t231; in the nav since t233)
     "/api/grid": "gridwatch",        # tab #grid (t231; in the nav since t233)
     "/api/gridstatus": "gridstatus", # #grid status map, local outages, weather-triggered checks (t234)
+    "/mesh": "meshnet",             # Meshtastic (Nov 12): /mesh live public-node map + drop-off watch, /mesh/chat (own radio), /mesh/guide
+    "/api/mesh": "meshnet",         # /api/mesh/{nodes,summary,signal,chat} + static JS/CSS (data/mesh_nodes.json from tools/meshtastic on the box)
     "/api/government": "government",   # Government tab #government (t247): index + org chart, government.db from government_collect.py
     "/api/gunlaws": "gunlaws",   # Gun Laws tab #gunlaws (t319): cases, bills, ballot measures, markets, estimates; gunlaws.db from gunlaws_collect.py
     "/api/midterms": "midterms",   # Midterms 2026 tab #midterms: races, ratings, polls vs markets, official live results (midterms.py)

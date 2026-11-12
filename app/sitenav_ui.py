@@ -44,7 +44,7 @@ I_X = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="15" heig
 # tab listed before it in NAV (so a new tab added next to Politics/Government lands in Politics & Government), else the first section.
 MENU = [
  ("Live", ["threat", "noise", "bcast", "streams", "radio", "trends", "heatmap"]),
- ("Threat categories", ["net", "grid", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "intel"]),
+ ("Threat categories", ["net", "grid", "@mesh", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "intel"]),
  ("Politics & Government", ["politics", "gov"]),
  ("Community", ["ranked", "@social", "@stats", "newsletter"]),
  ("Reference", ["res", "maps", "bush", "med", "preppers", "figures"]),
@@ -124,9 +124,9 @@ MENU3 = [
    ("bcast", "Broadcast transcripts"), ("radio", "Live Radio")]),
  ("threats", "Threats", "Weather, space, grid and network risks.",
   [("weather", "Weather"), ("solar_seismic", "Solar & Seismic"), ("grid", "Energy Grid"), ("net", "Network Status"),
-   ("starlink", "Starlink"), ("netnear", "Networks near me"), ("ai", "AI Threats"), ("@crime", "Crime")]),
+   ("starlink", "Starlink"), ("netnear", "Networks near me"), ("@mesh", "Mesh Network"), ("ai", "AI Threats"), ("@crime", "Crime")]),
  ("prepare", "Prepare", "Guides and tools to get ready.",
-  [("preppers", "Preppers"), ("res", "Local Resources"), ("maps", "Offline Maps"), ("med", "First Aid"), ("bush", "Bushcraft")]),
+  [("preppers", "Preppers"), ("res", "Local Resources"), ("maps", "Offline Maps"), ("med", "First Aid"), ("bush", "Bushcraft"), ("meshguide", "Off-grid Mesh Guide")]),
  ("politics", "Politics & Government", "Elections, laws and the people in power.",
   [("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"), ("gunlaws", "Gun Laws"), ("figures", "Key Figures")]),
  ("markets", "Markets & Tech", "Money, intel streams, launches and jets.",
@@ -147,7 +147,7 @@ M3_PV = {
  "about": '<span class="m3-k">Sources in the feed</span><b class="m3-big" data-pv="sources">&ndash;</b><span class="m3-asof" data-pv="sources-asof"></span>',
 }
 # Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
-M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near"}
+M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near", "meshguide": "/mesh/guide"}
 M3_SOON = set()
 
 def menu3_sections(sn):
