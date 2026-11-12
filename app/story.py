@@ -14,14 +14,22 @@ DB = os.path.join(BASE, "blackout.db")
 ET = ZoneInfo("America/New_York")
 CID = re.compile(r"^[0-9a-f]{16}$")
 ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$")
-TIERS = [(9, "Critical"), (7, "Major"), (5, "Significant"), (3, "Moderate"), (0, "Low")]
-COLORS = {9: "#ff3b3b", 7: "#ff7a1a", 5: "#f5a524", 3: "#4aa3ff", 0: "#8a94a3"}
+TIERS = [(10, "Catastrophic"), (9, "Critical"), (8, "Severe"), (7, "Major"), (6, "Serious"), (5, "Significant"), (4, "Regional"),
+         (3, "Minor regional"), (2, "Minor"), (1, "Background"), (0, "Noise")]   # t1276u: one name per rank, same as /scoring and the brief
+# Three-band severity colour (site rule): red only at rank 7+, brand yellow 4-6, neutral 0-3.
+COLORS = {10: "#ff3b3b", 9: "#ff3b3b", 8: "#ff3b3b", 7: "#ff3b3b", 5: "var(--bn-sev-mid,#FFC21A)", 3: "var(--bn-sev-mid,#FFC21A)", 0: "#8a94a3"}
+SEV_CSS = '<style>:root{--bn-sev-mid:#FFC21A}html[data-theme="light"]{--bn-sev-mid:#C97B00}</style>'
 _C = {}
 
 def tier(r):
     for k, n in TIERS:
         if (r or 0) >= k: return k, n
-    return 0, "Low"
+    return 0, "Noise"
+
+def band(r):
+    """Colour band for a 0-10 rank: 7+ red, 4-6 yellow, 0-3 neutral."""
+    r = int(r or 0)
+    return 7 if r >= 7 else (5 if r >= 4 else 0)
 
 def et(iso):
     try: d = datetime.strptime(iso[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
@@ -33,7 +41,8 @@ def _ro():
 
 def _what(brief, title):
     m = re.search(r"WHAT:\s*(.*?)\s*(?:WHERE:|WHEN:|CONFIDENCE:|$)", brief or "", re.S)
-    return S.clean_title((m.group(1) if m else title or "").rstrip(". "))
+    w = S.clean_title((m.group(1) if m else title or "").rstrip(". "))
+    return re.sub(r"\s+", " ", re.sub(r"\s*\[[^\[\]]{2,200}\]", "", w)).strip().rstrip(". ") or w   # t1276u: measured values ([magnitude: 6.4; ...]) move to Key facts
 
 def _short(t, n=65):
     """seo/batch-1: <title> text cut at a word boundary (was title[:90], which cut mid-word); the full headline stays in the H1."""
@@ -57,6 +66,17 @@ def load(cid):
         return cl, items
     finally: c.close()
 
+def _tt(t):
+    """Report headline as shown in the timeline: hype prefix and emoji removed (SVG-only rule)."""
+    try:
+        import story_report as SR; return SR.txt(t) or S.clean_title(t)
+    except Exception: return S.clean_title(t)
+
+def _ic(name):
+    try:
+        import story_report as SR; return SR.icon(name, "sr-i") + " "
+    except Exception: return ""
+
 def videos_for(cid):
     try:
         import social
@@ -69,7 +89,7 @@ def render(cid, since=""):
         body = ('<p class="crumb"><a href="/#wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
                 '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/#wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
-    rank = int(r.get("rank") or 0); k, tname = tier(rank); col = COLORS[k]
+    rank = int(r.get("rank") or 0); k, tname = tier(rank); col = COLORS[band(rank)]
     title = S.clean_title(r.get("title")); what = _what(r.get("brief"), r.get("title"))
     fams = [f for f in (r.get("families") or "").split(",") if f]
     eff = int(r.get("eff_families") or len(fams) or 0)
@@ -87,15 +107,15 @@ def render(cid, since=""):
     li = []
     for a in reversed(rows[-150:]):
         u = a.get("source_url") or ""; is_new = since_ok and (a.get("first_seen") or "") > since
-        link = (f'<a href="{S.E(u)}" target="_blank" rel="noopener">{S.E(S.clean_title(a.get("title"))[:220])}</a>' if re.match(r"^https?://", u)
-                else S.E(S.clean_title(a.get("title"))[:220]))
+        link = (f'<a href="{S.E(u)}" target="_blank" rel="noopener">{S.E(_tt(a.get("title"))[:220])}</a>' if re.match(r"^https?://", u)
+                else S.E(_tt(a.get("title"))[:220]))
         li.append(f'<li class="{"new" if is_new else ""}"><div class="when">{"<span class=tag>NEW</span>" if is_new else ""}{S.E(et(a.get("first_seen") or ""))}</div>'
                   f'{link}<div class="src">{S.E(a.get("source") or "")}{" · official source" if a.get("official") else ""}</div></li>')
     vids = videos_for(cid)
     vhtml = ""
     if vids:
         vhtml = '<section class="card"><h2>Watch</h2>' + "".join(
-            f'<p><a href="/story/{S.E(v["slug"])}">▶ {S.E(v["title"])}</a></p>' for v in vids) + '</section>'
+            f'<p><a href="/story/{S.E(v["slug"])}">{_ic("play")}{S.E(v["title"])}</a></p>' for v in vids) + '</section>'
     try:   # growth.py (Nov 1): Short embed, locator map, headshots, share row, follow card
         import growth as G
         g_short, g_img = G.short_html(cid, title)
@@ -104,6 +124,13 @@ def render(cid, since=""):
         g_share = G.share_html(f"{S.SITE}/wire/{cid}", f"{title} (rank {rank}/10) via BLACKOUT.NETWORK", "story")
         g_follow = G.follow_html()
     except Exception: g_short = g_loc = g_ppl = g_share = g_follow = ""; g_img = None
+    report, dek_note = "", ""
+    try:   # t1276u: news report under the headline (story_report.py; precomputed notes + images, sections dropped when empty)
+        import story_report as SR
+        report, dek_note = SR.render(cid, r, rows, rank, tname, title, what, r.get("location") or "", officials, eff,
+                                     fams, g_loc)
+    except Exception:
+        report, dek_note = "", ""
     upd = (f'<section class="card" style="border-color:#f5a524"><h2>What\'s new since {S.E(et(since))}</h2><p>{len(new)} new report(s), marked NEW below.</p></section>'
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
@@ -115,22 +142,22 @@ def render(cid, since=""):
             elec = ('<section class="card" id="bn_midterms_rel"><h2>2026 midterm elections</h2><p><a href="/midterms">2026 midterm elections: '
                     'where to vote, poll closing times and official results by state</a></p></section>')
     except Exception: elec = ""
-    body = (f'<span id="bn_story" hidden data-rank="{rank}" data-tier="{S.E(tname.lower())}" data-cat="{S.E((r.get("category") or "").lower())}"></span>'   # seo/batch-1: GA4 story_view params
+    body = (SEV_CSS + f'<span id="bn_story" hidden data-rank="{rank}" data-tier="{S.E(tname.lower())}" data-cat="{S.E((r.get("category") or "").lower())}"></span>'   # seo/batch-1: GA4 story_view params
             f'<p class="crumb"><a href="/#wire">The Wire</a> › Story</p>'
             f'<div><span class="pill" style="color:{col};border-color:{col}">RANK {rank}/10 · {tname.upper()}</span>'
             f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill" style="color:#f5a524">WATCHLIST</span>' if watch == 1 else "") + '</div>'
-            f'<h1 class="t">{S.E(title)}</h1>'
-            + (f'<p class="dek">{S.E(what)}</p>' if what and what != title else "")
+            f'<h1 class="t">{S.E(S.clean_title(dek_note).rstrip(". ") if dek_note else title)}</h1>'   # t1276u: the analyst headline (sourced, no hype) when a note exists
+            + ("" if dek_note else (f'<p class="dek">{S.E(what)}</p>' if what and what != title else ""))
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
-            + g_ppl + g_share + (g_short or g_loc)
-            + upd + vhtml + elec
+            + g_ppl + g_share + upd + report + (g_short if report else (g_short or g_loc))
+            + vhtml + elec
             + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
             + '<section class="card"><h2>How confident are we?</h2><p>'
             + S.E(f"{eff} independent source{'' if eff == 1 else 's'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
             + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></section>'
             + f'<section class="card"><h2>Timeline and sources</h2><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></section>'
-            + '<section class="card" id="follow"><h2>☆ Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
+            + '<section class="card" id="follow"><h2>' + _ic("star") + 'Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
               'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
               + g_follow + '<p class="meta"><a href="/#wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
     ld = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": title[:110], "description": desc,
@@ -154,6 +181,9 @@ def handle_get(path, qs):
     key = (m.group(1), since)
     try: mt = os.path.getmtime(DB)
     except OSError: return 503, {"error": "warming up"}
+    try:   # t1276u: a new story_reports.json (box push) refreshes cached pages too
+        import story_report as SR; mt = (mt, SR.reports_mtime())
+    except Exception: pass
     hit = _C.get(key)
     if hit and hit[0] == mt and time.time() - hit[1] < 120: return hit[2], hit[3], "text/html"
     code, body = render(m.group(1), since)
