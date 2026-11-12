@@ -444,6 +444,14 @@ def pwa_head(b):
         h = b[:4000].lower().find(b"<head>")
         if h >= 0 and b"<html" in b[:4000].lower() and b"bn_theme" not in b[:30000]:   # light/dark theme before first paint (t323)
             b = b[:h + 6] + THEME_HEAD + b[h + 6:]
+        if b"<html" in b[:4000].lower() and b"window.bnScroll" not in b[:40000]:   # new pages/tabs start at the top (sitenav.scroll_script)
+            try:
+                import sitenav
+                sc = sitenav.scroll_script().encode("utf-8")
+                hh = b[:4000].lower().find(b"<head>")
+                if hh >= 0: b = b[:hh + 6] + sc + b[hh + 6:]
+            except Exception:
+                pass
         al = b[:120000].lower(); j = al.find(b"</head>")   # Alerts bell + Web Push (webpush.py, t341)
         if j >= 0 and b"<html" in al[:4000] and b"/alerts.js" not in al[:j]: b = b[:j] + ALERTS_HEAD + b[j:]
         al = b[:120000].lower(); j = al.find(b"</head>")

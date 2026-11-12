@@ -210,7 +210,7 @@ def head_html(page, path=None):
     url = SITE + (path if path is not None else "/" + page)
     E = lambda s: html.escape(s, quote=True)
     img = SITE + OG_IMAGES.get(page, "/icons/icon-og-v2-1200x630.png?v=3")
-    return (UI.THEME_SCRIPT + f'<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
+    return (UI.THEME_SCRIPT + scroll_script() + f'<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             f'<meta property="og:type" content="website"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(title)}">'
             f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
             f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{img}"><meta name="twitter:site" content="{HANDLE}"><meta name="twitter:title" content="{E(title)}">'
@@ -223,6 +223,23 @@ def data():
     return {"groups": [g for g, _ in NAV], "tabs": t, "brand": BRAND, "tagline": TAGLINE, "site": SITE,
             "home": {"title": PAGES["home"][1], "desc": PAGES["home"][2]}, "social": social_html(),
             "plain": {it[0]: UI.plain(it[2]) for g, it in tabs()}}
+
+
+def scroll_script():
+    """Early inline script: new pages and dashboard tabs start at the top; real anchors
+    (/tos#acknowledgments) still work; Back restores the previous scroll position."""
+    names = {"home"}
+    for _g, it in tabs():
+        if not it or (it[0][:1] == "@"):
+            continue
+        if it[1] and not str(it[1]).startswith("/"):
+            names.add(str(it[1]).lower())
+            names.add(str(it[0]).lower())
+    tabobj = "{" + ",".join(f"{json.dumps(n)}:1" for n in sorted(names)) + "}"
+    path = os.path.join(BASE, "static", "bn-scroll.js")
+    with open(path, "r", encoding="utf-8") as fh:
+        js = fh.read()
+    return "<script>" + js.replace("/*BN_TABS*/{}", tabobj) + "</script>"
 
 FONTS = ("montserrat-latin-wght-normal.woff2", "inter-latin-wght-normal.woff2")
 
