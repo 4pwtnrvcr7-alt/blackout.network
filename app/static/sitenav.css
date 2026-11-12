@@ -358,3 +358,6 @@ body header.bn-top{padding-top:var(--bn-safe-top)}
 @media (display-mode:standalone),(display-mode:fullscreen){
  body:has(header.bn-top){padding-top:0!important}
 }
+
+/* Nov 12 (Matt): no notification dots or count badges on the menu button, menu links or tabs. */
+.bn-burger .bna-dot,.bn-badge,.bn-grp a .ns-badge,.tabs .ns-badge,.bna-mdot{display:none!important}

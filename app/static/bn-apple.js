@@ -43,12 +43,11 @@
  function alerts(a){if(a&&a.data&&a.count==null)a=a.data;a=a||{};
   var list=(Array.isArray(a.alerts)?a.alerts:[]).map(function(x){return typeof x=="object"&&x?[txt(x.src),typeof x.status=="string"?x.status:""].filter(Boolean).join(": "):txt(x)}).filter(Boolean);
   var n=list.length?(+a.count||list.length):0,ph=d.querySelector("#bn-menu .bn-ph"),box=d.getElementById("bna_malert"),b=d.querySelector("header.bn-top .bn-burger");
-  if(b){var dot=b.querySelector(".bna-dot");if(n&&!dot){dot=d.createElement("span");dot.className="bna-dot";b.appendChild(dot)}if(!n&&dot)dot.remove();
-   if(n)b.setAttribute("aria-label","Open menu ("+n+" network alert"+(n>1?"s":"")+")");else b.setAttribute("aria-label","Open menu")}
+  if(b){var dot=b.querySelector(".bna-dot");if(dot)dot.remove()}   // no notification dot on the menu button (Matt, Nov 12); alerts stay inside the menu
   if(!ph)return;if(!n){box&&box.remove();return}
   if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/#network";var anchor=ph.closest(".bn-mhead")||ph;anchor.parentNode.insertBefore(box,anchor.nextSibling);
    box.addEventListener("click",function(e){if(!window.bnMenuClose)return;e.preventDefault();e.stopPropagation();try{bnMenuClose(true,{replace:"/#network"})}catch(err){}})}
-  box.innerHTML='<span class="bna-mdot" aria-hidden="true"></span><span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
+  box.innerHTML='<span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
  function load(){fetch("/api/netstatus/alerts",{cache:"no-store"}).then(function(r){return r.json()}).then(alerts).catch(function(){})}
  function go(){tools();load();setInterval(load,300000)}
  // same-page hash links in the menu (The Wire, network alert, other /#tab links without a data-tab handler): close the menu and go to the top

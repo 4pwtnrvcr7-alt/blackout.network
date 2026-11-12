@@ -567,6 +567,16 @@ def _snap_js():
     dump = lambda v: json.dumps(v, separators=(",", ":"), default=str).replace("</", "<\\/") if v else "null"
     return f'<script>{js}</script><script>window.BNA&&BNA.render({dump(_cache["v"])},{dump(_dcache["v"])})</script>'
 
+_CSS_V = {}
+def _css_v():
+    """Content hash of static/bn-apple.css (cache-busting query), computed once per process."""
+    if "v" not in _CSS_V:
+        try:
+            import hashlib
+            with open(os.path.join(BASE, "static", "bn-apple.css"), "rb") as fh: _CSS_V["v"] = hashlib.sha1(fh.read()).hexdigest()[:10].encode()
+        except Exception: _CSS_V["v"] = b"1"
+    return _CSS_V["v"]
+
 def head_tag():
     """Early, render-blocking switch: '/' with no hash (or #home) shows the new homepage; any tab hash shows the dashboard."""
     # bna-home: the new homepage (dashboard path "/" with no tab hash). bna-pg: the page groups restyled so far
@@ -574,7 +584,7 @@ def head_tag():
     return (b'<script>(function(){var d=document.documentElement,p=location.pathname;function f(){var h=location.hash.replace(/^#/,""),home=p=="/"&&(!h||h=="home");'
             b'd.classList.toggle("bna-home",home);d.classList.toggle("bna-pg",!home)}'
             b'f();addEventListener("hashchange",f)})()</script>'
-            b'<link rel="stylesheet" href="/bn-apple.css">')
+            b'<link rel="stylesheet" href="/bn-apple.css?v=' + _css_v() + b'">')
 
 def _map_section():
     """Global signal map card. Failure here must not take the homepage down."""

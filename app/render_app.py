@@ -595,6 +595,24 @@ def _render_bg():
         except Exception: pass
         time.sleep(60)
 
+# ---------- bind late (2026-11-12, zero-downtime rule) ----------
+# Every push still gave ~60-165 s of public /healthz 503 from the NEW boot_id (DEPLOY_LOG Nov 10-11): Render was routing public
+# traffic to the new instance as soon as its port opened, while the handoff above was still running (health-check gating was not
+# holding traffic on the old instance). Pages survived via the relay, but /healthz, CSS/JS and writes on the new instance did not,
+# and a page whose /bn-apple.css 503'd showed the old wide top bar. Fix: do the handoff BEFORE opening the port. Render only
+# routes to an instance whose port it can see, so the old instance keeps serving every request until this one has its data.
+# Bounded by BN_BIND_WAIT_S (default 240 s; typical handoff 85-165 s): after that we bind anyway and the old behaviour applies
+# (/healthz 503 until the handoff ends, relay for pages). Cold start / no peer: the handoff gives up in seconds, so we bind at once.
+# BN_BIND_WAIT_S=0 restores binding immediately.
+BIND_WAIT_S = int(os.environ.get("BN_BIND_WAIT_S", "240"))
+def wait_before_bind():
+    if BIND_WAIT_S <= 0 or HANDOFF["state"] != "pending": return 0.0
+    t0 = time.time()
+    while HANDOFF["state"] == "pending" and time.time() - t0 < BIND_WAIT_S: time.sleep(0.5)
+    waited = round(time.time() - t0, 1)
+    print(f"bind late: waited {waited} s for the handoff (state {HANDOFF['state']}) before opening the port", flush=True)
+    return waited
+
 if __name__ == "__main__":
     server.passcode()      # creates a random one if none was provided (admin then unusable until the box pushes the real one)
     port = int(os.environ.get("PORT", "10000"))
@@ -602,6 +620,7 @@ if __name__ == "__main__":
     t = threading.Thread(target=_render_bg, daemon=True); t.start()
     start_handoff()
     print(f"deploy handoff: {HANDOFF['state']} (peer url set: {bool(HANDOFF_URL)})", flush=True)
+    wait_before_bind()
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True
     server.ThreadingHTTPServer.request_queue_size = 256   # t338: the default listen backlog (5) overflowed on page loads (~40 parallel requests) -> Render 502s

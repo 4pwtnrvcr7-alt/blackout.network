@@ -32,11 +32,16 @@ def page_404(path):
     import html, random
     rare = random.random() < 0.05
     extra = '<p class="nf-rare">Even the best scanners miss one now and then. You found the blank spot on the map.</p>' if rare else ""
+    try:   # the one shared header + menu (sitenav), same as every other page (Nov 12); a failure here must not break the 404
+        import sitenav as SN, sitenav_ui as UI
+        top, head = SN.header_html(""), UI.THEME_SCRIPT + '<script src="/sitenav.js" defer></script>'
+    except Exception:
+        top, head = "", ""
     return ("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">"
-            "<title>Page not found | BLACKOUT.NETWORK</title><meta name=robots content=noindex><link rel=stylesheet href=/sitenav.css>"
+            "<title>Page not found | BLACKOUT.NETWORK</title><meta name=robots content=noindex><link rel=stylesheet href=/sitenav.css>" + head +
             "<style>body{margin:0;background:var(--bn-bg,#0B0D10);color:var(--bn-text,#E6E9EE);font:15px/1.6 var(--bn-font-body,Inter,system-ui,sans-serif)}"
             "main{padding:48px 0}h1{font:800 28px/1.2 var(--bn-font-ui,Montserrat,system-ui,sans-serif);margin:0 0 8px}a{color:var(--bn-link,#4aa3ff)}"
-            ".nf-rare{color:var(--bn-muted,#8B95A3);font-size:13px;margin-top:28px}</style></head><body>"
+            ".nf-rare{color:var(--bn-muted,#8B95A3);font-size:13px;margin-top:28px}</style></head><body>" + top +
             f"<main id=main><h1>Page not found</h1><p>Nothing lives at <code>{html.escape(path[:120])}</code>.</p>"
             "<p><a href=\"/\">Go to The Wire</a> \u00b7 <a href=\"/sources\">Sources</a> \u00b7 <a href=\"/scoring\">How we score</a></p>"
             f"{extra}</main></body></html>").encode()

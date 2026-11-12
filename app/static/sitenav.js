@@ -139,9 +139,7 @@ function init(){
    if(!a&&first){var li=document.createElement("li");a=document.createElement("a");a.dataset.tab=k;a.href="#"+k;li.appendChild(a);first.appendChild(li)}
    if(a){var lb=b.textContent.trim();if(a.textContent!==lb)a.textContent=lb}});
   $$("a[data-tab]",dr).forEach(function(a){var k=a.dataset.tab;if(k.charAt(0)==="@")return;var b=btn(k);
-   var bad=b&&b.querySelector(".ns-badge,[class*=badge]"),mine=a.querySelector(".bn-badge"),txt=bad&&bad.textContent.trim();
-   if(txt){if(!mine){mine=document.createElement("span");mine.className="bn-badge";a.appendChild(mine)}if(mine.textContent!==txt)mine.textContent=txt;mine.setAttribute("aria-label",txt+" alerts")}
-   else if(mine)mine.remove()})}
+   var mine=a.querySelector(".bn-badge");if(mine)mine.remove()})}   // no count badges in the menu (Matt, Nov 12)
  // ---- per-tab title / description / highlight
  var last="";
  function upd(){var b=nav.querySelector("button.on[data-tab]");if(!b)return;var k=b.dataset.tab,t=byKey[k],title,d,url;

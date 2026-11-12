@@ -102,7 +102,7 @@ def topbar(sn, active="", ctl_html=""):
     """<header class="bn-top"> for every page. ctl_html = page-specific controls for the settings popover (dashboard: scan status,
     refresh, interval); add-ons that look for "header .ctl" (translate, live indicator) also land there."""
     prim = "".join(f'<a href="{E(h)}" data-tab="{E(k)}"' + (' aria-current="page"' if k == active else "") + (' class="bna-cta"' if apple_on() and k == "newsletter" else "") + f'>{E("Free brief" if apple_on() and k == "newsletter" else l)}</a>' for k, h, l in PRIMARY)
-    return ('<header class="bn-top" id="bn_topbar"><div class="bn-tbar">'
+    return ((CRIT_APPLE if apple_on() else "") + '<header class="bn-top" id="bn_topbar"><div class="bn-tbar">'
             f'<a class="bn-logo" href="/" aria-label="{sn.BRAND} home">{logo_html()}</a>'
             f'<nav class="bn-primary" aria-label="Primary">{prim}</nav>'
             f'<div class="bn-acts"><span class="bn-follows">{follow_links(sn)}</span>'
@@ -231,7 +231,17 @@ THEME_SCRIPT = ('<script>(function(){var d=document.documentElement,t;try{t=loca
                 'if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";'
                 'd.setAttribute("data-theme",t);d.style.colorScheme=t})()</script>')
 
+# apple_style_v1 critical chrome (Nov 12): the bar's hide rules ship inline with the header, so a page whose /bn-apple.css request
+# fails (Render 502/503 during a deploy swap or a busy load). Never write that stylesheet's literal path in header markup: server.py
+# skips injecting the apple head tag into any page that already contains it still shows the one shared header (wordmark, theme, menu) and never
+# falls back to the old wide bar (The Wire / Sources / Free brief / Follow us / Alerts / search / settings).
+CRIT_APPLE = ('<style id="bn_crit_apple">html .bn-top .bn-tbar .bn-primary,html .bn-top .bn-tbar .bn-follows,html .bn-top .bn-tbar .bnal-bell,'
+              'html .bn-top .bn-tbar .bn-searchbtn,html .bn-top .bn-tbar .bn-gear,html .bn-top .bn-tbar .bn-burger .bn-bl,'
+              'html .bn-burger .bna-dot,html .bn-badge,html .tabs .ns-badge{display:none!important}'
+              '.bn-tbar .bn-acts{margin-left:auto}.bn-top::after{display:none!important}</style>')
+
 # If Render drops /sitenav.css or /sitenav.js during a busy load (it sometimes 502s a few of a page's ~30 files), load them again.
 LOADER = ('<script>addEventListener("load",function(){var d=document,r=d.documentElement;'
           'if(!getComputedStyle(r).getPropertyValue("--bn-tbar-h")){var l=d.createElement("link");l.rel="stylesheet";l.href="/sitenav.css?retry=1";d.head.appendChild(l)}'
+          'var ac="/bn-apple"+".css";if(d.querySelector(\'link[href^="\'+ac+\'"]\')&&!getComputedStyle(r).getPropertyValue("--a-y")){var a=d.createElement("link");a.rel="stylesheet";a.href=ac+"?retry=1";d.head.appendChild(a)}'
           'if(!window.bnSitenav)setTimeout(function(){if(window.bnSitenav)return;var s=d.createElement("script");s.src="/sitenav.js?retry=1";d.head.appendChild(s)},1500)})</script>')

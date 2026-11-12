@@ -427,3 +427,6 @@ html[data-theme="light"] .bna-barday.on{background:rgba(0,0,0,.06)}
 .bna-rkchip.red{background:rgba(255,107,107,.18);color:#FF6B6B}
 html[data-theme="light"] .bna-rkchip.red{background:rgba(176,14,40,.12);color:#B00E28}
 .bna-ext{font-size:.8em;opacity:.7;margin-left:2px}
+
+/* Nov 12 (Matt): no notification dots or count badges anywhere in the chrome. */
+.bn-burger .bna-dot,.bn-badge,.tabs .ns-badge,.bna-mdot{display:none!important}
