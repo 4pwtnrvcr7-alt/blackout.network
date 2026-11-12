@@ -176,8 +176,8 @@ def menu3_sections(sn):
 
 def drawer(sn, active=""):
     """The v3 graphical menu (<div id="bn-menu">): full-viewport overlay on desktop/tablet (all seven sections open, no scroll),
-    full-screen accordion on phones. Behaviour (dialog, focus trap, Escape, search, theme) stays in sitenav.js; art, previews
-    and motion are added by bn-v3.js when the menu first opens."""
+    full-screen accordion on phones (every section starts collapsed whenever the menu opens). Behaviour (dialog, focus trap,
+    Escape, search, theme) stays in sitenav.js; art, previews and motion are added by bn-v3.js when the menu first opens."""
     # Sticky top row (bn-mbar): wordmark home + Close. It stays on screen and clears the
     # standalone status bar (env safe-area-inset-top). Search and the other tools stay in bn-ph.
     out = ['<div class="bn-drawer bn-m3" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
@@ -192,8 +192,10 @@ def drawer(sn, active=""):
            '<a class="bn-cta m3-cta" href="/newsletter">Free brief</a></div></div></div>'
            '<div class="m3-grid">']
     for n, (sid, name, desc, rows) in enumerate(menu3_sections(sn), 1):
-        cur_sec = any(k == active for k, _, _ in rows)
-        out.append(f'<details class="bn-grp m3-p m3-{sid}" data-grp="{E(name)}" data-sec="{sid}"' + (" open" if cur_sec or sid == "latest" else "") + '>'
+        # No section is pre-opened in the markup: on phones the menu must start fully collapsed
+        # (current page, remembered state and the old "Latest always open" default all stay shut).
+        # Desktop/tablet (>=768px) open the full board in bn-v3.js m3desk, with a CSS fallback when JS is off.
+        out.append(f'<details class="bn-grp m3-p m3-{sid}" data-grp="{E(name)}" data-sec="{sid}">'
                    f'<summary><span class="m3-art" aria-hidden="true"><svg viewBox="560 0 640 440" preserveAspectRatio="xMidYMid slice" focusable="false" data-art="{sid}"></svg></span>'
                    f'<span class="bn-gt"><span class="m3-n">{n:02d}</span><b class="m3-t">{E(name)}</b><small class="bn-gd">{E(desc)}</small></span><i class="m3-pm" aria-hidden="true"></i></summary>'
                    f'<div class="m3-body"><i class="m3-rule" aria-hidden="true"></i><div class="m3-pv" data-pvsec="{sid}">{M3_PV.get(sid, "")}</div><ul>')

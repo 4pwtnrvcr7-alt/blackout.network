@@ -132,6 +132,8 @@ html.bn-lock .bnr-fab{visibility:hidden}
  .bn-m3 .m3-p[open]{border-color:var(--m3-ln)}
  .bn-m3 .m3-p:hover{background:var(--m3-sf);transform:translateY(-3px)}
  .bn-m3 .m3-p>summary{display:block;min-height:0;padding:0;pointer-events:none;cursor:default}
+ /* no-JS: show every section body even when the <details> lacks open (JS m3desk also sets open) */
+ .bn-m3 details.m3-p:not([open])>:not(summary){display:block}
  .m3-art{display:block;height:clamp(28px,calc(14vh - 60px),90px);border:0;margin:0 0 clamp(6px,1.2vh,16px)}
  .m3-pm{display:none}.bn-m3 .bn-gd{display:none}
  .bn-m3 .bn-gt{flex-direction:row;align-items:baseline;gap:10px}

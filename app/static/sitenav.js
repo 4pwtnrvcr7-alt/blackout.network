@@ -1,6 +1,6 @@
 /* BLACKOUT.NETWORK shared nav (t301/t302/t320/t321/t323), loaded by the dashboard and every standalone page.
    - Sidebar menu (#bn-menu, markup from sitenav_ui.py): modal dialog with focus trap, Escape / scrim / close button, body scroll lock,
-     aria-expanded on the menu button, collapsible sections remembered per visitor, current tab highlighted, site search inside.
+     aria-expanded on the menu button, current tab highlighted, site search inside. On phones every section is collapsed each time the menu opens.
    - Light / dark theme toggle (the initial theme is set before paint by server.py THEME_HEAD); charts and maps follow the theme.
    - Settings popover (dashboard scan status, refresh, interval; language picker).
    - Dashboard: tab order + grouping, per-tab <title>/meta/Open Graph, the page title + one-line description, deep links.
@@ -45,7 +45,10 @@ function init(){
   var focusables=function(){return $$('a[href],button:not([disabled]),input:not([disabled]),select,summary,[tabindex]:not([tabindex="-1"])',panel).filter(function(x){return x.offsetParent!==null||x===document.activeElement})};
   var setExp=function(v){$$('[aria-controls="bn-menu"]').forEach(function(b){b.setAttribute("aria-expanded",v?"true":"false")})};
   var menuHist=false;
+  var desk=function(){return window.matchMedia&&matchMedia("(min-width:768px)").matches};
+  var collapseMenu=function(){$$("details.bn-grp",panel).forEach(function(d){d.open=false;if(d.dataset)delete d.dataset.v3auto})};
   window.bnMenuOpen=function(opts){opts=opts||{};if(dr.classList.contains("bn-open")){if(opts.search)focusSearch();return}lastFocus=document.activeElement;closePop();
+   if(!desk())collapseMenu();
    dr.classList.add("bn-open");dr.removeAttribute("aria-hidden");R.classList.add("bn-lock");setExp(true);
    if(!menuHist){try{history.pushState({bnMenu:1},"");menuHist=true}catch(e){}}
    if(opts.search)focusSearch();else{var c=$(".bn-close",panel);(c||panel).focus({preventScroll:true})}};
@@ -68,9 +71,9 @@ function init(){
    if(e.shiftKey&&(document.activeElement===a||document.activeElement===panel)){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}});
   document.addEventListener("focusin",function(e){if(dr.classList.contains("bn-open")&&!panel.contains(e.target)&&!(document.getElementById("bns_panel")||{contains:function(){return false}}).contains(e.target)){var c=$(".bn-close",panel);c&&c.focus()}});
   if(location.hash==="#bn-menu")bnMenuOpen();
-  // sections: remember open/closed (the current tab's section always opens)
-  $$("details.bn-grp",panel).forEach(function(d){var k="bn_grp_"+d.dataset.grp,v=LS.get(k);if(v==="1")d.open=true;else if(v==="0"&&!$('a[aria-current="page"]',d))d.open=false;
-   d.addEventListener("toggle",function(){if(!d.dataset.v3auto)LS.set(k,d.open?"1":"0")})});
+  // sections: do not restore or remember open/closed state (leftover bn_grp_* keys are ignored).
+  // Close only on phones here; the desktop board is opened by bn-v3.js m3desk.
+  if(!desk())$$("details.bn-grp",panel).forEach(function(d){d.open=false});
   // "/" opens the sidebar with search focused (the search script then focuses its field)
   document.addEventListener("keydown",function(e){if(e.key!=="/"||e.ctrlKey||e.metaKey||e.altKey)return;var a=document.activeElement;if(a&&(/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)||a.isContentEditable))return;
    if(document.getElementById("bns")){bnMenuOpen({search:true})}},true);
@@ -149,7 +152,6 @@ function init(){
   var line=(t&&t.desc)||"";if(desc.textContent!==line)desc.textContent=line;desc.hidden=!line;
   var nm=(D.plain&&D.plain[k])||b.textContent.replace(/^[^\w(]+/,"").replace(/\d+$/,"").trim();if(ptitle&&ptitle.textContent!==nm)ptitle.textContent=nm;
   $$("#bn-menu a[data-tab],.bn-primary a[data-tab]").forEach(function(a){if(a.dataset.tab===k)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
-  var act=dr&&$('#bn-menu a[aria-current="page"]');if(act){var dd=act.closest("details");if(dd&&!dd.open)dd.open=true}
   if(title+d===last&&document.title===title)return;last=title+d;setMeta(title,d,url)}
  // deep links to tabs whose add-on loads late (e.g. /#government): honor the first hash once its button appears
  var pending=(location.hash||"").slice(1);if(pending==="bn-menu")pending="";setTimeout(function(){pending=""},30000);

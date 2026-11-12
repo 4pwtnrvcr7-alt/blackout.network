@@ -140,7 +140,10 @@
   // Alerts: opens the existing Alerts panel (alerts.js) when it is on the page
   $$(".m3-alerts",p).forEach(function(b){if(!(window.BN&&window.BN.enableAlerts)&&!d.querySelector(".bn-bell,[data-bn-alerts]"))b.hidden=true;
    b.addEventListener("click",function(){if(window.bnMenuClose)bnMenuClose(true);if(window.BN&&window.BN.enableAlerts)window.BN.enableAlerts({from:"menu"});else{var x=d.querySelector(".bn-bell,[data-bn-alerts]");x&&x.click()}})});
-  var opened=function(){if(!dr.classList.contains("bn-open"))return;m3desk(p);m3art(p);m3data(p)};
+  var wasOpen=dr.classList.contains("bn-open");
+  var opened=function(){var isOpen=dr.classList.contains("bn-open");
+   if(isOpen&&!wasOpen&&!DESK.matches){$$(".m3-p",p).forEach(function(x){x.open=false;delete x.dataset.v3auto})}
+   wasOpen=isOpen;if(!isOpen)return;m3desk(p);m3art(p);m3data(p)};
   new MutationObserver(opened).observe(dr,{attributes:true,attributeFilter:["class"]});opened()}
 
  /* ---------- Wire bands: refresh from /api/v3/wire every 5 minutes (server already rendered them into the page) ---------- */
