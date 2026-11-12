@@ -317,7 +317,7 @@ def et(s, with_date=True):
 def shell(title, body, robots="index", wide=True):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<meta name="robots" content="{robots}">' + sitenav.head_html("sources") +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="stylesheet" href="/api/sources/app.css">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any"><link rel="stylesheet" href="/api/sources/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="sc-page"><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top("sources") +
             f'<div class="sc-wrap" id="main" role="main">{body}</div>'

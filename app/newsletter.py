@@ -2990,7 +2990,7 @@ def follows_of(sid):
 def page(title, body, robots="noindex"):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<meta name="robots" content="{robots}">' + sitenav.head_html("newsletter") +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any"><link rel="stylesheet" href="/api/newsletter/app.css">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any"><link rel="stylesheet" href="/api/newsletter/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="nl-page"><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top("newsletter") +
             f'<div class="nl-wrap" id="main" role="main">{body}</div>'

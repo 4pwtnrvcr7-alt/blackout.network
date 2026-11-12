@@ -47,7 +47,7 @@ def _page(slug, title, desc, toc, sections, intro):
     toc_html = "".join(f'<li><a href="#{a}">{html.escape(t)}</a></li>' for a, t in toc)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
             sitenav.head_html(slug) +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
             f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top(slug) +
             f'<main class="wrap" id="main"><h2 class="title">{html.escape(title)}</h2>'
@@ -471,7 +471,7 @@ def _simple(slug, title, desc_slug, body, css="", js=""):
                   (("/#wire", "← Dashboard"), ("/privacy", "Privacy"), ("/cookies", "Cookie Policy"), ("/privacy-choices", "Your Privacy Choices"), ("/tos", "Terms")))
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
             sitenav.head_html(desc_slug) +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
             f'<style>{CSS}{css}</style></head><body><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top(desc_slug) +
             f'<main class="wrap" id="main"><h2 class="title">{html.escape(title)}</h2>'

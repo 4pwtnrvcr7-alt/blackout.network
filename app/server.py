@@ -190,17 +190,17 @@ SITE_TITLE = "BLACKOUT.NETWORK · Signal over noise.™".encode("utf-8")
 THEME_HEAD = (b'<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
               b'if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";'
               b'd.setAttribute("data-theme",t);d.style.colorScheme=t;var m=document.querySelector(\'meta[name="theme-color"]\');if(m)m.content=t=="light"?"#f6f7f9":"#0b0d10"})()</script>'
-              b'<link rel="icon" type="image/svg+xml" href="/img/favicon.svg">'
+              b'<link rel="icon" type="image/svg+xml" href="/img/favicon.svg?v=3">'
               b'<link rel="preload" href="/fonts/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>'
               b'<link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>')
 _BRANDED = b"BLACKOUT.NETWORK"
-PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">'
-            b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">'
+PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest?v=3"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">'
+            b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png?v=3"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png?v=3">'
             b'<meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
             b'<meta name="apple-mobile-web-app-title" content="BLACKOUT"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
-            b'<link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96-v2.png"><link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192-v2.png">'   # BN favicons, new names so Google's favicon cache (YouTube channel links) refetches
-            b'<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="mask-icon" href="/img/safari-pinned-tab.svg" color="#0B0D10">'   # BN master tile icon set (t333)
-            b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png">'
+            b'<link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96-v2.png?v=3"><link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192-v2.png?v=3">'   # BN favicons, new names so Google's favicon cache (YouTube channel links) refetches
+            b'<link rel="icon" href="/favicon.ico?v=3" sizes="48x48"><link rel="mask-icon" href="/img/safari-pinned-tab.svg?v=3" color="#0B0D10">'   # BN master tile icon set (t333)
+            b'<meta name="msapplication-TileColor" content="#0B0D10"><meta name="msapplication-TileImage" content="/icons/icon-mstile-150.png?v=3">'
             b'<link rel="stylesheet" href="/install-guide.css"><script src="/install-guide.js" defer></script>')
 ALERTS_HEAD = b'<link rel="stylesheet" href="/alerts.css"><script src="/alerts.js" defer></script>'   # Alerts bell + panel (webpush.py, t341)
 PROGRESS_HEAD = b'<link rel="stylesheet" href="/bn-progress.css"><script src="/bn-progress.js" defer></script>'   # t480 shared search progress bar

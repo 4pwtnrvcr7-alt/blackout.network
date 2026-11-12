@@ -296,7 +296,7 @@ def _render():
     a('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
     import sitenav   # shared header, tab bar and SEO tags (t301/t302)
     a(sitenav.head_html("scoring"))
-    a('<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">')
+    a('<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">')
     a(f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>')
     a(sitenav.site_top("scoring"))
     a('<div class="wrap" id="main" role="main">')

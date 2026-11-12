@@ -341,7 +341,7 @@ def render():
             '<meta name="keywords" content="BLACKOUT.NETWORK stats, site traffic, YouTube @blkoutntw, X @BlkoutNtw, open analytics, threat monitor audience">'
             '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") + '</script>')
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
             f'<style>body{{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}}{CSS}</style></head><body><a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>'
             + sitenav.header_html("@stats") + body + foot + '</body></html>').encode("utf-8")
 

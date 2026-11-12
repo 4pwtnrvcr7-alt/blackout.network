@@ -138,7 +138,7 @@ def render(cid, since=""):
           "publisher": {"@type": "NewsMediaOrganization", "@id": f"{S.SITE}/#org", "name": S.BRAND, "url": S.SITE,
                         "logo": {"@type": "ImageObject", "url": f"{S.SITE}/icons/icon-512.png", "width": 512, "height": 512}},
           "author": {"@type": "Organization", "name": S.BRAND, "url": S.SITE}, "mainEntityOfPage": f"{S.SITE}/wire/{cid}",
-          "image": [g_img or f"{S.SITE}/icons/icon-og-v2-1200x630.png"], "articleSection": (r.get("category") or "News").title(),
+          "image": [g_img or f"{S.SITE}/icons/icon-og-v2-1200x630.png?v=3"], "articleSection": (r.get("category") or "News").title(),
           "isBasedOn": [a["source_url"] for a in rows[:10] if a.get("source_url")]}
     if loc: ld["contentLocation"] = {"@type": "Place", "name": loc, **({"geo": {"@type": "GeoCoordinates", "latitude": r["lat"], "longitude": r["lon"]}} if r.get("lat") is not None and r.get("lon") is not None else {})}
     ld = {"@context": "https://schema.org", "@graph": [{k: v for k, v in ld.items() if k != "@context"},

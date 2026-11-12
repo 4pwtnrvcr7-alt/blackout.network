@@ -58,7 +58,7 @@ def _title_tag(title):
     return t
 
 def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=None, og_type="article", script=False):
-    t = _title_tag(title); url = SITE + path; img = image or f"{SITE}/icons/icon-og-v2-1200x630.png"  # BN master tile og:image (t333)
+    t = _title_tag(title); url = SITE + path; img = image or f"{SITE}/icons/icon-og-v2-1200x630.png?v=3"  # BN master tile og:image (t333)
     head = ((sitenav.UI.THEME_SCRIPT if sitenav is not None else "") + f'<title>{E(t)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
             f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">' + ('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">' if not image else '') + f'<meta property="og:image:alt" content="{E(t)}"><meta property="og:locale" content="en_US">'
@@ -74,7 +74,7 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
     if not top:
         top = '<header class="bn-hd"><h1><a href="/" style="color:inherit;text-decoration:none">BLACKOUT.<b style="color:#c8102e">NETWORK</b></a></h1></header>'
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
             f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>{top}<main class="wrap" id="main">{body}</main>'
             '<footer class="ft">Research only: BLACKOUT.NETWORK is not an official warning service. Always follow official instructions from local authorities. · '
             '<a href="/#wire">The Wire</a> · <a href="/social">Videos &amp; posts</a> · <a href="/newsletter">Newsletter</a> · <a href="/scoring">How we score</a> · '

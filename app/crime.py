@@ -542,7 +542,7 @@ def render_page(q=""):
             '<link rel="stylesheet" href="/api/crime/app.css">')
     if title != TITLE: head = head.replace(f"<title>{E(TITLE)}</title>", f"<title>{E(title)}</title>", 1)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
             '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}</style></head><body><a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>'
             + sitenav.header_html("@crime") + body + foot + '<script src="/api/crime/app.js" defer></script></body></html>').encode("utf-8")
 
