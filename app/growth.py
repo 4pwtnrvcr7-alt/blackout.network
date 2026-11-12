@@ -148,7 +148,7 @@ and situational awareness only; it is not an official warning service. Follow of
 - [Sources]({SITE}/sources): every source we use, with item counts and a 0-10 confidence rating
 - [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
 - [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
-- [Off-grid network map]({SITE}/mesh): live map of public LoRa mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
+- [Off-grid network map]({SITE}/mesh): live map of public off-grid mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
 - [Videos & posts]({SITE}/social): our YouTube and X updates, each with a sourced story page
 - [Public stats]({SITE}/stats): our open traffic and audience numbers
 

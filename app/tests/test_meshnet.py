@@ -44,6 +44,7 @@ class Pages(unittest.TestCase):
             vis = _re.sub(r"<script.*?</script>|<style.*?</style>", " ", h, flags=_re.S)
             vis = _re.sub(r"<[^>]+>", " ", vis)
             self.assertNotIn("meshtastic", vis.lower(), path)
+            self.assertNotRegex(vis.lower(), r"\blora\b", path)
             self.assertIn('href="/tos#acknowledgments"', h, path)
     def test_tos_acknowledgments(self):
         import legal

@@ -88,7 +88,7 @@ Eton (Red Cross radios)|https://etoncorp.com|comms|hand-crank,weather radio|US �
 Garmin inReach|https://www.garmin.com/en-US/c/outdoor-recreation/satellite-communicators|comms|satellite,SOS,messaging|Global|$$|22112|Satellite texting and SOS anywhere; needs a subscription.
 ZOLEO|https://www.zoleo.com|comms|satellite,SOS,messaging|Global|$$|12112|Satellite messenger on the Iridium network; needs a plan.
 Starlink|https://www.starlink.com|comms|satellite,internet|Global|$$$|22112|Satellite internet that kept working in many disasters; needs power and a monthly plan.
-Meshtastic|https://meshtastic.org|comms|mesh,off-grid,open source|Free · Global|$|12222|Open-source off-grid text mesh on cheap LoRa radios; no license needed.
+Off-grid mesh radios|/mesh/guide|comms|mesh,off-grid,open source|Free · Global|$|12222|Text over the BLACKOUT.NETWORK off-grid network on inexpensive radios; no license needed.
 goTenna|https://gotenna.com|comms|mesh,off-grid|US|$$|11011|Mesh texting devices; product line has shifted toward government users.
 RepeaterBook|https://www.repeaterbook.com|comms|ham,repeaters,directory|Free · Global|Free|21222|Find local ham and GMRS repeaters.
 FEMA IPAWS (public alerts)|https://www.fema.gov/emergency-managers/practitioners/integrated-public-alert-warning-system|comms|alerts,guide|Free · US|Free|22222|How Wireless Emergency Alerts and EAS reach your phone and radio.

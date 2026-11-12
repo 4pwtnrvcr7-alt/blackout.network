@@ -105,8 +105,8 @@ def _top():
     return f'<header class="bn-hd"><a href="/" style="color:inherit;text-decoration:none;font-weight:800">BLACKOUT</a></header>'
 TITLES = {
     "mesh": ("Off-grid network map: live public mesh radios | BLACKOUT.NETWORK", "A live map of public off-grid mesh radios worldwide, centered on Central Florida, with a drop-off watch that flags regions where radios go quiet."),
-    "mesh-chat": ("Network chat from your own radio | BLACKOUT.NETWORK", "Read and send mesh channel messages from your own LoRa radio over Bluetooth or USB, right in the browser. Nothing is sent from our servers."),
-    "mesh-guide": ("Off-grid setup guide: text messaging when the grid goes down | BLACKOUT.NETWORK", "How to set up a LoRa mesh radio for a grid-down emergency: hardware, the US 915 MHz band, the app, channels, solar power, etiquette and the rules for unlicensed and ham use."),
+    "mesh-chat": ("Network chat from your own radio | BLACKOUT.NETWORK", "Read and send mesh channel messages from your own off-grid mesh radio over Bluetooth or USB, right in the browser. Nothing is sent from our servers."),
+    "mesh-guide": ("Off-grid setup guide: text messaging when the grid goes down | BLACKOUT.NETWORK", "How to set up an off-grid mesh radio for a grid-down emergency: hardware, the US 915 MHz band, the app, channels, solar power, etiquette and the rules for unlicensed and ham use."),
 }
 SUBNAV = [("mesh", "/mesh", "Network map"), ("mesh-chat", "/mesh/chat", "Network chat"), ("mesh-guide", "/mesh/guide", "Setup guide")]
 def _subnav(cur):
@@ -143,7 +143,7 @@ def map_page():
             f'{cnt.get("total", 0):,} nodes on the map · {cnt.get("active", 0):,} heard in the last hour')
     hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("mesh")} OFF-GRID NETWORK · LIVE</div>'
             '<h1>Off-grid network map</h1>'
-            '<p class="mx-dek">Small LoRa mesh radios send text with no license and keep working when the power grid and cell service are down. '
+            '<p class="mx-dek">Small off-grid mesh radios send text with no license and keep working when the power grid and cell service are down. '
             'This map shows public radios heard through the open-source mesh project\'s public MQTT server, starting with Central Florida.</p>'
             f'<div class="mx-stats" id="mx_stats" aria-live="polite">{E(stat)}</div>{_subnav("mesh")}</section>')
     mapc = ('<section class="mx-card mx-mapcard"><div class="mx-maphead"><h2>Live node map</h2><div class="mx-seg" role="group" aria-label="Map view">'
@@ -178,7 +178,7 @@ def map_page():
 # ---------------------------------------------------------------- /mesh/chat
 def chat_page():
     hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("radio")} NETWORK CHAT</div><h1>Network chat</h1>'
-            '<p class="mx-dek">Connect your own LoRa mesh radio to read your channels and send messages over the mesh. '
+            '<p class="mx-dek">Connect your own off-grid mesh radio to read your channels and send messages over the mesh. '
             'Your browser talks to your radio directly. Messages stay on this page and are gone when you close it.</p>' + _subnav("mesh-chat") + '</section>')
     support = ('<section class="mx-card mx-note" id="mx_support"><h2>' + icon("info") + ' Works in Chrome and Edge</h2>'
                '<p>Bluetooth and USB connections work in Chrome or Edge on a computer and in Chrome on Android. They do not work in Safari or on iPhone and iPad (Apple does not allow it). '
@@ -209,7 +209,7 @@ def _src(label, path):
     return f'<a href="{E(url)}" target="_blank" rel="noopener">{E(label)}</a>'
 def guide_page():
     hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("sun")} OFF-GRID GUIDE</div><h1>Off-grid setup guide</h1>'
-            '<p class="mx-dek">A small LoRa radio paired with your phone can send text messages for miles with no cell towers, Wi-Fi or power grid. '
+            '<p class="mx-dek">A small off-grid mesh radio paired with your phone can send text messages for miles with no cell towers, Wi-Fi or power grid. '
             'Here is how to set one up before you need it. Every step links to the official documentation of the open-source mesh project.</p>' + _subnav("mesh-guide") + '</section>')
     toc = [("what", "What it is"), ("hardware", "Hardware"), ("band", "US 915 MHz band"), ("app", "App setup"), ("channels", "Channels"),
            ("power", "Power and solar"), ("etiquette", "Etiquette"), ("legal", "Legal: unlicensed vs. ham"), ("drill", "Before the grid goes down")]
@@ -217,7 +217,7 @@ def guide_page():
     S = []
     S.append(('what', 'What it is', f'''<p>These radios run free, open-source mesh firmware (credited in our <a href="/tos#acknowledgments">Acknowledgments</a>). Each radio pairs with a phone or computer and relays messages for the others,
 so a group of radios forms a <b>mesh</b>: a message hops from node to node (3 hops by default, up to 7) until it reaches everyone. It needs no cell service, internet or license
-for normal use. It sends short text, positions and sensor readings, not voice. Sources: {_src("Introduction", "/introduction/")}, {_src("Mesh algorithm", "/overview/mesh-algo/")}, {_src("LoRa configuration", "/configuration/radio/lora/")}.</p>'''))
+for normal use. It sends short text, positions and sensor readings, not voice. Sources: {_src("Introduction", "/introduction/")}, {_src("Mesh algorithm", "/overview/mesh-algo/")}, {_src("Radio configuration", "/configuration/radio/lora/")}.</p>'''))
     S.append(('hardware', 'Hardware', f'''<p>Pick a supported board from the official {_src("supported devices list", "/hardware/devices/")}. The common types:</p><ul>
 <li><b>Ready-made handhelds</b> with a case, battery and screen: easiest for families. Pair one with each phone.</li>
 <li><b>Development boards</b> (for example Heltec, LILYGO, RAK WisBlock): cheaper, but you add a case, battery and antenna.</li>
@@ -226,7 +226,7 @@ for normal use. It sends short text, positions and sensor readings, not voice. S
 on a roof or on a hill reaches far more people. See {_src("Antennas", "/hardware/antennas/")} and {_src("Flashing firmware", "/getting-started/flashing-firmware/")} (the web {_src("flasher", "https://flasher.meshtastic.org/")} works in Chrome or Edge).</p>'''))
     S.append(('band', 'US 915 MHz band', f'''<p>In the United States, set the radio's region to <b>US</b>. That uses the 902–928 MHz band, with no duty-cycle limit and a 30 dBm (1 W) power cap in the firmware's region table.
 A new radio with the region left <b>unset</b> will not transmit at all, so this is the first setting to change. Every radio in your group needs the same region and the same
-<b>modem preset</b> (the default is LongFast). Sources: {_src("LoRa configuration: Region", "/configuration/radio/lora/")}, {_src("Radio settings and presets", "/overview/radio-settings/")}.</p>'''))
+<b>modem preset</b> (the default is LongFast). Sources: {_src("Radio configuration: Region", "/configuration/radio/lora/")}, {_src("Radio settings and presets", "/overview/radio-settings/")}.</p>'''))
     S.append(('app', 'App setup', f'''<ol><li>Install the official app: {_src("iPhone / iPad / Mac", IOS_APP)}, {_src("Android", ANDROID_APP)}, or use the {_src("web client", WEB_CLIENT)} in Chrome or Edge.</li>
 <li>Turn the radio on and pair it over Bluetooth from the app (the radio's screen or the app shows the PIN).</li>
 <li>Set <b>Region: US</b> and leave the preset on LongFast unless your local group uses another one.</li>
@@ -236,7 +236,7 @@ A new radio with the region left <b>unset</b> will not transmit at all, so this 
     S.append(('channels', 'Channels', f'''<p>Each radio has up to 8 channels. Channel 0, the <b>primary</b>, defaults to the public <b>LongFast</b> channel with a well-known key, so
 anyone nearby with default settings can read it. That is good for meeting neighbors and for public calls for help, but not for private messages.</p><ul>
 <li>Create a <b>secondary channel</b> with its own random key for your family or group, then share it by QR code or link from the app.</li>
-<li>Only scan channel QR codes from people you trust: a QR code can also change your radio's LoRa settings.</li>
+<li>Only scan channel QR codes from people you trust: a QR code can also change your radio's mesh settings.</li>
 <li>Your position is shared on the primary channel. Lower the position precision, or turn position sharing off, if you do not want your home location on the public channel.</li></ul>
 <p>Sources: {_src("Channel configuration", "/configuration/radio/channels/")}, {_src("FAQ: sharing a channel", "/faq/")}, {_src("Position configuration", "/configuration/radio/position/")}, {_src("Configuration tips", "/configuration/tips/")}.</p>'''))
     S.append(('power', 'Power and solar', f'''<p>Most boards run for a day or more on an 18650 or LiPo cell and charge from USB, so a USB power bank or a small folding solar panel keeps a handheld going.
@@ -246,7 +246,7 @@ to stretch a small battery or solar supply, so use it only on a fixed relay node
 <li>Keep messages short and do not repeat them. Every message uses airtime that everyone shares.</li>
 <li>Leave the hop limit at 3 unless your area really needs more.</li>
 <li>Do not set very short position or telemetry intervals; the defaults are chosen to keep the channel clear.</li>
-<li>Do not send private details on the public LongFast channel.</li></ul><p>Source: {_src("Configuration tips", "/configuration/tips/")}, {_src("LoRa configuration: hop limit", "/configuration/radio/lora/")}.</p>'''))
+<li>Do not send private details on the public LongFast channel.</li></ul><p>Source: {_src("Configuration tips", "/configuration/tips/")}, {_src("Radio configuration: hop limit", "/configuration/radio/lora/")}.</p>'''))
     S.append(('legal', 'Legal: unlicensed vs. ham', f'''<p><b>Unlicensed (default):</b> in the US, the firmware runs in the 902–928 MHz ISM band with no license, within the firmware's region power limits and using
 legal antennas for your device. Encryption is allowed in this mode.</p>
 <p><b>Licensed amateur (ham) mode:</b> a licensed operator can turn on the licensed setting with their call sign as the long name. The official FAQ notes this allows more transmit power
