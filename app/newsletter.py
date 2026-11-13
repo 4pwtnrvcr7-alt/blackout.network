@@ -822,6 +822,39 @@ def wire_url(cid, since=None, c=None, anchor=""):
     q = ("?" + urllib.parse.urlencode({"since": iso(since)})) if since else ""
     return f"{base}/wire/{cid}{q}{anchor}"
 
+def featured_desk(at=None, c=None):
+    """Matt, Nov 13: desk stories (desk_stories.py, data/desk_stories.json) are eligible for the brief. A desk story is featured near the
+    top of every issue while its homepage notice window is open (notice.show_from <= at < notice.show_until), or inside an explicit
+    "newsletter": {"feature": true, "from": ISO, "until": ISO} window. "newsletter": "hold" (or {"feature": false}) opts one out.
+    Brief rule: featured only when the desk story carries a brief with what_happened (its /wire page then shows the full breakdown).
+    Config "feature_desk_stories" (default true) turns it off. Fails closed: any error -> []."""
+    c = c or cfg(); at = at or now()
+    if not c.get("feature_desk_stories", True): return []
+    try:
+        import desk_stories as DS
+        out = []
+        for cid in DS.ids():
+            s = DS.get(cid) or {}
+            nl = s.get("newsletter"); nt = s.get("notice") if isinstance(s.get("notice"), dict) else {}
+            if nl == "hold" or (isinstance(nl, dict) and nl.get("feature") is False): continue
+            if isinstance(nl, dict) and nl.get("feature"):
+                t0, t1 = parse_t(nl.get("from") or nt.get("show_from")), parse_t(nl.get("until") or nt.get("show_until"))
+            elif nt:
+                t0, t1 = parse_t(nt.get("show_from")), parse_t(nt.get("show_until"))
+            else: continue
+            if not (t0 and t1 and t0 <= at < t1): continue
+            b = s.get("brief") if isinstance(s.get("brief"), dict) else {}
+            if not (b.get("what_happened") or "").strip(): continue
+            title = (nt.get("title") or b.get("headline") or s.get("title") or "").strip()
+            text = (nt.get("text") or b.get("why_it_matters") or "").strip()
+            if not title: continue
+            out.append({"cluster_id": cid, "kicker": (nt.get("kicker") or "Featured").strip(), "tag": (nt.get("tag") or "").strip(),
+                        "title": title, "text": text, "link_text": (nt.get("link_text") or "Read the full breakdown").strip(),
+                        "url": wire_url(cid, c=c), "what_to_do": (b.get("what_to_do") or "").strip()})
+        return out[:2]
+    except Exception as ex:
+        log(f"featured desk stories skipped: {type(ex).__name__}: {ex}"[:300], "analysis"); return []
+
 def _row_get(r, k, d=None):
     try: return r[k]
     except (KeyError, IndexError): return d
@@ -1186,6 +1219,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     except Exception as ex:
         log(f"story_gates prune skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
     _hold_unbriefed(issue, c)
+    issue["featured"] = featured_desk(at, c)   # Matt, Nov 13: desk stories (EAS test) featured near the top
     issue["bluf"] = bluf(issue)
     if issue.get("notes_lead"):
         issue["bluf"] = MATTERS + ". " + issue["notes_lead"]
@@ -1797,6 +1831,17 @@ def _bluf_html(txt, label="HERE'S WHAT MATTERS"):
     return (f'<tr><td class="bnpad" style="padding:0 20px 8px 20px"><div class="bns bnt" style="background:{PAL["surf"]};border-radius:18px;'
             f'padding:20px 22px;font:400 17px/1.5 {FB};color:{PAL["tx"]}"><div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:{PAL["ac"]};margin:0 0 6px 0">{label}</div>{E(txt)}</div></td></tr>')
 
+def _featured_html(f_):
+    """One featured desk story card (Matt, Nov 13). Green kicker, headline linking to its /wire story page, one-line text, link."""
+    kick = E(f_["kicker"].upper()) + ((" · " + E(f_["tag"].upper())) if f_.get("tag") else "")
+    return (f'<tr><td class="bnpad" bgcolor="{PAL["bg"]}" style="padding:0 20px 8px 20px;background:{PAL["bg"]}">'
+            f'<div class="bns" style="background:{PAL["surf"]};border-radius:18px;padding:20px 22px;color:{PAL["tx"]};border-left:4px solid #22C55E">'
+            f'<div class="bnr" style="font:600 12px/1.4 {FH};letter-spacing:1.2px;color:#22C55E;margin:0 0 6px 0">{kick}</div>'
+            f'<a href="{E(f_["url"])}" class="bnt bnh1" style="font:700 22px/28px {FACE};color:{PAL["tx"]};text-decoration:none">{E(f_["title"])}</a>'
+            + (f'<p class="bnt" style="margin:10px 0 0 0;font:400 17px/26px {FACE};color:{PAL["tx"]}">{E(f_["text"])}</p>' if f_.get("text") else "")
+            + f'<p style="margin:12px 0 0 0;font:700 15px/1.4 {FH}"><a href="{E(f_["url"])}" class="bnt" style="{_L}">{E(f_["link_text"])}</a></p>'
+            '</div></td></tr>')
+
 def _matters_html(issue):
     if issue.get("notes_lead"):
         bits = [f'<p class="bnt" style="margin:12px 0 0 0;font:400 17px/26px {FACE};color:{PAL["tx"]}">{E(issue["notes_lead"])}</p>']
@@ -1866,6 +1911,7 @@ def render(issue, links, c=None):
     B = []; a = B.append
     _number_map(issue)
     a(_matters_html(issue))
+    for f_ in issue.get("featured") or []: a(_featured_html(f_))
     a(_map_html(issue))
     a(_category_chart_html(issue))
     _an = _analysis_html(issue, c)
@@ -1923,6 +1969,8 @@ def render(issue, links, c=None):
     why = f"You get this because you confirmed a subscription to the {BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage."
     html_ = _shell(subj, pre, _head_html(f"{lab.upper()} BRIEF", PAL["ac"], day, rng), B, links, c, why)
     T = [share_text(issue), "", day, rng, ""]
+    for f_ in issue.get("featured") or []:
+        T += [f"{f_['kicker'].upper()}" + (f" · {f_['tag'].upper()}" if f_.get("tag") else ""), f_["title"]] + ([f_["text"]] if f_.get("text") else []) + [f"{f_['link_text']}: {f_['url']}", ""]
     T.extend(_analysis_text(issue, c))
     def tsec(title, items):
         T.extend([title.upper(), "=" * len(title)])
