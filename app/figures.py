@@ -6,7 +6,7 @@ Read-only: blackout.db is opened only as file:blackout.db?mode=ro; never touches
 Who appears: a curated base list (people in today's reports, roles as of Nov 1 2026) plus anyone from POOL who is named in a
 rank 4+ alert on The Wire in the last 7 days. Headlines: matching scanner alerts first (link to /wire/<id>, which the
 page turns into a jump to the item on The Wire), topped up from Google News (verbatim headlines) when fewer than 3 alerts match.
-Memory: one bounded DB pass (<=1500 short rows, truncated text), results cached 10 min; Google News per person cached 1 h (figures.db)."""
+Memory: one bounded DB pass (<=1500 short rows, truncated text), results cached 10 min; Google News per person cached 1 h (figures.db). A forced refresh (summary(force=True) or GET /api/figures?refresh=1, used by the top-bar Refresh data button) bypasses both caches and re-queries. Headlines are sorted newest event time first."""
 import os, re, json, hashlib, sqlite3, threading, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
@@ -183,6 +183,19 @@ def photo_bytes(key):
 URL1 = re.compile(r'"url"\s*:\s*"(https?://[^"]+)"|"(https?://[^"]+)"')
 _lock = threading.Lock(); _C = {"t": 0, "v": None}
 
+def _qflag(qs, *keys):
+    """True if any query flag is 1/true/yes/on. Accepts parse_qs lists or plain strings."""
+    qs = qs or {}
+    for k in keys:
+        v = qs.get(k, "")
+        if isinstance(v, (list, tuple)): v = v[0] if v else ""
+        if str(v).strip().lower() in ("1", "true", "yes", "on"): return True
+    return False
+
+def _hl_time(x):
+    """Headline sort key: event time first, then cluster updated (ISO strings compare in UTC)."""
+    return x.get("time") or x.get("updated") or ""
+
 def _alerts():
     """One bounded read-only pass over recent rank 4+ clusters on The Wire (watchlist=0; unconfirmed Watchlist items are left out) -> {key: [alerts newest first]}."""
     people = [(p[0], re.compile(p[5], re.I)) for p in BASE_LIST] + [(p[0], re.compile(p[4], re.I)) for p in POOL]
@@ -199,7 +212,7 @@ def _alerts():
                 counts[k] += 1
                 cc = (cat or "").lower(); lab = next((v for kk, v in CATS.items() if kk in cc), None)
                 if lab: cats[k][lab] = cats[k].get(lab, 0) + 1
-                if len(hits[k]) < MAX_HEADLINES:
+                if len(hits[k]) < 40:  # pool, then sort by event time and keep MAX_HEADLINES
                     m = URL1.search(links or ""); src = (m.group(1) or m.group(2)) if m else None
                     hits[k].append({"cid": cid, "title": (title or "")[:240], "time": ev or upd, "updated": upd, "url": src,
                                     "source": urllib.parse.urlsplit(src).netloc.replace("www.", "") if src else None,
@@ -208,15 +221,15 @@ def _alerts():
     except Exception as ex: err = f"{type(ex).__name__}: {str(ex)[:120]}"
     return hits, counts, cats, err
 
-def _gnews(name):
+def _gnews(name, force=False):
     def f():
         items = B.dedupe(B.gnews(f'"{name}" when:3d', 12))
         items.sort(key=lambda x: x.get("time") or "", reverse=True)
         return {"items": [{"title": x["title"][:240], "url": x["url"], "source": x.get("source"), "time": x.get("time"), "via": "Google News"} for x in items[:MAX_HEADLINES]]}
-    v = B.cached(DB, "gn:" + name, 3600, f)
+    v = B.cached(DB, "gn:" + name, 3600, f, force=force)
     return (v or {}).get("items") or []
 
-def build():
+def build(force=False):
     hits, counts, cats, err = _alerts()
     out = []
     for key, name, role, country, why, _rx, links in BASE_LIST:
@@ -228,7 +241,7 @@ def build():
             out.append({"key": key, "name": name, "role": role, "country": country, "why": why, "links": links, "curated": False})
     need = [p for p in out if len(hits.get(p["key"]) or []) < 3]
     with ThreadPoolExecutor(max_workers=4) as ex:
-        gn = dict(zip([p["key"] for p in need], ex.map(lambda p: _gnews(p["name"]), need)))
+        gn = dict(zip([p["key"] for p in need], ex.map(lambda p: _gnews(p["name"], force), need)))
     for p in out:
         h = list(hits.get(p["key"]) or [])
         if len(h) < 3:
@@ -238,6 +251,7 @@ def build():
                 if k in seen: continue
                 seen.add(k); h.append(x)
                 if len(h) >= MAX_HEADLINES: break
+        h.sort(key=_hl_time, reverse=True)
         p["headlines"] = h[:MAX_HEADLINES]; p["alerts"] = counts.get(p["key"], 0)
         p["latest"] = max([x.get("updated") or x.get("time") or "" for x in h] or [""])
         p["initials"] = INITIALS.get(p["key"]) or (p["name"].split()[0][0] + p["name"].split()[-1][0]).upper()
@@ -254,11 +268,12 @@ def build():
                      f"the scanner's sources and Google News. Alert counts cover rank 4+ items on The Wire in the last {DAYS} days. "
                      f"Roles as of Nov 1, 2026; follow the profile links for the latest.")}
 
-def summary():
-    if _C["v"] and time.time() - _C["t"] < 600: return _C["v"]
+def summary(force=False):
+    """Return the Key Figures payload. Cached 10 min unless force=True (header refresh / ?refresh=1)."""
+    if not force and _C["v"] and time.time() - _C["t"] < 600: return _C["v"]
     with _lock:
-        if _C["v"] and time.time() - _C["t"] < 600: return _C["v"]
-        v = build(); _C["v"] = v; _C["t"] = time.time(); return v
+        if not force and _C["v"] and time.time() - _C["t"] < 600: return _C["v"]
+        v = build(force=force); _C["v"] = v; _C["t"] = time.time(); return v
 
 def handle_get(path, qs):
     n = path[len("/api/figures/"):] if path.startswith("/api/figures/") else ""
@@ -268,7 +283,7 @@ def handle_get(path, qs):
         r = photo_bytes(n[6:-5])
         return (200, r[0], r[1]) if r else (404, {"error": "no photo"})
     if path == "/api/figures":
-        try: return 200, summary()
+        try: return 200, summary(force=_qflag(qs, "refresh", "force"))
         except Exception as ex: return 503, {"error": f"{type(ex).__name__}: {str(ex)[:160]}"}
     return 404, {"error": "not found"}
 

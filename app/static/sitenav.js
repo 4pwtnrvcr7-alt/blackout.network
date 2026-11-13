@@ -3,8 +3,8 @@
      aria-expanded on the menu button, current tab highlighted, site search inside. On phones every section is collapsed each time the menu opens.
    - Light / dark theme toggle (the initial theme is set before paint by server.py THEME_HEAD); charts and maps follow the theme.
    - Settings popover (theme, Refresh data, dashboard scan status + interval, language picker), with a scrim and a Close button.
-   - Refresh data (Nov 13): the top-bar refresh icon POSTs /api/refresh-all (one shared backend refresh per 60 s), then reloads the
-     page so every last-scanned / last-updated time is re-read; scroll position is kept and the icon shows "Updated just now".
+   - Refresh data (Nov 13): the top-bar refresh icon POSTs /api/refresh-all (one shared backend refresh per 60 s), then either a
+     page handler (window.bnRefreshPage) re-fetches live data or the page does a cache-busting navigation; the icon shows "Updated h:mm ET".
    - Dashboard: tab order + grouping, per-tab <title>/meta/Open Graph, the page title + one-line description, deep links.
    All data (tabs, groups, labels, titles) is embedded by the server from sitenav.py. */
 (function(){"use strict";
@@ -111,34 +111,54 @@ function init(){
   pop.addEventListener("click",function(e){if(e.target.closest&&e.target.closest(".bn-pop-x")){e.preventDefault();closePop(true)}})}
  window.bnSettingsOpen=function(from){if(window.bnMenuClose)bnMenuClose(true,{noHist:true});openPop(from)};
 
- /* ---------------- Refresh data (Nov 13) ----------------
-    One tap: spin, POST /api/refresh-all (the server shares one real refresh per 60 s between every visitor), then reload so
-    every "last scanned / last updated / last reported" time on the page is read again. After the reload the icon briefly shows
-    "Updated just now" and the scroll position is restored. On failure the icon stops and says so. */
+ /* ---------------- Refresh data (Nov 13, figures fix Nov 13) ----------------
+    One tap: spin, POST /api/refresh-all (the server shares one real refresh per 60 s between every visitor and marks short-TTL
+    caches including Key Figures stale). If the current page registered window.bnRefreshPage (returns a promise or true), that
+    handler re-fetches fresh data in place and the icon shows "Updated h:mm ET". Otherwise we do a cache-busting navigation
+    (not location.reload, which iOS Safari can serve from the back-forward cache). Scroll position is restored after a reload.
+    On failure the icon stops and says so. A pageshow from bfcache also re-runs the page handler or cache-busts. */
  var RF_KEY="bn_refreshed",rfRunning=false,rfT=0;
  function rfStatus(msg,cls){var st=document.getElementById("bn_rf_st");if(!st)return;clearTimeout(rfT);st.textContent=msg;st.className="bn-rf-st"+(cls?" "+cls:"");
-  if(msg&&cls)rfT=setTimeout(function(){st.textContent="";st.className="bn-rf-st"},cls==="bn-rf-err"?4000:2600)}
+  if(msg&&cls)rfT=setTimeout(function(){st.textContent="";st.className="bn-rf-st"},cls==="bn-rf-err"?4000:4000)}
  function rfBusy(on){$$("[data-bn-refresh]").forEach(function(b){b.classList.toggle("bn-rf-spin",on);b.setAttribute("aria-busy",on?"true":"false");if(on)b.setAttribute("aria-disabled","true");else b.removeAttribute("aria-disabled")})}
- function rfHere(){return location.pathname+location.search+location.hash}
+ function rfPath(){var q=new URLSearchParams(location.search);q.delete("_bnr");var s=q.toString();return location.pathname+(s?("?"+s):"")+location.hash}
+ function rfHere(){return rfPath()}
+ function rfStamp(iso){var d=iso?new Date(iso):new Date();if(isNaN(d.getTime()))d=new Date();
+  var h="",m="",ap="";
+  try{new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",hour12:true}).formatToParts(d).forEach(function(p){if(p.type==="hour")h=p.value;if(p.type==="minute")m=p.value;if(p.type==="dayPeriod")ap=p.value})}catch(e){}
+  if(!h){return "Updated just now"}
+  return "Updated "+h+":"+m+(ap?(" "+ap.toUpperCase()):"")+" ET"}
+ function rfDone(at){rfRunning=false;rfBusy(false);$$("[data-bn-refresh]").forEach(function(b){b.classList.add("bn-rf-done");setTimeout(function(){b.classList.remove("bn-rf-done")},4000)});rfStatus(rfStamp(at),"bn-rf-ok")}
+ function rfReload(){var u=new URL(location.href);u.searchParams.set("_bnr",String(Date.now()));location.replace(u.pathname+u.search+u.hash)}
  function rfRun(){if(rfRunning)return;rfRunning=true;rfBusy(true);rfStatus("Refreshing data");var t0=Date.now();
   var ac=window.AbortController?new AbortController():null,tm=setTimeout(function(){if(ac)ac.abort()},35000);
   fetch("/api/refresh-all",{method:"POST",cache:"no-store",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}",signal:ac?ac.signal:undefined})
    .then(function(r){if(!r.ok)throw new Error(String(r.status));return r.json()})
    .then(function(j){clearTimeout(tm);
-    try{sessionStorage.setItem(RF_KEY,JSON.stringify({t:Date.now(),p:rfHere(),y:Math.round(window.scrollY||0),at:j&&j.refreshed_at}))}catch(e){}
+    try{sessionStorage.setItem(RF_KEY,JSON.stringify({t:Date.now(),p:rfPath(),y:Math.round(window.scrollY||0),at:j&&j.refreshed_at}))}catch(e){}
     try{window.dispatchEvent(new CustomEvent("bn-refresh",{detail:j}))}catch(e){}
-    setTimeout(function(){location.reload()},Math.max(0,700-(Date.now()-t0)))})
+    var fn=window.bnRefreshPage,handled=null;
+    try{if(typeof fn==="function")handled=fn(j)}catch(e){handled=null}
+    if(handled&&typeof handled.then==="function"){
+      handled.then(function(ok){if(ok===false)rfReload();else rfDone(j&&j.refreshed_at)}).catch(function(){rfReload()});
+      return}
+    if(handled){rfDone(j&&j.refreshed_at);return}
+    setTimeout(function(){rfReload()},Math.max(0,700-(Date.now()-t0)))})
    .catch(function(){clearTimeout(tm);rfRunning=false;rfBusy(false);rfStatus("Couldn't refresh. Try again.","bn-rf-err")})}
- window.bnRefreshData=rfRun;
+ window.bnRefreshData=rfRun;window.rfStamp=rfStamp;
  document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-bn-refresh]");if(!b)return;e.preventDefault();rfRun()});
+ addEventListener("pageshow",function(e){if(!e.persisted)return;rfRunning=false;rfBusy(false);
+  var fn=window.bnRefreshPage;if(typeof fn==="function"){try{var r=fn({bfcache:true});if(r&&typeof r.then==="function")r.then(function(ok){if(ok!==false)rfDone();else rfReload()}).catch(function(){rfReload()});else if(r)rfDone();else rfReload();return}catch(err){}}
+  var v=null;try{v=JSON.parse(sessionStorage.getItem(RF_KEY)||"null")}catch(x){}
+  if(v&&v.t&&Date.now()-v.t<60000)rfReload()});
  (function rfAfter(){var v=null;try{v=JSON.parse(sessionStorage.getItem(RF_KEY)||"null");sessionStorage.removeItem(RF_KEY)}catch(e){}
-  if(!v||!v.t||Date.now()-v.t>60000||v.p!==rfHere())return;
+  if(!v||!v.t||Date.now()-v.t>60000||v.p!==rfPath())return;
   // keep the reader where they were: the page's data loads after first paint, so retry for ~4 s until the page is tall enough (stops on any user scroll input)
   if(v.y>0){var user=false,n=0,stop=function(){user=true};["wheel","touchstart","keydown"].forEach(function(t){addEventListener(t,stop,{passive:true,once:true})});
    var go=function(){if(user)return true;if(Math.abs((window.scrollY||0)-v.y)>2)window.scrollTo(0,v.y);return Math.abs((window.scrollY||0)-v.y)<=2&&n>8};
    go();var iv=setInterval(function(){if(go()||++n>26)clearInterval(iv)},150)}
-  $$("[data-bn-refresh]").forEach(function(b){b.classList.add("bn-rf-done");setTimeout(function(){b.classList.remove("bn-rf-done")},2600)});
-  rfStatus("Updated just now","bn-rf-ok")})();
+  $$("[data-bn-refresh]").forEach(function(b){b.classList.add("bn-rf-done");setTimeout(function(){b.classList.remove("bn-rf-done")},4000)});
+  rfStatus(rfStamp(v.at),"bn-rf-ok")})();
 
  /* ---------------- dashboard tabs ---------------- */
  if(!D)return;

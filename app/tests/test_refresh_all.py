@@ -99,6 +99,16 @@ class Run(unittest.TestCase):
         for bad in ("import scanner", "import push", "import jets", "aviation_watch", "import scoring", "run_scan", "interval_minutes", "save_json"):
             self.assertNotIn(bad, s)
 
+    def test_figures_cache_is_stale_marked_and_warmed(self):
+        self.assertIn(("figures", "_C", "tv"), RA.CACHES)
+        self.assertTrue(any(row[0] == "figures" for row in RA.WARM))
+        import figures
+        figures._C["t"] = time.time(); figures._C["v"] = {"people": ["cached"]}
+        n = RA.stale_caches()
+        self.assertGreaterEqual(n, 1)
+        self.assertEqual(figures._C["t"], 0)
+        self.assertEqual(figures._C["v"], {"people": ["cached"]})
+
 class Wiring(unittest.TestCase):
     def test_route_and_public_post_allow(self):
         import addons
@@ -120,8 +130,11 @@ class Wiring(unittest.TestCase):
         js = src("static", "sitenav.js")
         self.assertIn('fetch("/api/refresh-all",{method:"POST"', js)
         self.assertIn("if(rfRunning)return", js)
-        self.assertIn("Updated just now", js)
-        self.assertIn("location.reload()", js)
+        self.assertIn('return "Updated "+h+":"+m', js)
+        self.assertIn(" ET", js)
+        self.assertIn("bnRefreshPage", js)
+        self.assertIn("_bnr", js)
+        self.assertIn("location.replace(u.pathname+u.search+u.hash)", js)
 
 class SettingsLink(unittest.TestCase):
     def test_menu_settings_item_targets_the_panel_on_every_page(self):

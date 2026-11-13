@@ -10,7 +10,7 @@ refresh is running waits for that run and gets its result; a tap inside the wind
 aviation_watch.py): the box scanner keeps its own schedule and its scans still arrive over the sync channel. On this node a run
   1. re-reads the newest synced scanner state (render_app._refresh_state, when running as the public node),
   2. marks every known short-TTL upstream cache as stale, so the next page load re-fetches it (values are kept, so a failing
-     upstream still serves its last good copy; Trends rebuilds this way),
+     upstream still serves its last good copy; Trends and Key Figures rebuild this way),
   3. re-fetches the main live feeds in parallel (one thread per feed, BN_REFRESH_BUDGET_S overall, default 10 s); a slow feed keeps
      running in the background and is skipped by the next run until it finishes.
 Kill switches: BN_REFRESH_ALL=0 (no button, endpoint 404), BN_REFRESH_WARM=0 (steps 1-2 only, no upstream calls from the run)."""
@@ -39,7 +39,8 @@ def iso(t): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t)) if t else
 # scoring) or on file mtimes already change as soon as new data lands.
 CACHES = [("weather", "_C", "tdict"), ("trends", "_C", "tdict"), ("netpages", "_C", "tdict"),
           ("solar_live", "_cache", "tdd"), ("solar_live", "_memo", "tv"),
-          ("apple_v1", "_cache", "tv"), ("apple_v1", "_dcache", "tv"), ("unrest_feeds", "_C", "tv")]
+          ("apple_v1", "_cache", "tv"), ("apple_v1", "_dcache", "tv"), ("unrest_feeds", "_C", "tv"),
+          ("figures", "_C", "tv")]
 
 def _mod(name):
     m = sys.modules.get(name)
@@ -82,6 +83,7 @@ WARM = [("solar_seismic", "Space weather + earthquakes (NOAA SWPC, USGS)", _w("s
         ("finance", "Markets", _w("finance", "summary", force=True)),
         ("spacex", "SpaceX launches", _w("spacex", "summary", force=True)),
         ("elon", "Key figure feeds", _w("elon", "summary", force=True)),
+        ("figures", "Key Figures headlines", _w("figures", "summary", True)),
         ("politics", "Politics markets", _w("politics", "data", "24h", True)),
         ("home", "Homepage cards", _w("apple_v1", "home_data")),
         ("dash", "Homepage dashboard", _w("apple_v1", "dash_data"))]
