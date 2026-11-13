@@ -357,6 +357,287 @@
     "text": "A Birmingham jury convicted Mohammed Alfatih of wounding a bailiff. Germany wants him extradited over an alleged Hamas plot against Jewish and Israeli targets.",
     "link_text": "Read the full story"
    }
+  },
+  "59bef563ad245e29": {
+   "title": "FAA halts departing flights at all U.S. airports after an air traffic control communications failure",
+   "category": "infrastructure",
+   "location": "United States",
+   "rank": 8,
+   "score": 0,
+   "confidence": "High",
+   "rank_method": "desk rank (no scanner cluster yet): nationwide FAA order, confirmed by the FAA, DOT and four national outlets",
+   "first_seen": "2026-11-13T20:54:00Z",
+   "updated": "2026-11-13T22:08:00Z",
+   "event_time": "2026-11-13T20:54:00Z",
+   "families": [
+    "FAA",
+    "U.S. DOT",
+    "CNBC",
+    "Reuters",
+    "Axios",
+    "AP",
+    "Patch"
+   ],
+   "reports": [
+    {
+     "source": "FAA (X)",
+     "family": "FAA",
+     "official": 1,
+     "first_seen": "2026-11-13T22:02:47Z",
+     "title": "There has been a temporary telecommunications outage - out of an abundance of caution all flights have been halted",
+     "source_url": "https://x.com/FAANews/status/2121363171361575176"
+    },
+    {
+     "source": "Secretary Sean Duffy (X)",
+     "family": "U.S. DOT",
+     "official": 1,
+     "first_seen": "2026-11-13T21:16:46Z",
+     "title": "The FAA issued a nationwide ground stop for all U.S. airports following a communication issue impacting all Air Route Traffic Control Centers",
+     "source_url": "https://x.com/SecDuffy/status/2121351591106072679"
+    },
+    {
+     "source": "CNBC",
+     "family": "CNBC",
+     "official": 0,
+     "first_seen": "2026-11-13T21:01:00Z",
+     "title": "FAA issues nationwide ground stop citing communication issues affecting 'multiple' air traffic control facilities",
+     "source_url": "https://www.cnbc.com/2026/11/13/faa-ground-stop.html"
+    },
+    {
+     "source": "Reuters",
+     "family": "Reuters",
+     "official": 0,
+     "first_seen": "2026-11-13T21:08:00Z",
+     "title": "US FAA grounds all departing flights due to extraordinary circumstance, safety reasons",
+     "source_url": "https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html"
+    },
+    {
+     "source": "Axios",
+     "family": "Axios",
+     "official": 0,
+     "first_seen": "2026-11-13T21:10:00Z",
+     "title": "FAA issues nationwide ground stop due to \"extraordinary circumstances\"",
+     "source_url": "https://www.axios.com/2026/11/13/faa-nationwide-ground-stop"
+    },
+    {
+     "source": "AP News",
+     "family": "AP",
+     "official": 0,
+     "first_seen": "2026-11-13T21:20:00Z",
+     "title": "Flights halted at airports across US due to air traffic control communications problems, FAA says",
+     "source_url": "https://apnews.com/article/flights-halted-airports-faa-f81b0904331dafad6133f291e5f531a8"
+    },
+    {
+     "source": "Patch",
+     "family": "Patch",
+     "official": 0,
+     "first_seen": "2026-11-13T21:25:00Z",
+     "title": "Nationwide Ground Stop Hits O'Hare, Midway Amid Communications Issue",
+     "source_url": "https://patch.com/illinois/chicago/nationwide-ground-stop-hits-o-hare-midway-amid-communications-issue"
+    }
+   ],
+   "brief": {
+    "headline": "FAA halts departing flights at all U.S. airports after an air traffic control communications failure",
+    "why_it_matters": "If you are flying tonight or this weekend, expect delays, missed connections and cancellations even after flights restart; Reuters counts this as only the second nationwide halt of all departures since 9/11.",
+    "what_happened": "At 2:54 p.m. Central (3:54 p.m. ET) on Friday, Nov. 13, the FAA's Air Traffic Control System Command Center ordered all departing traffic at U.S. airports to stay on the ground \"due to extraordinary circumstances and for reasons of safety,\" until further notice. The FAA said communication issues hit multiple Air Route Traffic Control Centers, the facilities that handle high-altitude traffic between airports; Transportation Secretary Sean Duffy said on X the issue affected all of them. At 5:02 p.m. ET the FAA called it \"a temporary telecommunications outage\" and said \"every flight has been accounted for.\" Flights already in the air may land, and inbound international flights are handled case by case. As of 5:05 p.m. ET the FAA had not announced the stop lifted.",
+    "analysis": "About 45 minutes earlier, Chicago O'Hare and Midway were ground-stopped for an \"equipment outage,\" Patch and NBC News report. A ground stop holds planes at the gate; it does not force planes down, as after 9/11. The FAA has not said what failed or whether it was a technical fault or an attack, and no official has stated a cause. Reuters notes Congress approved $12.5 billion last year to fix the FAA's aging communications system, and on Friday the FAA and White House asked for another $30.1 billion.",
+    "rank_why": "A nationwide halt of U.S. departures is rare and affects every airport; the FAA, the Transportation Secretary, CNBC, Axios, AP and Reuters all report it. Desk rank 8.",
+    "risk": "Medium",
+    "risk_why": "A ground stop keeps planes on the ground, so the main harm is disruption, not danger; the cause is still unexplained.",
+    "if_true": "Watch for an FAA statement naming the failed system, the ground stop being lifted (the advisory gave an estimated end of 11 p.m. ET), and airline waivers. Delays and cancellations usually ripple into the next day as crews and planes end up out of place.",
+    "if_false": "If the fault is fixed quickly, departures resume airport by airport within hours, as in the January 2023 NOTAM outage, when the halt lasted under two hours.",
+    "what_to_do": "Check your airline's app before going to the airport and turn on flight alerts. If your flight is canceled and you choose not to travel, DOT rules say you are owed a refund. Ask about free rebooking, and watch nasstatus.faa.gov for your airport.",
+    "confidence": "High",
+    "confidence_why": "The ground stop, its wording and the telecommunications cause come from the FAA, Secretary Duffy, CNBC, Axios, AP and Reuters. The failed system, any cyber link and the end time are not known.",
+    "sources": [
+     "https://x.com/FAANews/status/2121363171361575176",
+     "https://x.com/SecDuffy/status/2121351591106072679",
+     "https://www.cnbc.com/2026/11/13/faa-ground-stop.html",
+     "https://www.axios.com/2026/11/13/faa-nationwide-ground-stop",
+     "https://apnews.com/article/flights-halted-airports-faa-f81b0904331dafad6133f291e5f531a8",
+     "https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html",
+     "https://patch.com/illinois/chicago/nationwide-ground-stop-hits-o-hare-midway-amid-communications-issue",
+     "https://nasstatus.faa.gov/",
+     "https://www.flightaware.com/live/cancelled/"
+    ],
+    "written_at": "2026-11-13T22:08:00Z"
+   },
+   "sections": [
+    {
+     "id": "what",
+     "h": "What happened",
+     "blocks": [
+      {
+       "p": "Friday afternoon, Nov. 13, the FAA stopped departing flights at every U.S. airport. The Air Traffic Control System Command Center advisory said \"all departing traffic should remain ground stopped until further notice\" and \"inbound international flights will be managed on a case by case basis.\" The advisory took effect at 2:54 p.m. Central, 3:54 p.m. Eastern. ([Reuters](https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html); [Axios](https://www.axios.com/2026/11/13/faa-nationwide-ground-stop); [News9](https://www.news9.com/oklahoma-city-news/faa-reportedly-issues-nationwide-ground-stop))"
+      },
+      {
+       "p": "The FAA said: \"The FAA issued a nationwide ground stop for all U.S. airports following communication issues impacting multiple Air Route Traffic Control Centers. FAA technicians are investigating the issue.\" At 5:02 p.m. ET the FAA added: \"There has been a temporary telecommunications outage - out of an abundance of caution all flights have been halted. Every flight has been accounted for.\" ([FAA on X](https://x.com/FAANews/status/2121363171361575176)) Transportation Secretary Sean Duffy posted at 4:16 p.m. ET that the issue affected \"all\" of the centers, and the FAA reposted him. The two statements differ on \"multiple\" versus \"all\"; we report both. ([CNBC](https://www.cnbc.com/2026/11/13/faa-ground-stop.html); [Secretary Duffy on X](https://x.com/SecDuffy/status/2121351591106072679))"
+      },
+      {
+       "p": "Before the nationwide order, Chicago O'Hare and Midway were ground-stopped at about 3:10 p.m. ET for what the FAA listed as an \"equipment outage.\" ([Patch, citing WGN](https://patch.com/illinois/chicago/nationwide-ground-stop-hits-o-hare-midway-amid-communications-issue))"
+      }
+     ]
+    },
+    {
+     "id": "time",
+     "h": "Timeline (Eastern time)",
+     "blocks": [
+      {
+       "figure": "timeline"
+      }
+     ]
+    },
+    {
+     "id": "scope",
+     "h": "How big is it",
+     "blocks": [
+      {
+       "ul": [
+        "Every U.S. airport: departures held at the gate. Planes already flying keep going and land normally. ([Reuters](https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html))",
+        "At 4:44 p.m. ET the FAA status page showed departure delays of 1 hour 31 minutes to 1 hour 45 minutes at Chicago O'Hare and Teterboro, about 1 hour at Fort Lauderdale, Houston Intercontinental and Miami, and 46 minutes to 1 hour at Newark and Phoenix, several tagged as the national ground stop or FAA equipment. ([nasstatus.faa.gov](https://nasstatus.faa.gov/))",
+        "FlightAware counted 7,884 delays and 339 cancellations within, into or out of the U.S. by about 5 p.m. ET Friday. That figure covers all causes for the whole day, not only the ground stop. ([FlightAware](https://www.flightaware.com/live/cancelled/))",
+        "The advisory lists an estimated end of 10 p.m. Central (11 p.m. ET), but the FAA has said only \"until further notice.\" ([News9](https://www.news9.com/oklahoma-city-news/faa-reportedly-issues-nationwide-ground-stop))"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "cause",
+     "h": "What caused it",
+     "blocks": [
+      {
+       "p": "The FAA and Secretary Duffy name a communication issue affecting the Air Route Traffic Control Centers, the regional facilities that guide planes at cruising altitude between airports. Earlier FAA notices cited an \"equipment outage\" in Chicago, and USA Today reports the FAA advisory also cited frequency issues across the system. ([Patch](https://patch.com/illinois/chicago/nationwide-ground-stop-hits-o-hare-midway-amid-communications-issue); [USA Today](https://www.usatoday.com/story/news/nation/2026/11/13/faa-orders-nationwide-groundstop-at-us-airports-citing-safety/92765499007/))"
+      },
+      {
+       "p": "Not known yet: which system failed, why, and whether it was a technical fault or deliberate. No official has said it was a cyberattack, and none has ruled one out. We will not guess. In the January 2023 NOTAM outage, the FAA later said contract staff deleted files by mistake and found no sign of a cyberattack ([FAA](https://www.faa.gov/newsroom/faa-notam-statement))."
+      }
+     ]
+    },
+    {
+     "id": "an",
+     "label": "Our analysis",
+     "h": "What it means",
+     "blocks": [
+      {
+       "p": "Nationwide ground stops are rare. Reuters counts this as the second nationwide stop of all departures since the Sept. 11, 2001 attacks; the other was the January 2023 NOTAM failure, which halted departures for under two hours. ([Reuters](https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html); [CNBC](https://www.cnbc.com/2026/11/13/faa-ground-stop.html))"
+      },
+      {
+       "p": "It lands on a Friday evening, one of the busiest flying times of the week, so even a short stop will strand crews and planes in the wrong cities and push delays into Saturday. It also adds pressure on the FAA's old equipment: Congress approved $12.5 billion last year to fix its communications system, and on Friday the FAA and White House asked for another $30.1 billion. ([Reuters](https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html))"
+      },
+      {
+       "scen": [
+        [
+         "If it is fixed tonight",
+         "Departures restart in waves; expect cancellations and late arrivals into Saturday morning."
+        ],
+        [
+         "If it drags on",
+         "Airlines cancel evening banks of flights and issue travel waivers; the advisory's 11 p.m. ET estimate slips."
+        ],
+        [
+         "Signposts",
+         "An FAA statement naming the failed system, the ground stop being lifted on nasstatus.faa.gov, and airline waiver notices."
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "do",
+     "h": "What to do if you are flying",
+     "blocks": [
+      {
+       "ul": [
+        "Check your airline's app or website before you leave for the airport, and turn on text or push alerts for your flight.",
+        "Look up your airport on the FAA's live status page: [nasstatus.faa.gov](https://nasstatus.faa.gov/).",
+        "If your flight is canceled and you choose not to travel, DOT rules entitle you to a refund, including for non-refundable tickets. ([DOT refunds](https://www.transportation.gov/airconsumer/refunds))",
+        "Ask about free rebooking. Meal and hotel vouchers are usually promised only for delays the airline controls, and an FAA outage usually is not one, so ask but plan for it yourself. ([DOT airline customer service dashboard](https://www.transportation.gov/airconsumer/airline-customer-service-dashboard))",
+        "Rebook in the app or by phone while you wait in line; seats on the next flights go fast.",
+        "Keep medicines, chargers and a change of clothes in your carry-on in case you are stuck.",
+        "If you have a connection, check both legs; a delay on the first can make you miss the second."
+       ]
+      }
+     ]
+    },
+    {
+     "id": "src",
+     "h": "Sources",
+     "blocks": [
+      {
+       "ul": [
+        "[FAA on X, 5:02 PM ET](https://x.com/FAANews/status/2121363171361575176)",
+        "[Secretary Sean Duffy on X, 4:16 PM ET](https://x.com/SecDuffy/status/2121351591106072679)",
+        "[CNBC: FAA issues nationwide ground stop](https://www.cnbc.com/2026/11/13/faa-ground-stop.html)",
+        "[Axios: FAA issues nationwide ground stop](https://www.axios.com/2026/11/13/faa-nationwide-ground-stop)",
+        "[AP: Flights halted at airports across US](https://apnews.com/article/flights-halted-airports-faa-f81b0904331dafad6133f291e5f531a8)",
+        "[Reuters (via StreetInsider): FAA grounds all departing flights](https://www.streetinsider.com/Reuters/FAA+issues+national+ground+stop+due+to+extraordinary+circumstance+and+reasons+for+safety/27343831.html)",
+        "[Patch: Ground stop hits O'Hare, Midway](https://patch.com/illinois/chicago/nationwide-ground-stop-hits-o-hare-midway-amid-communications-issue)",
+        "[News9: advisory times and estimated end](https://www.news9.com/oklahoma-city-news/faa-reportedly-issues-nationwide-ground-stop)",
+        "[Washington Post](https://www.washingtonpost.com/transportation/2026/11/13/faa-grounds-flights-all-us-airports-citing-communications-issue/)",
+        "[FAA National Airspace System status](https://nasstatus.faa.gov/)",
+        "[FlightAware delays and cancellations](https://www.flightaware.com/live/cancelled/)"
+       ]
+      }
+     ]
+    }
+   ],
+   "lead_figure": "timeline",
+   "figure_credit": "Graphic: BLACKOUT.NETWORK, built from the FAA, DOT, CNBC, Axios, Reuters, Patch, News9 and FlightAware.",
+   "timeline": [
+    [
+     "3:10 PM ET",
+     "O'Hare and Midway ground-stopped; FAA lists an equipment outage (Patch, WGN)"
+    ],
+    [
+     "3:54 PM ET",
+     "Command Center advisory: all U.S. airports ground stopped until further notice (News9, Reuters)"
+    ],
+    [
+     "~4:00 PM ET",
+     "FAA: communication issues at multiple Air Route Traffic Control Centers (CNBC, Axios)"
+    ],
+    [
+     "4:16 PM ET",
+     "Secretary Duffy on X: issue impacting all centers; FAA reposts at 4:18 (X)"
+    ],
+    [
+     "4:44 PM ET",
+     "FAA status page: departure delays up to 1 h 45 min at ORD and Teterboro (nasstatus.faa.gov)"
+    ],
+    [
+     "~5:00 PM ET",
+     "FlightAware: 7,884 delays and 339 cancellations in, into or out of the U.S. today, all causes"
+    ],
+    [
+     "5:02 PM ET",
+     "FAA: a temporary telecommunications outage; every flight accounted for (FAA on X)"
+    ],
+    [
+     "11:00 PM ET",
+     "Estimated end listed in the FAA advisory (not confirmed) (News9)"
+    ]
+   ],
+   "pin": {
+    "from": "2026-11-13T21:50:00Z",
+    "until": "2026-11-15T05:00:00Z",
+    "order": 0,
+    "kicker": "Featured story",
+    "tag": "U.S. · Air travel",
+    "title": "FAA halts departing flights at all U.S. airports",
+    "text": "Departures are held at every U.S. airport after a communications failure at FAA air traffic control centers. Planes in the air can land. Check your airline before you go.",
+    "link_text": "Read the full story"
+   },
+   "newsletter": {
+    "feature": true,
+    "from": "2026-11-13T21:50:00Z",
+    "until": "2026-11-14T05:00:00Z",
+    "order": -1,
+    "kicker": "Featured story",
+    "tag": "U.S. · Air travel",
+    "title": "FAA halts departing flights at all U.S. airports after an air traffic control communications failure",
+    "text": "Departures are held at every U.S. airport after a communications failure at FAA air traffic control centers. Planes in the air can land. Check your airline before you go.",
+    "link_text": "Read the full story"
+   }
   }
  }
 }

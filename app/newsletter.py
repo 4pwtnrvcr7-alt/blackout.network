@@ -855,10 +855,11 @@ def featured_desk(at=None, c=None):
             out.append({"cluster_id": cid, "kicker": (nd.get("kicker") or nt.get("kicker") or "Featured").strip(),
                         "tag": (nd.get("tag") or nt.get("tag") or "").strip(), "title": title, "text": text,
                         "link_text": (nd.get("link_text") or nt.get("link_text") or "Read the full breakdown").strip(),
-                        "url": wire_url(cid, c=c), "what_to_do": (b.get("what_to_do") or "").strip(), "_o": order})
+                        "url": wire_url(cid, c=c), "what_to_do": (b.get("what_to_do") or "").strip(), "_o": order,
+                        "lead": order < 0})   # Nov 13 4:39 PM ET: order < 0 = the issue's lead story (it names the subject line)
         out.sort(key=lambda x: x["_o"])   # stable: equal orders keep id order
         for x in out: x.pop("_o", None)
-        return out[:2]
+        return out[:3]   # Nov 13 4:39 PM ET: FAA ground stop leads, then the Hamas story, then the EAS notice
     except Exception as ex:
         log(f"featured desk stories skipped: {type(ex).__name__}: {ex}"[:300], "analysis"); return []
 
@@ -1589,10 +1590,14 @@ def subject_for(issue):
     """
     d = issue["end"].astimezone(ET).strftime("%b %-d"); lab = slot_label(issue["slot"])
     shown = _shown_stories(issue)
+    try:   # Nov 13 4:39 PM ET (FAA ground stop): a featured desk story with newsletter.order < 0 leads the subject too
+        fl = next((f_ for f_ in issue.get("featured") or [] if isinstance(f_, dict) and f_.get("lead") and f_.get("title")), None)
+    except Exception:
+        fl = None
     if not shown:
-        return f"{lab} Brief, {d}: {MATTERS}"
+        return f"{lab} Brief, {d}: " + (_subject_title(str(fl["title"]), 72) if fl else MATTERS)
     lead = _notes_top_shown(issue) or shown[0]
-    title = _subject_title(card_headline(lead), 72)
+    title = _subject_title(str(fl["title"]), 72) if fl else _subject_title(card_headline(lead), 72)
     extra = len(_story_pool(issue)) - 1
     return f"{lab} Brief, {d}: {title}" + (f" + {extra} more" if extra else "")
 
