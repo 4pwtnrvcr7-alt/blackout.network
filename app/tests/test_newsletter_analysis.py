@@ -317,7 +317,8 @@ class Render(unittest.TestCase):
             self.assertIn("Story map", html)
             self.assertIn("Section Top threats", html)
         else:
-            self.assertIn("TOP THREATS", html)
+            import newsletter_v2 as NV2   # v2 round 2: category group headers replace the v1 sections
+            self.assertTrue(any(lab.upper().replace("&", "&amp;") in html for lab, _ in NV2.GROUPS.values()))
         self.assertIn("Signal over noise", html)
         self.assertEqual((NL.env().get("NEWSLETTER_SENDER") or "preview"), "preview")
         self.assertFalse(NL.cfg().get("live_sending_approved"))
@@ -627,7 +628,11 @@ class Topics(unittest.TestCase):
         self.assertEqual(NL.card_headline({"title": "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles. As with the attack on the Southern Bridge, the missile penetrated the roadway completely. However, it remains unclear whether the damage is severe enough"}),
                          "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles")   # t1134: first whole sentence
         self.assertEqual(NL.card_headline({"title": "raw scanner text that goes on and on", "display_title": "Russian ballistic missiles damage Kyiv's Northern Bridge"}), "Russian ballistic missiles damage Kyiv's Northern Bridge")
-        self.assertIn("TOP THREATS" if V2 else "Section Top threats", html)
+        if V2:
+            import newsletter_v2 as NV2
+            self.assertTrue(any(lab.upper().replace("&", "&amp;") in html for lab, _ in NV2.GROUPS.values()))
+        else:
+            self.assertIn("Section Top threats", html)
         self.assertNotIn('height="315"', html)
         if not V2: self.assertIn("UPTREND", html)   # v2: trajectory shows on the story page, not in the email
         # Template-filler WHAT HAPPENED copy is omitted (Nov 10 2026 brief quality rules).

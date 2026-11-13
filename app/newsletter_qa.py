@@ -77,6 +77,8 @@ def extract(html_):
     """Pull what a reader sees as headlines, leads and labelled paragraphs out of the rendered HTML."""
     h = html_ or ""
     heads = [_txt(m.group(1)) for m in re.finditer(r'<a\s[^>]*class="bnt bnh1"[^>]*>(.*?)</a>', h, re.S)]
+    # layout v2 (round 2): headlines are plain text (the tappable link sits right-aligned under the story), marked data-bn-h
+    heads += [_txt(m.group(1)) for m in re.finditer(r'<div\s[^>]*class="bnt bnh1"[^>]*data-bn-h="1"[^>]*>(.*?)</div>', h, re.S)]
     heads = [re.sub(r"^\d+\.\s*", "", x) for x in heads if x]
     tops = [re.sub(r"^\d+\.\s*", "", _txt(m.group(1))) for m in re.finditer(r'<b style="font-weight:700">(\d+\..*?)</b>', h, re.S)]
     deks = [_txt(m.group(1)) for m in re.finditer(r'<b style="display:block;[^"]*">(.*?)</b>', h, re.S)]

@@ -55,6 +55,20 @@ def _src():
 def _issue():
     return N.build_issue({"id": None, "frequency": "twice", "interests": '["all"]'}, at=AT, since=AT - timedelta(hours=12), slot="evening")
 
+def _audit(case, html):
+    """Matt round 2: no body text under 16px (footer >= 12px); every link right-aligned in a >= 44px tap row; no # links."""
+    h = re.sub(r'<div style="display:none.*?</div>', "", html, count=1, flags=re.S)
+    body, _, foot = h.partition("<!--bn-footer-->")
+    px = lambda part: [int(m) for st in re.findall(r'style="([^"]*)"', part)
+                       for m in re.findall(r'font:\s*(?:\d{3}\s+)?(\d+)px|font-size:\s*(\d+)px', st) for m in m if m and m != "0"]
+    case.assertGreaterEqual(min(px(body)), 16); case.assertGreaterEqual(min(px(foot)), 12)
+    for m in re.finditer(r'<a\s[^>]*>', h):
+        a = m.group(0); st = re.search(r'style="([^"]*)"', a).group(1); td = h[:m.start()]; td = td[td.rfind("<td"):]
+        case.assertTrue('text-align:right' in td, a[:120])
+        pad = int(re.search(r'padding:(\d+)px', st).group(1)); lh = int(re.search(r'/(\d+)px', st).group(1))
+        case.assertGreaterEqual(2 * pad + lh, 44, a[:120]); case.assertIn("inline-block", st)
+    case.assertEqual([u for u in re.findall(r'href="([^"]+)"', h) if "#" in u], [])
+
 class V2Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls): _src()
@@ -80,12 +94,24 @@ class V2Tests(unittest.TestCase):
         for cid, *_ in STORIES:
             self.assertIn(f"/wire/{cid}", html)
         self.assertIn("/newsletter/img/lead/", html)                       # rights-cleared photo, through the same-origin copy
-        self.assertIn("Image: U.S. Geological Survey, Public domain", html)  # its credit
-        self.assertIn("/newsletter/img/card/aaaaaaaaaaaaaaa3.png", html)  # no photo: our own data graphic, labelled
-        self.assertIn("Graphic: BLACKOUT.NETWORK", html)
+        body, _, foot = html.partition("<!--bn-footer-->")
+        # round 2: no credit or rights text under pictures; every credit sits in the footer's numbered list
+        self.assertNotIn("U.S. Geological Survey", body)
+        self.assertIn("U.S. Geological Survey, Public domain", foot)
+        self.assertIn("IMAGE CREDITS &amp; SOURCES", foot)
+        self.assertIn("/newsletter/img/card/aaaaaaaaaaaaaaa3.png", html)  # no photo: our own data graphic
+        self.assertNotIn("Graphic:", body); self.assertNotIn("rights-cleared", body)
+        self.assertIn("Story graphics without a photo are made by", foot)
         self.assertEqual(html.count("Read the full brief"), len(shown) + len(issue.get("featured") or []))
-        self.assertIn("https://www.youtube.com/shorts/abcDEF12345", html)
-        self.assertEqual(html.count("Watch on YouTube"), 1)
+        self.assertEqual(body.count('href="https://www.youtube.com/shorts/abcDEF12345'), 1)
+        # subtle text links only: no filled buttons anywhere
+        self.assertNotIn("border-radius:999px", html)
+        self.assertNotRegex(html, r'<a\s[^>]*background:#FFC21A')
+        # stories grouped under category headers, highest-ranked group first (rank 8 natural disaster)
+        g1 = body.find("WEATHER &amp; NATURAL HAZARDS"); g2 = body.find("POLITICS &amp; GOVERNMENT")
+        self.assertTrue(0 < g1 < g2, (g1, g2))
+        self.assertLess(body.find("aaaaaaaaaaaaaaa1"), body.find("aaaaaaaaaaaaaaa2"))
+        _audit(self, html)
         self.assertIn("https://blackout.network/people/donald-trump", html)
         self.assertIn("/newsletter/img/person/donald-trump.jpg", html)
         self.assertNotIn("Not specified", html)
@@ -147,6 +173,7 @@ class V2Tests(unittest.TestCase):
         for bad in ("no confirmed high-severity", "nothing to report", "all quiet", "nothing new to report"):
             self.assertNotIn(bad, html.lower()); self.assertNotIn(bad, text.lower())
         self.assertIn("Unsubscribe", html)
+        _audit(self, html)
 
     def test_v2_links_open_at_top(self):
         os.environ["BN_NL_V2"] = "1"
@@ -157,6 +184,40 @@ class V2Tests(unittest.TestCase):
         self.assertEqual([h for h in hrefs if "#" in h], [])
         self.assertNotIn("#wire", text)
         self.assertIn("Find new sources", html)
+
+    def test_v2_spacex_section_and_tip(self):
+        os.environ["BN_NL_V2"] = "1"
+        sx = os.path.join(TMP, "spacex.json")
+        json.dump({"upcoming": {"items": [
+            {"name": "Falcon 9 Block 5 | Old Mission", "net": "2026-11-13T20:00:00Z", "status": "Go", "site": "Cape Canaveral SFS, FL, USA"},
+            {"name": "Falcon 9 Block 5 | Starlink Group 10-7", "net": "2026-11-14T03:30:00Z", "win_end": "2026-11-14T07:30:00Z", "status": "Go",
+             "precision": "Minute", "rocket": "Falcon 9 Block 5", "site": "Cape Canaveral SFS, FL, USA", "desc": "A batch of Starlink satellites for low Earth orbit."},
+            {"name": "Falcon 9 Block 5 | Crew-13", "net": "2026-11-20T12:00:00Z", "status": "TBC", "precision": "Hour"}]},
+            "news": {"items": [{"title": "SpaceX launches more Starlink satellites", "url": "https://spacenews.com/a", "source": "SpaceNews", "time": "2026-11-13T20:00:00Z"},
+                               {"title": "SpaceX shares soar", "url": "http://bad.example/x", "source": "Random Blog", "time": "2026-11-13T20:00:00Z"}]}},
+                  open(sx, "w"))
+        os.environ["BN_NL_SPACEX_JSON"] = sx
+        try: subj, html, text = N.render(_issue(), LINKS)
+        finally: os.environ.pop("BN_NL_SPACEX_JSON", None)
+        body, _, foot = html.partition("<!--bn-footer-->")
+        self.assertIn("NEXT SPACEX LAUNCH", body)
+        self.assertIn("Starlink Group 10-7", body); self.assertNotIn("Old Mission", body)          # already-flown NET is skipped
+        self.assertIn("Fri, Nov 13 · 10:30 PM ET", body)
+        self.assertIn("After that: Crew-13", body)
+        self.assertIn("SpaceX launches more Starlink satellites", body); self.assertNotIn("Random Blog", html)
+        self.assertIn("https://spacenews.com/a", foot); self.assertIn("Launch Library 2", foot)
+        self.assertIn("https://blackout.network/spacex", body)
+        self.assertIn("PREPAREDNESS TIP", body)
+        self.assertRegex(body, r'https://blackout.network/static/ready/0\d-[a-z0-9-]+\.pdf')
+        self.assertIn("https://blackout.network/ready", body)
+        self.assertIn("Next SpaceX launch: Starlink Group 10-7", text)
+        _audit(self, html)
+
+    def test_v2_without_spacex_data_skips_section(self):
+        os.environ["BN_NL_V2"] = "1"; os.environ["BN_NL_SPACEX_JSON"] = os.path.join(TMP, "missing.json")
+        try: subj, html, text = N.render(_issue(), LINKS)
+        finally: os.environ.pop("BN_NL_SPACEX_JSON", None)
+        self.assertNotIn("NEXT SPACEX LAUNCH", html)
 
 if __name__ == "__main__":
     unittest.main()

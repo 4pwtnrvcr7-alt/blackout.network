@@ -94,9 +94,55 @@ def frame(im, w, h):
     return bg
 
 # ------------------------------------------------------------------ photos
+_LBL = {"mt": None, "v": {}}
+def archive_label(name):
+    """Small on-image archive label for a file photo ("FILE PHOTO · MYKOLA AZAROV, 2012"), looked up server-side from the signed
+    story_reports.json people block by media id, so no caller can make this route draw arbitrary text. None for event photos."""
+    try:
+        import people as PP
+        b = PP.block()
+    except Exception:
+        return None
+    mt = id(b)
+    if _LBL["mt"] != mt:
+        v = {}
+        def cap_label(d):
+            cap = str((d or {}).get("caption") or "")
+            m = re.match(r"^File photo of (.{2,60}?) \((\d{4})\)", cap)
+            if m: return f"FILE PHOTO \u00b7 {m.group(1).upper()}, {m.group(2)}"
+            m = re.match(r"^(.{2,60}?), (\d{4})\. File photo", cap)
+            if m: return f"FILE PHOTO \u00b7 {m.group(1).upper()}, {m.group(2)}"
+            return "FILE PHOTO" if "file photo" in cap.lower() else None
+        for d in list((b.get("places") or {}).values()) + list((b.get("lead") or {}).values()):
+            if isinstance(d, dict) and str(d.get("src") or "").startswith("https://"):
+                lab = cap_label(d)
+                if lab: v[PP.mid(d["src"])] = lab
+        for p in (b.get("profiles") or {}).values():
+            po = (p or {}).get("portrait") or {}
+            if str(po.get("src") or "").startswith("https://"):
+                yr = str(po.get("date") or "")[:4]
+                v.setdefault(PP.mid(po["src"]), f"FILE PHOTO \u00b7 {str(p.get('name') or '').upper()}" + (f", {yr}" if yr.isdigit() else ""))
+        _LBL.update(mt=mt, v=v)
+    return _LBL["v"].get(name)
+
+def _stamp(im, label):
+    """Bottom-left archive label (pre-publish A13: place/person and year on the picture itself), readable at phone width."""
+    if not label: return im
+    from PIL import ImageDraw
+    im = im.convert("RGBA"); W, H = im.size
+    ov = __import__("PIL.Image", fromlist=["Image"]).new("RGBA", im.size, (0, 0, 0, 0)); dr = ImageDraw.Draw(ov)
+    f = _font(False, 40); label = label[:60]   # 40px on a 1136px picture shows at ~12.6px on a 390px phone
+    tw = dr.textlength(label, font=f); pad = 16
+    if tw > W - 80: f = _font(False, 32); tw = dr.textlength(label, font=f)
+    x0, y1 = 20, H - 20; y0 = y1 - 40 - 2 * pad + 8
+    dr.rounded_rectangle((x0, y0, x0 + tw + 2 * pad, y1), radius=10, fill=(0, 0, 0, 165))
+    dr.text((x0 + pad, y0 + pad - 4), label, font=f, fill=(245, 245, 247, 235))
+    im.alpha_composite(ov)
+    return im.convert("RGB")
+
 def lead_jpg(name):
     if not MID.match(name or ""): return None
-    key = "lead_" + name.rsplit(".", 1)[0] + ".jpg"
+    key = "lead3_" + name.rsplit(".", 1)[0] + ".jpg"
     hit = _cache_get(key, 14 * 86400)
     if hit: return hit, "image/jpeg"
     try:
@@ -111,7 +157,7 @@ def lead_jpg(name):
         im = Image.open(io.BytesIO(r[0])); im.load()
         if im.mode in ("RGBA", "LA", "P"):
             im = im.convert("RGBA"); bg = Image.new("RGB", im.size, (22, 24, 28)); bg.paste(im, mask=im.split()[-1]); im = bg
-        b = _jpeg(frame(im, 1136, 640), 80)
+        b = _jpeg(_stamp(frame(im, 1136, 640), archive_label(name)), 80)
         _cache_put(key, b)
         return b, "image/jpeg"
     except Exception:
@@ -171,7 +217,7 @@ def card_data(cid):
         s = None
     if s:
         reps = s.get("reports") or []
-        return {"rank": int(s.get("rank") or 0), "category": s.get("category") or "other", "place": s.get("location") or "",
+        return {"rank": int(s.get("rank") or 0), "category": s.get("category") or "other", "place": s.get("location") or "", "title": s.get("title") or "",
                 "sources": len(set(r.get("family") for r in reps if r.get("family"))) or len(s.get("families") or []),
                 "official": len(set(r.get("family") for r in reps if r.get("official"))), "reports": len(reps),
                 "span": _span(s.get("first_seen"), s.get("updated"))}
@@ -195,7 +241,7 @@ def _db_card(cid):
         import newsletter as N
         k = N.src()
         try:
-            r = k.execute("SELECT rank, category, location, eff_families, n_families, n_items, first_seen, updated FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
+            r = k.execute("SELECT rank, category, location, title, eff_families, n_families, n_items, first_seen, updated FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
             if not r: return None
             try:
                 off = k.execute("SELECT COUNT(DISTINCT family) FROM alerts WHERE cluster_id=? AND official=1", (cid,)).fetchone()[0]
@@ -206,7 +252,7 @@ def _db_card(cid):
             k.close()
         loc = (r["location"] or "").strip()
         if re.search(r"not (?:specified|reported|recorded)|unknown location", loc, re.I): loc = ""
-        return {"rank": int(r["rank"] or 0), "category": r["category"] or "other", "place": "",   # scanner places can be off; the email kicker shows a checked one
+        return {"rank": int(r["rank"] or 0), "category": r["category"] or "other", "place": "", "title": r["title"] or "",   # scanner places can be off; the email kicker shows a checked one
                 "sources": int(r["eff_families"] or r["n_families"] or 0), "official": int(off or 0),
                 "reports": int(nrep or r["n_items"] or 0), "span": _span(r["first_seen"], r["updated"])}
     except Exception:
@@ -249,6 +295,12 @@ def card_png(d):
     x0 = 480
     f_k, f_n, f_l = _font(True, 28), _font(True, 64), _font(False, 28)
     kick = (CAT_LABEL.get((d.get("category") or "other").lower(), (d.get("category") or "Report").capitalize())).upper()
+    try:   # the same category group the email files this story under (so the picture and its section never disagree)
+        import newsletter_v2 as NV2
+        g = NV2.group_of({"category": d.get("category"), "title": d.get("title") or "", "display_title": d.get("title") or ""})
+        if g != "world": kick = NV2.GROUPS[g][0].upper()
+    except Exception:
+        pass
     dr.rounded_rectangle([x0, 92, x0 + 10, 132], radius=5, fill=col)
     dr.text((x0 + 26, 94), _fit(dr, kick, f_k, W - x0 - 90), font=f_k, fill=(245, 245, 247))
     if d.get("place"):
