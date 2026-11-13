@@ -56,12 +56,12 @@ class Pin(unittest.TestCase):
             {"cluster_id": "3" * 16, "title": "Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases", "rank": 7, "n_families": 3,
              "category": "disease", "location": "", "lat": None, "lon": None, "updated": "2026-11-13T14:00:00Z", "first_seen": "2026-11-13T14:00:00Z", "event_time": None}]},
             _addon_mod=lambda n: types.SimpleNamespace(handle_get=lambda p, q: (404, {})))
-        real_mod, rp, rf, rev = sys.modules.get("server"), DS.pin_card, DS.feature_card, A._events
+        real_mod, rp, rf, rev, rps = sys.modules.get("server"), DS.pin_card, DS.feature_card, A._events, DS.pin_cards
         sys.modules["server"] = srv
-        DS.pin_card = lambda now=None: rp(NOW); DS.feature_card = lambda now=None: rf(NOW); A._events = lambda main: main
+        DS.pin_cards = lambda now=None, limit=3: rps(NOW, limit); DS.pin_card = lambda now=None: rp(NOW); DS.feature_card = lambda now=None: rf(NOW); A._events = lambda main: main
         try: out = A._home_build()
         finally:
-            DS.pin_card, DS.feature_card, A._events = rp, rf, rev
+            DS.pin_card, DS.feature_card, A._events, DS.pin_cards = rp, rf, rev, rps
             if real_mod is None: sys.modules.pop("server", None)
             else: sys.modules["server"] = real_mod
         self.assertEqual(out["pin"]["title"], HEADLINE); self.assertEqual(out["feature"]["cluster_id"], EAS)
@@ -71,7 +71,7 @@ class Static(unittest.TestCase):
     def test_js_pin_first_feature_second(self):
         js = open(os.path.join(APP, "static", "bn-apple-home.js"), encoding="utf-8").read()
         self.assertIn("if(P)cards.unshift(pcard(P));", js)
-        i, j = js.find("if(P)cards.unshift(pcard(P));"), js.find("cards.splice(Math.min(1,cards.length),0,fcard(F))")
+        i, j = js.find("if(P)cards.unshift(pcard(P));"), js.find("cards.splice(Math.min(PS.length||1,cards.length),0,fcard(F))")
         self.assertTrue(0 < i < j)   # pin goes in first, then the green card at index 1
         self.assertIn("'<h3>'+esc(f.title)+'</h3>", js)   # verbatim, not title()
         self.assertNotRegex(js, re.compile(r"meshtastic|\blora\b", re.I))

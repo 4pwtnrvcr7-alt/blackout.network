@@ -299,11 +299,11 @@ def feature_card(now=None):
 def pins_enabled():
     return os.environ.get("BN_HOME_PIN", "1") != "0"
 
-def pin_card(now=None):
-    """Matt, Nov 13 (t1349u): a desk story pinned as card 1 of the homepage top row, by cluster id, only between pin.from and
-    pin.until (UTC ISO; the Hamas bodyguard story runs to the end of Nov 14 ET). The title is shown verbatim. Kill switch
-    BN_HOME_PIN=0. The green featured card (feature_card) stays in position 2. None when off, expired or on any error."""
-    if not pins_enabled(): return None
+def pin_cards(now=None, limit=3):
+    """Every active pinned desk story, in card order (Matt, Nov 13 4:39 PM ET: the FAA nationwide ground stop leads, the Hamas
+    story moves to card 2, the green EAS card follows). Sort: pin.order ascending (default 50), then newest pin.from first.
+    Same window rule as before (pin.from <= now < pin.until, UTC ISO), titles verbatim, kill switch BN_HOME_PIN=0. [] on error."""
+    if not pins_enabled(): return []
     try:
         now = time.time() if now is None else now
         act = []
@@ -312,13 +312,23 @@ def pin_card(now=None):
             if not isinstance(p, dict) or not (p.get("title") or s.get("title")): continue
             a, b = _ts(p.get("from")), _ts(p.get("until"))
             if a is None or b is None or not (a <= now < b): continue
-            act.append((a, cid, s, p))
-        if not act: return None
-        _, cid, s, p = sorted(act, reverse=True)[0]
-        return {"cluster_id": cid, "href": f"/wire/{cid}", "title": str(p.get("title") or s["title"]), "text": str(p.get("text") or ""),
-                "kicker": str(p.get("kicker") or "Featured story"), "tag": str(p.get("tag") or ""),
-                "link_text": str(p.get("link_text") or "Read the full story"), "rank": max(0, min(10, int(s.get("rank") or 0))),
-                "show_until": str(p.get("until") or ""), "pinned": True}
+            try: o = int(p.get("order", 50))
+            except Exception: o = 50
+            act.append((o, -a, cid, s, p))
+        act.sort(key=lambda x: (x[0], x[1], x[2]))
+        return [{"cluster_id": cid, "href": f"/wire/{cid}", "title": str(p.get("title") or s["title"]), "text": str(p.get("text") or ""),
+                 "kicker": str(p.get("kicker") or "Featured story"), "tag": str(p.get("tag") or ""),
+                 "link_text": str(p.get("link_text") or "Read the full story"), "rank": max(0, min(10, int(s.get("rank") or 0))),
+                 "show_until": str(p.get("until") or ""), "pinned": True} for _, _, cid, s, p in act[:max(1, int(limit))]]
+    except Exception:
+        return []
+
+def pin_card(now=None):
+    """Matt, Nov 13 (t1349u): the desk story pinned as card 1 of the homepage top row (the first of pin_cards), or None when off,
+    expired or on any error. The green featured card (feature_card) follows the pinned cards."""
+    try:
+        p = pin_cards(now)
+        return p[0] if p else None
     except Exception:
         return None
 
