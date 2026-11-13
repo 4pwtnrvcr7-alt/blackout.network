@@ -44,7 +44,7 @@ I_X = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="15" heig
 # tab listed before it in NAV (so a new tab added next to Politics/Government lands in Politics & Government), else the first section.
 MENU = [
  ("Live", ["threat", "noise", "bcast", "streams", "radio", "trends", "heatmap"]),
- ("Threat categories", ["net", "grid", "@mesh", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "intel"]),
+ ("Threat categories", ["net", "grid", "@mesh", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "@cern", "intel"]),
  ("Politics & Government", ["politics", "gov"]),
  ("Community", ["ranked", "@social", "@stats", "newsletter"]),
  ("Reference", ["res", "maps", "bush", "med", "preppers", "figures"]),
@@ -129,8 +129,8 @@ MENU3 = [
   [("preppers", "Preppers"), ("res", "Local Resources"), ("maps", "Offline Maps"), ("med", "First Aid"), ("bush", "Bushcraft"), ("meshguide", "Off-grid Setup Guide")]),
  ("politics", "Politics & Government", "Elections, laws and the people in power.",
   [("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"), ("gunlaws", "Gun Laws"), ("figures", "Key Figures")]),
- ("markets", "Markets & Tech", "Money, intel streams, launches and jets.",
-  [("finance", "Markets"), ("intel", "Intel Streams"), ("spacex", "SpaceX"), ("jets", "Private Jets")]),
+ ("markets", "Markets & Tech", "Money, intel streams, launches, physics and jets.",
+  [("finance", "Markets"), ("intel", "Intel Streams"), ("spacex", "SpaceX"), ("@cern", "CERN & LHC"), ("jets", "Private Jets")]),
  ("community", "Community", "Briefs, videos and what readers rank.",
   [("newsletter", "Newsletter"), ("@social", "Videos & Posts"), ("ranked", "Ranked by Users"), ("games", "Games")]),
  ("about", "About", "Our sources, scoring and public numbers.",

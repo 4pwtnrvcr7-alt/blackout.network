@@ -87,6 +87,8 @@ ROUTES = {
     "/api/social": "social",
     "/story": "social",             # /story/<slug>: one page per launch video (article + nocookie embed), hidden until publish_at (t311)
     "/api/spacex": "spacex",
+    "/cern": "cern", "/lhc": "cern",   # CERN & LHC explainer (cern.py, Nov 13): /cern (+ /lhc, /cern/lhc aliases)
+    "/api/cern": "cern",            # /api/cern/{status,opendata,live/<display>.png,img/<file>,app.js,app.css,ring.json}
     "/api/elon": "elon",            # old Elon Musk tab API (tab retired t353; #elon now redirects to #figures)
     "/api/figures": "figures",      # Key Figures tab #figures (t353): neutral people-in-the-news cards
     "/api/finance": "finance",

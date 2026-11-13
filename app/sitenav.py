@@ -63,6 +63,7 @@ NAV = [
    "Private and business jets airborne right now anywhere in the world, tracked on BLACKOUT.NETWORK from public transponder data and refreshed every few minutes."),
   ("spacex", "spacex", "🚀 SpaceX", "SpaceX: launches, Starship and Starlink",
    "SpaceX on BLACKOUT.NETWORK: next-launch countdown, the full launch schedule, Starship and Starlink updates, recent news and related prediction markets."),
+  ("@cern", "/cern", "🧲 CERN & LHC", None, None),   # /cern page (cern.py, Nov 13): CERN & Large Hadron Collider explainer with live CERN displays
   ("intel", "intel", "🗂 Intel Streams", "Intel Streams: research, leaks, patents",
    "BLACKOUT.NETWORK's Intel Streams: new research papers, leak releases, patents, mergers and market shocks, each linked to its source, with an RSS feed."),
  ]),
@@ -135,6 +136,9 @@ PAGES = {
  "stats": ("@stats", "Public stats: site traffic, YouTube and X | BLACKOUT.NETWORK",
            "BLACKOUT.NETWORK's open stats: daily visitors and page views, the most-read pages and stories, where readers come from, plus YouTube @blkoutntw and X @BlkoutNtw growth.",
            "Open, aggregate numbers for the site, YouTube and X. Totals only, nothing personal."),
+ "cern": ("@cern", "CERN and the Large Hadron Collider: how it works, who pays, what it found | BLACKOUT.NETWORK",
+          "How CERN's 27 km Large Hadron Collider works and was built, who funds it country by country, what it discovered, the conspiracy theories next to the physics, and CERN's live control-room displays.",
+          "The Large Hadron Collider explained, with sourced funding data, the theories vs the physics, and live CERN displays."),
  "crime": ("@crime", "Crime map and statistics near you: ZIP, city, county, country | BLACKOUT.NETWORK",
            "Look up crime for any US ZIP code, city, county or state, or any country: official FBI rates per 100,000 with trends, near-real-time incident heat maps for 16 US cities, a US county map and a world homicide map.",
            "Official crime rates for any ZIP, city, county, state or country, plus near-real-time maps for 16 US cities."),
