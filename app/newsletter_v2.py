@@ -360,6 +360,8 @@ def story_card(it, links, c, refs, accent=None):
         H.append(_p(f'<b class="ta" style="color:{AMBER}">What\'s new:</b> {E(" ".join(bits) or "Updated.")}', 8))
     s = summary(it)
     if s: H.append(_p(E(s), 8))
+    al = N.also_line(it)   # a merged angle of the same event (NL-DEDUPE-1)
+    if al: H.append(_p(E(al), 8))
     H.append(_people_html(ps, refs))
     sec = ([("YouTube", yt)] if yt else []) + ([("X", xu)] if xu else [])
     fl = N.follow_links(links.get("_row"), it["cluster_id"], c)
@@ -381,6 +383,7 @@ def featured_card(f_, c, refs):
     H = [_img_html(im, refs, N._one_line(f_["title"], 60)),
          f'<div style="font:700 {BODY_PX}px/22px {FACE};letter-spacing:.6px;color:#22C55E;margin:0 0 6px 0">{kick}</div>', _headline(f_["title"])]
     if f_.get("text"): H.append(_p(E(f_["text"]), 8))
+    if N.also_line(f_): H.append(_p(E(N.also_line(f_)), 8))
     H.append(_people_html(ps, refs))
     yt = youtube_for(it); xu = x_for(it)
     H.append(_links(("Read the full brief", f_["url"]), ([("YouTube", yt)] if yt else []) + ([("X", xu)] if xu else [])))
@@ -730,12 +733,13 @@ def text_part(issue, links, c, subj, why, groups=None, sx=None, refs=None):
     elif not issue.get("featured"):
         T += [f"Open the live dashboard: {_base(c)}/", ""]
     for f_ in issue.get("featured") or []:
-        T += [f_["kicker"].upper() + (f" · {f_['tag'].upper()}" if f_.get("tag") else ""), f_["title"]] + ([f_["text"]] if f_.get("text") else []) + [f"Read the full brief: {f_['url']}", ""]
+        T += [f_["kicker"].upper() + (f" · {f_['tag'].upper()}" if f_.get("tag") else ""), f_["title"]] + ([f_["text"]] if f_.get("text") else []) + ([N.also_line(f_)] if N.also_line(f_) else []) + [f"Read the full brief: {f_['url']}", ""]
     def one(it, i):
         rk = "" if it.get("rank") is None else f"[Rank {int(it.get('rank') or 0)}/10] "
         T.append(f"{i}. {rk}{N.card_headline(it)}")
         s = summary(it)
         if s: T.append(f"   {s}")
+        if N.also_line(it): T.append(f"   {N.also_line(it)}")
         for p in people_of(it, c): T.append(f"   Profile, {p['name']}: {p['url']}")   # one per line: a trailing ";" would end up inside the tagged URL
         T.append(f"   Read the full brief: {N.wire_url(it['cluster_id'], c=c)}")
         yt = youtube_for(it); xu = x_for(it)

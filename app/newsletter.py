@@ -1227,6 +1227,8 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         log(f"story_gates prune skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
     _hold_unbriefed(issue, c)
     issue["featured"] = featured_desk(at, c)   # Matt, Nov 13: desk stories (EAS test) featured near the top
+    try: merge_same_event(issue)   # one event = one card (NL-DEDUPE-1); the QA gate re-checks (NL-DEDUPE-2)
+    except Exception as ex: log(f"same-event merge skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
     issue["bluf"] = bluf(issue)
     if issue.get("notes_lead"):
         issue["bluf"] = MATTERS + ". " + issue["notes_lead"]
@@ -1237,6 +1239,101 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     return issue
 
 _HOLD_SECTIONS = ("near", "main", "politics", "notable", "updates", "follow", "developing", "watchlist")
+
+# ---------------------------------------------------------------- one event = one card (Matt, Nov 13 2026; standards NL-DEDUPE-1/2)
+_DEDUPE_SECTIONS = ("near", "main", "politics", "follow", "updates", "notable", "developing", "watchlist")
+
+def _dedupe_gazetteer(title):
+    h = _place_from_headline(title, "")
+    return [h["place"]] if h and h.get("place") and h.get("precision") not in ("country", "continent", "region") else []
+
+def _dedupe_probe(it, R=None):
+    """The fields event_dedupe compares, for one issue item (story card, watchlist line or featured desk story)."""
+    cid = it.get("cluster_id") or ""
+    title = it.get("display_title") or it.get("title") or ""
+    alias = (R or {}).get("alias") or {}
+    sid = alias.get(cid) if isinstance(alias.get(cid), str) else None
+    ppl = []
+    try:
+        import people as PP
+        text = " ".join(str(x) for x in (title, it.get("title"), (it.get("analyst") or {}).get("what"), it.get("what")) if x)
+        for p_ in PP.people_for(cid, text) or []:
+            try: hit = re.search(p_.get("rx") or "~~", text)
+            except re.error: hit = None
+            if hit and p_.get("slug"): ppl.append(p_["slug"])
+    except Exception:
+        pass
+    return {"cluster_id": cid or None, "story_id": sid or cid or None, "title": title, "where": "" if it.get("approx") else (it.get("where") or ""),
+            "when": it.get("when"), "rank": it.get("rank"), "people": ppl}
+
+def _issue_entries(issue):
+    """[(section, item)] in priority order: featured desk stories, then the brief's own story order, then still-developing, then watchlist."""
+    out, seen = [], set()
+    for f_ in issue.get("featured") or []:
+        if isinstance(f_, dict) and f_.get("title"): out.append(("featured", f_)); seen.add(id(f_))
+    pos = {}
+    for sec in _DEDUPE_SECTIONS:
+        for it in issue.get(sec) or []:
+            pos.setdefault(id(it), sec)
+    try: pool = _story_pool(issue)
+    except Exception: pool = []
+    for it in pool:
+        if id(it) in pos and id(it) not in seen: out.append((pos[id(it)], it)); seen.add(id(it))
+    for sec in _DEDUPE_SECTIONS:
+        for it in issue.get(sec) or []:
+            if id(it) not in seen: out.append((sec, it)); seen.add(id(it))
+    return out
+
+def same_event_pairs(issue):
+    """Every pair of issue items that describe one event: [(section_a, item_a, section_b, item_b, reason)]. QA gate input."""
+    import event_dedupe as ED
+    try:
+        import story_report as SR
+        R = SR.reports() or {}
+    except Exception:
+        R = {}
+    ent = _issue_entries(issue); probes = [_dedupe_probe(it, R) for _, it in ent]
+    idx = {id(p_): i for i, p_ in enumerate(probes)}
+    return [(ent[idx[id(a)]][0], ent[idx[id(a)]][1], ent[idx[id(b)]][0], ent[idx[id(b)]][1], why)
+            for a, b, why in ED.duplicates(probes, _dedupe_gazetteer)]
+
+def merge_same_event(issue):
+    """Matt, Nov 13: one event appears once per issue. Two items about the same event (same cluster/story id, same place + event type
+    within 48 h, same named outbreak, shared named people + place, or near-identical headlines) are merged before layout: the
+    higher-ranked one stays (featured desk stories always stay; watchlist lines lose to story cards) and the other angle is folded in
+    as one "Also:" line that points readers to the kept story page. Applies to Top 3, every section and the watchlist.
+    Returns [(kept_cluster_id, dropped_cluster_id, reason)], also on issue["merged"]."""
+    import event_dedupe as ED
+    try:
+        import story_report as SR
+        R = SR.reports() or {}
+    except Exception:
+        R = {}
+    ent = _issue_entries(issue)
+    probes = [_dedupe_probe(it, R) for _, it in ent]
+    back = {id(p_): ent[i] for i, p_ in enumerate(probes)}
+    tier = {"featured": 0, "watchlist": 2}
+    prio = lambda p_: (tier.get(back[id(p_)][0], 1), 0 if back[id(p_)][0] == "featured" else -int(p_.get("rank") or 0), probes.index(p_))
+    kept, folded = ED.merge(probes, _dedupe_gazetteer, prio)
+    merged = []
+    for kp, dp, why in folded:
+        (ksec, kit), (dsec, dit) = back[id(kp)], back[id(dp)]
+        if dsec == "featured": continue   # never drop a featured desk story (Hamas pin, EAS)
+        issue[dsec] = [x for x in issue.get(dsec) or [] if x is not dit]
+        line = clean_title(dp.get("title") or "").rstrip(" .")
+        if line and dp.get("cluster_id") != kp.get("cluster_id"):
+            kit.setdefault("also", [])
+            if line not in [a["text"] for a in kit["also"]]:
+                kit["also"].append({"text": line, "cluster_id": dp.get("cluster_id"), "reason": why})
+        merged.append((kp.get("cluster_id"), dp.get("cluster_id"), why))
+        log(f"same event merged: kept {kp.get('cluster_id')} dropped {dp.get('cluster_id')} ({dsec}): {why}"[:300], "analysis")
+    issue["merged"] = merged
+    return merged
+
+def also_line(it):
+    """One short 'Also:' sentence for angles merged into this story (merge_same_event); empty when none."""
+    a = [x["text"] for x in (it.get("also") or []) if x.get("text")]
+    return ("Also: " + "; ".join(a[:2]) + ".") if a else ""
 
 def _hold_unbriefed(issue, c=None):
     """Matt, Nov 12: nothing goes out in the newsletter unless its story page has a full breakdown ready. Drops every story card whose
@@ -2656,6 +2753,8 @@ def qa_gate(issue, subj, html_, text, c=None):
     try:
         import newsletter_qa as QA
         r = QA.check(subj, html_, text, QA.sources_from_issue(issue), QA.titles_from_issue(issue))
+        dup = QA.duplicate_events(issue)   # NL-DEDUPE-2: two items about one event fail the issue
+        if dup: r = dict(r, ok=False, blockers=list(r["blockers"]) + dup)
     except Exception as ex:   # a broken gate must not silently pass: block, and say why
         r = {"ok": False, "blockers": [f"QA gate error: {type(ex).__name__}: {ex}"[:200]], "warnings": []}
     if r["warnings"]: log(f"QA gate warnings: {' | '.join(r['warnings'][:5])}"[:600], "qa")

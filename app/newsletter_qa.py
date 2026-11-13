@@ -172,6 +172,18 @@ def check(subject, html_, text="", sources=(), title_sources=None):
     return {"ok": not B, "blockers": B, "warnings": W, "counts": {k: len(v) for k, v in ex.items()}}
 
 
+def duplicate_events(issue):
+    """NL-DEDUPE-2 (Matt, Nov 13 2026): blockers for any two items in one issue that share a cluster/story id or match the
+    same-event heuristic (event_dedupe.same_event). newsletter.merge_same_event() folds these before layout, so a hit here
+    means the merge missed one and the issue must not go out as is."""
+    import newsletter as N
+    out = []
+    for sa, a, sb, b, why in N.same_event_pairs(issue):
+        ta = (a.get("display_title") or a.get("title") or "")[:90]; tb = (b.get("display_title") or b.get("title") or "")[:90]
+        out.append(f"duplicate event ({why}): {sa} {a.get('cluster_id')} {ta!r} and {sb} {b.get('cluster_id')} {tb!r}")
+    return out
+
+
 def titles_from_issue(issue):
     """Full headline strings only (analyst headline, raw title): a card headline is compared with these, not with body text."""
     out = []
