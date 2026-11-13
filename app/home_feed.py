@@ -6,8 +6,9 @@ under investigation for bank failure", "Ousted Paraguayan president placed under
 the same quake (JMA + EMSC + a news story), NWS re-issues the same warning for the same county, and the Nov 7 cutover
 catch-up re-ingested a backlog with the same first_seen. /api/state lists clusters, and the homepage row only grouped quakes.
 
-This module collapses those clusters into events here, at display time. It never changes the scanner, its scores or the DB
-(read-only, file:...?mode=ro), and it never invents anything: every card is a real cluster, shown with its own rank.
+This module collapses those clusters into events here, at display time (SITE-DEDUPE-1). Other angles of the same event
+become one "Also:" line on the kept card (event_dedupe, same matcher as the newsletter). It never changes the scanner, its
+scores or the DB (read-only, file:...?mode=ro), and it never invents anything: every card is a real cluster, shown with its own rank.
 
 Social links: the box posts each story to X and YouTube, verifies the links (HTTP 200 via oEmbed, deleted posts skipped) and
 pushes social_links.json over the signed sync channel (render_sync, pattern social_*.json). A link is rendered only when the
@@ -190,6 +191,14 @@ def group(items, now=None):
         rep["grouped"] = len(mem)
         ups = [u for u in (_ts(m.get("updated")) for m in mem) if u]
         if ups: rep["updated"] = max(m.get("updated") for m in mem if _ts(m.get("updated")) == max(ups))
+        also = list(rep.get("also") or [])
+        seen = {a.get("text") for a in also}
+        for m in mem[1:]:
+            line = (m.get("title") or "").rstrip(" .")
+            if line and line != (rep.get("title") or "") and line not in seen:
+                also.append({"text": line, "cluster_id": m.get("cluster_id"), "reason": "grouped same event"})
+                seen.add(line)
+        if also: rep["also"] = also
         out.append(rep)
     out.sort(key=lambda x: (-(int(x.get("rank") or 0)), -(int(x.get("n_families") or 0)), -(_ts(x.get("updated")) or 0)))
     return out
@@ -200,7 +209,90 @@ def events(items, now=None, limit=40):
     for x in items:
         t = clean_title(x.get("title"))
         if t: keep.append(dict(x, title=t))
-    return group(keep, now)[:limit]
+    return fold_angles(group(keep, now))[:limit]
+
+
+# ------------------------------------------------------------------ one event = one card (SITE-DEDUPE-1): reuse event_dedupe, display only
+def _gazetteer(title):
+    """Every place a headline clearly names (countries, plus the best resolved place). Never opens the DB."""
+    out = []
+    try:
+        import signal_place as SP
+        text = SP.story_text(title or "", "", "")
+        out.extend(SP.named_countries(text) or [])
+        inf = SP.infer(text)
+        if inf:
+            if inf.get("cc"): out.append(inf["cc"])
+            if inf.get("place"): out.append(inf["place"])
+    except Exception:
+        pass
+    try:
+        import story_display as SD
+        loc = SD.place_from_headline(title or "")
+        if loc: out.append(loc)
+    except Exception:
+        pass
+    seen, uniq = set(), []
+    for p_ in out:
+        k = str(p_).strip()
+        if k and k.lower() not in seen:
+            seen.add(k.lower()); uniq.append(k)
+    return uniq
+
+
+def also_line(item):
+    """One short 'Also:' sentence for angles merged into this card; empty when none."""
+    a = [x["text"] for x in (item.get("also") or []) if isinstance(x, dict) and x.get("text")]
+    return ("Also: " + "; ".join(a[:2]) + ".") if a else ""
+
+
+def _probe(it):
+    cid = it.get("cluster_id") or ""
+    if not cid and isinstance(it.get("url"), str) and "/wire/" in it["url"]:
+        cid = it["url"].rsplit("/", 1)[-1]
+    return {"cluster_id": cid or None, "story_id": it.get("story_id") or cid or None,
+            "title": it.get("title") or it.get("display_title") or "",
+            "where": it.get("location") or it.get("where") or it.get("loc") or "",
+            "when": it.get("event_time") or it.get("when") or it.get("updated") or it.get("first_seen") or it.get("t"),
+            "rank": it.get("rank"), "people": it.get("people") or []}
+
+
+def _add_also(kept, dropped, reason):
+    """Fold dropped's title into kept's also list and merge cluster_ids. Mutates kept."""
+    line = (dropped.get("title") or "").rstrip(" .")
+    if line and line != (kept.get("title") or ""):
+        kept.setdefault("also", [])
+        if line not in [a.get("text") for a in kept["also"]]:
+            kept["also"].append({"text": line, "cluster_id": dropped.get("cluster_id"), "reason": reason})
+    ids = list(kept.get("cluster_ids") or ([kept.get("cluster_id")] if kept.get("cluster_id") else []))
+    for cid in (dropped.get("cluster_ids") or ([dropped.get("cluster_id")] if dropped.get("cluster_id") else [])):
+        if cid and cid not in ids:
+            ids.append(cid)
+    if ids:
+        kept["cluster_ids"] = ids
+        kept["grouped"] = max(int(kept.get("grouped") or 1), len(ids))
+
+
+def fold_angles(items, gazetteer=None):
+    """Merge same-event cards (event_dedupe) and attach Also: lines. Display only; does not mutate scanner data.
+    Items are not copied: Also: is added on the kept dicts, dropped dicts are omitted from the returned list."""
+    import event_dedupe as ED
+    items = list(items or [])
+    if len(items) < 2:
+        return items
+    gz = gazetteer if gazetteer is not None else _gazetteer
+    probes = [_probe(it) for it in items]
+    back = {id(p): it for p, it in zip(probes, items)}
+    kept, folded = ED.merge(probes, gz)
+    for kp, dp, why in folded:
+        _add_also(back[id(kp)], back[id(dp)], why)
+    keep = {id(back[id(k)]) for k in kept}
+    return [it for it in items if id(it) in keep]
+
+
+def fold_story_list(stories, gazetteer=None):
+    """Same-event fold for homepage feed day lists and 'latest' lines (title + url or cluster_id)."""
+    return fold_angles(list(stories or []), gazetteer)
 
 # ------------------------------------------------------------------ social links (box -> Render, social_links.json)
 _LC = {"m": None, "v": {}}

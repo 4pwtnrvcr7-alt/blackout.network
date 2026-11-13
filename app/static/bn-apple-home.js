@@ -10,7 +10,7 @@
  // Same-event quakes (one quake reported by several agencies) collapse into one card: same category, within 1.5 degrees and 36 h.
  function group(items){var out=[];items.forEach(function(x){
    if(isQuake(x)&&x.lat!=null){for(var i=0;i<out.length;i++){var y=out[i];if(y.q&&Math.abs(y.lat-x.lat)<1.5&&Math.abs(y.lon-x.lon)<1.5&&Math.abs(new Date(y.first_seen)-new Date(x.first_seen))<1296e5){y.more++;return}}}
-   out.push({cluster_id:x.cluster_id,title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,social:x.social,posted:x.posted,q:isQuake(x),more:0})});return out}
+   out.push({cluster_id:x.cluster_id,title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,social:x.social,posted:x.posted,also:x.also,q:isQuake(x),more:0})});return out}
  // Display-only category fix (t100u): the scanner's keyword order labels "governor declares emergency over flooding" Political.
  // Hazard and outbreak terms outrank political ones here; the stored category is unchanged (proposed scanner fix: category_fix.patch).
  var HZ=/\b(earthquake|tsunami|flood|flooding|flash flood|cyclone|hurricane|typhoon|tropical storm|winter storm|wildfire|volcan|eruption|landslide|drought|tornado|blizzard|severe weather|severe storms?)/i,
@@ -26,9 +26,10 @@
   if(oky(s.yt))a.push('<a href="'+esc(s.yt)+'" target="_blank" rel="noopener" aria-label="Watch this story on YouTube">YouTube</a>');
   if(!a.length)return"";if(id&&s.story!==null)a.push('<a href="/wire/'+id+'">Story page</a>');
   return '<div class="bna-fol"><span>Follow this story</span>'+a.join("")+'</div>'}
- function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"",id=sid(x),fo=follow(x);
+ function also(x,tag){tag=tag||"p";var a=(x&&x.also||[]).map(function(z){return (z&&z.text)||(typeof z==="string"?z:"")}).filter(Boolean).slice(0,2);return a.length?'<'+tag+' class="bna-also">Also: '+esc(a.join("; "))+'.</'+tag+'>':""}
+function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"",id=sid(x),fo=follow(x);
   return '<article class="bna-card bna-it'+(hi?" hi":"")+(fo?" bna-has-fol":"")+'"><a class="bna-cardlnk" href="'+(id?"/wire/"+id:"/#wire")+'">'+(x.posted?'<p class="bna-pstw"><b class="bna-pst">On our channels</b></p>':'')+'<div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
-   '<h3>'+esc(title(x.title))+'</h3><p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'+fo+'</article>'}
+   '<h3>'+esc(title(x.title))+'</h3>'+also(x)+'<p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'+fo+'</article>'}
  // Featured desk card (Matt, Nov 13): green, always position 2 of the row, until its show_until (same window as the old notice).
  function feat(f){if(!f||!/^[0-9a-f]{16}$/.test(f.cluster_id||""))return null;var u=Date.parse(f.show_until||"");return isNaN(u)||Date.now()>=u?null:f}
  function fcard(f){return '<article class="bna-card bna-it bna-feat" data-desk="'+esc(f.cluster_id)+'"><a class="bna-cardlnk" href="/wire/'+f.cluster_id+'">'+
@@ -201,7 +202,7 @@
   if(!list.length)return '<p><b>'+esc(dn)+'.</b> No stories this day.</p>';
   return '<p><b>'+esc(dn)+'.</b> '+pl(list.length,"story","stories")+(o.src?"":" on The Wire")+'.</p><ul class="bna-day">'+list.map(function(z){
     var ext=z.ext?' target="_blank" rel="noopener"':"";
-    return '<li><a class="bna-lnk" href="'+esc(z.url)+'"'+ext+'>'+esc(z.title)+(z.ext?' <span class="bna-ext" aria-label="opens the original article">&#8599;</span>':"")+'</a> <span class="bna-rkchip'+(z.rank>=7?" red":"")+'">'+z.rank+'/10</span> <small>'+esc(z.src||"The Wire")+'</small></li>'}).join("")+"</ul>"}
+    return '<li><a class="bna-lnk" href="'+esc(z.url)+'"'+ext+'>'+esc(z.title)+(z.ext?' <span class="bna-ext" aria-label="opens the original article">&#8599;</span>':"")+'</a> <span class="bna-rkchip'+(z.rank>=7?" red":"")+'">'+z.rank+'/10</span> <small>'+esc(z.src||"The Wire")+'</small>'+also(z,"span")+'</li>'}).join("")+"</ul>"}
  function wg(k,o,def){if(!o){none(k);return}var tp=o.top,c=card(k);if(c)c._bnaO=o;
   var dayKeys=(o.days||[]).map(function(z){return z[0]});
   var cols=(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}});
@@ -220,7 +221,7 @@
    c:bars(cols,{labels:1,days:dayKeys}),t:esc(o.src||"The Wire")+" &middot; "+pl(o.n7,"story","stories")+" in 7 days",
    x:x(tp?'Top story now (rank '+tp.rank+'/10): <a class="bna-lnk" href="'+esc(tp.url)+'"'+(tp.ext?' target="_blank" rel="noopener"':"")+'>'+esc(tp.title)+'</a>, updated '+esc(et(tp.t))+".":"Nothing ranked in the last 24 hours.",
     def+" Tap a day bar for that day's stories. Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}
- function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <small>'+esc(et(z.t))+(z.single?" &middot; single source":"")+'</small></li>'}).join("")}
+ function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <small>'+esc(et(z.t))+(z.single?" &middot; single source":"")+'</small>'+also(z,"span")+'</li>'}).join("")}
  function spc(D){var S=D.spec||{},N=S.nuke,P=S.disp;
   function cols(o){return(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}})}
   function dayKeys(o){return(o.days||[]).map(function(z){return z[0]})}

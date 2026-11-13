@@ -22,7 +22,7 @@ def _body(r):
 
 def _slim(x):
     d = {k: x.get(k) for k in ("cluster_id", "title", "category", "location", "lat", "lon", "rank", "n_families", "updated", "first_seen")}
-    for k in ("grouped", "social", "posted"):   # home_feed: duplicates collapsed into one event; verified social links
+    for k in ("grouped", "social", "posted", "also"):   # home_feed: same-event angles folded into Also:; verified social links
         if x.get(k): d[k] = x[k]
     return d
 
@@ -30,6 +30,15 @@ def _slim(x):
 # last one immediately (or waits for the first build). Before, each concurrent request at expiry rebuilt its own copy (api_state,
 # the sources catalog, solar_seismic JSON), so a burst of N requests held N full copies at once.
 _build = {"home": threading.Lock(), "dash": threading.Lock()}
+
+def _fold_feed(stories):
+    """SITE-DEDUPE-1: one event per day-list / latest line on the homepage feed cards."""
+    try:
+        import home_feed as HF
+        return HF.fold_story_list(stories)
+    except Exception:
+        return list(stories or [])
+
 def _single(key, cache, ttl, build):
     v = cache["v"]
     if v and time.time() - cache["t"] < ttl: return v
@@ -273,6 +282,7 @@ def wire_groups(now):
         if top:
             st = _story(top[2], top[3], top[4], top[0], top[5] if len(top) > 5 else None)
             if st: tp = {"rank": top[0], "t": top[1], "url": st["url"], "title": st["title"], "loc": top[4]}
+        stories = {k: _fold_feed(stories[k]) for k in days}
         return {"n24": n24, "n7": n7, "max24": mx, "days": [[k] + d[k] for k in days],
                 "stories": {k: stories[k] for k in days}, "top": tp}
     def W(t, cat):
@@ -388,6 +398,8 @@ def special_cards(now):
             if st and len(latest) < 3 and st["title"].lower()[:60] not in seen:
                 seen.add(st["title"].lower()[:60])
                 latest.append(st)
+        latest = _fold_feed(latest)
+        stories = {k: _fold_feed(stories[k]) for k in days}
         return {"n24": n24, "conf24": conf24, "n7": sum(a + b for a, b in d.values()), "max24": mx,
                 "days": [[k] + d[k] for k in days], "latest": latest,
                 "stories": {k: stories[k] for k in days}, "top": top}

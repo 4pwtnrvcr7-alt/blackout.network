@@ -85,6 +85,9 @@ class Repeats(unittest.TestCase):
         self.assertEqual(sum("Ebola" in t for t in titles), 1)
         self.assertEqual(sum(bool(re.search("assassinat", t, re.I)) for t in titles), 1)
         self.assertEqual(len({e["cluster_id"] for e in out}), len(out))
+        ebola = [e for e in out if "Ebola" in e["title"]][0]
+        self.assertIn("4c1b364af6b12691", ebola.get("cluster_ids") or [])
+        self.assertEqual(H.also_line(ebola), "Also: Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases.")
 
 class HomeBuild(unittest.TestCase):
     def test_feature_in_payload_and_not_repeated_in_main(self):
@@ -110,6 +113,54 @@ class HomeBuild(unittest.TestCase):
     def test_feature_none_after_window(self):
         self.assertIsNone(DS.feature_card(DS._ts("2026-11-18T05:00:00Z")))
         self.assertIsNotNone(DS.feature_card(DS._ts("2026-11-18T04:59:00Z")))
+
+
+class SiteDedupe(unittest.TestCase):
+    """SITE-DEDUPE-1: same-event angles fold into one card with an Also: line (display only)."""
+    def test_ebola_outbreak_and_vaccine_fold(self):
+        outbreak = C("f7dd6f7a45562e44", "Wider use of Ervebo vaccine urged as DR Congo Ebola outbreak nears 11,000 cases", 7, cat="disease")
+        vaccine = C("4c1b364af6b12691", "Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases", 7, cat="disease")
+        ev = H.events([outbreak, vaccine], now=NOW, limit=10)
+        self.assertEqual(len(ev), 1)
+        self.assertEqual(ev[0]["cluster_id"], outbreak["cluster_id"])
+        self.assertEqual(sorted(ev[0]["cluster_ids"]), sorted([outbreak["cluster_id"], vaccine["cluster_id"]]))
+        self.assertEqual(H.also_line(ev[0]), "Also: Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases.")
+    def test_unrelated_outbreaks_do_not_fold(self):
+        a = C("1" * 16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, fam=4, cat="disease")
+        b = C("2" * 16, "Quick takes: Clade 1 mpox in California, H9N2 avian flu cases in China, more Ebola deaths", 5, fam=1, cat="disease")
+        ev = H.events([a, b], now=NOW, limit=10)
+        self.assertEqual(len(ev), 2)
+        self.assertFalse(any(H.also_line(e) for e in ev))
+    def test_fold_story_list_for_feed_cards(self):
+        stories = [
+            {"title": "Wider use of Ervebo vaccine urged as DR Congo Ebola outbreak nears 11,000 cases",
+             "url": "/wire/f7dd6f7a45562e44", "rank": 7, "src": "The Wire"},
+            {"title": "Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases",
+             "url": "/wire/4c1b364af6b12691", "rank": 7, "src": "The Wire"},
+        ]
+        out = H.fold_story_list(stories)
+        self.assertEqual(len(out), 1)
+        self.assertIn("Also: Kenya begins Ebola-free countdown", H.also_line(out[0]))
+    def test_slim_passes_also_and_keeps_pin_feature_keys(self):
+        import apple_v1 as A
+        outbreak = C("f7dd6f7a45562e44", "Wider use of Ervebo vaccine urged as DR Congo Ebola outbreak nears 11,000 cases", 7, cat="disease")
+        vaccine = C("4c1b364af6b12691", "Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases", 7, cat="disease")
+        ev = H.events([outbreak, vaccine], now=NOW, limit=10)[0]
+        d = A._slim(ev)
+        self.assertTrue(d.get("also"))
+        self.assertEqual(d["also"][0]["text"], "Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases")
+    def test_js_and_css_draw_also_line(self):
+        js = open(os.path.join(APP, "static", "bn-apple-home.js"), encoding="utf-8").read()
+        css = open(os.path.join(APP, "static", "bn-apple.css"), encoding="utf-8").read()
+        self.assertIn("function also(", js)
+        self.assertIn("bna-also", js)
+        self.assertIn("Also:", js)
+        self.assertIn(".bna-also{", css)
+        # Hamas pin and EAS featured cards stay in their slots; Also: is only on regular cards
+        self.assertIn("cards.unshift(pcard(P))", js)
+        self.assertIn("cards.splice(Math.min(1,cards.length),0,fcard(F))", js)
+        self.assertNotIn("also(P)", js)
+        self.assertNotIn("also(F)", js)
 
 class Static(unittest.TestCase):
     def setUp(self):
