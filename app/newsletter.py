@@ -89,6 +89,7 @@ DEFAULTS = {
     "outbox_retention_days": 30,
     "retry_backoff_minutes": [2, 10, 30],
     "editorial_ttl_hours": 24,
+    "require_story_brief": True,    # Matt, Nov 12: a story card goes out only when its /wire/<id> page shows a full brief (see _hold_unbriefed)
     "dedupe_days": 14,              # a story already sent is never repeated for this long, except as an UPDATE when it develops
     "max_update_items": 5,          # per section (Stories you follow / Developing stories)
     "follow_max": 50,               # active follows per subscriber
@@ -1183,6 +1184,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         SG.prune_issue(issue)
     except Exception as ex:
         log(f"story_gates prune skipped: {type(ex).__name__}: {ex}"[:300], "analysis")
+    _hold_unbriefed(issue, c)
     issue["bluf"] = bluf(issue)
     if issue.get("notes_lead"):
         issue["bluf"] = MATTERS + ". " + issue["notes_lead"]
@@ -1191,6 +1193,47 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
         for it in issue.get(sec) or []:
             it["lead"] = it.get("cluster_id") in lead_ids
     return issue
+
+_HOLD_SECTIONS = ("near", "main", "politics", "notable", "updates", "follow", "developing", "watchlist")
+
+def _hold_unbriefed(issue, c=None):
+    """Matt, Nov 12: nothing goes out in the newsletter unless its story page has a full breakdown ready. Drops every story card whose
+    /wire/<id> page would show the automatic "Quick brief" placeholder (no desk brief or analyst note with a what_happened in
+    data/story_reports.json, by cluster id or by its alias), and every story on the desk hold list (story_reports.json newsletter_hold).
+    Fails open only when story_reports.json is missing or unreadable (logged), so a missing file cannot empty every issue; the box
+    pre-send gate (newsletter/qa/brief_gate.py) covers that case. Returns [(section, cluster_id, reason)]; also on issue["held"]."""
+    c = c or cfg(); held = []
+    issue["held"] = held
+    if not c.get("require_story_brief", True): return held
+    try:
+        import story_report as SR
+        R = SR.reports() or {}
+    except Exception as ex:
+        log(f"brief hold skipped (story_report unavailable): {type(ex).__name__}: {ex}"[:300], "analysis"); return held
+    notes = R.get("notes")
+    if not isinstance(notes, dict):
+        log("brief hold skipped: data/story_reports.json missing or unreadable", "analysis"); return held
+    alias = R.get("alias") or {}
+    hold = {str(x) for x in (R.get("newsletter_hold") or []) if isinstance(x, str)}
+    def ready(cid):
+        n = notes.get(cid) or notes.get(alias.get(cid) or "")
+        return isinstance(n, dict) and bool((n.get("what_happened") or "").strip())
+    for sec in _HOLD_SECTIONS:
+        kept = []
+        for it in issue.get(sec) or []:
+            cid = str((it or {}).get("cluster_id") or "")
+            why = "desk hold list" if cid in hold else (None if cid and ready(cid) else "no brief on its story page yet")
+            if why: held.append((sec, cid, why))
+            else: kept.append(it)
+        if sec in issue: issue[sec] = kept
+    if held:
+        ids = {cid for _, cid, _ in held}
+        an = issue.get("analysis")
+        if isinstance(an, dict) and an.get("items"):
+            an["items"] = [x for x in an["items"] if str(x.get("cluster_id") or "") not in ids]
+        issue["quiet"] = not any(issue.get(sec) for sec in _HOLD_SECTIONS if sec != "watchlist")
+        log(("brief hold: " + "; ".join(f"{sec} {cid} ({why})" for sec, cid, why in held))[:900], "analysis")
+    return held
 
 def _attach_analysis(issue, at, c=None):
     """Analyst brief (what happened, analysis, trajectory, what to do). Read-only. A failure leaves the rest of the issue intact."""

@@ -264,6 +264,14 @@ def load_desk_briefs(path, max_age_days):
         out[cid] = n
     return out
 
+def newsletter_hold(path):
+    """Cluster ids the desk keeps out of the newsletter (desk/briefs.json entries with "newsletter": "hold", e.g. a scanner
+    false positive that is briefed as over-ranked). The sender drops these cards (app/newsletter.py _hold_unbriefed)."""
+    try: d = json.load(open(path)) if path and os.path.exists(path) else {}
+    except Exception: return []
+    b = d.get("briefs") if isinstance(d.get("briefs"), dict) else d
+    return sorted(k for k, v in b.items() if re.fullmatch(r"[0-9a-f]{16}", str(k)) and isinstance(v, dict) and v.get("newsletter") == "hold")
+
 def note_alias(notes, home):
     """Carry a desk note to the homepage's newer cluster id for the same story. Strict (a wrong note is worse than none):
     4+ shared distinctive words and Jaccard >= 0.3 between the note headline and the homepage title, one match only."""
@@ -307,11 +315,43 @@ def fetch_json(url):
     r = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=60)
     return json.loads(r.read())
 
+NL_SELECTION = "/workspace/launch/story_reports/desk/newsletter_selection.json"
+NL_GATE = "/workspace/launch/newsletter/qa/brief_gate.py"
+
+def refresh_nl_selection():
+    """Matt's rule (Nov 12): every story the next newsletter links to needs a live brief. Re-render the next issue's selection
+    (newsletter/qa/brief_gate.py --stage select, render only, never sends) so the queue below can include it. Off with BN_NL_SELECT=0."""
+    if os.environ.get("BN_NL_SELECT", "1") == "0" or not os.path.exists(NL_GATE): return
+    import subprocess
+    try:
+        p = subprocess.run([sys.executable, NL_GATE, "--stage", "select"], capture_output=True, text=True, timeout=240,
+                           env=dict(os.environ, NEWSLETTER_NO_WORKER="1"))
+        log(((p.stdout or "").strip().splitlines() or [f"newsletter selection exit={p.returncode}"])[-1][:300])
+    except Exception as ex: log(f"newsletter selection skipped: {type(ex).__name__}: {ex}")
+
+def nl_selection(path):
+    """[(cluster_id, item)] the next newsletter issue links to, from desk/newsletter_selection.json when it is fresh (< 14 h)."""
+    if not path: return []
+    try: d = json.load(open(path))
+    except Exception: return []
+    g, at = parse_dt(d.get("generated_at")), parse_dt(d.get("at"))
+    if not g or datetime.now(UTC) - g > timedelta(hours=14): return []
+    if at and datetime.now(UTC) - at > timedelta(hours=2): return []
+    return [(x["cluster_id"], x) for x in d.get("items") or [] if isinstance(x, dict) and re.fullmatch(r"[0-9a-f]{16}", str(x.get("cluster_id")))]
+
 def write_queue(a, net, notes, alias, home):
-    """desk/needs_brief.json: rank >= queue-rank homepage stories with no brief, or a brief over 24 h old with newer reports."""
+    """desk/needs_brief.json: every story the next newsletter links to (any rank) with no brief, then rank >= queue-rank homepage
+    stories with no brief, or a brief over 24 h old with newer reports."""
     now, q = datetime.now(UTC), []
+    seen = set()
+    for cid, x in nl_selection(getattr(a, "nl_selection", "")):   # newsletter stories first, regardless of rank
+        if notes.get(cid) or notes.get(alias.get(cid, "")): continue
+        seen.add(cid)
+        q.append({"cluster_id": cid, "rank": (home.get(cid) or {}).get("rank") or x.get("rank") or 0, "title": x.get("title") or (home.get(cid) or {}).get("title", ""),
+                  "url": f"{a.site.rstrip('/')}/wire/{cid}", "latest_report": wire_latest(net, a.site, cid),
+                  "reason": "newsletter story (next issue), no brief", "newsletter": True})
     for cid, h in sorted(home.items(), key=lambda x: -(x[1].get("rank") or 0)):
-        if (h.get("rank") or 0) < a.queue_rank: continue
+        if (h.get("rank") or 0) < a.queue_rank or cid in seen: continue
         n = notes.get(cid) or notes.get(alias.get(cid, ""))
         latest = wire_latest(net, a.site, cid)
         e = {"cluster_id": cid, "rank": h.get("rank"), "title": h.get("title", ""), "url": f"{a.site.rstrip('/')}/wire/{cid}", "latest_report": latest}
@@ -350,6 +390,7 @@ def main():
     ap.add_argument("--briefs", default="/workspace/launch/story_reports/desk/briefs.json", help="v2: desk briefs file")
     ap.add_argument("--queue", default="", help="v2: write needs_brief.json (rank >= --queue-rank homepage stories without a fresh brief)")
     ap.add_argument("--queue-rank", type=int, default=5)
+    ap.add_argument("--nl-selection", default=NL_SELECTION, help="next-issue newsletter selection (newsletter/qa/brief_gate.py); '' = off")
     ap.add_argument("--shares-ok", default="", help="v2: JSON list of approved share image URLs (desk review)")
     ap.add_argument("--desk", default="/workspace/launch/story_reports/desk/overrides.json",
                     help="v2: desk overrides {cluster_id: {risk, risk_why, if_true, if_false, pattern, what_to_do}}; every value must come from a cited source")
@@ -411,8 +452,9 @@ def main():
     out = {"v": 2, "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(), "notes": notes, "images": images,
            "image_policy": {"usgs_shakemap": True, "commons": True, "federal_og": a.federal_og, "outlet_og": a.outlet_og, "outlet_share": a.outlet_share},
            "alias": alias, "shares": shares, "share_policy": {"auto": bool(a.outlet_share_auto)},
-           "home": {k: v.get("rank", 0) for k, v in home.items()}}
+           "home": {k: v.get("rank", 0) for k, v in home.items()}, "newsletter_hold": newsletter_hold(a.briefs)}
     if a.review_html: write_review(a.review_html, shares, home)
+    if a.queue and a.nl_selection: refresh_nl_selection()
     if a.queue and home: write_queue(a, net, notes, alias, home)
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     tmp = a.out + ".tmp"

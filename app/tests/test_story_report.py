@@ -184,5 +184,36 @@ class Builder(unittest.TestCase):
         self.assertEqual({i["cluster_id"]: i["reason"] for i in out["items"]},
                          {"aaaaaaaaaaaaaaaa": "no brief", "bbbbbbbbbbbbbbbb": "brief over 24 h old, new reports since"})
 
+    def test_queue_puts_newsletter_stories_first_any_rank(self):
+        import build as B, types
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        d = tempfile.mkdtemp(); q = os.path.join(d, "needs_brief.json"); sel = os.path.join(d, "sel.json")
+        json.dump({"generated_at": now.isoformat(), "at": (now + timedelta(hours=1)).isoformat(),
+                   "items": [{"cluster_id": "eeeeeeeeeeeeeeee", "title": "Newsletter, rank 2", "rank": 2},
+                             {"cluster_id": "cccccccccccccccc", "title": "Newsletter, briefed", "rank": 5}]}, open(sel, "w"))
+        a = types.SimpleNamespace(queue=q, queue_rank=5, site="https://blackout.network", nl_selection=sel)
+        home = {"aaaaaaaaaaaaaaaa": {"title": "No brief", "rank": 6}, "cccccccccccccccc": {"title": "Fresh", "rank": 5}}
+        notes = {"cccccccccccccccc": {"generated_at": (now - timedelta(hours=2)).isoformat(), "desk": True}}
+        old = B.wire_latest
+        B.wire_latest = lambda net, site, cid: ""
+        try: B.write_queue(a, None, notes, {}, home)
+        finally: B.wire_latest = old
+        out = json.load(open(q))
+        self.assertEqual([i["cluster_id"] for i in out["items"]], ["eeeeeeeeeeeeeeee", "aaaaaaaaaaaaaaaa"])
+        self.assertEqual(out["items"][0]["reason"], "newsletter story (next issue), no brief")
+        json.dump({"generated_at": (now - timedelta(hours=20)).isoformat(), "items": [{"cluster_id": "eeeeeeeeeeeeeeee"}]}, open(sel, "w"))
+        B.wire_latest = lambda net, site, cid: ""
+        try: B.write_queue(a, None, notes, {}, home)
+        finally: B.wire_latest = old
+        self.assertEqual([i["cluster_id"] for i in json.load(open(q))["items"]], ["aaaaaaaaaaaaaaaa"])   # stale selection ignored
+
+    def test_newsletter_hold_list_from_briefs(self):
+        import build as B
+        d = tempfile.mkdtemp(); p = os.path.join(d, "briefs.json")
+        json.dump({"briefs": {"aaaaaaaaaaaaaaaa": {"newsletter": "hold"}, "bbbbbbbbbbbbbbbb": {}, "bad": {"newsletter": "hold"}}}, open(p, "w"))
+        self.assertEqual(B.newsletter_hold(p), ["aaaaaaaaaaaaaaaa"])
+        self.assertEqual(B.newsletter_hold(os.path.join(d, "missing.json")), [])
+
 if __name__ == "__main__":
     unittest.main()
