@@ -179,7 +179,7 @@ class SiteDedupe(unittest.TestCase):
         self.assertIn(".bna-also{", css)
         # Hamas pin and EAS featured cards stay in their slots; Also: is only on regular cards
         self.assertIn("cards.unshift(pcard(P))", js)
-        self.assertIn("cards.splice(Math.min(PS.length||1,cards.length),0,fcard(F))", js)
+        self.assertIn("cards.splice(Math.min(1,cards.length),0,fcard(F))", js)
         self.assertNotIn("also(P)", js)
         self.assertNotIn("also(F)", js)
 
@@ -188,7 +188,7 @@ class Static(unittest.TestCase):
         self.js = open(os.path.join(APP, "static", "bn-apple-home.js"), encoding="utf-8").read()
         self.css = open(os.path.join(APP, "static", "bn-apple.css"), encoding="utf-8").read()
     def test_js_puts_feature_second_and_green(self):
-        self.assertIn("cards.splice(Math.min(PS.length||1,cards.length),0,fcard(F))", self.js)
+        self.assertIn("cards.splice(Math.min(1,cards.length),0,fcard(F))", self.js)
         self.assertIn("bna-rk grn", self.js); self.assertIn('href="/wire/\'+f.cluster_id+\'"', self.js)
         self.assertIn("Date.now()>=u", self.js)                    # hides itself at show_until even from a stale snapshot
     def test_css_green(self):

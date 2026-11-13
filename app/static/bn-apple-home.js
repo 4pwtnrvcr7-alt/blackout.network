@@ -62,14 +62,11 @@ function srcLine(x){var n=+x.n_families||0,g=+x.grouped||0,s=n+(n==1?" source":"
   g.forEach(function(x){if(pick.length<N&&pick.indexOf(x)<0)pick.push(x)});
   // preserve relative server order among non-pinned cards (do not re-sort by rank alone)
   pick=pick.slice(0,lead).concat(pick.slice(lead));
-  // Nov 13 4:39 PM ET: several pins in server order (FAA ground stop, then Hamas); the green card goes right after the last pin.
-  var F=feat(d.feature),PS=(Array.isArray(d.pins)&&d.pins.length?d.pins:[d.pin]).map(feat).filter(function(p){return p&&(!F||p.cluster_id!==F.cluster_id)}).slice(0,3),P=PS[0]||null,pid={};
-  PS.forEach(function(p){pid[p.cluster_id]=1});
-  var cards=pick.filter(function(x){return (!F||x.cluster_id!==F.cluster_id)&&!pid[x.cluster_id]}).map(card);
-  cards=cards.slice(0,N-(F?1:0)-PS.length);
+  var F=feat(d.feature),P=feat(d.pin);if(P&&F&&P.cluster_id===F.cluster_id)P=null;
+  var cards=pick.filter(function(x){return (!F||x.cluster_id!==F.cluster_id)&&(!P||x.cluster_id!==P.cluster_id)}).map(card);
+  cards=cards.slice(0,N-(F?1:0)-(P?1:0));
   if(P)cards.unshift(pcard(P));
-  for(var pi=1;pi<PS.length;pi++)cards.splice(Math.min(pi,cards.length),0,pcard(PS[pi]));
-  if(F)cards.splice(Math.min(PS.length||1,cards.length),0,fcard(F));
+  if(F)cards.splice(Math.min(1,cards.length),0,fcard(F));
   var hh=cards.length?cards.join(""):'<p class="bna-empty">The Wire is quiet right now.</p>';if(row&&hh!==lastRow){lastRow=hh;row.innerHTML=hh;arrows()}
   if(d.slots_et&&!SLOTT)SLOTT=nextSlot(d.slots_et);
   if(d.generated)set("asof","Live data as of "+esc(et(d.generated))+".");

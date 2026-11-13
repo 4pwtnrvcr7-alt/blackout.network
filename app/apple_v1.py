@@ -102,35 +102,25 @@ def _pin():
     except Exception:
         return None
 
-def _pins():
-    """All active pinned desk stories in card order (desk_stories.pin_cards), [] when off, expired or on any error."""
-    try:
-        import desk_stories as DS
-        return DS.pin_cards() or []
-    except Exception:
-        return []
-
-def _row(ev, feat, pin=None, pins=None):
-    """Top-row display filter (home_feed.dedupe_row): no junk, no repeats, never the featured or a pinned story twice."""
+def _row(ev, feat, pin=None):
+    """Top-row display filter (home_feed.dedupe_row): no junk, no repeats, never the featured or pinned story twice."""
     try:
         import home_feed as HF
-        ps = [x for x in ([pin] + list(pins or [])) if x]
-        return HF.dedupe_row(ev, skip_ids=[x for x in [(feat or {}).get("cluster_id")] + [p.get("cluster_id") for p in ps] if x],
-                             skip_items=ps + ([feat] if feat else []))
+        return HF.dedupe_row(ev, skip_ids=[x for x in ((feat or {}).get("cluster_id"), (pin or {}).get("cluster_id")) if x],
+                             skip_items=[x for x in (pin, feat) if x])
     except Exception:
         return ev
 
 def _home_build():
     srv = sys.modules.get("server"); out = {"generated": None, "main": [], "counts": {}, "kp": None, "quake": None, "grid": None, "sources": None}
     out["feature"] = _feature()
-    out["pins"] = _pins()
-    out["pin"] = out["pins"][0] if out["pins"] else _pin()
+    out["pin"] = _pin()
     try:
         st = srv.api_state(); out["generated"] = st.get("generated")
         main = st.get("main") or []
         for x in main: out["counts"][x.get("category") or "other"] = out["counts"].get(x.get("category") or "other", 0) + 1
-        try: out["main"] = [_slim(x) for x in _row(_events(main), out["feature"], out["pin"], out["pins"])]
-        except Exception: out["main"] = [_slim(x) for x in _row(sorted(main, key=lambda x: (-(x.get("rank") or 0), -(x.get("n_families") or 0))), out["feature"], out["pin"], out["pins"])[:40]]
+        try: out["main"] = [_slim(x) for x in _row(_events(main), out["feature"], out["pin"])]
+        except Exception: out["main"] = [_slim(x) for x in _row(sorted(main, key=lambda x: (-(x.get("rank") or 0), -(x.get("n_families") or 0))), out["feature"], out["pin"])[:40]]
         try:
             import home_feed as HF; out["slots_et"] = HF.SLOTS_ET
         except Exception: pass
