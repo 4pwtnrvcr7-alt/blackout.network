@@ -182,16 +182,57 @@ def chart_sources(rows):
     return (f'<figure class="sr-chart"><figcaption class="sr-h3">{icon("facts")}Who is reporting</figcaption><ul class="sr-bars">{li}</ul>'
             + (f'<p class="sr-note">Plus {more} more source famil{"y" if more == 1 else "ies"}.</p>' if more > 0 else "") + '</figure>')
 
+_LOADING = {True: 'fetchpriority="high"', False: 'loading="lazy"'}
+def _local(src):
+    """t1351u: same-origin copy (/api/media/<id>, people.py) of an image listed in the signed story_reports.json; the original URL
+    stays as an onerror fallback. BN_MEDIA_PROXY=0 (people.py) returns the original URL and no fallback."""
+    try:
+        import people as PP
+        loc = PP.media_url(src)
+    except Exception:
+        loc = src
+    if loc == src: return src, ""
+    return loc, f' data-o="{E(src)}" onerror="if(this.dataset.o&&this.src!==this.dataset.o){{this.src=this.dataset.o}}"'
+
 def figure(im, lead=False):
     try: w, h = int(im["w"]), int(im["h"])
     except Exception: return ""
     src, link = im.get("src") or "", im.get("link") or ""
     if not re.match(r"^https://", src) or not re.match(r"^https?://", link): return ""
     cap = (im.get("caption") or "").strip()
-    return (f'<figure class="sr-fig{" sr-lead" if lead else ""}"><a href="{E(link)}" target="_blank" rel="noopener">'
-            f'<img src="{E(src)}" alt="{E(im.get("alt") or cap)}" width="{w}" height="{h}" loading="lazy" decoding="async" referrerpolicy="no-referrer"></a>'
+    loc, fb = _local(src)
+    return (f'<figure class="sr-fig{" sr-lead" if lead else ""}{" sr-file" if im.get("kind") in ("person", "place") else ""}"><a href="{E(link)}" target="_blank" rel="noopener">'
+            f'<img src="{E(loc)}"{fb} alt="{E(im.get("alt") or cap)}" width="{w}" height="{h}" {_LOADING[bool(lead)]} decoding="async" referrerpolicy="no-referrer"></a>'
             f'<figcaption>{E(cap)} <span class="sr-cr">Image: {E(im.get("credit") or "")}. {E(im.get("license") or "")}. '
             f'<a href="{E(link)}" target="_blank" rel="noopener">Source{icon("ext", "sr-i sr-i-s")}</a></span></figcaption></figure>')
+
+def glance(rank, rows, officials, eff, loc, catn, r):
+    """t1351u last-resort lead visual: a generated "story at a glance" graphic drawn only from this story's own data (rank, report and
+    source counts, how long we have tracked it, reports over time). Labelled as a BLACKOUT.NETWORK graphic, never as a photo."""
+    rank = int(rank or 0); lab, col = risk(rank)
+    W, H = 800, 300
+    d1, d2 = _dt(r.get("first_seen")), _dt(r.get("updated"))
+    hrs = (d2 - d1).total_seconds() / 3600 if d1 and d2 and d2 >= d1 else None
+    span = ("under 1 hour" if hrs < 1 else (f"{hrs:.0f} hours" if hrs < 48 else f"{hrs / 24:.0f} days")) if hrs is not None else "n/a"
+    b = _buckets(rows) if len(rows) >= 3 else None
+    bars = ""
+    if b:
+        c = b["counts"]; mx = max(c) or 1; n = len(c); bw = 440 / n
+        bars = "".join(f'<rect x="{330 + i * bw + bw * .15:.1f}" y="{270 - (v / mx) * 70:.1f}" width="{max(1.0, bw * .7):.1f}" height="{max(1.5, (v / mx) * 70):.1f}" rx="1.5" fill="{col}" opacity=".85"/>' for i, v in enumerate(c) if v)
+    stats = [(str(len(rows)), "reports logged"), (str(eff), "independent sources"), (str(len(officials)), "official sources"), (span, "tracked so far")]
+    st = "".join(f'<text x="{330 + (i % 2) * 230}" y="{70 + (i // 2) * 72}" class="g-n">{E(a)}</text><text x="{330 + (i % 2) * 230}" y="{94 + (i // 2) * 72}" class="g-l">{E(bl)}</text>' for i, (a, bl) in enumerate(stats))
+    ring = 2 * 3.14159 * 92; frac = max(0.02, rank / 10)
+    svg = (f'<svg class="sr-glance" viewBox="0 0 {W} {H}" role="img" aria-label="Story at a glance: rank {rank} of 10, {len(rows)} reports, {eff} independent sources, {len(officials)} official sources, tracked {span}">'
+           '<style>.g-n{font:700 34px Inter,system-ui,sans-serif;fill:currentColor}.g-l{font:500 15px Inter,system-ui,sans-serif;fill:currentColor;opacity:.65}'
+           '.g-k{font:700 13px Inter,system-ui,sans-serif;letter-spacing:.12em;fill:currentColor;opacity:.7}.g-big{font:800 64px Inter,system-ui,sans-serif;fill:currentColor}</style>'
+           f'<rect x="0" y="0" width="{W}" height="{H}" rx="22" fill="currentColor" opacity=".05"/>'
+           f'<circle cx="150" cy="150" r="92" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="16"/>'
+           f'<circle cx="150" cy="150" r="92" fill="none" stroke="{col}" stroke-width="16" stroke-linecap="round" stroke-dasharray="{ring * frac:.1f} {ring:.1f}" transform="rotate(-90 150 150)"/>'
+           f'<text x="150" y="160" text-anchor="middle" class="g-big">{rank}</text><text x="150" y="190" text-anchor="middle" class="g-l">of 10 · {E(RANK_NAME.get(rank, ""))}</text>'
+           f'<text x="330" y="36" class="g-k">{E((catn or "STORY").upper())}{(" · " + E(loc.upper()[:38])) if loc else ""}</text>{st}{bars}'
+           + (f'<text x="330" y="292" class="g-l" style="font-size:12px">Reports by {b["unit"]}</text>' if b else "") + '</svg>')
+    return (f'<figure class="sr-fig sr-lead sr-gfx">{svg}<figcaption><span class="sr-cr">Graphic: BLACKOUT.NETWORK, built from the '
+            f'{_plural(len(rows), "report")} on this page. No rights-cleared photo of this event was available.</span></figcaption></figure>')
 
 TRAJ_ICON = {"Rising": "up", "Easing": "down", "Steady": "flat"}
 
@@ -369,7 +410,8 @@ def share_card(sh):
     src, link = sh.get("src") or "", sh.get("link") or ""
     if not re.match(r"^https://", src) or not re.match(r"^https?://", link): return ""
     t = (sh.get("title") or "").strip(); site = (sh.get("site") or "").strip()
-    return (f'<a class="sr-share" href="{E(link)}" target="_blank" rel="noopener"><img src="{E(src)}" alt="{E(sh.get("alt") or t)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
+    loc, fb = _local(src)
+    return (f'<a class="sr-share" href="{E(link)}" target="_blank" rel="noopener"><img src="{E(loc)}"{fb} alt="{E(sh.get("alt") or t)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
             f'<span class="sr-share-b"><span class="sr-share-s">{E(site)}</span><span class="sr-share-t">{E(t)}</span>'
             f'<span class="sr-cr">Image: {E(site)}, shown as a link preview. Opens the article{icon("ext", "sr-i sr-i-s")}</span></span></a>')
 
@@ -415,7 +457,7 @@ def _srclist(note, rows, anchor=None, desk=False):
         if len(out) >= 8: break
     return out[:8]
 
-def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, locator=""):
+def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, locator="", people=""):
     """Returns (html, dek_override). rows: deduped alerts in time order."""
     R = reports(); notes = R.get("notes") or {}
     note = notes.get(cid) or notes.get((R.get("alias") or {}).get(cid) or "")
@@ -545,6 +587,16 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     figs = [x for x in (figure(im, i == 0) for i, im in enumerate(imgs[:3])) if x]
     cards = [x for x in (share_card(s) for s in shares[:2]) if x]
     lead_vis = figs[0] if figs else (cards[0] if cards else desk_lead)
+    if not lead_vis and os.environ.get("BN_STORY_LEAD_FALLBACK", "1") != "0":
+        # t1351u: every story page leads with a picture. Order: rights-cleared image, approved share card, desk graphic (above), then
+        # the main person's Commons portrait or a Commons photo of the place (both captioned as file photos, not from the event),
+        # then a generated graphic drawn only from this story's own reports.
+        try:
+            import people as PP
+            fb = PP.lead_for(cid, title or "", loc or "", " ".join(a.get("title") or "" for a in rows[:40]))
+        except Exception:
+            fb = None
+        lead_vis = (figure(fb, True) if isinstance(fb, dict) else "") or glance(rank, rows, officials, eff, loc, catn, r)
     more_vis = figs[1:] + (cards if figs else cards[1:])
     gallery = (f'<section class="sr-sec" aria-labelledby="sr_img"><h2 class="sr-k" id="sr_img">{icon("image")}Images</h2><div class="sr-gal">{"".join(more_vis)}</div></section>' if more_vis else "")
     # ---- details (collapsed): key facts, key moments, charts
@@ -571,7 +623,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
         kmh = "" if not li else f'<details class="sr-more"><summary>{icon("clock")}Key moments ({len(li)})</summary><ol class="sr-tl">{"".join(li)}</ol></details>'
     g = chart_time(rows) + chart_sources(rows)
     graphics = f'<section class="sr-card sr-graphics" aria-label="Graphics">{g}</section>' if g else ""
-    main = head + (lead_vis if lead_vis else "") + "".join(S) + gallery + kmh
+    main = head + (lead_vis if lead_vis else "") + (people or "") + "".join(S) + gallery + kmh
     side = (f'<div class="sr-loc">{locator}</div>' if locator else "") + facts + graphics
     return (f'<style>{CSS}</style><article class="sr sr2" aria-label="Story brief"><div class="sr-grid"><div class="sr-main">{main}</div>'
             f'<aside class="sr-side" aria-label="Key facts and graphics">{side}</aside></div></article>'), dek
@@ -653,6 +705,8 @@ html:not([data-theme="light"]) .sr a:not([class]){color:var(--a-lk,#FFC21A)}
 .sr-more{margin:0 0 26px;border-top:1px solid var(--sr-ln);padding-top:14px}.sr-more summary{cursor:pointer;display:flex;align-items:center;gap:8px;font:700 13px/1.2 Inter,system-ui,sans-serif;letter-spacing:.09em;text-transform:uppercase;color:var(--sr-y);list-style:none}
 .sr-more summary::-webkit-details-marker{display:none}.sr-more[open] summary{margin-bottom:14px}
 .sr2 .sr-fig.sr-lead{margin-bottom:24px}.sr2 .sr-fig img{max-height:420px}
+.sr-gfx{background:transparent!important}.sr-glance{display:block;width:100%;height:auto;color:var(--sr-ink)}
+.sr2 .sr-fig.sr-file img{object-fit:cover;object-position:50% 25%;max-height:380px;background:#0d0e10}
 @media(max-width:600px){.sr-if{grid-template-columns:1fr}.sr-share{grid-template-columns:1fr}.sr-share img{max-height:200px}.sr p.sr-bline-p{font-size:17px}.sr-ul li,.sr-ol li{font-size:15.5px}}
 
 """

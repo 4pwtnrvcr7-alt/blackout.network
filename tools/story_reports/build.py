@@ -18,9 +18,13 @@ Inputs
 Word rules: sentences with "verified", "first to", "before the news", anniversary / "today in history" framing are dropped.
 Never invents text: every string in the output is copied from a note or from the image's own source metadata.
 
+People layer (t1351u, people_engine.py): public figures named in the stories, their sourced profiles (Wikidata, Wikipedia excerpts,
+Commons photos) and a credited lead photo for stories with no image, written to the "people" key. Budgeted per cycle
+(--people-budget requests, --people-seconds), cached in people/, off with --no-people, BN_PEOPLE=0 or the file desk/people_off.
+
 usage: build.py --out data/story_reports.json [--notes DIR_OR_FILE ...] [--site https://blackout.network] [--no-net]
 """
-import argparse, glob, hashlib, html, io, json, os, re, sys, time, urllib.parse, urllib.request
+import argparse, atexit, fcntl, glob, hashlib, html, io, json, os, re, signal, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
@@ -88,14 +92,99 @@ def load_notes(paths, max_age_days):
     return best
 
 # ---------------------------------------------------------------- network helpers (cached)
+# Snapshot is cache_path (atomic replace). New entries are also appended to cache_path.journal
+# as JSON lines so a timeout or crash does not throw away a half-hour of fetches. On the next
+# start we load the snapshot, replay the journal, then compact. Periodic compact every 2 min.
+CACHE_COMPACT_EVERY = 120          # seconds between mid-run snapshot compact
+CYCLE_LOCK = "/workspace/launch/story_reports/cycle.lock"
+CYCLE_LOCK_STALE = 40 * 60         # seconds; we never steal a live lock, we only report it
+
 class Net:
     def __init__(self, cache_path, enabled=True):
         self.p, self.on = cache_path, enabled
-        try: self.c = json.load(open(cache_path))
-        except Exception: self.c = {}
-    def save(self):
-        if not self.p: return
-        tmp = self.p + ".tmp"; json.dump(self.c, open(tmp, "w")); os.replace(tmp, self.p)
+        self.journal_path = (cache_path + ".journal") if cache_path else ""
+        self._jfp = None
+        self._dirty = 0
+        self._last_save = time.time()
+        self._saving = False
+        try:
+            self.c = json.load(open(cache_path))
+        except Exception:
+            self.c = {}
+        n_snap = len(self.c)
+        n_j = self._replay_journal()
+        if n_j:
+            log(f"cache: loaded {n_snap} entries + {n_j} journal line(s) from {cache_path}")
+            self.save(reason="startup compact after journal replay", force=True)
+        else:
+            if cache_path:
+                log(f"cache: loaded {n_snap} entries from {cache_path}")
+        self._open_journal()
+
+    def _open_journal(self):
+        if not self.journal_path: return
+        self._jfp = open(self.journal_path, "a", encoding="utf-8")
+
+    def _replay_journal(self):
+        if not self.journal_path or not os.path.isfile(self.journal_path): return 0
+        n, skipped = 0, 0
+        try:
+            with open(self.journal_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line: continue
+                    try:
+                        k, v = json.loads(line)
+                    except Exception:
+                        skipped += 1
+                        continue
+                    if isinstance(k, str) and isinstance(v, dict):
+                        self.c[k] = v; n += 1
+                    else:
+                        skipped += 1
+        except Exception as ex:
+            log(f"cache journal replay failed: {ex}")
+        if skipped: log(f"cache journal: skipped {skipped} unreadable line(s)")
+        if n: self._dirty += n
+        return n
+
+    def _journal(self, k, v):
+        if not self.journal_path: return
+        if self._jfp is None: self._open_journal()
+        try:
+            self._jfp.write(json.dumps([k, v], ensure_ascii=False) + "\n")
+            self._jfp.flush()
+        except Exception as ex:
+            log(f"cache journal write failed: {ex}")
+        self._dirty += 1
+        if time.time() - self._last_save >= CACHE_COMPACT_EVERY:
+            self.save(reason="periodic compact")
+
+    def save(self, reason="", force=False):
+        if not self.p or self._saving: return
+        if not force and self._dirty <= 0: return
+        self._saving = True
+        try:
+            tmp = self.p + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(self.c, f)
+                f.flush()
+            os.replace(tmp, self.p)
+            if self._jfp:
+                try: self._jfp.flush(); self._jfp.close()
+                except Exception: pass
+                self._jfp = None
+            if self.journal_path:
+                open(self.journal_path, "w").close()
+            self._open_journal()
+            self._dirty = 0
+            self._last_save = time.time()
+            if reason: log(f"cache saved ({reason}): {len(self.c)} entries -> {self.p}")
+        except Exception as ex:
+            log(f"cache save failed: {ex}")
+        finally:
+            self._saving = False
+
     def get(self, url, limit=1_500_000, ttl=86400, binary=False):
         k = ("B:" if binary else "T:") + url
         hit = self.c.get(k)
@@ -109,7 +198,51 @@ class Net:
         if binary: return code, final, raw
         body = raw.decode("utf-8", "replace")
         self.c[k] = {"t": time.time(), "code": code, "final": final, "body": body[:200_000] if code == 200 else ""}
+        self._journal(k, self.c[k])
         return code, final, body
+
+def acquire_cycle_lock():
+    """Exclusive non-blocking lock so a loop cycle and a manual build cannot overlap.
+    fcntl locks drop when the holder dies, so a dead pid is not stale in the usual sense.
+    If a live holder has held the lock longer than CYCLE_LOCK_STALE, we log it and skip
+    (we do not steal a live lock). Exit 99 = skipped, already running.
+    """
+    os.makedirs(os.path.dirname(CYCLE_LOCK), exist_ok=True)
+    fd = os.open(CYCLE_LOCK, os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            info = os.read(fd, 256).decode("utf-8", "replace").strip()
+        except Exception:
+            info = ""
+        try: age = time.time() - os.stat(CYCLE_LOCK).st_mtime
+        except Exception: age = 0
+        log(f"story_reports: another build holds the cycle lock ({info or 'unknown holder'}, age {int(age)}s); skipping")
+        if age > CYCLE_LOCK_STALE:
+            log(f"story_reports: lock is stale ({int(age)}s > {CYCLE_LOCK_STALE}s); holder may be hung — not stealing a live lock")
+        os.close(fd)
+        sys.exit(99)
+    try:
+        os.ftruncate(fd, 0)
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.write(fd, f"{os.getpid()} {int(time.time())}\n".encode())
+    except Exception:
+        pass
+    return fd
+
+def install_cache_guards(net):
+    def _checkpoint(signum=None, frame=None):
+        why = f"signal {signum}" if signum is not None else "exit"
+        try: net.save(reason=why, force=bool(signum is not None or net._dirty))
+        except Exception as ex: log(f"cache checkpoint failed ({why}): {ex}")
+        if signum is not None:
+            sys.exit(128 + signum)
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        try: signal.signal(sig, _checkpoint)
+        except Exception: pass
+    atexit.register(_checkpoint)
 
 def link_status(net, url):
     """'ok' | 'blocked' (bot wall, page probably fine) | 'dead' (404/410/redirect to a homepage)."""
@@ -395,8 +528,13 @@ def main():
     ap.add_argument("--desk", default="/workspace/launch/story_reports/desk/overrides.json",
                     help="v2: desk overrides {cluster_id: {risk, risk_why, if_true, if_false, pattern, what_to_do}}; every value must come from a cited source")
     ap.add_argument("--review-html", default="", help="v2: write a contact sheet of share cards for review")
+    ap.add_argument("--no-people", action="store_true", help="t1351u: skip the people layer (also BN_PEOPLE=0 or desk/people_off)")
+    ap.add_argument("--people-budget", type=int, default=int(os.environ.get("BN_PEOPLE_BUDGET", "160")), help="max Wikimedia requests per cycle")
+    ap.add_argument("--people-seconds", type=int, default=int(os.environ.get("BN_PEOPLE_SECONDS", "150")), help="max seconds for the people layer")
     a = ap.parse_args()
+    lock_fd = acquire_cycle_lock()  # kept open until process exit so the flock is held
     net = Net(a.cache or (a.out + ".cache.json"), enabled=not a.no_net)
+    install_cache_guards(net)
     notes = load_notes(a.notes, a.max_age_days)
     for cid, b in load_desk_briefs(a.briefs, a.max_age_days).items():   # desk brief wins unless a newsletter note is 12 h+ newer
         n = notes.get(cid)
@@ -448,11 +586,20 @@ def main():
             if len(got) >= a.max_images: break
         if got: images[cid] = got
         if sh: shares[cid] = sh
-    net.save()
+    people = None
+    if not a.no_people and not a.no_net:   # t1351u: people drawers, /people profiles, lead photos (people_engine.py); never fatal
+        try:
+            import people_engine as PE
+            pages = {cid: (net.c.get(f"T:{a.site.rstrip('/')}/wire/{cid}") or {}).get("body") or "" for cid in set(home) | set(cand)}
+            people = PE.run(PE.corpus_from(st, items, home, notes, alias, images, shares, pages), budget=a.people_budget, seconds=a.people_seconds,
+                            max_new=int(os.environ.get("BN_PEOPLE_MAX_NEW", "150")), max_profiles=int(os.environ.get("BN_PEOPLE_MAX_PROFILES", "6")))
+        except Exception as ex:
+            log(f"people layer failed, story reports unaffected: {ex!r}")
     out = {"v": 2, "generated_at": datetime.now(UTC).replace(microsecond=0).isoformat(), "notes": notes, "images": images,
            "image_policy": {"usgs_shakemap": True, "commons": True, "federal_og": a.federal_og, "outlet_og": a.outlet_og, "outlet_share": a.outlet_share},
            "alias": alias, "shares": shares, "share_policy": {"auto": bool(a.outlet_share_auto)},
            "home": {k: v.get("rank", 0) for k, v in home.items()}, "newsletter_hold": newsletter_hold(a.briefs)}
+    if people: out["people"] = people
     if a.review_html: write_review(a.review_html, shares, home)
     if a.queue and a.nl_selection: refresh_nl_selection()
     if a.queue and home: write_queue(a, net, notes, alias, home)
@@ -465,6 +612,7 @@ def main():
         hn = sum(1 for k in home if k in notes or k in alias); hi = sum(1 for k in home if k in images); hs = sum(1 for k in home if k in shares)
         log(f"story_reports v2 coverage: {len(home)} homepage stories | every page gets an automatic brief | desk note {hn} ({len(alias)} via alias) | "
             f"rights-cleared image {hi} | share cards {hs} ({'shown automatically' if a.outlet_share_auto else str(sum(1 for v in shares.values() for x in v if x.get('ok'))) + ' approved'})")
+    net.save(reason="end of build", force=True)
 
 if __name__ == "__main__":
     main()

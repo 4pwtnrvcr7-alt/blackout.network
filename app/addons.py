@@ -90,6 +90,9 @@ ROUTES = {
     "/cern": "cern", "/lhc": "cern",   # CERN & LHC explainer (cern.py, Nov 13): /cern (+ /lhc, /cern/lhc aliases)
     "/api/cern": "cern",            # /api/cern/{status,opendata,live/<display>.png,img/<file>,app.js,app.css,ring.json}
     "/api/elon": "elon",            # old Elon Musk tab API (tab retired t353; #elon now redirects to #figures)
+    "/people": "people",            # t1351u: /people index + /people/<slug> profiles (people.py; data in story_reports.json "people")
+    "/api/people": "people",        # /api/people/img/<slug>.webp headshots, /api/people/people.js drawer motion
+    "/api/media": "people",         # /api/media/<id>.<ext>: same-origin copies of the images listed in story_reports.json
     "/api/figures": "figures",      # Key Figures tab #figures (t353): neutral people-in-the-news cards
     "/api/finance": "finance",
     "/api/intel": "intel_streams",

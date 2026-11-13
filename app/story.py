@@ -130,16 +130,22 @@ def render(cid, since=""):
         g_short, g_img = G.short_html(cid, title)
         g_loc = G.locator_html(r.get("lat"), r.get("lon"), r.get("location") or "")
         g_ppl = G.people_html(f"{title} {r.get('brief') or ''}")
+        try:   # t1351u: photo + drawer + profile link per public figure (people.py); the old name chips stay as the fallback
+            import people as PP
+            pp = PP.strip_html(cid, " ".join([title or "", r.get("brief") or ""] + [a.get("title") or "" for a in al[:60]]))
+            if pp: g_ppl = ""
+        except Exception: pp = ""
         g_share = G.share_html(f"{S.SITE}/wire/{cid}", f"{title} (rank {rank}/10) via BLACKOUT.NETWORK", "story")
         g_follow = G.follow_html()
-    except Exception: g_short = g_loc = g_ppl = g_share = g_follow = ""; g_img = None
+    except Exception: g_short = g_loc = g_ppl = g_share = g_follow = pp = ""; g_img = None
     report, dek_note = "", ""
     try:   # t1276u: news report under the headline (story_report.py; precomputed notes + images, sections dropped when empty)
         import story_report as SR
         report, dek_note = SR.render(cid, r, rows, rank, tname, title, what, r.get("location") or "", officials, eff,
-                                     fams, g_loc)
+                                     fams, g_loc, pp)
     except Exception:
         report, dek_note = "", ""
+    if not report and pp: g_ppl = pp   # no brief rendered: the people strip still shows, under the headline
     desk_story = bool(r.get("desk_story")); breakdown = ""
     if desk_story:   # t1330u: long-form breakdown and analysis under the brief
         try:
