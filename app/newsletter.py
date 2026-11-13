@@ -94,7 +94,8 @@ DEFAULTS = {
     "max_update_items": 5,          # per section (Stories you follow / Developing stories)
     "follow_max": 50,               # active follows per subscriber
     "audience_db": "",              # override for the subscriber list used by live sending (default: render_mirror/newsletter.db when live)
-    "breaking": {"enabled": True, "fresh_hours": 6, "min_gap_hours": 2, "max_per_day": 3, "max_items": 3, "quiet_start": 22, "quiet_end": 7, "quiet_min_rank": 9},
+    "breaking": {"enabled": True, "fresh_hours": 6, "min_gap_hours": 2, "max_per_day": 3, "max_items": 3, "quiet_start": 22, "quiet_end": 7, "quiet_min_rank": 9,
+                 "require_story_brief": True},   # Matt, Nov 13: a breaking alert waits until its /wire/<id> page shows a full brief (see _breaking_brief_hold)
 }
 E = lambda s: html.escape("" if s is None else str(s), quote=True)
 _LOCK = threading.RLock()
@@ -1234,6 +1235,43 @@ def _hold_unbriefed(issue, c=None):
         issue["quiet"] = not any(issue.get(sec) for sec in _HOLD_SECTIONS if sec != "watchlist")
         log(("brief hold: " + "; ".join(f"{sec} {cid} ({why})" for sec, cid, why in held))[:900], "analysis")
     return held
+
+_BRK_HELD = {"ids": None}
+
+def _breaking_brief_hold(cands, c=None):
+    """Matt, Nov 13 (same rule as the newsletter's require_story_brief, _hold_unbriefed): a breaking alert goes out only when its story
+    page already shows a full brief (a desk brief or analyst note with a what_happened in data/story_reports.json, by cluster id or by
+    its alias) and the story is not on the desk hold list (story_reports.json newsletter_hold). Held stories are NOT marked as seen, so
+    they alert on a later tick once the brief is live, while they are still inside breaking.fresh_hours; after that they lead the next
+    brief as usual. Unlike the brief gate this fails CLOSED: with data/story_reports.json missing or unreadable, every story is held
+    (there is no box pre-send gate for breaking alerts). Off with breaking.require_story_brief=false.
+    cands: [(row, rule, official)]. -> (kept, held) where held = [(cluster_id, reason)]."""
+    c = c or cfg(); b = c.get("breaking") or {}
+    if not b.get("require_story_brief", True): return list(cands), []
+    notes, alias, hold = None, {}, set()
+    try:
+        import story_report as SR
+        R = SR.reports() or {}
+        notes = R.get("notes") if isinstance(R.get("notes"), dict) else None
+        alias = R.get("alias") or {}
+        hold = {str(x) for x in (R.get("newsletter_hold") or []) if isinstance(x, str)}
+    except Exception as ex:
+        log(f"breaking brief hold: story_report unavailable ({type(ex).__name__}); holding every story"[:300], "breaking")
+    kept, held = [], []
+    for x in cands:
+        cid = str(x[0]["cluster_id"] or "")
+        if notes is None: why = "story briefs unavailable (data/story_reports.json missing or unreadable)"
+        elif cid in hold: why = "desk hold list"
+        else:
+            n = notes.get(cid) or notes.get(alias.get(cid) or "")
+            why = None if isinstance(n, dict) and (n.get("what_happened") or "").strip() else "no brief on its story page yet"
+        if why: held.append((cid, why))
+        else: kept.append(x)
+    ids = tuple(sorted(cid for cid, _ in held))
+    if held and ids != _BRK_HELD["ids"]:   # log when the held set changes, not every 45 s tick
+        log(("breaking brief hold: " + "; ".join(f"{cid} ({why})" for cid, why in held))[:900], "breaking")
+    _BRK_HELD["ids"] = ids
+    return kept, held
 
 def _attach_analysis(issue, at, c=None):
     """Analyst brief (what happened, analysis, trajectory, what to do). Read-only. A failure leaves the rest of the issue intact."""
@@ -2607,6 +2645,7 @@ def run_breaking(at=None, c=None, dry_run=False):
         briefed = {x[0] for x in k.execute("SELECT DISTINCT cluster_id FROM sent_items WHERE sent_at>=?", (iso(at - timedelta(days=float(c.get("dedupe_days") or 14))),))}
         fresh = [(r, rule, o) for r, rule, o in cands if r["cluster_id"] not in briefed and (r["cluster_id"] not in seen
                  or (int(r["rank"] or 0) >= 9 and int(seen[r["cluster_id"]]["rank"] or 0) < 9))]   # escalation into rank 9+ may alert again
+        fresh, _held = _breaking_brief_hold(fresh, c)   # Matt, Nov 13: no breaking alert before the story page has its full brief
         hr = at.astimezone(ET).hour
         if hr >= int(b.get("quiet_start", 22)) or hr < int(b.get("quiet_end", 7)):   # overnight: only rank 9+
             fresh = [x for x in fresh if int(x[0]["rank"] or 0) >= int(b.get("quiet_min_rank", 9))]
