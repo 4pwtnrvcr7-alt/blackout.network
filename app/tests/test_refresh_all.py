@@ -162,3 +162,26 @@ class MenuMotion(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class PhoneMenuRow(unittest.TestCase):
+    """Nov 13 (Matt): phone menu top row is one line: Alerts, refresh icon, theme icon, Free brief."""
+    def test_menu_has_icon_refresh_next_to_theme(self):
+        dr = UI.drawer(sitenav, "sources")
+        i, j = dr.find('class="m3-tl bn-rf-row bn-js-only" data-bn-refresh aria-label="Refresh data" title="Refresh data"'), dr.find("bn-theme-row m3-tl")
+        self.assertGreater(i, 0); self.assertGreater(j, i)
+        with mock.patch.dict(os.environ, {"BN_REFRESH_ALL": "0"}):
+            self.assertNotIn("bn-rf-row", UI.drawer(sitenav, "sources"))
+
+    def test_phone_row_hides_wire_sources_settings_desktop_unchanged(self):
+        css = src("static", "bn-v3.css")
+        block = css[css.index("phone menu tool row on ONE line"):]
+        self.assertIn("html.bn-js .bn-m3 .m3-tl.bn-rf-row{display:none!important}", block)   # no menu refresh icon on desktop
+        phone = block[block.index("@media (max-width:767px)"):]
+        for sel in (".m3-tl.bn-gear-row", ".bna-mlinks", ".m3-tl.bna-ml"): self.assertIn(sel, phone)
+        self.assertIn(".bn-theme-row .bn-tl{position:absolute;width:1px", phone)           # icon-only, label for screen readers
+        self.assertIn('if(b.classList.contains("bn-theme-row"))b.setAttribute("title"', src("static", "sitenav.js"))
+
+    def test_wire_and_sources_stay_reachable_from_sections(self):
+        dr = UI.drawer(sitenav, "")
+        self.assertRegex(dr, r'<details class="bn-grp m3-p m3-latest"[\s\S]*?data-tab="threat"')
+        self.assertRegex(dr, r'<details class="bn-grp m3-p m3-about"[\s\S]*?data-tab="sources"')

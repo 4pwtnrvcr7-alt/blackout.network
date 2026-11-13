@@ -215,6 +215,7 @@ def drawer(sn, active=""):
            '<div class="bn-ph">'
            '<div class="bn-dsearch bn-js-only" id="bn_dsearch"></div>'
            '<div class="m3-tools"><button type="button" class="m3-tl m3-alerts bn-js-only">Alerts</button>'
+           + (('<button type="button" class="m3-tl bn-rf-row bn-js-only" data-bn-refresh aria-label="Refresh data" title="Refresh data">' + I_REFRESH + '</button>') if refresh_on() else '')
            + theme_btn("bn-js-only bn-theme-row m3-tl") +
            '<button type="button" class="m3-tl bn-gear-row bn-js-only" aria-controls="bn_settings">Settings</button>'
            '<a class="bn-cta m3-cta" href="/newsletter">Free brief</a></div></div></div>'

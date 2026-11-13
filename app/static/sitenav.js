@@ -26,7 +26,8 @@ function charts(redraw){var C=window.Chart;if(!C||!C.defaults)return;C.defaults.
 function setTheme(t,save){t=t==="light"?"light":"dark";R.setAttribute("data-theme",t);R.style.colorScheme=t;if(save)LS.set("bn_theme",t);
  var m=$('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="light"?"#f6f7f9":"#0b0d10");
  $$("[data-bn-theme]").forEach(function(b){var nx=t==="light"?"dark":"light";b.setAttribute("aria-label","Switch to "+nx+" mode");b.setAttribute("aria-pressed",t==="light"?"true":"false");
-  var l=$(".bn-tl",b);if(l)l.textContent=(nx==="light"?"Light":"Dark")+" mode"});
+  var l=$(".bn-tl",b);if(l)l.textContent=(nx==="light"?"Light":"Dark")+" mode";
+  if(b.classList.contains("bn-theme-row"))b.setAttribute("title",(nx==="light"?"Light":"Dark")+" mode")});   // icon-only in the phone menu: tooltip names the mode it switches to
  charts(true);try{window.dispatchEvent(new CustomEvent("bn-theme",{detail:{theme:t}}))}catch(e){}}
 window.bnTheme=function(){return R.getAttribute("data-theme")==="light"?"light":"dark"};
 if(window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)");var onmq=function(){if(!LS.get("bn_theme"))setTheme(mq.matches?"light":"dark",false)};

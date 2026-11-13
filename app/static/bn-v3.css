@@ -362,3 +362,23 @@ html.bn-js .bn-m3 .bn-gear-row{display:inline-flex!important}
 .bn-m3 .m3-pm::after{transition:transform .38s var(--m3-drw)}
 .bn-m3 .m3-p.m3-shut .m3-pm::after{transform:rotate(90deg)}
 @media (prefers-reduced-motion:reduce){.bn-m3 .m3-body.m3-dz,.bn-m3 .m3-body.m3-dz>*,.bn-m3 .m3-pm::after{transition:none!important}}
+/* Nov 13 (Matt): phone menu tool row on ONE line: Alerts, refresh icon, theme icon, Free brief.
+   The Wire and Sources links (bn-apple.js .bna-ml) and Settings are removed from the phone row (The Wire stays in 01 Latest,
+   Sources in 07 About); refresh and theme are icon-only (same 20px icons, 1.8 stroke as the header buttons;
+   labels kept for screen readers). Desktop/tablet (>=768px) unchanged: no refresh icon in the menu board, Settings stays. */
+html.bn-js .bn-m3 .m3-tl.bn-rf-row{display:none!important}
+@media (max-width:767px){
+ .bn-m3 .bn-ph{column-gap:0;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+ .bn-m3 .bn-dsearch{flex:1 1 100%}
+ .bn-m3 .bn-ph .m3-tl,html:is(.bna-home,.bna-pg) .bn-m3 .bn-ph .bna-ml{flex:0 1 auto;min-width:0;padding:0 clamp(3px,1.1vw,6px);font-size:clamp(12.5px,3.6vw,14px);white-space:nowrap}
+ html:is(.bna-home,.bna-pg) .bn-m3 .bna-ml{order:4}.bn-m3 .m3-alerts{order:5}.bn-m3 .bn-rf-row{order:6}.bn-m3 .bn-theme-row{order:7}.bn-m3 .m3-cta{order:8}
+ html.bn-js body .bn-m3 .bn-ph .m3-tl.bn-gear-row,html body .bn-m3 .bn-ph .bna-mlinks,html body .bn-m3 .bn-ph .m3-tl.bna-ml{display:none!important}
+ html.bn-js body .bn-m3 .bn-ph .m3-tl.bn-rf-row{display:inline-flex!important}
+ .bn-m3 .bn-ph .m3-tl.bn-theme-row,.bn-m3 .bn-ph .m3-tl.bn-rf-row{flex:0 0 auto;justify-content:center;width:40px;min-width:40px;padding:0}
+ .bn-m3 .bn-ph .m3-tl.bn-rf-row svg{display:block;width:20px;height:20px}
+ .bn-m3 .bn-ph .m3-tl.bn-theme-row .bn-tl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+ .bn-m3 .bn-ph .m3-tl.bn-theme-row svg{width:20px;height:20px}
+ .bn-m3 .bn-ph .m3-tl.bn-theme-row .bn-sun{display:block}.bn-m3 .bn-ph .m3-tl.bn-theme-row .bn-moon{display:none}
+ html[data-theme="light"] .bn-m3 .bn-ph .m3-tl.bn-theme-row .bn-sun{display:none}html[data-theme="light"] .bn-m3 .bn-ph .m3-tl.bn-theme-row .bn-moon{display:block}
+ .bn-m3 .bn-ph .m3-cta{flex:0 0 auto;padding:0 clamp(10px,3vw,16px);font-size:clamp(12.5px,3.6vw,14px);margin-left:auto}
+}
