@@ -419,6 +419,12 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     """Returns (html, dek_override). rows: deduped alerts in time order."""
     R = reports(); notes = R.get("notes") or {}
     note = notes.get(cid) or notes.get((R.get("alias") or {}).get(cid) or "")
+    desk_lead = ""
+    if r.get("desk_story"):   # t1330u: desk stories ship their own sourced brief and graphic; a pushed note still wins
+        try:
+            import desk_stories as DS
+            note = note or DS.note(cid); desk_lead = DS.lead_html(cid)
+        except Exception: pass
     imgs = [i for i in (R.get("images") or {}).get(cid) or [] if isinstance(i, dict)]
     shares = [s for s in (R.get("shares") or {}).get(cid) or [] if isinstance(s, dict) and (s.get("ok") or (R.get("share_policy") or {}).get("auto"))]
     what_b, bfacts = brief_facts(r.get("brief"))
@@ -538,7 +544,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     # ---- visuals: rights-cleared image, else approved outlet share card, else locator map (snapshot graphic always in part 3)
     figs = [x for x in (figure(im, i == 0) for i, im in enumerate(imgs[:3])) if x]
     cards = [x for x in (share_card(s) for s in shares[:2]) if x]
-    lead_vis = figs[0] if figs else (cards[0] if cards else "")
+    lead_vis = figs[0] if figs else (cards[0] if cards else desk_lead)
     more_vis = figs[1:] + (cards if figs else cards[1:])
     gallery = (f'<section class="sr-sec" aria-labelledby="sr_img"><h2 class="sr-k" id="sr_img">{icon("image")}Images</h2><div class="sr-gal">{"".join(more_vis)}</div></section>' if more_vis else "")
     # ---- details (collapsed): key facts, key moments, charts

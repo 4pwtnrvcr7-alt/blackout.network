@@ -51,11 +51,20 @@ def _short(t, n=65):
     c = t[:n].rsplit(" ", 1)[0].rstrip(" ,;:-–(") or t[:n]
     return c + "…"
 
+def _desk(cid):
+    """t1330u: editor-written desk story (desk_stories.py) for an id the scanner has no cluster for; (None, []) otherwise."""
+    try:
+        import desk_stories as DS
+        return DS.cluster(cid)
+    except Exception:
+        return None, []
+
 def load(cid):
-    c = _ro()
+    try: c = _ro()
+    except Exception: return _desk(cid)   # no readable blackout.db: desk stories still render
     try:
         r = c.execute("SELECT * FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
-        if not r: return None, []
+        if not r: return _desk(cid)
         al = c.execute("SELECT source,family,title,source_url,first_seen,official,location FROM alerts WHERE cluster_id=? ORDER BY first_seen, official DESC LIMIT 400", (cid,)).fetchall()
         cl, items = dict(r), [dict(a) for a in al]
         try:
@@ -131,6 +140,11 @@ def render(cid, since=""):
                                      fams, g_loc)
     except Exception:
         report, dek_note = "", ""
+    desk_story = bool(r.get("desk_story")); breakdown = ""
+    if desk_story:   # t1330u: long-form breakdown and analysis under the brief
+        try:
+            import desk_stories as DS; breakdown = DS.sections_html(cid)
+        except Exception: breakdown = ""
     upd = (f'<section class="card" style="border-color:#f5a524"><h2>What\'s new since {S.E(et(since))}</h2><p>{len(new)} new report(s), marked NEW below.</p></section>'
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
@@ -150,7 +164,7 @@ def render(cid, since=""):
             + ("" if dek_note else (f'<p class="dek">{S.E(what)}</p>' if what and what != title else ""))
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
-            + g_ppl + g_share + upd + report + (g_short if report else (g_short or g_loc))
+            + g_ppl + g_share + upd + report + breakdown + (g_short if report else (g_short or g_loc))
             + vhtml + elec
             + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
             + '<section class="card"><h2>How confident are we?</h2><p>'
@@ -171,7 +185,7 @@ def render(cid, since=""):
     ld = {"@context": "https://schema.org", "@graph": [{k: v for k, v in ld.items() if k != "@context"},
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "The Wire", "item": f"{S.SITE}/#wire"},
                                                           {"@type": "ListItem", "position": 2, "name": title[:110], "item": f"{S.SITE}/wire/{cid}"}]}]}
-    noindex = watch != 0 or rank < 3
+    noindex = (watch != 0 or rank < 3) and not desk_story   # t1330u: desk stories are written up in full, so they stay indexable
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
 def handle_get(path, qs):

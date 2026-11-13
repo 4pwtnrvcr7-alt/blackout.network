@@ -440,11 +440,20 @@ def _board_html():
                 f'<span class="bna-ch" data-f="c" aria-hidden="true"></span><span class="bna-mf"><span class="bna-src" data-f="t"></span><span class="bna-chev" aria-hidden="true"></span></span></button>'
                 f'<div class="bna-mx" id="bna_mx_{k}" hidden><div data-f="x"></div><a class="bna-lnk" href="{href}">See full page</a></div></article>')
     out = ['<section class="bna-sec" id="bna_dash" aria-labelledby="bna_h_now"><div class="bna-wrap bna-sech"><h2 id="bna_h_now">Active Threat Monitoring</h2></div>']
-    for g, title, sub, cards in BOARD:
+    for i, (g, title, sub, cards) in enumerate(BOARD):
         out.append(f'<div class="bna-wrap bna-grp" data-g="{g}" role="group" aria-labelledby="bna_g_{g}"><div class="bna-gh"><h3 id="bna_g_{g}"><i aria-hidden="true"></i>{E(title)}</h3><p>{E(sub)}</p></div>'
                    f'<div class="bna-mgrid">' + "".join(card(*c) for c in cards) + '</div></div>')
+        if i == 0: out.append(_notice())   # t1330u: featured notice directly under the first group of blocks
     out.append('</section>')
     return "".join(out)
+
+def _notice():
+    """Featured desk-story notice (desk_stories.notice_html), '' when none is active or on any error."""
+    try:
+        import desk_stories as DS
+        return DS.notice_html()
+    except Exception:
+        return ""
 
 def dash_data():
     return _single("dash", _dcache, 90, _dash_build)

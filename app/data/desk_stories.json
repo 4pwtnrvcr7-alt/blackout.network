@@ -1,0 +1,238 @@
+{
+ "v": 1,
+ "stories": {
+  "ed747e9064795131": {
+   "cluster_id": "ed747e9064795131",
+   "slug": "nationwide-eas-test-2026-11-17",
+   "title": "FEMA and FCC nationwide Emergency Alert System test on Nov. 17, 2026, at 2:20 PM ET",
+   "category": "infrastructure",
+   "location": "United States",
+   "rank": 2,
+   "score": 20,
+   "confidence": "High",
+   "rank_method": "scanner.rebuild_cluster (unchanged scoring) run on the four official reports below in a throwaway database",
+   "event_time": "2026-11-17T19:20:00Z",
+   "first_seen": "2026-09-16T16:00:00Z",
+   "updated": "2026-11-13T09:40:00Z",
+   "families": [
+    "FCC",
+    "State emergency management",
+    "County emergency management"
+   ],
+   "reports": [
+    {
+     "source": "FCC Public Safety and Homeland Security Bureau",
+     "family": "FCC",
+     "official": 1,
+     "first_seen": "2026-09-16T16:00:00Z",
+     "title": "Public Safety and Homeland Security Bureau announces nationwide test of the Emergency Alert System on November 17, 2026 (DA 26-989)",
+     "source_url": "https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf"
+    },
+    {
+     "source": "FCC EAS Test Reporting System page",
+     "family": "FCC",
+     "official": 1,
+     "first_seen": "2026-09-16T16:05:00Z",
+     "title": "FEMA will conduct a nationwide EAS test on November 17, 2026; backup date December 3, 2026",
+     "source_url": "https://www.fcc.gov/general/eas-test-reporting-system"
+    },
+    {
+     "source": "ReadyHarris (Harris County, Texas)",
+     "family": "County emergency management",
+     "official": 1,
+     "first_seen": "2026-09-30T15:00:00Z",
+     "title": "FEMA: 2026 Nationwide Emergency Alert System Test",
+     "source_url": "https://www.readyharris.org/Newsroom/News-Releases/Ready-Harris-All-News-Releases/2026-nationwide-emergency-alert-system-test"
+    },
+    {
+     "source": "Wisconsin Emergency Management",
+     "family": "State emergency management",
+     "official": 1,
+     "first_seen": "2026-11-10T15:00:00Z",
+     "title": "ReadyWisconsin press release: Nationwide Emergency Alert System Test on Nov. 17",
+     "source_url": "https://wem.wi.gov/nationwide-emergency-alert-system-test-nov-17/"
+    }
+   ],
+   "brief": {
+    "headline": "FEMA and the FCC will run a nationwide Emergency Alert System test on TV and radio on Nov. 17 at 2:20 PM ET.",
+    "why_it_matters": "A one-minute test message will interrupt TV, radio, cable and satellite programming across the country; it is a scheduled test required by law, not an emergency, and it will not go to phones.",
+    "what_happened": "The FCC's Public Safety and Homeland Security Bureau announced on Sept. 16, 2026 (Public Notice DA 26-989) that FEMA, in coordination with the FCC, will send a nationwide test of the Emergency Alert System at 2:20 p.m. ET on Tuesday, Nov. 17, with Dec. 3 as the backup date. FEMA will send it through its Integrated Public Alert and Warning System (IPAWS) as a Common Alerting Protocol message in English and Spanish, using the National Periodic Test (NPT) event code. Wisconsin Emergency Management, publishing FEMA's release, says the test lasts about one minute and will not be sent to phones through Wireless Emergency Alerts.",
+    "analysis": "Federal law (6 U.S.C. 321o) requires FEMA to run a nationwide test of the public alert and warning system at least once every three years, and the last nationwide EAS test was on Oct. 4, 2023. In that test, the FCC reported that 96.6% of stations and providers received the alert and 93.6% passed it on, while about 23% of EAS equipment units ran outdated or unsupported software. This test checks the same chain again, and every participant must file day-of-test results with the FCC within 48 hours.",
+    "pattern": "The FCC lists earlier nationwide EAS tests in November 2011, September 2016, September 2017, October 2018, August 2019, August 2021 and October 2023.",
+    "rank_why": "Our published scoring rules give a scheduled test from official sources 2/10 (Minor): three official sources confirm it, but nothing is happening to anyone. We feature it on the homepage anyway because the message will interrupt TV and radio nationwide on Nov. 17 and readers should know ahead of time that it is only a test.",
+    "risk": "Low",
+    "risk_why": "A scheduled one-minute test with no action required; the main risk is confusion, not harm.",
+    "if_true": "On Nov. 17 at about 2:20 PM ET, TV and radio carry the test message with the standard alert tones. Stations and providers file day-of-test results with the FCC by 2:20 PM ET on Nov. 19 and detailed results by Jan. 4, 2027, and the FCC later publishes a report on how many received and relayed the alert. If conditions force a delay, the test moves to Dec. 3.",
+    "if_false": "If the test is postponed, the FCC notice already names Dec. 3 as the backup date. Claims that the test is cover for some other planned event have no support in the FCC notice, the law or FEMA's release, which says no action is required by the public.",
+    "what_to_do": "No action is needed. If your TV, radio, cable or satellite service did not carry the test, or carried it with problems, you can tell the FCC through the alerting test feedback form on its Public Safety Support Center page.",
+    "confidence": "High",
+    "confidence_why": "The FCC public notice (DA 26-989) and the FCC's ETRS page set the date, time, delivery method and filing deadlines; Wisconsin Emergency Management and ReadyHarris published FEMA's release with the message text, duration and the note that phones will not get it.",
+    "sources": [
+     "https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf",
+     "https://www.fcc.gov/general/eas-test-reporting-system",
+     "https://wem.wi.gov/nationwide-emergency-alert-system-test-nov-17/",
+     "https://www.readyharris.org/Newsroom/News-Releases/Ready-Harris-All-News-Releases/2026-nationwide-emergency-alert-system-test",
+     "https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf",
+     "https://www.law.cornell.edu/uscode/text/6/321o"
+    ],
+    "written_at": "2026-11-13T09:40:00Z"
+   },
+   "sections": [
+    {
+     "id": "test",
+     "h": "The test, in plain terms",
+     "blocks": [
+      {
+       "p": "At 2:20 p.m. Eastern on Tuesday, Nov. 17, FEMA will send a test through the Emergency Alert System (EAS). Radio and TV stations, cable systems, satellite radio and TV providers and wireline video systems will interrupt programming for about one minute, then go back to normal. If conditions that day force a delay, the backup date is Thursday, Dec. 3. ([FCC Public Notice DA 26-989](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf); [Wisconsin Emergency Management](https://wem.wi.gov/nationwide-emergency-alert-system-test-nov-17/))"
+      },
+      {
+       "p": "The FCC notice gives the wording, which the audio and on-screen text are meant to match: “This is a nationwide test of the Emergency Alert System, issued by the Federal Emergency Management Agency, covering the United States from 2:20 to 2:50 hours ET. This is only a test. No action is required by the public.” The message goes out in English and Spanish, with the standard alert tones. ([FCC](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf))"
+      },
+      {
+       "p": "Phones are not part of this test. FEMA's release says the message will not be sent through Wireless Emergency Alerts, the system that pushes alerts to cell phones. The October 2023 test covered both phones and broadcast; this one covers broadcast and pay-TV only. ([Wisconsin Emergency Management](https://wem.wi.gov/nationwide-emergency-alert-system-test-nov-17/); [FCC 2023 test report](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+      }
+     ]
+    },
+    {
+     "id": "tech",
+     "h": "How the alert travels: the technology",
+     "blocks": [
+      {
+       "p": "FEMA runs the Integrated Public Alert and Warning System (IPAWS). For this test, FEMA will send the alert as a Common Alerting Protocol (CAP) message, an XML format that carries the text, a recorded audio file and versions in more than one language. FCC rules require every EAS participant to have equipment that can collect CAP version 1.2 messages (built to the IPAWS profile) and convert them into the older EAS format. Stations' equipment checks the IPAWS feed for new alerts at regular intervals. ([47 CFR Part 11, section 11.56](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-11); [FCC 2023 test report](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+      },
+      {
+       "p": "The older path is the broadcast “daisy chain.” FEMA sends the alert to Primary Entry Point (PEP) stations. Local Primary stations monitor the PEPs and rebroadcast the alert, and every other station and cable system picks it up from the stations it monitors. FCC rules require each participant to monitor two EAS sources, so one failed link does not cut a station off. ([FCC 2023 test report, appendix](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf); [FCC notice, note 6](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf))"
+      },
+      {
+       "p": "FEMA says there are 77 PEP stations, mostly AM radio stations, equipped with backup generators and satellite links, hardened against physical and environmental threats, and able to run on their own for long periods. FEMA says this network can reach nearly 90 percent of the U.S. population within minutes, even when the internet, cell networks and power are down. Florida's PEP stations on FEMA's list are WFLF 540 AM (Maitland), WOKV 690 AM and 104.5 FM (Jacksonville) and WWFE 670 AM (Miami). The FCC's 2023 report described 72 PEP stations; FEMA's current page lists 77. ([FEMA National Public Warning System](https://www.fema.gov/emergency-managers/practitioners/integrated-public-alert-warning-system/national-public-warning-system); [FCC 2023 test report](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+      },
+      {
+       "p": "Over the air, every EAS message uses the same four parts, set out in FCC rules: a digital header sent three times (ZCZC-ORG-EEE-PSSCCC+TTTT-JJJHHMM-LLLLLLLL, which encodes who sent it, the event code, the areas covered, how long it is valid, the time it was issued and the station that sent it), an 8 to 25 second two-tone attention signal at 853 and 960 Hz, the audio or text message, and an end-of-message code (NNNN) sent three times. The header format is the same Specific Area Message Encoding (SAME) used by NOAA Weather Radio. ([47 CFR 11.31](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-11); [FCC 2023 test report, note 102](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+      },
+      {
+       "p": "The trade-off is quality. A station that gets the alert straight from IPAWS gets the full CAP message, including clean digital audio and Spanish. When the alert is passed down the daisy chain instead, the CAP data are lost, and stations can only relay what they heard over the air. ([FCC 2023 test report, note 21](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+      },
+      {
+       "p": "The event code matters too. NPT stands for National Periodic Test. EAN is the code for a real national activation, which FCC rules now call the National Emergency Message (formerly the Emergency Action Notification or Presidential alert). The 2011 test used a live EAN, sent to PEP stations over a secure phone line. The FCC then recommended a less disruptive test code such as NPT, and the 2026 test uses NPT. ([47 CFR 11.2 and 11.31](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-11); [FCC report on the 2017 test](https://docs.fcc.gov/public/attachments/DOC-350223A1.pdf); [FCC 2013 report on the 2011 test](https://docs.fcc.gov/public/attachments/DOC-320152A1.pdf))"
+      }
+     ]
+    },
+    {
+     "id": "past",
+     "h": "What past tests found",
+     "blocks": [
+      {
+       "figure": "tests"
+      },
+      {
+       "ul": [
+        "2011: the original nationwide test used a live EAN. The FCC found the system “basically sound” but reported widespread poor audio quality, areas with no PEP station, some stations unable to receive or relay the alert, a test that was too short, and equipment programming problems. ([FCC 2013 report](https://docs.fcc.gov/public/attachments/DOC-320152A1.pdf))",
+        "2017: 95.8% of participants received the test and 91.9% relayed it; 58.1% got it over the air first rather than from IPAWS, so they could not pass on the CAP version. ([FCC 2017 report](https://docs.fcc.gov/public/attachments/DOC-350223A1.pdf))",
+        "2018: 95.7% received and 92.1% relayed it; 58.7% got it from IPAWS first, up from 41.9% in 2017. ([FCC 2018 report](https://docs.fcc.gov/public/attachments/DOC-356902A1.pdf))",
+        "2019 and 2021: both tests used only the broadcast daisy chain, to see how the system works without the internet. Receipt rose from 82.5% in 2019 to 89.3% in 2021, relay from 79.8% to 87.1%, and PEP stations with technical problems fell from 12 to 7. ([FCC 2021 report](https://docs.fcc.gov/public/attachments/DOC-378861A1.pdf))",
+        "2023: 96.6% received and 93.6% relayed the alert, which the FCC linked to sending it as a CAP message. About 23% of EAS equipment units, at more than 4,500 participants, ran outdated software or equipment that no longer got updates; fully updated equipment did best (97% received, 95% relayed) and unsupported equipment worst (90% and 85%). Five of the six weakest areas were U.S. territories, led by the Northern Mariana Islands at 20.0% relay success and Guam at 33.3%. Participants made 20,682 unique filings, an 81.7% participation rate. ([FCC 2023 report](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "law",
+     "h": "The legal framework",
+     "blocks": [
+      {
+       "ul": [
+        "Executive Order 13407 (June 26, 2006) set the policy of having a system to warn Americans “in situations of war, terrorist attack, natural disaster, or other hazards” and to ensure “that under all conditions the President can communicate with the American people.” It put the Department of Homeland Security in charge of the EAS and directed the FCC to adopt rules so communications systems can carry alerts. ([Federal Register](https://www.federalregister.gov/documents/2006/06/28/06-5829/public-alert-and-warning-system))",
+        "The IPAWS Modernization Act of 2015 (Public Law 114-143, signed April 11, 2016), codified at 6 U.S.C. 321o, requires FEMA to conduct “not less than once every 3 years, periodic nationwide tests” of the system. It also limits use: except for testing, the system may not carry a message unrelated to a natural disaster, act of terrorism, or other man-made disaster or threat to public safety. ([6 U.S.C. 321o](https://www.law.cornell.edu/uscode/text/6/321o))",
+        "FCC rules in 47 CFR Part 11 make radio and TV stations, cable, satellite and wireline video systems “EAS participants.” A national test replaces that week's and month's routine tests, and the FCC must give at least two months' notice; the Sept. 16 notice says it meets that requirement. Part 11 lists its legal authority in the Communications Act, including 47 U.S.C. 606, the section on the President's war powers over communications. ([47 CFR Part 11](https://www.ecfr.gov/current/title-47/chapter-I/subchapter-A/part-11); [47 U.S.C. 606](https://www.law.cornell.edu/uscode/text/47/606); [FCC notice](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf))",
+        "Filing duties: every participant had to file ETRS Form One by Oct. 30, 2026; Form Two (day-of-test results) is due within 48 hours, by 2:20 p.m. ET on Nov. 19, instead of the 24 hours the rule normally allows; and Form Three (detailed results) is due by Jan. 4, 2027. The FCC warns that failing to receive or relay the alert because of an equipment failure may lead to enforcement action. ([FCC notice](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf); [FCC ETRS page](https://www.fcc.gov/general/eas-test-reporting-system))",
+        "Phone alerts are a separate system: Wireless Emergency Alerts come from the WARN Act of 2006 and FCC Part 10 rules, and carriers take part voluntarily. They are not part of this test. ([FCC 2023 test report](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "why",
+     "h": "Why it is happening now",
+     "blocks": [
+      {
+       "p": "The short answer is the legal cycle. The law requires a nationwide test at least every three years, and the last one was Oct. 4, 2023, so this test comes a little over three years later. FEMA's associate administrator for national continuity programs notified the FCC on Sept. 16, 2026, and the FCC announced the date the same day. ([FCC notice](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf); [FCC 2023 report](https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf))"
+      },
+      {
+       "p": "FEMA's own explanation is that the tests “allow FEMA to identify technical or operational issues before the system is needed during an actual emergency.” The FCC notice asks stations to update equipment software, check that they monitor the right sources, and sync equipment clocks, which lines up with the problems the 2023 report found. ([ReadyHarris, publishing FEMA's release](https://www.readyharris.org/Newsroom/News-Releases/Ready-Harris-All-News-Releases/2026-nationwide-emergency-alert-system-test); [FCC notice](https://docs.fcc.gov/public/attachments/DA-26-989A1.pdf))"
+      }
+     ]
+    },
+    {
+     "id": "analysis",
+     "h": "Our analysis: what this does and does not tell us",
+     "label": "Our analysis",
+     "note": "This section is BLACKOUT.NETWORK analysis. It is kept apart from the sourced facts above, and every fact in it links to a source.",
+     "blocks": [
+      {
+       "p": "The test lands in a tense stretch. Stories on our board this week include Iran's Revolutionary Guards saying explosions stopped two loaded supertankers in the Strait of Hormuz, the Guards saying Iran's 2,000-km limit on missile range has been lifted, Saudi residents receiving text alerts to take shelter during Houthi missile attacks on Riyadh, and Russian strikes that knocked out power in parts of Ukraine and left critical sites running on generators. ([Hormuz](/wire/2cb682f7fe34d1ff); [Iran missile range](/wire/9d612e4f00713013); [Riyadh](/wire/22224aec1f152958); [Ukraine grid](/wire/98fdd3f9a50d90a8))"
+      },
+      {
+       "p": "Those stories show why a warning system that does not depend on the internet matters. In Riyadh, phone alerts told people to shelter. In Ukraine, attacks aimed at the grid itself. The U.S. system is built for both cases: phone alerts in normal times, and a hardened radio network with its own power and satellite links for when the grid and the internet are down. That is the part this test exercises."
+      },
+      {
+       "p": "On the “Fortress” question: we searched Defense Department pages and major outlets and found no official program called “Fortress Protocol” or “Operation Fortress.” The closest real match is FORTRESS America, which Defense Secretary Pete Hegseth (who uses the title Secretary of War) announced on Sept. 30, 2026. It is a program to make U.S. military bases able to keep running through grid failures, cyberattacks, sabotage and supply disruptions, built on five pillars: energy independence, supply-chain resilience, a strategic defense reserve, installation hardening and cyber resilience, and space and spectrum resilience. The Pentagon's acquisition chief set up its program office in an Oct. 6 memo. ([Department of War](https://www.war.gov/News/News-Stories/Article/Article/4615637/hegseth-delivers-state-of-the-force-address-outlines-series-of-new-initiatives/); [DefenseScoop](https://defensescoop.com/2026/10/07/pentagon-memo-operationalize-fortress-america-program-office/))"
+      },
+      {
+       "p": "FORTRESS America is about military installations, not civilian alerts. Nothing in the FCC notice, FEMA's release or the Pentagon material we read connects it to the EAS test. Some outlets reported a target of 90 days of self-sufficiency for bases; we did not find that number in the public memo text, so we do not rely on it. ([The Guardian](https://www.theguardian.com/us-news/2026/nov/02/us-emergency-preparedness-military); [DefenseScoop](https://defensescoop.com/2026/10/07/pentagon-memo-operationalize-fortress-america-program-office/))"
+      },
+      {
+       "p": "Connecting the dots honestly: the two efforts share a planning assumption, not a timeline. FEMA built its PEP network to work “under all conditions,” and FORTRESS America plans for bases to run if “an adversary takes down the grid,” in Hegseth's words. Both plan for a day when the grid and the internet are not there. Planning for that day is not the same as expecting it on a given date."
+      },
+      {
+       "scen": [
+        [
+         "Very likely",
+         "The test is what the FCC notice says: a scheduled, legally required check. Expect an FCC report in 2027 with receipt and relay rates you can compare with 2023's 96.6% and 93.6%."
+        ],
+        [
+         "Likely",
+         "The results feed into upgrades. The 2023 test found that about 23% of equipment was out of date and that the territories lagged, and FEMA says it is upgrading PEP stations' power resilience and protection against emerging threats. ([FEMA](https://www.fema.gov/emergency-managers/practitioners/integrated-public-alert-warning-system/national-public-warning-system))"
+        ],
+        [
+         "What the system is for",
+         "A real national activation would use the EAN code for a national emergency. The 2006 executive order names war, terrorist attack and natural disaster, and the 2016 law limits non-test use to disasters, terrorism and threats to public safety."
+        ],
+        [
+         "Not supported",
+         "That this test signals a planned war, attack, blackout or other hidden event. No source we found supports that. A real national alert would not be announced two months ahead and labeled “only a test.”"
+        ]
+       ]
+      },
+      {
+       "p": "What we are watching: whether the test runs on Nov. 17 or slips to Dec. 3; the FCC's results report; whether more stations replace outdated equipment, as the FCC recommended after 2023; and FORTRESS America's implementation plan, which the Pentagon has not yet published. Bottom line: the risk on Nov. 17 is confusion, not danger. The bigger story is whether the backup warning system works if the grid and internet fail, and this test is how the public finds out."
+      }
+     ]
+    },
+    {
+     "id": "do",
+     "h": "What you can do",
+     "blocks": [
+      {
+       "ul": [
+        "Nothing is required. If you see or hear the test, it is only a test, and it will not come to your phone.",
+        "If your TV, radio or pay-TV service did not carry it, or the audio or text was garbled, tell the FCC through the alerting test feedback form on its [Public Safety Support Center](https://www.fcc.gov/general/public-safety-support-center) page.",
+        "Keep a battery-powered or hand-crank radio and a NOAA Weather Radio with tone alert in your kit, as [Ready.gov](https://www.ready.gov/kit) recommends. Radio is the path the PEP network uses when power and internet are down.",
+        "Make sure emergency alerts are turned on in your phone's settings so real alerts reach you ([Ready.gov](https://www.ready.gov/alerts))."
+       ]
+      }
+     ]
+    }
+   ],
+   "figure_credit": "Graphic: BLACKOUT.NETWORK, built from FCC nationwide EAS test reports (2017, 2018, 2021, 2023).",
+   "notice": {
+    "tag": "Scheduled test",
+    "show_from": "2026-11-13T00:00:00Z",
+    "show_until": "2026-11-18T05:00:00Z",
+    "kicker": "Featured notice",
+    "title": "Nationwide alert test on TV and radio: Tue., Nov. 17, 2:20 PM ET",
+    "text": "FEMA and the FCC will interrupt TV, radio, cable and satellite programming for about one minute. It is only a test, required by law, and it will not go to phones.",
+    "link_text": "Read the full breakdown"
+   }
+  }
+ }
+}
