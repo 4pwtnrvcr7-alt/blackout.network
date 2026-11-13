@@ -1068,14 +1068,26 @@ def card_fragment(a):
         import story_gates as SG
         if SG.is_template_filler(what, analysis, a.get("title") or ""):
             what, analysis = "", ""
+        # Nov 13 fix: the pre-send QA gate (newsletter_qa.check) judges each printed paragraph ON ITS OWN
+        # (is_template_filler(what, "", "") and is_template_filler("", analysis, "")). Judging the pair together
+        # let "6 deaths stated in the reports" in WHAT HAPPENED carry a boilerplate ANALYSIS line ("The reports
+        # describe the use of force in ..., rank 5/10.") past this check, and the gate then blocked the whole
+        # 7 AM issue for every subscriber (Nov 12 + Nov 13 mornings). Use the gate's own per-line test here.
+        if what and SG.is_template_filler(what, "", ""):
+            what = ""
+        if analysis and SG.is_template_filler("", analysis, ""):
+            analysis = ""
     except Exception:
         if what.lower().startswith("on the record") or analysis.lower().startswith("the reports describe"):
             what, analysis = "", ""
     parts = []
     if what:
         parts.append(_p(_lbl("WHAT HAPPENED") + _e(what)))
-    if analysis or a.get("takeaway"):
+    if analysis:
         parts.append(_analysis_block(analysis, a.get("takeaway") or ""))
+    elif (a.get("takeaway") or "").strip() and not re.search(r"is why this is ranked\b", a.get("takeaway") or "", re.I):
+        # a takeaway alone is printed as the paragraph body: a dek with an empty body is an "ANALYSIS paragraph is empty" QA blocker
+        parts.append(_analysis_block(a.get("takeaway"), ""))
     if hist:
         parts.append(hist)
     if a.get("outlook") or a.get("trend_detail") or word:

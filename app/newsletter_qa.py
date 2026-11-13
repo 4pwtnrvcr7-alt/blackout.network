@@ -60,9 +60,15 @@ def _prefix_of(shown, sources):
     if shown.rstrip().endswith(TERMINAL[:3]): return None   # a whole sentence that opens a longer text is not a cut
     a = _norm(shown)
     if len(a) < 12: return None
+    lead = re.sub(r"\s+", " ", shown).strip().lower()
     for src in sources or ():
         b = _norm(src)
         if len(b) > len(a) + 2 and b.startswith(a + " "):
+            raw = re.sub(r"\s+", " ", str(src)).strip()
+            # Nov 13: a headline that is the source's whole first sentence minus its full stop ("... between London and Paris"
+            # from "... between London and Paris. French authorities ...") is not a cut.
+            if raw.lower().startswith(lead) and raw[len(lead):len(lead) + 1] in (".", "!", "?"):
+                continue
             return src
     return None
 
