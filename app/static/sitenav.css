@@ -361,3 +361,43 @@ body header.bn-top{padding-top:var(--bn-safe-top)}
 
 /* Nov 12 (Matt): no notification dots or count badges on the menu button, menu links or tabs. */
 .bn-burger .bna-dot,.bn-badge,.bn-grp a .ns-badge,.tabs .ns-badge,.bna-mdot{display:none!important}
+/* ---------- Refresh data (Nov 13): top-bar icon beside the theme icon, tooltip on desktop, spin while it runs ---------- */
+html.bn-js .bn-tbar .bn-refresh{display:inline-flex!important;position:relative;width:44px;min-width:44px;height:44px;min-height:44px;flex:none;color:inherit;background:none;cursor:pointer}
+.bn-tbar .bn-refresh:hover{background:var(--bn-hover)}
+.bn-tbar .bn-refresh:focus-visible{outline:2px solid var(--bn-accent);outline-offset:-2px}
+.bn-rf-ico{transform-origin:50% 50%}
+[data-bn-refresh].bn-rf-spin .bn-rf-ico{animation:bn-rf-spin .9s linear infinite}
+[data-bn-refresh][aria-disabled="true"]{cursor:progress}
+[data-bn-refresh].bn-rf-done{color:var(--bn-sev-lo,#3FAE80)}
+@keyframes bn-rf-spin{to{transform:rotate(360deg)}}
+.bn-rf-tip{position:absolute;top:calc(100% + 6px);left:50%;transform:translate(-50%,-4px);padding:6px 10px;border-radius:8px;white-space:nowrap;pointer-events:none;
+ font:600 12px/1.2 var(--bn-font-ui);letter-spacing:.01em;color:var(--bn-bg,#0b0d10);background:var(--bn-text,#e8eaed);box-shadow:0 6px 18px rgba(0,0,0,.28);
+ opacity:0;visibility:hidden;transition:opacity .15s ease,transform .15s ease,visibility 0s .15s;z-index:5}
+@media (hover:hover) and (pointer:fine){.bn-refresh:hover .bn-rf-tip,.bn-refresh:focus-visible .bn-rf-tip{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .15s ease .25s,transform .15s ease .25s,visibility 0s .25s}}
+.bn-refresh.bn-rf-spin .bn-rf-tip,.bn-refresh.bn-rf-done .bn-rf-tip{opacity:0!important;visibility:hidden!important}
+header.bn-top .bn-tbar{position:relative}
+.bn-rf-st{position:absolute;right:max(12px,env(safe-area-inset-right));top:calc(100% + 8px);z-index:6;padding:7px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;
+ font:600 13px/1.2 var(--bn-font-ui);color:var(--bn-text);background:var(--bn-surface,#15181d);border:1px solid var(--bn-line);box-shadow:0 6px 18px rgba(0,0,0,.25);
+ opacity:0;transform:translateY(-4px);transition:opacity .2s ease,transform .2s ease}
+.bn-rf-st:empty{display:none}
+.bn-rf-st.bn-rf-ok,.bn-rf-st.bn-rf-err{opacity:1;transform:none}
+.bn-rf-st.bn-rf-ok::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--bn-sev-lo,#3FAE80);vertical-align:1px}
+.bn-rf-st.bn-rf-err{color:var(--bn-sev-hi,#ff6b6b)}
+@media (prefers-reduced-motion:reduce){[data-bn-refresh].bn-rf-spin .bn-rf-ico{animation-duration:2.4s}.bn-rf-tip,.bn-rf-st{transition:none!important}}
+/* Settings panel (Nov 13): opened from the menu's Settings item or the gear; scrim behind it, Close button, theme + Refresh data rows */
+.bn-pop-scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:calc(var(--bn-z-drawer) + 205)}
+.bn-pop-scrim[hidden]{display:none!important}
+.bn-pop-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bn-pop-x{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;margin:-10px -8px -10px 0;padding:0;border:0;border-radius:var(--bn-radius-sm);background:none;color:var(--bn-text);cursor:pointer}
+.bn-pop-x:hover{background:var(--bn-hover)}
+.bn-pop-rows{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid var(--bn-line)}
+.bn-pop-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:1px solid var(--bn-line);border-radius:var(--bn-radius-sm);background:none;color:var(--bn-text);font:600 14px/1 var(--bn-font-ui);cursor:pointer}
+.bn-pop-btn:hover{background:var(--bn-hover)}
+.bn-pop-btn svg{width:18px;height:18px;flex:none}
+.bn-pop-theme .bn-sun,.bn-pop-theme .bn-moon{display:none}
+html[data-theme="light"] .bn-pop-theme .bn-moon,html:not([data-theme="light"]) .bn-pop-theme .bn-sun{display:block}
+body .bn-pop .ctl:empty{display:none}
+body .bn-pop .ctl:empty::before{content:none}
+body #bn_settings .ctl>#bntr_bar:first-child{border-top:0;padding-top:0}
+/* the panel is moved to <body> while open (so it sits above the menu); on wide screens anchor it under the top bar, not under the page */
+@media(min-width:821px){body>.bn-pop{position:fixed;top:calc(var(--bn-tbar-h) + 8px);right:max(var(--bn-pad-x),env(safe-area-inset-right));left:auto;bottom:auto;width:380px;max-height:calc(100vh - var(--bn-tbar-h) - 24px)}}

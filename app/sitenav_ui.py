@@ -35,6 +35,9 @@ I_GEAR = (f'<svg {_SVG}><path fill="none" stroke="currentColor" stroke-width="1.
 I_SUN = (f'<svg class="bn-sun" {_SVG}><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
          'd="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>')
 I_MOON = f'<svg class="bn-moon" {_SVG}><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>'
+# Nov 13: "Refresh data" (refresh_all.py). Same 20px grid and 1.8 stroke as the sun/moon and gear icons.
+I_REFRESH = (f'<svg class="bn-rf-ico" {_SVG}><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" '
+             'd="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M19.8 4.2v4.6h-4.6"/></svg>')
 I_YT = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="20" height="14" viewBox="0 0 24 17"><rect width="24" height="17" rx="4" fill="#FF0033"/>'
         '<path d="M9.6 4.9v7.2l6.2-3.6z" fill="#fff"/></svg>')
 I_X = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="15" height="15" viewBox="0 0 24 24"><path fill="currentColor" '
@@ -98,6 +101,29 @@ def theme_btn(cls):
     return (f'<button type="button" class="bn-ib bn-theme {cls}" data-bn-theme aria-label="Switch to light mode" title="Light / dark mode">'
             f'{I_SUN}{I_MOON}<span class="bn-tl">Light mode</span></button>')
 
+def refresh_on():
+    try:
+        import refresh_all
+        return refresh_all.enabled()
+    except Exception:
+        return False
+
+def refresh_btn():
+    """Top-bar "Refresh data" button (sitenav.js runs it; BN_REFRESH_ALL=0 = not rendered). The tip is a real element so it shows
+    on hover/focus on desktop; the status pill ("Updated just now") is announced politely to screen readers."""
+    if not refresh_on(): return ""
+    return ('<button type="button" class="bn-ib bn-js-only bn-refresh" data-bn-refresh aria-label="Refresh data">'
+            f'{I_REFRESH}<span class="bn-rf-tip" aria-hidden="true">Refresh data</span></button>'
+            '<span class="bn-rf-st" id="bn_rf_st" role="status" aria-live="polite"></span>')
+
+def settings_rows():
+    """Rows every page's Settings panel shows (Nov 13: the menu's Settings item opened a nearly empty panel on most pages):
+    theme and "Refresh data". Page-specific controls (dashboard scan status, refresh interval) and the language picker follow in .ctl."""
+    rf = ('<button type="button" class="bn-pop-btn" data-bn-refresh>' + I_REFRESH + '<span>Refresh data</span></button>') if refresh_on() else ""
+    return ('<div class="bn-pop-rows">'
+            '<button type="button" class="bn-pop-btn bn-pop-theme" data-bn-theme aria-label="Switch to light mode">' + I_SUN + I_MOON +
+            '<span class="bn-tl">Light mode</span></button>' + rf + '</div>')
+
 def topbar(sn, active="", ctl_html=""):
     """<header class="bn-top"> for every page. ctl_html = page-specific controls for the settings popover (dashboard: scan status,
     refresh, interval); add-ons that look for "header .ctl" (translate, live indicator) also land there."""
@@ -107,11 +133,13 @@ def topbar(sn, active="", ctl_html=""):
             f'<nav class="bn-primary" aria-label="Primary">{prim}</nav>'
             f'<div class="bn-acts"><span class="bn-follows">{follow_links(sn)}</span>'
             f'<a class="bn-ib bn-js-only bn-searchbtn" href="#bn-menu" role="button" aria-label="Search" title="Search (/)">{I_SEARCH}</a>'
-            + theme_btn("bn-js-only bn-theme-bar") +
+            + refresh_btn() + theme_btn("bn-js-only bn-theme-bar") +
             f'<button type="button" class="bn-ib bn-js-only bn-gear" aria-label="Settings and scan status" aria-expanded="false" aria-controls="bn_settings" title="Settings">{I_GEAR}</button>'
             f'<a class="bn-ib bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">{I_MENU}<span class="bn-bl">Menu</span></a>'
             '</div></div>'
-            '<div class="bn-pop" id="bn_settings" role="dialog" aria-label="Settings" hidden><div class="bn-pop-h">Settings</div>'
+            '<div class="bn-pop" id="bn_settings" role="dialog" aria-label="Settings" hidden><div class="bn-pop-h">Settings'
+            f'<button type="button" class="bn-pop-x" aria-label="Close settings">{I_CLOSE}</button></div>'
+            + settings_rows() +
             f'<div class="ctl">{ctl_html}</div></div></header>' + LOADER)
 
 # v3 graphical menu (approved Nov 2, 11:41 ET): seven sections, each with engraved art, a one-line description, a live

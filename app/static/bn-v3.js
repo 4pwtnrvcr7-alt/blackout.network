@@ -134,6 +134,25 @@
   m3desk(p);DESK.addEventListener?DESK.addEventListener("change",function(){m3desk(p)}):DESK.addListener(function(){m3desk(p)});
   // desktop: the board is always open (summaries are headings, not toggles)
   p.addEventListener("click",function(e){var s=e.target.closest&&e.target.closest(".m3-p>summary");if(s&&DESK.matches)e.preventDefault()},true);
+  // phone accordion motion (Nov 13, Matt): the +/- toggle slides a section open and shut with the homepage drawer motion
+  // (bn-apple-home.js "Drawer motion": 380 ms height + padding, cubic-bezier(.65,0,.35,1), content fades and settles 10 px).
+  // Interrupt-safe (a second tap reverses from the current height), ends at height:auto, instant under prefers-reduced-motion.
+  // The section stays a native <details>: it is open while it slides shut and closes when the motion ends (.m3-shut flips the icon).
+  var MDS=380;
+  function mDone(x,b,g,open){if(b._m3g!==g)return;clearTimeout(b._m3t);b.classList.remove("m3-dz","m3-dz0");b.style.height="";if(!open){x.open=false;x.classList.remove("m3-shut")}}
+  function mSlide(x,open){var b=$(".m3-body",x);if(!b){x.open=open;return}var g=(b._m3g||0)+1;b._m3g=g;clearTimeout(b._m3t);
+   if(RMQ.matches||DESK.matches||!("transition" in b.style)){b.classList.remove("m3-dz","m3-dz0");b.style.height="";x.classList.remove("m3-shut");x.open=open;return}
+   var wasShut=!x.open,cur=wasShut?0:b.getBoundingClientRect().height;
+   x.classList.toggle("m3-shut",!open);x.open=true;b.classList.remove("m3-dz","m3-dz0");b.style.height="";
+   var to=open?b.getBoundingClientRect().height:0;
+   if(Math.abs(to-cur)<1){mDone(x,b,g,open);return}
+   if(wasShut)b.classList.add("m3-dz0");b.style.height=cur+"px";void b.offsetHeight;
+   b.classList.add("m3-dz");void b.offsetHeight;b.classList.toggle("m3-dz0",!open);b.style.height=to+"px";
+   var end=function(e){if(e&&(e.target!==b||e.propertyName!=="height"))return;b.removeEventListener("transitionend",end);mDone(x,b,g,open)};
+   b.addEventListener("transitionend",end);b._m3t=setTimeout(end,MDS+120)}
+  p.addEventListener("click",function(e){var s=e.target.closest&&e.target.closest(".m3-p>summary");if(!s||DESK.matches||e.defaultPrevented)return;
+   var x=s.parentNode;e.preventDefault();mSlide(x,!(x.open&&!x.classList.contains("m3-shut")))});
+  window.bnMenuSlide=mSlide;
   // phone accordion keys: Up/Down/Home/End move between section headers (Enter/Space toggle natively)
   p.addEventListener("keydown",function(e){var s=e.target.closest&&e.target.closest(".m3-p>summary");if(!s||DESK.matches)return;var all=$$(".m3-p>summary",p),i=all.indexOf(s),j=-1;
    if(e.key==="ArrowDown")j=Math.min(all.length-1,i+1);else if(e.key==="ArrowUp")j=Math.max(0,i-1);else if(e.key==="Home")j=0;else if(e.key==="End")j=all.length-1;if(j<0)return;e.preventDefault();all[j].focus()});
@@ -142,7 +161,7 @@
    b.addEventListener("click",function(){if(window.bnMenuClose)bnMenuClose(true);if(window.BN&&window.BN.enableAlerts)window.BN.enableAlerts({from:"menu"});else{var x=d.querySelector(".bn-bell,[data-bn-alerts]");x&&x.click()}})});
   var wasOpen=dr.classList.contains("bn-open");
   var opened=function(){var isOpen=dr.classList.contains("bn-open");
-   if(isOpen&&!wasOpen&&!DESK.matches){$$(".m3-p",p).forEach(function(x){x.open=false;delete x.dataset.v3auto})}
+   if(isOpen&&!wasOpen&&!DESK.matches){$$(".m3-p",p).forEach(function(x){x.open=false;delete x.dataset.v3auto;x.classList.remove("m3-shut");var b=$(".m3-body",x);if(b){b._m3g=(b._m3g||0)+1;clearTimeout(b._m3t);b.classList.remove("m3-dz","m3-dz0");b.style.height=""}})}
    wasOpen=isOpen;if(!isOpen)return;m3desk(p);m3art(p);m3data(p)};
   new MutationObserver(opened).observe(dr,{attributes:true,attributeFilter:["class"]});opened()}
 

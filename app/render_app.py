@@ -413,7 +413,7 @@ def _addon_mod(name):
 server._addon_mod = _addon_mod
 
 POST_ALLOW = ["/api/vote", "/api/newsletter", "/newsletter", "/api/translate", "/api/search", "/api/sources", "/sources",
-              "/api/report", "/api/reports", "/api/alerts"] + \
+              "/api/report", "/api/reports", "/api/alerts", "/api/refresh-all"] + \
              [x for x in os.environ.get("BN_PUBLIC_POST_ALLOW", "").split(",") if x]
 OWNED_WRITERS = ["/api/vote", "/api/newsletter", "/newsletter", "/api/alerts"]
 BOX_ONLY = {"/api/refresh": "Scans run on the blackout.network scanner node; this page updates automatically every few minutes.",

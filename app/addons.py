@@ -30,6 +30,7 @@ ROUTES = {
     "/map": "signal_map",             # Global signal map (Control panel v2 look): /map page. Not /maps (printable maps tab).
     "/api/signal": "signal_map",      # /api/signal/app.js, leaflet, world.geojson. Dots come from /api/state, not a new feed.
     "/api/weather": "weather",
+    "/api/refresh-all": "refresh_all",   # Nov 13: top-bar "Refresh data" (one shared refresh per 60 s; BN_REFRESH_ALL=0 = off)
     "/api/trends": "trends",
     "/api/wire_history": "wire_history",   # Wire tab scrollable history + ARCHIVE items (t246)
     "/api/noise": "bnoise",

@@ -2,7 +2,9 @@
    - Sidebar menu (#bn-menu, markup from sitenav_ui.py): modal dialog with focus trap, Escape / scrim / close button, body scroll lock,
      aria-expanded on the menu button, current tab highlighted, site search inside. On phones every section is collapsed each time the menu opens.
    - Light / dark theme toggle (the initial theme is set before paint by server.py THEME_HEAD); charts and maps follow the theme.
-   - Settings popover (dashboard scan status, refresh, interval; language picker).
+   - Settings popover (theme, Refresh data, dashboard scan status + interval, language picker), with a scrim and a Close button.
+   - Refresh data (Nov 13): the top-bar refresh icon POSTs /api/refresh-all (one shared backend refresh per 60 s), then reloads the
+     page so every last-scanned / last-updated time is re-read; scroll position is kept and the icon shows "Updated just now".
    - Dashboard: tab order + grouping, per-tab <title>/meta/Open Graph, the page title + one-line description, deep links.
    All data (tabs, groups, labels, titles) is embedded by the server from sitenav.py. */
 (function(){"use strict";
@@ -46,7 +48,7 @@ function init(){
   var setExp=function(v){$$('[aria-controls="bn-menu"]').forEach(function(b){b.setAttribute("aria-expanded",v?"true":"false")})};
   var menuHist=false;
   var desk=function(){return window.matchMedia&&matchMedia("(min-width:768px)").matches};
-  var collapseMenu=function(){$$("details.bn-grp",panel).forEach(function(d){d.open=false;if(d.dataset)delete d.dataset.v3auto})};
+  var collapseMenu=function(){$$("details.bn-grp",panel).forEach(function(d){d.open=false;if(d.dataset)delete d.dataset.v3auto;d.classList.remove("m3-shut");var b=$(".m3-body",d);if(b){b._m3g=(b._m3g||0)+1;b.classList.remove("m3-dz","m3-dz0");b.style.height=""}})};
   window.bnMenuOpen=function(opts){opts=opts||{};if(dr.classList.contains("bn-open")){if(opts.search)focusSearch();return}lastFocus=document.activeElement;closePop();
    if(!desk())collapseMenu();
    dr.classList.add("bn-open");dr.removeAttribute("aria-hidden");R.classList.add("bn-lock");setExp(true);
@@ -89,19 +91,53 @@ function init(){
 
  /* ---------------- settings popover ---------------- */
  var pop=document.getElementById("bn_settings"),gear=$(".bn-gear"),popFrom=null;
+ var scrim=null;
  function openPop(from){if(!pop)return;popFrom=from||gear;
   if(pop.parentNode!==document.body){pop._bnHome=pop.parentNode;document.body.appendChild(pop)}
+  if(!scrim){scrim=document.createElement("div");scrim.className="bn-pop-scrim";scrim.setAttribute("aria-hidden","true");scrim.addEventListener("click",function(){closePop(true)})}
+  if(scrim.parentNode!==document.body)document.body.insertBefore(scrim,pop);scrim.hidden=false;
   document.documentElement.classList.add("bn-settings-open");
   pop.hidden=false;gear&&gear.setAttribute("aria-expanded","true");(from||gear)&& (from||gear).setAttribute("aria-expanded","true");
   var f=$("button,select,input,a[href]",pop);(f||pop).focus&&setTimeout(function(){try{(f||pop).focus({preventScroll:true})}catch(e){}},0)}
- function closePop(back){if(!pop||pop.hidden)return;pop.hidden=true;document.documentElement.classList.remove("bn-settings-open");
+ function closePop(back){if(!pop||pop.hidden)return;pop.hidden=true;if(scrim)scrim.hidden=true;document.documentElement.classList.remove("bn-settings-open");
   gear&&gear.setAttribute("aria-expanded","false");popFrom&&popFrom.setAttribute&&popFrom.setAttribute("aria-expanded","false");
   if(pop._bnHome){try{pop._bnHome.appendChild(pop)}catch(e){}pop._bnHome=null}
   if(back&&popFrom&&popFrom.offsetParent!==null)popFrom.focus()}
  if(pop){pop.setAttribute("tabindex","-1");
   gear&&gear.addEventListener("click",function(e){e.preventDefault();pop.hidden?openPop(gear):closePop(true)});
   document.addEventListener("pointerdown",function(e){if(!pop.hidden&&!pop.contains(e.target)&&!(gear&&gear.contains(e.target))&&!e.target.closest(".bn-gear-row"))closePop()},true);
-  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!pop.hidden){closePop(true)}})}
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!pop.hidden){closePop(true)}});
+  pop.addEventListener("click",function(e){if(e.target.closest&&e.target.closest(".bn-pop-x")){e.preventDefault();closePop(true)}})}
+ window.bnSettingsOpen=function(from){if(window.bnMenuClose)bnMenuClose(true,{noHist:true});openPop(from)};
+
+ /* ---------------- Refresh data (Nov 13) ----------------
+    One tap: spin, POST /api/refresh-all (the server shares one real refresh per 60 s between every visitor), then reload so
+    every "last scanned / last updated / last reported" time on the page is read again. After the reload the icon briefly shows
+    "Updated just now" and the scroll position is restored. On failure the icon stops and says so. */
+ var RF_KEY="bn_refreshed",rfRunning=false,rfT=0;
+ function rfStatus(msg,cls){var st=document.getElementById("bn_rf_st");if(!st)return;clearTimeout(rfT);st.textContent=msg;st.className="bn-rf-st"+(cls?" "+cls:"");
+  if(msg&&cls)rfT=setTimeout(function(){st.textContent="";st.className="bn-rf-st"},cls==="bn-rf-err"?4000:2600)}
+ function rfBusy(on){$$("[data-bn-refresh]").forEach(function(b){b.classList.toggle("bn-rf-spin",on);b.setAttribute("aria-busy",on?"true":"false");if(on)b.setAttribute("aria-disabled","true");else b.removeAttribute("aria-disabled")})}
+ function rfHere(){return location.pathname+location.search+location.hash}
+ function rfRun(){if(rfRunning)return;rfRunning=true;rfBusy(true);rfStatus("Refreshing data");var t0=Date.now();
+  var ac=window.AbortController?new AbortController():null,tm=setTimeout(function(){if(ac)ac.abort()},35000);
+  fetch("/api/refresh-all",{method:"POST",cache:"no-store",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}",signal:ac?ac.signal:undefined})
+   .then(function(r){if(!r.ok)throw new Error(String(r.status));return r.json()})
+   .then(function(j){clearTimeout(tm);
+    try{sessionStorage.setItem(RF_KEY,JSON.stringify({t:Date.now(),p:rfHere(),y:Math.round(window.scrollY||0),at:j&&j.refreshed_at}))}catch(e){}
+    try{window.dispatchEvent(new CustomEvent("bn-refresh",{detail:j}))}catch(e){}
+    setTimeout(function(){location.reload()},Math.max(0,700-(Date.now()-t0)))})
+   .catch(function(){clearTimeout(tm);rfRunning=false;rfBusy(false);rfStatus("Couldn't refresh. Try again.","bn-rf-err")})}
+ window.bnRefreshData=rfRun;
+ document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-bn-refresh]");if(!b)return;e.preventDefault();rfRun()});
+ (function rfAfter(){var v=null;try{v=JSON.parse(sessionStorage.getItem(RF_KEY)||"null");sessionStorage.removeItem(RF_KEY)}catch(e){}
+  if(!v||!v.t||Date.now()-v.t>60000||v.p!==rfHere())return;
+  // keep the reader where they were: the page's data loads after first paint, so retry for ~4 s until the page is tall enough (stops on any user scroll input)
+  if(v.y>0){var user=false,n=0,stop=function(){user=true};["wheel","touchstart","keydown"].forEach(function(t){addEventListener(t,stop,{passive:true,once:true})});
+   var go=function(){if(user)return true;if(Math.abs((window.scrollY||0)-v.y)>2)window.scrollTo(0,v.y);return Math.abs((window.scrollY||0)-v.y)<=2&&n>8};
+   go();var iv=setInterval(function(){if(go()||++n>26)clearInterval(iv)},150)}
+  $$("[data-bn-refresh]").forEach(function(b){b.classList.add("bn-rf-done");setTimeout(function(){b.classList.remove("bn-rf-done")},2600)});
+  rfStatus("Updated just now","bn-rf-ok")})();
 
  /* ---------------- dashboard tabs ---------------- */
  if(!D)return;

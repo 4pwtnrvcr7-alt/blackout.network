@@ -351,3 +351,14 @@ details.bn-acc[open]>summary{border-bottom:1px solid var(--bn-line)}
  details.bn-acc>summary .bn-acc-v:empty{display:none}
 }
 html.bn-js .bn-m3 .bn-gear-row{display:inline-flex!important}
+/* Nov 13 (Matt): phone menu sections slide open and shut with the homepage drawer motion (bn-apple.css "Drawer motion":
+   380 ms height + padding, cubic-bezier(.65,0,.35,1), content fades and settles 10 px). JS (bn-v3.js mSlide) sets the pixel heights. */
+.bn-m3{--m3-drw:cubic-bezier(.65,0,.35,1)}
+.bn-m3 .m3-body{box-sizing:border-box}
+.bn-m3 .m3-body.m3-dz{overflow:hidden;will-change:height;transition:height .38s var(--m3-drw),padding .38s var(--m3-drw),opacity .3s var(--m3-drw)}
+.bn-m3 .m3-body.m3-dz>*{transition:transform .38s var(--m3-drw)}
+.bn-m3 .m3-body.m3-dz0{padding-top:0;padding-bottom:0;opacity:0}
+.bn-m3 .m3-body.m3-dz0>*{transform:translateY(-10px)}
+.bn-m3 .m3-pm::after{transition:transform .38s var(--m3-drw)}
+.bn-m3 .m3-p.m3-shut .m3-pm::after{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){.bn-m3 .m3-body.m3-dz,.bn-m3 .m3-body.m3-dz>*,.bn-m3 .m3-pm::after{transition:none!important}}
