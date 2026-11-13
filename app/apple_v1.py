@@ -258,6 +258,7 @@ def wire_groups(now):
             "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire",
             "title": tt[:140],
             "loc": loc,
+            "n_families": int(fam or 0),
             "src": f"{int(fam)} source{'s' if int(fam or 0) != 1 else ''}" if fam else "The Wire",
         }
     def agg(match):

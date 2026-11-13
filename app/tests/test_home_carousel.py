@@ -7,9 +7,11 @@ import home_feed as H
 import desk_stories as DS
 
 NOW = DS._ts("2026-11-13T13:00:00Z")
-def C(cid, title, rank=7, fam=3, cat="war/conflict", t="2026-11-13T10:00:00Z"):
-    return {"cluster_id": cid, "title": title, "rank": rank, "n_families": fam, "category": cat, "location": "", "lat": None, "lon": None,
+def C(cid, title, rank=7, fam=3, cat="war/conflict", t="2026-11-13T10:00:00Z", families=None):
+    d = {"cluster_id": cid, "title": title, "rank": rank, "n_families": fam, "category": cat, "location": "", "lat": None, "lon": None,
             "updated": t, "first_seen": t, "event_time": t}
+    if families is not None: d["families"] = families
+    return d
 # The row Matt saw on Nov 13 (titles from /api/apple/home at 8:56 AM ET)
 LIVE_ROW = [
     C("ed62f62c7c6492a2", "LIVE] Times Now: Trump Announcement Live | Nuclear Attack on Iran? Trump Speech LIVE", 6),
@@ -125,6 +127,23 @@ class SiteDedupe(unittest.TestCase):
         self.assertEqual(ev[0]["cluster_id"], outbreak["cluster_id"])
         self.assertEqual(sorted(ev[0]["cluster_ids"]), sorted([outbreak["cluster_id"], vaccine["cluster_id"]]))
         self.assertEqual(H.also_line(ev[0]), "Also: Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases.")
+    def test_merged_card_uses_combined_distinct_sources(self):
+        outbreak = C("f7dd6f7a45562e44", "Wider use of Ervebo vaccine urged as DR Congo Ebola outbreak nears 11,000 cases", 7, fam=1, cat="disease", families=["CIDRAP"])
+        kenya = C("4c1b364af6b12691", "Kenya begins Ebola-free countdown as DR Congo tops 11,000 cases", 7, fam=1, cat="disease", families=["CIDRAP"])
+        kids = C("b1bba3904c6dd786", "DR Congo: Fast facts: Ebola's toll on children six months into the outbreak and response", 6, fam=3, cat="disease",
+                 families=["ReliefWeb", "rescue.org", "unicef.org"])
+        ev = H.events([outbreak, kenya, kids], now=NOW, limit=10)
+        self.assertEqual(len(ev), 1)
+        self.assertEqual(ev[0]["n_families"], 4)   # CIDRAP counted once, plus ReliefWeb, rescue.org, unicef.org
+        self.assertEqual(ev[0]["grouped"], 3)
+        self.assertEqual(H.source_meta(ev[0]), ("4 sources", "3 stories merged"))
+        # no family lists: counts are added
+        a = C("1" * 16, "Overnight explosion levels Warren home, hurling debris in all directions", 5, fam=2, cat="natural disaster")
+        b = C("2" * 16, "Warren house explosion", 4, fam=1, cat="natural disaster")
+        ev2 = H.events([a, b], now=NOW, limit=10)
+        self.assertEqual(len(ev2), 1)
+        self.assertEqual(ev2[0]["n_families"], 3)
+        self.assertEqual(H.source_meta(ev2[0])[1], "2 stories merged")
     def test_unrelated_outbreaks_do_not_fold(self):
         a = C("1" * 16, "Yakima County, Washington, reports 2 more avian flu cases, 1 death", 7, fam=4, cat="disease")
         b = C("2" * 16, "Quick takes: Clade 1 mpox in California, H9N2 avian flu cases in China, more Ebola deaths", 5, fam=1, cat="disease")
@@ -155,6 +174,8 @@ class SiteDedupe(unittest.TestCase):
         self.assertIn("function also(", js)
         self.assertIn("bna-also", js)
         self.assertIn("Also:", js)
+        self.assertIn("stories merged", js)
+        self.assertIn("function srcLine(", js)
         self.assertIn(".bna-also{", css)
         # Hamas pin and EAS featured cards stay in their slots; Also: is only on regular cards
         self.assertIn("cards.unshift(pcard(P))", js)

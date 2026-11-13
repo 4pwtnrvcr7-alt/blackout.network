@@ -199,6 +199,8 @@ def group(items, now=None):
                 also.append({"text": line, "cluster_id": m.get("cluster_id"), "reason": "grouped same event"})
                 seen.add(line)
         if also: rep["also"] = also
+        for m in mem[1:]:
+            _merge_source_fields(rep, m)
         out.append(rep)
     out.sort(key=lambda x: (-(int(x.get("rank") or 0)), -(int(x.get("n_families") or 0)), -(_ts(x.get("updated")) or 0)))
     return out
@@ -271,6 +273,38 @@ def _add_also(kept, dropped, reason):
     if ids:
         kept["cluster_ids"] = ids
         kept["grouped"] = max(int(kept.get("grouped") or 1), len(ids))
+    _merge_source_fields(kept, dropped)
+
+
+def _family_set(it):
+    """Distinct source-family names on a cluster dict (list or JSON string). Empty if none are present."""
+    fam = (it or {}).get("families")
+    if isinstance(fam, str):
+        try: fam = json.loads(fam)
+        except Exception: fam = None
+    if isinstance(fam, (list, tuple, set)):
+        return {str(x).strip() for x in fam if str(x).strip()}
+    return set()
+
+
+def _merge_source_fields(kept, other):
+    """Display-only: union distinct source families onto kept. If neither item lists families, add the counts."""
+    if not kept or not other: return
+    names = _family_set(kept) | _family_set(other)
+    if names:
+        kept["families"] = sorted(names)
+        kept["n_families"] = len(names)
+    elif not _family_set(kept):
+        kept["n_families"] = int(kept.get("n_families") or 0) + int(other.get("n_families") or 0)
+
+
+def source_meta(item):
+    """('N sources', 'M stories merged'|None) for a card. The stories label is set only when more than one angle was folded in."""
+    n = int((item or {}).get("n_families") or 0)
+    src = f"{n} source" + ("" if n == 1 else "s")
+    g = int((item or {}).get("grouped") or 0) or (1 + len((item or {}).get("also") or []))
+    extra = f"{g} stories merged" if g > 1 else None
+    return src, extra
 
 
 def fold_angles(items, gazetteer=None):
@@ -290,9 +324,17 @@ def fold_angles(items, gazetteer=None):
     return [it for it in items if id(it) in keep]
 
 
+def apply_source_label(item):
+    """Stamp a display `src` string (combined count, plus 'N stories merged' when angles were folded)."""
+    if not item: return item
+    src, extra = source_meta(item)
+    item["src"] = (src + " · " + extra) if extra else src
+    return item
+
+
 def fold_story_list(stories, gazetteer=None):
     """Same-event fold for homepage feed day lists and 'latest' lines (title + url or cluster_id)."""
-    return fold_angles(list(stories or []), gazetteer)
+    return [apply_source_label(it) for it in fold_angles(list(stories or []), gazetteer)]
 
 # ------------------------------------------------------------------ social links (box -> Render, social_links.json)
 _LC = {"m": None, "v": {}}

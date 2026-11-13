@@ -10,7 +10,7 @@
  // Same-event quakes (one quake reported by several agencies) collapse into one card: same category, within 1.5 degrees and 36 h.
  function group(items){var out=[];items.forEach(function(x){
    if(isQuake(x)&&x.lat!=null){for(var i=0;i<out.length;i++){var y=out[i];if(y.q&&Math.abs(y.lat-x.lat)<1.5&&Math.abs(y.lon-x.lon)<1.5&&Math.abs(new Date(y.first_seen)-new Date(x.first_seen))<1296e5){y.more++;return}}}
-   out.push({cluster_id:x.cluster_id,title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,updated:x.updated,first_seen:x.first_seen,social:x.social,posted:x.posted,also:x.also,q:isQuake(x),more:0})});return out}
+   out.push({cluster_id:x.cluster_id,title:x.title,category:x.category,location:x.location,lat:x.lat,lon:x.lon,rank:x.rank,n_families:x.n_families,grouped:x.grouped,updated:x.updated,first_seen:x.first_seen,social:x.social,posted:x.posted,also:x.also,q:isQuake(x),more:0})});return out}
  // Display-only category fix (t100u): the scanner's keyword order labels "governor declares emergency over flooding" Political.
  // Hazard and outbreak terms outrank political ones here; the stored category is unchanged (proposed scanner fix: category_fix.patch).
  var HZ=/\b(earthquake|tsunami|flood|flooding|flash flood|cyclone|hurricane|typhoon|tropical storm|winter storm|wildfire|volcan|eruption|landslide|drought|tornado|blizzard|severe weather|severe storms?)/i,
@@ -29,7 +29,8 @@
  function also(x,tag){tag=tag||"p";var a=(x&&x.also||[]).map(function(z){return (z&&z.text)||(typeof z==="string"?z:"")}).filter(Boolean).slice(0,2);return a.length?'<'+tag+' class="bna-also">Also: '+esc(a.join("; "))+'.</'+tag+'>':""}
 function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"",id=sid(x),fo=follow(x);
   return '<article class="bna-card bna-it'+(hi?" hi":"")+(fo?" bna-has-fol":"")+'"><a class="bna-cardlnk" href="'+(id?"/wire/"+id:"/#wire")+'">'+(x.posted?'<p class="bna-pstw"><b class="bna-pst">On our channels</b></p>':'')+'<div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
-   '<h3>'+esc(title(x.title))+'</h3>'+also(x)+'<p class="bna-m">'+x.n_families+(x.n_families==1?' source':' sources')+(x.more?" · "+(x.more+1)+" agency reports grouped":"")+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'+fo+'</article>'}
+   '<h3>'+esc(title(x.title))+'</h3>'+also(x)+'<p class="bna-m">'+srcLine(x)+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'+fo+'</article>'}
+function srcLine(x){var n=+x.n_families||0,g=+x.grouped||0,s=n+(n==1?" source":" sources");if(g>1)s+=" · "+g+" stories merged";if(x.more)s+=" · "+(x.more+1)+" agency reports grouped";return s}
  // Featured desk card (Matt, Nov 13): green, always position 2 of the row, until its show_until (same window as the old notice).
  function feat(f){if(!f||!/^[0-9a-f]{16}$/.test(f.cluster_id||""))return null;var u=Date.parse(f.show_until||"");return isNaN(u)||Date.now()>=u?null:f}
  function fcard(f){return '<article class="bna-card bna-it bna-feat" data-desk="'+esc(f.cluster_id)+'"><a class="bna-cardlnk" href="/wire/'+f.cluster_id+'">'+
