@@ -233,6 +233,130 @@
     "text": "FEMA and the FCC will interrupt TV, radio, cable and satellite programming for about one minute. It is only a test, required by law, and it will not go to phones.",
     "link_text": "Read the full breakdown"
    }
+  },
+  "c6abb98df0496535": {
+   "title": "Hamas leader's former bodyguard granted British citizenship - 'then plotted terror attack in Europe'",
+   "category": "terrorism",
+   "location": "Birmingham, UK",
+   "rank": 7,
+   "score": 0,
+   "confidence": "High",
+   "first_seen": "2026-11-13T12:31:00Z",
+   "updated": "2026-11-13T14:40:00Z",
+   "event_time": "2026-11-13T12:31:00Z",
+   "families": [
+    "BBC News",
+    "ITV News",
+    "The Independent",
+    "The National"
+   ],
+   "reports": [
+    {
+     "source": "BBC News",
+     "family": "BBC News",
+     "official": 0,
+     "first_seen": "2026-11-13T12:31:00Z",
+     "title": "Former Hamas bodyguard guilty of UK knife attack",
+     "source_url": "https://www.bbc.co.uk/news/articles/c51k9709krxvo"
+    },
+    {
+     "source": "ITV News",
+     "family": "ITV News",
+     "official": 0,
+     "first_seen": "2026-11-13T14:01:00Z",
+     "title": "Suspected Hamas member guilty of wounding bailiff over unpaid parking fines",
+     "source_url": "https://www.itv.com/news/2026-11-13/suspected-hamas-member-guilty-of-wounding-bailiff-over-unpaid-parking-fines"
+    },
+    {
+     "source": "The Independent",
+     "family": "The Independent",
+     "official": 0,
+     "first_seen": "2026-11-13T14:05:00Z",
+     "title": "Hamas terror suspect guilty of wounding bailiff in violent knife attack over wife's unpaid parking fines",
+     "source_url": "https://www.independent.co.uk/news/uk/crime/mohammed-alfatih-hamas-bailiff-knife-attack-birmingham-b3084549.html"
+    },
+    {
+     "source": "The National",
+     "family": "The National",
+     "official": 0,
+     "first_seen": "2026-11-13T14:10:00Z",
+     "title": "Hamas bodyguard to be extradited from UK to Germany over massacre plot",
+     "source_url": "https://www.thenationalnews.com/news/uk/2026/11/13/hamas-bodyguard-to-be-extradited-from-uk-to-germany-over-massacre-plot/"
+    }
+   ],
+   "brief": {
+    "headline": "Hamas leader's former bodyguard granted British citizenship - 'then plotted terror attack in Europe'",
+    "why_it_matters": "A man granted UK asylum and then citizenship is now wanted in Germany over an alleged Hamas plot against Jewish and Israeli targets in Europe, raising questions about how he was vetted.",
+    "what_happened": "A jury at Birmingham Crown Court on Friday, Nov. 13, found Mohammed Alfatih, 40, also known as Mohammed Naim, guilty by majority verdict of unlawfully wounding a bailiff, possessing two knives and criminal damage, after an Oct. 14, 2025 attack outside his home in Kings Heath, BBC News and ITV News report. He was cleared of wounding with intent. The BBC says he was photographed working as a bodyguard for the late Hamas leader Ismail Haniyeh, and was granted asylum in the UK in 2015 and British citizenship in 2020.",
+    "analysis": "Jurors were not told of his alleged Hamas links. German prosecutors charged seven suspected Hamas members in September over an alleged plot to target Jews or Israelis in Germany or Austria around the second anniversary of the Oct. 7 attack, and they say a \"Mohammed A\" had a prominent role moving and storing weapons, according to ITV News. The National reports an automatic rifle, 13 pistols and 700 rounds were seized in Berlin. He faces extradition proceedings at Westminster Magistrates' Court.",
+    "rank_why": "Three UK outlets reported it within hours and it links a UK court case to an alleged terror plot in Europe; we agree with a 7.",
+    "risk": "Medium",
+    "risk_why": "He is in custody and the alleged plot was disrupted, but the case points to a wider network German prosecutors are still pursuing.",
+    "if_true": "Expect sentencing in Birmingham on Jan. 11, 2027, extradition hearings at Westminster Magistrates' Court, and political pressure on the Home Office over how his asylum and citizenship were approved.",
+    "if_false": "The German allegations have not been tested in court. If they do not hold, this remains a UK wounding conviction with no proven terror link.",
+    "what_to_do": "No action is needed. If you travel to Germany or Austria, check the State Department's travel advisories before you go.",
+    "confidence": "High",
+    "confidence_why": "BBC News, ITV News, The Independent and The National report the verdict and the background. The German plot allegations come from prosecutors and are unproven.",
+    "sources": [
+     "https://www.bbc.co.uk/news/articles/c51k9709krxvo",
+     "https://www.itv.com/news/2026-11-13/suspected-hamas-member-guilty-of-wounding-bailiff-over-unpaid-parking-fines",
+     "https://www.independent.co.uk/news/uk/crime/mohammed-alfatih-hamas-bailiff-knife-attack-birmingham-b3084549.html",
+     "https://www.thenationalnews.com/news/uk/2026/11/13/hamas-bodyguard-to-be-extradited-from-uk-to-germany-over-massacre-plot/"
+    ],
+    "written_at": "2026-11-13T14:40:00Z"
+   },
+   "lead_figure": "timeline",
+   "figure_credit": "Graphic: BLACKOUT.NETWORK, built from BBC News and ITV News reporting.",
+   "timeline": [
+    [
+     "2006-08",
+     "Travels with Hamas leader Ismail Haniyeh as a bodyguard (BBC)"
+    ],
+    [
+     "2015",
+     "Granted asylum in the UK (BBC)"
+    ],
+    [
+     "2020",
+     "Granted British citizenship (BBC)"
+    ],
+    [
+     "Oct 14, 2025",
+     "Knife attack on a bailiff in Kings Heath, Birmingham (BBC, ITV)"
+    ],
+    [
+     "Sep 2026",
+     "German prosecutors charge seven suspected Hamas members over an alleged plot (ITV)"
+    ],
+    [
+     "Nov 13, 2026",
+     "Found guilty of wounding; name can now be reported (BBC, ITV)"
+    ],
+    [
+     "Jan 11, 2027",
+     "Sentencing due in Birmingham (ITV)"
+    ]
+   ],
+   "pin": {
+    "from": "2026-11-13T14:30:00Z",
+    "until": "2026-11-15T05:00:00Z",
+    "kicker": "Featured story",
+    "tag": "UK · Court verdict",
+    "title": "Hamas leader's former bodyguard granted British citizenship - 'then plotted terror attack in Europe'",
+    "text": "A Birmingham jury convicted Mohammed Alfatih of wounding a bailiff. Germany wants him extradited over an alleged Hamas plot against Jewish and Israeli targets.",
+    "link_text": "Read the full story"
+   },
+   "newsletter": {
+    "feature": true,
+    "from": "2026-11-13T14:30:00Z",
+    "until": "2026-11-15T05:00:00Z",
+    "order": 0,
+    "kicker": "Featured story",
+    "tag": "UK · Court verdict",
+    "title": "Hamas leader's former bodyguard granted British citizenship - 'then plotted terror attack in Europe'",
+    "text": "A Birmingham jury convicted Mohammed Alfatih of wounding a bailiff. Germany wants him extradited over an alleged Hamas plot against Jewish and Israeli targets.",
+    "link_text": "Read the full story"
+   }
   }
  }
 }

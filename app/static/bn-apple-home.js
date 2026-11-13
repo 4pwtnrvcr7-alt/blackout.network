@@ -34,6 +34,10 @@
  function fcard(f){return '<article class="bna-card bna-it bna-feat" data-desk="'+esc(f.cluster_id)+'"><a class="bna-cardlnk" href="/wire/'+f.cluster_id+'">'+
    '<div class="bna-ct"><p class="bna-k">'+esc(f.kicker||"Featured notice")+'</p><span class="bna-rk grn">Rank '+(+f.rank||0)+'<i>/10</i></span></div>'+
    (f.tag?'<p class="bna-ftag">'+esc(f.tag)+'</p>':'')+'<h3>'+esc(f.title)+'</h3><p class="bna-m">'+esc(f.text)+'</p><p class="bna-fgo">'+esc(f.link_text||"Read more")+'</p></a></article>'}
+ // Pinned story (Matt, Nov 13, t1349u): card 1 of the row until its show_until; title shown verbatim (no title() rewrite).
+ function pcard(f){var hi=(+f.rank||0)>=7;return '<article class="bna-card bna-it bna-pin'+(hi?" hi":"")+'" data-pin="'+esc(f.cluster_id)+'"><a class="bna-cardlnk" href="/wire/'+f.cluster_id+'">'+
+   '<div class="bna-ct"><p class="bna-k">'+esc(f.kicker||"Featured story")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+(+f.rank||0)+'<i>/10</i></span></div>'+
+   (f.tag?'<p class="bna-ptag">'+esc(f.tag)+'</p>':'')+'<h3>'+esc(f.title)+'</h3><p class="bna-m">'+esc(f.text)+'</p><p class="bna-pgo">'+esc(f.link_text||"Read the full story")+'</p></a></article>'}
  function set(k,v){var e=H.querySelector('[data-bna="'+k+'"]');if(e)e.innerHTML=v}
  var row=document.getElementById("bna_row_latest"),arws=H.querySelectorAll(".bna-arw");
  function arrows(){if(!row)return;var m=row.scrollWidth-row.clientWidth;arws.forEach(function(b){b.disabled=b.dataset.dir<0?row.scrollLeft<=2:row.scrollLeft>=m-2})}
@@ -56,8 +60,11 @@
   g.forEach(function(x){if(pick.length<N&&pick.indexOf(x)<0)pick.push(x)});
   // preserve relative server order among non-pinned cards (do not re-sort by rank alone)
   pick=pick.slice(0,lead).concat(pick.slice(lead));
-  var F=feat(d.feature),cards=pick.filter(function(x){return !F||x.cluster_id!==F.cluster_id}).map(card);
-  if(F){cards=cards.slice(0,N-1);cards.splice(Math.min(1,cards.length),0,fcard(F))}
+  var F=feat(d.feature),P=feat(d.pin);if(P&&F&&P.cluster_id===F.cluster_id)P=null;
+  var cards=pick.filter(function(x){return (!F||x.cluster_id!==F.cluster_id)&&(!P||x.cluster_id!==P.cluster_id)}).map(card);
+  cards=cards.slice(0,N-(F?1:0)-(P?1:0));
+  if(P)cards.unshift(pcard(P));
+  if(F)cards.splice(Math.min(1,cards.length),0,fcard(F));
   var hh=cards.length?cards.join(""):'<p class="bna-empty">The Wire is quiet right now.</p>';if(row&&hh!==lastRow){lastRow=hh;row.innerHTML=hh;arrows()}
   if(d.slots_et&&!SLOTT)SLOTT=nextSlot(d.slots_et);
   if(d.generated)set("asof","Live data as of "+esc(et(d.generated))+".");

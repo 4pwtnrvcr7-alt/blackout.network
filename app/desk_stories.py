@@ -167,13 +167,33 @@ def chart_chain():
             '<a href="https://docs.fcc.gov/public/attachments/DOC-403500A1.pdf" target="_blank" rel="noopener">FCC 2023 test report</a> and '
             '<a href="https://www.fema.gov/emergency-managers/practitioners/integrated-public-alert-warning-system/national-public-warning-system" target="_blank" rel="noopener">FEMA\'s National Public Warning System page</a>.</span></figcaption></figure>')
 
-FIGS = {"tests": lambda s: chart_tests(s.get("figure_credit")), "chain": lambda s: chart_chain()}
+def chart_timeline(s):
+    """Dated timeline graphic from the story's own sourced "timeline" list ([label, text], each naming its outlet). '' when empty."""
+    ev = [x for x in (s.get("timeline") or []) if isinstance(x, list) and len(x) == 2 and x[0] and x[1]][:10]
+    if not ev: return ""
+    W, R = 640, 46; H = 24 + R * len(ev)
+    g = [f'<line x1="132" y1="18" x2="132" y2="{H - 14}" class="ds-grid"/>']
+    for i, (a, b) in enumerate(ev):
+        y = 30 + i * R; last = i == len(ev) - 1
+        g.append(f'<circle cx="132" cy="{y - 5}" r="6" class="ds-n {"ds-n3" if last else "ds-n2"}"/>')
+        g.append(f'<text x="118" y="{y}" text-anchor="end" class="ds-yr">{E(a)}</text>')
+        g.append(f'<text x="148" y="{y}" class="ds-ns" style="font-size:13px">{E(b)}</text>')
+    svg = (f'<svg class="ds-svg" viewBox="0 0 {W} {H}" role="img" aria-labelledby="ds_tt ds_td"><title id="ds_tt">Timeline</title>'
+           f'<desc id="ds_td">' + "; ".join(f"{E(a)}: {E(b)}" for a, b in ev) + '</desc>' + "".join(g) + '</svg>')
+    flow = '<ol class="ds-flow">' + "".join(f'<li><b>{E(a)}.</b> {E(b)}</li>' for a, b in ev) + '</ol>'
+    return (f'<figure class="sr-fig ds-fig"><figcaption class="ds-cap"><b>Timeline</b></figcaption><div class="ds-chain">{svg}</div>{flow}'
+            f'<figcaption><span class="sr-cr">{E(s.get("figure_credit") or "Graphic: BLACKOUT.NETWORK, built from the sources listed below.")}</span></figcaption></figure>')
+
+FIGS = {"tests": lambda s: chart_tests(s.get("figure_credit")), "chain": lambda s: chart_chain(), "timeline": chart_timeline,
+        "none": lambda s: ""}
 
 def lead_html(cid):
     """Lead graphic for the brief (used by story_report when the story has no rights-cleared photo): the alert-path diagram."""
     s = get(cid)
     if not s: return ""
-    try: return chart_chain()
+    try:
+        k = s.get("lead_figure") or "chain"   # Nov 13: per-story lead graphic (the EAS story keeps the alert-path diagram)
+        return FIGS[k](s) if k in FIGS else ""
     except Exception: return ""
 
 CSS = """
@@ -272,6 +292,33 @@ def feature_card(now=None):
                 "kicker": str(n.get("kicker") or "Featured notice"), "tag": str(n.get("tag") or ""),
                 "link_text": str(n.get("link_text") or "Read more"), "rank": max(0, min(10, int(s.get("rank") or 0))),
                 "show_until": str(n.get("show_until") or "")}
+    except Exception:
+        return None
+
+# ---------------------------------------------------------------- homepage pinned story (card 1 of the top row)
+def pins_enabled():
+    return os.environ.get("BN_HOME_PIN", "1") != "0"
+
+def pin_card(now=None):
+    """Matt, Nov 13 (t1349u): a desk story pinned as card 1 of the homepage top row, by cluster id, only between pin.from and
+    pin.until (UTC ISO; the Hamas bodyguard story runs to the end of Nov 14 ET). The title is shown verbatim. Kill switch
+    BN_HOME_PIN=0. The green featured card (feature_card) stays in position 2. None when off, expired or on any error."""
+    if not pins_enabled(): return None
+    try:
+        now = time.time() if now is None else now
+        act = []
+        for cid, s in _load().items():
+            p = s.get("pin")
+            if not isinstance(p, dict) or not (p.get("title") or s.get("title")): continue
+            a, b = _ts(p.get("from")), _ts(p.get("until"))
+            if a is None or b is None or not (a <= now < b): continue
+            act.append((a, cid, s, p))
+        if not act: return None
+        _, cid, s, p = sorted(act, reverse=True)[0]
+        return {"cluster_id": cid, "href": f"/wire/{cid}", "title": str(p.get("title") or s["title"]), "text": str(p.get("text") or ""),
+                "kicker": str(p.get("kicker") or "Featured story"), "tag": str(p.get("tag") or ""),
+                "link_text": str(p.get("link_text") or "Read the full story"), "rank": max(0, min(10, int(s.get("rank") or 0))),
+                "show_until": str(p.get("until") or ""), "pinned": True}
     except Exception:
         return None
 

@@ -446,3 +446,13 @@ html[data-theme="light"] .bna-rkchip.red{background:rgba(176,14,40,.12);color:#B
 html[data-theme="light"] .bna-it.bna-feat{background:linear-gradient(180deg,rgba(29,122,70,.12),rgba(29,122,70,.03) 55%),var(--a-sf);box-shadow:0 0 0 2px #1d7a46,inset 0 6px 0 #1d7a46}
 html[data-theme="light"] .bna-it.bna-feat .bna-k,html[data-theme="light"] .bna-ftag,html[data-theme="light"] .bna-fgo{color:#1d7a46}
 html[data-theme="light"] .bna-ftag{border-color:rgba(29,122,70,.6)}html[data-theme="light"] .bna-rk.grn{background:#1d7a46}
+/* Pinned story, card 1 of the top row (Nov 13): yellow brand accent, so it reads apart from the green featured card 2 */
+.bna-it.bna-pin{box-shadow:0 0 0 2px var(--a-y,#FFC21A),inset 0 6px 0 var(--a-y,#FFC21A)}
+.bna-it.bna-pin .bna-k{color:var(--a-y,#FFC21A)}
+.bna-ptag{margin:12px 0 0;display:inline-block;align-self:flex-start;font:700 11px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,194,26,.7);color:var(--a-y,#FFC21A)}
+.bna-it.bna-pin h3{margin-top:12px}
+.bna-it.bna-pin .bna-m{margin:10px 0 0;padding-top:0;font-size:14px;color:var(--a-ink2,#A1A1A6);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.bna-pgo{margin:auto 0 0;padding-top:14px;font-weight:600;font-size:15px;color:var(--a-y,#FFC21A)}.bna-pgo:after{content:"\00a0\203A"}
+html[data-theme="light"] .bna-it.bna-pin{box-shadow:0 0 0 2px #B7791F,inset 0 6px 0 #B7791F}
+html[data-theme="light"] .bna-it.bna-pin .bna-k,html[data-theme="light"] .bna-ptag,html[data-theme="light"] .bna-pgo{color:#8a5a00}
+html[data-theme="light"] .bna-ptag{border-color:rgba(183,121,31,.6)}

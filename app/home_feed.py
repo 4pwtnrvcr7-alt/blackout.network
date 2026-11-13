@@ -310,18 +310,24 @@ def same_story(a, b):
     if len(ta) < 3 or len(tb) < 3: return False
     return len(ta & tb) / min(len(ta), len(tb)) >= 0.6
 
-def dedupe_row(evs, skip_ids=()):
+def dedupe_row(evs, skip_ids=(), skip_items=()):
     """Top-row display filter, order kept: drops junk, cards whose cluster is already shown (or is in skip_ids, e.g. the featured
     desk card), near-identical titles, and a second card on the same theme (one Ebola card, one assassination card ...)."""
     if not row_filter_on(): return list(evs or [])
     seen_ids, seen_th, kept = set(i for i in skip_ids if i), set(), []
+    # skip_items (Nov 13): the pinned card 1 and green card 2 are placed by the page, never by this list, so a scanner card that is
+    # the same story (near-identical title or same theme) is dropped too. They are never returned.
+    ghost = [x for x in (skip_items or ()) if isinstance(x, dict) and x.get("title")]
+    for g in ghost:
+        if g.get("cluster_id"): seen_ids.add(g["cluster_id"])
+        seen_th |= themes(g.get("title"))
     for e in evs or []:
         if not e or row_junk(e): continue
         ids = set(e.get("cluster_ids") or []) | ({e.get("cluster_id")} if e.get("cluster_id") else set())
         if ids & seen_ids: continue
         th = themes(e.get("title"))
         if th & seen_th: continue
-        if any(same_story(e, k) for k in kept): continue
+        if any(same_story(e, k) for k in kept) or any(same_story(e, g) for g in ghost): continue
         kept.append(e); seen_ids |= ids; seen_th |= th
     return kept
 
