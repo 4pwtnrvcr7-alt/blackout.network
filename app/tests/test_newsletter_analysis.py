@@ -19,6 +19,10 @@ socket.socket.connect = _blocked
 socket.create_connection = _blocked
 import newsletter_analysis as NA
 import newsletter as NL
+# BN_NL_V2=1 runs this module against the concise v2 layout (newsletter_v2.py). v1-only layout details
+# (inline WHAT HAPPENED / WHAT TO DO blocks, sparkline data URIs, cid images, per-source links, guide links,
+# trend labels) live on the /wire story page in v2, so those assertions are v1-only; v2 gets equivalents.
+V2 = os.environ.get("BN_NL_V2") == "1"
 
 UTC = timezone.utc
 AT = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)  # 7:00 AM ET
@@ -269,19 +273,24 @@ class Render(unittest.TestCase):
         _subj, html, text = NL.render(issue, links)
         # Nov 10 2026: auto template "On the record / The reports describe" is omitted, so
         # WHAT HAPPENED is not required on every card; story links and guides still are.
-        self.assertGreaterEqual(html.count("WHAT TO DO"), len(an["items"]))
-        self.assertIn("Prepare › Water", html)
-        self.assertIn("#water", html)
-        self.assertIn("TRAJECTORY", html)
-        self.assertGreaterEqual(html.count("Full story"), 5)
-        self.assertIn("data:image/png;base64,", html)
-        self.assertIn("Patterns", html)
+        if V2:
+            self.assertGreaterEqual(html.count("Read the full brief"), 5)
+            self.assertNotIn("data:image", html)          # Gmail blocks data URIs; v2 images are hosted
+            self.assertNotIn('#wire"', html)
+        else:
+            self.assertGreaterEqual(html.count("WHAT TO DO"), len(an["items"]))
+            self.assertIn("Prepare › Water", html)
+            self.assertIn("#water", html)
+            self.assertIn("TRAJECTORY", html)
+            self.assertGreaterEqual(html.count("Full story"), 5)
+            self.assertIn("data:image/png;base64,", html)
+            self.assertIn("Patterns", html)
         self.assertNotIn("not enough history", html)
         self.assertNotIn("30d: 0", html)
         self.assertNotIn("Confirmed by 8 independent", html)
         self.assertTrue(any("after collapsing repeated headlines" in (it.get("card_confidence") or "") for it in an["items"]))
         self.assertNotIn("not proof", html.lower())
-        self.assertIn("ANALYST BRIEF", text)
+        if not V2: self.assertIn("ANALYST BRIEF", text)
         visible = re.sub(r'<div style="display:none.*?</div>', " ", html, count=1)
         low = re.sub(r"<[^>]+>", " ", visible).lower()
         for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):
@@ -300,12 +309,15 @@ class Render(unittest.TestCase):
                     dups.append(s)
                 seen.setdefault(s, i)
         self.assertEqual(dups, [], dups[:3])
-        self.assertIn("Prepare › Water", text)
+        if not V2: self.assertIn("Prepare › Water", text)
         self.assertIn("https://blackout.network/wire/a11ce00000000003", text)
         # sender mode untouched: preview, and render did not write an outbox message
         self.assertLess(len(html.encode()), 1_500_000)
-        self.assertIn("Story map", html)
-        self.assertIn("Section Top threats", html)
+        if not V2:
+            self.assertIn("Story map", html)
+            self.assertIn("Section Top threats", html)
+        else:
+            self.assertIn("TOP THREATS", html)
         self.assertIn("Signal over noise", html)
         self.assertEqual((NL.env().get("NEWSLETTER_SENDER") or "preview"), "preview")
         self.assertFalse(NL.cfg().get("live_sending_approved"))
@@ -340,9 +352,10 @@ class Render(unittest.TestCase):
         links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _s, html, text = NL.render(issue, links)
-        self.assertIn("trend data loading", html)
+        if not V2:   # v2 carries no trend line in the email; the story page shows it
+            self.assertIn("trend data loading", html)
+            self.assertIn("trend data loading", text)
         self.assertNotIn("Live cluster snapshot", html)
-        self.assertIn("trend data loading", text)
 
     def test_mime_uses_cid_and_does_not_send(self):
         issue = self._issue()
@@ -352,9 +365,13 @@ class Render(unittest.TestCase):
         msg = NL.build_mime("preview@outbox.invalid", subj, html, text, None, "issue")
         raw = msg.as_string()
         unfolded = raw.replace("=\n", "")
-        self.assertIn("cid:bn-img-1@blackout.network", unfolded)
+        if V2:   # v2 inlines nothing: every image is an absolute https URL on blackout.network
+            self.assertNotIn("cid:", unfolded)
+            self.assertIn("https://blackout.network/newsletter/img/", unfolded)
+        else:
+            self.assertIn("cid:bn-img-1@blackout.network", unfolded)
+            self.assertIn("Content-ID: <bn-img-1@blackout.network>", raw)
         self.assertNotIn("data:image/png;base64,", raw)
-        self.assertIn("Content-ID: <bn-img-1@blackout.network>", raw)
         self.assertNotIn("RESEND_API_KEY", raw)
         self.assertNotIn("@mail.test", raw)
 
@@ -412,9 +429,10 @@ class Notes(unittest.TestCase):
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _s, html, _t = NL.render(issue, links)
         self.assertIn("Eighteen people were killed near Hormuz.", html)
-        self.assertIn("Agree on one out-of-area contact tonight.", html)
-        self.assertIn("Hormuz appears in more than one report.", html)
-        self.assertIn("UPTREND", html)
+        if not V2:
+            self.assertIn("Agree on one out-of-area contact tonight.", html)
+            self.assertIn("Hormuz appears in more than one report.", html)
+            self.assertIn("UPTREND", html)
         self.assertNotIn("is named.", html.lower())
 
     def test_stale_notes_are_ignored(self):
@@ -452,13 +470,13 @@ class Notes(unittest.TestCase):
         links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _s, html, _t = NL.render(issue, links)
-        blocks = re.split(r"WHAT HAPPENED", html)[1:]
+        blocks = re.split(r"WHAT HAPPENED", html)[1:] if not V2 else re.split(r"Read the full brief", html)[:-1]
         self.assertGreaterEqual(len(blocks), 1)
         for block in blocks:
             self.assertLessEqual(block.lower().count("not enough history"), 1)
             self.assertNotIn("for the report", block.lower())
             self.assertNotIn("is named", block.lower())
-        self.assertIn("Prepare ›", html)
+        if not V2: self.assertIn("Prepare ›", html)
         import render_rules
         self.assertIn("newsletter_analysis.json", render_rules.SYNC_JSON)
 
@@ -494,9 +512,13 @@ class Notes(unittest.TestCase):
         links = {"unsubscribe": "https://blackout.network/newsletter", "manage": "https://blackout.network/newsletter",
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _s, html, _t = NL.render(issue, links)
-        self.assertIn("https://www.axios.com/2026/11/08/pete-hegseth-impeachment-house-republicans-massie", html)
-        self.assertIn("Prepare › Home kit", html)
-        self.assertIn("#home-kit", html)
+        if V2:   # v2 links the story page (which lists the sources), never the outlet directly
+            self.assertIn("https://blackout.network/wire/a6272da62f181f19", html)
+            self.assertIn("House leaders expect enough votes to impeach the defense secretary.", html)
+        else:
+            self.assertIn("https://www.axios.com/2026/11/08/pete-hegseth-impeachment-house-republicans-massie", html)
+            self.assertIn("Prepare › Home kit", html)
+            self.assertIn("#home-kit", html)
         self.assertNotIn("/prepare", html)
 
     def test_older_noted_cluster_is_a_full_card(self):
@@ -528,7 +550,8 @@ class Notes(unittest.TestCase):
                  "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/#wire", "_row": None}
         _s, html, _t = NL.render(issue, links)
         self.assertIn("Overnight, Russia fired 36 ballistic missiles at Kyiv and hit the Northern Bridge.", html)
-        self.assertIn("#power", html)
+        if not V2: self.assertIn("#power", html)
+        else: self.assertIn("https://blackout.network/wire/98fdd3f9a50d90a8", html)
 
 
 class Topics(unittest.TestCase):
@@ -599,13 +622,14 @@ class Topics(unittest.TestCase):
         self.assertIn("Here's what matters right now", html)
         self.assertIn(NL.share_text(issue).split("\n", 1)[0], text)
         _assert_no_empty_framing(self, subj, html, text, NL.share_text(issue))
-        self.assertIn('width="72"', html)
+        if not V2: self.assertIn('width="72"', html)   # v1 thumbnail column; v2 uses full-width lead images
+        else: self.assertIn("https://blackout.network/newsletter/img/", html)
         self.assertEqual(NL.card_headline({"title": "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles. As with the attack on the Southern Bridge, the missile penetrated the roadway completely. However, it remains unclear whether the damage is severe enough"}),
                          "The aftermath of yesterday's strikes on Kyiv's Northern Bridge using RM-48U ballistic missiles")   # t1134: first whole sentence
         self.assertEqual(NL.card_headline({"title": "raw scanner text that goes on and on", "display_title": "Russian ballistic missiles damage Kyiv's Northern Bridge"}), "Russian ballistic missiles damage Kyiv's Northern Bridge")
-        self.assertIn("Section Top threats", html)
+        self.assertIn("TOP THREATS" if V2 else "Section Top threats", html)
         self.assertNotIn('height="315"', html)
-        self.assertIn("UPTREND", html)
+        if not V2: self.assertIn("UPTREND", html)   # v2: trajectory shows on the story page, not in the email
         # Template-filler WHAT HAPPENED copy is omitted (Nov 10 2026 brief quality rules).
         low = html.lower()
         for bad in ("is named.", "for this missile", "the headline states", "the report says", "the place named is"):

@@ -1,0 +1,3 @@
+Inter (Bold and Medium static instances, Latin subset) by Rasmus Andersson and the Inter project authors.
+Licensed under the SIL Open Font License, Version 1.1: https://openfontlicense.org/open-font-license-official-text/
+Source: https://github.com/rsms/inter. Used server-side only to draw newsletter graphics (newsletter_img.py).

@@ -1910,8 +1910,16 @@ def _text_item(it, n):
     return T
 
 def render(issue, links, c=None):
-    """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site (+ _row: the subscriber row, for Follow links)."""
-    c = c or cfg(); subj = subject_for(issue); rr = issue["rule"]
+    """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site (+ _row: the subscriber row, for Follow links).
+    Layout v2 (newsletter_v2.py, Nov 13 2026) only when BN_NL_V2=1 or config "template": "v2"; any v2 error falls back to this layout."""
+    c = c or cfg()
+    try:
+        import newsletter_v2 as NV2
+        if NV2.on(c):
+            return NV2.render(issue, links, c)
+    except Exception as ex:
+        log(f"layout v2 failed, using v1: {type(ex).__name__}: {ex}"[:300], "qa")
+    subj = subject_for(issue); rr = issue["rule"]
     rng = window_str(issue["start"], issue["end"]); addr, _ = _addr(c)
     lab = slot_label(issue["slot"]); day = issue["end"].astimezone(ET).strftime("%A, %B %-d, %Y")
     if issue.get("label"): day = issue["label"]
@@ -3294,6 +3302,9 @@ def _confirm_result(tok):
 
 def handle_get(path, qs):
     if "/admin" in path: return 404, {"error": "not found"}   # admin is not part of the public node
+    if path.startswith("/newsletter/img/"):   # v2 email images (newsletter_img.py): served before, and without, the worker check
+        import newsletter_img as NI
+        return NI.handle_get(path)
     ensure_worker()
     q1 = lambda k: (qs.get(k) or [""])[0]
     if path.startswith("/api/newsletter/"):
