@@ -104,7 +104,7 @@ def _top():
         except Exception: pass
     return f'<header class="bn-hd"><a href="/" style="color:inherit;text-decoration:none;font-weight:800">BLACKOUT</a></header>'
 TITLES = {
-    "mesh": ("Off-grid network map: live public mesh radios | BLACKOUT.NETWORK", "A live map of public off-grid mesh radios worldwide, centered on Central Florida, with a drop-off watch that flags regions where radios go quiet."),
+    "mesh": ("Off-grid network map: live public mesh radios | BLACKOUT.NETWORK", "A live map of public off-grid mesh radios worldwide, opening on a U.S. view, with a drop-off watch that flags regions where radios go quiet."),
     "mesh-chat": ("Network chat from your own radio | BLACKOUT.NETWORK", "Read and send mesh channel messages from your own off-grid mesh radio over Bluetooth or USB, right in the browser. Nothing is sent from our servers."),
     "mesh-guide": ("Off-grid setup guide: text messaging when the grid goes down | BLACKOUT.NETWORK", "How to set up an off-grid mesh radio for a grid-down emergency: hardware, the US 915 MHz band, the app, channels, solar power, etiquette and the rules for unlicensed and ham use."),
 }
@@ -144,16 +144,16 @@ def map_page():
     hero = (f'<section class="mx-hero"><div class="mx-kick">{icon("mesh")} OFF-GRID NETWORK · LIVE</div>'
             '<h1>Off-grid network map</h1>'
             '<p class="mx-dek">Small off-grid mesh radios send text with no license and keep working when the power grid and cell service are down. '
-            'This map shows public radios heard through the open-source mesh project\'s public MQTT server, starting with Central Florida.</p>'
+            'This map shows public radios heard through the open-source mesh project\'s public MQTT server. It opens on a U.S. view; pick a closer region or the world map if you want.</p>'
             f'<div class="mx-stats" id="mx_stats" aria-live="polite">{E(stat)}</div>{_subnav("mesh")}</section>')
     mapc = ('<section class="mx-card mx-mapcard"><div class="mx-maphead"><h2>Live node map</h2><div class="mx-seg" role="group" aria-label="Map view">'
-            '<button type="button" data-view="cfl" aria-pressed="true">Central Florida</button><button type="button" data-view="us" aria-pressed="false">U.S.</button>'
+            '<button type="button" data-view="cfl" aria-pressed="false">Central Florida</button><button type="button" data-view="us" aria-pressed="true">U.S.</button>'
             '<button type="button" data-view="world" aria-pressed="false">World</button></div></div>'
             '<div class="mx-map" id="mx_map" role="region" aria-label="Map of public mesh radios"><noscript><p class="mx-mu">The map needs JavaScript.</p></noscript></div>'
             '<div class="mx-legend"><span><i class="d d-r"></i>Router / repeater</span><span><i class="d d-c"></i>Client</span><span><i class="d d-o"></i>Not heard in 1 h+</span>'
             '<span><i class="ring"></i>Watch area</span></div>'
             '<p class="mx-mu mx-small" id="mx_fresh"></p></section>')
-    focus = ('<section class="mx-grid2"><div class="mx-card" id="mx_focus"><h2>Central Florida right now</h2><p class="mx-mu">Sanford, Lake Mary, Orlando and the area within about 70 km (45 mi).</p>'
+    focus = ('<section class="mx-grid2"><div class="mx-card" id="mx_focus"><h2 id="mx_focus_h">United States right now</h2><p class="mx-mu" id="mx_focus_mu">Public mesh radios heard across the country. Pick a closer region or the world map to change the view.</p>'
              '<div class="mx-kv" id="mx_focus_kv"><div><b>–</b><span>nodes listed</span></div><div><b>–</b><span>heard in the last hour</span></div><div><b>–</b><span>regular nodes gone quiet</span></div></div></div>'
              '<div class="mx-card" id="mx_watch"><h2>Drop-off watch</h2><p class="mx-mu">Regions where regular nodes have gone quiet compared with the prior 24 hours. '
              'Single source, unconfirmed.</p><div id="mx_watch_list" class="mx-wl"><p class="mx-mu">Loading…</p></div></div></section>')
@@ -173,7 +173,7 @@ def map_page():
            '<li>Software and data credits: <a href="/tos#acknowledgments">Credits</a>.</li></ul></section>')
     cta = ('<section class="mx-grid2"><a class="mx-card mx-link" href="/mesh/chat">' + icon("radio") + '<b>Network chat</b><span>Connect your own radio and read or send channel messages in the browser.</span></a>'
            '<a class="mx-card mx-link" href="/mesh/guide">' + icon("sun") + '<b>Off-grid setup guide</b><span>Hardware, the 915 MHz band, channels, solar power and etiquette.</span></a></section>')
-    return page("mesh", "/mesh", hero + mapc + focus + cta + how, ["/api/mesh/app.js?v=1"])
+    return page("mesh", "/mesh", hero + mapc + focus + cta + how, ["/api/mesh/app.js?v=2"])
 
 # ---------------------------------------------------------------- /mesh/chat
 def chat_page():

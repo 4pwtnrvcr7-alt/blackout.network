@@ -13,8 +13,6 @@ E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
 FIRST_MODES = ("banner", "redirect")
 VIDEO_SRC = ""  # hidden unless an approved same-origin intro exists; do not autoplay sound
-# Central Florida chip fills a place the existing geocoder already accepts (newsletter form example).
-FL_PLACE = "Sanford, FL"
 YT_SUB = "https://www.youtube.com/@blkoutntw?sub_confirmation=1"
 X_URL = "https://x.com/BlkoutNtw"
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -307,10 +305,9 @@ def _render():
         '<p class="wel-kicker" style="margin-top:22px">On the site</p><p class="wel-note">These two are tools on the site. The brief does not have a separate category for them yet.</p>'
         f'<div class="wel-chips" role="group" aria-label="Site tools">{extras}</div>'
         '<div class="wel-loc"><p class="wel-lede" style="font-size:16px;margin-top:20px">Want a Near you section in the brief?</p>'
-        f'<button type="button" class="wel-chip" data-loc="{E(FL_PLACE)}" aria-pressed="false">Central Florida<small>Uses {E(FL_PLACE)} — a city the brief already accepts</small></button>'
-        f'<p class="wel-note">Or type a US ZIP code, a city (for example {E(FL_PLACE)}) or a country. We store only the place name and a rough location, never a street address.</p>'
+        '<p class="wel-note">Type a US ZIP code, a city (for example Denver, CO) or a country. We store only the place name and a rough location, never a street address. Nothing is filled in until you choose.</p>'
         '<label class="wel-el" for="wel_loc">Your area (optional)</label>'
-        f'<input id="wel_loc" type="text" name="location" form="wel_form" maxlength="80" autocomplete="postal-code" placeholder="e.g. 32771, {E(FL_PLACE)} or Germany">'
+        '<input id="wel_loc" type="text" name="location" form="wel_form" maxlength="80" autocomplete="postal-code" placeholder="e.g. 80202, Denver, CO or Germany">'
         "</div>"
         '<p class="wel-cta"><button type="button" class="wel-btn" data-next>Continue</button>'
         '<button type="button" class="wel-btn wel-btn-2" data-next>Skip — I will get every category</button></p>')

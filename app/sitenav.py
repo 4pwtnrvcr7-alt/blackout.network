@@ -143,7 +143,7 @@ PAGES = {
            "Look up crime for any US ZIP code, city, county or state, or any country: official FBI rates per 100,000 with trends, near-real-time incident heat maps for 16 US cities, a US county map and a world homicide map.",
            "Official crime rates for any ZIP, city, county, state or country, plus near-real-time maps for 16 US cities."),
  "mesh": ("@mesh", "Off-grid network map: live public mesh radios | BLACKOUT.NETWORK",
-          "A live map of public off-grid mesh radios worldwide, centered on Central Florida, with a drop-off watch that flags regions where radios go quiet.",
+          "A live map of public off-grid mesh radios worldwide, opening on a U.S. view, with a drop-off watch that flags regions where radios go quiet.",
           "Public off-grid mesh radios heard through the public MQTT server, with a drop-off watch."),
  "mesh-chat": ("@mesh", "Network chat from your own radio | BLACKOUT.NETWORK",
                "Read and send mesh channel messages from your own off-grid mesh radio over Bluetooth or USB, right in the browser. Nothing is sent from our servers.",

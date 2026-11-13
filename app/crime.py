@@ -210,7 +210,7 @@ def _feed_summary(f, days=30):
 
 def lookup(q):
     p = resolve(q)
-    if not p: return {"ok": False, "q": q, "message": "We couldn't find that place. Try a US ZIP code (60614), a city (Chicago, IL), a county (Seminole County, FL), a state or a country."}
+    if not p: return {"ok": False, "q": q, "message": "We couldn't find that place. Try a US ZIP code (60614), a city (Chicago, IL), a county (Cook County, IL), a state or a country."}
     out = {"ok": True, "q": q, "place": p, "national": national()}
     if p["kind"] in ("country", "intl_city"):
         out["country"] = country(iso2=p["cc"])
@@ -474,7 +474,7 @@ def render_page(q=""):
             f'<input id="cr-q" name="place" type="search" value="{E(q)}" maxlength="80" autocomplete="off" placeholder="ZIP, city, county, state or country" enterkeyhint="search">'
             '<button type="submit">Look up</button></form>'
             '<div class="cr-chips">' + "".join(f'<a class="cr-chip" href="/crime?place={urllib.parse.quote(x)}" data-q="{E(x)}">{E(x)}</a>' for x in
-                                                ("60614", "Chicago, IL", "Seminole County, FL", "Philadelphia", "Florida", "Canada")) + '</div>'
+                                                ("60614", "Chicago, IL", "Cook County, IL", "Philadelphia", "Florida", "Canada")) + '</div>'
             f'<div class="cr-stats"><span><b>{len(fs)}</b> cities with near-real-time maps</span><span><b>{n(q1("SELECT COUNT(*) FROM counties WHERE year IS NOT NULL")[0] if _db() else 0)}</b> US counties with FBI rates</span>'
             f'<span><b>{n(q1("SELECT COUNT(*) FROM countries")[0] if _db() else 0)}</b> countries</span>'
             + (f'<span>Newest police report: <b>{E(dfmt(newest, "%b %-d"))}</b></span>' if newest else "") + '</div></section>')

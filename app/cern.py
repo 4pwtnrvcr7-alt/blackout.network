@@ -578,9 +578,9 @@ for the <b>HiLumi LHC</b>, which aims to deliver ten times the original design's
 
     scale = sec("scale", "map", "Interactive map", "Where it is, and how big", f'''
 <p>The ring straddles the French-Swiss border, with Point 1 (ATLAS) beside CERN's main site at Meyrin in Switzerland and the other three big experiments at sites in France.
-The map opens with the ring dropped on Sanford, Florida, to show how big 26.7 km really is. Pick another city, use your location, or choose Geneva to see the real tunnel (as mapped in OpenStreetMap) and tap the experiment sites for details.</p>
+The map opens on the real tunnel at Geneva (as mapped in OpenStreetMap). Pick a city to drop the same-size ring over it and see how big 26.7 km really is, or use your location, and tap the experiment sites for details.</p>
 <div class="cx-map-ctl"><label class="cx-fl" for="cx-city">Put the ring over</label><select id="cx-city">''' +
-            "".join(f'<option value="{k}"{" selected" if k == "sanford" else ""}>{E(n)}</option>' for k, n, _, _ in CITIES) +
+            "".join(f'<option value="{k}"{" selected" if k == "geneva" else ""}>{E(n)}</option>' for k, n, _, _ in CITIES) +
             f'''</select><button type="button" class="cx-btn" id="cx-geo">Use my location</button></div>
 <div class="cx-map" id="cx-map" role="region" aria-label="Map of the LHC ring and experiment sites"><p class="cx-map-ph">Loading the map...</p></div>
 <p class="cx-note" id="cx-geo-note">Your location is used only in your browser to place the ring; it is never sent to our server.</p>

@@ -114,7 +114,7 @@ function alertHTML(a,src){return `<div class="wx-al ${sevC(a.severity)}"><div><s
 function render(){const d=W.d,l=W.loc,om=OK("open_meteo");
  const pts=OK("nws_points");
  $w("wx_head").innerHTML=`<span class=wx-loc>${E(locLabel(l))}</span> <span class=meta>· ${(+d.lat).toFixed(3)}, ${(+d.lon).toFixed(3)}${om?" · local time zone "+E(om.timezone)+" ("+E(om.timezone_abbreviation)+")":""}${pts?` · NWS ${E(pts.office)} grid ${E(pts.grid)}, zone ${E(pts.zone)}`:""}
-  · <b>Last updated ${etF(d.generated)}</b>${d.cached?" (cached copy, refreshed every 10 min)":""} · next auto-refresh in ~10 min${W.saved?"":" · default location (nothing saved yet)"}</span>`;
+  · <b>Last updated ${etF(d.generated)}</b>${d.cached?" (cached copy, refreshed every 10 min)":""} · next auto-refresh in ~10 min${W.saved?"":" · from your location picker (not saved as a weather place yet)"}</span>`;
  // alerts
  let h="",n=0;
  if(d.us){const a=OK("nws_alerts");if(a){n+=a.length;h+=a.map(x=>alertHTML(x,"National Weather Service")).join("")}else h+=`<div class=warn>NWS alerts unavailable: ${E((S("nws_alerts")||{}).error)}</div>`}

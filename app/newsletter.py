@@ -1074,6 +1074,23 @@ def _breaking_ids():
         k = db(); ids = {x[0] for x in k.execute("SELECT cluster_id FROM breaking_seen")}; k.close(); return ids
     except Exception: return set()
 
+def _subscriber_crime(sub):
+    """Local crime section for one subscriber's brief, or None.
+
+    Used by build_issue, so also by preview_issue and test_send. Requires an explicit
+    saved loc_label and crime_brief=1. Never invents a default place when the
+    subscriber has no area.
+    """
+    if not sub or not _row_get(sub, "crime_brief", 0):
+        return None
+    if not str(sub.get("loc_label") or "").strip():
+        return None
+    try:
+        import crime as _crime
+        return _crime.brief_for(dict(sub))
+    except Exception:
+        return None
+
 def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     """Select content for one subscriber. sub: dict with id (None for previews), frequency, interests, last_sent_at, follows (cluster ids).
     Window: since the subscriber's last send, capped at max_window_hours (24 h).
@@ -1206,11 +1223,7 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
              "end": at, "slot": slot, "empty": not (main or notable or watch or updates or follow_u or politics or near), "rule": {"rank": rmin, "sources": smin}}
     issue["videos"] = videos_for(issue, c)
     issue["empty"] = issue["empty"] and not issue["videos"]
-    if sub and _row_get(sub, "crime_brief", 0) and sub.get("loc_label"):   # t392: opt-in local crime summary (never makes an issue non-empty on its own)
-        try:
-            import crime as _crime
-            issue["crime"] = _crime.brief_for(dict(sub))
-        except Exception: issue["crime"] = None
+    issue["crime"] = _subscriber_crime(sub)   # only when they opted in AND saved an area; never invents a default place
     issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries the matters lead (no separate "nothing confirmed" email)
     _include_noted(issue)
     _uniquify_why(issue)
@@ -2479,7 +2492,7 @@ def subscribe(d, ip="", headers=None):
         loc = None
         if str(d.get("location") or "").strip():
             loc = geocode_place(d.get("location"))
-            if not loc: return 400, {"ok": False, "message": "We couldn't find that place. Try a US ZIP code, a city (e.g. Sanford, FL) or a country.", "field": "location"}
+            if not loc: return 400, {"ok": False, "message": "We couldn't find that place. Try a US ZIP code, a city (e.g. Denver, CO) or a country.", "field": "location"}
         ek = h("em:" + email)
         if hits(k, "sub_email", ek, 86400) >= int(rl["email_per_day"]):
             return 429, {"ok": False, "message": "This address has had several signup attempts today. Please try again tomorrow, or use the link already sent."}
@@ -2563,7 +2576,7 @@ def manage(tok, d):
     if "location" in d:
         if str(d.get("location") or "").strip():
             loc = geocode_place(d.get("location"))
-            if not loc: return 400, {"ok": False, "message": "We couldn't find that place. Try a US ZIP code, a city (e.g. Sanford, FL) or a country."}
+            if not loc: return 400, {"ok": False, "message": "We couldn't find that place. Try a US ZIP code, a city (e.g. Denver, CO) or a country."}
         else: loc = None
     k = db()
     if loc != "keep": _set_loc(k, r["id"], loc)
@@ -3255,7 +3268,7 @@ def form_html(mode="page"):
                       f'<span class="nl-sm"> ({E(sl["morning"] + " & " + sl["evening"] if k == "twice" else sl[k])} ET)</span></label>' for k, v in FREQS.items())
             + '</fieldset>'
             f'<label for="{uid}_loc" class="nl-loc-l">Your area (optional): US ZIP, city or country</label>'
-            f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="e.g. 32771, Sanford, FL or Germany">'
+            f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="e.g. 80202, Denver, CO or Germany">'
             '<p class="nl-sm">Adds a "Near you" section first. We store only the place name and a rough location (about 10 km), never your address.</p>'
             '<div class="nl-crime"><label class="nl-chk"><input type="checkbox" name="crime_brief" value="1"> Include local crime summary in my briefs</label>'
             '<label class="nl-chk"><input type="checkbox" name="crime_alerts" value="1"> Real-time crime alerts for my area (cities with live police data)</label></div>'
@@ -3326,7 +3339,7 @@ def prefs_form(tok, r):
             "".join(f'<label class="nl-chk"><input type="checkbox" name="interests" value="{E(x)}"{" checked" if allc or x in ints else ""}> {E(x)}</label>' for x in CATEGORIES) +
             '</div><p class="nl-sm">Leave all ticked (or none) to get every category.</p></fieldset>'
             '<fieldset><legend>Your area</legend><label for="nl_m_loc">US ZIP, city or country (leave empty for none)</label>'
-            f'<input id="nl_m_loc" class="nl-loc" type="text" name="location" maxlength="80" value="{E(_row_get(r, "loc_label", "") or "")}" placeholder="e.g. 32771, Sanford, FL or Germany">'
+            f'<input id="nl_m_loc" class="nl-loc" type="text" name="location" maxlength="80" value="{E(_row_get(r, "loc_label", "") or "")}" placeholder="e.g. 80202, Denver, CO or Germany">'
             '<p class="nl-sm">Used for the "Near you" section and local breaking alerts. Stored as a place name and rough location only.</p></fieldset>'
             '<fieldset><legend>Breaking alerts</legend><input type="hidden" name="breaking_present" value="1">'
             f'<label class="nl-chk"><input type="checkbox" name="breaking" value="1"{" checked" if _row_get(r, "breaking", 1) else ""}> Send me rare breaking alerts for truly major events (at most 3 a day, 2+ hours apart)</label></fieldset>'

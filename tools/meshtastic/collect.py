@@ -25,7 +25,7 @@ Drop-off signal (single source, unconfirmed, never high severity):
   * feed guard: if the worldwide silent_pct >= FEED_GUARD_PCT, or the fetch failed / data is older than 20 min,
     the drop is treated as a data-source problem and no regional signal is raised.
 Regions: U.S. grid-operator sections (app/gridstatus_static/sections.geojson), countries (app/signal_map_static/world.geojson)
-and named metro watch areas (circles, below; Central Florida first).
+and named metro watch areas (circles, below).
 
 usage: collect.py [--out PATH] [--state PATH] [--src-file nodes.json (offline test)] [--now EPOCH]
 Never touches scanner.py, scoring, push.py, jets.py, config.json, aviation_watch.py or blackout.db."""
@@ -53,7 +53,7 @@ RANK_CAP = 5
 
 # Named watch areas: (id, name, lat, lon, radius km)
 AREAS = [
-    ("cfl", "Central Florida (Sanford / Lake Mary / Orlando)", 28.70, -81.33, 70),
+    ("cfl", "Central Florida (Orlando metro)", 28.70, -81.33, 70),
     ("tampa", "Tampa Bay", 27.95, -82.46, 60), ("sfl", "South Florida", 26.10, -80.20, 70), ("jax", "Jacksonville", 30.33, -81.66, 50),
     ("atl", "Atlanta", 33.75, -84.39, 60), ("hou", "Houston", 29.76, -95.37, 70), ("dfw", "Dallas-Fort Worth", 32.80, -97.00, 70),
     ("aus", "Austin / San Antonio", 29.90, -97.90, 90), ("phx", "Phoenix", 33.45, -112.07, 60), ("la", "Los Angeles", 34.05, -118.25, 70),
@@ -224,7 +224,7 @@ def main():
            "params": {"active_min": ACTIVE_MIN, "regular_frac": REGULAR_FRAC, "min_regulars": MIN_REGULARS, "min_silent": MIN_SILENT,
                       "watch_pct": WATCH_PCT, "persist_samples": PERSIST, "rank_cap": RANK_CAP, "feed_guard_pct": FEED_GUARD_PCT},
            "counts": {"total": len(nodes_out), "active": sum(1 for n in nodes_out if n[4] <= ACTIVE_MIN)},
-           "focus": "area:cfl", "areas": [{"id": "area:" + a[0], "name": a[1], "lat": a[2], "lon": a[3], "r_km": a[4]} for a in AREAS],
+           "focus": "country:United States of America", "areas": [{"id": "area:" + a[0], "name": a[1], "lat": a[2], "lon": a[3], "r_km": a[4]} for a in AREAS],
            "hw": hw, "nodes": nodes_out, "regions": regions, "signals": signals}
     _write(a.out, out); _write(a.state, st)
     log(f"ok: {len(nodes_out)} nodes, {out['counts']['active']} active, {len(signals)} signals, samples {samples}, feed_ok {feed_ok}")

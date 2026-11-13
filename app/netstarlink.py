@@ -547,7 +547,7 @@ def render(np):
     sec_wx = (f'<section class="np-sec" id="weather"><h2>{ic("storm")}Weather and Starlink</h2><p class="np-sub">Starlink says its dish handles snow, sleet, heavy rain and strong wind, but heavy rain or wind can still cause slower speeds or a rare outage, '
               f'and snow piling up around the dish can block its view (<a href="{WX_HELP}" target="_blank" rel="noopener">Starlink Help Center</a>). Storms also cut power, and the dish and router need power.</p>'
               f'<form class="nm-form" action="/network/near" method="get" role="search"><label class="np-mu" for="sl_q" style="flex-basis:100%">See weather alerts and network status for a place</label>'
-              f'<input id="sl_q" name="where" placeholder="ZIP code or city, e.g. 32771 or Mumbai" maxlength="120"><button class="np-btn p" type="submit">{ic("search", "np-ic sm")}Check this place</button></form></section>')
+              f'<input id="sl_q" name="where" placeholder="ZIP code or city, e.g. 80202, Denver or Mumbai" maxlength="120"><button class="np-btn p" type="submit">{ic("search", "np-ic sm")}Check this place</button></form></section>')
     steps = ["Open the Starlink app: it reports known outages, obstructions and the dish's status.", "Check the sky view: the app's obstruction check shows trees or buildings in the way.",
              "Restart the dish and router by unplugging power for about a minute.", "Look at the weather where the dish is; heavy rain, snow or strong wind can slow it.",
              "Compare with the outage signals above. If they show a drop, the problem is probably not only yours."]
@@ -775,7 +775,7 @@ def render_near(np):
             '<h1>Networks near me, <em>with the weather</em></h1><p>Type a ZIP code, city or address. We show the networks that serve that place and their status right now, '
             'active weather alerts there, and a plain note on how that weather can affect your connection.</p></div></div>'
             f'<form class="nm-form" id="nm_form" role="search"><label for="nm_q" class="np-mu" style="flex-basis:100%">ZIP code, city or address</label>'
-            f'<input id="nm_q" name="where" placeholder="e.g. 32771, Denver or Mumbai" maxlength="120" required>'
+            f'<input id="nm_q" name="where" placeholder="e.g. 80202, Denver or Mumbai" maxlength="120" required>'
             f'<button class="np-btn p" type="submit">{ic("search", "np-ic sm")}Check</button></form></section>'
             '<div id="nm_out"><p class="np-mu">Nothing about your search is stored. We look up the center of the ZIP code or town and keep the result in memory for 10 minutes so repeat checks are fast.</p></div>'
             '<p class="np-mu" style="margin-top:14px">Sources: IODA (Georgia Tech) internet measurements, official provider status feeds, National Weather Service, MeteoAlarm, Open-Meteo, GDACS. '

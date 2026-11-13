@@ -43,7 +43,11 @@ class WelcomePage(unittest.TestCase):
         self.assertIn('value="twice"', h)
         for cat, _lab, *_ in welcome.CHIP_CATS + [(a, b) for a, b in welcome.MORE_CATS]:
             self.assertIn(f'value="{cat}"', h)
-        self.assertIn("Sanford, FL", h)
+        self.assertIn("Denver, CO", h)
+        self.assertIn("80202, Denver, CO or Germany", h)
+        self.assertNotIn("Sanford", h)
+        self.assertNotIn("32771", h)
+        self.assertNotIn("Central Florida", h)
         self.assertIn("The brief does not have a separate category", h)
 
     def test_copy_rules(self):

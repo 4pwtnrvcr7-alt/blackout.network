@@ -8,6 +8,9 @@ var LIB=["dist/maplibre-gl.js","sha384-5+cfbwT0iiub6VsQAdn6yz16nr6sDiQoHx6tm4O8O
 var STYLE_D="https://tiles.openfreemap.org/styles/dark",STYLE_L="https://tiles.openfreemap.org/styles/positron";
 var ROLE={R:"Router",P:"Repeater",C:"Client",M:"Client (mute)",B:"Client (base)",T:"Tracker",S:"Sensor"};
 var VIEWS={cfl:{center:[-81.33,28.70],zoom:8.2},us:{center:[-96,38.5],zoom:3.3},world:{center:[10,25],zoom:1.1}};
+var FOCUS={us:{id:"country:United States of America",title:"United States right now",mu:"Public mesh radios heard across the country. Pick a closer region or the world map to change the view."},
+ cfl:{id:"area:cfl",title:"Central Florida right now",mu:"Orlando and the area within about 70 km (45 mi)."},
+ world:{id:"world",title:"Worldwide right now",mu:"Public mesh radios heard around the world."}};
 function light(){return document.documentElement.getAttribute("data-theme")==="light"}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function tag(n,a){return new Promise(function(ok,no){var e=document.createElement(n);for(var k in a)e.setAttribute(k,a[k]);e.crossOrigin="anonymous";e.onload=ok;e.onerror=no;document.head.appendChild(e)})}
@@ -17,7 +20,7 @@ function lib(){if(window.maplibregl)return Promise.resolve(true);if(libP)return 
   await tag("script",{src:CDN[i]+LIB[0],integrity:LIB[1]});if(window.maplibregl)return true}catch(e){}}return false})();return libP}
 function ago(m){if(m==null)return"–";if(m<1)return"just now";if(m<60)return m+" min ago";var h=Math.round(m/60);return h<48?h+" h ago":Math.round(h/24)+" d ago"}
 function etTime(iso){try{return new Date(iso).toLocaleString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",month:"short",day:"numeric"})+" ET"}catch(e){return iso||""}}
-var S={d:null,map:null,view:"cfl"};
+var S={d:null,map:null,view:"us"};
 function geo(d){var hw=d.hw||[];return {type:"FeatureCollection",features:(d.nodes||[]).map(function(n){
  return {type:"Feature",geometry:{type:"Point",coordinates:[n[1],n[0]]},properties:{r:(n[2]==="R"||n[2]==="P")?1:0,role:ROLE[n[2]]||"Client",hw:hw[n[3]]||"",age:n[4],old:n[4]>60?1:0,sn:n[5]||""}}})}}
 function ring(lon,lat,km){var pts=[],R=6371,d=km/R,la=lat*Math.PI/180,lo=lon*Math.PI/180;for(var i=0;i<=64;i++){var b=i/64*2*Math.PI;
@@ -44,11 +47,12 @@ function mk(){var el=$("#mx_map");if(!el||S.map)return;var v=VIEWS[S.view];
  m.on("style.load",function(){layers(m)});
  new MutationObserver(function(){if(!S.map)return;S.map.setStyle(light()?STYLE_L:STYLE_D)}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]})}
 function view(k){S.view=k;$$(".mx-seg button").forEach(function(b){b.setAttribute("aria-pressed",b.dataset.view===k?"true":"false")});
- if(S.map){var v=VIEWS[k];S.map.jumpTo({center:v.center,zoom:v.zoom})}}
+ if(S.map){var v=VIEWS[k];S.map.jumpTo({center:v.center,zoom:v.zoom})}panels()}
 function panels(){var d=S.d||{};var reg={};(d.regions||[]).forEach(function(r){reg[r.id]=r});var f=d.feed||{};
  var st=$("#mx_stats");if(st&&d.counts)st.textContent=(d.counts.total||0).toLocaleString()+" nodes on the map · "+(d.counts.active||0).toLocaleString()+" heard in the last hour";
  var fr=$("#mx_fresh");if(fr)fr.innerHTML=d.generated?("Updated "+esc(etTime(d.generated))+" · source <a href=\"https://meshmap.net/\" target=\"_blank\" rel=\"noopener\">MeshMap.net</a>"+(f.ok?"":" · <b>data source delayed: drop-off watch paused</b>")):"Waiting for the first sync.";
- var c=reg[d.focus||"area:cfl"]||{};var kv=$$("#mx_focus_kv b");
+ var fm=FOCUS[S.view]||FOCUS.us;var ht=$("#mx_focus_h");if(ht)ht.textContent=fm.title;var mu=$("#mx_focus_mu");if(mu)mu.textContent=fm.mu;
+ var c=reg[fm.id]||reg[d.focus]||{};var kv=$$("#mx_focus_kv b");
  if(kv.length===3){kv[0].textContent=c.total!=null?c.total:"–";kv[1].textContent=c.active!=null?c.active:"–";
   var num=c.regular>=10&&c.silent_pct!=null;kv[2].textContent=num?(c.silent+" of "+c.regular):(f.baseline_ready?"Too few to judge":"Baseline building");kv[2].classList.toggle("mx-kt",!num)}
  var wl=$("#mx_watch_list");if(!wl)return;var sig=d.signals||[];

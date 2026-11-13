@@ -759,7 +759,7 @@ def _sys_mod():
     import sys as _sys
     return _sys.modules[__name__]
 HUBQ = ('<div class="np-hubq"><b>{pin}Networks near me</b><form action="/network/near" method="get" role="search"><label for="hub_q" class="np-mu" style="position:absolute;left:-9999px">ZIP code or city</label>'
-        '<input id="hub_q" name="where" placeholder="ZIP code or city, e.g. 32771" maxlength="120" style="flex:1 1 200px;min-width:0;font:500 15px/1.2 var(--bn-font-body,Inter,sans-serif);padding:10px 12px;border-radius:10px;border:1px solid var(--bd2,#2f3742);background:var(--bn-surface,#161b21);color:var(--tx,#e6e9ee)">'
+        '<input id="hub_q" name="where" placeholder="ZIP code or city, e.g. 80202 or Denver" maxlength="120" style="flex:1 1 200px;min-width:0;font:500 15px/1.2 var(--bn-font-body,Inter,sans-serif);padding:10px 12px;border-radius:10px;border:1px solid var(--bd2,#2f3742);background:var(--bn-surface,#161b21);color:var(--tx,#e6e9ee)">'
         '<button class="np-btn p" type="submit">Check status and weather</button></form></div>')
 
 # ---------------------------------------------------------------- accordion for the dashboard's Network Status tab (enhances #ns_list rows in place)
