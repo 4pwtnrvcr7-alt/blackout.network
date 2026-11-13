@@ -19,10 +19,10 @@ socket.socket.connect = _blocked
 socket.create_connection = _blocked
 import newsletter_analysis as NA
 import newsletter as NL
-# BN_NL_V2=1 runs this module against the concise v2 layout (newsletter_v2.py). v1-only layout details
+# By default (BN_NL_V2 unset) this module runs against the concise v2 layout (newsletter_v2.py). v1-only layout details
 # (inline WHAT HAPPENED / WHAT TO DO blocks, sparkline data URIs, cid images, per-source links, guide links,
 # trend labels) live on the /wire story page in v2, so those assertions are v1-only; v2 gets equivalents.
-V2 = os.environ.get("BN_NL_V2") == "1"
+V2 = os.environ.get("BN_NL_V2", "").strip() != "0"   # BN_NL_V2=0 = old v1 layout (kill switch)
 
 UTC = timezone.utc
 AT = datetime(2026, 11, 8, 12, 0, tzinfo=UTC)  # 7:00 AM ET

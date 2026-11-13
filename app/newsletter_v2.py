@@ -1,6 +1,6 @@
 """BLACKOUT.NETWORK brief, layout v2 (Matt, Nov 13 2026: t1365u, round 2 t1391u): shorter, grouped, quieter.
 
-Off by default. On with the Render env BN_NL_V2=1 (or "template": "v2" in newsletter_config.json); newsletter.render() calls
+On by default since Nov 13 2026. Kill switch: Render env BN_NL_V2=0 (or "template": "v1" in newsletter_config.json); newsletter.render() calls
 render() here and falls back to the v1 layout if anything in this module raises. Issue selection, the brief gate, the
 Hamas pin / featured desk stories, the QA gate, tracking and every footer control are unchanged: this module only draws.
 
@@ -33,7 +33,9 @@ NL_PLACE_ALIAS = {r"\bhormuz\b": "strait of hormuz", r"\bgaza\b|\bwest bank\b": 
 _YT = re.compile(r"^https://(?:www\.)?youtube\.com/(?:shorts/|watch\?v=)[A-Za-z0-9_-]{6,20}$")
 
 def on(c=None):
-    return os.environ.get("BN_NL_V2", "0") == "1" or str((c or {}).get("template") or "").lower() == "v2"
+    """On by default (Matt approved, Nov 13 2026). Kill switch: BN_NL_V2=0 on Render, or "template": "v1" in newsletter_config.json."""
+    if os.environ.get("BN_NL_V2", "").strip() == "0": return False
+    return str((c or {}).get("template") or "").lower() != "v1"
 
 # ------------------------------------------------------------------ data helpers
 def _N():

@@ -1,4 +1,4 @@
-"""Newsletter layout v2 (Matt, Nov 13 2026, t1365u): off by default, behind BN_NL_V2=1. Every story card gets a picture served
+"""Newsletter layout v2 (Matt, Nov 13 2026, t1365u): on by default since Nov 13 2026; BN_NL_V2=0 is the kill switch. Every story card gets a picture served
 from blackout.network with a credit, a short summary, "Read the full brief", "Watch on YouTube" when our video exists, and
 headshots with a Profile link for named people. Offline: temp databases, no network, no send, no worker."""
 import os, sys, json, sqlite3, tempfile, unittest, io, re
@@ -18,15 +18,13 @@ json.dump(REPORTS, open(os.path.join(TMP, "reports.json"), "w"))
 LINKSF = os.path.join(TMP, "social_links.json")
 json.dump({"stories": {"aaaaaaaaaaaaaaa2": {"policy_ok": True, "yt_ok": True, "yt_url": "https://www.youtube.com/shorts/abcDEF12345", "x_ok": False, "hidden": []}}},
           open(LINKSF, "w"))
-os.environ.update({"NEWSLETTER_NO_WORKER": "1", "NEWSLETTER_ENV": os.path.join(TMP, "nl.env"), "NEWSLETTER_DB": os.path.join(TMP, "nl.db"),
-                   "NEWSLETTER_SRC_DB": os.path.join(TMP, "src.db"), "NEWSLETTER_OUTBOX": os.path.join(TMP, "outbox"),
-                   "NEWSLETTER_CONFIG": os.path.join(TMP, "newsletter_config.json"), "NEWSLETTER_ANALYSIS_JSON": os.path.join(TMP, "none.json"),
-                   "NEWSLETTER_PASSFILE": os.path.join(TMP, "pass.txt"), "BN_STORY_REPORTS": os.path.join(TMP, "reports.json")})
-os.environ.pop("BN_NL_V2", None)
+os.environ["NEWSLETTER_NO_WORKER"] = "1"
+# Nothing else is set at import time: `unittest discover` imports every test module before running any, so import-time env or
+# path changes would leak into other modules (that was the clean-env failure on Nov 13). setUpClass/tearDownClass own all state.
+OWN_P = {"db": "nl.db", "src": "src.db", "outbox": "outbox", "cfg": "newsletter_config.json", "env": "nl.env", "pass": "pass.txt"}
+OWN_ENV = {"NEWSLETTER_ANALYSIS_JSON": os.path.join(TMP, "none.json"), "BN_STORY_REPORTS": os.path.join(TMP, "reports.json")}
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import newsletter as N, newsletter_qa as QA, newsletter_v2 as V2, newsletter_img as NI, home_feed as HF
-HF.F_LINKS = LINKSF
-NI.CACHE = os.path.join(TMP, "imgcache")
+import newsletter as N, newsletter_qa as QA, newsletter_v2 as V2, newsletter_img as NI, home_feed as HF, story_report as SR
 UTC = timezone.utc
 AT = datetime(2026, 11, 14, 0, 0, tzinfo=UTC)   # Nov 13, 7 PM ET
 LINKS = {"unsubscribe": "https://blackout.network/newsletter/unsubscribe?token=x", "manage": "https://blackout.network/newsletter",
@@ -71,11 +69,35 @@ def _audit(case, html):
 
 class V2Tests(unittest.TestCase):
     @classmethod
-    def setUpClass(cls): _src()
+    def setUpClass(cls):
+        cls._env = {k: os.environ.get(k) for k in list(OWN_ENV) + ["BN_NL_V2", "BN_NL_SPACEX_JSON"]}
+        cls._P = dict(N.P); cls._sr = SR.REPORTS; cls._links = HF.F_LINKS; cls._cache = NI.CACHE
+        os.environ.update(OWN_ENV); N.P.update({k: os.path.join(TMP, v) for k, v in OWN_P.items()})
+        SR.REPORTS = OWN_ENV["BN_STORY_REPORTS"]; SR._RC.update(mt=None, v={})
+        HF.F_LINKS = LINKSF; NI.CACHE = os.path.join(TMP, "imgcache")
+        N._INIT.clear(); _src()
 
+    @classmethod
+    def tearDownClass(cls):
+        for k, v in cls._env.items():
+            if v is None: os.environ.pop(k, None)
+            else: os.environ[k] = v
+        N.P.clear(); N.P.update(cls._P); N._INIT.clear()
+        SR.REPORTS = cls._sr; SR._RC.update(mt=None, v={}); HF.F_LINKS = cls._links; NI.CACHE = cls._cache
+
+    def setUp(self): os.environ.pop("BN_NL_V2", None)
     def tearDown(self): os.environ.pop("BN_NL_V2", None)
 
-    def test_off_by_default_keeps_v1(self):
+    def test_on_by_default(self):
+        self.assertTrue(V2.on({})); self.assertTrue(V2.on(None))
+        os.environ["BN_NL_V2"] = "1"; self.assertTrue(V2.on({}))
+        os.environ["BN_NL_V2"] = "0"; self.assertFalse(V2.on({}))
+        os.environ.pop("BN_NL_V2"); self.assertFalse(V2.on({"template": "v1"}))
+        subj, html, text = N.render(_issue(), LINKS)
+        self.assertIn("/newsletter/img/", html)
+
+    def test_kill_switch_keeps_v1(self):
+        os.environ["BN_NL_V2"] = "0"
         subj, html, text = N.render(_issue(), LINKS)
         self.assertNotIn("TOP 3 RIGHT NOW", html)
         self.assertNotIn("/newsletter/img/", html)
@@ -145,12 +167,15 @@ class V2Tests(unittest.TestCase):
     def test_card_graphic_and_routes(self):
         st, body, ct = NI.handle_get("/newsletter/img/card/aaaaaaaaaaaaaaa1.png")
         self.assertEqual((st, ct), (200, "image/png"))
-        from PIL import Image
-        im = Image.open(io.BytesIO(body)); self.assertEqual(im.size, (1200, 675)); self.assertFalse(im.info.get("exif"))
+        try: from PIL import Image   # prod installs Pillow (requirements.txt); without it the routes still answer, size checks skip
+        except ImportError: Image = None
+        if Image: im = Image.open(io.BytesIO(body)); self.assertEqual(im.size, (1200, 675)); self.assertFalse(im.info.get("exif"))
         self.assertEqual(NI.handle_get("/newsletter/img/card/ffffffffffffffff.png")[0], 404)        # unknown story
         self.assertEqual(NI.handle_get("/newsletter/img/lead/0123456789abcdef0123.jpg")[0], 404)   # not in the signed allowlist
         self.assertEqual(NI.handle_get("/newsletter/img/../../etc/passwd")[0], 404)
-        st, body, ct = NI.handle_get("/newsletter/img/person/donald-trump.jpg")
+        r = NI.handle_get("/newsletter/img/person/donald-trump.jpg")
+        if not Image: self.assertEqual(r[0], 404); return   # headshots need Pillow; without it the route 404s cleanly
+        st, body, ct = r
         self.assertEqual((st, ct), (200, "image/jpeg"))
         self.assertEqual(Image.open(io.BytesIO(body)).size, (160, 160))
 

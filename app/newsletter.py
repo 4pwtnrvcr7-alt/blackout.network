@@ -1911,7 +1911,7 @@ def _text_item(it, n):
 
 def render(issue, links, c=None):
     """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site (+ _row: the subscriber row, for Follow links).
-    Layout v2 (newsletter_v2.py, Nov 13 2026) only when BN_NL_V2=1 or config "template": "v2"; any v2 error falls back to this layout."""
+    Layout v2 (newsletter_v2.py, Nov 13 2026) by default; BN_NL_V2=0 or config "template": "v1" restores this layout; any v2 error falls back to this layout."""
     c = c or cfg()
     try:
         import newsletter_v2 as NV2
