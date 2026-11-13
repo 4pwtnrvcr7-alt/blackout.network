@@ -4,9 +4,11 @@ line on why they are in the news, how many recent alerts mention them, the lates
 Never labels a person a threat; shows no ranks, scores or severity for people and no aircraft tracking.
 Read-only: blackout.db is opened only as file:blackout.db?mode=ro; never touches scanner.py, scoring, push.py, jets.py or config.json.
 Who appears: a curated base list (people in today's reports, roles as of Nov 1 2026) plus anyone from POOL who is named in a
-rank 4+ alert on The Wire in the last 7 days. Headlines: matching scanner alerts first (link to /wire/<id>, which the
+rank 2+ alert on The Wire or Watchlist in the last 7 days (suppressed low-signal rows are left out). Related alerts match the
+person's name or per-figure aliases (e.g. Kremlin / Russian president for Putin), or a country term plus conflict context where
+that is defensible; a bare country name is never enough. Headlines: matching scanner alerts first (link to /wire/<id>, which the
 page turns into a jump to the item on The Wire), topped up from Google News (verbatim headlines) when fewer than 3 alerts match.
-Memory: one bounded DB pass (<=1500 short rows, truncated text), results cached 10 min; Google News per person cached 1 h (figures.db). A forced refresh (summary(force=True) or GET /api/figures?refresh=1, used by the top-bar Refresh data button) bypasses both caches and re-queries. Headlines are sorted newest event time first."""
+Memory: one bounded DB pass (<=1500 short rows, truncated text), results cached 10 min; Google News per person cached 1 h (figures.db). A forced refresh (summary(force=True) or GET /api/figures?refresh=1, used by the top-bar Refresh data button) bypasses both caches and re-queries. The 7-day window and headline sort use event time (not cluster updated)."""
 import os, re, json, hashlib, sqlite3, threading, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
@@ -17,7 +19,7 @@ BASE = os.path.dirname(os.path.abspath(__file__)); DB = os.path.join(BASE, "figu
 BDB = "file:" + os.path.join(BASE, "blackout.db") + "?mode=ro"
 STATIC = os.path.join(BASE, "figures_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css"}
 WIKI = "https://en.wikipedia.org/wiki/"
-DAYS, MIN_RANK, MAX_ROWS, MAX_HEADLINES = 7, 4, 1500, 5
+DAYS, MIN_RANK, MAX_ROWS, MAX_HEADLINES = 7, 2, 1500, 5
 AS_OF = "2026-11-01"
 
 # key, name, role, country, why (neutral, factual, sourced in today's reports), regex, profile links [(label, url)]
@@ -66,7 +68,7 @@ BASE_LIST = [
   r"\bElon\s+Musk\b|\bMusk's\b|\bMusk\b", [("Wikipedia", WIKI + "Elon_Musk"),
    ("SpaceX updates", "https://www.spacex.com/updates/"), ("xAI news", "https://x.ai/news")]),
 ]
-# Shown only when named in a rank 4+ alert in the last DAYS days. Roles as of AS_OF.
+# Shown only when a related alert matches in the last DAYS days. Roles as of AS_OF.
 POOL = [
  ("vance", "JD Vance", "Vice President of the United States", "United States", r"\bVance\b", [("Wikipedia", WIKI + "JD_Vance")]),
  ("hegseth", "Pete Hegseth", "U.S. Secretary of Defense", "United States", r"\bHegseth\b", [("Wikipedia", WIKI + "Pete_Hegseth")]),
@@ -87,6 +89,46 @@ POOL = [
  ("sheinbaum", "Claudia Sheinbaum", "President of Mexico", "Mexico", r"\bSheinbaum\b", [("Wikipedia", WIKI + "Claudia_Sheinbaum")]),
  ("lukashenko", "Alexander Lukashenko", "President of Belarus", "Belarus", r"\bLukashenko\b", [("Wikipedia", WIKI + "Alexander_Lukashenko")]),
 ]
+# Extra aliases and (anchor, context) pairs on top of each figure's name regex.
+# A row matches if the name regex or an "also" alias hits, or if both sides of a context pair hit the same text.
+# Country or city words (Russia, Moscow, Iran, Beijing, …) never match a figure on their own.
+ALIASES = {
+    "trump": {"also": [r"\bDonald J\.?\s+Trump\b", r"\bPOTUS\b"]},
+    "mkhamenei": {"also": [r"\bAyatollah Khamenei\b", r"\bIran(?:ian)?(?:'s)?\s+supreme leader\b"]},
+    "araghchi": {"also": [r"\bIran(?:ian)?'?s?\s+foreign minister\b"]},
+    "rezaei": {"also": [r"\bMohsen Rezaei\b"]},
+    "rubio": {"also": [r"\bSecretary of State Rubio\b", r"\bMarco Rubio\b"]},
+    "bessent": {"also": [r"\b(?:U\.?S\.?\s+)?Treasury Secretary\b", r"\bSecretary of the Treasury\b"]},
+    "netanyahu": {"also": [r"\bIsraeli prime minister\b", r"\bPrime Minister of Israel\b", r"\bIsraeli PM\b"],
+                  "context": [(r"\b(?:Israeli government|Israel's government)\b",
+                               r"\b(?:Gaza|Hamas|Hezbollah|Iran|Lebanon|IDF|ceasefire|war|strike)\b")]},
+    "zelensky": {"also": [r"\bUkrainian president\b", r"\bPresident of Ukraine\b", r"\bUkraine's president\b",
+                          r"\bVolodymyr Zelensk(?:y|yy|iy|ii)\b"]},
+    "putin": {"also": [r"\bKremlin\b", r"\bRussian president\b", r"\bPresident of Russia\b", r"\bRussia's president\b",
+                       r"\bMoscow-ordered\b",
+                       r"\bRussian (?:government|forces|military|army|troops|airstrike|air ?strikes?|defense ministry|defence ministry|MoD)\b"],
+              "context": [(r"\b(?:Russia|Russians?|Moscow)\b|\U0001F1F7\U0001F1FA",
+                           r"\b(?:wars?|wartime|warship|invasion|offensive|missiles?|drones?|airstrike|air ?strikes?|strikes?|bombing|shelling|ceasefire|peace talks?|sanctions?|Ukraine|Ukrainian|Kyiv|Kiev|Donbas|Donetsk|Kherson|Zaporizh(?:zh)?ia)\b")]},
+    "carney": {"also": [r"\bCanadian prime minister\b", r"\bPrime Minister of Canada\b", r"\bCanada's prime minister\b"]},
+    "tedros": {"also": [r"\bWHO director-general\b", r"\bDirector-General of the WHO\b"]},
+    "vance": {"also": [r"\bVice President Vance\b", r"\bJD Vance\b"]},
+    "hegseth": {"also": [r"\bDefense Secretary Hegseth\b", r"\bSecretary of Defense Hegseth\b"]},
+    "kimju": {"also": [r"\bNorth Korean leader\b", r"\bKim Jong Un\b"]},
+    "xi": {"also": [r"\bChinese president\b", r"\bPresident of China\b", r"\bChina's president\b"],
+           "context": [(r"\b(?:Beijing|Chinese government)\b", r"\b(?:Xi|Communist Party|CCP|Politburo)\b")]},
+    "pezeshkian": {"also": [r"\bIranian president\b", r"\bPresident of Iran\b", r"\bIran's president\b"]},
+    "tusk": {"also": [r"\bPolish prime minister\b", r"\bPrime Minister of Poland\b"]},
+    "nawrocki": {"also": [r"\bPolish president\b", r"\bPresident of Poland\b"]},
+    "erdogan": {"also": [r"\bTurkish president\b", r"\bPresident of Turkey\b"]},
+    "modi": {"also": [r"\bIndian prime minister\b", r"\bPrime Minister of India\b"]},
+    "macron": {"also": [r"\bFrench president\b", r"\bPresident of France\b"]},
+    "merz": {"also": [r"\bGerman chancellor\b", r"\bChancellor of Germany\b"]},
+    "lula": {"also": [r"\bBrazilian president\b", r"\bPresident of Brazil\b"]},
+    "mbs": {"also": [r"\bSaudi crown prince\b", r"\bCrown Prince of Saudi Arabia\b"]},
+    "lavrov": {"also": [r"\bRussian foreign minister\b", r"\bRussia's foreign minister\b"]},
+    "sheinbaum": {"also": [r"\bMexican president\b", r"\bPresident of Mexico\b"]},
+    "lukashenko": {"also": [r"\bBelarusian president\b", r"\bPresident of Belarus\b"]},
+}
 CATS = {"conflict": "conflict", "war": "conflict", "political": "politics", "disease": "health", "natural": "natural hazards", "cyber": "cyber",
         "financial": "finance", "space": "space weather"}
 INITIALS = {"kimju": "KJU", "tedros": "TAG", "mbs": "MBS", "xi": "XJ"}
@@ -196,19 +238,45 @@ def _hl_time(x):
     """Headline sort key: event time first, then cluster updated (ISO strings compare in UTC)."""
     return x.get("time") or x.get("updated") or ""
 
+def _person_rx():
+    """(key, name-or-alias regex, context pairs) for every curated and pool figure."""
+    out = []
+    for key, rx in [(p[0], p[5]) for p in BASE_LIST] + [(p[0], p[4]) for p in POOL]:
+        extra = ALIASES.get(key) or {}
+        parts = [rx] + list(extra.get("also") or [])
+        direct = re.compile("|".join("(?:%s)" % x for x in parts), re.I)
+        ctx = [(re.compile(a, re.I), re.compile(b, re.I)) for a, b in extra.get("context") or []]
+        out.append((key, direct, ctx))
+    return out
+
+MATCHERS = _person_rx()
+
+def cluster_text(title, brief="", location="", entities=""):
+    """Searchable text for related-alert matching: headline, summary, and entities (if present).
+    Location is not searched: place names like Vance County would false-hit people (e.g. JD Vance)."""
+    return " ".join(x for x in (title, brief, entities) if x)
+
+def matches(key, text):
+    """True if text is a related alert for this figure (word-boundary name, alias, or context pair)."""
+    text = text or ""
+    for k, direct, ctx in MATCHERS:
+        if k == key:
+            return bool(direct.search(text) or any(a.search(text) and b.search(text) for a, b in ctx))
+    return False
+
 def _alerts():
-    """One bounded read-only pass over recent rank 4+ clusters on The Wire (watchlist=0; unconfirmed Watchlist items are left out) -> {key: [alerts newest first]}."""
-    people = [(p[0], re.compile(p[5], re.I)) for p in BASE_LIST] + [(p[0], re.compile(p[4], re.I)) for p in POOL]
-    cut = B.iso(datetime.now(timezone.utc) - timedelta(days=DAYS)); hits = {k: [] for k, _ in people}; counts = {k: 0 for k, _ in people}; cats = {k: {} for k, _ in people}
+    """One bounded read-only pass over recent rank 2+ clusters on The Wire and Watchlist (watchlist 0/1; suppressed watchlist=2 left out), 7-day window by event time -> {key: [alerts newest first]}."""
+    cut = B.iso(datetime.now(timezone.utc) - timedelta(days=DAYS)); hits = {k: [] for k, _, _ in MATCHERS}; counts = {k: 0 for k, _, _ in MATCHERS}; cats = {k: {} for k, _, _ in MATCHERS}
     try:
         c = sqlite3.connect(BDB, uri=True, timeout=10)
-        cur = c.execute("SELECT cluster_id, title, substr(COALESCE(brief,''),1,600), substr(COALESCE(links,''),1,700), category, COALESCE(updated, first_seen), "
-                        "COALESCE(event_time, first_seen), watchlist FROM clusters WHERE watchlist=0 AND rank>=? AND COALESCE(updated, first_seen)>=? "
-                        "ORDER BY COALESCE(updated, first_seen) DESC LIMIT ?", (MIN_RANK, cut, MAX_ROWS))
+        cur = c.execute("SELECT cluster_id, title, substr(COALESCE(brief,''),1,2000), substr(COALESCE(links,''),1,700), category, "
+                        "COALESCE(updated, first_seen), COALESCE(event_time, first_seen), watchlist FROM clusters "
+                        "WHERE watchlist IN (0, 1) AND rank>=? AND COALESCE(event_time, first_seen)>=? "
+                        "ORDER BY COALESCE(event_time, first_seen) DESC LIMIT ?", (MIN_RANK, cut, MAX_ROWS))
         for cid, title, brief, links, cat, upd, ev, wl in cur:
-            text = (title or "") + " " + (brief or "")
-            for k, rx in people:
-                if not rx.search(text): continue
+            text = cluster_text(title, brief)
+            for k, direct, ctx in MATCHERS:
+                if not (direct.search(text) or any(a.search(text) and b.search(text) for a, b in ctx)): continue
                 counts[k] += 1
                 cc = (cat or "").lower(); lab = next((v for kk, v in CATS.items() if kk in cc), None)
                 if lab: cats[k][lab] = cats[k].get(lab, 0) + 1
@@ -265,7 +333,7 @@ def build(force=False):
     return {"updated": B.iso(), "as_of": AS_OF, "days": DAYS, "people": out, "db_error": err,
             "note": ("People named in the stories BLACKOUT.NETWORK is following, listed by their most recent mention. This is a neutral reference: "
                      "being listed says nothing about a person beyond their public role and the news they appear in. Headlines are shown verbatim from "
-                     f"the scanner's sources and Google News. Alert counts cover rank 4+ items on The Wire in the last {DAYS} days. "
+                     f"the scanner's sources and Google News. Alert counts cover rank 2+ items on The Wire and Watchlist in the last {DAYS} days, matched by name, alias, or role/country context, using event time. "
                      f"Roles as of Nov 1, 2026; follow the profile links for the latest.")}
 
 def summary(force=False):

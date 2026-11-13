@@ -29,7 +29,7 @@ function credits(ps){const c=ps.filter(p=>p.photo);if(!c.length)return"";
  <p>Photos are cropped and resized from the files linked above (Wikimedia Commons, many of them official government portraits). Public-domain images need no attribution; it is given anyway.</p></details>`}
 function card(p){const n=p.alerts;
  return `<article class=kf-card data-k="${E((p.name+" "+p.role+" "+p.country).toLowerCase())}"><div class=kf-hd>${av(p)}<div class=kf-id><h3>${E(p.name)}</h3><div class=kf-role>${E(p.role)}</div><div class=kf-ctry>${E(p.country)}</div></div></div>
- <p class=kf-why>${E(p.why)}</p><div class=kf-cnt>${n?`${n} related alert${n==1?"":"s"} on The Wire in the last ${S.d.days} days`:`No related alerts on The Wire in the last ${S.d.days} days`}</div>
+ <p class=kf-why>${E(p.why)}</p><div class=kf-cnt>${n?`${n} related alert${n==1?"":"s"} in the last ${S.d.days} days`:`No related alerts in the last ${S.d.days} days`}</div>
  <ul class=kf-ul>${(p.headlines||[]).map(hl).join("")||"<li class=kf-m>No recent headlines found.</li>"}</ul>
  <div class=kf-lk>${(p.links||[]).map(l=>`<a href="${U(l[1])}" target=_blank rel=noopener>${E(l[0])} ↗</a>`).join("")}</div></article>`}
 const stamp=M.querySelector("#kf_stamp"),spin=M.querySelector(".kf-spin");
