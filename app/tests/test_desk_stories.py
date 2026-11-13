@@ -72,25 +72,39 @@ class Notice(unittest.TestCase):
         self.assertIn(f'href="/wire/{CID}"', h); self.assertNotIn(f"/wire/{CID}#", h)
         self.assertIn("Nov. 17, 2:20 PM ET", h); self.assertIn("Rank 2/10", h); self.assertNotIn("#ff3b3b", h)
 
-    def test_board_places_notice_under_first_group(self):
+    def test_board_no_longer_carries_the_notice_block(self):
+        # Nov 13 (Matt): the notice moved into the top row as card 2, so the block under the first group is off by default.
         import apple_v1 as A
         real = DS.notice_html
         try:
             DS.notice_html = lambda now=None: real(IN)
+            os.environ.pop("BN_DESK_NOTICE_BLOCK", None)
+            h = A._board_html()
+            self.assertNotIn("bna-notice", h); self.assertTrue(h.endswith("</section>")); self.assertEqual(h.count("<section"), 1)
+            os.environ["BN_DESK_NOTICE_BLOCK"] = "1"          # opt-in restores the old block under the first group
             h = A._board_html()
             g = [m.start() for m in re.finditer(r'class="bna-wrap bna-grp"', h)]; n = h.find('class="bna-wrap bna-notice"')
             self.assertGreater(len(g), 1); self.assertTrue(g[0] < n < g[1])
-            self.assertTrue(h.endswith("</section>")); self.assertEqual(h.count("<section"), 1)
-            DS.notice_html = lambda now=None: real(AFTER)
-            self.assertNotIn("bna-notice", A._board_html())
         finally:
-            DS.notice_html = real
+            DS.notice_html = real; os.environ.pop("BN_DESK_NOTICE_BLOCK", None)
+
+    def test_feature_card_window_and_link(self):
+        self.assertIsNone(DS.feature_card(BEFORE)); self.assertIsNone(DS.feature_card(AFTER))
+        f = DS.feature_card(IN)
+        self.assertEqual(f["cluster_id"], CID); self.assertEqual(f["href"], f"/wire/{CID}"); self.assertNotIn("#", f["href"])
+        self.assertEqual(f["rank"], 2); self.assertIn("Nov. 17, 2:20 PM ET", f["title"]); self.assertEqual(f["show_until"], "2026-11-18T05:00:00Z")
+        self.assertFalse(WORDS.search(" ".join(all_text(f))))
+
+    def test_feature_card_kill_switch(self):
+        os.environ["BN_DESK_STORIES"] = "0"
+        try: self.assertIsNone(DS.feature_card(IN))
+        finally: os.environ.pop("BN_DESK_STORIES", None)
 
     def test_bad_file_fails_closed(self):
         d = tempfile.mkdtemp(); p = os.path.join(d, "x.json"); open(p, "w").write("{not json")
         old = DS.PATH; DS.PATH = p; DS._C["mt"] = None
         try:
-            self.assertIsNone(DS.get(CID)); self.assertEqual(DS.notice_html(IN), ""); self.assertEqual(DS.cluster(CID), (None, []))
+            self.assertIsNone(DS.get(CID)); self.assertEqual(DS.notice_html(IN), ""); self.assertIsNone(DS.feature_card(IN)); self.assertEqual(DS.cluster(CID), (None, []))
         finally:
             DS.PATH = old; DS._C["mt"] = None
 

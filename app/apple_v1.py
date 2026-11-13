@@ -77,14 +77,31 @@ def _events(main):
         ev = pins + [e for e in ev if e.get("cluster_id") not in have]
     except Exception: pass
     return ev
+def _feature():
+    """Active desk-story card for position 2 of the top row (desk_stories.feature_card), None when off, expired or on any error."""
+    try:
+        import desk_stories as DS
+        return DS.feature_card()
+    except Exception:
+        return None
+
+def _row(ev, feat):
+    """Top-row display filter (home_feed.dedupe_row): no junk, no repeats, never the featured story twice."""
+    try:
+        import home_feed as HF
+        return HF.dedupe_row(ev, skip_ids=[(feat or {}).get("cluster_id")])
+    except Exception:
+        return ev
+
 def _home_build():
     srv = sys.modules.get("server"); out = {"generated": None, "main": [], "counts": {}, "kp": None, "quake": None, "grid": None, "sources": None}
+    out["feature"] = _feature()
     try:
         st = srv.api_state(); out["generated"] = st.get("generated")
         main = st.get("main") or []
         for x in main: out["counts"][x.get("category") or "other"] = out["counts"].get(x.get("category") or "other", 0) + 1
-        try: out["main"] = [_slim(x) for x in _events(main)]
-        except Exception: out["main"] = [_slim(x) for x in sorted(main, key=lambda x: (-(x.get("rank") or 0), -(x.get("n_families") or 0)))[:40]]
+        try: out["main"] = [_slim(x) for x in _row(_events(main), out["feature"])]
+        except Exception: out["main"] = [_slim(x) for x in _row(sorted(main, key=lambda x: (-(x.get("rank") or 0), -(x.get("n_families") or 0))), out["feature"])[:40]]
         try:
             import home_feed as HF; out["slots_et"] = HF.SLOTS_ET
         except Exception: pass
@@ -443,7 +460,7 @@ def _board_html():
     for i, (g, title, sub, cards) in enumerate(BOARD):
         out.append(f'<div class="bna-wrap bna-grp" data-g="{g}" role="group" aria-labelledby="bna_g_{g}"><div class="bna-gh"><h3 id="bna_g_{g}"><i aria-hidden="true"></i>{E(title)}</h3><p>{E(sub)}</p></div>'
                    f'<div class="bna-mgrid">' + "".join(card(*c) for c in cards) + '</div></div>')
-        if i == 0: out.append(_notice())   # t1330u: featured notice directly under the first group of blocks
+        if i == 0 and os.environ.get("BN_DESK_NOTICE_BLOCK") == "1": out.append(_notice())   # t1330u block; Nov 13: moved into the top row (card 2)
     out.append('</section>')
     return "".join(out)
 

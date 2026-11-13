@@ -7,8 +7,9 @@ SYNC_DIRS "data"). One entry per 16-hex cluster_id, so the story lives at /wire/
   - brief: the 7-part desk brief, same fields as story_reports desk/briefs.json. It is only a fallback: when the pushed
     data/story_reports.json carries a note for this id, that note wins (story_report.render).
   - sections: the long-form breakdown shown under the brief. Inline links use [text](url); urls must be https:// or /path.
-  - notice: optional homepage featured notice (apple_v1._board_html puts it under the first group of blocks) shown only
-    between show_from and show_until (UTC ISO).
+  - notice: optional homepage featured notice shown only between show_from and show_until (UTC ISO). Since Nov 13 it is the
+    green card in position 2 of the top row (feature_card -> /api/apple/home "feature"); the block under the first group of
+    widgets (notice_html) is off unless BN_DESK_NOTICE_BLOCK=1.
 Read-only: never writes anything, never opens blackout.db, never touches scanner.py scoring, push.py, jets.py or config.json.
 Every public function fails closed (returns None / "") so a bad file can never take a page down. Off with BN_DESK_STORIES=0.
 """
@@ -259,6 +260,20 @@ def active_notices(now=None):
         if a is None or b is None or not (a <= now < b): continue
         out.append((a, cid, s, n))
     return [x[1:] for x in sorted(out, reverse=True)]
+
+def feature_card(now=None):
+    """Newest active notice as data for the homepage top row (Matt, Nov 13: "Put that alert in the 2nd box and make it green").
+    Same show_from/show_until window as the notice. The link has no #fragment so the story opens at the top. None when off/expired."""
+    try:
+        act = active_notices(now)
+        if not act: return None
+        cid, s, n = act[0]
+        return {"cluster_id": cid, "href": f"/wire/{cid}", "title": str(n["title"]), "text": str(n.get("text") or ""),
+                "kicker": str(n.get("kicker") or "Featured notice"), "tag": str(n.get("tag") or ""),
+                "link_text": str(n.get("link_text") or "Read more"), "rank": max(0, min(10, int(s.get("rank") or 0))),
+                "show_until": str(n.get("show_until") or "")}
+    except Exception:
+        return None
 
 def notice_html(now=None):
     """Homepage featured notice (newest active one), or ''. Links to the story page with no #fragment so it opens at the top."""

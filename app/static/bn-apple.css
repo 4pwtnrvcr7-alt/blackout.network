@@ -435,3 +435,14 @@ html[data-theme="light"] .bna-rkchip.red{background:rgba(176,14,40,.12);color:#B
 
 /* Nov 12 (Matt): no notification dots or count badges anywhere in the chrome. */
 .bn-burger .bna-dot,.bn-badge,.tabs .ns-badge,.bna-mdot{display:none!important}
+/* Featured desk card in the top row (Nov 13): green border, badge and accent; same size as the other cards */
+.bna-it.bna-feat{background:linear-gradient(180deg,rgba(63,166,106,.16),rgba(63,166,106,.04) 55%),var(--a-sf);box-shadow:0 0 0 2px #3fa66a,inset 0 6px 0 #3fa66a}
+.bna-it.bna-feat .bna-k{color:#5cc488}
+.bna-rk.grn{background:#3fa66a;color:#fff}
+.bna-ftag{margin:12px 0 0;display:inline-block;align-self:flex-start;font:700 11px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-radius:999px;border:1px solid rgba(63,166,106,.7);color:#5cc488}
+.bna-it.bna-feat h3{margin-top:12px}
+.bna-it.bna-feat .bna-m{margin:10px 0 0;padding-top:0;font-size:14px;color:var(--a-ink2,#A1A1A6);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.bna-fgo{margin:auto 0 0;padding-top:14px;font-weight:600;font-size:15px;color:#5cc488}.bna-fgo:after{content:"\00a0\203A"}
+html[data-theme="light"] .bna-it.bna-feat{background:linear-gradient(180deg,rgba(29,122,70,.12),rgba(29,122,70,.03) 55%),var(--a-sf);box-shadow:0 0 0 2px #1d7a46,inset 0 6px 0 #1d7a46}
+html[data-theme="light"] .bna-it.bna-feat .bna-k,html[data-theme="light"] .bna-ftag,html[data-theme="light"] .bna-fgo{color:#1d7a46}
+html[data-theme="light"] .bna-ftag{border-color:rgba(29,122,70,.6)}html[data-theme="light"] .bna-rk.grn{background:#1d7a46}

@@ -265,9 +265,70 @@ def explainer_junk(item):
     if int((item or {}).get("n_families") or 0) >= 2 and _OUTBREAK.search(t): return False
     return True
 
+# ------------------------------------------------------------------ top-row junk + repeat filter (Matt, Nov 13: "stop posting duplicate stories in the top")
+# Display only: never changes scanner.py scoring, the DB or any cluster. Off with BN_HOME_ROW_FILTER=0.
+ROW_BLOCK = {"ff9e5add02c443c4"}   # Snyder "Trump's Next Coup Attempt" (Project Syndicate opinion column via a blog repost): scanner false positive
+_ROW_URL = re.compile(r"https?:|\bwww\.|\b[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.(?:com|net|org|io|co|tv|news|be|ly|gov|info|me|us|uk|de|ru|ua|blog)/", re.I)
+_ROW_LIVE = re.compile(r"\bLIVE\s*\]|\[\s*LIVE\b|\bLIVE\s*:|\bLIVE\s*$|\blive ?stream(?:ing)?\b|\blive (?:updates|coverage|blog)\b|\bwatch live\b|\bspeech live\b", re.I)
+_ROW_LIVE_CAPS = re.compile(r"\bLIVE\b")    # all-caps LIVE anywhere is a broadcast/stream title ("Trump Speech LIVE")
+_ROW_OPINION = re.compile(r"\bProject Syndicate\b|^\s*opinion\b|\|\s*opinion\b|\bop-?ed\b|\bcolumn(?:ist)?\s*:|\bcommentary\s*:|\beditorial\s*:|\bguest essay\b", re.I)
+_ROW_HISTORY = re.compile(r"\btoday in history\b|\bthis day in history\b|\bon this day\b|\byears ago today\b", re.I)
+# Same-theme keys: the top row shows one card per outbreak / attack type, so several reports of one thread (Ebola totals, plots,
+# car bombings) do not fill it. The Wire still lists every cluster.
+_THEMES = (("outbreak:ebola", r"\bebola\b"), ("outbreak:marburg", r"\bmarburg\b"), ("outbreak:cholera", r"\bcholera\b"),
+           ("outbreak:mpox", r"\bmpox\b"), ("outbreak:measles", r"\bmeasles\b"), ("outbreak:h5n1", r"\b(?:h5n1|bird flu|avian (?:flu|influenza))\b"),
+           ("outbreak:polio", r"\bpolio\b"), ("outbreak:dengue", r"\bdengue\b"),
+           ("attack:assassination", r"\bassassinat\w*|\bplot(?:ted|ting)? to (?:kill|murder)\b|\bmurder plot\b|\bkill(?:ing)? plot\b"),
+           ("attack:car-bomb", r"\bcar (?:bomb\w*|explo\w+|blast)|\bcar (?:was |has )?(?:blown up|exploded)\b|\bvehicle[- ]borne\b"),
+           ("coup", r"\bcoup(?: attempt| d'?\u00e9tat| plot)?\b"))
+_THEMES = tuple((k, re.compile(r, re.I)) for k, r in _THEMES)
+
+def row_filter_on():
+    return os.environ.get("BN_HOME_ROW_FILTER", "1") != "0"
+
+def row_junk(item):
+    """True for titles that are not headlines for the top row: URLs / domain paths, livestream titles, opinion columns,
+    history features, and the explicit ROW_BLOCK list."""
+    if not row_filter_on(): return False
+    item = item or {}
+    ids = set(item.get("cluster_ids") or []) | {item.get("cluster_id")}
+    if ids & ROW_BLOCK: return True
+    t = str(item.get("title") or "")
+    return bool(_ROW_URL.search(t) or _ROW_LIVE.search(t) or _ROW_LIVE_CAPS.search(t) or _ROW_OPINION.search(t) or _ROW_HISTORY.search(t))
+
+def themes(title):
+    t = str(title or "")
+    return {k for k, r in _THEMES if r.search(t)}
+
+def _norm(t):
+    return re.sub(r"[^a-z0-9 ]+", "", re.sub(r"\s+", " ", str(t or "").lower())).strip()[:80]
+
+def same_story(a, b):
+    """Near-identical or same-event titles: same normalised title, or 60%+ of the smaller title's content words shared."""
+    if _norm(a.get("title")) and _norm(a.get("title")) == _norm(b.get("title")): return True
+    ta, tb = tokens(a.get("title")), tokens(b.get("title"))
+    if len(ta) < 3 or len(tb) < 3: return False
+    return len(ta & tb) / min(len(ta), len(tb)) >= 0.6
+
+def dedupe_row(evs, skip_ids=()):
+    """Top-row display filter, order kept: drops junk, cards whose cluster is already shown (or is in skip_ids, e.g. the featured
+    desk card), near-identical titles, and a second card on the same theme (one Ebola card, one assassination card ...)."""
+    if not row_filter_on(): return list(evs or [])
+    seen_ids, seen_th, kept = set(i for i in skip_ids if i), set(), []
+    for e in evs or []:
+        if not e or row_junk(e): continue
+        ids = set(e.get("cluster_ids") or []) | ({e.get("cluster_id")} if e.get("cluster_id") else set())
+        if ids & seen_ids: continue
+        th = themes(e.get("title"))
+        if th & seen_th: continue
+        if any(same_story(e, k) for k in kept): continue
+        kept.append(e); seen_ids |= ids; seen_th |= th
+    return kept
+
 def row_ok(item):
     """Latest-row gate: topic policy (same rules as pins) plus explainer / entertainment junk filter."""
     if not item: return False
+    if row_junk(item): return False
     summ = " ".join(str(item.get(k) or "") for k in ("summary", "location", "category"))
     if not topic_ok(item.get("title"), summ): return False
     if explainer_junk(item): return False
@@ -304,10 +365,12 @@ def latest(items, now=None, limit=40):
     from functools import cmp_to_key
     now = now or time.time()
     ev = [e for e in events(items, now=now, limit=max(limit * 4, 80)) if row_ok(e)]
-    pool = [e for e in ev if _updated(e) >= now - LATEST_FRESH_H * 3600]
-    if len(pool) < LATEST_MIN:
-        pool = [e for e in ev if _updated(e) >= now - LATEST_WIDEN_H * 3600]
-    pool.sort(key=cmp_to_key(lambda a, b: _cmp_latest(a, b, now)))
+    def pick(h):   # sort first so the strongest card of a repeated thread is the one kept
+        p = [e for e in ev if _updated(e) >= now - h * 3600]
+        p.sort(key=cmp_to_key(lambda a, b: _cmp_latest(a, b, now)))
+        return dedupe_row(p)
+    pool = pick(LATEST_FRESH_H)
+    if len(pool) < LATEST_MIN: pool = pick(LATEST_WIDEN_H)
     return pool[:limit]
 
 def links_mtime():
