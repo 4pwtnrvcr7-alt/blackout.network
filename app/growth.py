@@ -59,7 +59,7 @@ def people_in(text, limit=3):
 def _ro():
     c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=10); c.row_factory = sqlite3.Row; return c
 
-STATIC_PAGES = [("/", "hourly", "1.0"), ("/newsletter", "daily", "0.9"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
+STATIC_PAGES = [("/", "hourly", "1.0"), ("/wire", "hourly", "0.9"), ("/newsletter", "daily", "0.9"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
                 ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/crime", "hourly", "0.8"), ("/network", "hourly", "0.8"), ("/mesh", "hourly", "0.7"), ("/mesh/chat", "weekly", "0.5"), ("/mesh/guide", "monthly", "0.6"), ("/cern", "weekly", "0.7"),
                 ("/network/aws", "hourly", "0.7"), ("/network/azure", "hourly", "0.7"), ("/network/m365", "hourly", "0.7"), ("/network/gcp", "hourly", "0.7"),
                 ("/network/workspace", "hourly", "0.7"), ("/network/cloudflare", "hourly", "0.7"), ("/network/akamai", "hourly", "0.7"), ("/network/starlink", "hourly", "0.7"), ("/network/near", "weekly", "0.6"), ("/newsletter/sample", "daily", "0.5"),

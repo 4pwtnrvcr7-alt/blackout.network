@@ -33,6 +33,7 @@ ROUTES = {
     "/api/refresh-all": "refresh_all",   # Nov 13: top-bar "Refresh data" (one shared refresh per 60 s; BN_REFRESH_ALL=0 = off)
     "/api/trends": "trends",
     "/api/wire_history": "wire_history",   # Wire tab scrollable history + ARCHIVE items (t246)
+    "/api/wire_page": "wire_page",         # /api/wire_page/app.js|app.css for the /wire listing (Nov 14 rethink)
     "/api/noise": "bnoise",
     "/api/politics": "politics",
     "/api/games": "games",

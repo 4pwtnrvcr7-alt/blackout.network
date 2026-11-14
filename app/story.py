@@ -95,8 +95,8 @@ def videos_for(cid):
 def render(cid, since=""):
     r, al = load(cid)
     if not r:
-        body = ('<p class="crumb"><a href="/#wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
-                '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/#wire">The Wire</a>.</p>')
+        body = ('<p class="crumb"><a href="/wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
+                '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
     rank = int(r.get("rank") or 0); k, tname = tier(rank); col = COLORS[band(rank)]
     title = S.clean_title(r.get("title")); what = _what(r.get("brief"), r.get("title"))
@@ -163,7 +163,7 @@ def render(cid, since=""):
                     'where to vote, poll closing times and official results by state</a></p></section>')
     except Exception: elec = ""
     body = (SEV_CSS + f'<span id="bn_story" hidden data-rank="{rank}" data-tier="{S.E(tname.lower())}" data-cat="{S.E((r.get("category") or "").lower())}"></span>'   # seo/batch-1: GA4 story_view params
-            f'<p class="crumb"><a href="/#wire">The Wire</a> › Story</p>'
+            f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>'
             f'<div><span class="pill" style="color:{col};border-color:{col}">RANK {rank}/10 · {tname.upper()}</span>'
             f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill" style="color:#f5a524">WATCHLIST</span>' if watch == 1 else "") + '</div>'
             f'<h1 class="t">{S.E(S.clean_title(dek_note).rstrip(". ") if dek_note else title)}</h1>'   # t1276u: the analyst headline (sourced, no hype) when a note exists
@@ -179,7 +179,7 @@ def render(cid, since=""):
             + f'<section class="card"><h2>Timeline and sources</h2><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></section>'
             + '<section class="card" id="follow"><h2>' + _ic("star") + 'Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
               'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
-              + g_follow + '<p class="meta"><a href="/#wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
+              + g_follow + '<p class="meta"><a href="/wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
     ld = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": title[:110], "description": desc,
           "datePublished": r.get("first_seen"), "dateModified": r.get("updated"), "url": f"{S.SITE}/wire/{cid}",
           "publisher": {"@type": "NewsMediaOrganization", "@id": f"{S.SITE}/#org", "name": S.BRAND, "url": S.SITE,
@@ -189,12 +189,15 @@ def render(cid, since=""):
           "isBasedOn": [a["source_url"] for a in rows[:10] if a.get("source_url")]}
     if loc: ld["contentLocation"] = {"@type": "Place", "name": loc, **({"geo": {"@type": "GeoCoordinates", "latitude": r["lat"], "longitude": r["lon"]}} if r.get("lat") is not None and r.get("lon") is not None else {})}
     ld = {"@context": "https://schema.org", "@graph": [{k: v for k, v in ld.items() if k != "@context"},
-          {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "The Wire", "item": f"{S.SITE}/#wire"},
+          {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "The Wire", "item": f"{S.SITE}/wire"},
                                                           {"@type": "ListItem", "position": 2, "name": title[:110], "item": f"{S.SITE}/wire/{cid}"}]}]}
     noindex = (watch != 0 or rank < 3) and not desk_story   # t1330u: desk stories are written up in full, so they stay indexable
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
 def handle_get(path, qs):
+    if path in ("/wire", "/wire/"):
+        import wire_page
+        return wire_page.page()
     m = re.match(r"^/wire/([0-9a-f]{16})/?$", path)
     if not m: return 404, {"error": "not found"}
     since = (qs.get("since") or [""])[0][:25]
