@@ -225,32 +225,32 @@ function srcLine(x){var n=+x.n_families||0,g=+x.grouped||0,s=n+(n==1?" source":"
    c:bars(cols,{labels:1,days:dayKeys}),t:esc(o.src||"The Wire")+" &middot; "+pl(o.n7,"story","stories")+" in 7 days",
    x:x(tp?'Top story now (rank '+tp.rank+'/10): <a class="bna-lnk" href="'+esc(tp.url)+'"'+(tp.ext?' target="_blank" rel="noopener"':"")+'>'+esc(tp.title)+'</a>, updated '+esc(et(tp.t))+".":"Nothing ranked in the last 24 hours.",
     def+" Tap a day bar for that day's stories. Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.")})}
- function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'">'+esc(z.title)+'</a> <small>'+esc(et(z.t))+(z.single?" &middot; single source":"")+'</small>'+also(z,"span")+'</li>'}).join("")}
+ function hl3(o){return (o.latest||[]).map(function(z){return '<li><a class="bna-lnk" href="'+esc(z.url)+'"'+(z.ext?' target="_blank" rel="noopener"':"")+'>'+esc(z.title)+(z.ext?' <span class="bna-ext" aria-label="opens the original article">&#8599;</span>':"")+'</a> <small>'+esc(et(z.t))+(z.ext?" &middot; "+esc(z.src||""):z.single?" &middot; single source":"")+'</small>'+also(z,"span")+'</li>'}).join("")}
  function spc(D){var S=D.spec||{},N=S.nuke,P=S.disp;
   function cols(o){return(o.days||[]).map(function(z){var dt=new Date(z[0]+"T12:00:00");return{v:[0,z[1],z[2]],l:DNS[dt.getDay()].charAt(0)}})}
   function dayKeys(o){return(o.days||[]).map(function(z){return z[0]})}
   if(N){var lv=N.max24>=8?"High":(N.max24>=6||N.conf24>=3)?"Elevated":N.n24?"Watch":"Low",tp=(N.latest||[])[0],cn=card("c_nuke");if(cn)cn._bnaO=N;
    put("c_nuke",{v:lv+" <small>"+pl(N.n24,"item")+" in 24 hours</small>",sev:N.max24>=7,s:tp?esc(tp.title):"No nuclear-related items in 7 days",c:bars(cols(N),{labels:1,days:dayKeys(N)}),
-    t:"The Wire &middot; "+pl(N.n7,"item")+" in 7 days",
+    t:esc(N.src||"The Wire")+" &middot; "+pl(N.n7,"item")+" in 7 days",
     x:'<p><b>Latest.</b></p><ul class="bna-hl">'+(hl3(N)||"<li>Nothing in 7 days.</li>")+'</ul>'+x(pl(N.n24,"item")+" in the last 24 hours ("+N.conf24+" confirmed by 2+ sources), highest rank "+N.max24+"/10.",
      "Wire items about nuclear strikes or threats, warheads, ICBMs, tactical weapons, nuclear tests, Zaporizhzhia and other plant risks, and the Doomsday Clock. Single-source items are marked. Tap a day bar for that day's stories. Red marks rank 7 and up.",
      "High: an item ranked 8+ in 24 hours. Elevated: rank 6+ or 3+ confirmed items. Watch: any item. Low: none. Our wording, from Wire ranks; not an official alert level.")})}else none("c_nuke");
   if(P){var tq=(P.latest||[])[0],cp=card("el_disp");if(cp)cp._bnaO=P;
    put("el_disp",{v:P.n24?pl(P.n24,"report")+" <small>in 24 hours</small>":"Quiet <small>in 24 hours</small>",sev:P.max24>=7,s:tq?esc(tq.title):"No reports in 7 days",c:bars(cols(P),{labels:1,days:dayKeys(P)}),
-    t:"The Wire &middot; "+pl(P.n7,"report")+" in 7 days",
+    t:esc(P.src||"The Wire")+" &middot; "+pl(P.n7,"report")+" in 7 days",
     x:'<p><b>Latest 3.</b></p><ul class="bna-hl">'+(hl3(P)||"<li>Nothing in 7 days.</li>")+'</ul>'+x(pl(P.n24,"report")+" in the last 24 hours.",
      "U.S. reports about polling places, vote counting, certification, lawsuits, recounts, voter access, and Democratic or Republican party legal and monitoring actions. Single-source items are marked; check the linked sources. Tap a day bar for that day's stories. Red marks rank 7 and up.","")})}else none("el_disp")}
  function board(D){LASTD=D;el(D);spc(D);
   var C=D.conf||{},H=D.health||{},R=D.hard||{};
-  wg("c_il",C.il,"Conflict stories on The Wire that mention Israel, Gaza, Lebanon, Yemen or the Houthis.");
-  wg("c_ir",C.ir,"Conflict stories on The Wire that mention Iran.");
-  wg("c_ru",C.ru,"Conflict stories on The Wire that mention Russia or Ukraine.");
+  wg("c_il",C.il,"Conflict stories about Israel, Gaza, Lebanon, Yemen and the Houthis from The Wire plus world outlets (BBC, Times of Israel, Al Jazeera, AP, Reuters and others).");
+  wg("c_ir",C.ir,"Conflict stories about Iran from The Wire plus world outlets (BBC, Iran International, AP, Reuters and others).");
+  wg("c_ru",C.ru,"Conflict stories about Russia and Ukraine from The Wire plus world outlets (BBC, Kyiv Independent, AP, Reuters and others).");
   wg("c_uk",C.uk,"Conflict and security stories about the UK and London from The Wire and major outlets (BBC, Guardian, Sky News and others): terror, protests and disorder, cyber attacks and state threats.");
-  wg("c_other",C.other,"Conflict stories on The Wire from every other region.");
-  wg("h_ebola",H.ebola,"Stories on The Wire about Ebola (and the related Marburg virus).");
-  wg("h_measles",H.measles,"Stories on The Wire about measles.");
-  wg("h_other",H.other,"Other outbreak and disease stories on The Wire: cholera, dengue, bird flu, mpox and more.");
-  wg("food",R.food,"Stories on The Wire plus world news feeds about food supply, shortages, recalls, shipping, grain, fertilizer and supply chains.");
+  wg("c_other",C.other,"Conflict stories from every other region (Sudan, Congo, Sahel, Myanmar, Haiti and more) from The Wire plus world outlets and ReliefWeb.");
+  wg("h_ebola",H.ebola,"Ebola (and the related Marburg virus) from The Wire plus WHO, CIDRAP, ECDC and major outlets.");
+  wg("h_measles",H.measles,"Measles from The Wire plus WHO, CIDRAP, ECDC and major outlets.");
+  wg("h_other",H.other,"Other outbreaks (cholera, dengue, bird flu, mpox, MERS and more) from The Wire plus WHO Disease Outbreak News, CIDRAP, WOAH, ECDC and major outlets.");
+  wg("food",R.food,"Food supply from The Wire plus official and world sources: USDA APHIS bird flu culls, FDA and USDA FSIS recalls, WOAH, FAO (food price index), WFP and IPC hunger alerts, CIDRAP, egg, grain and fertilizer shortages, ports and shipping.");
   wg("unrest",R.unrest,"Protests, riots, clashes, curfews, crackdowns, general strikes, coups and troop deployments in the U.S. and worldwide, from The Wire and major outlets. One entry per event.");
   var M=D.comms;if(M){var bad=(M.isp_bad||[]).concat(M.cloud_bad||[]),N=D.net||{};
    put("comms",{v:bad.length?pl(bad.length,"provider issue"):"All clear",sev:bad.length>=3,
@@ -292,7 +292,7 @@ function srcLine(x){var n=+x.n_families||0,g=+x.grouped||0,s=n+(n==1?" source":"
    var px=c.querySelector(".bna-mx"),h0=open&&px&&!px.hidden?px.getBoundingClientRect().height:null;
    var xel=c.querySelector('[data-f="x"]');if(xel)xel.innerHTML=dayList(o,day)+x(
     ((o.top)?'Top overall: <a class="bna-lnk" href="'+esc(o.top.url)+'"'+(o.top.ext?' target="_blank" rel="noopener"':"")+'>'+esc(o.top.title)+'</a>.':""),
-    (o.src?"Bars count stories per day for 7 days from The Wire plus world news feeds (BBC, Guardian, Sky, Al Jazeera and other major outlets), one entry per event. Outlet count shows how many outlets reported it.":"Bars count Wire stories per day for 7 days.")+" Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
+    (o.src?"Bars count stories per day (Eastern Time) for 7 days from The Wire plus world news feeds and official sources, one entry per event. A story counts on the day it first appeared and the day it was last updated. Outlet count shows how many outlets reported it.":"Bars count Wire stories per day (Eastern Time) for 7 days, on the day each first appeared and the day it was last updated.")+" Red marks rank 7 and up.","Rank 0 to 3 low, 4 to 6 notable, 7 to 10 high severity.");
    toggle(c,true,h0)}
  S.addEventListener("click",function(e){
   var dayBtn=e.target.closest&&e.target.closest(".bna-barday");

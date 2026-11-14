@@ -220,10 +220,10 @@ def elections_card(now):
             "senate": key("senate", allr), "governor": key("governor", allr), "house": key("house", allr),
             "t": (off.get("fetched") or b.get("built")), "night": bool(M.election_night())}
 
-_REG = [("il", "Israel and Gaza", r"\b(israel|israeli|gaza|idf|hamas|hezbollah|west bank|lebanon|houthi|yemen|netanyahu|tel aviv|jerusalem)"),
-        ("ir", "Iran", r"\b(iran|iranian|tehran|irgc|khamenei|araghchi)"),
-        ("ru", "Russia and Ukraine", r"\b(russia|russian|ukraine|ukrainian|kyiv|kiev|kharkiv|moscow|kremlin|putin|zelensk|donetsk|crimea|odesa)"),
-        ("uk", "UK and London", r"\b(uk|u\.k\.|united kingdom|britain|british|london|england|scotland|wales|met police|downing street|keir starmer|starmer|westminster|whitehall)\b")]
+# Region cards (TOPIC-CARDS-1): place matching lives in topic_cards.py (word boundaries, homonyms such as "British Columbia",
+# "New England", "Lebanon, Pa." or "Moscow, Idaho" masked). Kept as (key, label, matcher) so the order and labels stay the same.
+import topic_cards as TC
+_REG = [("il", "Israel and Gaza", TC.is_il), ("ir", "Iran", TC.is_ir), ("ru", "Russia and Ukraine", TC.is_ru), ("uk", "UK and London", TC.is_uk_place)]
 _HEALTH = [("ebola", "Ebola", r"\b(ebola|marburg)"), ("measles", "Measles", r"\bmeasles")]
 _DIS = r"\b(outbreak|virus|ebola|marburg|cholera|measles|influenza|h5n1|bird flu|avian flu|mpox|dengue|plague|pathogen|epidemic|pandemic|polio|tuberculosis|meningitis|anthrax|rift valley)"
 _US = r"\b(u\.s\.a?\.?|united states|america|american|national guard|" \
@@ -272,23 +272,24 @@ def wire_groups(now):
             "src": f"{int(fam)} source{'s' if int(fam or 0) != 1 else ''}" if fam else "The Wire",
         }
     def agg(match):
-        n24 = 0; d = {x: [0, 0] for x in days}; top = None; mx = 0
+        n24 = 0; n7 = 0; d = {x: [0, 0] for x in days}; top = None; mx = 0
         stories = {x: [] for x in days}; seen_d = {x: set() for x in days}
         for cid, t, cat, loc, rk, fs, up, fam in rows:
             t = t or ""; cat = cat or ""; loc = loc or ""
             if not match(t, cat, loc): continue
-            ft = _iso(fs) or 0; ut = _iso(up) or 0; rk = int(rk or 0)
-            k = day(ft) if ft else None
-            if k in d:
-                d[k][1 if rk >= 7 else 0] += 1
+            ft = _iso(fs) or 0; ut = _iso(up) or ft; rk = int(rk or 0)
+            ks = TC.active_days(ft, ut, d)   # first-seen day AND last-updated day (ET), so "in 24 hours" always has a bar
+            if ks:
+                n7 += 1
                 st = _story(cid, t, loc, rk, fam)
+            for k in ks:
+                d[k][1 if rk >= 7 else 0] += 1
                 if st and st["title"].lower()[:60] not in seen_d[k] and len(stories[k]) < 14:
                     seen_d[k].add(st["title"].lower()[:60]); stories[k].append(st)
             if ut >= now - 86400:
                 n24 += 1; mx = max(mx, rk)
                 ok = re.match(r"^[A-Za-z0-9\"'(]", t) and not re.match(r"^(www\.|https?:)", t) and not re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", t)
                 if ok and (top is None or (rk, ut) > (top[0], top[1])): top = (rk, ut, cid, t, loc, fam)
-        n7 = sum(a + b for a, b in d.values())
         tp = None
         if top:
             st = _story(top[2], top[3], top[4], top[0], top[5] if len(top) > 5 else None)
@@ -296,22 +297,24 @@ def wire_groups(now):
         stories = {k: _fold_feed(stories[k]) for k in days}
         return {"n24": n24, "n7": n7, "max24": mx, "days": [[k] + d[k] for k in days],
                 "stories": {k: stories[k] for k in days}, "top": tp}
+    import unrest_feeds as UF
     def W(t, cat):
-        if quakeish.search(t): return False
+        if quakeish.search(t) or not TC.conflict_ok(t): return False
         return cat == "war/conflict" or (cat == "political" and re.search(r"\b(strike|missile|drone|attack|troops|war|military)", t.lower()))
-    conf = {}
-    used = []
-    for k, label, rx in _REG:
-        r = re.compile(rx, re.I); used.append(r)
-        if k == "uk":
-            # Conflict + security for UK/London (cyber attacks, protests, terror) — not UFO/disease
-            sec = re.compile(r"\b(protest|riot|unrest|terror|attack|strike|missile|drone|troops|war|military|cyber|bomb|stab|knife|curfew|clash|crackdown|security|emergency)\b", re.I)
-            conf[k] = dict(agg(lambda t, cat, loc, r=r, sec=sec: bool(r.search(t + " " + loc)) and not quakeish.search(t) and (
+    sec = re.compile(r"\b(protest|riot|unrest|terror|attack|strike|missile|drone|troops|war|military|cyber|bomb|stab|knife|curfew|clash|crackdown|security|emergency)\b", re.I)
+    def reg_match(k, fn):
+        if k == "uk":   # conflict + security for UK/London (cyber attacks, protests, terror), not UFO/disease/weather
+            return lambda t, cat, loc: fn(t, loc) and not quakeish.search(t) and TC.conflict_ok(t) and (
                 (cat == "war/conflict") or (cat in ("political", "cyber") and (W(t, cat) or sec.search(t)))
-            )), label=label)
-        else:
-            conf[k] = dict(agg(lambda t, cat, loc, r=r: bool(W(t, cat)) and bool(r.search(t + " " + loc))), label=label)
-    conf["other"] = dict(agg(lambda t, cat, loc: bool(W(t, cat)) and not any(r.search(t + " " + loc) for r in used)), label="Other conflict zones")
+                or (cat in ("political", "cyber", "crime", "other") and UF.is_uk(t, False)))
+        return lambda t, cat, loc: bool(W(t, cat)) and fn(t, loc)
+    conf = {}
+    for k, label, fn in _REG:
+        conf[k] = dict(agg(reg_match(k, fn)), label=label)
+    # Other conflict zones: not a named region, and not a U.S. domestic incident (house explosion, police call) the scanner tagged war/conflict
+    other_match = lambda t, cat, loc: bool(W(t, cat)) and not any(fn(t, loc) for _, _, fn in _REG) and (bool(UF.OTHER_WAR.search(t)) or (
+        not UF.is_us(t, loc) and not TC.DOMESTIC.search(t) and bool(UF.VIOLENT.search(t)))) and not TC.SPORTS.search(t)
+    conf["other"] = dict(agg(other_match), label="Other conflict zones")
     dis = re.compile(_DIS, re.I)
     H = lambda t, cat: (cat == "disease" and not re.search(r"\b(weather|storm|tornado|war) outbreak", t, re.I)) or (cat == "political" and dis.search(t))
     health = {}
@@ -321,12 +324,13 @@ def wire_groups(now):
         health[k] = dict(agg(lambda t, cat, loc, r=r: bool(r.search(t)) and (cat in ("disease", "political", "war/conflict", "other"))), label=label)
     health["other"] = dict(agg(lambda t, cat, loc: bool(H(t, cat)) and not any(r.search(t) for r in hused)), label="Other outbreaks")
     fd = re.compile(_FOOD, re.I)
-    # Civil unrest: Wire stories that pass the strict unrest filter + supplemental world news feeds (unrest_feeds.py), deduped by event.
+    # Every topic card = Wire stories + public feeds (unrest_feeds.py: world outlets, official/primary sources), deduped by event.
     import unrest_feeds as UF
     def wire_pick(match):
         out = []
         for cid, t, cat, loc, rk, fs, up, fam in rows:
             t = t or ""; cat = cat or ""; loc = loc or ""
+            if cat == "ufo/uap": continue
             tt = UF.clean_headline(t)
             if len(tt) < 20 or re.match(r"^(www\.|https?:|#|@)", tt) or re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", tt) or quakeish.search(tt): continue
             if not match(tt, cat, loc): continue
@@ -334,34 +338,43 @@ def wire_groups(now):
             out.append({"title": tt, "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire", "t": ft or ut, "ut": ut,
                         "rank": int(rk or 0), "n": int(fam or 0), "loc": loc, "us": UF.is_us(tt, loc)})
         return out
-    w_un = wire_pick(lambda t, cat, loc: cat in ("political", "war/conflict", "other", "crime") and UF.is_unrest(t))
-    unrest_all = _r(None, lambda: UF.combine(w_un, UF.events("u", now), days, day, now, "Civil unrest", split_us=True))
-    if not unrest_all:
-        unrest_all = dict(agg(lambda t, cat, loc: cat in ("political", "war/conflict", "other") and UF.is_unrest(t)), label="Civil unrest")
-    # UK and London: Wire conflict stories naming the UK + Wire/feeds security stories (terror, protest/disorder, cyber attacks, state threats)
-    ukr = re.compile(dict((k, rx) for k, _, rx in _REG)["uk"], re.I)
-    w_uk = wire_pick(lambda t, cat, loc: (cat == "war/conflict" and bool(W(t, cat)) and bool(ukr.search(t + " " + loc)))
-                     or (cat in ("political", "cyber", "crime", "other") and UF.is_uk(t, False)))
-    uk = _r(None, lambda: UF.combine(w_uk, UF.events("uk", now), days, day, now, "UK and London"))
-    if uk: conf["uk"] = uk
-    w_food = wire_pick(lambda t, cat, loc: UF.is_food(t))
-    food = _r(None, lambda: UF.combine(w_food, UF.events("food", now), days, day, now, "Food and supply chain"))
-    if not food:
-        food = dict(agg(lambda t, cat, loc: UF.is_food(t) or bool(fd.search(t))), label="Food and supply chain")
-    hard = {"unrest": unrest_all, "food": food}
+    def combo(store, key, kind, label, match, **kw):
+        v = _r(None, lambda: UF.combine(wire_pick(match), UF.events(kind, now), days, day, now, label, **kw))
+        if v:
+            store[key] = v
+        if key in store:
+            UF.want_backfill(kind, TC.empty_days(store[key]))   # still-empty days get a dated search on the next feed refresh
+    for k, label, fn in _REG:
+        combo(conf, k, k, label, reg_match(k, fn))
+    combo(conf, "other", "other", "Other conflict zones", other_match)
+    combo(health, "ebola", "ebola", "Ebola", lambda t, cat, loc: TC.is_ebola(t) and cat in ("disease", "political", "war/conflict", "other", "crime"))
+    combo(health, "measles", "measles", "Measles", lambda t, cat, loc: TC.is_measles(t) and cat in ("disease", "political", "war/conflict", "other", "crime"))
+    combo(health, "other", "outbreak", "Other outbreaks", lambda t, cat, loc: (bool(H(t, cat)) or (cat in ("other", "natural disaster") and TC.is_outbreak(t)))
+          and not TC.is_ebola(t) and not TC.is_measles(t))
+    hard = {}
+    combo(hard, "unrest", "u", "Civil unrest", lambda t, cat, loc: cat in ("political", "war/conflict", "other", "crime") and UF.is_unrest(t), split_us=True)
+    if "unrest" not in hard:
+        hard["unrest"] = dict(agg(lambda t, cat, loc: cat in ("political", "war/conflict", "other") and UF.is_unrest(t)), label="Civil unrest")
+    combo(hard, "food", "food", "Food and supply chain", lambda t, cat, loc: UF.is_food(t))
+    if "food" not in hard:
+        hard["food"] = dict(agg(lambda t, cat, loc: UF.is_food(t) or bool(fd.search(t))), label="Food and supply chain")
     return {"conf": conf, "health": health, "hard": hard}
 
 
 # t106u: Nuclear threat (War group) and Election disputes (Elections group). Real Wire items only: confirmed stories plus single-source
 # watchlist items (marked as such), last 7 days, titles matched by keyword. Headlines shown are cleaned (no emoji, livestream or profane posts).
 _NUK = r"\b(nuclear (strike|strikes|attack|weapons?|war|threats?|test|tests|testing|warheads?|arsenal|plant|power plant|deterrent|doctrine|submarines?|missiles?|escalation|talks|program|programme|facility|facilities|sites?|deal|bomb|capable|forces|drills?|exercise|alert|advisory|warning)|nukes?\b|warheads?|icbms?\b|intercontinental ballistic|tactical nuclear|zaporizhzhia nuclear|znpp|chornobyl|chernobyl|doomsday clock|iaea|uranium enrichment|enriched uranium|enrich uranium|plutonium|dirty bomb|radiation leak|radioactive|new start|sarmat|burevestnik|oreshnik)"
-_ELC = r"\b(election|elections|ballot|ballots|vote|votes|voting|voter|voters|polls\b|polling|precincts?|recount|certification|canvass\w*|electoral|midterms?)\b"
+_ELC = r"\b(election|elections|ballot|ballots|vote|votes|voting|voter|voters|polls\b|polling|precincts?|recount|certification|canvass\w*|electoral|midterms?|congressional|runoffs?)\b"
+def _elc_ok(t):
+    """Election wording other than a bare "recount" ("witnesses recount the shooting" is not an election story)."""
+    import re
+    return bool(re.search(_ELC, re.sub(r"\brecount(s|ed|ing)?\b(?!\s+(of|in|for|results|ballots|votes|request|petition))", " ", t or "", flags=re.I), re.I))
 _DSP = (r"\b(lawsuits?|sue[sd]?|suing|court|judge|ruling|injunction|recount|certif\w*|challeng\w*|disput\w*|contested|fraud|intimidat\w*|suppress\w*|purg\w*|"
         r"irregularit\w*|delay(ed|s)?|extended|extends?|long lines|glitch\w*|malfunction\w*|observers?|poll watchers?|monitors?|doj|justice department|bomb threats?|"
         r"disinformation|misinformation|provisional|rejected|turned away|voter id|voter rolls?|redistrict\w*|gerrymander\w*|federal agents|ice agents|national guard|sanctions|evacuat\w*)\b"
         r"|\b(rnc|dnc|democrats?|republicans?|gop|democratic party|republican party)\b.{0,40}\b(sues?|sued|files?|filed|lawsuit|challeng\w*|asks?|seeks?|demands?|deploys?|sends?|monitor\w*|court|requests?|urges?)\b")
 _FOREIGN = r"\b(india|delhi|pakistan|bangladesh|britain|british|u\.k\.|canada|canadian|brazil|mexico|nigeria|kenya|uganda|tanzania|cameroon|venezuela|argentina|philippines|japan|korea|taiwan|germany|france|italy|spain|poland|hungary|romania|moldova|serbia|turkey|israel|iran|iraq|russia|ukraine|belarus|nato)\b"
-_BAD = r"(\bf\W?u?c?k|\bf\*ck|\bshit|\bdamn|\[live\]|\blive:|\bwatch:|blueanon|\bmaga\b|^\W*(rt|breaking)\b)"
+_BAD = r"(\bf\W?u?c?k|\bf\*ck|\bshit|\bdamn|\[live\]|\blive:|\blivestream|\bwatch:|blueanon|\bmaga\b|^\W*(rt|breaking)\b)"
 def _clean_hl(t):
     import re
     t = re.sub(r"\s+", " ", t or "").strip()
@@ -385,20 +398,21 @@ def special_cards(now):
     days = et_days.et_last_days(7, now)
     nk, ec, dp = re.compile(_NUK, re.I), re.compile(_ELC, re.I), re.compile(_DSP, re.I)
     def agg(match):
-        d = {x: [0, 0] for x in days}; n24 = 0; mx = 0; conf24 = 0; latest = []; seen = set()
+        d = {x: [0, 0] for x in days}; n24 = 0; n7 = 0; mx = 0; conf24 = 0; latest = []; seen = set()
         stories = {x: [] for x in days}; seen_d = {x: set() for x in days}; top = None
         for cid, t, cat, rk, fs, up, wl in rows:
             t = t or ""
             if cat == "ufo/uap" or not match(t, wl): continue
-            ft = _iso(fs) or 0; ut = _iso(up) or 0; rk = int(rk or 0)
-            k = day(ft) if ft else None
+            ft = _iso(fs) or 0; ut = _iso(up) or ft; rk = int(rk or 0)
+            ks = TC.active_days(ft, ut, d)   # first-seen AND last-updated ET day
             h = _clean_hl(t)
             st = None
             if h:
                 st = {"title": h, "t": ut, "rank": rk, "single": wl != 0,
                       "src": "single source" if wl != 0 else "The Wire",
                       "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire"}
-            if k in d:
+            if ks: n7 += 1
+            for k in ks:
                 d[k][1 if rk >= 7 else 0] += 1
                 if st and st["title"].lower()[:60] not in seen_d[k] and len(stories[k]) < 14:
                     seen_d[k].add(st["title"].lower()[:60]); stories[k].append(st)
@@ -411,13 +425,22 @@ def special_cards(now):
                 latest.append(st)
         latest = _fold_feed(latest)
         stories = {k: _fold_feed(stories[k]) for k in days}
-        return {"n24": n24, "conf24": conf24, "n7": sum(a + b for a, b in d.values()), "max24": mx,
+        return {"n24": n24, "conf24": conf24, "n7": n7, "max24": mx,
                 "days": [[k] + d[k] for k in days], "latest": latest,
                 "stories": {k: stories[k] for k in days}, "top": top}
     fr = re.compile(_FOREIGN, re.I)
     # Nuclear: confirmed + single-source items. Disputes: also rank 0-1 items the feed suppresses (local polling-place reports are often rank 1).
-    return {"nuke": agg(lambda t, wl: wl in (0, 1) and bool(nk.search(t))),
-            "disp": agg(lambda t, wl: bool(ec.search(t)) and bool(dp.search(t)) and not fr.search(t))}
+    out = {"nuke": agg(lambda t, wl: wl in (0, 1) and bool(nk.search(t))),
+           "disp": agg(lambda t, wl: _elc_ok(t) and bool(dp.search(t)) and not fr.search(t))}
+    # TOPIC-CARDS-1: public feeds (IAEA, wires, Votebeat ...) fill days the Wire missed; still-empty days get a dated search.
+    try:
+        import unrest_feeds as UF
+        for k in ("nuke", "disp"):
+            UF.merge_feed(out[k], UF.events(k, now), days, day, now)
+            UF.want_backfill(k, TC.empty_days(out[k]))
+    except Exception:
+        pass
+    return out
 
 def comms_card():
     import sqlite3

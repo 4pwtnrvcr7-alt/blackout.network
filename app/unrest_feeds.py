@@ -1,4 +1,9 @@
-"""Supplemental world-news feeds for the homepage Civil unrest, UK and London, and Food and supply chain widgets (site-side only).
+"""Supplemental public feeds for every homepage topic card (site-side only): Civil unrest, UK and London, Food and supply chain,
+Israel and Gaza, Iran, Russia and Ukraine, Other conflict zones, Ebola, Measles, Other outbreaks, Nuclear threat, Election disputes.
+
+TOPIC-CARDS-1 (Nov 14, 2026): each card has its own Google News searches (7 days + 1 day), primary/official sources (FDA recalls,
+USDA APHIS/FSIS and FAO/WFP via site: searches, WHO news + Disease Outbreak News, CIDRAP, WOAH, ECDC, ReliefWeb, IAEA), regional outlets,
+a 7-day retained pool, and a dated gap backfill: a day still empty on a card triggers one Google News after:/before: search for that day.
 
 The Wire (scanner) carries few protest/UK-security stories, so these two widgets also read keyless public feeds:
 GDELT DOC 2.0 (artlist), Google News RSS search (outlet-attributed), and direct RSS from public broadcasters/major papers.
@@ -10,6 +15,7 @@ headline-cleaned and grouped into events by title similarity; an event's outlet 
 import os, re, json, time, threading, html, urllib.request, urllib.parse
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
+import topic_cards as TC
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 REFRESH = 30 * 60
@@ -37,12 +43,57 @@ OUTLETS = {
     "africanews.com": "Africanews", "news24.com": "News24", "nation.africa": "Nation Africa", "premiumtimesng.com": "Premium Times",
     "thenationalnews.com": "The National", "arabnews.com": "Arab News", "yonhapnews.co.kr": "Yonhap", "koreaherald.com": "Korea Herald",
     "taipeitimes.com": "Taipei Times", "rappler.com": "Rappler", "bangkokpost.com": "Bangkok Post", "dailystar.net": "Daily Star",
+    # TOPIC-CARDS-1: more wire/regional outlets for the conflict cards
+    "jpost.com": "Jerusalem Post", "ynetnews.com": "Ynet", "i24news.tv": "i24NEWS", "al-monitor.com": "Al-Monitor", "iranintl.com": "Iran International",
+    "aa.com.tr": "Anadolu", "ukrinform.net": "Ukrinform", "pravda.com.ua": "Ukrainska Pravda", "themoscowtimes.com": "Moscow Times", "meduza.io": "Meduza",
+    "defensenews.com": "Defense News", "militarytimes.com": "Military Times", "breakingdefense.com": "Breaking Defense", "janes.com": "Janes",
+    "understandingwar.org": "ISW", "crisisgroup.org": "Crisis Group", "acleddata.com": "ACLED", "foreignpolicy.com": "Foreign Policy",
+    # primary / official and specialist sources (food, outbreaks, nuclear, elections)
+    "who.int": "WHO", "fao.org": "FAO", "wfp.org": "WFP", "woah.org": "WOAH", "iaea.org": "IAEA", "un.org": "UN", "unicef.org": "UNICEF",
+    "reliefweb.int": "ReliefWeb", "ipcinfo.org": "IPC", "fews.net": "FEWS NET", "ecdc.europa.eu": "ECDC", "paho.org": "PAHO", "africacdc.org": "Africa CDC",
+    "cidrap.umn.edu": "CIDRAP", "statnews.com": "STAT", "outbreaknewstoday.com": "Outbreak News Today", "foodsafetynews.com": "Food Safety News",
+    "world-grain.com": "World Grain", "wattagnet.com": "WATTPoultry", "wattpoultry.com": "WATTPoultry", "feedstuffs.com": "Feedstuffs",
+    "agweb.com": "AgWeb", "farmprogress.com": "Farm Progress", "freightwaves.com": "FreightWaves", "joc.com": "JOC", "lloydslist.com": "Lloyd's List",
+    "splash247.com": "Splash247", "gcaptain.com": "gCaptain", "supplychaindive.com": "Supply Chain Dive", "fooddive.com": "Food Dive",
+    "votebeat.org": "Votebeat", "democracydocket.com": "Democracy Docket", "stateline.org": "Stateline", "armscontrol.org": "Arms Control Association",
+    "thebulletin.org": "Bulletin of the Atomic Scientists", "nti.org": "NTI", "gov.uk": "GOV.UK", "europa.eu": "European Union",
+    # established national papers/broadcasters in outbreak and conflict regions (Ebola, cholera, Sahel, Sudan ...)
+    "punchng.com": "Punch", "dailytrust.com": "Daily Trust", "guardian.ng": "The Guardian Nigeria", "vanguardngr.com": "Vanguard", "thecable.ng": "TheCable",
+    "channelstv.com": "Channels TV", "newvision.co.ug": "New Vision", "monitor.co.ug": "Daily Monitor", "theeastafrican.co.ke": "The EastAfrican",
+    "standardmedia.co.ke": "The Standard", "citizen.digital": "Citizen Digital", "actualite.cd": "Actualite.cd", "radiookapi.net": "Radio Okapi",
+    "allafrica.com": "AllAfrica", "theafricareport.com": "The Africa Report", "devex.com": "Devex", "thenewhumanitarian.org": "The New Humanitarian",
+    "health-policy-watch.news": "Health Policy Watch", "sudantribune.com": "Sudan Tribune", "dabangasudan.org": "Radio Dabanga", "ghanaweb.com": "GhanaWeb",
+    "myjoyonline.com": "JoyNews", "iol.co.za": "IOL", "dailymaverick.co.za": "Daily Maverick", "irrawaddy.com": "The Irrawaddy", "geo.tv": "Geo News",
+    "tribune.com.pk": "Express Tribune", "tolonews.com": "TOLOnews", "kyivpost.com": "Kyiv Post", "nv.ua": "NV", "euromaidanpress.com": "Euromaidan Press",
+    "today.com": "TODAY (NBC)", "outbreaknewstoday.substack.com": "Outbreak News Today", "newschannel5.com": "NewsChannel 5 Nashville",
+    "middleeasteye.net": "Middle East Eye", "english.alarabiya.net": "Al Arabiya", "alarabiya.net": "Al Arabiya", "lbcgroup.tv": "LBCI", "naharnet.com": "Naharnet",
+    "ctvnews.ca": "CTV News",
 }
+NOT_CALLSIGN = {"kpmg", "kia", "kfc", "wix", "wish", "wise", "wiki", "kiwi", "kiva", "wwe", "kind", "keto", "kids", "wine", "wire", "work", "web", "wifi", "kraft"}
+NON_UK_LOCAL = ("cbc.ca", "globalnews.ca", "theglobeandmail.com", "ctvnews.ca", "abc.net.au", "smh.com.au")
+US_DOMAINS = {"apnews.com", "reuters.com", "nytimes.com", "washingtonpost.com", "wsj.com", "cnn.com", "cbsnews.com", "nbcnews.com", "abcnews.go.com",
+              "abcnews.com", "npr.org", "pbs.org", "usatoday.com", "latimes.com", "chicagotribune.com", "bostonglobe.com", "inquirer.com", "sfchronicle.com",
+              "seattletimes.com", "startribune.com", "miamiherald.com", "politico.com", "axios.com", "thehill.com", "bloomberg.com", "cnbc.com", "foxnews.com",
+              "newsweek.com", "time.com", "votebeat.org", "democracydocket.com", "stateline.org"}
+GOV_NAMES = {"fda.gov": "FDA", "aphis.usda.gov": "USDA APHIS", "fsis.usda.gov": "USDA FSIS", "usda.gov": "USDA", "cdc.gov": "CDC", "hhs.gov": "HHS",
+             "state.gov": "State Department", "defense.gov": "Defense Department", "energy.gov": "Energy Department", "nnsa.energy.gov": "NNSA",
+             "dhs.gov": "DHS", "fema.gov": "FEMA", "eac.gov": "U.S. Election Assistance Commission", "justice.gov": "Justice Department",
+             "ers.usda.gov": "USDA ERS", "fns.usda.gov": "USDA FNS", "nrc.gov": "NRC", "whitehouse.gov": "White House"}
 def outlet(domain):
     d = (domain or "").lower().strip().lstrip(".")
     d = re.sub(r"^(www|m|amp|edition|uk|us|eu|news|feeds|rss)\.", "", d) if d.count(".") > 1 and not d.startswith("news.sky") else d
     for k, v in OUTLETS.items():
         if d == k or d.endswith("." + k): return k, v
+    m = re.match(r"^([kw][a-z]{2,3})(?:tv\d*|\d+|news\d*|radio|-tv)?\.com$", d)
+    if m and m.group(1) not in NOT_CALLSIGN:   # U.S. broadcast stations by call sign (WGN, KENS 5, KCEN ...): licensed local newsrooms
+        return d, m.group(1).upper()
+    if re.search(r"\.gov\.(ng|ug|ke|za|gh|in|au)$", d):   # national government / public health agencies (NCDC, Voice of Nigeria ...)
+        return ".".join(d.split(".")[-3:]), ".".join(d.split(".")[-3:])
+    if re.search(r"\.(gov|mil)$", d):   # U.S. federal and state government sources (official, primary)
+        for k, v in GOV_NAMES.items():
+            if d == k or d.endswith("." + k): return k, v
+        parts = d.split("."); k = ".".join(parts[-3:]) if len(parts) > 2 and parts[-2] in ("state", "ca", "ny") else ".".join(parts[-2:])
+        return k, k
     return None, None
 
 # ------------------------------------------------------------------ headline clean-up
@@ -50,6 +101,8 @@ _SUFFIX = re.compile(r"\s+[-\u2013\u2014|]\s+(?P<o>[A-Z0-9][^-\u2013\u2014|]{1,4
 _TAILS = [r"\s*[:\-\u2013\u2014|]?\s*\d+\s+outlets?\s+compared\s*$", r"\s*\(?\b(video|photos?|watch|live updates?|live)\)?\s*$",
           r"\s+via\s+@\w+.*$", r"\s+https?://\S+.*$", r"\s+#\w+(\s+#\w+)*\s*$", r"\s*\|\s*[^|]{2,40}$"]
 _SENT = re.compile(r"(?<=[a-z0-9\)\"'\u2019])[.!?]\s+(?=\S)")
+import functools
+@functools.lru_cache(maxsize=40000)
 def clean_headline(t, known_outlet=None):
     t = html.unescape(re.sub(r"<[^>]+>", "", t or ""))
     t = re.sub(r"\s+", " ", t).strip().strip('"').strip()
@@ -158,7 +211,9 @@ UK_SEC = re.compile(r"\b(terror\w*|counter-terror\w*|extremis\w*|far-right|jihad
                     r"national security|security services|threat level|armed police|counter-?terrorism|arson attack|attacks?|violence|violent|gunfire|firearms?|"
                     r"critical incident|evacuated after|bomb threat|threats? received|officers? (?:hurt|injured|attacked|stabbed)|state threats?)\b", re.I)
 UK_NOT = re.compile(r"\b(spy(?:ing)? on|private investigators?|affair|terror tsar|terrorism watchdog|in terror|domestic violence|domestic abuse|football|premier league|cricket|rugby|tennis|f1|formula one|strictly|bake off|x factor|eurovision|recipe|travel|holiday|"
-                    r"heart attack|panic attack|asthma attack|shark attack|dog attack|review|obituary|crossword|quiz|fashion|royal baby)\b", re.I)
+                    r"heart attack|panic attack|asthma attack|shark attack|dog attack|review|obituary|crossword|quiz|fashion|royal baby|"
+                    r"(?:affective|eating|personality|mental|bipolar|stress|sleep|anxiety|seasonal)\s+disorders?|sad\s+lamps?|"
+                    r"explosive\s+(?:report|claims?|interview|book|memoir|row|testimony|allegations?|revelations?|evidence))\b", re.I)
 UK_COURT = re.compile(r"\b(trial|court hears|told a court|court rules|jury|sentenced|jailed|inquest|appeal|tribunal|convicted|contempt)\b", re.I)
 UK_DOMAINS = ("bbc.co.uk", "bbc.com", "theguardian.com", "news.sky.com", "skynews.com", "standard.co.uk", "independent.co.uk", "telegraph.co.uk",
               "thetimes.co.uk", "thetimes.com", "itv.com", "channel4.com", "inews.co.uk", "scotsman.com", "heraldscotland.com")
@@ -167,8 +222,9 @@ UK_LOCAL = re.compile(r"\b(police|officers?|arrest\w*|critical incident|evacuate
 PROTESTY = re.compile(r"\b(protest\w*|demonstrat\w*|clash\w*|march\w*)\b", re.I)
 def is_uk(t, uk_feed=False):
     if not t or UK_NOT.search(t) or (NOT_EVENT.search(t) or NOT_START.search(t)) and not re.search(r"terror", t, re.I): return False
-    if not (uk_feed or UK_GEO.search(t)): return False
-    if NOT_UK.search(t) and not re.search(r"\b(northern ireland|belfast|derry)\b", t, re.I) and not UK_GEO.search(re.sub(r"\b(british|briton)s?\b", "", t, flags=re.I)): return False
+    if not (uk_feed or TC.is_uk_place(t)): return False
+    if TC._MASK_RX.search(t) and not TC.is_uk_place(t): return False   # "British Columbia", "New South Wales", "London, Ont." are not the UK
+    if NOT_UK.search(t) and not re.search(r"\b(northern ireland|belfast|derry)\b", t, re.I) and not TC.is_uk_place(re.sub(r"\b(british|briton)s?\b", "", t, flags=re.I)): return False
     if not UK_SEC.search(t): return False
     sec = [m.group(0).lower() for m in UK_SEC.finditer(t)]
     if all(PROTESTY.fullmatch(x) for x in sec) and not is_unrest(t): return False   # "despite MPs' protests" is not unrest
@@ -240,8 +296,7 @@ _FOOD = re.compile(
     r"(tanker|shipping|oil|trade|cargo).{0,40}hormuz)\b", re.I)
 _RECALL_VERB = re.compile(r"\brecalls?\s+(seeing|that|how|when|the (?:moment|day|time))\b", re.I)
 def is_food(t):
-    if not t or _RECALL_VERB.search(t): return False
-    return bool(_FOOD.search(t))
+    return TC.is_food(t)   # widened matcher (HPAI culls, recalls, FAO/WFP/IPC, grain/egg/fertilizer, ports) lives in topic_cards.py
 
 UNREST_Q = ['(protest OR protesters OR riot OR rioters OR clashes OR "tear gas") when:7d',
             '(curfew OR crackdown OR "general strike" OR coup OR "martial law" OR "national guard") when:7d',
@@ -261,6 +316,58 @@ FOOD_Q = [
     '("grain export" OR fertilizer OR "port congestion" OR "shipping disruption" OR "dock workers" OR "rail strike") when:7d',
     '("Strait of Hormuz" OR Hormuz) (tanker OR shipping OR oil OR cargo OR trade) when:7d',
 ]
+# TOPIC-CARDS-1: every topic card gets its own searches (7 days for the backfill, 1 day for today's bar) and primary sources.
+FOOD_Q += [
+    '("bird flu" OR "avian influenza" OR HPAI OR H5N1) (poultry OR flock OR cull OR culled OR eggs OR dairy OR turkeys) when:7d',
+    '(recall OR recalled OR recalls) (listeria OR salmonella OR "E. coli" OR botulism OR undeclared OR FSIS OR FDA) when:7d',
+    '("food price index" OR FAO OR "World Food Programme" OR WFP OR IPC OR famine OR "food insecurity") when:7d',
+    '("egg prices" OR "egg shortage" OR "grain prices" OR "wheat prices" OR "fertilizer prices" OR "fertilizer shortage" OR "rice prices") when:7d',
+    '(port OR ports OR dockworkers OR longshore) (strike OR congestion OR closure OR backlog OR shutdown) when:7d',
+    'site:aphis.usda.gov when:14d', 'site:fsis.usda.gov recall when:14d', 'site:fda.gov recall when:14d', 'site:fao.org when:14d', 'site:wfp.org when:14d',
+    '("supply chain" OR "food prices" OR recall OR "bird flu" OR famine OR shipping) when:1d',
+]
+TOPIC_Q = {   # kind -> Google News searches (en-US unless the query says otherwise)
+    "il": ['(Gaza OR Israel OR Israeli OR Hezbollah OR "West Bank" OR Houthi OR Lebanon) (strike OR strikes OR attack OR killed OR troops OR ceasefire OR missile OR hostages) when:7d',
+           '(Gaza OR Israel OR Hezbollah OR "West Bank" OR Houthi) (strike OR attack OR killed OR ceasefire) when:1d'],
+    "ir": ['(Iran OR Iranian OR Tehran OR IRGC) (strike OR attack OR missile OR drone OR military OR sanctions OR nuclear OR navy) when:7d',
+           '(Iran OR Tehran OR IRGC) (strike OR attack OR missile OR drone OR military OR sanctions) when:1d'],
+    "ru": ['(Ukraine OR Russia OR Kyiv OR Kremlin OR Zelensky OR Putin) (attack OR strike OR drone OR missile OR troops OR front OR killed OR ceasefire OR offensive) when:7d',
+           '(Ukraine OR Russia OR Kyiv OR Kremlin) (attack OR strike OR drone OR missile OR troops OR killed) when:1d'],
+    "other": ['(Sudan OR Congo OR M23 OR Myanmar OR Sahel OR Mali OR "Burkina Faso" OR Somalia OR Haiti OR Ethiopia OR Syria OR Pakistan OR Afghanistan OR Nigeria OR Yemen OR Venezuela) (fighting OR clashes OR killed OR attack OR airstrike OR militants OR rebels OR army) when:7d',
+              '(Sudan OR Congo OR Myanmar OR Sahel OR Somalia OR Haiti OR Syria OR Pakistan OR Nigeria OR Venezuela) (fighting OR clashes OR airstrike OR militants OR rebels OR army) when:1d'],
+    "ebola": ['(Ebola OR Marburg) when:7d', '(Ebola OR Marburg) when:1d'],
+    "measles": ['measles (outbreak OR cases OR exposure OR elimination) when:7d', 'measles when:1d'],
+    "outbreak": ['(outbreak OR "bird flu" OR H5N1 OR cholera OR mpox OR dengue OR polio OR MERS OR "disease outbreak" OR chikungunya OR Nipah) when:7d',
+                 '(outbreak OR "bird flu" OR H5N1 OR cholera OR mpox OR dengue OR polio OR MERS) when:1d', 'site:who.int "Disease Outbreak News" when:30d'],
+    "uk": ['(London OR Britain OR "United Kingdom" OR Manchester OR Glasgow OR Birmingham) (police OR terror OR protest OR stabbing OR attack OR "cyber attack" OR disorder) -"British Columbia" -"New South Wales" -"New England" when:1d'],
+    "nuke": ['("nuclear weapons" OR "nuclear test" OR IAEA OR Zaporizhzhia OR "uranium enrichment" OR warhead OR ICBM OR "nuclear threat") when:7d',
+             '("nuclear weapons" OR "nuclear test" OR IAEA OR Zaporizhzhia OR "uranium enrichment" OR warhead OR ICBM) when:1d'],
+    "disp": ['("election lawsuit" OR recount OR "certification" OR "voter intimidation" OR "ballot challenge" OR "contested election" OR "election results" lawsuit) when:7d',
+             '(recount OR "election lawsuit" OR certification OR "ballot challenge") election when:1d'],
+}
+# Dated gap backfill: one search per (card, empty ET day), Google News after:/before: operators. Real stories only.
+BACKFILL_Q = {   # kind -> searches tried in order until the empty day has a story
+    "il": ['(Gaza OR Israel OR Hezbollah OR "West Bank" OR Houthi) (strike OR attack OR killed OR troops OR ceasefire)',
+           '(Israel OR Gaza OR Lebanon OR Yemen) (military OR IDF OR hostages OR rockets)'],
+    "ir": ['(Iran OR Tehran OR IRGC) (strike OR attack OR missile OR drone OR military OR sanctions OR nuclear)',
+           '(Iran OR Iranian) (threat OR navy OR Hormuz OR proxy OR plot)'],
+    "ru": ['(Ukraine OR Russia OR Kyiv OR Kremlin) (attack OR strike OR drone OR missile OR troops OR killed)',
+           '(Ukraine OR Russia) (front OR offensive OR shelling OR ceasefire OR talks)'],
+    "uk": ['(London OR Britain OR "United Kingdom") (police OR terror OR protest OR stabbing OR attack OR "cyber attack" OR disorder)',
+           '("Met Police" OR "Scotland Yard" OR "counter-terrorism" OR MI5) (arrest OR arrested OR charged OR attack OR plot)',
+           '(UK OR Britain OR British) (spy OR espionage OR "national security" OR sabotage OR drones OR riot)'],
+    "other": ['(Sudan OR Congo OR Myanmar OR Sahel OR Somalia OR Haiti OR Syria OR Pakistan OR Nigeria) (fighting OR clashes OR killed OR airstrike OR militants OR rebels)',
+              '(Sudan OR RSF OR "El Fasher" OR Kordofan OR Darfur) (killed OR attack OR drone OR fighting)',
+              '(Congo OR M23 OR "Islamic State" OR Mali OR "Burkina Faso" OR "al-Shabaab" OR Myanmar) (killed OR attack OR airstrike OR militants)'],
+    "ebola": ['(Ebola OR Marburg)', 'Ebola (outbreak OR cases OR vaccine OR WHO)'],
+    "measles": ['measles', 'measles (cases OR outbreak OR exposure OR vaccination)'],
+    "outbreak": ['(outbreak OR "bird flu" OR H5N1 OR cholera OR mpox OR dengue OR polio)', '(WHO OR CDC OR CIDRAP) (outbreak OR cases OR virus)'],
+    "u": ['(protest OR protesters OR riot OR clashes OR "tear gas" OR curfew)', '(protesters OR demonstrators) (police OR arrested OR clashes)'],
+    "food": ['("supply chain" OR "food prices" OR recall OR "bird flu" OR famine OR "food shortage" OR fertilizer OR "egg prices" OR "port strike")',
+             '(recall OR listeria OR salmonella OR "avian influenza" OR "food insecurity" OR "grain exports")'],
+    "nuke": ['("nuclear weapons" OR IAEA OR Zaporizhzhia OR "uranium enrichment" OR warhead OR ICBM)', 'nuclear (Iran OR Russia OR "North Korea" OR IAEA OR test)'],
+    "disp": ['(recount OR "election lawsuit" OR certification OR "ballot challenge") election', '(election OR ballots OR recount) (lawsuit OR court OR certify OR certified)'],
+}
 GN = "https://news.google.com/rss/search?q={q}&hl={hl}&gl={gl}&ceid={gl}:{hl0}"
 RSS = [  # (url, domain, kinds, uk_feed)
     ("https://feeds.bbci.co.uk/news/world/rss.xml", "bbc.co.uk", "u", False),
@@ -277,7 +384,35 @@ RSS = [  # (url, domain, kinds, uk_feed)
     ("https://www.cbsnews.com/latest/rss/world", "cbsnews.com", "u", False),
     ("https://feeds.nbcnews.com/nbcnews/public/world", "nbcnews.com", "u", False),
     ("https://www.standard.co.uk/news/london/rss", "standard.co.uk", "uk", True),
+    # TOPIC-CARDS-1 ("gen" = read by every card's matcher). Primary/official sources first.
+    ("https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/food-safety-recalls/rss.xml", "fda.gov", "food", False),
+    ("https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/recalls/rss.xml", "fda.gov", "food", False),
+    ("https://www.cidrap.umn.edu/rss.xml", "cidrap.umn.edu", "gen", False),
+    ("https://www.woah.org/en/feed/", "woah.org", "gen", False),
+    ("https://www.who.int/rss-feeds/news-english.xml", "who.int", "gen", False),
+    ("https://www.ecdc.europa.eu/en/taxonomy/term/1307/feed", "ecdc.europa.eu", "gen", False),
+    ("https://reliefweb.int/updates/rss.xml", "reliefweb.int", "gen", False),
+    ("https://www.iaea.org/feeds/topnews", "iaea.org", "nuke", False),
+    ("https://feeds.bbci.co.uk/news/world/middle_east/rss.xml", "bbc.co.uk", "gen", False),
+    ("https://feeds.bbci.co.uk/news/world/europe/rss.xml", "bbc.co.uk", "gen", False),
+    ("https://feeds.bbci.co.uk/news/world/africa/rss.xml", "bbc.co.uk", "gen", False),
+    ("https://feeds.bbci.co.uk/news/world/asia/rss.xml", "bbc.co.uk", "gen", False),
+    ("https://feeds.bbci.co.uk/news/health/rss.xml", "bbc.co.uk", "gen", False),
+    ("https://www.timesofisrael.com/feed/", "timesofisrael.com", "gen", False),
+    ("https://www.iranintl.com/en/feed", "iranintl.com", "gen", False),
+    ("https://www.aa.com.tr/en/rss/default?cat=world", "aa.com.tr", "gen", False),
+    ("https://www.gov.uk/search/news-and-communications.atom", "gov.uk", "uk", True),
 ]
+WHO_DON = "https://www.who.int/api/news/diseaseoutbreaknews?sf_culture=en&$orderby=PublicationDateAndTime%20desc&$top=30"
+def _who_don():
+    j = json.loads(_get(WHO_DON, timeout=20) or "{}")
+    out = []
+    for a in j.get("value") or []:
+        t = a.get("Title") or a.get("OverrideTitle"); u = a.get("ItemDefaultUrl") or a.get("UrlName")
+        if not t or not u: continue
+        url = u if u.startswith("http") else "https://www.who.int/emergencies/disease-outbreak-news/item" + ("" if u.startswith("/") else "/") + u
+        out.append({"title": t, "url": url, "domain": "who.int", "t": _ts(a.get("PublicationDateAndTime") or a.get("PublicationDate")), "direct": True})
+    return out
 GDELT_Q = [("u", '(protest OR protesters OR riot OR clashes OR curfew OR crackdown OR "general strike" OR coup OR "martial law" OR "national guard")', "24h"),
            ("u", '(protest OR protesters OR riot OR clashes OR curfew OR crackdown OR "general strike" OR coup OR "martial law" OR "national guard")', "7d"),
            ("uk", '(London OR Britain OR "Met Police") (protest OR riot OR terror OR stabbing OR cyberattack OR disorder)', "7d"),
@@ -320,10 +455,11 @@ def fetch_all(log=None):
         time.sleep(3); run("Google News UK: " + q[:40], "uk", lambda q=q: _rss(_gn(GN.format(q=urllib.parse.quote(q), hl="en-GB", gl="GB", hl0="en"))))
     for q in FOOD_Q:
         time.sleep(3); run("Google News food: " + q[:40], "food", lambda q=q: _rss(_gn(GN.format(q=urllib.parse.quote(q), hl="en-US", gl="US", hl0="en"))))
-    # World RSS items can also be food/supply-chain stories (same fetch, second kind)
-    for it in list(items):
-        if it.get("kind") == "u" and not it.get("uk_feed"):
-            items.append({**it, "kind": "food"})
+    for kind, qs in TOPIC_Q.items():
+        for q in qs:
+            gl, hl = ("GB", "en-GB") if kind == "uk" else ("US", "en-US")
+            time.sleep(3); run(f"Google News {kind}: " + q[:40], kind, lambda q=q, gl=gl, hl=hl: _rss(_gn(GN.format(q=urllib.parse.quote(q), hl=hl, gl=gl, hl0="en"))))
+    run("WHO Disease Outbreak News", "gen", _who_don)
     for kind, q, span in GDELT_Q:
         run(f"GDELT DOC 2.0 ({kind}, {span})", kind, lambda q=q, s=span: _gdelt(q, s))
     return items, status
@@ -364,24 +500,54 @@ def rank_of(title, outlets):
     if sev < 3: r = min(r, 6)
     return max(1, min(r, 8))
 
+VIOLENT = re.compile(r"\b(killed|kills?|killing|dead|deaths|died|attack\w*|airstrikes?|air\s+strikes?|strikes?|struck|shelling|shelled|bomb\w*|fighting|offensive|"
+                     r"massacre|displac\w*|wounded|injur\w*|shot|shoots|clashes|abduct\w*|kidnap\w*|ambush\w*|raid\w*|captur\w*|seiz\w*|siege|drone|drones)\b", re.I)
+OTHER_WAR = re.compile(r"\b(war|fighting|(?:violent|deadly|armed|ethnic|tribal|border)\s+clashes|clashes\s+(?:between|erupt\w*)|airstrikes?|air\s+strikes?|drone\s+strikes?|shelling|artillery|militants?|militia|rebels?|insurgents?|jihadi\w*|"
+                       r"paramilitary|rsf|m23|al-shabaab|boko\s+haram|isis|islamic\s+state|junta|troops|army|soldiers|offensive|ceasefire|massacre|"
+                       r"gunmen|armed\s+groups?|bombing|suicide\s+bomb\w*|gangs?\s+(?:attack|violence|war))\b", re.I)
+def _conflict_kind(fn):
+    def m(t):
+        if not t or NOT_EVENT.search(t) or NOT_START.search(t) or t.rstrip().endswith("?"): return False
+        return fn(t) and bool(TC.CONFLICT.search(t)) and TC.conflict_ok(t) and not TC.CELEB.search(t)
+    return m
+def _other_conflict(t):
+    if not t or NOT_EVENT.search(t) or NOT_START.search(t) or t.rstrip().endswith("?"): return False
+    if TC.is_il(t) or TC.is_ir(t) or TC.is_ru(t) or TC.is_uk_place(t) or is_us(t): return False
+    if TC.SPORTS.search(t) or TC.CELEB.search(t) or TC.is_ebola(t) or TC.is_measles(t) or TC.is_outbreak(t): return False
+    if PROTEST.search(t) or re.search(r"\b(general|national|nationwide)\s+strike|protesters|demonstrators", t, re.I): return False   # street protests belong on Civil unrest
+    return bool(OTHER_WAR.search(t)) and bool(VIOLENT.search(t)) and TC.conflict_ok(t)
+def _health(fn):
+    return lambda t: bool(t) and not NOT_EVENT.search(t) and fn(t)
+KIND_MATCH = {
+    "u": is_unrest, "food": is_food, "uk": is_uk,
+    "il": _conflict_kind(TC.is_il), "ir": _conflict_kind(TC.is_ir), "ru": _conflict_kind(TC.is_ru), "other": _other_conflict,
+    "ebola": _health(TC.is_ebola), "measles": _health(TC.is_measles), "outbreak": _health(TC.is_outbreak),
+    "nuke": lambda t: TC.is_nuke(t) and not NOT_EVENT.search(t or ""), "disp": TC.is_disp,
+}
+
 def build_events(items, kind, now, horizon=7 * 86400):
     """Filter raw items to the topic, keep reputable outlets, clean headlines and group into events."""
     keep = []
+    match = KIND_MATCH.get(kind)
     for it in items:
-        if it.get("kind") != kind and not (kind == "uk" and it.get("kind") == "u"): continue
+        # Each card reads its own searches plus the shared pool (world RSS, primary sources, other cards' searches); the matcher decides.
+        if match is None and it.get("kind") != kind: continue
+        if kind == "u" and it.get("kind") not in ("u", "gen"): continue   # unrest keeps its own searches + shared RSS (crackdown on fraud is not unrest)
         dom, name = outlet(it.get("domain"))
+        if kind == "disp" and dom and not (dom in US_DOMAINS or dom.endswith(".gov")): continue   # U.S. election disputes only
         if not dom: continue
         t = it.get("t") or 0
         if not t or t < now - horizon or t > now + 3600: continue
         title = clean_headline(it.get("title"), name)
-        if len(title) < 25: continue
-        if kind == "u":
-            ok = is_unrest(title)
-        elif kind == "food":
-            ok = is_food(title)
+        if len(title) < 25 or (kind != "u" and TC.NOT_NEWS.search(title)): continue
+        if kind == "uk":
+            via = it.get("via") or ""
+            ok = is_uk(title, (it.get("uk_feed") and it.get("kind") == "uk") or (via.startswith(("Google News UK", "Google News uk", "Google News backfill uk"))
+                                                                                and dom in UK_DOMAINS and bool(UK_LOCAL.search(title))))
+            if ok and dom in NON_UK_LOCAL and not TC.is_uk_place(TC.UK_AMBIG.sub(" ", re.sub(r"\blondon\w*", " ", title, flags=re.I))):
+                ok = False   # London, Ontario / Newcastle, NSW from a Canadian or Australian outlet
         else:
-            ok = is_uk(title, it.get("uk_feed") or (it.get("via", "").startswith("Google News UK") and dom in UK_DOMAINS
-                                                                                and bool(UK_LOCAL.search(title))))
+            ok = match(title)
         if not ok: continue
         keep.append({"title": title, "url": it.get("url"), "direct": bool(it.get("direct")), "domain": dom, "outlet": name, "t": t, "tok": _toks(title), "pr": _props(title), "bi": _bi(title)})
     seen = set(); uniq = []
@@ -445,7 +611,22 @@ def refresh(now=None):
         items += old
         for s in status:
             if s["src"] in failed: s["carried"] = sum(1 for i in old if i.get("via") == s["src"])
-    v = {"t": now, "status": status, "raw": [{k: i.get(k) for k in ("title", "url", "domain", "t", "direct", "kind", "uk_feed", "via")} for i in items]}
+    # 7-day backfill: keep every earlier item still inside the window (searches only return their newest results), deduped by url+kind
+    have = {(i.get("url"), i.get("kind")) for i in items}
+    keep_old = [i for i in (prev.get("raw") or []) if now - 8 * 86400 <= (i.get("t") or 0) <= now + 3600 and (i.get("url"), i.get("kind")) not in have
+                and i.get("via") not in failed]
+    items += keep_old
+    # one copy per url (cards share the pool), but a UK-feed copy keeps its flag
+    seen, uniq = set(), []
+    for i in sorted(items, key=lambda i: (not i.get("uk_feed"), i.get("kind") == "gen")):
+        if i.get("url") in seen: continue
+        seen.add(i.get("url")); uniq.append(i)
+    items = uniq
+    try: items += backfill(items, now, status)
+    except Exception as e: status.append({"src": "Google News dated backfill", "ok": False, "err": str(e)[:120], "ms": 0})
+    items = sorted(items, key=lambda i: -(i.get("t") or 0))[:MAX_RAW]
+    v = {"t": now, "status": status, "raw": [{k: i.get(k) for k in ("title", "url", "domain", "t", "direct", "kind", "uk_feed", "via")} for i in items],
+         "bf_done": _BF["done"]}
     _C["v"], _C["t"] = v, now
     try:
         p = _cache_path(); tmp = p + ".tmp"
@@ -453,6 +634,57 @@ def refresh(now=None):
         os.replace(tmp, p)
     except Exception: pass
     return v
+MAX_RAW = 20000
+# ------------------------------------------------------------------ dated gap backfill (TOPIC-CARDS-1)
+# apple_v1 reports each card's still-empty ET days via want_backfill(); the next refresh runs one dated Google News search per
+# (card, day) (after:/before:) and keeps what passes the card's matcher. A pair is searched at most once every 6 hours.
+_BF = {"want": {}, "done": {}}
+BF_PER_REFRESH = int(os.environ.get("BN_TOPIC_BACKFILL_MAX", "24"))
+def want_backfill(kind, days):
+    for d in days or []:
+        _BF["want"][(kind, d)] = time.time()
+def _bf_query(kind, d, i=0):
+    import datetime
+    d0 = datetime.date.fromisoformat(d)
+    return f'{BACKFILL_Q[kind][i]} after:{(d0 - datetime.timedelta(days=1)).isoformat()} before:{(d0 + datetime.timedelta(days=2)).isoformat()}'
+def backfill(items, now, status, fetch=None):
+    """Dated searches for (kind, ET day) pairs that were empty. Returns new raw items (kind set, via 'Google News backfill')."""
+    if os.environ.get("BN_TOPIC_BACKFILL", "1") == "0": return []
+    def _default(q, kind):
+        hl, gl = ("en-GB", "GB") if kind == "uk" else ("en-US", "US")
+        return _rss(_gn(GN.format(q=urllib.parse.quote(q), hl=hl, gl=gl, hl0="en")))
+    fetch = fetch or _default
+    import et_days
+    days = set(et_days.et_last_days(7, now))
+    done = {tuple(k.split("|", 1)): v for k, v in (_BF["done"] or {}).items()} if isinstance(_BF["done"], dict) else {}
+    out, n = [], 0
+    pend = sorted([p for p in list(_BF["want"]) if p[1] in days and p[0] in BACKFILL_Q], key=lambda p: p[1], reverse=True)
+    def covered(kind, d):
+        return any(TC.active_days(e["t"], e["t1"], {d}) for e in build_events(items + out, kind, now))
+    for kind, d in pend:
+        if n >= BF_PER_REFRESH: break
+        if now - done.get((kind, d), 0) < 6 * 3600: continue
+        if covered(kind, d):
+            _BF["want"].pop((kind, d), None); continue   # the regular feeds already cover that day
+        ok_any = False
+        for i in range(len(BACKFILL_Q[kind])):
+            if n >= BF_PER_REFRESH: break
+            t0 = time.time(); n += 1
+            try:
+                time.sleep(3)
+                q = _bf_query(kind, d, i)
+                got = fetch(q, kind) if fetch is _default else fetch(q)
+                for it in got: it.update(kind=kind, uk_feed=False, via=f"Google News backfill {kind}")
+                out += got; ok_any = True
+                status.append({"src": f"Google News backfill {kind} {d} #{i + 1}", "ok": True, "n": len(got), "ms": int((time.time() - t0) * 1000)})
+            except Exception as e:
+                status.append({"src": f"Google News backfill {kind} {d} #{i + 1}", "ok": False, "err": str(e)[:120], "ms": int((time.time() - t0) * 1000)})
+                continue
+            if covered(kind, d): break
+        if ok_any:   # a network error is retried on the next refresh; a real empty result waits 6 hours
+            done[(kind, d)] = now; _BF["want"].pop((kind, d), None)
+    _BF["done"] = {f"{k}|{d}": v for (k, d), v in done.items() if now - v < 8 * 86400}
+    return out
 def _load():
     try:
         with open(_cache_path()) as f: return json.load(f)
@@ -462,7 +694,9 @@ def _kick():
         if _C["busy"]: return
         _C["busy"] = True
     def run():
-        try: refresh()
+        try:
+            refresh()
+            for k in KIND_MATCH: events(k)   # warm the per-card events off the request path
         except Exception: pass
         finally: _C["busy"] = False
     threading.Thread(target=run, name="bn-unrest-feeds", daemon=True).start()
@@ -471,12 +705,21 @@ def raw(now=None):
     now = now or time.time()
     if _C["v"] is None:
         v = _load()
-        if v: _C["v"], _C["t"] = v, v.get("t") or 0
+        if v:
+            _C["v"], _C["t"] = v, v.get("t") or 0
+            if isinstance(v.get("bf_done"), dict) and not _BF["done"]: _BF["done"] = dict(v["bf_done"])
     if now - _C["t"] > REFRESH and os.environ.get("BN_UNREST_FEEDS", "1") != "0": _kick()
     return (_C["v"] or {}).get("raw") or []
+_EV = {"ver": None, "t": 0.0, "ev": {}}
 def events(kind, now=None):
+    """Feed events for a card, memoized per feed-cache version (12 cards share one pool; the refresh thread pre-builds them)."""
     now = now or time.time()
-    try: return build_events(raw(now), kind, now)
+    try:
+        items = raw(now); ver = (id(_C["v"]), _C["t"])
+        if _EV["ver"] != ver or now - _EV["t"] > 2400 or now < _EV["t"] - 3600:
+            _EV.update(ver=ver, t=now, ev={})
+        if kind not in _EV["ev"]: _EV["ev"][kind] = build_events(items, kind, now)
+        return _EV["ev"][kind]
     except Exception: return []
 def status():
     v = _C["v"] or _load() or {}
@@ -486,7 +729,7 @@ if __name__ == "__main__":
     import sys
     v = refresh()
     for s in v["status"]: print(("OK  " if s["ok"] else "ERR ") + s["src"], s.get("n", ""), s.get("err", ""), f'{s["ms"]}ms')
-    for k in ("u", "uk", "food"):
+    for k in KIND_MATCH:
         ev = build_events(v["raw"], k, time.time())
         print("\n==", k, len(ev), "events")
         for e in sorted(ev, key=lambda e: -e["t"])[:60]:
@@ -513,14 +756,15 @@ def combine(wire, ext, days, day_fn, now, label, split_us=False):
         evs.append({"title": e["title"], "url": e["url"], "t": e["t"], "ut": e["t1"], "rank": e["rank"], "wire_n": 0, "outlets": e["outlets"],
                     "n_out": e["n_outlets"], "ext": True, "us": e.get("us"), "loc": None, "tok": tok, "pr": pr})
     def agg(sel):
-        d = {x: [0, 0] for x in days}; st = {x: [] for x in days}; n24 = 0; mx = 0; top = None
+        d = {x: [0, 0] for x in days}; st = {x: [] for x in days}; n24 = 0; mx = 0; top = None; n7 = 0
         for v in sel:
-            k = day_fn(v["t"])
-            if k in d: d[k][1 if v["rank"] >= 7 else 0] += 1; st[k].append(v)
+            ks = [k for k in dict.fromkeys((day_fn(v["t"]), day_fn(v["ut"]))) if k in d]   # first-seen AND last-updated ET day
+            if ks: n7 += 1
+            for k in ks: d[k][1 if v["rank"] >= 7 else 0] += 1; st[k].append(v)
             if v["ut"] >= now - 86400:
                 n24 += 1; mx = max(mx, v["rank"])
                 if top is None or (v["rank"], v["n_out"] + v["wire_n"], v["ut"]) > (top["rank"], top["n_out"] + top["wire_n"], top["ut"]): top = v
-        return d, st, n24, mx, top
+        return d, st, n24, mx, top, n7
     def item(v):
         if v["ext"]:
             src = f'{v["n_out"]} outlet{"s" if v["n_out"] != 1 else ""} \u00b7 ' + ", ".join(v["outlets"][:3])
@@ -532,14 +776,49 @@ def combine(wire, ext, days, day_fn, now, label, split_us=False):
         if v["ext"]: o["ext"] = 1
         if split_us: o["us"] = 1 if v["us"] else 0
         return o
-    d, st, n24, mx, top = agg(evs)
+    d, st, n24, mx, top, n7 = agg(evs)
     stories = {k: [item(v) for v in sorted(st[k], key=lambda v: (-v["rank"], -(v["n_out"] + v["wire_n"]), -v["ut"]))[:14]] for k in days}
-    out = {"label": label, "n24": n24, "n7": sum(a + b for a, b in d.values()), "max24": mx, "days": [[k] + d[k] for k in days], "stories": stories,
+    out = {"label": label, "n24": n24, "n7": n7, "max24": mx, "days": [[k] + d[k] for k in days], "stories": stories,
            "top": ({"rank": top["rank"], "t": top["ut"], "url": top["url"], "title": top["title"], "loc": top.get("loc"), "ext": 1 if top["ext"] else 0} if top else None),
            "src": "The Wire + world news feeds", "n_feed": sum(1 for v in evs if v["ext"]), "n_wire": sum(1 for v in evs if not v["ext"])}
     if split_us:
         for key, sel in (("us", [v for v in evs if v["us"]]), ("world", [v for v in evs if not v["us"]])):
-            d2, _, a24, m2, t2 = agg(sel)
-            out[key] = {"n24": a24, "n7": sum(a + b for a, b in d2.values()), "max24": m2,
+            d2, _, a24, m2, t2, n72 = agg(sel)
+            out[key] = {"n24": a24, "n7": n72, "max24": m2,
                         "top": ({"rank": t2["rank"], "t": t2["ut"], "url": t2["url"], "title": t2["title"]} if t2 else None)}
     return out
+
+
+def merge_feed(card, ext, days, day_fn, now):
+    """Add feed events to a Wire-only card (Nuclear threat, Election disputes) without double-counting a Wire story.
+    Bars, per-day stories, n24 and n7 include the feed events; the threat level (max24/conf24) stays Wire-only."""
+    if not card or not ext: return card
+    have = {k: [_toks(s.get("title")) for s in (card.get("stories") or {}).get(k) or []] for k in days}
+    rows = {r[0]: r for r in card.get("days") or []}
+    added = 0
+    for e in sorted(ext, key=lambda e: -e["t1"]):
+        tok = _toks(e["title"]); ks = TC.active_days(e["t"], e["t1"], set(days))
+        if not ks: continue
+        if any(_sim(tok, h) >= 0.5 for k in ks for h in have.get(k) or []): continue
+        added += 1
+        o = {"title": e["title"], "url": e["url"], "t": e["t1"], "rank": e["rank"], "ext": 1, "single": e["n_outlets"] < 2,
+             "src": f'{e["n_outlets"]} outlet{"s" if e["n_outlets"] != 1 else ""} \u00b7 ' + ", ".join(e["outlets"][:3])}
+        for k in ks:
+            r = rows.get(k)
+            if r: r[2 if e["rank"] >= 7 else 1] += 1
+            lst = card.setdefault("stories", {}).setdefault(k, [])
+            if len(lst) < 14: lst.append(o); have.setdefault(k, []).append(tok)
+        if e["t1"] >= now - 86400: card["n24"] = (card.get("n24") or 0) + 1
+    card["n7"] = (card.get("n7") or 0) + added
+    if added:
+        card["src"] = "The Wire + world news feeds"
+        # "Latest" list and the card's subline read card["latest"]: newest three across Wire + feeds
+        pool = list(card.get("latest") or []) + [o for k in days for o in (card.get("stories") or {}).get(k) or [] if o.get("ext")]
+        seen, lat = set(), []
+        for o in sorted(pool, key=lambda o: -(o.get("t") or 0)):
+            key = (o.get("title") or "").lower()[:60]
+            if key in seen: continue
+            seen.add(key); lat.append(o)
+            if len(lat) == 3: break
+        card["latest"] = lat
+    return card
