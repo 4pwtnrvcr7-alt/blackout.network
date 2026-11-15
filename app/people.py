@@ -488,7 +488,7 @@ def index_page():
         cards.append(f'<a class="pf-card" href="/people/{E(s)}">' + (f'<img class="pp-av" src="{E(av)}" alt="" width="56" height="56" loading="lazy" decoding="async">' if av else "")
                      + f'<span class="pp-t"><span class="pp-n">{E(p.get("name"))}</span><span class="pp-r">{E(p.get("role") or p.get("description") or "")}</span>'
                      + (f'<span class="pf-m">In {n} current stor{"y" if n == 1 else "ies"}</span>' if n else "") + '</span></a>')
-    body = (f'<style>{STRIP_CSS}{PAGE_CSS}</style><div class="pf pp-strip"><p class="crumb"><a href="/#wire">The Wire</a> › People</p><h1 class="t">People in the news</h1>'
+    body = (f'<style>{STRIP_CSS}{PAGE_CSS}</style><div class="pf pp-strip"><p class="crumb"><a href="/wire">The Wire</a> › People</p><h1 class="t">People in the news</h1>'
             '<p class="dek">Public figures named in the stories BLACKOUT.NETWORK is tracking, most mentioned first. Each profile is neutral and sourced to Wikipedia and Wikidata.</p>'
             f'<div class="pf-grid">{"".join(cards) or "<p>No profiles yet.</p>"}</div></div>')
     return 200, _page("People in the news", "Neutral, sourced profiles of the public figures in BLACKOUT.NETWORK stories.", body, "/people")

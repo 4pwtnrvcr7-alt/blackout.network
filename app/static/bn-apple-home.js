@@ -28,7 +28,7 @@
   return '<div class="bna-fol"><span>Follow this story</span>'+a.join("")+'</div>'}
  function also(x,tag){tag=tag||"p";var a=(x&&x.also||[]).map(function(z){return (z&&z.text)||(typeof z==="string"?z:"")}).filter(Boolean).slice(0,2);return a.length?'<'+tag+' class="bna-also">Also: '+esc(a.join("; "))+'.</'+tag+'>':""}
 function card(x){x=Object.assign({},x,{category:dcat(x)});var hi=x.rank>=7,loc=x.location&&x.location.length<34?" · "+esc(x.location):"",id=sid(x),fo=follow(x);
-  return '<article class="bna-card bna-it'+(hi?" hi":"")+(fo?" bna-has-fol":"")+'"><a class="bna-cardlnk" href="'+(id?"/wire/"+id:"/#wire")+'">'+(x.posted?'<p class="bna-pstw"><b class="bna-pst">On our channels</b></p>':'')+'<div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
+  return '<article class="bna-card bna-it'+(hi?" hi":"")+(fo?" bna-has-fol":"")+'"><a class="bna-cardlnk" href="'+(id?"/wire/"+id:"/wire")+'">'+(x.posted?'<p class="bna-pstw"><b class="bna-pst">On our channels</b></p>':'')+'<div class="bna-ct"><p class="bna-k">'+esc(CAT[x.category]||x.category||"")+'</p><span class="bna-rk'+(hi?" red":"")+'">Rank '+x.rank+'<i>/10</i></span></div>'+
    '<h3>'+esc(title(x.title))+'</h3>'+also(x)+'<p class="bna-m">'+srcLine(x)+loc+'<br>Updated '+esc(et(x.updated))+'</p></a>'+fo+'</article>'}
 function srcLine(x){var n=+x.n_families||0,g=+x.grouped||0,s=n+(n==1?" source":" sources");if(g>1)s+=" · "+g+" stories merged";if(x.more)s+=" · "+(x.more+1)+" agency reports grouped";return s}
  // Featured desk card (Matt, Nov 13): green, always position 2 of the row, until its show_until (same window as the old notice).

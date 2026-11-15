@@ -245,7 +245,7 @@ def render():
     tp = s.get("top_pages") or []; ts = s.get("top_stories") or []
     pages = (f'<div class="st-card"><h3>Most-visited pages · 7 days</h3>{bars(tp, "label", "views", "path") or "<div class=st-empty>Not enough visits yet.</div>"}</div>')
     stories = ('<div class="st-card"><h3>Most-read stories · 7 days</h3>' +
-               (bars(ts, "title", "views", "path") if ts else '<div class="st-empty">Story pages (<a href="/#wire">/wire</a> and <a href="/social">/story</a>) are counted from today; '
+               (bars(ts, "title", "views", "path") if ts else '<div class="st-empty">Story pages (<a href="/wire">/wire</a> and <a href="/social">/story</a>) are counted from today; '
                 'each story appears here once it passes 5 readers.</div>') + "</div>")
     tabs = s.get("top_tabs") or []
     tabs_html = f'<div class="st-card"><h3>Most-used dashboard sections · 7 days</h3>{bars(tabs, "label", "requests", unit="loads") or "<div class=st-empty>Not enough data yet.</div>"}</div>'

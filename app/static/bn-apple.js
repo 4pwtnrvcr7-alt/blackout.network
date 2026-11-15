@@ -38,7 +38,7 @@
  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
  function txt(v){return v==null?"":typeof v=="string"||typeof v=="number"?String(v):Array.isArray(v)?v.map(txt).filter(Boolean).join(", "):typeof v=="object"?txt(v.src||v.name||v.label||v.title||v.status||""):""}
  function tools(){var t=d.querySelector("#bn-menu .m3-tools");if(!t||t.querySelector(".bna-mlinks"))return t;
-  var w=d.createElement("span");w.className="bna-mlinks";w.innerHTML='<a class="m3-tl bna-ml" href="/#wire">The Wire</a><a class="m3-tl bna-ml" href="/sources">Sources</a>';
+  var w=d.createElement("span");w.className="bna-mlinks";w.innerHTML='<a class="m3-tl bna-ml" href="/wire">The Wire</a><a class="m3-tl bna-ml" href="/sources">Sources</a>';
   t.insertBefore(w,t.firstChild);return t}
  function alerts(a){if(a&&a.data&&a.count==null)a=a.data;a=a||{};
   var list=(Array.isArray(a.alerts)?a.alerts:[]).map(function(x){return typeof x=="object"&&x?[txt(x.src),typeof x.status=="string"?x.status:""].filter(Boolean).join(": "):txt(x)}).filter(Boolean);

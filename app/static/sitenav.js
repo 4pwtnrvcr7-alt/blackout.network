@@ -172,7 +172,9 @@ function init(){
  // sidebar / bar links switch tabs in place
  function btn(k){return nav.querySelector('button[data-tab="'+k+'"]')}
  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[data-tab],.bn-primary a[data-tab]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
-  var k=a.dataset.tab;if(k.charAt(0)==="@")return;var b=btn(k);if(!b)return;e.preventDefault();
+  var k=a.dataset.tab;if(k.charAt(0)==="@")return;
+  if(k==="threat")return; // The Wire is the standalone /wire page; do not trap the click as a dashboard tab
+  var b=btn(k);if(!b)return;e.preventDefault();
   var dest=a.hash&&a.hash!==location.hash?a.hash:"";if(!(window.bnMenuClose&&bnMenuClose(true,dest?{replace:dest}:{}))&&dest)try{history.pushState(null,"",dest)}catch(_){}
   if(!b.classList.contains("on"))b.click();window.scrollTo(0,0);var h=document.getElementById("bn_ptitle");if(h){h.setAttribute("tabindex","-1");try{h.focus({preventScroll:true})}catch(_){}}});
  // ---- one tab order (kept for add-ons that read the strip); tabs not listed in sitenav.py go at the end of the first group
@@ -208,7 +210,9 @@ function init(){
   if(!t&&k!=="threat"){title=b.textContent.replace(/^\W+/,"").trim()+" | "+D.brand}
   var line=(t&&t.desc)||"";if(desc.textContent!==line)desc.textContent=line;desc.hidden=!line;
   var nm=(D.plain&&D.plain[k])||b.textContent.replace(/^[^\w(]+/,"").replace(/\d+$/,"").trim();if(ptitle&&ptitle.textContent!==nm)ptitle.textContent=nm;
-  $$("#bn-menu a[data-tab],.bn-primary a[data-tab]").forEach(function(a){if(a.dataset.tab===k)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
+  $$("#bn-menu a[data-tab],.bn-primary a[data-tab]").forEach(function(a){
+   var on=a.dataset.tab===k;if(a.dataset.tab==="threat")on=false; // /wire is a standalone page
+   if(on)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")});
   if(title+d===last&&document.title===title)return;last=title+d;setMeta(title,d,url)}
  // deep links to tabs whose add-on loads late (e.g. /#government): honor the first hash once its button appears
  var pending=(location.hash||"").slice(1);if(pending==="bn-menu")pending="";setTimeout(function(){pending=""},30000);

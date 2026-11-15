@@ -416,7 +416,7 @@
     return '<a class="bnal-src" href="' + esc(l.url) + '" target="_blank" rel="noopener nofollow">Source: ' + esc(l.source && !/^https?:/.test(l.source) ? l.source : h) + ' ↗</a>';
   }
   function sampleHTML(it) {
-    var url = it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/#wire", cat = catLabel(it.category), r = Math.max(0, Math.min(10, it.rank | 0));
+    var url = it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/wire", cat = catLabel(it.category), r = Math.max(0, Math.min(10, it.rank | 0));
     var head = cleanT(it.title);
     return '<div class="bnal-sh"><span class="bnal-tagS">SAMPLE</span><span>' + (it.example ? "Illustrative example (not a real event)" : "Based on a real alert from " + esc(etTime(it.high_at).replace(/,? \d+:\d\d [AP]M ET$/, ""))) + '</span></div>'
       + '<div class="bnal-notif" aria-label="How the notification looks on your lock screen"><img src="/icons/icon-192.png" alt="" width="38" height="38">'
@@ -448,7 +448,7 @@
         getReg().then(function (r) {
           return r.showNotification("SAMPLE · " + (it.rank | 0) + "/10 · " + catLabel(it.category).toUpperCase(), { body: cleanT(it.title).slice(0, 180),
             icon: "/icons/icon-192.png", badge: "/alerts/badge.png", tag: "bn-sample",
-            data: { url: location.origin + (it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/#wire") } });
+            data: { url: location.origin + (it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/wire") } });
         }).then(function () { say("Sample shown below and sent to your notifications.", "ok"); }, function () { say("Sample shown below.", "ok"); });
       } else say("Sample shown below.", "ok");
     }).catch(function () { showSample(box, EXAMPLE); say("Sample shown below.", "ok"); });

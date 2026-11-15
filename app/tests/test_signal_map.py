@@ -114,7 +114,7 @@ console.log(JSON.stringify(out));
         self.assertTrue(got["ext"]["ext"])
         self.assertEqual(got["ext"]["kind"], "source")
         self.assertTrue(got["ext"]["label"].startswith("Source:"))
-        self.assertEqual(got["bad"]["href"], "/#wire")
+        self.assertEqual(got["bad"]["href"], "/wire")
         self.assertFalse(got["bad"]["ext"])
         self.assertEqual(got["bad"]["kind"], "fallback")
         self.assertEqual(got["trk"]["href"], "/#solar")

@@ -265,7 +265,7 @@ def wire_groups(now):
             return None
         return {
             "rank": int(rk or 0),
-            "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire",
+            "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/wire",
             "title": tt[:140],
             "loc": loc,
             "n_families": int(fam or 0),
@@ -335,7 +335,7 @@ def wire_groups(now):
             if len(tt) < 20 or re.match(r"^(www\.|https?:|#|@)", tt) or re.search("[\u2600-\u27BF\U0001F000-\U0001FFFF]", tt) or quakeish.search(tt): continue
             if not match(tt, cat, loc): continue
             ft = _iso(fs) or 0; ut = _iso(up) or ft
-            out.append({"title": tt, "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire", "t": ft or ut, "ut": ut,
+            out.append({"title": tt, "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/wire", "t": ft or ut, "ut": ut,
                         "rank": int(rk or 0), "n": int(fam or 0), "loc": loc, "us": UF.is_us(tt, loc)})
         return out
     def combo(store, key, kind, label, match, **kw):
@@ -410,7 +410,7 @@ def special_cards(now):
             if h:
                 st = {"title": h, "t": ut, "rank": rk, "single": wl != 0,
                       "src": "single source" if wl != 0 else "The Wire",
-                      "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/#wire"}
+                      "url": f"/wire/{cid}" if re.match(r"^[0-9a-f]{16}$", cid or "") else "/wire"}
             if ks: n7 += 1
             for k in ks:
                 d[k][1 if rk >= 7 else 0] += 1
@@ -706,7 +706,7 @@ def home_html(sn):
 <section class="bna-sec" aria-labelledby="bna_h_latest"><div class="bna-wrap bna-sech"><h2 id="bna_h_latest">The latest. <span>Ranked as it happens.</span></h2>
 <div class="bna-arrows"><button type="button" class="bna-arw" data-dir="-1" aria-label="Scroll back" aria-controls="bna_row_latest">&lsaquo;</button><button type="button" class="bna-arw" data-dir="1" aria-label="Scroll forward" aria-controls="bna_row_latest">&rsaquo;</button></div></div>
 <div class="bna-row" id="bna_row_latest" tabindex="0" aria-label="Top of the Wire"></div>
-<p class="bna-wrap bna-more"><a class="bna-lnk" href="/#wire">Open The Wire</a></p></section>
+<p class="bna-wrap bna-more"><a class="bna-lnk" href="/wire">Open The Wire</a></p></section>
 {_map_section()}
 {_board_html()}{_snap_js()}
 <section class="bna-sec bna-wrap"><div class="bna-brief"><div><h2>The Free brief. <span>The day, ranked.</span></h2><p>The highest-ranked events of the day, in one email.</p></div>

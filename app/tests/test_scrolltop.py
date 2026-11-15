@@ -53,14 +53,15 @@ class ScrollScript(unittest.TestCase):
         self.assertIn("scrollTo(0,0)", tag)
 
     def test_welcome_and_tos_still_link_as_intended(self):
-        # /wire (the bare path intent) and /#wire stay in the shared nav/welcome; acknowledgments id stays on Terms.
+        # The Wire nav/welcome links go to the standalone /wire page; acknowledgments id stays on Terms.
         head = sitenav.head_html("welcome")
         self.assertIn("/sitenav.js", head)
         import welcome, legal
         code, body, _ = welcome.handle_get("/welcome", {})
         self.assertEqual(code, 200)
         html = body if isinstance(body, str) else body.decode()
-        self.assertIn('href="/#wire"', html)
+        self.assertIn('href="/wire"', html)
+        self.assertNotIn('href="/#wire"', html)
         self.assertIn("window.bnScroll", html)
         code, body, _ = legal.handle_get("/tos", {})
         self.assertEqual(code, 200)

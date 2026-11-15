@@ -22,7 +22,7 @@ def logo_html():
     return '<span class="bn-word bna-wm" aria-label="BLACKOUT.NETWORK">BLACKOUT</span>' if apple_on() else LOGO_HTML
 
 # Text links shown in the bar on wide screens (everything is also in the sidebar).
-PRIMARY = [("threat", "/#wire", "The Wire"), ("sources", "/sources", "Sources"), ("newsletter", "/newsletter", "Newsletter")]
+PRIMARY = [("threat", "/wire", "The Wire"), ("sources", "/sources", "Sources"), ("newsletter", "/newsletter", "Newsletter")]
 
 _SVG = 'aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"'
 I_MENU = f'<svg {_SVG}><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>'
@@ -166,7 +166,7 @@ MENU3 = [
 ]
 # empty preview slots, filled by bn-v3.js from same-origin endpoints only when the menu opens (nothing is fetched at first paint)
 M3_PV = {
- "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/#wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
+ "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
  "threats": '<span class="m3-row3"><span><span class="m3-k">Kp index</span><b class="m3-big" data-pv="kp">&ndash;</b></span><span><span class="m3-k">Latest quake</span><b class="m3-big" data-pv="quake">&ndash;</b><span class="m3-sm" data-pv="quake-place"></span></span><span><span class="m3-k">Grid desk</span><b class="m3-big" data-pv="grid">&ndash;</b><span class="m3-sm" data-pv="grid-sub"></span></span></span><span class="m3-asof" data-pv="threats-asof"></span>',
  "prepare": '<a class="m3-h" href="/ready"><span class="m3-k">Everyday Readiness</span><span style="display:flex;margin:4px 0"><img src="/static/ready/01-72-hour-home-kit.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/02-water-at-home.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/03-power-outage-readiness.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/04-family-communication-plan.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/05-first-aid-and-medication-basics.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"></span><span class="m3-sm">Five printable one-page guides (PDF)</span></a>',
  "politics": '<span class="m3-k">Midterms 2026</span><span><b class="m3-big" data-pv="midterms">&ndash;</b> <span class="m3-sm" data-pv="midterms-unit"></span></span>',
@@ -196,6 +196,7 @@ def menu3_sections(sn):
             it = nav.get(key)
             hidden = bool(it and len(it) > 5 and it[5])
             if key in M3_SOON or hidden: rows.append((key, label, None))
+            elif key == "threat": rows.append((key, label, "/wire"))
             elif it: rows.append((key, label, it[1] if it[1].startswith("/") else "/#" + it[1]))
             elif key in M3_HREF: rows.append((key, label, M3_HREF[key]))
             else: rows.append((key, label, None))

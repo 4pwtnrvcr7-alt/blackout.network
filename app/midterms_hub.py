@@ -348,7 +348,7 @@ def render(now=None):
                                f'<div><b>{E(_et(lc.get("at"), "%a %-I %p ET"))}</b><span>Last polls close ({E(lc.get("where"))})</span></div>')
     wire = _wire_items()
     rel = ("<ul class=\"mh-list\">" + "".join(f'<li><a href="{E(w["url"])}">{E(w["title"])}</a> <span class="meta">{E(w["meta"])}</span></li>' for w in wire) + "</ul>"
-           if wire else '<p>No ranked election stories on The Wire right now. The live feed is on <a href="/#wire">The Wire</a>.</p>')
+           if wire else '<p>No ranked election stories on The Wire right now. The live feed is on <a href="/wire">The Wire</a>.</p>')
     gen = b.get("generic") or {}; cols = gen.get("columns") or []
     grows = "".join('<tr><td>' + E(r.get("source")) + '</td>' + "".join(f'<td>{E((r.get("values") or {}).get(c, ""))}</td>' for c in cols)
                     + f'<td>{E(r.get("updated") or "")}</td></tr>' for r in (gen.get("rows") or [])[:8])

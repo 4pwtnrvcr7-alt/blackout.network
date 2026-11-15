@@ -264,7 +264,7 @@ def page(qs):
 </select></label>
 </div>
 <div id="bn_sig_map" class="bn-sig-map" role="group" aria-label="World map. Hover or tap a dot for the headline, rank and time."></div>
-<noscript><p class="bn-sig-note">The map needs JavaScript. <a href="/#wire">The Wire</a> lists the same stories.</p></noscript>
+<noscript><p class="bn-sig-note">The map needs JavaScript. <a href="/wire">The Wire</a> lists the same stories.</p></noscript>
 </div>
 <script src="/api/signal/leaflet.js"></script><script src="/api/signal/app.js"></script>
 <script>if(window.BNSignal)BNSignal.mount(document.getElementById("bn_map_page"));</script>

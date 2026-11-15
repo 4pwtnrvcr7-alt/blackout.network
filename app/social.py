@@ -150,7 +150,7 @@ def social_page():
                  f'<a href="{S.E(p["url"])}" target="_blank" rel="noopener">View on X</a>' + (f' · <a href="{S.E(p["story"])}">Read &amp; watch on BLACKOUT.NETWORK</a>' if p["story"] else "")
                  + '</div></div>' for p in data["x"])
     xs = xs or f'<div class="empty" style="padding:14px"><b>{LAUNCH}</b>Posts from <a href="{X_URL}" target="_blank" rel="noopener">@BLKOUTNTW</a> will appear here.</div>'
-    body = ('<p class="crumb"><a href="/#wire">The Wire</a> › Videos &amp; posts</p><h1 class="t">Videos &amp; posts</h1>'
+    body = ('<p class="crumb"><a href="/wire">The Wire</a> › Videos &amp; posts</p><h1 class="t">Videos &amp; posts</h1>'
             '<p class="dek">BLACKOUT.NETWORK’s video reports and posts, each with a full, sourced write-up on this site.</p>' + _follow_btns() +
             f'<section style="margin-top:8px"><h2 style="font-size:19px">▶ YouTube · @blkoutntw</h2>{vid}</section>'
             f'<section class="card" style="margin-top:18px"><h2>𝕏 Latest from @BLKOUTNTW</h2>{xs}</section>')
@@ -173,7 +173,7 @@ def story_page(s, preview=False):
     banner = ('<div class="card" style="border-color:#f5a524;color:#f5a524"><b>PREVIEW</b> — this page is hidden until the video premieres '
               f'({S.E(et(s.get("publish_at")))}). Not indexed; do not share.</div>') if preview else ""
     meta = " · ".join(x for x in [("Published " + et(s.get("publish_at"))) if s.get("publish_at") else "", ("Data window: " + s["data_window"]) if s.get("data_window") else ""] if x)
-    body = (banner + '<p class="crumb"><a href="/#wire">The Wire</a> › <a href="/social">Videos &amp; posts</a> › Story</p>'
+    body = (banner + '<p class="crumb"><a href="/wire">The Wire</a> › <a href="/social">Videos &amp; posts</a> › Story</p>'
             f'<h1 class="t">{S.E(s.get("title"))}</h1><p class="dek">{S.E(s.get("dek") or "")}</p><p class="meta">{S.E(meta)}</p>'
             + player + btns + f'<article class="article">{S.blocks(s.get("article"))}</article>'
             + (f'<section class="card"><h2>Sources</h2><ul>{src}</ul></section>' if src else "")
@@ -203,6 +203,6 @@ def handle_get(path, qs):
         if s and is_public(s): return 200, story_page(s), "text/html"
         if s and preview_ok((qs.get("preview") or [""])[0], s["slug"]): return 200, story_page(s, preview=True), "text/html"
         body = ('<h1 class="t">Story not found</h1><p class="dek">This story isn’t published yet or doesn’t exist. '
-                'See <a href="/social">Videos &amp; posts</a> or <a href="/#wire">The Wire</a>.</p>')
+                'See <a href="/social">Videos &amp; posts</a> or <a href="/wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is not available.", body, p, "@social", noindex=True), "text/html"
     return 404, {"error": "not found"}

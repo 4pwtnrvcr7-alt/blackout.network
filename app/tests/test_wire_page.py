@@ -102,3 +102,28 @@ class Page(unittest.TestCase):
         finally:
             sqlite3.connect = orig
         self.assertEqual(opened, [])
+
+
+class NavHrefs(unittest.TestCase):
+    def test_primary_and_drawer_point_at_standalone_wire(self):
+        import sitenav_ui as UI, re
+        href = next(h for k, h, l in UI.PRIMARY if k == "threat")
+        self.assertEqual(href, "/wire")
+        html = sitenav.header_html("threat")
+        self.assertRegex(html, r'href="/wire"[^>]*>The Wire</a>')
+        self.assertNotIn('href="/#wire">The Wire</a>', html)
+        self.assertIn('class="bn-word bna-wm"', html)
+        self.assertNotIn("bn-icon", html)  # apple-style text wordmark, no old logo mark
+        self.assertIn('data-tab="threat"', html)
+        for m in re.finditer(r'<a[^>]*>The Wire</a>', html):
+            tag = m.group(0)
+            self.assertIn('href="/wire"', tag)
+            self.assertNotIn("/#wire", tag)
+
+    def test_homepage_see_all_and_js_do_not_trap_wire(self):
+        import pathlib, apple_v1
+        text = pathlib.Path(apple_v1.__file__).read_text()
+        self.assertIn('href="/wire">Open The Wire</a>', text)
+        root = pathlib.Path(__file__).resolve().parents[1]
+        self.assertIn('if(k==="threat")return', (root / "static" / "sitenav.js").read_text())
+        self.assertIn('href="/wire">The Wire</a>', (root / "static" / "bn-apple.js").read_text())

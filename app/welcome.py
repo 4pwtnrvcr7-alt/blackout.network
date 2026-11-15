@@ -109,7 +109,7 @@ ICONS = {
 }
 
 TOOLS = [
-    ("wire", "The Wire", "The live threat feed, ranked 0–10 and linked to its sources.", "/#wire"),
+    ("wire", "The Wire", "The live threat feed, ranked 0–10 and linked to its sources.", "/wire"),
     ("score", "How we score", "The 0–100 score and the 0–10 rank, explained factor by factor.", "/scoring"),
     ("alerts", "Alerts", "Instant push alerts, sent only for rank 7+ stories confirmed by independent sources.", None),
     ("brief", "Free brief", "The highest-ranked events of the day, in one email. Free, double opt-in.", "/newsletter"),
@@ -296,7 +296,7 @@ def _render():
         "<li><p>The data is for research and situational awareness only. This is not an official warning service. "
         "Follow official agencies for instructions in an emergency.</p></li></ul>"
         '<p class="wel-cta"><button type="button" class="wel-btn" data-next>Get started</button>'
-        '<a class="wel-btn wel-btn-2" href="/#wire">Skip to The Wire</a></p>', 1)
+        '<a class="wel-btn wel-btn-2" href="/wire">Skip to The Wire</a></p>', 1)
 
     interests = _step("interests", "What should we watch for you?",
         "<p class=\"wel-lede\">Pick any that matter. If you skip this, you will get every category in the brief. You can change it later.</p>"
@@ -396,7 +396,7 @@ def _render():
         '<p class="wel-lede">Everything below is live on this site. Open any of them, or start on The Wire — the live feed, ranked as it happens.</p>'
         f'<div class="wel-grid">{cards}</div>'
         f'<p class="wel-also">Also in the menu: {also}.</p>'
-        '<p class="wel-cta"><a class="wel-btn" href="/#wire">Open The Wire</a>'
+        '<p class="wel-cta"><a class="wel-btn" href="/wire">Open The Wire</a>'
         '<a class="wel-btn wel-btn-2" href="/newsletter">Newsletter page</a></p>')
 
     return (
@@ -410,11 +410,11 @@ def _render():
         + '<div class="wel-shell"><div class="wel-bar">'
         '<button type="button" class="wel-navbtn" data-back hidden>Back</button>'
         + _dots()
-        + '<a class="wel-skip" href="/#wire">Skip to The Wire</a></div>'
+        + '<a class="wel-skip" href="/wire">Skip to The Wire</a></div>'
         + _network_art()
         + f'<main class="wel-stage" id="main">{hero}{interests}{brief}{inbox}{install}{follow}{tools}</main></div>'
         '<footer class="wel-foot"><p>Research-only data. Not official alerts.</p>'
-        '<p><a href="/#wire">The Wire</a> · <a href="/newsletter">Newsletter</a> · '
+        '<p><a href="/wire">The Wire</a> · <a href="/newsletter">Newsletter</a> · '
         '<a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p>'
         "<p>BLACKOUT.NETWORK. Signal over noise.&trade;</p></footer>"
         '<script src="/welcome.js" defer></script>'

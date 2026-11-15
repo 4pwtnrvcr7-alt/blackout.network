@@ -59,7 +59,7 @@
     return null;
   }
   function fallback(c) {
-    var cat = String(c && c.category || ""), href = "/#wire";
+    var cat = String(c && c.category || ""), href = "/wire";
     if (cat === "natural disaster") href = "/#weather";
     else if (cat === "space weather") href = "/#solar";
     else if (cat === "political") href = "/#politics";
