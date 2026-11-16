@@ -2966,7 +2966,8 @@ def run_crime_alerts(at=None, c=None, dry_run=False, only_email=None):
     if out: log(f"crime alerts: {out}", "breaking")
     return out
 
-def run_due(at=None):
+HELD = {}   # Nov 16: slots this process will not catch up on its own (missed while the service was down); owner sends via send_now
+def run_due(at=None, hold_before=None):
     """Called every ~30 s by newsletter_worker.py. Idempotent per slot: the slot_runs row is written before anything is sent and each
     (subscriber, slot) pair is UNIQUE in sends, so restarts never double-send. Catch-up: a slot missed while the box was down is sent
     once if we're within catchup_hours (2 h) of it, otherwise recorded as skipped. Failed sends retry with backoff (2, 10, 30 min).
@@ -2984,6 +2985,11 @@ def run_due(at=None):
                 k = db(); r = k.execute("SELECT * FROM slot_runs WHERE slot_key=?", (key,)).fetchone()
                 late = (at - t) > timedelta(hours=float(c["catchup_hours"]))
                 if r is None:
+                    if hold_before is not None and t < hold_before and not late and not c.get("paused") and (at - t) > timedelta(minutes=5):
+                        # Nov 16: this instance was not up (restart/OOM) at slot time. Never auto-send a catch-up on boot; leave it for an
+                        # owner-approved /internal/newsletter/send_now. No row is written, so the normal "skipped" record lands after the window.
+                        if key not in HELD: HELD[key] = iso(at); log(f"slot {key} ({fmt_et(t)}): held: missed while this instance was down; catch-up needs owner OK (send_now)", "slot")
+                        k.close(); continue
                     if c.get("paused"): status, note = "paused", "pause-all was on at slot time"
                     elif late and fresh: status, note = "skipped", "before the newsletter was installed"
                     elif late: status, note = "skipped", f"missed (worker or box down at slot time); more than {c['catchup_hours']} h late, so not sent"

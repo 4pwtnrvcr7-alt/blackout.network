@@ -98,8 +98,10 @@ def _nl_lookup(NL, em):
     try: r = k.execute("SELECT status, created, confirmed_at FROM subscribers WHERE email=?", (str(em).strip().lower(),)).fetchone()
     finally: k.close()
     return dict(r) if r else "not found"
+NL_READY = {"at": None}   # Nov 16: first moment this process could run the scheduler (restored + render_scheduler on)
 def _nl_tick():
     import fcntl
+    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
     while True:
         time.sleep(45)
         try:
@@ -107,10 +109,13 @@ def _nl_tick():
             if FREEZE["until"] > time.time(): continue                      # handing newsletter.db to a new deploy: it runs the next slot
             import newsletter as NL
             if not NL.cfg().get("render_scheduler"): continue
+            if NL_READY["at"] is None: NL_READY["at"] = _dt.now(_tz.utc) - _td(seconds=60)   # 60 s grace for the first tick
+            # A clean deploy handoff means the previous instance was serving until moments ago (it froze for us): run due slots normally.
+            hold = None if HANDOFF.get("state") == "done" else NL_READY["at"]
             with open(os.path.join(STATE, "newsletter_sched.lock"), "w") as lk:
                 try: fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except OSError: continue
-                for key, st in NL.run_due(): print(f"newsletter slot {key}: {st}", flush=True)
+                for key, st in NL.run_due(hold_before=hold): print(f"newsletter slot {key}: {st}", flush=True)
         except Exception: traceback.print_exc()
 threading.Thread(target=_nl_tick, name="nl-sched", daemon=True).start()
 
@@ -548,7 +553,7 @@ class RH(server.H):
             if path.endswith("/status"):
                 st = NL.admin_stats()
                 return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
-                                       "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"],
+                                       "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"], "held": dict(NL.HELD),
                                        "lookup": _nl_lookup(NL, d.get("email"))})
             if path.endswith("/send_now"):   # Nov 8: owner-approved one-off send of a brief slot (e.g. a missed morning). Box-signed; once per key.
                 slot = d.get("slot") if d.get("slot") in ("morning", "evening") else None

@@ -27,7 +27,7 @@
   "email_per_day": 3
  },
  "mx_check": false,
- "live_sending_approved": false,
+ "live_sending_approved": true,
  "transactional_sending_approved": true,
  "outbox_retention_days": 30,
  "retry_backoff_minutes": [
@@ -36,5 +36,19 @@
   30
  ],
  "editorial_ttl_hours": 24,
- "watchlist_enabled": false
+ "watchlist_enabled": false,
+ "render_scheduler": true,
+ "breaking": {
+  "min_gap_hours": 2,
+  "max_per_day": 3,
+  "quiet_start": 22,
+  "quiet_end": 7,
+  "quiet_min_rank": 9
+ },
+ "crime_alerts": {
+  "enabled": true,
+  "test_only": false,
+  "_note": "t392/t414: real-time crime alert emails ON (Matt approved 2026-11-01 2:02 PM ET). Opt-in only; dedupe per subscriber+incident; shares breaking caps (max_per_day 3, min_gap_hours 2, quiet 22-7 ET)."
+ },
+ "_restart_note": "Nov 16 2026: committed defaults carry Matt's approved live switches (live sending, Render scheduler, breaking/crime caps) so a Render restart comes back live. No secrets here; mail keys stay in Render env. Boot never sends a missed-slot catch-up (render_app _nl_tick hold)."
 }
