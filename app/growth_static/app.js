@@ -135,7 +135,8 @@ function bar(){if(NOPOP||subscribed()||isNL||mapRoot()||document.getElementById(
 function nlPage(){if(!isNL)return;var m=/[?&]utm_source=([A-Za-z0-9_-]{1,12})/.exec(location.search);if(m)document.querySelectorAll("form[data-nl-form] input[name=source]").forEach(function(i){i.value="page_"+m[1].toLowerCase()});
  if(document.querySelector(".nl-result.ok")&&/confirm/.test(location.pathname))markSub()}
 function scan(){if(!ready)return;inlines();["feed","watch"].forEach(function(id){enhanceFeed(document.getElementById(id))});footer();signup();share()}
-function q(){var m=/[?&]q=([^&#]+)/.exec(location.search);if(!m||!window.bnMenuOpen)return;var v=decodeURIComponent(m[1].replace(/\+/g," ")).slice(0,120);
+function q(){if(/^\/crime(\/|$)/.test(location.pathname))return;   /* /crime owns ?q= (a place lookup, same as ?place=); never open the site search drawer there */
+ var m=/[?&]q=([^&#]+)/.exec(location.search);if(!m||!window.bnMenuOpen)return;var v=decodeURIComponent(m[1].replace(/\+/g," ")).slice(0,120);
  window.bnMenuOpen({search:true});setTimeout(function(){var i=document.getElementById("bns_q");if(!i)return;i.value=v;i.dispatchEvent(new Event("input",{bubbles:true}));var f=i.closest("form");if(f&&f.requestSubmit)f.requestSubmit()},150)}
 function watchMap(){function sync(){document.documentElement.classList.toggle("bn-sig-visible",mapOnScreen())}sync();addEventListener("scroll",sync,{passive:true});var el=document.getElementById("bn_sig");if(el&&"IntersectionObserver"in window)new IntersectionObserver(sync,{threshold:[0,0.2]}).observe(el)}
 function start(){watchMap();fetch("/api/growth/data").then(function(r){return r.json()}).then(function(j){D=j||D}).catch(function(){}).then(function(){ready=true;scan()});
