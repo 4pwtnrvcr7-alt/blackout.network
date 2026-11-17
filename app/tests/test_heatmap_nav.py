@@ -102,6 +102,12 @@ class FollowAndFooter(unittest.TestCase):
         self.assertNotRegex(css, r"\.bng-foot[^{]*\{[^}]*#c8102e")
         self.assertIn("footer.h-foot .bn-legal-links,footer.h-foot .bn-cred-link{display:contents}", css)
         self.assertIn(".w2-foot .bn-legal-links,.w2-foot .bn-cred-link{display:inline;font-size:12px", css)
+        # Matt 5:43 PM: newsletter kicker is grey/white, never red
+        self.assertIn(".bng-cta-k{", css)
+        k = css.split(".bng-cta-k{",1)[1].split("}",1)[0]
+        self.assertNotRegex(k, r"#ff4d5e|#c8102e|#FF4D|200,16,46")
+        self.assertRegex(k, r"rgba\(240,240,250|#[89A-Fa-f][0-9A-Fa-f]{5}|#F2F2F4|#C9CDD3")
+
 
     def test_home_shows_follow_above_footer(self):
         h = theme.home_page()
