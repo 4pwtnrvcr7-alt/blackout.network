@@ -55,8 +55,11 @@
 @media (prefers-reduced-motion:reduce){.bnt-acc-b,.bnt-peek .bnt-peek-d,.bnt-btn,.bnt-btn::before{transition:none!important}}
 
 /* Nov 17 2026 Phase 2: one dark top bar on every page, in both themes (CoS 1:00 AM: no white header over dark content) */
-html .bn-top{background:rgba(5,6,10,.9)!important;border-bottom:1px solid rgba(240,240,250,.08)!important;color:#F0F0FA!important;color-scheme:dark;
- -webkit-backdrop-filter:saturate(1.4) blur(18px)!important;backdrop-filter:saturate(1.4) blur(18px)!important}
+html .bn-top{background:#05060a!important;border-bottom:1px solid rgba(240,240,250,.08)!important;color:#F0F0FA!important;color-scheme:dark;
+ -webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important;background-image:none!important}
+/* iOS Safari (Matt 4:10 PM): a solid bar so Safari tints the status area to match instead of laying its dark edge shade over a
+   see-through bar; it keeps sitenav.css padding below the notch (--bn-safe-top = env(safe-area-inset-top), viewport-fit=cover) and sits above every hero layer. */
+html body header.bn-top{z-index:2400!important;isolation:isolate}
 html .bn-top .bn-tbar{color:#F0F0FA!important}
 html .bn-top .bn-logo,html .bn-top .bn-ib,html .bn-top .bn-follow,html .bn-top .bn-burger,html .bn-top .bn-rf-st{color:#F0F0FA!important}
 html .bn-top .bn-primary a:not(.bna-cta){color:rgba(240,240,250,.78)!important}

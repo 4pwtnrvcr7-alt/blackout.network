@@ -41,7 +41,7 @@ P = {  # every path is overridable by env var for tests (NEWSLETTER_DB, NEWSLETT
     "dir_db": os.environ.get("NEWSLETTER_DIR_DB", os.path.join(BASE, "sources_dir", "directory.db")),  # global directory (read-only here)
 }
 BRAND = "BLACKOUT.NETWORK"   # brand is always written in capitals in every email and page (t300)
-TAGLINE = "Signal over noise.\u2122"   # global tagline (t326u): small supporting line under the masthead domain and in the footer
+TAGLINE = "Global threat monitoring"   # Matt, Nov 17 2026 (was "Signal over noise.")   # global tagline (t326u): small supporting line under the masthead domain and in the footer
 DISCLAIMER = ("Research only. BLACKOUT.NETWORK is not an official warning service. Items are machine-collected and scored; "
               "always verify with official sources before acting.")
 PRIVACY = "Email only used for this newsletter; unsubscribe anytime. We count opens and clicks to improve it; in the EEA, UK and Switzerland only if you tick the box."
@@ -2028,6 +2028,12 @@ def render(issue, links, c=None):
     """-> (subject, html, text). links: dict with unsubscribe, manage, scoring, site (+ _row: the subscriber row, for Follow links).
     Layout v2 (newsletter_v2.py, Nov 13 2026) by default; BN_NL_V2=0 or config "template": "v1" restores this layout; any v2 error falls back to this layout."""
     c = c or cfg()
+    try:
+        import newsletter_v4 as NV4   # layout v4 (Nov 17 2026): site design; BN_NL_V4=0 or "template": "v2" falls back to v2
+        if NV4.on(c):
+            return NV4.render(issue, links, c)
+    except Exception as ex:
+        log(f"layout v4 failed, using v2: {type(ex).__name__}: {ex}"[:300], "qa")
     try:
         import newsletter_v2 as NV2
         if NV2.on(c):

@@ -246,3 +246,12 @@ class V2Tests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+_V4_PREV = None
+def setUpModule():   # these tests cover layout v2; v4 (default since Nov 17 2026) is switched off here
+    global _V4_PREV
+    _V4_PREV = os.environ.get("BN_NL_V4"); os.environ["BN_NL_V4"] = "0"
+def tearDownModule():
+    if _V4_PREV is None: os.environ.pop("BN_NL_V4", None)
+    else: os.environ["BN_NL_V4"] = _V4_PREV

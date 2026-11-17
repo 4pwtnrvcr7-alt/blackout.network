@@ -189,6 +189,9 @@ M3_PV = {
 # Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
 M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near", "meshguide": "/mesh/guide"}
 M3_SOON = set()
+# Menu items that open a full page rather than their /live tab (Matt 4:07 PM Nov 17: Heat Map opens the full-screen map).
+# The "@" key keeps sitenav.js from trapping the click as a dashboard tab switch; /live#heatmap keeps working.
+M3_PAGE = {"heatmap": ("@map", "/map")}
 
 def menu3_sections(sn):
     nav = {it[0]: it for g, its in sn.NAV for it in its}
@@ -209,6 +212,7 @@ def menu3_sections(sn):
             hidden = bool(it and len(it) > 5 and it[5])
             if key in M3_SOON or hidden: rows.append((key, label, None))
             elif key == "threat": rows.append((key, label, "/wire"))
+            elif key in M3_PAGE: rows.append(M3_PAGE[key][:1] + (label,) + M3_PAGE[key][1:])   # full-screen page instead of the /live tab
             elif it: rows.append((key, label, it[1] if it[1].startswith("/") else "/live#" + it[1]))   # dashboard tabs live on /live (Nov 17)
             elif key in M3_HREF: rows.append((key, label, M3_HREF[key]))
             else: rows.append((key, label, None))

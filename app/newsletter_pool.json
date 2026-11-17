@@ -1,0 +1,536 @@
+{
+ "note": "Newsletter v4 topic divider pool (Wikimedia Commons: public domain or CC; credits on /credits#newsletter). Rotated per issue, no repeat inside a topic until its pool cycles.",
+ "images": [
+  {
+   "name": "nlwara-d.jpg",
+   "topic": "war",
+   "title": "Flickr - Official U.S. Navy Imagery - Aircraft carrier at sea.",
+   "page": "https://commons.wikimedia.org/wiki/File:Flickr_-_Official_U.S._Navy_Imagery_-_Aircraft_carrier_at_sea..jpg",
+   "license": "Public domain",
+   "artist": "Mass Communication Specialist Seaman Ricardo R. Guzman/U.S. Navy",
+   "bytes": 131009
+  },
+  {
+   "name": "nlwarb-d.jpg",
+   "topic": "war",
+   "title": "Flickr - Official U.S. Navy Imagery - Two Navy aircraft carriers together at sea.",
+   "page": "https://commons.wikimedia.org/wiki/File:Flickr_-_Official_U.S._Navy_Imagery_-_Two_Navy_aircraft_carriers_together_at_sea..jpg",
+   "license": "Public domain",
+   "artist": "Official Navy Page from United States of America MC3 (AW) William Pittman/U.S. Navy",
+   "bytes": 154334
+  },
+  {
+   "name": "nlwarc-d.jpg",
+   "topic": "war",
+   "title": "Flickr - Official U.S. Navy Imagery - Two Navy aircraft carriers together at sea. (1)",
+   "page": "https://commons.wikimedia.org/wiki/File:Flickr_-_Official_U.S._Navy_Imagery_-_Two_Navy_aircraft_carriers_together_at_sea._(1).jpg",
+   "license": "Public domain",
+   "artist": "Official Navy Page from United States of America MC3 (AW) William Pittman/U.S. Navy",
+   "bytes": 99258
+  },
+  {
+   "name": "nlward-d.jpg",
+   "topic": "war",
+   "title": "USAF fighter jets practice for inauguration flyover 170119-F-UN009-383",
+   "page": "https://commons.wikimedia.org/wiki/File:USAF_fighter_jets_practice_for_inauguration_flyover_170119-F-UN009-383.jpg",
+   "license": "Public domain",
+   "artist": "Airman 1st Class Derek Seifert",
+   "bytes": 23915
+  },
+  {
+   "name": "nlware-d.jpg",
+   "topic": "war",
+   "title": "U S Air Force and The Philippine Air Force conduct bilateral training (8590880)",
+   "page": "https://commons.wikimedia.org/wiki/File:U_S_Air_Force_and_The_Philippine_Air_Force_conduct_bilateral_training_(8590880).jpg",
+   "license": "Public domain",
+   "artist": "U.S. Air Force photo by Senior Airman Mitchell Corley",
+   "bytes": 65498
+  },
+  {
+   "name": "nlwarf-d.jpg",
+   "topic": "war",
+   "title": "\"Star Lord\" blasts through Desert Scimitar 150413-M-PC317-207",
+   "page": "https://commons.wikimedia.org/wiki/File:%22Star_Lord%22_blasts_through_Desert_Scimitar_150413-M-PC317-207.jpg",
+   "license": "Public domain",
+   "artist": "Sgt. Christopher J. Moore",
+   "bytes": 66044
+  },
+  {
+   "name": "nlwarg-d.jpg",
+   "topic": "war",
+   "title": "Two French Air Force Rafale fighter aircraft, below, prepare to break formation after refueling with a U.S. Ai",
+   "page": "https://commons.wikimedia.org/wiki/File:Two_French_Air_Force_Rafale_fighter_aircraft,_below,_prepare_to_break_formation_after_refueling_with_a_U.S._Air_Force_KC-135_Stratotanker_aircraft_with_the_351st_Expeditionary_Air_Refueling_Squadron_over_Mali_130423-F-DT859-086.jpg",
+   "license": "Public domain",
+   "artist": "1st Lt Christopher Mesnard",
+   "bytes": 66623
+  },
+  {
+   "name": "nlwarh-d.jpg",
+   "topic": "war",
+   "title": "U S Air Force and The Philippine Air Force conduct bilateral training (8590877)",
+   "page": "https://commons.wikimedia.org/wiki/File:U_S_Air_Force_and_The_Philippine_Air_Force_conduct_bilateral_training_(8590877).jpg",
+   "license": "Public domain",
+   "artist": "U.S. Air Force photo by Senior Airman Mitchell Corley",
+   "bytes": 78727
+  },
+  {
+   "name": "nlwari-d.jpg",
+   "topic": "war",
+   "title": "Kentcuky Airmen provide tactical airlift for RAFL26 formation flight (9765130)",
+   "page": "https://commons.wikimedia.org/wiki/File:Kentcuky_Airmen_provide_tactical_airlift_for_RAFL26_formation_flight_(9765130).jpg",
+   "license": "Public domain",
+   "artist": "U.S. Air Force 103AW by Master Sgt. Sarah McClanahan",
+   "bytes": 117927
+  },
+  {
+   "name": "nlwarj-d.jpg",
+   "topic": "war",
+   "title": "Abrams in formation",
+   "page": "https://commons.wikimedia.org/wiki/File:Abrams_in_formation.jpg",
+   "license": "Public domain",
+   "artist": "PHC D. W. HOLMES II, US Navy",
+   "bytes": 119201
+  },
+  {
+   "name": "nlheala-d.jpg",
+   "topic": "health",
+   "title": "Novel Coronavirus SARS-CoV-2",
+   "page": "https://commons.wikimedia.org/wiki/File:Novel_Coronavirus_SARS-CoV-2.jpg",
+   "license": "CC BY 2.0",
+   "artist": "NIAID-RML",
+   "bytes": 101301
+  },
+  {
+   "name": "nlhealb-d.jpg",
+   "topic": "health",
+   "title": "Novel Coronavirus SARS-CoV-2 (49531042907)",
+   "page": "https://commons.wikimedia.org/wiki/File:Novel_Coronavirus_SARS-CoV-2_(49531042907).jpg",
+   "license": "CC BY 2.0",
+   "artist": "National Institute of Allergy and Infectious Diseases (NIAID)",
+   "bytes": 120273
+  },
+  {
+   "name": "nlhealc-d.jpg",
+   "topic": "health",
+   "title": "Novel Coronavirus SARS-CoV-2 (49557550706)",
+   "page": "https://commons.wikimedia.org/wiki/File:Novel_Coronavirus_SARS-CoV-2_(49557550706).jpg",
+   "license": "CC BY 2.0",
+   "artist": "National Institute of Allergy and Infectious Diseases (NIAID)",
+   "bytes": 131986
+  },
+  {
+   "name": "nlheald-d.jpg",
+   "topic": "health",
+   "title": "Novel Coronavirus SARS-CoV-2 (49557550781)",
+   "page": "https://commons.wikimedia.org/wiki/File:Novel_Coronavirus_SARS-CoV-2_(49557550781).jpg",
+   "license": "CC BY 2.0",
+   "artist": "National Institute of Allergy and Infectious Diseases (NIAID)",
+   "bytes": 130244
+  },
+  {
+   "name": "nlheale-d.jpg",
+   "topic": "health",
+   "title": "Novel Coronavirus SARS-CoV-2 (49557785727)",
+   "page": "https://commons.wikimedia.org/wiki/File:Novel_Coronavirus_SARS-CoV-2_(49557785727).jpg",
+   "license": "CC BY 2.0",
+   "artist": "National Institute of Allergy and Infectious Diseases (NIAID)",
+   "bytes": 122595
+  },
+  {
+   "name": "nlhealf-d.jpg",
+   "topic": "health",
+   "title": "CDC scientist transfers H7N9",
+   "page": "https://commons.wikimedia.org/wiki/File:CDC_scientist_transfers_H7N9.png",
+   "license": "Public domain",
+   "artist": "James Gathany",
+   "bytes": 70912
+  },
+  {
+   "name": "nlhazaa-d.jpg",
+   "topic": "hazards",
+   "title": "Cyclone Catarina from the ISS on March 26 2004",
+   "page": "https://commons.wikimedia.org/wiki/File:Cyclone_Catarina_from_the_ISS_on_March_26_2004.JPG",
+   "license": "Public domain",
+   "artist": "Astronaut photograph ISS008-E-19646 was taken March 7, 2004, with a Kodak DCS760 digital c",
+   "bytes": 97318
+  },
+  {
+   "name": "nlhazab-d.jpg",
+   "topic": "hazards",
+   "title": "Dramatic Views of Hurricane Florence from the International Space Station From 9 12 (42828603210)",
+   "page": "https://commons.wikimedia.org/wiki/File:Dramatic_Views_of_Hurricane_Florence_from_the_International_Space_Station_From_9_12_(42828603210).jpg",
+   "license": "CC BY 2.0",
+   "artist": "NASA/Goddard Space Flight Center",
+   "bytes": 116018
+  },
+  {
+   "name": "nlhazac-d.jpg",
+   "topic": "hazards",
+   "title": "Hurricane -Patricia approaches -Mexico. It's massive. Be careful! -YearInSpace",
+   "page": "https://commons.wikimedia.org/wiki/File:Hurricane_-Patricia_approaches_-Mexico._It%27s_massive._Be_careful!_-YearInSpace.jpg",
+   "license": "Public domain",
+   "artist": "NASA/Scott Kelly",
+   "bytes": 74816
+  },
+  {
+   "name": "nlhazad-d.jpg",
+   "topic": "hazards",
+   "title": "Hurricane Florence Viewed from the Space Station",
+   "page": "https://commons.wikimedia.org/wiki/File:Hurricane_Florence_Viewed_from_the_Space_Station.jpg",
+   "license": "Public domain",
+   "artist": "NASA",
+   "bytes": 138631
+  },
+  {
+   "name": "nlhazae-d.jpg",
+   "topic": "hazards",
+   "title": "Hurricane Isabel eye from ISS (edit 1)",
+   "page": "https://commons.wikimedia.org/wiki/File:Hurricane_Isabel_eye_from_ISS_(edit_1).jpg",
+   "license": "Public domain",
+   "artist": "NASA astronaut Ed Lu",
+   "bytes": 60169
+  },
+  {
+   "name": "nlhazaf-d.jpg",
+   "topic": "hazards",
+   "title": "Hurricane Isabel from ISS",
+   "page": "https://commons.wikimedia.org/wiki/File:Hurricane_Isabel_from_ISS.jpg",
+   "license": "Public domain",
+   "artist": "Mike Trenchard, Earth Sciences & Image Analysis Laboratory, NASA Johnson Space Center.",
+   "bytes": 68841
+  },
+  {
+   "name": "nlhazag-d.jpg",
+   "topic": "hazards",
+   "title": "Staring Down Hurricane Florence",
+   "page": "https://commons.wikimedia.org/wiki/File:Staring_Down_Hurricane_Florence.jpg",
+   "license": "Public domain",
+   "artist": "Alexander Gerst",
+   "bytes": 86670
+  },
+  {
+   "name": "nlhazah-d.jpg",
+   "topic": "hazards",
+   "title": "FEMA - 33313 - Firefighters at the Poomacha fire in California",
+   "page": "https://commons.wikimedia.org/wiki/File:FEMA_-_33313_-_Firefighters_at_the_Poomacha_fire_in_California.jpg",
+   "license": "Public domain",
+   "artist": "Andrea Booher",
+   "bytes": 59768
+  },
+  {
+   "name": "nlhazai-d.jpg",
+   "topic": "hazards",
+   "title": "FEMA - 33316 - Firefighters on the fire line in California",
+   "page": "https://commons.wikimedia.org/wiki/File:FEMA_-_33316_-_Firefighters_on_the_fire_line_in_California.jpg",
+   "license": "Public domain",
+   "artist": "Andrea Booher",
+   "bytes": 92863
+  },
+  {
+   "name": "nlhazaj-d.jpg",
+   "topic": "hazards",
+   "title": "Gusty Offshore Winds Continue to Fuel California Wildfires (NESDIS 2018-11-13)",
+   "page": "https://commons.wikimedia.org/wiki/File:Gusty_Offshore_Winds_Continue_to_Fuel_California_Wildfires_(NESDIS_2018-11-13).png",
+   "license": "Public domain",
+   "artist": "NOAA",
+   "bytes": 110097
+  },
+  {
+   "name": "nlpolia-d.jpg",
+   "topic": "politics",
+   "title": "Capitol at Dusk 2",
+   "page": "https://commons.wikimedia.org/wiki/File:Capitol_at_Dusk_2.jpg",
+   "license": "CC BY-SA 3.0",
+   "artist": "Martin Falbisoner",
+   "bytes": 61311
+  },
+  {
+   "name": "nlpolib-d.jpg",
+   "topic": "politics",
+   "title": "Capitol Building at Night",
+   "page": "https://commons.wikimedia.org/wiki/File:Capitol_Building_at_Night.JPG",
+   "license": "CC BY-SA 3.0",
+   "artist": "M.Fitzsimmons",
+   "bytes": 74883
+  },
+  {
+   "name": "nlpolic-d.jpg",
+   "topic": "politics",
+   "title": "Minnesota Capitol night, September 2012",
+   "page": "https://commons.wikimedia.org/wiki/File:Minnesota_Capitol_night,_September_2012.jpg",
+   "license": "CC BY-SA 2.0",
+   "artist": "Steve",
+   "bytes": 99201
+  },
+  {
+   "name": "nlpolid-d.jpg",
+   "topic": "politics",
+   "title": "US Capitol Building at night Jan 2006",
+   "page": "https://commons.wikimedia.org/wiki/File:US_Capitol_Building_at_night_Jan_2006.jpg",
+   "license": "Public domain",
+   "artist": "Diliff",
+   "bytes": 60868
+  },
+  {
+   "name": "nlpolie-d.jpg",
+   "topic": "politics",
+   "title": "Capitol Building Full View",
+   "page": "https://commons.wikimedia.org/wiki/File:Capitol_Building_Full_View.jpg",
+   "license": "Public domain",
+   "artist": "Noclip",
+   "bytes": 98954
+  },
+  {
+   "name": "nlpolif-d.jpg",
+   "topic": "politics",
+   "title": "US Capitol west side",
+   "page": "https://commons.wikimedia.org/wiki/File:US_Capitol_west_side.JPG",
+   "license": "CC BY-SA 3.0",
+   "artist": "Martin Falbisoner",
+   "bytes": 103451
+  },
+  {
+   "name": "nlpolig-d.jpg",
+   "topic": "politics",
+   "title": "US Capitol east side",
+   "page": "https://commons.wikimedia.org/wiki/File:US_Capitol_east_side.JPG",
+   "license": "CC BY-SA 3.0",
+   "artist": "Martin Falbisoner",
+   "bytes": 83012
+  },
+  {
+   "name": "nlworla-d.jpg",
+   "topic": "world",
+   "title": "Chicago, Illinois, pictured at night from the International Space Station (iss075e0099858)",
+   "page": "https://commons.wikimedia.org/wiki/File:Chicago,_Illinois,_pictured_at_night_from_the_International_Space_Station_(iss075e0099858).jpg",
+   "license": "Public domain",
+   "artist": "NASA Johnson Space Center",
+   "bytes": 69931
+  },
+  {
+   "name": "nlworlb-d.jpg",
+   "topic": "world",
+   "title": "ISS-20 Thunderstorms on the Brazilian Horizon",
+   "page": "https://commons.wikimedia.org/wiki/File:ISS-20_Thunderstorms_on_the_Brazilian_Horizon.jpg",
+   "license": "Public domain",
+   "artist": "NASA Expedition 20 crew",
+   "bytes": 83045
+  },
+  {
+   "name": "nlworlc-d.jpg",
+   "topic": "world",
+   "title": "ISS-38 Hawaiian Island chain",
+   "page": "https://commons.wikimedia.org/wiki/File:ISS-38_Hawaiian_Island_chain.jpg",
+   "license": "Public domain",
+   "artist": "NASA",
+   "bytes": 120052
+  },
+  {
+   "name": "nlworld-d.jpg",
+   "topic": "world",
+   "title": "ISS-40 Thunderheads near Borneo",
+   "page": "https://commons.wikimedia.org/wiki/File:ISS-40_Thunderheads_near_Borneo.jpg",
+   "license": "Public domain",
+   "artist": "NASA/Expedition 40 crew member",
+   "bytes": 108484
+  },
+  {
+   "name": "nlworle-d.jpg",
+   "topic": "world",
+   "title": "ISS-43 Northern Europe",
+   "page": "https://commons.wikimedia.org/wiki/File:ISS-43_Northern_Europe.jpg",
+   "license": "Public domain",
+   "artist": "NASA/Scott Kelly",
+   "bytes": 91473
+  },
+  {
+   "name": "nlworlf-d.jpg",
+   "topic": "world",
+   "title": "ISS-66 Atmospheric plume from 2022 Hunga Tonga eruption - edited",
+   "page": "https://commons.wikimedia.org/wiki/File:ISS-66_Atmospheric_plume_from_2022_Hunga_Tonga_eruption_-_edited.jpg",
+   "license": "Public domain",
+   "artist": "NASA / Kayla Barron",
+   "bytes": 79190
+  },
+  {
+   "name": "nlworlg-d.jpg",
+   "topic": "world",
+   "title": "City Lights of Asia and Middle East 2016",
+   "page": "https://commons.wikimedia.org/wiki/File:City_Lights_of_Asia_and_Middle_East_2016.png",
+   "license": "Public domain",
+   "artist": "NASA Earth Observatory",
+   "bytes": 62813
+  },
+  {
+   "name": "nlmonea-d.jpg",
+   "topic": "money",
+   "title": "Eccles Building (26088200676)",
+   "page": "https://commons.wikimedia.org/wiki/File:Eccles_Building_(26088200676).jpg",
+   "license": "Public domain",
+   "artist": "Federalreserve",
+   "bytes": 102178
+  },
+  {
+   "name": "nlmoneb-d.jpg",
+   "topic": "money",
+   "title": "US Federal Reserve Eccles Building 1937",
+   "page": "https://commons.wikimedia.org/wiki/File:US_Federal_Reserve_Eccles_Building_1937.jpg",
+   "license": "Public domain",
+   "artist": "Federalreserve",
+   "bytes": 119272
+  },
+  {
+   "name": "nlmonec-d.jpg",
+   "topic": "money",
+   "title": "2025 construction Eccles Federal Reserve Building Washington DC 2025-02-10 12-05-42",
+   "page": "https://commons.wikimedia.org/wiki/File:2025_construction_Eccles_Federal_Reserve_Building_Washington_DC_2025-02-10_12-05-42.jpg",
+   "license": "CC BY 4.0",
+   "artist": "G. Edward Johnson",
+   "bytes": 124661
+  },
+  {
+   "name": "nlcybea-d.jpg",
+   "topic": "cyber",
+   "title": "BalticServers data center",
+   "page": "https://commons.wikimedia.org/wiki/File:BalticServers_data_center.jpg",
+   "license": "CC BY-SA 3.0",
+   "artist": "BalticServers.com",
+   "bytes": 114337
+  },
+  {
+   "name": "nlcybeb-d.jpg",
+   "topic": "cyber",
+   "title": "Virginia Tech - data center",
+   "page": "https://commons.wikimedia.org/wiki/File:Virginia_Tech_-_data_center.jpg",
+   "license": "CC BY-SA 2.0",
+   "artist": "Christopher Bowns",
+   "bytes": 167313
+  },
+  {
+   "name": "nlcybec-d.jpg",
+   "topic": "cyber",
+   "title": "Wikimedia Foundation Servers-8055 13",
+   "page": "https://commons.wikimedia.org/wiki/File:Wikimedia_Foundation_Servers-8055_13.jpg",
+   "license": "CC BY-SA 3.0",
+   "artist": "Victorgrigas",
+   "bytes": 89012
+  },
+  {
+   "name": "nlcybed-d.jpg",
+   "topic": "cyber",
+   "title": "H-frame suspension pylon Wisconsin US 2017",
+   "page": "https://commons.wikimedia.org/wiki/File:H-frame_suspension_pylon_Wisconsin_US_2017.jpg",
+   "license": "CC BY-SA 2.0",
+   "artist": "Tony Webster",
+   "bytes": 48761
+  },
+  {
+   "name": "nlcybee-d.jpg",
+   "topic": "cyber",
+   "title": "Sunset with Power Lines (26993470630)",
+   "page": "https://commons.wikimedia.org/wiki/File:Sunset_with_Power_Lines_(26993470630).jpg",
+   "license": "CC BY 2.0",
+   "artist": "Eric Sonstroem from California, USA",
+   "bytes": 65654
+  },
+  {
+   "name": "nlcybef-d.jpg",
+   "topic": "cyber",
+   "title": "Transmission Lines at Sunset",
+   "page": "https://commons.wikimedia.org/wiki/File:Transmission_Lines_at_Sunset.jpg",
+   "license": "CC BY 4.0",
+   "artist": "Kkiefuik",
+   "bytes": 42683
+  },
+  {
+   "name": "nlspaca-d.jpg",
+   "topic": "space",
+   "title": "CRS-9 mission (28348649546)",
+   "page": "https://commons.wikimedia.org/wiki/File:CRS-9_mission_(28348649546).jpg",
+   "license": "CC0",
+   "artist": "SpaceX",
+   "bytes": 32786
+  },
+  {
+   "name": "nlspacb-d.jpg",
+   "topic": "space",
+   "title": "Falcon 9 Starlink 8-10 Launch (8623020)",
+   "page": "https://commons.wikimedia.org/wiki/File:Falcon_9_Starlink_8-10_Launch_(8623020).jpg",
+   "license": "Public domain",
+   "artist": "U.S. Space Force photo by Joshua Conti",
+   "bytes": 41120
+  },
+  {
+   "name": "nlspacc-d.jpg",
+   "topic": "space",
+   "title": "Falcon 9 Starlink 8-10 Launch (8623021)",
+   "page": "https://commons.wikimedia.org/wiki/File:Falcon_9_Starlink_8-10_Launch_(8623021).jpg",
+   "license": "Public domain",
+   "artist": "U.S. Space Force photo by Joshua Conti",
+   "bytes": 50968
+  },
+  {
+   "name": "nlspacd-d.jpg",
+   "topic": "space",
+   "title": "Falcon 9 rocket launch June 18 2024",
+   "page": "https://commons.wikimedia.org/wiki/File:Falcon_9_rocket_launch_June_18_2024.jpg",
+   "license": "CC0",
+   "artist": "Jebeadso",
+   "bytes": 63186
+  },
+  {
+   "name": "nlspace-d.jpg",
+   "topic": "space",
+   "title": "SES-10 Launch - world's first reflight of an orbital class rocket (33361035200)",
+   "page": "https://commons.wikimedia.org/wiki/File:SES-10_Launch_-_world%27s_first_reflight_of_an_orbital_class_rocket_(33361035200).jpg",
+   "license": "CC0",
+   "artist": "SpaceX",
+   "bytes": 61998
+  },
+  {
+   "name": "nlspacf-d.jpg",
+   "topic": "space",
+   "title": "Apollo 17 Night Launch - GPN-2000-001150",
+   "page": "https://commons.wikimedia.org/wiki/File:Apollo_17_Night_Launch_-_GPN-2000-001150.jpg",
+   "license": "Public domain",
+   "artist": "NASA",
+   "bytes": 76240
+  },
+  {
+   "name": "nlspacg-d.jpg",
+   "topic": "space",
+   "title": "Ares I-X at the Launch Pad",
+   "page": "https://commons.wikimedia.org/wiki/File:Ares_I-X_at_the_Launch_Pad.jpg",
+   "license": "Public domain",
+   "artist": "Bill Ingalls",
+   "bytes": 77947
+  },
+  {
+   "name": "nlspach-d.jpg",
+   "topic": "space",
+   "title": "Earth and international space station",
+   "page": "https://commons.wikimedia.org/wiki/File:Earth_and_international_space_station.jpg",
+   "license": "Public domain",
+   "artist": "NASA / pingnews.com",
+   "bytes": 106328
+  },
+  {
+   "name": "nlspaci-d.jpg",
+   "topic": "space",
+   "title": "Good Morning From the International Space Station",
+   "page": "https://commons.wikimedia.org/wiki/File:Good_Morning_From_the_International_Space_Station.jpg",
+   "license": "Public domain",
+   "artist": "Scott Kelly",
+   "bytes": 90247
+  },
+  {
+   "name": "nlspacj-d.jpg",
+   "topic": "space",
+   "title": "International Space Station star trails - JSC2012E039800",
+   "page": "https://commons.wikimedia.org/wiki/File:International_Space_Station_star_trails_-_JSC2012E039800.jpg",
+   "license": "Public domain",
+   "artist": "NASA/Don Pettit",
+   "bytes": 118645
+  }
+ ]
+}

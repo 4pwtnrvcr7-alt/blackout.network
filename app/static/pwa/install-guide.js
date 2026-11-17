@@ -15,6 +15,7 @@
   var ss = function (k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } };
   var ck = function (k, v) { try { if (v === undefined) return (document.cookie.match("(?:^|; )" + k + "=([^;]*)") || [])[1] || null;
     document.cookie = k + "=" + v + "; Max-Age=315360000; Path=/; SameSite=Lax" + (location.protocol === "https:" ? "; Secure" : ""); } catch (e) { return null; } };
+  var AUTO = "__BN_POPUPS__" === 1;   // pwa.py swaps in 1 only when Render env BN_POPUPS=1 (default 0: nothing opens by itself)
   var reduced = false; try { reduced = matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
 
   // ---------------- installed / dismissed ----------------
@@ -358,6 +359,7 @@
     forcedNa = q && /^(ask|granted|denied|error)$/.test(q) ? q : null;
     if (forcedNa) return setTimeout(function () { naRender(forcedNa, forcedNa === "error" ? { error: "Alerts are not available right now. Please try again later." } : { live: true }); }, 200);
     var E2 = naEnv();
+    if (!AUTO) return;                                                          // no automatic alerts soft-ask (BN_POPUPS)
     if (!standalone() || !E2.api || Notification.permission !== "default" || naSnoozed()) return;
     try { if ((JSON.parse(ls("bn_alerts") || "{}") || {}).on) return; } catch (e) {}
     setTimeout(function () { if (Notification.permission === "default" && !document.querySelector(".bnal.bnal-open")) naRender("ask"); }, DELAY + 600);
@@ -372,6 +374,7 @@
     maybeAsk((location.search.match(/[?&]bnna=([\w-]+)/) || [])[1] || null);
     if (forcedNa) return;                                                     // testing a soft-ask state: no install sheet
     if (!q) {
+      if (!AUTO) { if (!D.mobile && !(D.os === "mac" && D.browser === "safari")) D.ready = false; return; }   // no automatic install sheet (BN_POPUPS)
       if (standalone() || isInstalled() || isDismissed() || ss(SKEY)) return;
       if (!D.mobile && !(D.os === "mac" && D.browser === "safari")) { D.ready = true; return; }   // desktop Chromium waits for beforeinstallprompt
     }
