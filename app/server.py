@@ -529,6 +529,15 @@ def version_assets(b):
             if j > 0: b = b[:j] + b'<script src="/bn-apple.js" defer></script>' + b[j:]
         return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
     except Exception: return b
+def theme_assets(b):
+    """Nov 17 push B: shared theme links for full pages that skip pwa_head (/stats, /midterms, /mesh*, /report-status via reports._send)."""
+    if not new_home_on(): return b
+    try:
+        al = b[:200000].lower(); j = al.find(b"</head>")
+        if j >= 0 and b"<html" in al[:4000] and b"/bnt/theme.css" not in al[:j]: b = b[:j] + _addon_mod("theme").head_links() + b[j:]
+    except Exception: traceback.print_exc()
+    return b
+
 def apple_assets(b):   # apple_style_v1 for full pages that skip version_assets (/midterms, /stats: "text/html; charset=utf-8"; /report-status via reports._send). BN_APPLE=0 = off (unchanged bytes)
     try:
         lo = b[:6000].lower()
@@ -588,11 +597,7 @@ class H(BaseHTTPRequestHandler):
             except Exception: pass
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
         if ctype.startswith("text/html; "): b = apple_assets(b)   # apple_style_v1 on /midterms and /stats
-        if ctype.startswith("text/html; ") and new_home_on():   # Nov 17 push B: shared theme on pages returned as "text/html; charset=utf-8" too (/stats, /midterms, /mesh*), which skip pwa_head
-            try:
-                al = b[:200000].lower(); j = al.find(b"</head>")
-                if j >= 0 and b"<html" in al[:4000] and b"/bnt/theme.css" not in al[:j]: b = b[:j] + _addon_mod("theme").head_links() + b[j:]
-            except Exception: traceback.print_exc()
+        if ctype.startswith("text/html; "): b = theme_assets(b)   # Nov 17 push B: shared theme on "text/html; charset=utf-8" pages (/stats, /midterms, /mesh*)
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
         if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")

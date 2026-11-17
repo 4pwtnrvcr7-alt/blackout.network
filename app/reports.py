@@ -339,6 +339,7 @@ def _send(h, code, body, ctype="application/json", robots=False):
             srv = next((m for m in (sys.modules.get("server"), sys.modules.get("__main__")) if m is not None and hasattr(m, "ga_head")), None)
             if srv: b = srv.ga_head(b, ga=False)
             if srv and hasattr(srv, "apple_assets"): b = srv.apple_assets(b)   # apple_style_v1 on /report-status (BN_APPLE=0 = off)
+            if srv and hasattr(srv, "theme_assets"): b = srv.theme_assets(b)   # Nov 17 push B: shared theme
         except Exception: pass
     h.send_response(code); h.send_header("Content-Type", ctype + "; charset=utf-8"); h.send_header("Cache-Control", "no-store")
     h.send_header("X-Content-Type-Options", "nosniff"); h.send_header("Referrer-Policy", "same-origin")
