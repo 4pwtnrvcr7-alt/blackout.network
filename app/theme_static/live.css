@@ -119,3 +119,12 @@
 /* Nov 17: glow backdrop drifts slightly slower than the page (theme.js data-bn-par); its own layer */
 .bnt-live .l-glow[data-bn-par]{will-change:transform}
 @media (prefers-reduced-motion:reduce){.bnt-live .l-glow[data-bn-par]{transform:none!important;will-change:auto}}
+
+/* Nov 17 2:26 AM (Matt): gauge explainer = "Highest threat right now" + the top alert's headline and rank chip, nothing else */
+.bnt-live .l-gtext .plain{max-width:420px}
+.bnt-live .l-hk{display:block;font:700 11px/1.2 var(--bnt-hd);letter-spacing:.14em;text-transform:uppercase;color:#FFC21A;margin-bottom:8px}
+.bnt-live .l-ht{display:flex;align-items:flex-start;gap:10px;text-align:left;color:inherit;text-decoration:none}
+.bnt-live .l-ht:hover .l-htt,.bnt-live .l-ht:focus-visible .l-htt{text-decoration:underline;text-underline-offset:3px}
+.bnt-live .l-hc{flex:none;display:inline-flex;align-items:baseline;gap:1px;padding:4px 7px;border:1px solid var(--c);border-radius:8px;color:var(--c)}
+.bnt-live .l-hc b{font:800 17px/1 var(--bnt-hd)}.bnt-live .l-hc small{font:600 10px var(--bnt-hd);opacity:.75}
+.bnt-live .l-htt{font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
