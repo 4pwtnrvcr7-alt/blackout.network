@@ -219,11 +219,14 @@ def _newsletter_form():
         import traceback; traceback.print_exc()
         return '<p class="nl-sm"><a href="/newsletter">Sign up for the free brief</a></p>'
 
+# Nov 17 (Matt 8:53 AM): the intro is always reachable from the wordmark and menu; the "skip next time" option and redirect are off. BN_INTRO_SKIP=1 restores them.
+INTRO_SKIP = __import__("os").environ.get("BN_INTRO_SKIP", "0") == "1"
+SKIPBOX = '<label class="h-skipbox"><input type="checkbox" id="h_skip"> Skip this intro next time</label>' if INTRO_SKIP else ""
 HEAD_JS = ("(function(){try{var h=location.hash,s=location.search;"
            "if(h&&h!=='#'&&h!=='#bn-menu'&&!/^#(s[1-7]|intro|top)$/.test(h)){location.replace('/live'+s+h);return}"
            "var app=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;"
-           "if(!/[?&]intro=1/.test(s)&&(app||localStorage.getItem('bn_skip_intro')==='1')){location.replace('/live'+s);return}"
-           "}catch(e){}document.documentElement.classList.add('bnt-homepage')})()")
+           + ("if(!/[?&]intro=1/.test(s)&&(app||localStorage.getItem('bn_skip_intro')==='1')){location.replace('/live'+s);return}" if INTRO_SKIP else "")
+           + "}catch(e){}document.documentElement.classList.add('bnt-homepage')})()")
 DESC = "Independent, sourced early-warning signals on US and global threats: threat alerts and breaking news, updated around the clock. Not official alerts."
 ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2v12M3 9l5 5 5-5"/></svg>'
 
@@ -313,7 +316,7 @@ def home_page():
  <h2 class="h-h">Signal over noise.</h2>
  <p class="h-lede">Everything in one place, updated around the clock.</p>
  <a class="bnt-btn y" href="/live">Enter the dashboard</a>
- <label class="h-skipbox"><input type="checkbox" id="h_skip"> Skip this intro next time</label>
+ {SKIPBOX}
 </div><p class="h-credit">Screen capture: BLACKOUT.NETWORK live dashboard</p>
 <footer class="h-foot" id="h_foot"><span class="bntr-foot" hidden></span>
  <a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/sources">Sources</a><a href="/scoring">How we score</a><a href="/bnt/credits.txt">Footage credits</a>
