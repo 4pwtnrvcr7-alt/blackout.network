@@ -92,11 +92,21 @@ def videos_for(cid):
         return [s for s in social.stories(public_only=True) if cid in (s.get("cluster_ids") or [])]
     except Exception: return []
 
+def _cut(t, n=80):
+    """Push D: display headline <= ~80 chars: first sentence if short enough, else cut at a word boundary."""
+    t = (t or "").strip()
+    if len(t) <= n: return t
+    m = re.match(r"^(.{20,%d}?[.!?])\s" % n, t)
+    if m: return m.group(1).rstrip(".")
+    c = t[:n].rsplit(" ", 1)[0].rstrip(",;:-—– ")
+    return c + "…"
+
 def _h1(full, what=""):
     """Nov 17 push C: short clean headline (theme._headline, display only); the full wording stays just below as the dek."""
     try:
         import theme; short = theme._headline(full)
     except Exception: short = full
+    short = _cut(short)
     dek = full if short != full else (what if what and what != full else "")
     return f'<h1 class="t">{S.E(short)}</h1>' + (f'<p class="dek">{S.E(dek)}</p>' if dek else "")
 
