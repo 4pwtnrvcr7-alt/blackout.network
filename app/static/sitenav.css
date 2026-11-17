@@ -465,3 +465,5 @@ html.bn-m4.bn-closing .bn-panel{opacity:1!important}
 @media (prefers-reduced-motion:reduce){
 #bn-menu .m4-lead a,#bn-menu .m3-grid>.bn-grp,#bn-menu .m3-foot{animation:none!important}
 }
+/* Matt 5:25 PM: old regional heat map tab is retired; Heat Map opens /map */
+nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:none!important}

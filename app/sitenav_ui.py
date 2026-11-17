@@ -190,8 +190,8 @@ M3_PV = {
 # Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
 M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near", "meshguide": "/mesh/guide"}
 M3_SOON = set()
-# Menu items that open a full page rather than their /live tab (Matt 4:07 PM Nov 17: Heat Map opens the full-screen map).
-# The "@" key keeps sitenav.js from trapping the click as a dashboard tab switch; /live#heatmap keeps working.
+# Menu items that open a full page rather than their /live tab (Matt 5:25 PM: Heat Map is always the full-screen /map).
+# No data-tab on these links so dashboard JS cannot intercept the click as a tab switch.
 M3_PAGE = {"heatmap": ("@map", "/map")}
 
 def menu3_sections(sn):
@@ -254,7 +254,8 @@ def drawer(sn, active=""):
                 out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
             else:
                 cur = ' aria-current="page"' if key == active else ""
-                out.append(f'<li><a href="{E(href)}" data-tab="{E(key)}"{cur}>{E(label)}</a></li>')
+                tab = "" if (href or "").split("?")[0] in ("/map",) or key in ("@map",) else f' data-tab="{E(key)}"'
+                out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
     out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'
                f'<a href="{E(sn.YT_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on YouTube {sn.HANDLE} (opens in a new tab)">YouTube</a>'
