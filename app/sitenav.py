@@ -103,6 +103,11 @@ NAV = [
    "BLACKOUT.NETWORK is free to use. Leave a tip to help cover the scanners, data feeds and servers that keep this early-warning threat monitor running 24/7."),
  ]),
 ]
+# Nov 17 2026 (Matt): the Support Us / tips page is hidden site-wide. BN_TIPS=1 brings the tab, nav links and page back.
+TIPS_ON = os.environ.get("BN_TIPS", "0") == "1"
+if not TIPS_ON:
+    NAV = [(g, [it for it in its if it[0] != "tips"]) for g, its in NAV]
+    NAV = [(g, its) for g, its in NAV if its]
 
 # Standalone pages: path -> (active nav key, title, meta description, visible one-line description).
 PAGES = {

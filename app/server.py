@@ -219,6 +219,9 @@ def dashboard_page():
     except Exception:
         traceback.print_exc(); top = _DASH_FALLBACK
     b = b.replace(b"<!--BN_TOP-->", top, 1)
+    if os.environ.get("BN_TIPS", "0") != "1":   # Nov 17 2026: Support Us / tips tab hidden; markup kept in dashboard.html between BN_TIPS markers
+        b = re.sub(rb"<!--BN_TIPS-->.*?<!--/BN_TIPS-->", b"", b, flags=re.S)
+        b = re.sub(rb"/\*BN_TIPS\*/.*?/\*/BN_TIPS\*/", b"", b, flags=re.S)
     if os.environ.get("BN_APPLE", "1") != "0":   # apple_style_v1 homepage (apple_v1.py): shown on "/" with no tab hash; the dashboard stays below, hidden
         try:
             import sitenav
@@ -647,6 +650,9 @@ class H(BaseHTTPRequestHandler):
         if seg == "ready":   # seo/ready-hub: /ready is a real page (ready.py); variants like /ready/ or /READY 301 to /ready (keep ?utm_*)
             q = urlparse(self.path).query
             self.send_response(301); self.send_header("Location", "/ready" + ("?" + q if q else "")); self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "public, max-age=3600"); self.end_headers(); return True
+        if seg in ("tips", "support", "support-us", "donate", "tip") and os.environ.get("BN_TIPS", "0") != "1":   # Nov 17 2026: Support Us page hidden (BN_TIPS=1 restores)
+            self.send_response(301); self.send_header("Location", "/live"); self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "public, max-age=3600"); self.end_headers(); return True
         if seg in self.TAB_PATHS:
             q = urlparse(self.path).query   # seo/batch-1: keep ?utm_* (and any other query) through the tab redirect
