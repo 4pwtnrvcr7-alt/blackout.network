@@ -72,7 +72,7 @@ def _shell():
         "<main class=\"wrap bn-wire bnt-pg bnt-lt w-loading\" id=\"main\" aria-busy=\"true\">"
         "<p class=\"kicker\">The Wire</p>"
         "<h1>What matters now</h1>"
-        "<p class=\"dek\">What changed in the last 24 hours, then every ranked alert on the board.</p>"
+        "<p class=\"dek\">Every ranked alert, newest changes first.</p>"
         "<div class=\"w-how bnt-peek\" tabindex=\"0\" aria-expanded=\"false\"><span class=\"w-how-t\">How to read The Wire</span>"
         "<div class=\"bnt-peek-d\"><div><p>A 24-hour change bulletin, then a ranked digest of live threats and emergencies. "
         "Open any row for what we know, what to do, sources, and any related @BlkoutNtw video. "
