@@ -4,6 +4,11 @@ body.bnm{color:#F0F0FA;font-family:var(--bnt-tx,Inter,sans-serif);-webkit-tap-hi
 .bnm-vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .bnm-map{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;background:#05060a}
 .bnm-map .maplibregl-canvas{outline:none}
+/* load: theme-coloured placeholder with a soft pulse, map fades in when tiles + heat are drawn */
+.bnm-map{opacity:0;transition:opacity .7s var(--bnt-ease,ease)}
+body.bnm-ready .bnm-map{opacity:1}
+body.bnm::before{content:"";position:fixed;inset:0;background:radial-gradient(60% 50% at 50% 45%,rgba(255,194,26,.05),transparent 70%),#05060a;transition:opacity .7s;pointer-events:none}
+body.bnm.bnm-ready::before{opacity:0}
 /* header: the shared top bar, wordmark + menu only, slides away after a moment; the top edge brings it back */
 .bnm-head{position:fixed;left:0;right:0;top:0;z-index:30;transform:translateY(-110%);transition:transform .45s var(--bnt-ease,cubic-bezier(.2,.7,.2,1));will-change:transform}
 body.bnm-hd-on .bnm-head{transform:none}
@@ -119,4 +124,4 @@ body.bnm-hd-on .bnm-top{transform:translate(-50%,64px)}
  body.bnm-hd-on .bnm-top{transform:translateY(60px)}
  .bnm-chip{font-size:11px;padding:9px 12px}
 }
-@media (prefers-reduced-motion:reduce){.bnm-head,.bnm-top,.bnm-panel,.bnm-x{transition:none!important}.bnm-card.in{animation:none}}
+@media (prefers-reduced-motion:reduce){.bnm-map,body.bnm::before,.bnm-head,.bnm-top,.bnm-panel,.bnm-x{transition:none!important}.bnm-card.in{animation:none}}

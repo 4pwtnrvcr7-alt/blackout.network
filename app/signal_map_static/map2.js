@@ -165,7 +165,7 @@
   /* ---------- map ---------- */
   function boot() {
     if (!window.maplibregl) { $("bnm_count").textContent = "The map could not start in this browser."; return; }
-    var v = VIEWS[state.view] || VIEWS.world;
+    var v = VIEWS[state.view] || VIEWS.world, t0 = Date.now();
     map = new maplibregl.Map({
       container: "bnm_map", style: style(), center: v.center || [-96, 38], zoom: v.zoom != null ? v.zoom : 3, minZoom: 0.4, maxZoom: 15,
       attributionControl: false, maplibreLogo: false, dragRotate: false, pitchWithRotate: false, touchPitch: false,
@@ -205,7 +205,10 @@
       map.addLayer({ id: "pt-glow", type: "circle", source: "dots", filter: ["all", ["!", ["has", "point_count"]], [">=", ["get", "rank"], 7]], paint: {
         "circle-color": C.high, "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, 6, 8, 16], "circle-opacity": ["interpolate", ["linear"], ["zoom"], 2, 0, 3, 0.18], "circle-blur": 1 } }, "pt");
       ready = true; apply(false);
-      d.body.classList.add("bnm-ready");
+      /* fade in once tiles + heat have drawn (no flash, no layout shift); 5 s safety net */
+      var reveal = function () { d.body.classList.add("bnm-ready"); };
+      var tryReveal = function () { if (rows.length || Date.now() - t0 > 2500) { reveal(); map.off("idle", tryReveal); } };
+      map.on("idle", tryReveal); setTimeout(reveal, 5000);
     });
     var hit = ["pt", "cl"];
     map.on("click", function (e) {
