@@ -32,7 +32,7 @@
 .bng-btn.bng-p{background:#c8102e;border-color:#c8102e;color:#fff!important}
 .bng-btn:hover{filter:brightness(1.12)}
 .bng-cta{border-color:rgba(200,16,46,.55)!important;background:linear-gradient(135deg,rgba(200,16,46,.13),transparent 60%),var(--pn,#12161b)!important}
-.bng-cta-k{font:800 10.5px/1 Montserrat,Inter,sans-serif;letter-spacing:1.4px;color:#ff4d5e;margin-bottom:6px}
+.bng-cta-k{font:800 10.5px/1 Montserrat,Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(240,240,250,.62);margin-bottom:6px}
 .bng-cta-h{font:800 18px/1.25 Montserrat,Inter,sans-serif;color:var(--tx,#e6e9ee)}
 .bng-cta p{margin:6px 0 0;color:var(--bn-text-2,#c9d1db);font-size:14px}
 .bng-foot,.bng-follow-card{max-width:none;width:100%;margin:0;padding:80px max(24px,6vw) 72px;border:0;border-radius:0;background:transparent;box-shadow:none;text-align:center;box-sizing:border-box}
@@ -68,7 +68,7 @@ footer.ft .bn-legal-links,footer.ft .bn-cred-link,#site_foot .bn-legal-links,#si
 .bng-nlbox .nl-priv{font-size:11px;line-height:1.4;color:var(--mu,#8a94a3);margin:8px 0 0}.bng-nlbox .nl-msg{margin:6px 0 0;font-size:13px}.bng-nlbox .nl-msg.ok{color:#33c17a}.bng-nlbox .nl-msg.err{color:#ff6b6b}
 .bng-nlbox .nl-msg:empty{display:none}.bng-prompt .nl-priv{display:block}.bng-fine{font-size:11.5px;color:var(--mu,#8a94a3);margin:8px 0 0!important}.bng-fine a{color:inherit}
 .bng-nlbox .nl-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
-.bng-inline{border-color:rgba(200,16,46,.55)!important;background:linear-gradient(135deg,rgba(200,16,46,.13),transparent 60%),var(--pn,#12161b)!important}
+.bng-inline{border-color:rgba(242,242,244,.18)!important;background:transparent!important}
 .bng-inline p{margin:6px 0 0;color:var(--bn-text-2,#c9d1db);font-size:14px}
 .bng-prompt{position:fixed;right:20px;bottom:20px;z-index:5500;width:380px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:18px 18px 12px;border-radius:16px;border:1px solid rgba(200,16,46,.6);background:var(--pn,#12161b);color:var(--tx,#e6e9ee);box-shadow:0 18px 50px rgba(0,0,0,.45);transform:translateY(calc(100% + 40px));opacity:0;transition:transform .32s ease,opacity .32s ease}
 .bng-prompt.bng-in{transform:none;opacity:1}
