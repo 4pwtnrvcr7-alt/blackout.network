@@ -502,7 +502,7 @@ Page 1 shows the beam mode, energy and intensity live.</p>
 def page_html():
     lede = ('<header class="cx-hero" id="top"><canvas class="cx-tracks" id="cx-tracks" aria-hidden="true"></canvas><div class="cx-hero-in">'
             '<p class="cx-kick cx-kick-hero">' + ic("atom") + '<span>Explainer · Science &amp; infrastructure</span></p>'
-            '<h1 class="cx-h1">CERN and the Large Hadron Collider</h1>'
+            '<h1 class="cx-h1">CERN &amp; the LHC</h1>'
             '<p class="cx-dek">The 27 km machine under the French-Swiss border: how it works, how it was built, who pays for it, what it found, '
             'what people claim about it, and what it is doing right now.</p>'
             '<div class="cx-facts" role="list">'

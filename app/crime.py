@@ -467,7 +467,7 @@ def render_page(q=""):
     fm = meta("fbi_meta"); cm = meta("countries_meta")
     newest = max((x["newest"] for x in fs), default=None)
     hero = (f'<section class="cr-hero"><div class="cr-row">{TILE}<div class="cr-ht"><div class="cr-live"><i></i>BLACKOUT.NETWORK · CRIME DATA</div>'
-            '<h1>Crime near you, <em>in real numbers</em></h1>'
+            '<h1>Crime near you</h1>'
             '<p>Type a US ZIP code, city, county or state, or any country. You get official rates per 100,000 people, how they compare and how they are trending, '
             'plus a live heat map of recent police reports where the city publishes them.</p></div></div>'
             f'<form class="cr-search" action="/crime" method="get" role="search"><label for="cr-q" class="cr-vh">Place</label>'
