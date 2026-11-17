@@ -219,6 +219,13 @@ CREDITS_LEDGER = [
   ("Section band \"Watchlist\"", "NASA JSC, ISS Expedition 67, iss067e302248 (Mediterranean at night), 2022", "Public domain"),
   ("Health, conflict, finance and cyber graphics", "Original abstract graphics made for BLACKOUT.NETWORK (no real event)", "BLACKOUT.NETWORK"),
   ("Note on illustrative photos", "Storm and other story photos are illustrative: they show the same kind of event seen from orbit, not the specific event in the story.", "")]),
+ ("stories", "Story pages (/wire/<id>, when Story v3 is on)", [
+  ("MERS in Qatar hero (desktop video and still; phone still)", "NIAID, colorized scanning electron micrograph of Vero E6 cells infected with MERS-CoV (Flickr, 2017); graded monochrome for this page. Not a photograph of the patients or farms in this story.", "Public domain (U.S. government work)"),
+  ("MERS in Qatar inline micrograph", "CDC / Maureen Metcalfe, Cynthia Goldsmith and Azaibi Tamin, transmission electron micrograph of MERS-CoV particles.", "Public domain"),
+  ("Ebola in Congo (UNICEF child-toll story) hero", "CDC / Dr. Frederick Murphy, transmission electron micrograph of an Ebola virus particle. Laboratory image, not a photograph of this outbreak.", "Public domain"),
+  ("Cyclone Akvan hero diagram", "Original BLACKOUT.NETWORK locator diagram. Storm position from GDACS / JTWC as of 17 Nov 2026; landfall stretch as reported from IMD via The Hindu. Not a satellite photograph of the storm.", "BLACKOUT.NETWORK"),
+  ("Ebola reconstruction (human travel) hero diagram", "Original BLACKOUT.NETWORK diagram of places named in the Science reconstruction, plotted approximately. Not a surveyed map.", "BLACKOUT.NETWORK"),
+  ("Fed AI / bank-run warning hero diagram", "Original BLACKOUT.NETWORK typographic diagram using a phrase from Governor Barr's 16 Nov 2026 speech. Not a photograph of any person or building.", "BLACKOUT.NETWORK")]),
 ]
 def _nl_credits():
     """Newsletter topic divider images (newsletter_pool.json): one row per image, licence and author."""
@@ -312,7 +319,7 @@ def _home_page_raw():
     m4btn = '<span class="h-ml">Menu</span>' if m4 else ""
     mlead = ('<div class="h-m4lead"><a href="#s1" data-h-close>Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>' if m4
              else '<a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>')
-    snap = snap_on()
+    snap = snap_on() and home_snap_on()   # Matt 4:07 PM: the intro scrolls freely and smoothly like the Wire, no section snap
     snapattr = " data-bn-snap" if snap else ""
     snapjs = f'<script src="{url("snap.js")}" defer></script>' if snap else ""
     return f'''<!doctype html><html lang="en" data-bnt-home><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -426,6 +433,11 @@ def home_page():
 def snap_on():
     """Shared full-section snapping (theme_static/snap.js). BN_SNAP=0 = off (free scrolling everywhere)."""
     return os.environ.get("BN_SNAP", "1") != "0"
+
+def home_snap_on():
+    """Section snap on the intro homepage "/". Off by default (Matt 4:07 PM Nov 17: smooth free scroll like the Wire). BN_HOME_SNAP=1 = snap back on.
+    /live and the other tab heroes keep BN_SNAP."""
+    return os.environ.get("BN_HOME_SNAP", "0") == "1"
 
 def credits_page_on():
     """Matt 12:07 PM: no credits on top of images/video; every page links "Image credits" -> /credits. BN_CREDITS_PAGE=0 = old overlays."""

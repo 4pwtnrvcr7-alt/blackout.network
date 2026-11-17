@@ -379,7 +379,7 @@ def wire_latest(net, site, cid):
 def load_desk_briefs(path, max_age_days):
     """Desk briefs (desk/briefs.json, written by analysts or the scheduled brief job, see desk/BRIEF_HOWTO.md):
     {cluster_id: {headline, what_happened, why_it_matters, analysis, rank_why, risk, risk_why, if_true, if_false, what_to_do,
-    confidence, confidence_why, sources[], written_at}}. Same word rules and source rules as newsletter notes."""
+    confidence, confidence_why, sources[], written_at, optional story{}}}. Same word rules and source rules as newsletter notes."""
     try: d = json.load(open(path)) if path and os.path.exists(path) else {}
     except Exception as ex: log(f"desk briefs unreadable: {ex}"); return {}
     out, now = {}, datetime.now(UTC)
@@ -394,6 +394,9 @@ def load_desk_briefs(path, max_age_days):
         if not srcs or not n["what_happened"]: continue
         n.update(sources=[{"url": u, "domain": urllib.parse.urlsplit(u).netloc.lower().removeprefix("www.")} for u in srcs[:8]],
                  generated_at=gen.isoformat(), edition="BLACKOUT.NETWORK desk brief", file=os.path.basename(path), desk=True)
+        story = it.get("story")
+        if isinstance(story, dict):
+            n["story"] = story  # v3 narrative block; ignored by older page renderers
         out[cid] = n
     return out
 

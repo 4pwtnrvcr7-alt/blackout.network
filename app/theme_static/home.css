@@ -1,5 +1,5 @@
 /* "/" cinematic onboarding (Nov 17 2026). Classes h-*; shared pieces from theme.css (bnt-*). */
-html.bnt-homepage{scroll-snap-type:y proximity;scroll-behavior:smooth;background:#000}
+html.bnt-homepage{scroll-behavior:smooth;background:#000}   /* free native scroll like the Wire (no snap); in-page jumps glide */
 body.bnt-home{margin:0;background:#000;color:var(--bnt-ink);font:400 16px/1.55 var(--bnt-tx);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 body.bnt-home a{color:inherit;text-decoration:none}
 body.bnt-home #bng_bar,body.bnt-home .bng-foot,body.bnt-home #bng_prompt{display:none!important}
@@ -36,7 +36,7 @@ body.bnt-home #bng_bar,body.bnt-home .bng-foot,body.bnt-home #bng_prompt{display
 .h-scrim{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.4s}
 .h-scrim.on{opacity:1;pointer-events:auto}
 /* sections */
-.h-sec{position:relative;min-height:100vh;min-height:100svh;scroll-snap-align:start;overflow:hidden;display:flex;align-items:flex-end;background:#000 center/cover no-repeat}
+.h-sec{position:relative;min-height:100vh;min-height:100svh;overflow:hidden;display:flex;align-items:flex-end;background:#000 center/cover no-repeat}
 .h-sec video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:0;transition:opacity 1.2s}
 .h-sec video.on{opacity:1}
 .h-sec::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.74) 0%,rgba(0,0,0,.38) 45%,rgba(0,0,0,0) 75%),linear-gradient(0deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,0) 45%),linear-gradient(180deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,0) 18%)}
@@ -148,7 +148,7 @@ footer.h-foot select{background:#111;color:var(--bnt-ink);border:1px solid var(-
  #s7{padding-bottom:150px}
 }
 @media (max-height:720px) and (min-width:901px){.h-copy{padding-bottom:70px}.h-h{font-size:56px}h2.h-h{font-size:48px}}
-@media (prefers-reduced-motion:reduce){html.bnt-homepage{scroll-snap-type:none;scroll-behavior:auto}.h-copy>*{opacity:1;transform:none;transition:none}.h-sec video{display:none}.h-stats .h-asof i{animation:none}}
+@media (prefers-reduced-motion:reduce){html.bnt-homepage{scroll-behavior:auto}.h-copy>*{opacity:1;transform:none;transition:none}.h-sec video{display:none}.h-stats .h-asof i{animation:none}}
 /* Push H: SpaceX-language full-screen menu (theme.py adds .h-menu4 unless BN_MENU_V2=0) */
 .h-burger .h-ml{display:none}
 .h-burger:has(.h-ml){width:auto;padding:0 40px 0 8px;font:600 11px/44px Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#fff}

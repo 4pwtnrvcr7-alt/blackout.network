@@ -319,7 +319,7 @@ class Render(unittest.TestCase):
         else:
             import newsletter_v2 as NV2   # v2 round 2: category group headers replace the v1 sections
             self.assertTrue(any(lab.upper().replace("&", "&amp;") in html for lab, _ in NV2.GROUPS.values()))
-        self.assertIn("Signal over noise", html)
+        self.assertIn("Global threat monitoring", html)
         self.assertEqual((NL.env().get("NEWSLETTER_SENDER") or "preview"), "preview")
         self.assertFalse(NL.cfg().get("live_sending_approved"))
 
@@ -801,3 +801,12 @@ class SubjectNotesTopStory(unittest.TestCase):
         subj = NL.subject_for(issue)
         self.assertIn("Garry Kasparov cancels a Berlin appearance", subj)
 
+
+
+_V4_PREV = None
+def setUpModule():   # these render tests assert the v1/v2 layout; v4 (default since Nov 17 2026) has its own tests
+    global _V4_PREV
+    _V4_PREV = os.environ.get("BN_NL_V4"); os.environ["BN_NL_V4"] = "0"
+def tearDownModule():
+    if _V4_PREV is None: os.environ.pop("BN_NL_V4", None)
+    else: os.environ["BN_NL_V4"] = _V4_PREV
