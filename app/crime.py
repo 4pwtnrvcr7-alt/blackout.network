@@ -606,7 +606,7 @@ def render_page(q=""):
     head = (sitenav.head_html("crime", path) + '<meta name="robots" content="index,follow,max-image-preview:large">'
             '<meta name="keywords" content="crime map, crime rate by ZIP code, crime statistics, county crime rate, violent crime rate, property crime, crime near me, homicide rate by country, FBI crime data">'
             '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
-            '<link rel="stylesheet" href="/api/crime/app.css?v=2">')
+            '<link rel="stylesheet" href="/api/crime/app.css?v=3">')
     if title != TITLE: head = head.replace(f"<title>{E(TITLE)}</title>", f"<title>{E(title)}</title>", 1)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
