@@ -220,6 +220,17 @@ CREDITS_LEDGER = [
   ("Health, conflict, finance and cyber graphics", "Original abstract graphics made for BLACKOUT.NETWORK (no real event)", "BLACKOUT.NETWORK"),
   ("Note on illustrative photos", "Storm and other story photos are illustrative: they show the same kind of event seen from orbit, not the specific event in the story.", "")]),
 ]
+def _nl_credits():
+    """Newsletter topic divider images (newsletter_pool.json): one row per image, licence and author."""
+    try:
+        import json
+        d = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "newsletter_pool.json")))
+        return [("newsletter", "Newsletter section images", [(f"{im['topic'].title()} divider ({im['name'].split('-')[0]})",
+                 f"{im['title']}, {im['artist']}, via Wikimedia Commons ({im['page']})", im["license"]) for im in d.get("images") or []]
+                 + [("Note", "Generic topic images that open each newsletter section. They do not show the events in the stories.", "")])]
+    except Exception:
+        return []
+CREDITS_LEDGER += _nl_credits()
 CREDITS_PAGE_KEY = {"/": "intro", "/live": "live", "/dashboard": "live", "/wire": "wire"}
 
 def credits_page():

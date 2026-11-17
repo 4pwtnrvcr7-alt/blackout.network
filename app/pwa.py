@@ -15,7 +15,10 @@ def _read(name):
     with open(os.path.join(D, name), "rb") as fh: return fh.read()
 def handle_get(path, qs):
     if path in FIXED:
-        name, ct = FIXED[path]; return 200, _read(name), ct
+        name, ct = FIXED[path]; b = _read(name)
+        if name == "install-guide.js":   # Matt, Nov 17 2026: no pop-ups. Auto install sheet + alerts soft-ask only when BN_POPUPS=1
+            b = b.replace(b'"__BN_POPUPS__"', b"1" if os.environ.get("BN_POPUPS", "0").strip() == "1" else b"0")
+        return 200, b, ct
     if path.startswith("/icons/"):
         name = path[len("/icons/"):]
         if re.fullmatch(r"icon-[a-z0-9\-]+\.png", name) and os.path.isfile(os.path.join(D, name)): return 200, _read(name), "image/png"
