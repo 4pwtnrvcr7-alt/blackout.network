@@ -60,9 +60,9 @@
 /* Light-mode legibility (AA): the restyled pages inherit many older text colors that were tuned for dark. In light mode only, after
    render, every visible text color below 4.5:1 (3:1 for large text) against its real background is corrected in place: neutral or
    yellow text becomes ink or white (never brown), colored text is darkened toward black keeping its hue. Yellow fills/rules are snapped
-   to the one brand yellow (#FFC21A). Maps, SVG and media are skipped; switching to dark restores the original colors. */
+   to the one brand yellow (#F2F2F4). Maps, SVG and media are skipped; switching to dark restores the original colors. */
 (function(){
- var d=document,R=d.documentElement,done=[],Y="rgb(255, 194, 26)",slow=false;
+ var d=document,R=d.documentElement,done=[],Y="rgb(242,242,244)",slow=false;
  function on(){return R.getAttribute("data-theme")=="light"&&(R.classList.contains("bna-pg")||R.classList.contains("bna-home"))}
  function rgb(s){var m=/rgba?\(([^)]+)\)/.exec(s||"");if(!m)return null;var p=m[1].split(/[\s,\/]+/).filter(Boolean).map(Number);return[p[0],p[1],p[2],p.length>3?p[3]:1]}
  function lum(c){var a=[0,1,2].map(function(i){var v=c[i]/255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*a[0]+.7152*a[1]+.0722*a[2]}
@@ -92,9 +92,9 @@
    var has=false;for(var n=e.firstChild;n;n=n.nextSibling)if(n.nodeType==3&&n.nodeValue.trim()){has=true;break}
    var cs=null;
    if(e.nodeType==1&&!e.dataset.bnaD){var c0=getComputedStyle(e),b0=rgb(c0.backgroundColor);var f0=rgb(c0.color);if(b0&&b0[3]>.8&&lum(b0)<.03&&f0&&ratio(f0,b0)<4.5&&c0.backgroundImage=="none"&&!e.closest(DARKOK)&&!e.querySelector("img,picture,video,canvas")){var r0=e.getBoundingClientRect();if(r0.width>=120&&r0.height>=36){e.dataset.bnaD=1;setp(e,"background-color","#FFFFFF");bgc=new Map()}}}
-   if(!has){cs=getComputedStyle(e);var bc=rgb(cs.backgroundColor);if(bc&&bc[3]>.5&&yb(bc)&&cs.backgroundColor!=Y&&!e.dataset.bnaY){e.dataset.bnaY=1;setp(e,"background-color","#FFC21A");if(e.children.length)setp(e,"color","#1D1D1F")}return}
+   if(!has){cs=getComputedStyle(e);var bc=rgb(cs.backgroundColor);if(bc&&bc[3]>.5&&yb(bc)&&cs.backgroundColor!=Y&&!e.dataset.bnaY){e.dataset.bnaY=1;setp(e,"background-color","#F2F2F4");if(e.children.length)setp(e,"color","#1D1D1F")}return}
    var r=e.getBoundingClientRect();if(r.width<1||r.height<1)return;
-   cs=cs||getComputedStyle(e);var bcol=rgb(cs.backgroundColor);if(bcol&&bcol[3]>.5&&yb(bcol)&&cs.backgroundColor!=Y){setp(e,"background-color","#FFC21A");bgc.delete(e)}
+   cs=cs||getComputedStyle(e);var bcol=rgb(cs.backgroundColor);if(bcol&&bcol[3]>.5&&yb(bcol)&&cs.backgroundColor!=Y){setp(e,"background-color","#F2F2F4");bgc.delete(e)}
    var fg=rgb(cs.color),bg=bgOf(e);if(!fg||!bg)return;var f=mix(fg,bg),fs=parseFloat(cs.fontSize),need=(fs>=24||(+cs.fontWeight>=700&&fs>=18.66))?3:4.5;
    if(ratio(f,bg)>=need&&!brown(f))return;e.dataset.bnaC=1;var h=hsl(f),light=lum(bg)>.4,out;
    if(h[1]<.25||yb(f)||!light){out=ratio([29,29,31],bg)>=ratio([255,255,255],bg)?[29,29,31]:[255,255,255]}

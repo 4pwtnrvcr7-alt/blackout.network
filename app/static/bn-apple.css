@@ -1,7 +1,7 @@
 /* BLACKOUT.NETWORK apple_style_v1 phase 2 (Nov 3 2026): minimal chrome + homepage. Loaded only when BN_APPLE=1.
    Tokens follow review/design/apple_style_v1/STYLE_GUIDE.md. Dark is the site default; light via html[data-theme="light"]. */
 :root{--a-bg:#0B0D10;--a-sf:#16181C;--a-sf2:#121418;--a-ink:#F5F5F7;--a-ink2:#D2D2D7;--a-mu:#A1A1A6;--a-ln:#2A2D33;--a-ln2:#1F2226;
- --a-y:#FFC21A;--a-on-y:#0B0D10;--a-lk:#FFC21A;--a-red:#C8102E;--a-hi:#0F1114;--a-hi-mu:#A1A1A6;--a-sh:0 0 0 1px #23262B;
+ --a-y:#F2F2F4;--a-on-y:#0B0D10;--a-lk:#F2F2F4;--a-red:#C8102E;--a-hi:#0F1114;--a-hi-mu:#A1A1A6;--a-sh:0 0 0 1px #23262B;
  --a-max:1180px;--a-gut:clamp(20px,3.4vw,40px);--a-r:18px;--a-ease:cubic-bezier(.25,.1,.25,1)}
 html[data-theme="light"]{--a-bg:#F5F5F7;--a-sf:#FFFFFF;--a-sf2:#FBFBFD;--a-ink:#1D1D1F;--a-ink2:#424245;--a-mu:#6E6E73;--a-ln:#D2D2D7;--a-ln2:#E8E8ED;--a-lk:#1D1D1F;--a-sh:0 4px 18px rgba(0,0,0,.07)}
 /* ---- site chrome: the BLACKOUT wordmark replaces the logo; the bar gets quieter ---- */
@@ -97,9 +97,9 @@ html.bna-home .bnr-fab:hover,html.bna-home .bnr-fab:focus-visible{opacity:1;colo
    Only on html.bna-pg (set in the head script). Restyles containers and type; every widget, map, chart, filter and tab is untouched. ==== */
 html.bna-pg{--bn-font-ui:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
  --bn-bg:#0B0D10;--bn-tbar-bg:rgba(11,13,16,.9);--bn-surface-0:#121418;--bn-surface:#16181C;--bn-raised:#1B1D21;--bn-surface-2:#1B1D21;
- --bn-line:#26292E;--bn-line-2:#33363C;--bn-text:#F5F5F7;--bn-text-2:#D2D2D7;--bn-muted:#A1A1A6;--bn-link:#FFC21A;--bn-radius:18px;--bn-shadow:0 0 0 1px #23262B}
+ --bn-line:#26292E;--bn-line-2:#33363C;--bn-text:#F5F5F7;--bn-text-2:#D2D2D7;--bn-muted:#A1A1A6;--bn-link:#F2F2F4;--bn-radius:18px;--bn-shadow:0 0 0 1px #23262B}
 html.bna-pg[data-theme="light"]{--bn-bg:#F5F5F7;--bn-tbar-bg:rgba(251,251,253,.9);--bn-surface-0:#F0F0F3;--bn-surface:#FFFFFF;--bn-raised:#FBFBFD;--bn-surface-2:#F0F0F3;
- --bn-line:#E3E3E8;--bn-line-2:#D2D2D7;--bn-text:#1D1D1F;--bn-text-2:#424245;--bn-muted:#5E5E63;--bn-link:#1D1D1F;--bn-brand:#FFC21A;--bn-brand-ink:#1D1D1F;--bn-accent:#1D1D1F;--bn-active:rgba(255,194,26,.22);--bn-shadow:0 4px 18px rgba(0,0,0,.07)}
+ --bn-line:#E3E3E8;--bn-line-2:#D2D2D7;--bn-text:#1D1D1F;--bn-text-2:#424245;--bn-muted:#5E5E63;--bn-link:#1D1D1F;--bn-brand:#F2F2F4;--bn-brand-ink:#1D1D1F;--bn-accent:#1D1D1F;--bn-active:rgba(242,242,244,.22);--bn-shadow:0 4px 18px rgba(0,0,0,.07)}
 html.bna-pg body{background:var(--a-bg)!important;-webkit-font-smoothing:antialiased}
 html.bna-pg body h1,html.bna-pg body h2,html.bna-pg body h3{font-family:Inter,system-ui,sans-serif}
 /* page head: one large title and a short lede, lots of air */
@@ -162,7 +162,7 @@ html.bna-pg .bna-dup>.meta{margin-top:0!important}
 /* (e) glyph icons dropped from headings and controls */
 html.bna-pg .bna-glyph{display:none!important}
 /* (c) Wire score badges: white on the darkened amber/green keeps 4.5:1 in light mode */
-html[data-theme="light"] .sc.m{background:#FFC21A!important;color:#1D1D1F!important}
+html[data-theme="light"] .sc.m{background:#F2F2F4!important;color:#1D1D1F!important}
 /* (d) Report a problem: between phone and wide desktop it sits at the end of the page (as on phone), so it never covers a card */
 @media (min-width:601px) and (max-width:1279px){html.bna-home .bnr-fab,html.bna-pg .bnr-fab{position:static!important;display:flex!important;margin:8px auto 28px!important;width:max-content!important;right:auto!important;bottom:auto!important;transform:none!important}
  html.bna-home body:has(.bnr-fab),html.bna-pg body:has(.bnr-fab){padding-bottom:0!important}}
@@ -213,8 +213,8 @@ html.bna-home #bna_home>.bna-sec:first-of-type{padding-top:clamp(28px,4vw,56px)!
 html:is(.bna-home,.bna-pg) .bn-tbar .bn-acts{margin-left:auto!important}
 @media (max-width:767px){html:is(.bna-home,.bna-pg) .bn-m3 .bna-ml{order:4;padding:0 4px}}
 /* ---------- Active Threat Monitoring: chart cards (homepage) ---------- */
-:root{--a-ch:var(--a-y);--a-chf:rgba(255,194,26,.14);--a-b0:#4A4E56}
-html[data-theme="light"]{--a-ch:#FFC21A;--a-chf:rgba(255,194,26,.55);--a-b0:#C7C7CC}
+:root{--a-ch:var(--a-y);--a-chf:rgba(242,242,244,.14);--a-b0:#4A4E56}
+html[data-theme="light"]{--a-ch:#F2F2F4;--a-chf:rgba(242,242,244,.55);--a-b0:#C7C7CC}
 /* light mode: the chart line is a dark neutral edge over the button-yellow area (yellow alone is 1.6:1 on white); bars keep the yellow fill with a thin dark outline */
 html[data-theme="light"] .bna-ch .l{stroke:#3A3A3C;stroke-width:1.5}
 html[data-theme="light"] .bna-ch .b1{stroke:#3A3A3C;stroke-width:.75;vector-effect:non-scaling-stroke}
@@ -263,13 +263,13 @@ html[data-theme="light"] .bna-mc.bna-sev .bna-mv{color:#B00E28}
 @media (prefers-reduced-motion:reduce){.bna-chev::before,.bna-card{transition:none!important}a.bna-card:hover{transform:none}}
 .bna-mc.bna-sev .bna-mv{color:#FF6B6B}html[data-theme="light"] .bna-mc.bna-sev .bna-mv{color:#B00E28}
 
-/* One yellow everywhere: the Free brief button yellow (#FFC21A, --a-y). Light mode never uses brown: links are ink with a button-yellow underline. */
+/* One yellow everywhere: the Free brief button yellow (#F2F2F4, --a-y). Light mode never uses brown: links are ink with a button-yellow underline. */
 html[data-theme="light"] .bna-lnk{text-decoration:underline;text-decoration-color:var(--a-y);text-decoration-thickness:2px;text-underline-offset:4px}
 html[data-theme="light"].bna-pg main a:not([class]){text-decoration:underline;text-decoration-color:var(--a-y);text-decoration-thickness:2px;text-underline-offset:3px}
-html.bna-home[data-theme="light"]{--bn-brand:#FFC21A;--bn-brand-ink:#1D1D1F;--bn-accent:#1D1D1F;--bn-active:rgba(255,194,26,.22)}
+html.bna-home[data-theme="light"]{--bn-brand:#F2F2F4;--bn-brand-ink:#1D1D1F;--bn-accent:#1D1D1F;--bn-active:rgba(242,242,244,.22)}
 html[data-theme="light"] .bng-cta-k{color:#6E6E73!important}
 .bng-btn,.bng-btn span{color:#0B0D10!important}
-html[data-theme="light"] .bn-acc-st.warn{background:#FFC21A!important;color:#0B0D10!important}
+html[data-theme="light"] .bn-acc-st.warn{background:#F2F2F4!important;color:#0B0D10!important}
 /* light-mode AA leftovers (c4aae97 sweep) */
 html[data-theme="light"] #tab-grid .gs-mfresh{background:rgba(255,255,255,.94)!important;color:#1D1D1F!important;border-color:rgba(0,0,0,.12)!important}
 html[data-theme="light"] #tab-grid .gs-mfresh span{color:#515154!important}
@@ -277,10 +277,10 @@ html[data-theme="light"] .leaflet-control-attribution,html[data-theme="light"] .
 html[data-theme="light"] .leaflet-control-attribution{background:rgba(255,255,255,.9)!important}
 html[data-theme="light"] #tab-trends .tr-org.l{color:#0F6B3A!important}
 html[data-theme="light"] #tab-trends .tr-rk[style*="255, 77, 79"],html[data-theme="light"] #tab-trends .tr-rk[style*="#ff4d4f"],html[data-theme="light"] #tab-trends .tr-rk[style*="#FF4D4F"]{background:#D70015!important}
-html[data-theme="light"] #tab-noise .bn-seg button.on,html[data-theme="light"] #tab-noise .bn-seg button.on .meta{background:#FFC21A!important;color:#1D1D1F!important}
+html[data-theme="light"] #tab-noise .bn-seg button.on,html[data-theme="light"] #tab-noise .bn-seg button.on .meta{background:#F2F2F4!important;color:#1D1D1F!important}
 html[data-theme="light"] .gs-card ul.gs-rs{color:#1D1D1F!important}
-html[data-theme="light"] .ssl-ic{color:#FFC21A!important;-webkit-text-stroke:.5px #3A3A3C}
-html[data-theme="light"] #ssl_mtabs button.on,html[data-theme="light"] #ssl_itabs button.on{background:#FFC21A!important;color:#1D1D1F!important;border-color:#FFC21A!important}
+html[data-theme="light"] .ssl-ic{color:#F2F2F4!important;-webkit-text-stroke:.5px #3A3A3C}
+html[data-theme="light"] #ssl_mtabs button.on,html[data-theme="light"] #ssl_itabs button.on{background:#F2F2F4!important;color:#1D1D1F!important;border-color:#F2F2F4!important}
 html[data-theme="light"] #ssl_cards a.ssl-card,html[data-theme="light"] #sq_app .sq-badge{border-color:rgba(0,0,0,.12)!important}
 html[data-theme="light"] .gs-bad{color:#1D1D1F!important}
 
@@ -288,7 +288,7 @@ html[data-theme="light"] .gs-bad{color:#1D1D1F!important}
    Keyboard users keep a focus ring via :focus-visible only. */
 html,html *{-webkit-tap-highlight-color:transparent}
 html.bna-pg :is(button,summary,[role=button],a):focus:not(:focus-visible),html.bna-home :is(button,summary,[role=button],a):focus:not(:focus-visible){outline:none!important;box-shadow:none}
-html.bna-pg :is(button[aria-expanded],summary,.nsa-b,.ns-row,.ss-ah,.hm-ah):focus-visible{outline:2px solid #FFC21A!important;outline-offset:-2px;border-radius:inherit}
+html.bna-pg :is(button[aria-expanded],summary,.nsa-b,.ns-row,.ss-ah,.hm-ah):focus-visible{outline:2px solid #F2F2F4!important;outline-offset:-2px;border-radius:inherit}
 html.bna-pg main button[aria-expanded],html.bna-pg .nsa>.nsa-b{border-radius:inherit}
 .nsa>.nsa-b{border-radius:8px}
 @media (hover:none){
@@ -319,7 +319,7 @@ html[data-theme="light"].bna-pg .nsa.open{background:#fff!important;border-color
 .bna-grp[data-g="el"]{--g:#4AA3FF;--gf:rgba(74,163,255,.16);--gl:#0A5BD3;--gfl:rgba(10,91,211,.16)}
 .bna-grp[data-g="cf"]{--g:#B8B7FE;--gf:rgba(184,183,254,.16);--gl:#5B4BC4;--gfl:rgba(91,75,196,.16)}
 .bna-grp[data-g="hl"]{--g:#52C49A;--gf:rgba(82,196,154,.16);--gl:#0F7A55;--gfl:rgba(15,122,85,.16)}
-.bna-grp[data-g="hd"]{--g:#FFC21A;--gf:rgba(255,194,26,.14);--gl:#3A3A3C;--gfl:rgba(255,194,26,.55)}
+.bna-grp[data-g="hd"]{--g:#F2F2F4;--gf:rgba(242,242,244,.14);--gl:#3A3A3C;--gfl:rgba(242,242,244,.55)}
 .bna-grp[data-g="nh"]{--g:#6DB2B5;--gf:rgba(109,178,181,.16);--gl:#1F6F73;--gfl:rgba(31,111,115,.16)}
 .bna-grp .bna-ch,.bna-grp .bna-mx{--a-ch:var(--g);--a-chf:var(--gf)}
 html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-ch,html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-mx{--a-ch:var(--gl);--a-chf:var(--gfl)}
@@ -328,12 +328,12 @@ html[data-theme="light"] .bna-grp:not([data-g="hd"]) .bna-ch .b1{stroke:none}
 .bna-gh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding-top:6px;border-top:1px solid var(--a-ln,rgba(127,127,127,.2))}
 .bna-gh h3{margin:10px 0 0;font-size:19px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
 .bna-gh h3 i{width:10px;height:10px;border-radius:50%;background:var(--g);flex:none}
-html[data-theme="light"] .bna-gh h3 i{background:var(--gl)}html[data-theme="light"] .bna-grp[data-g="hd"] .bna-gh h3 i{background:#FFC21A;box-shadow:0 0 0 1px #3A3A3C}
+html[data-theme="light"] .bna-gh h3 i{background:var(--gl)}html[data-theme="light"] .bna-grp[data-g="hd"] .bna-gh h3 i{background:#F2F2F4;box-shadow:0 0 0 1px #3A3A3C}
 .bna-gh p{margin:0;font-size:14px;color:var(--a-ink2,#86868B)}
 html[data-theme="light"] .bna-gh p{color:#515154}
 .bna-grp .bna-mc{box-shadow:inset 0 3px 0 var(--g)}
 html[data-theme="light"] .bna-grp .bna-mc{box-shadow:inset 0 3px 0 var(--gl)}
-html[data-theme="light"] .bna-grp[data-g="hd"] .bna-mc{box-shadow:inset 0 3px 0 #FFC21A}
+html[data-theme="light"] .bna-grp[data-g="hd"] .bna-mc{box-shadow:inset 0 3px 0 #F2F2F4}
 .bna-rl{list-style:none;margin:0;padding:0;font-size:13px;line-height:1.3}
 .bna-rl li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--a-ln,rgba(127,127,127,.18))}
 .bna-rl li:first-child{border-top:0}
@@ -357,8 +357,8 @@ html[data-theme="light"] .fin-st{background:#fff!important;border-color:rgba(0,0
 html[data-theme="light"] .fin-st .fin-st-h,html[data-theme="light"] .fin-st .fin-st-h b{color:#1D1D1F!important}
 html[data-theme="light"] .fin-st .meta{color:#3A3A3C!important}
 html[data-theme="light"] .fin-st .fin-rule{color:#515154!important}
-html[data-theme="light"] .fin-st .fin-cite{color:#1D1D1F!important;text-decoration:underline;text-decoration-color:#FFC21A;text-decoration-thickness:2px;text-underline-offset:3px}
-html[data-theme="light"] .fin-st.fin-ok{border-left-color:#248A3D!important}html[data-theme="light"] .fin-st.fin-warn{border-left-color:#FFC21A!important}html[data-theme="light"] .fin-st.fin-bad{border-left-color:#D70015!important}
+html[data-theme="light"] .fin-st .fin-cite{color:#1D1D1F!important;text-decoration:underline;text-decoration-color:#F2F2F4;text-decoration-thickness:2px;text-underline-offset:3px}
+html[data-theme="light"] .fin-st.fin-ok{border-left-color:#248A3D!important}html[data-theme="light"] .fin-st.fin-warn{border-left-color:#F2F2F4!important}html[data-theme="light"] .fin-st.fin-bad{border-left-color:#D70015!important}
 html[data-theme="light"] .fin-card{background:#fff!important;border-color:rgba(0,0,0,.1)!important;color:#1D1D1F!important}
 html[data-theme="light"] .fin-card .fin-nm b{color:#1D1D1F!important}html[data-theme="light"] .fin-card .fin-sym{color:#515154!important}
 /* Promo buttons in dark mode: ink text leaked onto dark/yellow buttons */
@@ -414,7 +414,7 @@ html[data-theme="light"] .bna-grp .bna-ms{color:#515154}
 .bna-fol a{display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--a-y);color:var(--a-y);font:600 14px/1 Inter,sans-serif;text-decoration:none}
 .bna-fol a:hover{background:var(--a-y);color:var(--a-on-y)}
 .bna-fol a:focus-visible{outline:2px solid var(--a-y);outline-offset:2px}
-html[data-theme="light"] .bna-it:not(.hi) .bna-fol a{color:#0B0D10;background:rgba(255,194,26,.16)}
+html[data-theme="light"] .bna-it:not(.hi) .bna-fol a{color:#0B0D10;background:rgba(242,242,244,.16)}
 html[data-theme="light"] .bna-it:not(.hi) .bna-fol a:hover{background:var(--a-y)}
 
 /* civil-unrest day bars */
@@ -438,23 +438,23 @@ html[data-theme="light"] .bna-rkchip.red{background:rgba(176,14,40,.12);color:#B
 /* Nov 12 (Matt): no notification dots or count badges anywhere in the chrome. */
 .bn-burger .bna-dot,.bn-badge,.tabs .ns-badge,.bna-mdot{display:none!important}
 /* Featured desk card in the top row (Nov 13): green border, badge and accent; same size as the other cards */
-.bna-it.bna-feat{background:linear-gradient(180deg,rgba(63,166,106,.16),rgba(63,166,106,.04) 55%),var(--a-sf);box-shadow:0 0 0 2px #3fa66a,inset 0 6px 0 #3fa66a}
-.bna-it.bna-feat .bna-k{color:#5cc488}
-.bna-rk.grn{background:#3fa66a;color:#fff}
-.bna-ftag{margin:12px 0 0;display:inline-block;align-self:flex-start;font:700 11px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-radius:999px;border:1px solid rgba(63,166,106,.7);color:#5cc488}
+.bna-it.bna-feat{background:linear-gradient(180deg,rgba(107,112,118,.16),rgba(107,112,118,.04) 55%),var(--a-sf);box-shadow:0 0 0 2px #6B7076,inset 0 6px 0 #6B7076}
+.bna-it.bna-feat .bna-k{color:#C9CDD3}
+.bna-rk.grn{background:#6B7076;color:#fff}
+.bna-ftag{margin:12px 0 0;display:inline-block;align-self:flex-start;font:700 11px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-radius:999px;border:1px solid rgba(107,112,118,.7);color:#C9CDD3}
 .bna-it.bna-feat h3{margin-top:12px}
 .bna-it.bna-feat .bna-m{margin:10px 0 0;padding-top:0;font-size:14px;color:var(--a-ink2,#A1A1A6);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
-.bna-fgo{margin:auto 0 0;padding-top:14px;font-weight:600;font-size:15px;color:#5cc488}.bna-fgo:after{content:"\00a0\203A"}
-html[data-theme="light"] .bna-it.bna-feat{background:linear-gradient(180deg,rgba(29,122,70,.12),rgba(29,122,70,.03) 55%),var(--a-sf);box-shadow:0 0 0 2px #1d7a46,inset 0 6px 0 #1d7a46}
-html[data-theme="light"] .bna-it.bna-feat .bna-k,html[data-theme="light"] .bna-ftag,html[data-theme="light"] .bna-fgo{color:#1d7a46}
-html[data-theme="light"] .bna-ftag{border-color:rgba(29,122,70,.6)}html[data-theme="light"] .bna-rk.grn{background:#1d7a46}
+.bna-fgo{margin:auto 0 0;padding-top:14px;font-weight:600;font-size:15px;color:#C9CDD3}.bna-fgo:after{content:"\00a0\203A"}
+html[data-theme="light"] .bna-it.bna-feat{background:linear-gradient(180deg,rgba(29,122,70,.12),rgba(29,122,70,.03) 55%),var(--a-sf);box-shadow:0 0 0 2px #3A3F45,inset 0 6px 0 #3A3F45}
+html[data-theme="light"] .bna-it.bna-feat .bna-k,html[data-theme="light"] .bna-ftag,html[data-theme="light"] .bna-fgo{color:#3A3F45}
+html[data-theme="light"] .bna-ftag{border-color:rgba(29,122,70,.6)}html[data-theme="light"] .bna-rk.grn{background:#3A3F45}
 /* Pinned story, card 1 of the top row (Nov 13): yellow brand accent, so it reads apart from the green featured card 2 */
-.bna-it.bna-pin{box-shadow:0 0 0 2px var(--a-y,#FFC21A),inset 0 6px 0 var(--a-y,#FFC21A)}
-.bna-it.bna-pin .bna-k{color:var(--a-y,#FFC21A)}
-.bna-ptag{margin:12px 0 0;display:inline-block;align-self:flex-start;font:700 11px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-radius:999px;border:1px solid rgba(255,194,26,.7);color:var(--a-y,#FFC21A)}
+.bna-it.bna-pin{box-shadow:0 0 0 2px var(--a-y,#F2F2F4),inset 0 6px 0 var(--a-y,#F2F2F4)}
+.bna-it.bna-pin .bna-k{color:var(--a-y,#F2F2F4)}
+.bna-ptag{margin:12px 0 0;display:inline-block;align-self:flex-start;font:700 11px/1 Inter,sans-serif;text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;border-radius:999px;border:1px solid rgba(242,242,244,.7);color:var(--a-y,#F2F2F4)}
 .bna-it.bna-pin h3{margin-top:12px}
 .bna-it.bna-pin .bna-m{margin:10px 0 0;padding-top:0;font-size:14px;color:var(--a-ink2,#A1A1A6);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
-.bna-pgo{margin:auto 0 0;padding-top:14px;font-weight:600;font-size:15px;color:var(--a-y,#FFC21A)}.bna-pgo:after{content:"\00a0\203A"}
+.bna-pgo{margin:auto 0 0;padding-top:14px;font-weight:600;font-size:15px;color:var(--a-y,#F2F2F4)}.bna-pgo:after{content:"\00a0\203A"}
 html[data-theme="light"] .bna-it.bna-pin{box-shadow:0 0 0 2px #B7791F,inset 0 6px 0 #B7791F}
 html[data-theme="light"] .bna-it.bna-pin .bna-k,html[data-theme="light"] .bna-ptag,html[data-theme="light"] .bna-pgo{color:#8a5a00}
 html[data-theme="light"] .bna-ptag{border-color:rgba(183,121,31,.6)}
