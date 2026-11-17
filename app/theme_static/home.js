@@ -21,7 +21,7 @@ if("IntersectionObserver" in window){
  secs.forEach(function(s){near.observe(s);vis.observe(s)});
 }else secs.forEach(function(s){s.classList.add("in")});
 /* rank bar */
-var bar=$("h_bar");if(bar){var h="";for(var i=0;i<=10;i++)h+='<i style="background:'+(i<=3?"var(--bnt-calm)":i<=6?"var(--bnt-elev)":"var(--bnt-high)")+';opacity:'+(.45+i*.05)+'"></i>';bar.innerHTML=h}
+var bar=$("h_bar");if(bar){var h="";for(var i=0;i<=10;i++)h+='<i style="background:'+(i>=7?"#E5484D":"#fff")+';opacity:'+(i>=7?1:.18+i*.1)+'"></i>';bar.innerHTML=h}
 /* live numbers */
 function fmtAgo(iso){try{var m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?"just now":m<60?m+" min ago":Math.round(m/60)+" h ago"}catch(e){return""}}
 fetch("/api/live/summary",{cache:"no-store"}).then(function(r){return r.json()}).then(function(S){if(!S||!S.wire)return;
@@ -38,8 +38,8 @@ var mo=$("h_moreopt"),box=$("nl_app");if(mo)mo.addEventListener("click",function
 /* extra layers */
 var inst=$("h_install");if(inst)inst.addEventListener("click",function(){if(window.BN&&BN.showInstallGuide)BN.showInstallGuide();else location.href="/live"});
 /* remember: skip the intro next time */
-var sk=$("h_skip");try{sk.checked=localStorage.getItem("bn_skip_intro")==="1"}catch(e){}
-sk.addEventListener("change",function(){try{localStorage.setItem("bn_skip_intro",sk.checked?"1":"0")}catch(e){}});
+var sk=$("h_skip");if(sk)try{sk.checked=localStorage.getItem("bn_skip_intro")==="1"}catch(e){}
+if(sk)sk.addEventListener("change",function(){try{localStorage.setItem("bn_skip_intro",sk.checked?"1":"0")}catch(e){}});
 /* slide-out menu */
 var menu=$("h_menu"),scrim=$("h_scrim"),last=null;
 function open(on){menu.classList.toggle("open",on);scrim.classList.toggle("on",on);menu.setAttribute("aria-hidden",on?"false":"true");

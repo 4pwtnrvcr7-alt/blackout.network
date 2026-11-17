@@ -212,6 +212,14 @@ def render(cid, since=""):
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
 def handle_get(path, qs):
+    try:   # Push F: Wire v2 (wire_v2.py) on /wire, /wire/<id>, /wire2/static/*; BN_WIRE_V2=0 = the pages below
+        import wire_v2
+        if path.startswith(wire_v2.ST + "/"):
+            return wire_v2.handle_static(path) or (404, {"error": "not found"})
+        r = wire_v2.handle(path, qs)
+        if r: return r
+    except Exception:
+        import traceback; traceback.print_exc()
     if path in ("/wire", "/wire/"):
         import wire_page
         return wire_page.page()
