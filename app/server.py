@@ -529,6 +529,53 @@ def version_assets(b):
             if j > 0: b = b[:j] + b'<script src="/bn-apple.js" defer></script>' + b[j:]
         return _ASSET_RE.sub(lambda m: m.group(1) + m.group(2) + b"?v=" + v + m.group(3), b)
     except Exception: return b
+# Nov 17 2026 (Matt, 11:20 AM ET): the main menu must be reachable on EVERY page. Safety net for full HTML pages that ship
+# without the shared header/menu (e.g. /newsletter/sample, the HTML 500 page): a fixed MENU button + the shared drawer.
+# Pages with their own menu (shared drawer #bn-menu, the intro h-menu4, Wire v2 #w2_open) or data-bn-nomenu are left alone.
+_FB_SKIP = ("/api/", "/internal/", "/embed", "/wire2/")
+_FB_CSS = (b'<style id="bn_fbm">.bn-fbm{position:fixed;z-index:6900;top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));'
+           b'display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;background:rgba(5,6,10,.82);color:#F2F2F4;border:1px solid rgba(242,242,244,.28);'
+           b'font:600 12px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}'
+           b'.bn-fbm svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}.bn-fbm:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}'
+           b'body.bn-fbm-on .bntr-float{top:calc(60px + env(safe-area-inset-top))!important}'
+           b'body.bn-fbm-on:has(#bn-menu.bn-open) .bn-fbm,body.bn-fbm-on:has(#bn-menu.bn-open) .bntr-float{visibility:hidden}'
+           b'body.bn-fbm-on #bn-menu [data-bn-theme]{display:none!important}</style>')
+def menu_fallback(b, path=""):
+    try:
+        if path.startswith(_FB_SKIP) or os.environ.get("BN_MENU_FALLBACK", "1") == "0": return b
+        lo = b[:4000].lower()
+        if b"<html" not in lo or b'id="bn-menu"' in b or b"h-menu4" in b or b'id="w2_open"' in b or b"data-bn-nomenu" in b[:4000]: return b
+        import sitenav as SN, sitenav_ui as UI
+        btn = ('<a class="bn-fbm bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">'
+               '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></a>')
+        body = (btn + UI.drawer(SN, "")).encode("utf-8")
+        head = _FB_CSS + (b"" if b"/sitenav.css" in b else b'<link rel="stylesheet" href="/sitenav.css">')
+        tail = b"" if b"/sitenav.js" in b else b'<script src="/sitenav.js" defer></script>'
+        k = b.find(b"</head>")
+        if k > 0: b = b[:k] + head + b[k:]
+        m = re.search(rb"<body[^>]*>", b)
+        if not m: return b
+        b = b[:m.end()] + body + b'<script>document.body.classList.add("bn-fbm-on")</script>' + b[m.end():]
+        j = b.rfind(b"</body>")
+        b = (b[:j] + tail + b[j:]) if j > 0 else b + tail
+        return b
+    except Exception:
+        traceback.print_exc(); return b
+
+def error_page_html():
+    """HTML 500 for people (API clients keep JSON); no exception text. Gets the shared header + menu."""
+    try:
+        import sitenav as SN, sitenav_ui as UI
+        top, head = SN.header_html(""), UI.THEME_SCRIPT + '<script src="/sitenav.js" defer></script>'
+    except Exception:
+        top, head = "", ""
+    return ("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content=\"width=device-width,initial-scale=1\">"
+            "<title>Something went wrong | BLACKOUT.NETWORK</title><meta name=robots content=noindex><link rel=stylesheet href=/sitenav.css>" + head +
+            "<style>body{margin:0;background:var(--bn-bg,#0B0D10);color:var(--bn-text,#E6E9EE);font:15px/1.6 var(--bn-font-body,Inter,system-ui,sans-serif)}"
+            "main{padding:48px 20px;max-width:760px;margin:0 auto}h1{font:800 28px/1.2 var(--bn-font-ui,Montserrat,system-ui,sans-serif);margin:0 0 8px}a{color:var(--bn-link,#4aa3ff)}</style></head><body>" + top +
+            "<main id=main><h1>Something went wrong</h1><p>This page could not load right now. Please try again in a minute.</p>"
+            "<p><a href=\"/live\">Go to Live</a> &middot; <a href=\"/wire\">The Wire</a></p></main></body></html>")
+
 def theme_assets(b):
     """Nov 17 push B: shared theme links for full pages that skip pwa_head (/stats, /midterms, /mesh*, /report-status via reports._send)."""
     if not new_home_on(): return b
@@ -595,9 +642,12 @@ class H(BaseHTTPRequestHandler):
         if ctype == "application/json" and b"://" in b:   # t347: show people the human page, not the raw API/RSS endpoint (display only)
             try: b = display_links.rewrite_json(b.decode("utf-8")).encode("utf-8")
             except Exception: pass
+        if code >= 500 and ctype == "application/json" and not self.path.startswith(("/api/", "/internal/")) and "text/html" in (self.headers.get("Accept") or ""):
+            b, ctype = error_page_html().encode("utf-8"), "text/html"   # Nov 17: people get an HTML error page with the menu, not raw JSON
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
         if ctype.startswith("text/html; "): b = apple_assets(b)   # apple_style_v1 on /midterms and /stats
         if ctype.startswith("text/html; "): b = theme_assets(b)   # Nov 17 push B: shared theme on "text/html; charset=utf-8" pages (/stats, /midterms, /mesh*)
+        if ctype.startswith("text/html"): b = menu_fallback(b, self.path)   # Nov 17: menu on every full page
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
         if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
