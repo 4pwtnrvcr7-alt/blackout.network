@@ -39,7 +39,7 @@ if(on("m")){ var W=360,H=155,x=function(l){return l+180},y=function(a){return (8
  (land||[]).forEach(function(p){s+='<circle cx="'+x(p[0])+'" cy="'+y(p[1])+'" r=".62"/>'});s+="</g>";
  var pts=S.geo.slice().sort(function(a,b){return a[2]-b[2]}),cn={c:0,e:0,h:0};
  pts.forEach(function(g,i){var b=band(g[2]),rad=b==="h"?2.1:b==="e"?1.5:1.1;cn[b]++;if(g[0]<-73||g[0]>82)return;
-  s+='<circle cx="'+x(g[1]).toFixed(1)+'" cy="'+y(g[0]).toFixed(1)+'" r="'+rad+'" fill="'+col[b]+'" fill-opacity="'+(b==="c"?.7:.95)+'" filter="url(#bntl_g3)">'+(b==="h"&&!reduce?'<animate attributeName="r" values="'+rad+";"+(rad+1.6)+";"+rad+'" dur="2.4s" begin="'+((i%7)*.3)+'s" repeatCount="indefinite"/>':"")+"</circle>"});
+  s+='<circle cx="'+x(g[1]).toFixed(1)+'" cy="'+y(g[0]).toFixed(1)+'" r="'+rad+'" fill="'+col[b]+'" fill-opacity="'+(b==="c"?.7:.95)+'" filter="url(#bntl_g3)">'+""/* Nov 17 1:45 AM: SMIL pulse removed, it repainted the blurred SVG every frame and caused most scroll jank on /live */+"</circle>"});
  $("bntl_map").innerHTML=s+"</svg>";$("bntl_maph").textContent=pts.length+" located alerts · "+cn.h+" high, "+cn.e+" elevated, "+cn.c+" calm";}
  // rank spread
 if(on("d")){ var mx=1;for(var k=0;k<=10;k++)mx=Math.max(mx,S.ranks[k]||0);var h="";
