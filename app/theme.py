@@ -98,9 +98,10 @@ CAT_NAMES = {"natural disaster": "Weather & quakes", "war/conflict": "Conflict",
 
 _sum = {"t": 0, "v": None}
 _slock = threading.Lock()
-def summary():
+def summary(fresh=False):
+    """fresh=True (a module refresh button) rebuilds once the copy is 15 s old; otherwise 60 s."""
     with _slock:
-        if _sum["v"] and time.time() - _sum["t"] < 60: return _sum["v"]
+        if _sum["v"] and time.time() - _sum["t"] < (15 if fresh else 60): return _sum["v"]
     st = _srv().api_state()
     m = st.get("main") or []
     rk = lambda x: int(x.get("rank") or 0)
@@ -109,9 +110,13 @@ def summary():
     bands = {"calm": sum(1 for x in m if rk(x) <= 3), "elevated": sum(1 for x in m if 4 <= rk(x) <= 6), "high": sum(1 for x in m if rk(x) >= 7)}
     fam = lambda x: int(x.get("n_families") or x.get("eff_families") or len(x.get("families") or []) or 0)
     tops = sorted([x for x in m if fam(x) >= 2], key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:6]
-    top = [{"title": _short(_clean(x.get("title")), 140), "loc": _clean(x.get("location"))[:60], "cat": x.get("category") or "", "rank": rk(x),
+    top = [{"title": _short(_clean(x.get("title")), 400), "loc": _clean(x.get("location"))[:60], "cat": x.get("category") or "", "rank": rk(x),
             "sources": fam(x), "rising": bool(x.get("rising")), "first_seen_et": _et(x.get("first_seen"), "%b %-d, %-I:%M %p ET"),
             "url": "/wire/" + str(x.get("cluster_id") or "")} for x in tops]
+    # Gauge (Matt Nov 17 1:08 AM): average rank of the current top stories, i.e. the rank 7+ items on the main feed
+    # (The Wire's High section, the Top Signals / newsletter pool). Fewer than 3 -> the top 10 by rank. Read-only; no scoring change.
+    lead = [x for x in m if rk(x) >= 7]
+    if len(lead) < 3: lead = sorted(m, key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:10]
     vol = {}
     for v in st.get("volume") or []:
         dd = vol.setdefault(v.get("d"), {}); dd[v.get("category")] = dd.get(v.get("category"), 0) + int(v.get("n") or 0)
@@ -122,7 +127,8 @@ def summary():
     src = st.get("sources") or []; sc = (st.get("scans") or [{}])[0] or {}
     last = sc.get("finished") or st.get("generated")
     out = {"generated": st.get("generated"), "wire": len(m), "watch": st.get("watchlist_count") or 0, "ranks": ranks, "bands": bands,
-           "level": round(sum(rk(x) for x in m) / len(m), 1) if m else 0.0, "max_rank": max([rk(x) for x in m] or [0]),
+           "level": round(sum(rk(x) for x in lead) / len(lead), 1) if lead else 0.0, "level_n": len(lead), "level_hi": len(lead) > 0 and all(rk(x) >= 7 for x in lead),
+           "wire_avg": round(sum(rk(x) for x in m) / len(m), 1) if m else 0.0, "max_rank": max([rk(x) for x in m] or [0]),
            "top": top, "geo": [[round(float(x["lat"]), 2), round(float(x["lon"]), 2), rk(x)] for x in m if x.get("lat") is not None and x.get("lon") is not None],
            "volume": [{"d": lab(k, "%a"), "n": sum(vol[k].values())} for k in days], "cats": cats, "today": lab(today, "%a %b %-d") if today else "",
            "sources_ok": sum(1 for s in src if s.get("ok")), "sources_total": len(src),
@@ -134,7 +140,7 @@ def summary():
 # ---------- routes ----------
 def handle_stream(path, qs, h):
     if path == "/api/live/summary":
-        try: return h.send(200, summary())
+        try: return h.send(200, summary(fresh=(qs.get("fresh") or ["0"])[0] == "1"))
         except Exception as ex:
             import traceback; traceback.print_exc(); return h.send(503, {"error": "summary unavailable"})
     if path.startswith("/bnt/media/"):
@@ -316,18 +322,19 @@ def live_overview_html():
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>
-<div class="l-hero"><div class="bnt-card l-gcard"><p class="k">Average rank on The Wire</p><div class="l-gauge" id="bntl_g"></div><div class="l-gtext"><p class="plain" id="bntl_gt">&nbsp;</p></div></div>
+<div class="l-hero"><div class="bnt-card l-gcard"><div class="l-kr"><p class="k">Top stories · Average rank</p><span id="bntl_ug"></span></div><div class="l-gauge" id="bntl_g"></div><div class="l-gtext"><p class="plain" id="bntl_gt">&nbsp;</p></div></div>
 <div class="l-tiles">
 <a class="bnt-card l-tile h" href="/wire"><p class="k">High &middot; 7&ndash;10</p><b id="bntl_th">&ndash;</b><p class="plain">Major events. Start here.</p><div class="l-meter" id="bntl_mh"></div></a>
 <a class="bnt-card l-tile e" href="/wire"><p class="k">Elevated &middot; 4&ndash;6</p><b id="bntl_te">&ndash;</b><p class="plain">Worth keeping an eye on.</p><div class="l-meter" id="bntl_me"></div></a>
 <a class="bnt-card l-tile c" href="/wire"><p class="k">Calm &middot; 0&ndash;3</p><b id="bntl_tc">&ndash;</b><p class="plain">Local or minor.</p><div class="l-meter" id="bntl_mc"></div></a>
 <a class="bnt-card l-tile s" href="/sources"><div class="l-ring" id="bntl_ring"></div><div><p class="k">Sources online</p><p class="plain" id="bntl_src">&nbsp;</p></div></a>
+<div class="l-tstamp"><span id="bntl_ut"></span></div>
 </div></div>
-<div class="l-head"><h3>Top signals</h3><span class="l-hint">Highest ranked, confirmed by two or more independent sources</span><a class="l-more" href="/wire">Full Wire &rarr;</a></div>
+<div class="l-head"><h3>Top signals</h3><span class="l-hint">Highest ranked, confirmed by two or more independent sources</span><span id="bntl_us"></span><a class="l-more" href="/wire">Full Wire &rarr;</a></div>
 <div class="l-sigs" id="bntl_sigs"></div>
-<div class="l-split"><div class="bnt-card"><div class="l-head"><h3>Where it's happening</h3><span class="l-hint" id="bntl_maph"></span><a class="l-more" href="#heatmap">Heat Map &rarr;</a></div><div class="l-map" id="bntl_map"></div></div>
-<div class="bnt-card"><div class="l-head"><h3>Rank spread</h3><span class="l-hint">Alerts on The Wire by rank</span></div><div class="l-dist" id="bntl_dist"></div><p class="plain">Most alerts are calm or elevated. The few red ones are what to watch.</p></div></div>
-<div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Alerts per day</h3><span class="l-hint">Last 7 days, Eastern Time</span></div><div id="bntl_vol"></div></div>
-<div class="bnt-card"><div class="l-head"><h3>What's moving today</h3><span class="l-hint" id="bntl_cath"></span></div><div class="l-cats" id="bntl_cats"></div></div></div>
+<div class="l-split"><div class="bnt-card"><div class="l-head"><h3>Where it's happening</h3><span class="l-hint" id="bntl_maph"></span><span id="bntl_um"></span><a class="l-more" href="/map">Full-screen map &rarr;</a></div><div class="l-map" id="bntl_map"></div></div>
+<div class="bnt-card"><div class="l-head"><h3>Rank spread</h3><span class="l-hint">Alerts on The Wire by rank</span><span id="bntl_ud"></span></div><div class="l-dist" id="bntl_dist"></div><p class="plain">Most alerts are calm or elevated. The few red ones are what to watch.</p></div></div>
+<div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Alerts per day</h3><span class="l-hint">Last 7 days, Eastern Time</span><span id="bntl_uv"></span></div><div id="bntl_vol"></div></div>
+<div class="bnt-card"><div class="l-head"><h3>What's moving today</h3><span class="l-hint" id="bntl_cath"></span><span id="bntl_uc"></span></div><div class="l-cats" id="bntl_cats"></div></div></div>
 <div class="bnt-card l-cta"><div><h3>Get the brief</h3><p class="plain">A sourced brief at 7 AM and 7 PM ET, plus email alerts when something serious breaks.</p></div><a class="bnt-btn y" href="/newsletter">Get the free brief</a></div>
 </div></section><script src="{url("live.js")}" defer></script>'''

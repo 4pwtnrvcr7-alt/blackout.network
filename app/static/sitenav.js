@@ -23,14 +23,16 @@ var chartHooked=false;
 function charts(redraw){var C=window.Chart;if(!C||!C.defaults)return;C.defaults.color=cssv("--bn-muted");C.defaults.borderColor=cssv("--bn-line");
  if(!chartHooked&&C.register){chartHooked=true;try{C.register({id:"bnTheme",beforeUpdate:function(ch){if(R.getAttribute("data-theme")==="light"||ch.$bnThemed)chartTheme(ch)}})}catch(e){}}
  if(redraw){var I=C.instances||{};Object.keys(I).forEach(function(k){var ch=I[k];ch.$bnThemed=true;chartTheme(ch);try{ch.update("none")}catch(e){}})}}
-function setTheme(t,save){t=t==="light"?"light":"dark";R.setAttribute("data-theme",t);R.style.colorScheme=t;if(save)LS.set("bn_theme",t);
+function setTheme(t,save){t=t==="light"?"light":"dark";if(window.BN_DARK_ONLY!==0)t="dark";   /* Matt Nov 17 1:10 AM: dark only; set window.BN_DARK_ONLY=0 to bring light mode back */
+R.setAttribute("data-theme",t);R.style.colorScheme=t;if(save)LS.set("bn_theme",t);
  var m=$('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="light"?"#f6f7f9":"#0b0d10");
  $$("[data-bn-theme]").forEach(function(b){var nx=t==="light"?"dark":"light";b.setAttribute("aria-label","Switch to "+nx+" mode");b.setAttribute("aria-pressed",t==="light"?"true":"false");
   var l=$(".bn-tl",b);if(l)l.textContent=(nx==="light"?"Light":"Dark")+" mode";
   if(b.classList.contains("bn-theme-row"))b.setAttribute("title",(nx==="light"?"Light":"Dark")+" mode")});   // icon-only in the phone menu: tooltip names the mode it switches to
  charts(true);try{window.dispatchEvent(new CustomEvent("bn-theme",{detail:{theme:t}}))}catch(e){}}
 window.bnTheme=function(){return R.getAttribute("data-theme")==="light"?"light":"dark"};
-if(window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)");var onmq=function(){if(!LS.get("bn_theme"))setTheme(mq.matches?"light":"dark",false)};
+/* Nov 17 new theme: dark is the default; light only when the visitor picks it, so no system-scheme follow */
+if(false&&window.matchMedia){var mq=matchMedia("(prefers-color-scheme: light)");var onmq=function(){if(!LS.get("bn_theme"))setTheme(mq.matches?"light":"dark",false)};
  if(mq.addEventListener)mq.addEventListener("change",onmq);else if(mq.addListener)mq.addListener(onmq)}
 
 /* t397: the language picker + site-wide translation (/api/translate/app.js) on every page, not just the four that linked it */
