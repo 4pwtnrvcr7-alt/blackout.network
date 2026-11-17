@@ -676,7 +676,7 @@ def head_tag():
     """Early, render-blocking switch: '/' with no hash (or #home) shows the new homepage; any tab hash shows the dashboard."""
     # bna-home: the new homepage (dashboard path "/" with no tab hash). bna-pg: the page groups restyled so far
     # (The Wire, Threats tabs, /crime, /network, /wire/<id> event pages); every other page keeps its current look.
-    return (b'<script>(function(){var d=document.documentElement,p=location.pathname;function f(){var h=location.hash.replace(/^#/,""),home=p=="/"&&(!h||h=="home");'
+    return (b'<script>(function(){var d=document.documentElement,p=location.pathname;function f(){var h=location.hash.replace(/^#/,""),home=(p=="/"||p=="/live")&&(!h||h=="home");'
             b'var was=d.classList.contains("bna-home");'
             b'd.classList.toggle("bna-home",home);d.classList.toggle("bna-pg",!home);'
             b'if(was&&!home)try{scrollTo(0,0)}catch(e){}}'

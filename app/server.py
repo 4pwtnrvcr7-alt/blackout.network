@@ -207,7 +207,7 @@ PROGRESS_HEAD = b'<link rel="stylesheet" href="/bn-progress.css"><script src="/b
 GROWTH_HEAD = b'<link rel="stylesheet" href="/api/growth/app.css"><script src="/api/growth/app.js" defer></script>'   # growth.py: share/follow/visual Wire cards (Nov 1)
 _OLD_TAGLINES = [b"The world's threats, scored and sourced, before cable news catches up.", b"The world&#x27;s threats, scored and sourced, before cable news catches up.",
                  b"The world&#39;s threats, scored and sourced, before cable news catches up."]
-_DASH_FALLBACK = (b'<header class="bn-top" id="bn_topbar"><div class="bn-tbar"><a class="bn-logo" href="/">BLACKOUT.<b>NETWORK</b></a></div>'
+_DASH_FALLBACK = (b'<header class="bn-top" id="bn_topbar"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bn-word bnt-wm" aria-label="BLACKOUT.NETWORK">blackout.network</span></a></div>'
                   b'<div class="bn-pop" id="bn_settings" hidden><div class="ctl"><span id="status">loading\xe2\x80\xa6</span><button class="pri" id="refresh">Manual refresh</button>'
                   b'<label>Scans every <select id="interval"></select></label><span id="msg"></span></div></div></header>')
 def dashboard_page():
@@ -232,6 +232,24 @@ def dashboard_page():
         if i > 0 and b"application/ld+json" not in b[:i]: b = b[:i] + ld + b[i:]
     except Exception: traceback.print_exc()
     return b
+
+def live_page():
+    """/live (Nov 17 2026 new theme): the dashboard that used to be "/", every tab unchanged (/live#wire, /live#heatmap ...).
+    With no tab hash it opens on the new live overview (theme.live_overview_html, real data from /api/live/summary)
+    followed by the existing home sections."""
+    b = dashboard_page()
+    b = b.replace(b'<link rel="canonical" href="https://blackout.network/">', b'<link rel="canonical" href="https://blackout.network/live">', 1)
+    b = b.replace(b'<meta property="og:url" content="https://blackout.network/">', b'<meta property="og:url" content="https://blackout.network/live">', 1)
+    try:
+        ov = _addon_mod("theme").live_overview_html().encode("utf-8")
+        k = b.find(b'<h1 class="bna-vh">')
+        k = b.find(b"</h1>", k) + 5 if k >= 0 else -1
+        if k > 4: b = b[:k] + ov + b[k:]
+    except Exception: traceback.print_exc()
+    return b
+
+def new_home_on():
+    return os.environ.get("BN_NEW_HOME", "1").strip() != "0"
 
 # GA4 (seo/batch-1; Compliance 2026-11-01_privacy-ga4.md + 2026-11-01_global-legal-gap.md): Google Analytics 4 (G-KND6CPBB1X), opt-out model.
 # gtag.js is never loaded for: visitors in the EEA/UK/CH (CF-IPCountry, read here and not stored; no consent banner); visitors whose country is
@@ -290,7 +308,7 @@ function bnGroup(k){var p=location.pathname.toLowerCase();
 if(/^\/(wire|story)(\/|$)/.test(p))return 'Wire';if(/^\/(midterms|elections?)\/?$/.test(p))return 'Midterms';
 if(/^\/(privacy|cookies|cookie-policy|privacy-choices|do-not-sell|tos|terms)\/?$/.test(p))return 'Legal';
 if(/^\/(stats|report-status)\/?$/.test(p))return 'Stats';if(/^\/(alerts|crime)(\/|$)/.test(p))return 'Alerts';
-if(p==='/'||p===''){k=k||tabKey();return k?TABG[k]:'Home';}
+if(p==='/'||p===''||p==='/live'){k=k||tabKey();return k?TABG[k]:'Home';}
 var s=p.split('/')[1];return TABG[s]||'Home';}
 window.bnContentGroup=bnGroup;
 /* G-fixes-2: /crime titles echo the geocoder label ('Crime in <place>'), which for international or free-text lookups can be user-typed text,
@@ -359,7 +377,7 @@ try{if(window.PushManager&&PushManager.prototype.subscribe&&!PushManager.prototy
 PushManager.prototype.subscribe=function(){return ps.apply(this,arguments).then(function(s){T('push_subscribe',{platform:platform()});T('push_optin',{platform:platform()});return s;});};PushManager.prototype.subscribe.bnWrapped=1;}}catch(e){}
 try{var f0=window.fetch;if(f0&&!f0.bnWrapped){window.fetch=function(input,init){var u=typeof input==='string'?input:(input&&input.url)||'';var r=f0.apply(this,arguments);
 if(/\/api\/newsletter\/subscribe(\?|$)/.test(u)&&init&&String(init.method||'').toUpperCase()==='POST'){var src='form';try{src=String(JSON.parse(init.body).source||'form');}catch(x){}
-r.then(function(res){if(res&&res.ok){var loc=location.pathname==='/'?'home'+(tabKey()?'_'+tabKey():''):location.pathname.replace(/^\/+|\/+$/g,'').replace(/\/[0-9a-f]{16}$/,'').replace(/\//g,'_');
+r.then(function(res){if(res&&res.ok){var loc=location.pathname==='/live'?'home'+(tabKey()?'_'+tabKey():''):location.pathname==='/'?'intro':location.pathname.replace(/^\/+|\/+$/g,'').replace(/\/[0-9a-f]{16}$/,'').replace(/\//g,'_');
 var p={signup_source:src,form_location:loc||'home'};T('newsletter_signup',p);T('generate_lead',p);}},function(){});}
 return r;};window.fetch.bnWrapped=1;}}catch(e){}
 function onReady(){var p=location.pathname,st=document.getElementById('bn_story');
@@ -458,6 +476,10 @@ def pwa_head(b):
         if j >= 0 and b"<html" in al[:4000] and b"/api/growth/app.js" not in al[:j]: b = b[:j] + GROWTH_HEAD + b[j:]
         al = b[:120000].lower(); j = al.find(b"</head>")
         if j >= 0 and b"<html" in al[:4000] and b"/bn-progress.js" not in al[:j]: b = b[:j] + PROGRESS_HEAD + b[j:]
+        al = b[:200000].lower(); j = al.find(b"</head>")   # shared theme (theme.py): plain-text wordmark, accordions, peek panels, /live hash bridge
+        if new_home_on() and j >= 0 and b"<html" in al[:4000] and b"/bnt/theme.css" not in al[:j]:
+            try: b = b[:j] + _addon_mod("theme").head_links() + b[j:]
+            except Exception: traceback.print_exc()
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]
@@ -491,12 +513,13 @@ def version_assets(b):
         if h >= 0 and b"<html" in lo and b"bnRetry" not in b[:40000]: b = b[:h + 6] + BN_RETRY_HEAD + b[h + 6:]
         j = b.rfind(b"</body>")   # dead-link guard + easter eggs (bn_extras.py) on every full page
         if j > 0 and b"<html" in lo and b"/linkguard.js" not in b: b = b[:j] + b'<script src="/bn-icons.js"></script><script src="/linkguard.js" defer></script><script src="/bn-eggs.js" defer></script>' + b[j:]   # bn-icons runs before first paint (no emoji flash)
-        if os.environ.get("BN_DESIGN_V3", "1") != "0" and b"<html" in lo and b"/bn-v3.css" not in b:   # design v3 phase 1 (design_v3.py); BN_DESIGN_V3=0 = off
+        standalone = b"data-bnt-home" in b[:600]   # the "/" onboarding (theme.py) has its own look: no design-v3 / apple layers
+        if os.environ.get("BN_DESIGN_V3", "1") != "0" and b"<html" in lo and b"/bn-v3.css" not in b and not standalone:   # design v3 phase 1 (design_v3.py); BN_DESIGN_V3=0 = off
             k = b.find(b"</head>")
             if k > 0: b = b[:k] + b'<link rel="stylesheet" href="/bn-v3.css">' + b[k:]
             j = b.rfind(b"</body>")
             if j > 0: b = b[:j] + b'<script src="/bn-v3.js" defer></script>' + b[j:]
-        if os.environ.get("BN_APPLE", "1") != "0" and b"<html" in lo and b"/bn-apple.css" not in b:   # apple_style_v1 (apple_v1.py); on by default; BN_APPLE=0 = off
+        if os.environ.get("BN_APPLE", "1") != "0" and b"<html" in lo and b"/bn-apple.css" not in b and not standalone:   # apple_style_v1 (apple_v1.py); on by default; BN_APPLE=0 = off
             k = b.find(b"</head>")
             if k > 0: b = b[:k] + _addon_mod("apple_v1").head_tag() + b[k:]
             j = b.rfind(b"</body>")
@@ -627,7 +650,7 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "public, max-age=3600"); self.end_headers(); return True
         if seg in self.TAB_PATHS:
             q = urlparse(self.path).query   # seo/batch-1: keep ?utm_* (and any other query) through the tab redirect
-            self.send_response(302); self.send_header("Location", "/" + ("?" + q if q else "") + "#" + seg); self.send_header("Content-Length", "0")
+            self.send_response(302); self.send_header("Location", ("/live" if new_home_on() else "/") + ("?" + q if q else "") + "#" + seg); self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); return True
         try:
             import bn_extras; self.send(404, bn_extras.page_404(path), "text/html"); return True
@@ -637,7 +660,15 @@ class H(BaseHTTPRequestHandler):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
             if u.path in ("/", "/index.html"):
+                if new_home_on():   # Nov 17 2026: "/" = cinematic onboarding (theme.py); the dashboard moved to /live. BN_NEW_HOME=0 = old "/"
+                    try: return self.send(200, _addon_mod("theme").home_page().encode("utf-8"), "text/html")
+                    except Exception: traceback.print_exc()
                 return self.send(200, dashboard_page(), "text/html")
+            if u.path == "/live":
+                return self.send(200, live_page() if new_home_on() else dashboard_page(), "text/html")
+            if u.path in ("/live/", "/dashboard", "/dashboard/"):
+                self.send_response(301); self.send_header("Location", "/live" + ("?" + u.query if u.query else "")); self.send_header("Content-Length", "0")
+                self.send_header("Cache-Control", "public, max-age=3600"); self.end_headers(); return
             if u.path == "/api/state": return self.send(200, api_state())
             if u.path == "/api/state_items": return self.send(200, api_state_items())
             if u.path == "/api/health":
