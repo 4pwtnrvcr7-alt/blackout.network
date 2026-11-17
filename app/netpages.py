@@ -720,24 +720,46 @@ def render(slug):
               {"@type": "Question", "name": f"What caused past {p['name']} outages?", "acceptedAnswer": {"@type": "Answer", "text": " ".join(f"{n['date']}: {n['title']} ({CAT_NAME[n['cat']]})." for n in p["notable"][:3])}}]}]
     return site_page.page(title, desc, body, f"/network/{slug}", active="net", jsonld=ld, og_type="website")
 
+HUBCSS = """
+.np-sum{margin:28px 0 30px}.np-big{font:700 clamp(34px,6vw,56px)/1.05 Montserrat,Inter,system-ui,sans-serif;letter-spacing:-.01em;color:#F2F2F4}
+.np-sum .np-mu{margin:10px 0 6px;font-size:15px}
+.np-accs{display:flex;flex-direction:column;border-top:1px solid #23272e;margin:0 0 22px}
+.np-acc{border-bottom:1px solid #23272e}.np-acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 2px;min-height:44px}
+.np-acc>summary::-webkit-details-marker{display:none}.np-acc>summary::after{content:"+";color:#9aa3ad;font-size:20px;margin-left:8px}.np-acc[open]>summary::after{content:"\\2013"}
+.np-an{display:flex;align-items:center;gap:10px;font:600 17px/1.2 Montserrat,Inter,sans-serif;color:#F2F2F4}.np-an svg{width:18px;height:18px;opacity:.75}
+.np-acc .np-lv{margin-left:auto}.np-ab{padding:0 2px 20px;display:flex;flex-direction:column;gap:10px}.np-ab .bnt-btn{align-self:flex-start}
+.np-key{margin:0 0 26px}.np-key>summary{cursor:pointer;color:#9aa3ad;text-transform:uppercase;letter-spacing:.12em;font-size:12px}
+"""
+
 def render_hub():
     with ThreadPoolExecutor(8) as ex:
         fsl = ex.submit(sl_brief); bs = list(ex.map(lambda s: (s, brief(s)), ORDER)); slb = fsl.result()
-    cards = []
+    # Nov 17 push C: calm summary + provider accordions (same data, links and attribution; legend tucked under "Key")
+    cards = []; lv = []
     for s, b in bs:
-        p = P[s]; lt = b.get("latest")
-        cards.append(f'<a class="np-pv" href="/network/{s}"><h2>{ic(p["icon"])}{E(p["name"])}</h2>{lvchip(b["level"])}<p>{E(b["status"])}</p>'
-                     + (f'<p class="np-mu">Latest: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else "") + f'{bars_weeks(b["weeks"])}<span class="np-mu">Full analysis →</span></a>')
-    lt = slb.get("latest")
+        p = P[s]; lt = b.get("latest"); lv.append(b.get("level"))
+        cards.append(f'<details class="np-acc"><summary><span class="np-an">{ic(p["icon"])}{E(p["name"])}</span>{lvchip(b["level"])}</summary><div class="np-ab"><p>{E(b["status"])}</p>'
+                     + (f'<p class="np-mu">Latest: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else "") + f'{bars_weeks(b["weeks"])}<a class="bnt-btn" href="/network/{s}">Full analysis</a></div></details>')
+    lt = slb.get("latest"); lv.append(slb.get("level"))
     try: attr = sl().ioda_credit_html(_sys_mod(), fmt_et(datetime.now(timezone.utc)))
     except Exception: attr = ""
-    cards.append(f'<div class="np-pv"><a href="/network/starlink" style="display:flex;flex-direction:column;gap:6px;color:inherit;text-decoration:none"><h2>{ic("network")}Starlink</h2>{lvchip(slb["level"])}<p>{E(slb["status"])}</p>'
-                 + (f'<p class="np-mu">Latest signal: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else '<p class="np-mu">Satellite internet. Independent measurements (IODA); live constellation map.</p>')
-                 + (bars_weeks(slb["weeks"]) if slb.get("weeks") else "") + '<span class="np-mu">Status, satellites and speeds →</span></a>' + attr + '</div>')
+    cards.append(f'<details class="np-acc"><summary><span class="np-an">{ic("network")}Starlink</span>{lvchip(slb["level"])}</summary><div class="np-ab"><p>{E(slb["status"])}</p>'
+                 + (f'<p class="np-mu">Latest signal: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else '<p class="np-mu">Satellite internet. Independent measurements (IODA).</p>')
+                 + (bars_weeks(slb["weeks"]) if slb.get("weeks") else "") + '<a class="bnt-btn" href="/network/starlink">Status and satellites</a>' + attr + '</div></details>')
+    n = len(lv); ok = sum(1 for x in lv if x == 0); bad = [x for x in lv if isinstance(x, int) and x > 0]
+    worst = max(bad) if bad else 0
+    big = f"{ok} of {n} normal" if ok < n else "All normal"
+    sub = (f"{len(bad)} with issues · worst: {LVN.get(worst, '')}" if bad else "Every provider feed reports normal service.")
+    now_l, _z = to_et(datetime.now(timezone.utc)); stamp = now_l.strftime("%-I:%M %p")
     body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/#net">Network Status</a> › Providers</p>'
-            f'<section class="np-hero page-header-band"><div class="np-hrow">{TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div><h1>Is the cloud down? <em>Provider by provider</em></h1>'
-            '<p>Live status, incident history, root causes and a what-to-do checklist for the clouds and networks most businesses run on. Official feeds; times in ET.</p></div></div></section>'
-            + HUBQ.replace("{pin}", ic("network")) + f'<div class="np-provs">{"".join(cards)}</div>{LEG}<p class="np-mu" style="margin-top:8px">Bars: incidents per week over the last 13 weeks from each official feed (Starlink: IODA outage signals). <a href="/#net">See every network check</a> · <a href="/network/near">Networks near me</a>.</p></div><style>{CSS}</style>')
+            f'<section class="np-hero page-header-band"><div class="np-hrow"><div style="min-width:0"><div class="np-kick">NETWORK STATUS</div><h1>Cloud status</h1>'
+            '<p>Official provider feeds. Times in ET.</p></div></div></section>'
+            f'<section class="np-sum"><div class="np-big">{E(big)}</div><p class="np-mu">{E(sub)}</p><div class="bnt-tstamp">Updated {stamp} ET · next in 1m</div></section>'
+            + f'<div class="np-accs">{"".join(cards)}</div>'
+            + '<details class="bnt-more np-key"><summary>Key</summary>' + LEG + '<p class="np-mu" style="margin-top:8px">Bars: incidents per week over the last 13 weeks from each official feed (Starlink: IODA outage signals).</p></details>'
+            + HUBQ.replace("{pin}", ic("network"))
+            + '<p class="np-mu" style="margin-top:18px"><a href="/#net">Every network check</a> · <a href="/network/near">Networks near me</a></p></div>'
+            + f'<style>{CSS}{HUBCSS}</style>')
     desc = "Is AWS, Azure, Microsoft 365, Google Cloud, Google Workspace, Cloudflare, Akamai or Starlink down? Live status, incidents, root causes and what to do, plus a networks-near-me check."
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Cloud and network provider status", "url": SITE + "/network", "description": desc,
           "hasPart": [{"@type": "WebPage", "name": f"{P[s]['name']} status", "url": f"{SITE}/network/{s}"} for s in ORDER] + [{"@type": "WebPage", "name": "Starlink status", "url": f"{SITE}/network/starlink"}]}
@@ -826,12 +848,21 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 
 def acc_js(): return ACC_JS.replace("__MAP__", json.dumps(dict(SRC2SLUG, Starlink="starlink"))).encode()
 
+_PC = {}
 def handle_get(path, qs, headers=None):
     p = path.rstrip("/") or "/"
     if p in ("/network/starlink", "/network/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
         r = sl().handle_get(p, qs or {}, _sys_mod(), headers)
         if r is not None: return r
-    if p == "/network": return 200, render_hub(), "text/html"
+    if p == "/network" or re.fullmatch(r"/network/[a-z0-9]+", p):   # Nov 17 push C: 45 s page cache (the hub took 1.5-8 s per request and timed out headless checks)
+        k = p; hit = _PC.get(k)
+        if hit and time.time() - hit[0] < 45: return 200, hit[1], "text/html"
+        if p == "/network": out = render_hub()
+        else:
+            m = re.fullmatch(r"/network/([a-z0-9]+)", p)
+            if m.group(1) not in P: return 404, {"error": "not found"}
+            out = render(m.group(1))
+        _PC[k] = (time.time(), out); return 200, out, "text/html"
     m = re.fullmatch(r"/network/([a-z0-9]+)", p)
     if m and m.group(1) in P: return 200, render(m.group(1)), "text/html"
     if p == "/api/network/accordion.js": return 200, acc_js(), "application/javascript; charset=utf-8"

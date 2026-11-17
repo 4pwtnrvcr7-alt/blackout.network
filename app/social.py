@@ -29,6 +29,13 @@ SLUG = re.compile(r"^[a-z0-9][a-z0-9\-]{1,80}$")
 YTID = re.compile(r"^[A-Za-z0-9_\-]{11}$")
 _RSS = {"t": 0, "v": None}; _LK = threading.Lock()
 
+def _short(t):
+    """Nov 17 push C: short display headline (theme._headline); full title kept in the title attribute and <title>."""
+    try:
+        import theme; return theme._headline(t or "") or (t or "")
+    except Exception:
+        return t or ""
+
 def _j(p, d):
     try:
         with open(p, encoding="utf-8") as f: return json.load(f)
@@ -126,7 +133,7 @@ def api():
 def _follow_btns():
     return (f'<div class="btns"><a class="btn p" href="{YT_URL}?sub_confirmation=1" target="_blank" rel="noopener me">▶ Subscribe on YouTube @blkoutntw</a>'
             f'<a class="btn" href="{X_URL}" target="_blank" rel="noopener me">Follow on X @BLKOUTNTW</a>'
-            '<a class="btn" href="/newsletter">✉ Get the email brief</a></div>')
+            '<a class="btn" href="/newsletter">Get the email brief</a></div>')
 
 def _card(href, img, alt, title, date, btns):
     return (f'<article class="sc"><a class="th" href="{S.E(href)}"><img src="{S.E(img)}" alt="{S.E(alt)}" loading="lazy" width="480" height="270"></a>'
@@ -167,14 +174,14 @@ def story_page(s, preview=False):
         player = (f'<div class="vid"><img src="{S.E(img)}" alt="{S.E(alt)}"><span class="note">'
                   + ("Video premieres " + S.E(et(s.get("publish_at"))) if not is_public(s) else "Watch on YouTube or X below") + '</span></div>')
     btns = (f'<div class="btns"><a class="btn p" href="{S.E(yt_watch(s))}" target="_blank" rel="noopener">▶ Watch on YouTube</a>'
-            f'<a class="btn" href="{S.E(x_link(s))}" target="_blank" rel="noopener">Watch on X</a><a class="btn" href="/newsletter">✉ Get the brief</a></div>')
+            f'<a class="btn" href="{S.E(x_link(s))}" target="_blank" rel="noopener">Watch on X</a><a class="btn" href="/newsletter">Get the brief</a></div>')
     src = "".join(f'<li><a href="{S.E(x["url"])}" target="_blank" rel="noopener">{S.E(x["name"])}</a></li>' for x in s.get("sources") or [] if re.match(r"^https?://", str(x.get("url") or "")))
     rel = "".join(f'<li><a href="/wire/{S.E(c)}">Live story & every source →</a> <span class="meta">({S.E(c)})</span></li>' for c in (s.get("cluster_ids") or []) if re.fullmatch(r"[0-9a-f]{16}", str(c)))
     banner = ('<div class="card" style="border-color:#f5a524;color:#f5a524"><b>PREVIEW</b> — this page is hidden until the video premieres '
               f'({S.E(et(s.get("publish_at")))}). Not indexed; do not share.</div>') if preview else ""
     meta = " · ".join(x for x in [("Published " + et(s.get("publish_at"))) if s.get("publish_at") else "", ("Data window: " + s["data_window"]) if s.get("data_window") else ""] if x)
     body = (banner + '<p class="crumb"><a href="/wire">The Wire</a> › <a href="/social">Videos &amp; posts</a> › Story</p>'
-            f'<h1 class="t">{S.E(s.get("title"))}</h1><p class="dek">{S.E(s.get("dek") or "")}</p><p class="meta">{S.E(meta)}</p>'
+            f'<h1 class="t" title="{S.E(s.get("title"))}">{S.E(_short(s.get("title")))}</h1><p class="dek">{S.E(s.get("dek") or "")}</p><p class="meta">{S.E(meta)}</p>'
             + player + btns + f'<article class="article">{S.blocks(s.get("article"))}</article>'
             + (f'<section class="card"><h2>Sources</h2><ul>{src}</ul></section>' if src else "")
             + (f'<section class="card"><h2>Follow these stories live</h2><ul>{rel}</ul></section>' if rel else "")

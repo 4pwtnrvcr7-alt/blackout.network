@@ -1,6 +1,7 @@
 // BLACKOUT.NETWORK Energy Grid tab (#grid): "Mesh network drop-offs" panel from /api/mesh/summary (meshnet.py). Single source, unconfirmed.
 (function(){"use strict";
 if(window.__bnMeshGrid)return;window.__bnMeshGrid=1;
+if(window.BN_MESH_UI!==1)return; // Nov 17 push C: mesh panel hidden (no-mesh rule); set window.BN_MESH_UI=1 to restore
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 var CSS='.mxg{border:1px solid var(--bn-line,#252b33);background:var(--bn-surface,#14181d);border-radius:14px;padding:14px 16px;margin:0 0 14px}'+
 '.mxg h3{margin:0 0 4px;font:800 16px/1.3 Montserrat,Inter,system-ui,sans-serif}.mxg .mu{color:var(--bn-muted,#8b95a3);font-size:12.5px;margin:0 0 8px}'+

@@ -75,6 +75,9 @@ def build():
     except Exception: pass
     for line in D.ROWS.strip().splitlines():
         name, url, cat, tags, region, tier, sc, note = [x.strip() for x in line.split("|")]
+        if os.environ.get("BN_MESH_UI") != "1":   # Nov 17 push C: hide mesh mentions (flag, not deleted)
+            if url.startswith("/mesh"): continue
+            tags = ",".join(t for t in tags.split(",") if t.strip() != "mesh"); note = note.replace("Mesh texting", "Off-grid texting")
         parts = dict(zip([k for k, _ in RUBRIC], [int(c) for c in sc])); r = sum(parts.values())
         sid = slug(name)
         while sid in seen: sid += "-x"

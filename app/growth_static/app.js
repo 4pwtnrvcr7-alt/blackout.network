@@ -53,7 +53,7 @@ function thanks(el){if(!el||el.dataset.bngThanks)return;el.dataset.bngThanks=1;v
 function signup(){document.querySelectorAll(".nl-result.ok").forEach(function(r){var p=r.querySelector("p");if(p)thanks(p)});
  document.querySelectorAll(".nl-msg.ok").forEach(function(m){if(m.textContent.trim().length>8){thanks(m);markSub()}})}
 function share(){document.querySelectorAll(".bng-share .bng-native[hidden]").forEach(function(b){if(navigator.share)b.hidden=false});
- document.querySelectorAll(".bng-share .bng-mesh[hidden]").forEach(function(b){b.hidden=false})}   // Push to Mesh (meshnet.py): own-radio send, or copy/share for the Meshtastic app
+ if(window.BN_MESH_SHARE===1)document.querySelectorAll(".bng-share .bng-mesh[hidden]").forEach(function(b){b.hidden=false})}   // Nov 17 2026: Push to Mesh hidden (no-Meshtastic rule); window.BN_MESH_SHARE=1 brings it back   // Push to Mesh (meshnet.py): own-radio send, or copy/share for the Meshtastic app
 var meshP=null;function meshShare(w){if(!meshP)meshP=new Promise(function(ok,no){var s=document.createElement("script");s.src="/api/mesh/share.js?v=1";s.onload=ok;s.onerror=function(){meshP=null;no()};document.head.appendChild(s)});
  meshP.then(function(){window.BNMeshShare&&window.BNMeshShare.open(w)})}
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".bng-mesh");if(!b)return;meshShare(b.closest(".bng-share"))});

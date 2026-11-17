@@ -772,7 +772,7 @@ def render_near(np):
     ic = lambda n, c="np-ic": _ic(np, n, c)
     body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/#net">Network Status</a> › <a href="/network">Providers</a> › Networks near me</p>'
             f'<section class="np-hero page-header-band"><div class="np-hrow">{np.TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div>'
-            '<h1>Networks near me, <em>with the weather</em></h1><p>Type a ZIP code, city or address. We show the networks that serve that place and their status right now, '
+            '<h1>Networks near me</h1><p>Type a ZIP code, city or address. We show the networks that serve that place and their status right now, '
             'active weather alerts there, and a plain note on how that weather can affect your connection.</p></div></div>'
             f'<form class="nm-form" id="nm_form" role="search"><label for="nm_q" class="np-mu" style="flex-basis:100%">ZIP code, city or address</label>'
             f'<input id="nm_q" name="where" placeholder="e.g. 80202, Denver or Mumbai" maxlength="120" required>'
