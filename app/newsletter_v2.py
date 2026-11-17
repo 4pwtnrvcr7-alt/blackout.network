@@ -752,7 +752,10 @@ def text_part(issue, links, c, subj, why, groups=None, sx=None, refs=None):
         for i, it in enumerate(items, 1): one(it, i)
     if issue.get("near"): tsec(f"Near you · {issue.get('loc_label') or 'your area'}", issue["near"])
     if issue.get("crime"):
-        cr = issue["crime"]; T += [f"CRIME NEAR YOU · {cr['label'].upper()}"] + cr["lines"][:3] + [f"Map and full numbers: {cr['url']}", ""]
+        cr = issue["crime"]; T += [f"CRIME NEAR YOU · {cr['label'].upper()}"]
+        for x in [x for x in (cr.get("items") or []) if x.get("title") and x.get("url")][:5]:   # real local reports: headline, date, source, link
+            T += [f"- {x['title']} ({str(x.get('date') or '')[:10]}, {x.get('source') or ''})", f"  {x['url']}"]
+        T += cr["lines"][:3] + [f"Map and full numbers: {cr['url']}", ""]
     tsec("Stories you follow", issue.get("follow"))
     for g, items in groups: tsec(GROUPS[g][0], items)
     for s_ in issue.get("videos") or []: T.extend(N._video_text(s_, c, issue["slot"]))
