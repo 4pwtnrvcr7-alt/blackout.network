@@ -81,6 +81,7 @@ ROUTES = {
     "/vsubs": "video_subs",
     "/api/search": "search",
     "/newsletter": "newsletter",
+    "/credits": "theme",            # Nov 17 (Matt 12:07): shared Image credits page fed from theme.CREDITS_LEDGER
     "/bnt": "theme",                # Nov 17 2026 new theme: /bnt/<css|js|json>, /bnt/media/<clip> (Range), /bnt/credits.txt (theme.py)
     "/api/live": "theme",           # /api/live/summary: read-only numbers for "/" and the /live overview (theme.py)
     "/api/newsletter": "newsletter",
