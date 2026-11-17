@@ -19,7 +19,8 @@ import os
 def apple_on(): return os.environ.get("BN_APPLE", "1") != "0"
 def logo_html():
     """apple_style_v1 (on unless BN_APPLE=0): the plain BLACKOUT wordmark, no mark. Off = the V2-final logo, unchanged."""
-    return '<span class="bn-word bna-wm" aria-label="BLACKOUT.NETWORK">BLACKOUT</span>' if apple_on() else LOGO_HTML
+    # Nov 17 2026 (Matt): no logo mark anywhere on the site; a plain-text lowercase wordmark in the theme font (theme.css .bnt-wm)
+    return '<span class="bn-word bna-wm bnt-wm" aria-label="BLACKOUT.NETWORK">blackout.network</span>'
 
 # Text links shown in the bar on wide screens (everything is also in the sidebar).
 PRIMARY = [("threat", "/wire", "The Wire"), ("sources", "/sources", "Sources"), ("newsletter", "/newsletter", "Newsletter")]
@@ -171,7 +172,7 @@ M3_PV = {
  "prepare": '<a class="m3-h" href="/ready"><span class="m3-k">Everyday Readiness</span><span style="display:flex;margin:4px 0"><img src="/static/ready/01-72-hour-home-kit.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/02-water-at-home.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/03-power-outage-readiness.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/04-family-communication-plan.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/05-first-aid-and-medication-basics.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"></span><span class="m3-sm">Five printable one-page guides (PDF)</span></a>',
  "politics": '<span class="m3-k">Midterms 2026</span><span><b class="m3-big" data-pv="midterms">&ndash;</b> <span class="m3-sm" data-pv="midterms-unit"></span></span>',
  "markets": '<span class="m3-k" data-pv="spx-label">S&amp;P 500</span><span class="m3-sprow"><svg class="m3-spark" viewBox="0 0 200 40" aria-hidden="true" focusable="false"><polyline data-pv="spark" points=""/></svg><b class="m3-mid" data-pv="spx">&ndash;</b><span class="m3-chg" data-pv="spx-chg"></span></span><span class="m3-k">Next SpaceX launch</span><span class="m3-sm m3-strong" data-pv="launch">&ndash;</span><span class="m3-asof" data-pv="markets-asof"></span>',
- "community": '<a class="m3-trailer" href="/social"><span class="m3-k">Channel trailer</span><b class="m3-big" data-pv="sources-c">&ndash;</b><span class="m3-sm">sources, one feed</span></a>',
+ "community": '<a class="m3-trailer" href="/social"><span class="m3-k">Videos &amp; posts</span><span class="m3-sm">Our latest videos, Shorts and posts in one place</span><b class="m3-big" data-pv="sources-c" hidden></b></a>',
  "about": '<span class="m3-k">Sources in the feed</span><b class="m3-big" data-pv="sources">&ndash;</b><span class="m3-asof" data-pv="sources-asof"></span>',
 }
 # Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
@@ -197,7 +198,7 @@ def menu3_sections(sn):
             hidden = bool(it and len(it) > 5 and it[5])
             if key in M3_SOON or hidden: rows.append((key, label, None))
             elif key == "threat": rows.append((key, label, "/wire"))
-            elif it: rows.append((key, label, it[1] if it[1].startswith("/") else "/#" + it[1]))
+            elif it: rows.append((key, label, it[1] if it[1].startswith("/") else "/live#" + it[1]))   # dashboard tabs live on /live (Nov 17)
             elif key in M3_HREF: rows.append((key, label, M3_HREF[key]))
             else: rows.append((key, label, None))
         out.append((sid, name, desc, rows))

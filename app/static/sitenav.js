@@ -205,8 +205,8 @@ function init(){
  // ---- per-tab title / description / highlight
  var last="";
  function upd(){var b=nav.querySelector("button.on[data-tab]");if(!b)return;var k=b.dataset.tab,t=byKey[k],title,d,url;
-  if(!t||k==="threat"){title=D.home.title;d=D.home.desc;url=D.site+"/"}
-  else{title=(t.title||b.textContent.trim())+" | "+D.brand;d=t.desc||D.home.desc;url=D.site+"/#"+t.hash}
+  if(!t||k==="threat"){title=D.home.title;d=D.home.desc;url=D.site+(location.pathname==="/live"?"/live":"/")}
+  else{title=(t.title||b.textContent.trim())+" | "+D.brand;d=t.desc||D.home.desc;url=D.site+"/live#"+t.hash}
   if(!t&&k!=="threat"){title=b.textContent.replace(/^\W+/,"").trim()+" | "+D.brand}
   var line=(t&&t.desc)||"";if(desc.textContent!==line)desc.textContent=line;desc.hidden=!line;
   var nm=(D.plain&&D.plain[k])||b.textContent.replace(/^[^\w(]+/,"").replace(/\d+$/,"").trim();if(ptitle&&ptitle.textContent!==nm)ptitle.textContent=nm;

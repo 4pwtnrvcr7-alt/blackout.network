@@ -81,6 +81,8 @@ ROUTES = {
     "/vsubs": "video_subs",
     "/api/search": "search",
     "/newsletter": "newsletter",
+    "/bnt": "theme",                # Nov 17 2026 new theme: /bnt/<css|js|json>, /bnt/media/<clip> (Range), /bnt/credits.txt (theme.py)
+    "/api/live": "theme",           # /api/live/summary: read-only numbers for "/" and the /live overview (theme.py)
     "/api/newsletter": "newsletter",
     "/sources": "sources",
     "/api/sources": "sources",

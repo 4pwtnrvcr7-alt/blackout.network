@@ -33,7 +33,7 @@ function part(){var h=(location.hash||"").slice(1);if(!h)return"";try{return dec
 function go(){
   var p=part();
   if(p==="bn-menu")return;
-  var onDash=location.pathname==="/"||location.pathname==="";
+  var onDash=location.pathname==="/"||location.pathname===""||location.pathname==="/live";
   if(!p||p==="home"||(onDash&&TABS[p])){window.scrollTo(0,0);return}
   var el=p&&document.getElementById(p);
   if(el){el.scrollIntoView({block:"start",behavior:"auto"});return}

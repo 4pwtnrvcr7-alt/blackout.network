@@ -128,7 +128,7 @@
   J("/api/spacex").then(function(X){var x=sec("markets");if(X&&X.next&&x){put(x,"launch",X.next.name+" · NET "+etFmt(X.next.net))}fin()});
   J("/api/sources/catalog?per=1").then(function(C){var a=sec("about"),c=sec("community");if(C&&C.total){count(pv(a,"sources"),+C.total,0);count(pv(c,"sources-c"),+C.total,0);put(a,"sources-asof","as of "+etFmt(new Date().toISOString()))}fin()});
   var mx=sec("politics");if(mx){var d=Math.ceil((Date.UTC(2026,10,3,5)-Date.now())/86400000);if(d>0){count(pv(mx,"midterms"),d,0);put(mx,"midterms-unit",(d===1?"day":"days")+" to Election Day, Nov 3")}
-   else if(d===0){put(mx,"midterms","Today");put(mx,"midterms-unit","Election Day, Nov 3")}else{put(mx,"midterms","Results");put(mx,"midterms-unit","Midterms 2026")}}}
+   else if(d===0){put(mx,"midterms","Today");put(mx,"midterms-unit","Election Day, Nov 3")}else{put(mx,"midterms","Results");put(mx,"midterms-unit","House, Senate and governor races")}}}
  function menu(){
   var dr=d.getElementById("bn-menu"),p=dr&&$(".bn-panel",dr);if(!p||!dr.classList.contains("bn-m3")||p.dataset.m3)return;p.dataset.m3="1";
   m3desk(p);DESK.addEventListener?DESK.addEventListener("change",function(){m3desk(p)}):DESK.addListener(function(){m3desk(p)});
