@@ -92,3 +92,45 @@ html body [data-bn-refresh],html body .bn-rf-st,html body [data-bn-theme],html b
 .bnt-btn,.bnt-btn.y{border-width:1px!important;border-radius:0!important;font-size:11.5px!important;letter-spacing:.18em!important;color:#F2F2F4!important;padding:14px 26px}
 .bnt-btn::before,.bnt-btn.y::before{background:#F2F2F4!important}
 .bnt-btn:hover,.bnt-btn:focus-visible,.bnt-btn.y:hover,.bnt-btn.y:focus-visible{color:#05060a!important}
+
+/* ===== Nov 17 push B (Matt 2:36/2:37 AM): one premium skin for every remaining page =====
+   Monochrome accent, room to breathe, larger calm headings, square outlined buttons, dense tables folded.
+   Colour stays only where it means something (rank/severity). Theme pages (home, /live overview, Wire, map) keep their own styles. */
+:root:root:root{--bn-brand:#F2F2F4;--bn-brand-ink:#F2F2F4;--bn-accent:#F2F2F4;--bn-active:rgba(242,242,244,.06);--v3-glow:transparent;
+ --bn-link:#E6E9EE;--ac:#E6E9EE;--bn-mark-hi:#F2F2F4;--bn-ink-on-brand:#05060a;--v3-rule:none}
+html body header.bn-top::after{display:none!important}
+html body :is(button.pri,.pri[role=button],a.pri,.nl-card button[type=submit],a.np-btn,.btn-primary,.cta-btn){background:transparent!important;border:1px solid rgba(242,242,244,.85)!important;color:#F2F2F4!important;border-radius:0!important;
+ font-family:var(--bnt-hd,Montserrat,sans-serif)!important;font-weight:700!important;font-size:11.5px!important;letter-spacing:.18em!important;text-transform:uppercase!important;padding:13px 22px!important;box-shadow:none!important;transition:background .2s,color .2s}
+html body :is(button.pri,.pri[role=button],a.pri,.nl-card button[type=submit],a.np-btn,.btn-primary,.cta-btn):is(:hover,:focus-visible){background:#F2F2F4!important;color:#05060a!important}
+html body .bn-primary a[aria-current="page"]{box-shadow:inset 0 -1px 0 #F2F2F4}
+html body main[id^="tab-"]{max-width:1240px;margin-left:auto!important;margin-right:auto!important;padding-left:clamp(16px,4vw,48px)!important;padding-right:clamp(16px,4vw,48px)!important;row-gap:clamp(20px,3vw,40px)!important;column-gap:clamp(20px,3vw,40px)!important}
+html body main .pn:not(.bnt-card){padding:clamp(22px,3.2vw,44px)!important;margin-bottom:clamp(20px,3vw,40px)!important;border-radius:16px!important;border:1px solid rgba(242,242,244,.07)!important;background:#0b0d12!important;box-shadow:none!important}
+html body main :is(.pn,section,article)>h2,html body main>h2,html body .np-wrap h2,html body .bn-page h2{font-family:var(--bnt-hd,Montserrat,sans-serif)!important;font-weight:800!important;font-size:clamp(21px,2.5vw,30px)!important;
+ letter-spacing:.01em!important;text-transform:uppercase;line-height:1.12!important;margin:0 0 18px!important;color:#F2F2F4}
+html body main :is(.pn,section,article) h3{font-family:var(--bnt-hd,Montserrat,sans-serif);letter-spacing:.02em}
+html body:not(.bnt-home):not(.bnm) h1:not(.bnt-skip){font-family:var(--bnt-hd,Montserrat,sans-serif)!important;font-weight:800!important;text-transform:uppercase;letter-spacing:.01em;line-height:1.04}
+html body main .warn{background:transparent!important;border:1px solid rgba(242,242,244,.12)!important;color:rgba(242,242,244,.72)!important;border-radius:12px!important}
+html body main .meta{color:rgba(242,242,244,.55)}
+html body .tabs button{font-family:var(--bnt-hd,Montserrat,sans-serif);letter-spacing:.12em;text-transform:uppercase;font-size:11.5px}
+html body .tabs button.on{box-shadow:inset 0 -1px 0 #F2F2F4!important;color:#F2F2F4!important}
+@media (min-width:1100px){html body main :is([class$="-grid"],[class*="-grid "],.cards,.grid){grid-template-columns:repeat(auto-fill,minmax(270px,1fr))!important;gap:clamp(16px,2vw,28px)!important}}
+@media (max-width:640px){html body main :is([class$="-grid"],[class*="-grid "],.cards,.grid){grid-template-columns:1fr!important}}
+/* progressive disclosure helpers (theme.js simplify()) */
+table.bnt-fold:not(.bnt-open) tbody tr:nth-child(n+7){display:none}
+.bnt-foldb,details.bnt-more>summary{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:8px;margin:14px 0 4px;padding:10px 16px;border:1px solid rgba(242,242,244,.35);
+ font:700 11px/1 var(--bnt-hd,Montserrat,sans-serif);letter-spacing:.18em;text-transform:uppercase;color:#F2F2F4;cursor:pointer;list-style:none}
+details.bnt-more>summary::-webkit-details-marker{display:none}
+.bnt-foldb:is(:hover,:focus-visible),details.bnt-more>summary:is(:hover,:focus-visible){background:#F2F2F4;color:#05060a}
+details.bnt-more[open]>summary{margin-bottom:12px}
+details.bnt-more>*:not(summary){color:rgba(242,242,244,.72)}
+html body .bn-tabdesc,html body .bn-pagehead p{display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;max-width:760px;color:rgba(242,242,244,.6)!important;cursor:pointer}
+html body .bn-tabdesc.bnt-open,html body .bn-pagehead p.bnt-open{-webkit-line-clamp:unset;display:block}
+html body .bn-pagehead{padding-top:clamp(24px,5vw,72px)!important;padding-bottom:clamp(12px,2vw,28px)!important}
+html body main h2 .meta{display:block;margin-top:8px;font:500 12px/1.4 var(--bnt-tx,Inter,sans-serif)!important;letter-spacing:0!important;text-transform:none!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+html body .bna-mopen{color:#F2F2F4!important}
+html body :is(.stale,.bn-stale,#stale_banner){border-radius:0!important}
+html body .bnt-lead{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:760px;color:rgba(242,242,244,.62)!important;cursor:pointer}
+html body .bnt-lead.bnt-open{-webkit-line-clamp:unset;display:block}
+@media (max-width:640px){html body .bnt-lead{-webkit-line-clamp:2}}
+html body .bnt-clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+html body .bnt-clamp.bnt-open{-webkit-line-clamp:unset;display:block}

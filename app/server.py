@@ -588,6 +588,11 @@ class H(BaseHTTPRequestHandler):
             except Exception: pass
         if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
         if ctype.startswith("text/html; "): b = apple_assets(b)   # apple_style_v1 on /midterms and /stats
+        if ctype.startswith("text/html; ") and new_home_on():   # Nov 17 push B: shared theme on pages returned as "text/html; charset=utf-8" too (/stats, /midterms, /mesh*), which skip pwa_head
+            try:
+                al = b[:200000].lower(); j = al.find(b"</head>")
+                if j >= 0 and b"<html" in al[:4000] and b"/bnt/theme.css" not in al[:j]: b = b[:j] + _addon_mod("theme").head_links() + b[j:]
+            except Exception: traceback.print_exc()
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
         if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")

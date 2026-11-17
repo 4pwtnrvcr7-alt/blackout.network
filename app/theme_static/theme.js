@@ -65,3 +65,39 @@ setInterval(function(){UPS.forEach(upPaint)},15000);
  if("IntersectionObserver"in window){var io=new IntersectionObserver(function(es){es.forEach(function(x){x.isIntersecting?vis.add(x.target):vis.delete(x.target)});req()});els.forEach(function(e){io.observe(e)})}else els.forEach(function(e){vis.add(e)});
  window.addEventListener("scroll",req,{passive:true});req();
 }catch(x){}})();
+
+/* Nov 17 push B (Matt 2:37 AM "Simplify"): on the remaining pages, headings lose emoji and trailing explanations,
+   long intro copy goes behind one "More" expander and long tables show 6 rows with "Show all". Content is moved, never removed. */
+(function(){try{
+ var EMO=/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}\u{FE0F}\u{200D}]\s*/gu;
+ function skip(el){return !el||el.closest(".bnt-live,.bn-wire,.bnt-home,.bnm,form,[data-bnt-skip],svg,.bn-top")}
+ function hd(h){if(skip(h))return;if(h.dataset.bntH){EMO.lastIndex=0;if(!EMO.test(h.textContent))return;EMO.lastIndex=0}for(var n=h.firstChild;n;n=n.nextSibling){if(n.nodeType!==3)continue;var t=n.nodeValue,u=t.replace(EMO,"");
+   if(!h.dataset.bntH&&/^(H1|H2)$/.test(h.tagName)){var m=u.match(/^(\s*[^:—–]{2,48}?)\s*(?::|\s[—–]\s)\s*(.{8,})$/);if(m&&m[1].trim().split(/\s+/).length<=5){u=m[1];if(!h.title)h.title=m[2].trim()}}
+   if(u!==t)n.nodeValue=u;break}h.dataset.bntH=1}
+ function tabs(){document.querySelectorAll(".tabs button,.bn-side a,.m3-list a").forEach(function(b){for(var n=b.firstChild;n;n=n.nextSibling){if(n.nodeType===3&&EMO.test(n.nodeValue)){EMO.lastIndex=0;n.nodeValue=n.nodeValue.replace(EMO,"")}EMO.lastIndex=0}})}
+ function plain(p){return p.tagName==="P"&&!p.id&&!p.querySelector("[id],input,button,select,textarea,img,video,iframe")}
+ function intro(box){if(skip(box)||box.dataset.bntI)return;box.dataset.bntI=1;var ps=[].filter.call(box.children,plain);if(!ps.length)return;
+   var txt=ps.map(function(p){return p.textContent}).join(" ").trim();if(txt.length<160)return;
+   var keep=ps[0].textContent.trim().length<=110?ps.shift():null;if(!ps.length)return;
+   var d=document.createElement("details");d.className="bnt-more";d.innerHTML="<summary>More</summary>";ps[0].parentNode.insertBefore(d,ps[0]);ps.forEach(function(p){d.appendChild(p)})}
+ function tables(){document.querySelectorAll("main table").forEach(function(t){if(skip(t)||t.dataset.bntT)return;var b=t.tBodies[0];if(!b||b.rows.length<=8)return;t.dataset.bntT=1;t.classList.add("bnt-fold");
+   var x=document.createElement("button");x.type="button";x.className="bnt-foldb";var lab=function(){x.textContent=t.classList.contains("bnt-open")?"Show fewer":"Show all "+t.tBodies[0].rows.length};lab();
+   x.addEventListener("click",function(){t.classList.toggle("bnt-open");lab()});(t.closest(".tbl-wrap,.table-wrap")||t).insertAdjacentElement("afterend",x)})}
+ function lead(){document.querySelectorAll("body:not(.bnt-home):not(.bnm) h1 + p").forEach(function(p){if(!skip(p)&&p.textContent.trim().length>90)p.classList.add("bnt-lead")})}
+ var LEGAL=/^\/(terms|tos|privacy|cookies|privacy-choices)\b/.test(location.pathname);
+ function clampLong(){if(LEGAL)return;document.querySelectorAll("p").forEach(function(p){if(p.dataset.bntC||skip(p)||p.closest("details,.bnt-lead"))return;p.dataset.bntC=1;
+   if(plain(p)&&p.textContent.trim().length>260){p.classList.add("bnt-clamp");p.title="Tap to read more"}})}
+ function run(){lead();clampLong();document.querySelectorAll("main h1,main h2,main h3,.np-wrap h2,.bn-page h2,h1").forEach(hd);tabs();
+   document.querySelectorAll("main .pn,main[id^='tab-']>section,main section,main article,body>section,body>article,[class*='wrap']>section,[class*='wrap']>article,.np-wrap section,.bn-page section").forEach(intro);tables()}
+ var Y=/^rgba?\(255, ?194, ?26/;
+ function deyellow(){if(document.body.classList.contains("bnt-home"))return;var els=document.querySelectorAll("body *:not(svg *):not(script):not(style)"),n=0;
+   for(var i=0;i<els.length&&n<4000;i++){var e=els[i];if(e.closest(".bnt-live,.bn-wire,.bnm"))continue;n++;var c=getComputedStyle(e);
+     if(Y.test(c.color))e.style.setProperty("color","#F2F2F4","important");
+     if(Y.test(c.backgroundColor)){e.style.setProperty("background-color","transparent","important");e.style.setProperty("color","#F2F2F4","important");e.style.setProperty("border","1px solid rgba(242,242,244,.85)","important")}
+     if(/^(A|BUTTON)$/.test(e.tagName)&&e.textContent.trim().length>12){var m=c.backgroundColor.match(/^rgba?\((\d+), ?(\d+), ?(\d+)/);if(m&&+m[1]>170&&+m[2]<90&&+m[3]<90){e.style.setProperty("background-color","transparent","important");e.style.setProperty("color","#F2F2F4","important");e.style.setProperty("border","1px solid rgba(242,242,244,.85)","important");e.style.setProperty("border-radius","0","important")}}
+     ["Top","Right","Bottom","Left"].forEach(function(k){if(Y.test(c["border"+k+"Color"])&&parseFloat(c["border"+k+"Width"])>0)e.style.setProperty("border-"+k.toLowerCase()+"-color","rgba(242,242,244,.25)","important")})}}
+ var q=0;function soon(){if(q)return;q=setTimeout(function(){q=0;run()},400)}
+ document.addEventListener("click",function(e){var d=e.target.closest&&e.target.closest(".bn-tabdesc,.bn-pagehead p,.bnt-lead,.bnt-clamp");if(d)d.classList.toggle("bnt-open")});
+ var go=function(){run();setTimeout(deyellow,1200);setTimeout(deyellow,5000);try{new MutationObserver(soon).observe(document.body,{childList:true,subtree:true})}catch(e){}};
+ if(document.readyState!=="loading")go();else document.addEventListener("DOMContentLoaded",go);
+}catch(x){}})();

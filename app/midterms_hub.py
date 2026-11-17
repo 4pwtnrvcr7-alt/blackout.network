@@ -22,19 +22,19 @@ PHASES = {
     "a": {"title": "Midterm Elections 2026: Where to Vote | BLACKOUT.NETWORK",
           "desc": ("Midterm elections 2026: where do I vote, what time polls close in each state, and every Senate and governor race, "
                    "with official sources. BLACKOUT.NETWORK"),
-          "h1": "2026 Midterm Elections: Where to Vote and When Polls Close",
+          "h1": "Midterms 2026",   # Nov 17 push B: headers of 1-5 words (SEO title/desc unchanged)
           "deck": ("Find your polling place and your state's voting rules with the official tools below, and check when polls close. "
                    "On election night, follow results from official state election offices, linked in every race panel.")},
     "b": {"title": "Midterm Elections 2026 Results by State | BLACKOUT.NETWORK",
           "desc": ("Midterm elections 2026 results by state: links to official state results, poll closing times and every Senate "
                    "and governor race. BLACKOUT.NETWORK"),
-          "h1": "2026 Midterm Election Results by State: Official Sources",
+          "h1": "Midterms 2026",   # Nov 17 push B: headers of 1-5 words (SEO title/desc unchanged)
           "deck": ("Polls are closing across the country. Election results come from official state election offices; each race "
                    "panel below links to its state's official results page. BLACKOUT.NETWORK does not call races.")},
     "c": {"title": "Midterm Election Results So Far, 2026 | BLACKOUT.NETWORK",
           "desc": ("2026 midterm election results so far and when we will know the results: official state results links for every "
                    "Senate and governor race. BLACKOUT.NETWORK"),
-          "h1": "2026 Midterm Election Results So Far and When We Will Know More",
+          "h1": "Midterms 2026",   # Nov 17 push B: headers of 1-5 words (SEO title/desc unchanged)
           "deck": ("Counting can continue for days in some states, and official results are certified later on each state's own "
                    "schedule. Each race panel below links to its state's official results page. BLACKOUT.NETWORK does not call races.")},
 }
