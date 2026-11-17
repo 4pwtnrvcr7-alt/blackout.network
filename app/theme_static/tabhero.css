@@ -1,0 +1,23 @@
+/* Latest tab heroes (BN_TAB_HERO): full-screen under the sticky header; grey, cool, no yellow; text minimal; data below scrolls freely */
+.bn-th[hidden]{display:none!important}
+.bn-th{position:relative;margin:0;padding:0;background:#05060a}
+.bn-th .bn-th-s,[data-bn-snap] .bn-th-s[data-snap]{position:relative;box-sizing:border-box;height:calc(100vh - var(--bn-th-hdr,64px));height:calc(100svh - var(--bn-th-hdr,64px));min-height:calc(100svh - var(--bn-th-hdr,64px));overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:0 max(20px,4vw) clamp(56px,11vh,120px)}
+.bn-th-bg,.bn-th-bg picture,.bn-th-bg img,.bn-th-v{position:absolute;inset:0;width:100%;height:100%}
+.bn-th-bg img,.bn-th-v{object-fit:cover;display:block}
+.bn-th-bg img{opacity:1}
+.bn-th-v{opacity:0;transition:opacity 1.4s ease}
+.bn-th-v.on{opacity:1}
+/* layers stay fully opaque and the darkening is one overlay: translucent full-bleed layers cost frames while scrolling */
+.bn-th-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,10,.62) 0%,rgba(5,6,10,.42) 30%,rgba(5,6,10,.52) 55%,rgba(5,6,10,.95) 100%)}
+.bn-th-c{position:relative;z-index:1;max-width:min(900px,92vw)}
+.bn-th-k{margin:0 0 14px;font:600 12px/1 Inter,system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#C9CDD3;display:flex;align-items:center;gap:12px}
+.bn-th-k::before{content:"";width:34px;height:1px;background:currentColor;opacity:.8}
+#bn_th .bn-th-c .bn-pagehead,html body #bn_th .bn-pagehead{margin:0!important;padding:0!important;max-width:none!important;background:none!important;border:0!important}
+#bn_th .bn-th-c .bn-ptitle,html body #bn_th .bn-ptitle{margin:0 0 14px!important;font:800 clamp(40px,7.2vw,96px)/.98 Montserrat,system-ui,sans-serif!important;text-transform:uppercase;letter-spacing:-.01em;color:#F3F4F8!important}
+#bn_th .bn-th-c .bn-tabdesc,html body #bn_th .bn-tabdesc{margin:0!important;max-width:620px;color:#C9CDD3!important;font:400 clamp(15px,1.3vw,18px)/1.5 Inter,system-ui,sans-serif!important}
+.bn-th-cue{position:absolute;z-index:1;left:50%;bottom:22px;width:44px;height:44px;margin-left:-22px;display:grid;place-items:center;color:#C9CDD3;border:1px solid rgba(236,238,245,.28);border-radius:50%;transition:border-color .25s,color .25s}
+.bn-th-cue:hover{color:#fff;border-color:rgba(236,238,245,.6)}
+.bn-th-cue svg{width:20px;height:20px}
+@media (max-width:700px){.bn-th-v{display:none}.bn-th-bg img{opacity:1}.bn-th .bn-th-s{padding-bottom:84px}#bn_th .bn-th-c .bn-ptitle,html body #bn_th .bn-ptitle{font-size:clamp(36px,11vw,52px)!important}}
+@media (prefers-reduced-motion:reduce){.bn-th-v{display:none}.bn-th-cue{transition:none}}
+html.bn-th-on .bn-pagehead~*:first-child{margin-top:0}

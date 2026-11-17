@@ -178,7 +178,7 @@ html body .bng-share .bng-sb:is(:hover,:focus-visible){background:#F2F2F4!import
 html body .bng-share .bng-sb[hidden]{display:none!important}
 .ss-lead.ss-lead-fig{display:block!important}
 /* bn-snap (snap.js, BN_SNAP): pages opt in with [data-bn-snap] + [data-snap] sections. CSS snap is the no-JS fallback; with JS the module drives one eased move per gesture */
-html:has([data-bn-snap]){scroll-snap-type:y mandatory!important}
+html:has([data-bn-snap]:not([hidden]):not([data-snap-hero])){scroll-snap-type:y mandatory!important}html:has([data-snap-hero]:not([hidden])){scroll-snap-type:y proximity}
 [data-bn-snap] [data-snap]{min-height:100vh;min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always}
 html.bn-snap-js{scroll-snap-type:none!important;scroll-behavior:auto!important}
 html.bn-snap-js body{overscroll-behavior-y:none}
