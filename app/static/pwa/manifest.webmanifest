@@ -1,7 +1,7 @@
 {
   "name": "BLACKOUT.NETWORK",
   "short_name": "BLACKOUT",
-  "description": "Signal over noise. Global threats ranked 0–10, sourced and updated hourly.",
+  "description": "Global threat monitoring: threats ranked 0–10, sourced and updated hourly.",
   "id": "/",
   "start_url": "/live",
   "scope": "/",

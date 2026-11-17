@@ -363,7 +363,7 @@ def _home_page_raw():
 </div><p class="h-credit">Screen capture: BLACKOUT.NETWORK Heat Map</p></section>
 
 <section class="h-sec"{" data-snap" if snap else ""} id="s3" data-clip="noise"><div class="h-copy">
- <p class="bnt-eyebrow">Signal over noise.</p>
+ <p class="bnt-eyebrow">Global threat monitoring</p>
  <h2 class="h-h">Every alert,<br>ranked 0 to 10</h2>
  <p class="h-lede">Each item is scored on impact and on how many independent sources back it up. The serious ones rise to the top. Nothing is hidden: the full feed is always one tap away.</p>
  <div class="h-scale" aria-label="Rank scale 0 to 10"><div class="h-bar" id="h_bar"></div><div class="h-nums"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
@@ -400,7 +400,7 @@ def _home_page_raw():
 
 <section class="h-sec"{" data-snap" if snap else ""} id="s7" data-clip="dash"><div class="h-copy c">
  <p class="bnt-eyebrow">The live dashboard</p>
- <h2 class="h-h">Signal over noise.</h2>
+ <h2 class="h-h">Global threat monitoring</h2>
  <p class="h-lede">Everything in one place, updated around the clock.</p>
  <a class="bnt-btn y" href="/live">Enter the dashboard</a>
  {SKIPBOX}

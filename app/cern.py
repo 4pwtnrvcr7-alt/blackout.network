@@ -717,7 +717,7 @@ def full_page():
             '<a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>' + _top() +
             '<main class="cx" id="main">' + page_html() + '</main>'
             '<footer class="cx-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/#solar">Solar &amp; Seismic</a> · <a href="/#spacex">SpaceX</a> · '
-            '<a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a><br>Independent explainer. Not affiliated with or endorsed by CERN. Signal over noise.</footer>'
+            '<a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a><br>Independent explainer. Not affiliated with or endorsed by CERN. Global threat monitoring.</footer>'
             '<script src="/api/cern/app.js" defer></script></body></html>')
 
 # ------------------------------------------------------------------ routes

@@ -12,7 +12,7 @@ import glob, os, shutil, subprocess, sys, tempfile
 SITE = "https://blackout.network"
 PAGE = {"wire": SITE + "/#wire", "maps": SITE + "/#maps", "home": SITE + "/"}   # real deep links (dashboard TABHASH); no per-story permalink exists
 BG, PANEL, TX, MU, HI, AC = "#0b0d10", "#14181d", "#e6e9ee", "#8b95a3", "#ff4d4f", "#4aa3ff"   # static/theme.css
-TAGLINE = "Signal over noise."
+TAGLINE = "Global threat monitoring"
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"; FONTB = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 MARK = "bn-brand-qr:"          # JPEG comment / PNG text / PDF metadata marker -> idempotent
 # Logo V2-final mark (BN + severity meter, dark version, transparent), shown left of "blackout.network" on every band/end card.
