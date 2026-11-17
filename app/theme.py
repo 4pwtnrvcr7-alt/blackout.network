@@ -236,6 +236,11 @@ def home_page():
         f'<div class="h-chip bnt-peek" tabindex="0" aria-expanded="false"><span class="h-ct">{_ic(ic)}{E(t)}</span>'
         f'<div class="bnt-peek-d"><div><p>{E(dsc)} <a href="{E(href)}" class="h-cl">Open &rarr;</a></p></div></div></div>' for t, ic, dsc, href in CHIPS)
     wm = '<span class="bnt-wm">blackout.network</span>'
+    m4 = __import__("os").environ.get("BN_MENU_V2", "1") != "0"   # Push H: SpaceX-language full-screen menu (BN_MENU_V2=0 = side drawer)
+    m4cls = " h-menu4" if m4 else ""
+    m4btn = '<span class="h-ml">Menu</span>' if m4 else ""
+    mlead = ('<div class="h-m4lead"><a href="#s1" data-h-close>Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>' if m4
+             else '<a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>')
     return f'''<!doctype html><html lang="en" data-bnt-home><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script>{HEAD_JS}</script>
 <title>BLACKOUT.NETWORK · Signal over noise.™</title>
@@ -256,7 +261,7 @@ def home_page():
 <header class="h-nav" id="h_nav">
  <a class="h-wm" href="/live" aria-label="BLACKOUT.NETWORK live dashboard">{wm}</a>
  <nav class="h-links" aria-label="Primary"><a href="/live#heatmap">Live map</a><a href="/wire">The Wire</a><a href="#s3">How it ranks</a><a href="#s6">Free brief</a></nav>
- <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false"><i></i><i></i><i></i></button></div>
+ <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{m4btn}<i></i><i></i><i></i></button></div>
 </header>
 <ol class="h-pager" id="h_pager" aria-hidden="true"></ol>
 <main id="flow">
@@ -325,10 +330,10 @@ def home_page():
 </footer></section>
 </main>
 <div class="h-scrim" id="h_scrim"></div>
-<aside class="h-menu" id="h_menu" aria-hidden="true" aria-label="Site menu">
+<aside class="h-menu{m4cls}" id="h_menu" aria-hidden="true" aria-label="Site menu">
  <button class="h-x" type="button" aria-label="Close menu">&times;</button>
  <a class="h-wm" href="/live" style="display:block;margin:0 0 18px;font-size:18px">{wm}</a>
- <a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>
+ {mlead}
  {_menu()}
  <div class="h-mfoot"><a class="bnt-btn y" href="#s6" data-h-close>Get the free brief</a><a class="bnt-btn" href="/live">Open dashboard</a></div>
 </aside>

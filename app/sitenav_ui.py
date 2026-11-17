@@ -17,6 +17,8 @@ LOGO_HTML = ('<svg class="bn-icon" viewBox="0 0 1024 1024" aria-hidden="true" fo
 
 import os
 def apple_on(): return os.environ.get("BN_APPLE", "1") != "0"
+def menu_v2_on():   # Push H (Nov 17): SpaceX-language full-screen menu site-wide; BN_MENU_V2=0 = the v3 card-grid menu, unchanged
+    return os.environ.get("BN_MENU_V2", "1") != "0"
 def logo_html():
     """apple_style_v1 (on unless BN_APPLE=0): the plain BLACKOUT wordmark, no mark. Off = the V2-final logo, unchanged."""
     # Nov 17 2026 (Matt): no logo mark anywhere on the site; a plain-text lowercase wordmark in the theme font (theme.css .bnt-wm)
@@ -129,7 +131,7 @@ def topbar(sn, active="", ctl_html=""):
     """<header class="bn-top"> for every page. ctl_html = page-specific controls for the settings popover (dashboard: scan status,
     refresh, interval); add-ons that look for "header .ctl" (translate, live indicator) also land there."""
     prim = "".join(f'<a href="{E(h)}" data-tab="{E(k)}"' + (' aria-current="page"' if k == active else "") + (' class="bna-cta"' if apple_on() and k == "newsletter" else "") + f'>{E("Free brief" if apple_on() and k == "newsletter" else l)}</a>' for k, h, l in PRIMARY)
-    return ((CRIT_APPLE if apple_on() else "") + '<header class="bn-top" id="bn_topbar"><div class="bn-tbar">'
+    return ((CRIT_APPLE if apple_on() else "") + '<header class="bn-top' + (' bn-top4' if menu_v2_on() else '') + '" id="bn_topbar"><div class="bn-tbar">'
             f'<a class="bn-logo" href="/" aria-label="{sn.BRAND} home">{logo_html()}</a>'
             f'<nav class="bn-primary" aria-label="Primary">{prim}</nav>'
             f'<div class="bn-acts"><span class="bn-follows">{follow_links(sn)}</span>'
@@ -178,7 +180,7 @@ if _os.environ.get("BN_MESH_UI", "0") != "1":
 M3_PV = {
  "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
  "threats": '<span class="m3-row3"><span><span class="m3-k">Kp index</span><b class="m3-big" data-pv="kp">&ndash;</b></span><span><span class="m3-k">Latest quake</span><b class="m3-big" data-pv="quake">&ndash;</b><span class="m3-sm" data-pv="quake-place"></span></span><span><span class="m3-k">Grid desk</span><b class="m3-big" data-pv="grid">&ndash;</b><span class="m3-sm" data-pv="grid-sub"></span></span></span><span class="m3-asof" data-pv="threats-asof"></span>',
- "prepare": '<a class="m3-h" href="/ready"><span class="m3-k">Everyday Readiness</span><span style="display:flex;margin:4px 0"><img src="/static/ready/01-72-hour-home-kit.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/02-water-at-home.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/03-power-outage-readiness.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/04-family-communication-plan.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/05-first-aid-and-medication-basics.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"></span><span class="m3-sm">Five printable one-page guides (PDF)</span></a>',
+ "prepare": '<a class="m3-h" href="/ready"><span class="m3-k">Everyday Readiness</span><span style="display:flex;margin:4px 0"><img src="/static/ready/01-72-hour-home-kit.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(242,242,244,.35);margin-right:4px"><img src="/static/ready/02-water-at-home.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/03-power-outage-readiness.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/04-family-communication-plan.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/05-first-aid-and-medication-basics.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"></span><span class="m3-sm">Five printable one-page guides (PDF)</span></a>',
  "politics": '<span class="m3-k">Midterms 2026</span><span><b class="m3-big" data-pv="midterms">&ndash;</b> <span class="m3-sm" data-pv="midterms-unit"></span></span>',
  "markets": '<span class="m3-k" data-pv="spx-label">S&amp;P 500</span><span class="m3-sprow"><svg class="m3-spark" viewBox="0 0 200 40" aria-hidden="true" focusable="false"><polyline data-pv="spark" points=""/></svg><b class="m3-mid" data-pv="spx">&ndash;</b><span class="m3-chg" data-pv="spx-chg"></span></span><span class="m3-k">Next SpaceX launch</span><span class="m3-sm m3-strong" data-pv="launch">&ndash;</span><span class="m3-asof" data-pv="markets-asof"></span>',
  "community": '<a class="m3-trailer" href="/social"><span class="m3-k">Videos &amp; posts</span><span class="m3-sm">Our latest videos, Shorts and posts in one place</span><b class="m3-big" data-pv="sources-c" hidden></b></a>',
@@ -219,7 +221,8 @@ def drawer(sn, active=""):
     Escape, search, theme) stays in sitenav.js; art, previews and motion are added by bn-v3.js when the menu first opens."""
     # Sticky top row (bn-mbar): wordmark home + Close. It stays on screen and clears the
     # standalone status bar (env safe-area-inset-top). Search and the other tools stay in bn-ph.
-    out = ['<div class="bn-drawer bn-m3" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
+    m4 = menu_v2_on()
+    out = [(M4_CSS if m4 else "") + '<div class="bn-drawer bn-m3' + (' bn-m4' if m4 else '') + '" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
            '<nav class="bn-panel" aria-label="Site menu"><div class="bn-mhead"><div class="bn-mbar">'
            f'<a class="bn-logo" href="/" aria-label="{E(sn.BRAND)} home">{logo_html()}</a>'
            f'<a class="bn-close m3-close" href="#_" role="button" aria-label="Close menu">{I_CLOSE}<span>Close</span></a></div>'
@@ -230,12 +233,12 @@ def drawer(sn, active=""):
            + theme_btn("bn-js-only bn-theme-row m3-tl") +
            '<button type="button" class="m3-tl bn-gear-row bn-js-only" aria-controls="bn_settings">Settings</button>'
            '<a class="bn-cta m3-cta" href="/newsletter">Free brief</a></div></div></div>'
-           '<div class="m3-grid">']
+           + (M4_LEAD if m4 else '') + '<div class="m3-grid">']
     for n, (sid, name, desc, rows) in enumerate(menu3_sections(sn), 1):
         # No section is pre-opened in the markup: on phones the menu must start fully collapsed
         # (current page, remembered state and the old "Latest always open" default all stay shut).
         # Desktop/tablet (>=768px) open the full board in bn-v3.js m3desk, with a CSS fallback when JS is off.
-        out.append(f'<details class="bn-grp m3-p m3-{sid}" data-grp="{E(name)}" data-sec="{sid}">'
+        out.append(f'<details class="bn-grp m3-p m3-{sid}" data-grp="{E(name)}" data-sec="{sid}"' + (' data-m4x' if m4 else '') + '>'
                    f'<summary><span class="m3-art" aria-hidden="true"><svg viewBox="560 0 640 440" preserveAspectRatio="xMidYMid slice" focusable="false" data-art="{sid}"></svg></span>'
                    f'<span class="bn-gt"><span class="m3-n">{n:02d}</span><b class="m3-t">{E(name)}</b><small class="bn-gd">{E(desc)}</small></span><i class="m3-pm" aria-hidden="true"></i></summary>'
                    f'<div class="m3-body"><i class="m3-rule" aria-hidden="true"></i><div class="m3-pv" data-pvsec="{sid}">{M3_PV.get(sid, "")}</div><ul>')
@@ -254,6 +257,7 @@ def drawer(sn, active=""):
                '<div class="m3-stamp" id="m3_stamp" aria-live="off"></div>'
                '<p class="bn-dfoot m3-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/stats">Stats</a><a href="/report-status">Report status</a></p>'
                '</div></nav></div>')
+    if m4: out.append(M4_JS)
     return "".join(out)
 
 def pagehead(title, desc):
@@ -287,3 +291,61 @@ LOADER = ('<script>addEventListener("load",function(){var d=document,r=d.documen
           'if(!getComputedStyle(r).getPropertyValue("--bn-tbar-h")){var l=d.createElement("link");l.rel="stylesheet";l.href="/sitenav.css?retry=1";d.head.appendChild(l)}'
           'var ac="/bn-apple"+".css";if(d.querySelector(\'link[href^="\'+ac+\'"]\')&&!getComputedStyle(r).getPropertyValue("--a-y")){var a=d.createElement("link");a.rel="stylesheet";a.href=ac+"?retry=1";d.head.appendChild(a)}'
           'if(!window.bnSitenav)setTimeout(function(){if(window.bnSitenav)return;var s=d.createElement("script");s.src="/sitenav.js?retry=1";d.head.appendChild(s)},1500)})</script>')
+
+# Push H: SpaceX-language menu (BN_MENU_V2, default on). Same drawer markup and sitenav.js/bn-v3.js behaviour (dialog, focus trap,
+# Escape, search, alerts, settings); this layer only restyles it: black full screen, four large uppercase lead links, small
+# uppercase group labels, uppercase link lists, no art, no descriptions, no previews, no numbers.
+M4_LEAD = ('<div class="m4-lead"><a href="/?intro=1">Intro</a><a href="/wire" data-tab="threat">The Wire</a>'
+           '<a href="/live">Live</a><a href="/newsletter" data-tab="newsletter">Newsletter</a></div>')
+M4_CSS = ('<style id="bn_m4">'
+  'html .bn-top4 .bn-tbar .bn-burger .bn-bl{display:inline!important;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;margin:0 10px 0 0!important;width:auto!important;height:auto!important;clip:auto!important;clip-path:none!important;position:static!important;overflow:visible!important;white-space:nowrap;color:#fff!important}'
+  'html .bn-top4 .bn-tbar .bn-theme-bar{display:none!important}'
+  'html .bn-top4 .bn-burger{display:inline-flex!important;flex-direction:row-reverse;align-items:center;width:auto!important;padding:0 4px!important;background:none!important;border:0!important}'
+  'html .bn-m4 .bn-panel{background:#000!important;border:0!important;box-shadow:none!important}'
+  'html .bn-m4 .bn-scrim{background:#000!important;opacity:1!important}'
+  'html .bn-m4 .m3-art,html .bn-m4 .bn-gd,html .bn-m4 .m3-pv,html .bn-m4 .m3-n,html .bn-m4 .m3-rule,html .bn-m4 .m3-stamp,html .bn-m4 .m3-cta,html .bn-m4 .bn-theme-row,html .bn-m4 .m3-soon{display:none!important}'
+  'html .bn-m4 .m4-lead{display:flex;flex-direction:column;gap:2px;padding:28px 0 28px;margin-bottom:8px}'
+  'html .bn-m4 .m4-lead a{font:700 clamp(30px,4.2vw,52px)/1.1 Inter,system-ui,sans-serif!important;text-transform:uppercase;letter-spacing:.02em;color:#fff!important;text-decoration:none;width:max-content;max-width:100%}'
+  'html .bn-m4 .m4-lead a:hover{color:#C9CDD3!important}'
+  'html .bn-m4 .bn-grp,html .bn-m4 .m3-p{background:none!important;border:0!important;box-shadow:none!important;padding:0!important;min-height:0!important}'
+  'html .bn-m4 .bn-grp>summary{background:none!important;padding:10px 0!important;min-height:0!important}'
+  'html .bn-m4 .m3-t{font:600 11px/1.3 Inter,system-ui,sans-serif!important;letter-spacing:.14em!important;text-transform:uppercase;color:#8A8F98!important}'
+  'html .bn-m4 .m3-body{padding:0!important;background:none!important}'
+  'html .bn-m4 .m3-body ul{list-style:none;margin:0;padding:0 0 18px!important;display:block!important}'
+  'html .bn-m4 .m3-body li{margin:0!important;border:0!important}'
+  'html .bn-m4 .m3-body li a{display:block;padding:7px 0!important;font:600 13px/1.35 Inter,system-ui,sans-serif!important;letter-spacing:.12em!important;text-transform:uppercase;color:#E6E8EB!important;background:none!important;border:0!important;text-decoration:none}'
+  'html .bn-m4 .m3-body li a:hover,html .bn-m4 .m3-body li a[aria-current]{color:#fff!important;text-decoration:underline;text-underline-offset:4px}'
+  'html .bn-m4 .m3-tools .m3-tl{background:none!important;border:1px solid rgba(255,255,255,.35)!important;border-radius:0!important;font:600 11px/1 Inter,system-ui,sans-serif!important;letter-spacing:.14em!important;text-transform:uppercase;color:#fff!important}'
+  'html .bn-m4 .m3-foot{border-top:1px solid rgba(255,255,255,.12)!important}'
+  'html .bn-m4 .m3-foot a{font:600 11px/1 Inter,system-ui,sans-serif!important;letter-spacing:.14em!important;text-transform:uppercase;color:#8A8F98!important}'
+  'html .bn-m4 .bn-close span{font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}'
+  'html .bn-m4 .bn-panel::before,html .bn-m4 .m3-p::after,html .bn-m4 .m3-foot::before{display:none!important;content:none!important}'
+  'html .bn-m4 .m4-lead,html .bn-m4 .m3-grid{padding-left:max(20px,3vw)!important;padding-right:max(20px,3vw)!important;box-sizing:border-box}'
+  'html .bn-m4 .m4-lead{margin-left:0;margin-right:0}'
+  'html .bn-m4 .bn-dsearch input,html .bn-m4 .bn-dsearch button{background:#000!important;border:1px solid rgba(255,255,255,.28)!important;border-radius:0!important;box-shadow:none!important;color:#fff!important}'
+  'html .bn-m4 .bn-close{background:none!important;border:0!important;box-shadow:none!important}'
+  'html .bn-m4 .bn-panel{position:absolute!important;inset:0!important;width:100%!important;max-width:none!important;height:100%!important;transform:none!important;opacity:0;transition:opacity .2s ease!important;overflow:auto!important;display:flex;flex-direction:column}'
+  'html .bn-m4.bn-open .bn-panel,html .bn-m4:target .bn-panel{opacity:1}'
+  'html .bn-m4 .bn-mhead{background:#000!important;border-bottom:1px solid rgba(255,255,255,.12)!important;padding:12px max(20px,3vw)!important;position:sticky;top:0;z-index:2}'
+  'html .bn-m4 .m3-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}'
+  'html .bn-m4 .m3-tools .m3-tl{padding:9px 12px!important;cursor:pointer}'
+  'html .bn-m4 summary{list-style:none}html .bn-m4 summary::-webkit-details-marker{display:none}'
+  'html .bn-m4 .m3-follow{display:flex;gap:24px;align-items:center;flex-wrap:wrap}html .bn-m4 .m3-k{font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#8A8F98}'
+  'html .bn-m4 .m3-foot{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:center;padding:16px max(20px,3vw) 28px!important;margin-top:auto}'
+  'html .bn-m4 .m3-legal{display:flex;flex-wrap:wrap;gap:12px 24px;margin:0}'
+  '@media (min-width:768px){html .bn-m4 .m3-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:0 24px!important;padding-bottom:32px!important}'
+  'html .bn-m4 .bn-grp>summary{pointer-events:none}html .bn-m4 .m3-pm,html .bn-m4 .bn-grp>summary::after{display:none!important}}'
+  'html .bn-m4 .bn-mhead{display:flex!important;align-items:center!important;gap:12px 20px!important;flex-wrap:wrap!important;margin:0!important;border-radius:0!important;box-shadow:none!important;max-width:none!important;width:100%!important;box-sizing:border-box}'
+  'html .bn-m4 .bn-mbar{display:contents!important}html .bn-m4 .bn-mbar .bn-logo{order:0}html .bn-m4 .bn-close{order:2;margin-left:auto!important}'
+  'html .bn-m4 .bn-ph{order:1;flex:1 1 300px;display:flex!important;align-items:center;gap:10px 16px;flex-wrap:wrap;background:none!important;padding:0!important;margin:0!important;border:0!important;box-shadow:none!important}'
+  'html .bn-m4 .bn-dsearch{flex:1 1 220px;max-width:520px;margin:0!important}html .bn-m4 .m3-tools{margin:0!important;justify-content:flex-start}'
+  'html .bn-m4 .m3-tools .m3-tl{height:auto!important;min-height:0!important;line-height:1!important;width:auto!important}'
+  'html .bn-m4 .m3-body li a{min-height:0!important}'
+  'html .bn-m4 .m3-foot,html .bn-m4 .m3-follow,html .bn-m4 .m3-legal{justify-content:flex-start!important;text-align:left!important;border:0!important;max-width:none!important;margin-left:0!important;margin-right:0!important}'
+  'html .bn-m4 .m3-foot{border-top:1px solid rgba(255,255,255,.12)!important}'
+  '@media (max-width:767px){html .bn-m4 .bn-ph{order:3;flex-basis:100%}}'
+  '</style>')
+M4_JS = ('<script>(function(){var mq=matchMedia("(min-width:768px)");function o(){if(!mq.matches)return;'
+         'document.querySelectorAll("#bn-menu details[data-m4x]").forEach(function(d){d.open=true})}'
+         'o();document.addEventListener("click",function(e){if(e.target.closest&&e.target.closest(".bn-burger,.bn-searchbtn"))setTimeout(o,60)},true);'
+         'if(mq.addEventListener)mq.addEventListener("change",o)})()</script>')
