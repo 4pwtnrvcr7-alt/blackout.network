@@ -261,7 +261,7 @@ def meter_html(rank, size=""):
 
 # Light/dark theme before first paint (same script as server.THEME_HEAD; the "bn_theme" marker stops a second copy).
 THEME_SCRIPT = ('<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
-                'if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";'
+                't="dark";'   # Matt Nov 17 1:10 AM: dark only (light CSS kept; reversible: restore 'if(t!=="light"&&t!=="dark")' before t="dark")
                 'd.setAttribute("data-theme",t);d.style.colorScheme=t})()</script>')
 
 # apple_style_v1 critical chrome (Nov 12): the bar's hide rules ship inline with the header, so a page whose /bn-apple.css request

@@ -188,7 +188,7 @@ _RW = b'<link rel="stylesheet" href="/api/report/app.css"><script src="/api/repo
 SITE_TITLE = "BLACKOUT.NETWORK · Signal over noise.™".encode("utf-8")
 # Light/dark theme (t323): set data-theme on <html> before first paint (saved choice, else the OS setting) + preload the self-hosted fonts.
 THEME_HEAD = (b'<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
-              b'if(t!=="light"&&t!=="dark")t=window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark";'
+              b't="dark";'
               b'd.setAttribute("data-theme",t);d.style.colorScheme=t;var m=document.querySelector(\'meta[name="theme-color"]\');if(m)m.content=t=="light"?"#f6f7f9":"#0b0d10"})()</script>'
               b'<link rel="icon" type="image/svg+xml" href="/img/favicon.svg?v=3">'
               b'<link rel="preload" href="/fonts/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>'

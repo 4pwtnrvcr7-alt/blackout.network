@@ -6,7 +6,7 @@
 --bnt-hd:Montserrat,"Noto Sans",Arial,sans-serif;--bnt-tx:Inter,"Noto Sans",Arial,sans-serif;--bnt-ease:cubic-bezier(.2,.7,.2,1)}
 /* plain-text wordmark (replaces every logo image on the site, Matt Nov 17 12:11 AM) */
 .bnt-wm{font-family:var(--bnt-hd)!important;font-weight:700!important;letter-spacing:.08em!important;text-transform:lowercase!important;white-space:nowrap;line-height:1!important;color:inherit}
-.bn-logo .bnt-wm{font-size:17px!important;color:var(--bn-ink,var(--a-ink,currentColor))!important}
+.bn-logo .bnt-wm{font-size:17px!important;color:inherit!important}
 .bn-logo .bnt-wm b{color:inherit!important;font-weight:inherit!important}
 .bn-m3 .bn-logo .bnt-wm{font-size:18px!important}
 @media (max-width:560px){.bn-logo .bnt-wm{font-size:15px!important;letter-spacing:.06em!important}}
@@ -53,3 +53,36 @@
 .bnt-key span::before{content:"";width:9px;height:9px;border-radius:50%}
 .bnt-key .c::before{background:var(--bnt-calm);box-shadow:0 0 10px var(--bnt-calm)}.bnt-key .e::before{background:var(--bnt-elev);box-shadow:0 0 10px var(--bnt-elev)}.bnt-key .h::before{background:var(--bnt-high);box-shadow:0 0 10px var(--bnt-high)}
 @media (prefers-reduced-motion:reduce){.bnt-acc-b,.bnt-peek .bnt-peek-d,.bnt-btn,.bnt-btn::before{transition:none!important}}
+
+/* Nov 17 2026 Phase 2: one dark top bar on every page, in both themes (CoS 1:00 AM: no white header over dark content) */
+html .bn-top{background:rgba(5,6,10,.9)!important;border-bottom:1px solid rgba(240,240,250,.08)!important;color:#F0F0FA!important;color-scheme:dark;
+ -webkit-backdrop-filter:saturate(1.4) blur(18px)!important;backdrop-filter:saturate(1.4) blur(18px)!important}
+html .bn-top .bn-tbar{color:#F0F0FA!important}
+html .bn-top .bn-logo,html .bn-top .bn-ib,html .bn-top .bn-follow,html .bn-top .bn-burger,html .bn-top .bn-rf-st{color:#F0F0FA!important}
+html .bn-top .bn-primary a:not(.bna-cta){color:rgba(240,240,250,.78)!important}
+html .bn-top .bn-primary a:not(.bna-cta):hover,html .bn-top .bn-primary a[aria-current="page"]:not(.bna-cta){color:#FFC21A!important}
+html .bn-top .bn-ib:hover{background:rgba(240,240,250,.08)!important}
+html .bn-top .bn-ib:focus-visible,html .bn-top .bn-logo:focus-visible{outline:2px solid #FFC21A!important;outline-offset:2px}
+/* skip link: hidden until focused (it showed on /wire) */
+a.skip:not(:focus){position:absolute!important;left:-9999px!important;top:auto!important;width:1px;height:1px;overflow:hidden}
+a.skip:focus{position:fixed;left:12px;top:12px;z-index:10000;padding:10px 14px;border-radius:10px;background:#FFC21A;color:#05060a;font-weight:700;text-decoration:none}
+/* opt-in light-mode ink for theme pages that follow the visitor's light/dark choice (dark is the default) */
+html[data-theme="light"] .bnt-lt{--bnt-ink:#0b0d12;--bnt-ink-80:rgba(11,13,18,.8);--bnt-ink-60:rgba(11,13,18,.62);--bnt-ink-35:rgba(11,13,18,.38);
+ --bnt-ink-15:rgba(11,13,18,.14);--bnt-ink-08:rgba(11,13,18,.08);--bnt-y:#B07D00}
+html[data-theme="light"] .bnt-lt .bnt-key span{background:rgba(11,13,18,.03)}
+/* theme page skin: eyebrow + Montserrat display headline (opt-in with .bnt-pg) */
+.bnt-pg .kicker{font:700 12px/1 var(--bnt-hd)!important;letter-spacing:.2em!important;text-transform:uppercase;color:var(--bnt-y)!important;margin:28px 0 12px!important}
+.bnt-pg h1{font-family:var(--bnt-hd)!important;font-weight:800!important;text-transform:uppercase;letter-spacing:.01em!important;line-height:1.02!important;font-size:clamp(34px,5.2vw,58px)!important;margin:0 0 12px!important}
+.bnt-pg h2{font-family:var(--bnt-hd)}
+
+/* per-module refresh stamp */
+.bnt-up{display:inline-flex;align-items:center;gap:6px;font:500 11.5px/1.2 var(--bnt-tx);color:var(--bnt-ink-60);letter-spacing:0;text-transform:none;white-space:nowrap}
+.bnt-rf{all:unset;box-sizing:border-box;width:26px;height:26px;display:inline-grid;place-items:center;border-radius:50%;cursor:pointer;color:var(--bnt-ink-60);border:1px solid var(--bnt-ink-08);flex:none;transition:color .2s,border-color .2s,background .2s}
+.bnt-rf:hover{color:var(--bnt-y);border-color:rgba(255,194,26,.4)}
+.bnt-rf:focus-visible{outline:2px solid var(--bnt-y);outline-offset:2px}
+.bnt-rf svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.bnt-rf.spin svg{animation:bnt-spin .8s linear infinite}
+@keyframes bnt-spin{to{transform:rotate(360deg)}}
+@media (pointer:coarse){.bnt-rf{width:34px;height:34px}}
+/* Matt Nov 17 1:10 AM: no global refresh and no light/dark switch in the top bar (code kept; per-module refresh replaces it) */
+html body [data-bn-refresh],html body .bn-rf-st,html body [data-bn-theme],html body .bn-theme-row,html body .bn-theme-bar,html body .bn-pop-theme,html body .bn-top .bn-tbar .bn-refresh,html body .bn-top .bn-tbar .bn-theme,html.bn-js body .bn-top .bn-tbar [data-bn-theme].bn-ib,html.bn-js body .bn-top .bn-tbar [data-bn-refresh].bn-ib,html.bn-js body [data-bn-theme].bn-ib.bn-theme-row,html.bn-js body [data-bn-refresh].bn-rf-row,html.bn-js body .bn-m3 .bn-ph .m3-tl.bn-rf-row[data-bn-refresh],html.bn-js body .bn-m3 .bn-ph .m3-tl.bn-theme-row[data-bn-theme]{display:none!important}

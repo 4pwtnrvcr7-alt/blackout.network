@@ -4,6 +4,8 @@
 (function(){"use strict";if(window.__bnGrowth)return;window.__bnGrowth=1;
 var SITE="https://blackout.network",XU="https://x.com/BlkoutNtw",YT="https://www.youtube.com/@blkoutntw",YTS=YT+"?sub_confirmation=1";
 var D={shorts:{},figures:[]},ready=false;
+/* Matt Nov 17 1:33 AM: no newsletter pop-ups, slide-ins, sticky bars or corner chips for now (inline sections stay). Code kept: set window.BN_NL_POPUPS=1 to bring them back. */
+var NOPOP=window.BN_NL_POPUPS!==1;
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function utm(u,s,m,c){return u+(u.indexOf("?")<0?"?":"&")+"utm_source="+s+"&utm_medium="+m+"&utm_campaign="+c}
 function xIntent(text,url,camp){return "https://x.com/intent/post?text="+encodeURIComponent(text.slice(0,200))+"&url="+encodeURIComponent(utm(url,"x","social",camp||"share"))+"&via=BlkoutNtw"}
@@ -101,13 +103,13 @@ function mapOnScreen(){
  var r=el.getBoundingClientRect();
  return r.bottom>72&&r.top<window.innerHeight-24&&r.height>40}
 function showMapChip(){
- if(document.getElementById("bng_mapchip")||subscribed()||isNL)return;
+ if(NOPOP||document.getElementById("bng_mapchip")||subscribed()||isNL)return;
  var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
  var chip=document.createElement("aside");chip.id="bng_mapchip";chip.className="bng-mapchip";chip.setAttribute("role","region");chip.setAttribute("aria-label","Newsletter");
  chip.innerHTML='<p class="bng-mapchip-t"><b>Finding this useful?</b> <span>The 7 AM / 7 PM brief, ranked and sourced.</span></p><a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=corner&utm_campaign=map">Get the brief</a><button type="button" class="bng-x" aria-label="Close">×</button>';
  chip.querySelector(".bng-x").onclick=function(){LS.s("bn_nl_dis",String(Date.now()));chip.remove();document.body.classList.remove("bng-chip-on")};
  document.body.classList.add("bng-chip-on");document.body.appendChild(chip)}
-var shown=false;function showPrompt(){if(shown||subscribed()||isNL||location.hash==="#newsletter")return;var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
+var shown=false;function showPrompt(){if(NOPOP||shown||subscribed()||isNL||location.hash==="#newsletter")return;var d=+LS.g("bn_nl_dis")||0;if(Date.now()-d<WEEK)return;
  if(document.querySelector(".bnr-back"))return;
  if(mapRoot()){showMapChip();return}
  if(mapOnScreen())return;
@@ -117,11 +119,11 @@ var shown=false;function showPrompt(){if(shown||subscribed()||isNL||location.has
  document.body.appendChild(p);p.querySelector(".bng-x").onclick=function(){closePrompt(true)};p.querySelector(".bng-no").onclick=function(){closePrompt(true)};
  document.addEventListener("keydown",escK);mountForm(p.querySelector(".bng-nlbox"),"prompt");requestAnimationFrame(function(){p.classList.add("bng-in")});
  var b=document.getElementById("bng_bar");if(b){b.hidden=true;document.body.classList.remove("bng-bar-on")}}
-function promptTriggers(){if(subscribed()||isNL)return;var pv=(+LS.g("bn_pv")||0)+1;LS.s("bn_pv",String(pv));
+function promptTriggers(){if(NOPOP||subscribed()||isNL)return;var pv=(+LS.g("bn_pv")||0)+1;LS.s("bn_pv",String(pv));
  if(mapRoot()){showMapChip();return}
  setTimeout(showPrompt,pv>=2?8000:50000);
  var onS=function(){if(mapOnScreen())return;var h=document.documentElement,max=h.scrollHeight-h.clientHeight;if(max>400&&h.scrollTop/max>=.5){removeEventListener("scroll",onS);showPrompt()}};addEventListener("scroll",onS,{passive:true})}
-function bar(){if(subscribed()||isNL||mapRoot()||document.getElementById("bng_bar"))return;var d=+LS.g("bn_nl_bar")||0;if(Date.now()-d<WEEK)return;
+function bar(){if(NOPOP||subscribed()||isNL||mapRoot()||document.getElementById("bng_bar"))return;var d=+LS.g("bn_nl_bar")||0;if(Date.now()-d<WEEK)return;
  var b=document.createElement("div");b.id="bng_bar";b.className="bng-bar";b.setAttribute("role","region");b.setAttribute("aria-label","Newsletter");
  b.innerHTML='<span class="bng-bar-t"><b>Get the free brief</b><span class="bng-bar-s"> · 7 AM &amp; 7 PM ET, ranked and sourced</span></span><a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=sticky&utm_campaign=bar">Sign up</a><button type="button" class="bng-x" aria-label="Dismiss">×</button>';
  b.querySelector(".bng-x").onclick=function(){LS.s("bn_nl_bar",String(Date.now()));b.remove();document.body.classList.remove("bng-bar-on")};
