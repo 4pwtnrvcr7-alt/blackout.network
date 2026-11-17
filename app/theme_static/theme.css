@@ -172,3 +172,8 @@ body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a:hover{background:#F2F2F4
 /* Nov 17 push D: Push to Mesh stays hidden unless BN_MESH_SHARE=1 unhides it; story headline in sentence case */
 html body .bng-mesh[hidden]{display:none!important}
 body:has(#bn_story) h1.t{text-transform:none!important;letter-spacing:-.01em}
+/* Nov 17 push E: story share row = square outlined monochrome buttons (all of them); solar lead = diagram only */
+html body .bng-share .bng-sb{border-radius:0!important;background:transparent!important;border:1px solid rgba(242,242,244,.55)!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.12em;font:600 11px/1 Inter,system-ui,sans-serif!important;padding:10px 14px!important;min-height:36px}
+html body .bng-share .bng-sb:is(:hover,:focus-visible){background:#F2F2F4!important;color:#05060a!important}
+html body .bng-share .bng-sb[hidden]{display:none!important}
+.ss-lead.ss-lead-fig{display:block!important}

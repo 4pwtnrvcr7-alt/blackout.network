@@ -849,20 +849,32 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 def acc_js(): return ACC_JS.replace("__MAP__", json.dumps(dict(SRC2SLUG, Starlink="starlink"))).encode()
 
 _PC = {}
+_PC_BUSY = set(); _PC_LOCK = threading.Lock()
+def _pc_build(k):
+    return render_hub() if k == "/network" else render(k.rsplit("/", 1)[1])
+def _pc_refresh(k):
+    with _PC_LOCK:
+        if k in _PC_BUSY: return
+        _PC_BUSY.add(k)
+    def job():
+        try: _PC[k] = (time.time(), _pc_build(k))
+        except Exception: pass
+        finally:
+            with _PC_LOCK: _PC_BUSY.discard(k)
+    threading.Thread(target=job, daemon=True, name="np-swr").start()
 def handle_get(path, qs, headers=None):
     p = path.rstrip("/") or "/"
     if p in ("/network/starlink", "/network/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
         r = sl().handle_get(p, qs or {}, _sys_mod(), headers)
         if r is not None: return r
     if p == "/network" or re.fullmatch(r"/network/[a-z0-9]+", p):   # Nov 17 push C: 45 s page cache (the hub took 1.5-8 s per request and timed out headless checks)
-        k = p; hit = _PC.get(k)
-        if hit and time.time() - hit[0] < 45: return 200, hit[1], "text/html"
-        if p == "/network": out = render_hub()
-        else:
-            m = re.fullmatch(r"/network/([a-z0-9]+)", p)
-            if m.group(1) not in P: return 404, {"error": "not found"}
-            out = render(m.group(1))
-        _PC[k] = (time.time(), out); return 200, out, "text/html"
+        # Push E: stale-while-revalidate. Fresh (<45 s) or stale (<30 min) copies are served at once; a stale copy triggers one background rebuild.
+        if p != "/network" and p.rsplit("/", 1)[1] not in P: return 404, {"error": "not found"}
+        k = p; hit = _PC.get(k); age = time.time() - hit[0] if hit else None
+        if hit and age < 45: return 200, hit[1], "text/html"
+        if hit and age < 1800:
+            _pc_refresh(k); return 200, hit[1], "text/html"
+        out = _pc_build(k); _PC[k] = (time.time(), out); return 200, out, "text/html"
     m = re.fullmatch(r"/network/([a-z0-9]+)", p)
     if m and m.group(1) in P: return 200, render(m.group(1)), "text/html"
     if p == "/api/network/accordion.js": return 200, acc_js(), "application/javascript; charset=utf-8"
