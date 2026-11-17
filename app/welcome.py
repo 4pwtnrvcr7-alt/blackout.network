@@ -287,7 +287,7 @@ def _render():
     hero = _step("hero", "Welcome in.",
         '<p class="wel-lede">This is BLACKOUT.NETWORK — a free, sourced early-warning feed for real threats, '
         "ranked as they happen, and a set of tools you can use when you need them.</p>"
-        '<p class="wel-by">Created by humans. Powered by Superintelligence. Signal over noise.</p>'
+        '<p class="wel-by">Created by humans. Powered by Superintelligence. Global threat monitoring.</p>'
         + _video()
         + '<ul class="wel-goals">'
         "<li><p>We track outbreaks, earthquakes, space weather, severe weather, cyber attacks, infrastructure "
@@ -416,7 +416,7 @@ def _render():
         '<footer class="wel-foot"><p>Research-only data. Not official alerts.</p>'
         '<p><a href="/wire">The Wire</a> · <a href="/newsletter">Newsletter</a> · '
         '<a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p>'
-        "<p>BLACKOUT.NETWORK. Signal over noise.&trade;</p></footer>"
+        "<p>BLACKOUT.NETWORK. Global threat monitoring</p></footer>"
         '<script src="/welcome.js" defer></script>'
         "</body></html>"
     )

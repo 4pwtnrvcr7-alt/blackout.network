@@ -48,7 +48,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import logo_v2_a
 _t = LV2.png(LV2.tile('dark', 1024, rx=200, stroke='#2A3038', sw=10), 104); og.paste(_t, (70, 66), _t)
 d.text((72, 210), 'BLACKOUT.', font=B.mont(64, 900), fill=(236, 239, 243))
 d.text((72 + d.textlength('BLACKOUT.', font=B.mont(64, 900)), 210), 'NETWORK', font=B.mont(64, 900), fill=B.RED)
-d.text((74, 292), 'Signal over noise.', font=B.inter(34, 600), fill=(201, 209, 219))
+d.text((74, 292), 'Global threat monitoring', font=B.inter(34, 600), fill=(201, 209, 219))
 y = 360
 for line in ['Global threats, ranked 0–10 and linked', 'to their sources. Free, updated hourly.']:
     d.text((74, y), line, font=B.inter(27, 400), fill=(150, 160, 174)); y += 38
