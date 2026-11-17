@@ -301,6 +301,7 @@ def _newsletter_form():
 INTRO_SKIP = __import__("os").environ.get("BN_INTRO_SKIP", "0") == "1"
 SKIPBOX = '<label class="h-skipbox"><input type="checkbox" id="h_skip"> Skip this intro next time</label>' if INTRO_SKIP else ""
 HEAD_JS = ("(function(){try{var h=location.hash,s=location.search;"
+           "if(h==='#heatmap'||h==='#map'){location.replace('/map'+s);return}"
            "if(h&&h!=='#'&&h!=='#bn-menu'&&!/^#(s[1-7]|intro|top)$/.test(h)){location.replace('/live'+s+h);return}"
            "var app=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;"
            + ("if(!/[?&]intro=1/.test(s)&&(app||localStorage.getItem('bn_skip_intro')==='1')){location.replace('/live'+s);return}" if INTRO_SKIP else "")
@@ -342,7 +343,7 @@ def _home_page_raw():
 <a class="h-skip" href="#s6">Skip to the free brief</a>
 <header class="h-nav" id="h_nav">
  <a class="h-wm" href="/live" aria-label="BLACKOUT.NETWORK live dashboard">{wm}</a>
- <nav class="h-links" aria-label="Primary"><a href="/live#heatmap">Live map</a><a href="/wire">The Wire</a><a href="#s3">How it ranks</a><a href="#s6">Free brief</a></nav>
+ <nav class="h-links" aria-label="Primary"><a href="/map">Live map</a><a href="/wire">The Wire</a><a href="#s3">How it ranks</a><a href="#s6">Free brief</a></nav>
  <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{hx}{m4btn}</button></div>
 </header>
 <ol class="h-pager" id="h_pager" aria-hidden="true"></ol>
@@ -359,7 +360,7 @@ def _home_page_raw():
  <h2 class="h-h">Watch the world<br>as it happens</h2>
  <p class="h-lede">Quakes, storms, outbreaks, outages and conflict, pinned to one live map and sorted by what matters most.</p>
  <div class="h-stats" aria-live="polite"><div><b id="h_n_wire">&ndash;</b><span>alerts on The Wire</span></div><div><b id="h_n_src">&ndash;</b><span>sources online</span></div><div><b id="h_n_high">&ndash;</b><span>ranked High (7&ndash;10)</span></div><p class="h-asof" id="h_asof"></p></div>
- <a class="bnt-btn" href="/live#heatmap">Open the live map</a>
+ <a class="bnt-btn" href="/map">Open the live map</a>
 </div><p class="h-credit">Screen capture: BLACKOUT.NETWORK Heat Map</p></section>
 
 <section class="h-sec"{" data-snap" if snap else ""} id="s3" data-clip="noise"><div class="h-copy">
@@ -428,6 +429,17 @@ def home_page():
     if credits_page_on():
         h = re.sub(r'<p class="h-credit">[^<]*</p>', "", h)
         h = h.replace('<a href="/bnt/credits.txt">Footage credits</a>', '<a href="/credits#intro">Image credits</a>')
+    # Matt 5:28 PM: follow band sits on the page black, above a normal footer (not over the last hero).
+    m = re.search(r'<footer class="h-foot"[^>]*>.*?</footer>', h, re.S)
+    if m:
+        foot = m.group(0)
+        h = h[:m.start()] + h[m.end():]
+        try:
+            import growth
+            band = growth.follow_html()
+        except Exception:
+            band = ""
+        h = h.replace("</main>", "</main>\n" + band + foot, 1)
     return h
 
 # ---------- "/live" overview (top of the dashboard home view) ----------

@@ -1,6 +1,6 @@
 /* BLACKOUT.NETWORK growth enhancer (growth.py). No cookies, no trackers, no third-party scripts.
    Wire cards: thumbnail (our YouTube Short, else a Natural Earth locator map), headshots of named people, share row, full-story link.
-   In-feed follow cards every 10 items, footer "Follow BLACKOUT.NETWORK" block, post-signup follow prompt, ?q= search deep link. */
+   In-feed follow cards every 10 items, footer Follow band, post-signup follow prompt, ?q= search deep link. */
 (function(){"use strict";if(window.__bnGrowth)return;window.__bnGrowth=1;
 var SITE="https://blackout.network",XU="https://x.com/BlkoutNtw",YT="https://www.youtube.com/@blkoutntw",YTS=YT+"?sub_confirmation=1";
 var D={shorts:{},figures:[]},ready=false;
@@ -43,10 +43,13 @@ function ctaCard(i){var k=CTAS[i%CTAS.length],d=document.createElement("div");d.
 function enhanceFeed(root){if(!root)return;var cards=root.querySelectorAll(":scope > .card[data-cid]");cards.forEach(enhanceCard);
  if(root.id!=="feed"||root.querySelector(":scope > [data-bng-cta]"))return;var n=0;
  cards.forEach(function(c,i){if((i+1)%10===0&&i+1<cards.length&&n<6){c.after(ctaCard(n++))}})}
-function footer(){if(document.getElementById("bng_follow"))return;var f=document.getElementById("site_foot")||document.querySelector("footer.ft")||document.querySelector("footer");if(!f)return;
+function footer(){if(document.getElementById("bng_follow"))return;var f=document.getElementById("site_foot")||document.querySelector("footer.ft")||document.querySelector("footer.h-foot")||document.querySelector("footer");if(!f)return;
  var s=document.createElement("section");s.id="bng_follow";s.className="bng-foot";s.setAttribute("aria-labelledby","bng_follow_h");
- s.innerHTML='<h2 id="bng_follow_h">Follow BLACKOUT.NETWORK</h2><p>Global threat monitoring. Ranked, sourced alerts on the site, in your inbox, on X and on YouTube. Find BLACKOUT.NETWORK at <b>blackout.network</b>.</p><div class="bng-btns">'+btns("footer")+'</div>';
- f.parentNode.insertBefore(s,f)}
+ s.innerHTML='<p class="bng-follow-k" id="bng_follow_h">Follow</p><p class="bng-follow-l">Ranked, sourced alerts as they happen.</p><div class="bng-btns">'+btns("footer")+'</div>';
+ if(f.classList.contains("h-foot")){var main=document.getElementById("flow")||document.querySelector("main"),host=main&&main.parentNode;
+  if(host){host.insertBefore(s,main.nextSibling);host.insertBefore(f,s.nextSibling);f.classList.add("h-foot-after");}
+  else f.parentNode.insertBefore(s,f)}
+ else f.parentNode.insertBefore(s,f)}
 function thanks(el){if(!el||el.dataset.bngThanks)return;el.dataset.bngThanks=1;var d=document.createElement("div");d.className="bng-thanks";
  d.innerHTML='<b>One more step to stay ahead:</b> follow along where the stories break first.<div class="bng-btns"><a class="bng-btn bng-p" href="'+XU+'" target="_blank" rel="noopener">'+IX+'<span>Follow @BlkoutNtw on X</span></a><a class="bng-btn" href="'+YTS+'" target="_blank" rel="noopener">'+IY+'<span>Subscribe on YouTube</span></a></div>';
  el.parentNode.insertBefore(d,el.nextSibling)}

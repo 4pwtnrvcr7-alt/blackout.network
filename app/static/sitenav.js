@@ -10,6 +10,9 @@
 (function(){"use strict";
 if(window.bnSitenav)return;window.bnSitenav=1;
 var D=/*BN_SITENAV_DATA*/null;var R=document.documentElement;R.classList.add("bn-js");
+/* Matt 5:25 PM: /live#heatmap and /#heatmap always go to the full-screen /map, never the old regional panel. */
+var _hm=(location.hash||"").replace(/^#/,"").split(/[/?]/)[0];
+if((_hm==="heatmap"||_hm==="map")&&/^\/(live\/?)?$/.test(location.pathname)){location.replace("/map"+location.search);}
 var LS={get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 if(!window.bnMeter)window.bnMeter=function(r,sz){r=Math.max(0,Math.min(10,Math.round(+r||0)));return '<span class="bn-meter bn-r'+r+(sz?" bn-meter-"+sz:"")+'" role="img" aria-label="Rank '+r+' of 10" title="Rank '+r+' of 10"><span class="bn-segs" aria-hidden="true">'+new Array(11).join("<i></i>")+'</span><b class="bn-num" aria-hidden="true">'+r+'<small>/10</small></b></span>'};
 function $(s,r){return (r||document).querySelector(s)}function $$(s,r){return [].slice.call((r||document).querySelectorAll(s))}
@@ -183,7 +186,7 @@ function init(){
  // sidebar / bar links switch tabs in place
  function btn(k){return nav.querySelector('button[data-tab="'+k+'"]')}
  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[data-tab],.bn-primary a[data-tab]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
-  var k=a.dataset.tab;if(k.charAt(0)==="@")return;
+  var k=a.dataset.tab,href=(a.getAttribute("href")||"").split("?")[0];if(k.charAt(0)==="@"||k==="heatmap"||href==="/map")return;
   if(k==="threat")return; // The Wire is the standalone /wire page; do not trap the click as a dashboard tab
   var b=btn(k);if(!b)return;e.preventDefault();
   var dest=a.hash&&a.hash!==location.hash?a.hash:"";if(!(window.bnMenuClose&&bnMenuClose(true,dest?{replace:dest}:{}))&&dest)try{history.pushState(null,"",dest)}catch(_){}
@@ -228,7 +231,7 @@ function init(){
  // deep links to tabs whose add-on loads late (e.g. /#government): honor the first hash once its button appears
  var pending=(location.hash||"").slice(1);if(pending==="bn-menu")pending="";setTimeout(function(){pending=""},30000);
  nav.addEventListener("pointerdown",function(){pending=""},true);if(dr)dr.addEventListener("pointerdown",function(){pending=""},true);
- function deep(){if(!pending)return;var t=byHash[pending];if(!t||t.hidden||t.key.charAt(0)==="@"){pending="";return}
+ function deep(){if(!pending)return;if(pending==="heatmap"||pending==="map"){pending="";location.replace("/map"+location.search);return}var t=byHash[pending];if(!t||t.hidden||t.key.charAt(0)==="@"){pending="";return}
   var b=btn(t.key);if(!b)return;pending="";if(!b.classList.contains("on"))b.click()}
  var tm=0;function soon(){clearTimeout(tm);tm=setTimeout(function(){if(!busy)order();deep();syncMenu();upd()},60)}
  new MutationObserver(soon).observe(nav,{childList:true,subtree:true,attributes:true,attributeFilter:["class"],characterData:true});

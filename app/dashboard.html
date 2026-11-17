@@ -1095,7 +1095,7 @@ setInterval(()=>{nsAlerts();if($("tab-net").style.display!="none")nsLoad()},3000
  nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(b&&e.target!==b){e.stopImmediatePropagation();e.preventDefault();b.click()}},true);
  nav.addEventListener("click",e=>{const b=e.target.closest("button[data-tab]");if(!b)return;const h=TABHASH[b.dataset.tab];if(!h)return;
   if(b.dataset.tab=="thread"&&location.hash.startsWith("#thread/"))return;if(location.hash!="#"+h)history.replaceState(null,"","#"+h)});
- function go(){const h=location.hash.slice(1);if(!window.THREAD_ENABLED&&/^thread(\/|$)/.test(h)){history.replaceState(null,"","#wire");if(B("threat")&&!B("threat").classList.contains("on"))B("threat").click();return}if(h.startsWith("thread/"))return;const t=HASHTAB[h];if(t&&B(t)&&!B(t).classList.contains("on"))B(t).click()}
+ function go(){const h=location.hash.slice(1);if(h==="heatmap"||h==="map"){location.replace("/map"+location.search);return}if(!window.THREAD_ENABLED&&/^thread(\/|$)/.test(h)){history.replaceState(null,"","#wire");if(B("threat")&&!B("threat").classList.contains("on"))B("threat").click();return}if(h.startsWith("thread/"))return;const t=HASHTAB[h];if(t&&B(t)&&!B(t).classList.contains("on"))B(t).click()}
  addEventListener("hashchange",go);setTimeout(go,300)})();
 
 </script>

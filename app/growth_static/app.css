@@ -35,9 +35,23 @@
 .bng-cta-k{font:800 10.5px/1 Montserrat,Inter,sans-serif;letter-spacing:1.4px;color:#ff4d5e;margin-bottom:6px}
 .bng-cta-h{font:800 18px/1.25 Montserrat,Inter,sans-serif;color:var(--tx,#e6e9ee)}
 .bng-cta p{margin:6px 0 0;color:var(--bn-text-2,#c9d1db);font-size:14px}
-.bng-foot{max-width:1100px;margin:28px auto 8px;padding:20px 18px;border:1px solid var(--bd,#232a33);border-radius:14px;background:linear-gradient(135deg,rgba(200,16,46,.12),transparent 55%),var(--pn,#12161b);text-align:left;box-sizing:border-box;width:calc(100% - 24px)}
-.bng-foot h2{font:800 19px/1.2 Montserrat,Inter,sans-serif;margin:0 0 6px;color:var(--tx,#e6e9ee)}
-.bng-foot p{margin:0;color:var(--bn-text-2,#c9d1db);font-size:14px;line-height:1.5}
+.bng-foot,.bng-follow-card{max-width:none;width:100%;margin:0;padding:80px max(24px,6vw) 72px;border:0;border-radius:0;background:transparent;box-shadow:none;text-align:center;box-sizing:border-box}
+.bng-follow-k,.bng-foot h2,#bng_follow_h{font:600 11px/1 Inter,system-ui,sans-serif!important;letter-spacing:.16em;text-transform:uppercase;color:rgba(240,240,250,.62)!important;margin:0 0 18px!important;font-weight:600!important}
+.bng-follow-l,.bng-foot p,.bng-follow-card p{margin:0 auto 32px!important;max-width:36em;font:400 14px/1.55 Inter,system-ui,sans-serif;color:rgba(240,240,250,.62);letter-spacing:0;text-transform:none}
+.bng-foot .bng-btns{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:0}
+.bng-foot .bng-btn,.bng-follow-card .bng-btn{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:46px;padding:14px 22px;border:1px solid #F2F2F4!important;border-radius:0!important;background:none!important;color:#F2F2F4!important;font:600 11.5px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none!important;filter:none}
+.bng-foot .bng-btn.bng-p,.bng-follow-card .bng-btn.bng-p{background:none!important;border-color:#F2F2F4!important;color:#F2F2F4!important}
+.bng-foot .bng-btn:hover,.bng-foot .bng-btn:focus-visible,.bng-follow-card .bng-btn:hover,.bng-follow-card .bng-btn:focus-visible{background:#F2F2F4!important;color:#05060a!important;filter:none}
+.bng-foot .bng-btn svg{flex:none}
+/* Footer legal links: same small grey size as How we score / Privacy / Terms, one tidy line */
+footer .bn-legal-links,footer .bn-cred-link{font:inherit;font-size:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit}
+footer .bn-legal-links a,footer .bn-cred-link a{font:inherit;color:inherit;text-decoration:none}
+footer.h-foot .bn-legal-links,footer.h-foot .bn-cred-link{display:contents}
+.w2-foot .w2-legal{display:inline;margin:0}
+.w2-foot .bn-legal-links,.w2-foot .bn-cred-link{display:inline;font-size:12px;line-height:1.5;color:#7E848C}
+footer.bn-legal-ft,footer.bn-cred-ft,footer.ft .bn-legal-links,footer.ft .bn-cred-link,#site_foot .bn-legal-links,#site_foot .bn-cred-link{font:600 11px/1.6 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#8b95a3}
+footer.bn-legal-ft,footer.bn-cred-ft{text-align:center;padding:14px 12px 24px}
+footer.ft .bn-legal-links,footer.ft .bn-cred-link,#site_foot .bn-legal-links,#site_foot .bn-cred-link{display:inline;letter-spacing:0;text-transform:none;font:inherit;color:inherit}
 .bng-thanks{margin:12px 0 0;padding:12px 14px;border:1px solid rgba(200,16,46,.5);border-radius:10px;background:rgba(200,16,46,.08);font-size:14px;color:var(--tx,#e6e9ee);text-align:left}
 .bng-loc-lg{position:relative;margin:0 0 14px;width:100%;aspect-ratio:21/9;border-radius:12px;border:1px solid var(--bd,#232a33);overflow:hidden;background:#0c0f14}
 .bng-loc-lg .bng-map{width:260%}

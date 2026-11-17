@@ -86,7 +86,9 @@ body.w2-lock{overflow:hidden}
 .w2-share{display:flex;gap:12px;margin-top:48px;flex-wrap:wrap}
 /* footer */
 .w2-foot{padding:80px var(--w2-gut) 60px;border-top:1px solid var(--w2-line);text-align:center}
-.w2-tag{font:600 12px/1 Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#fff;margin-bottom:16px!important}.w2-legal{font-size:12px;color:#7E848C}
+.w2-tag{font:600 12px/1 Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#fff;margin-bottom:16px!important}.w2-legal{font-size:12px;color:#7E848C;display:inline;margin:0}
+.w2-foot .bn-legal-links,.w2-foot .bn-cred-link{display:inline;font-size:12px;line-height:1.5;color:#7E848C}
+.w2-foot .bn-legal-links a,.w2-foot .bn-cred-link a{font:inherit;color:inherit;text-decoration:none}
 /* reveal */
 .w2-rv{opacity:0;transform:translateY(24px);transition:opacity .5s ease-out,transform .5s ease-out}.w2-rv.in{opacity:1;transform:none}
 .w2-nojs .w2-rv{opacity:1;transform:none}

@@ -316,7 +316,7 @@ details.bn-acc[open]>summary{border-bottom:1px solid var(--bn-line)}
 /* growth CTAs + stats button: brand yellow instead of red (red is reserved for rank 7+) */
 .bng-p,.st-btn.red{background:var(--bn-brand)!important;border-color:var(--bn-brand)!important;color:var(--bn-ink-on-brand)!important}
 .bng-cta,.bng-inline{border-color:color-mix(in srgb,var(--bn-brand) 55%,transparent)!important;background:linear-gradient(135deg,var(--v3-glow),transparent 60%),var(--pn,#12161b)!important}
-.bng-foot{background:linear-gradient(135deg,var(--v3-glow),transparent 55%),var(--pn,#12161b)}
+.bng-foot{background:transparent;border:0;box-shadow:none;border-radius:0}
 .bng-thanks{border-color:color-mix(in srgb,var(--bn-brand) 50%,transparent);background:var(--v3-glow)}
 .bng-prompt,.bng-bar{border-color:color-mix(in srgb,var(--bn-brand) 60%,transparent)!important}
 

@@ -185,7 +185,7 @@ def story_page(s, preview=False):
             + player + btns + f'<article class="article">{S.blocks(s.get("article"))}</article>'
             + (f'<section class="card"><h2>Sources</h2><ul>{src}</ul></section>' if src else "")
             + (f'<section class="card"><h2>Follow these stories live</h2><ul>{rel}</ul></section>' if rel else "")
-            + '<section class="card"><h2>Follow BLACKOUT.NETWORK</h2>' + _follow_btns() + '</section>')
+            + (__import__('growth').follow_html()))
     desc = (s.get("description") or s.get("dek") or S.plain(s.get("article"))[:155])[:300]
     ld = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": (s.get("title") or "")[:110], "description": desc,
           "datePublished": s.get("publish_at"), "url": f"{S.SITE}/story/{slug}", "image": [thumb_url(s)],
