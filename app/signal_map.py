@@ -25,6 +25,12 @@ FILES = {
     "leaflet.css": "text/css",
     "world.geojson": "application/json",
     "us_states.geojson": "application/json",
+    # Nov 17 2026 full-screen heat map (MapLibre GL JS 5.24.1, BSD-3-Clause, vendored; OpenFreeMap vector tiles)
+    "maplibre-gl.js": "application/javascript",
+    "maplibre-gl.css": "text/css",
+    "maplibre-LICENSE.txt": "text/plain",
+    "map2.js": "application/javascript",
+    "map2.css": "text/css",
 }
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
@@ -436,9 +442,140 @@ def _build_points(limit=None):
         _kick()  # finish the full verified set in the background
     return body
 
+# ---------- Nov 17 2026: full-screen heat map (/map) ----------
+# One MapLibre renderer: OpenFreeMap vector base + the heat as a native heatmap layer + rank dots, so heat and map move as one.
+# Kill switch: BN_NEW_MAP=0 (or ?classic=1) serves the Leaflet page above unchanged.
+def new_map_on():
+    return os.environ.get("BN_NEW_MAP", "1") != "0"
+
+_VER = {}
+def _v(name):
+    """Content hash for ?v= (immutable caching), refreshed when the file changes."""
+    import hashlib
+    path = os.path.join(STATIC, name)
+    try: mt = os.path.getmtime(path)
+    except OSError: return "0"
+    hit = _VER.get(name)
+    if hit and hit[0] == mt: return hit[1]
+    with open(path, "rb") as fh: h = hashlib.sha1(fh.read()).hexdigest()[:10]
+    _VER[name] = (mt, h)
+    return h
+
+def page2(qs):
+    rank = _pick(qs, "rank", ("", "0", "4", "7"), "")
+    win = _pick(qs, "window", ("24", "72", "168"), "168")
+    view = _pick(qs, "view", ("us", "world", "conflicts"), "world")
+    topic = (qs.get("topic") or [""])[0][:80]
+    if topic and not re.fullmatch(r"[A-Za-z0-9 /&+\-]{1,80}", topic): topic = ""
+    try:
+        import sitenav, sitenav_ui
+        top = sitenav.header_html("")
+        theme = sitenav_ui.THEME_SCRIPT
+    except Exception:
+        top = '<header class="bn-top"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bnt-wm">blackout.network</span></a></div></header>'
+        theme = ""
+    title = "Heat map | BLACKOUT.NETWORK"
+    desc = "Full-screen live heat map of ranked alerts from the last 7 days: conflicts, weather and quakes, outbreaks, outages and unrest."
+    import json as _json
+    cfg = _json.dumps({"rank": rank, "window": win, "view": view, "topic": topic}).replace("<", "\\u003c")
+    return f'''<!doctype html><html lang="en" class="bnm-root"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
+<title>{E(title)}</title><meta name="description" content="{E(desc)}">
+<link rel="canonical" href="https://blackout.network/map">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
+<meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website">
+<meta name="theme-color" content="#05060a">
+<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={_v("maplibre-gl.css")}"><link rel="stylesheet" href="/api/signal/map2.css?v={_v("map2.css")}">
+</head><body class="bnm" data-bn-map2="1">
+<a class="skip" href="#bnm_map">Skip to the map</a>
+<div class="bnm-head" id="bnm_head">{top}</div>
+<button type="button" class="bnm-x" id="bnm_x" aria-label="Close the map and go back" title="Close map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+<div class="bnm-edge" id="bnm_edge" aria-hidden="true"></div>
+<main id="bnm_main">
+<h1 class="bnm-vh">Heat map</h1>
+<div id="bnm_map" class="bnm-map" role="region" aria-label="Heat map of ranked alerts. Drag to pan, pinch or scroll to zoom, tap a dot for the headline."></div>
+<div class="bnm-top"><div class="bnm-chip" id="bnm_chip"><i></i><span id="bnm_count" aria-live="polite">Loading alerts…</span></div><span class="bnm-upw" id="bnm_up"></span></div>
+<div class="bnm-ctl" id="bnm_ctl">
+<button type="button" class="bnm-b" id="bnm_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
+<button type="button" class="bnm-b" id="bnm_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
+</div>
+<button type="button" class="bnm-fbtn" id="bnm_fbtn" aria-expanded="false" aria-controls="bnm_panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg><span>Filters</span><b id="bnm_fn" hidden></b></button>
+<section class="bnm-panel" id="bnm_panel" hidden aria-label="Map filters and legend">
+<div class="bnm-grab" aria-hidden="true"></div>
+<div class="bnm-ph"><p class="bnm-eb">Heat map</p><button type="button" class="bnm-pclose" id="bnm_pclose" aria-label="Close filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="bnm-row"><span class="bnm-l">View</span><div class="bnm-seg" data-k="view" role="group" aria-label="View">
+<button type="button" data-v="world">World <em data-n="world"></em></button><button type="button" data-v="us">U.S. <em data-n="us"></em></button><button type="button" data-v="conflicts">Conflicts <em data-n="conflicts"></em></button></div></div>
+<div class="bnm-row"><span class="bnm-l">Rank</span><div class="bnm-seg" data-k="rank" role="group" aria-label="Rank">
+<button type="button" data-v="">All</button><button type="button" data-v="7">High 7–10</button><button type="button" data-v="4">Elevated 4–6</button><button type="button" data-v="0">Calm 0–3</button></div></div>
+<div class="bnm-row"><span class="bnm-l">Window</span><div class="bnm-seg" data-k="window" role="group" aria-label="Time window">
+<button type="button" data-v="24">24 hours</button><button type="button" data-v="72">3 days</button><button type="button" data-v="168">7 days</button></div></div>
+<div class="bnm-row"><label class="bnm-l" for="bnm_topic">Topic</label><select id="bnm_topic"><option value="">All topics</option></select></div>
+<div class="bnm-row bnm-lyr"><span class="bnm-l">Layers</span><label><input type="checkbox" id="bnm_lh" checked> Heat</label><label><input type="checkbox" id="bnm_ld" checked> Alert dots</label></div>
+<div class="bnm-leg"><div class="bnm-ramp" aria-hidden="true"></div><div class="bnm-rl"><span>Fewer, lower-ranked</span><span>More, higher-ranked</span></div>
+<div class="bnm-key"><span class="c">Calm 0–3</span><span class="e">Elevated 4–6</span><span class="h">High 7–10</span></div>
+<p class="bnm-note" id="bnm_note">Heat weighs each located alert by its rank. Dots appear as you zoom in; tap one for the headline, rank and sources.</p>
+<p class="bnm-note" id="bnm_cov"></p></div>
+<div class="bnm-links"><a href="/wire">The Wire</a><a href="/live#heatmap">Heat map tab</a><a href="/scoring">How we score</a><button type="button" id="bnm_report">Report a problem</button></div>
+<p class="bnm-attr">Map data &copy; <a href="https://www.openstreetmap.org/copyright" rel="noopener" target="_blank">OpenStreetMap</a> contributors · <a href="https://openfreemap.org" rel="noopener" target="_blank">OpenFreeMap</a> · <a href="https://openmaptiles.org/" rel="noopener" target="_blank">OpenMapTiles</a></p>
+</section>
+<aside class="bnm-card" id="bnm_card" hidden aria-live="polite"></aside>
+<noscript><p class="bnm-nojs">The map needs JavaScript. <a href="/wire">The Wire</a> lists the same stories.</p></noscript>
+</main>
+<script>window.BNM_CFG={cfg};</script>
+<script src="/api/signal/maplibre-gl.js?v={_v("maplibre-gl.js")}" defer></script><script src="/api/signal/map2.js?v={_v("map2.js")}" defer></script>
+</body></html>'''
+
+_HEAT = {"t": 0.0, "v": None}
+_HLOCK = _th.Lock()
+def heat_payload():
+    """Slim, read-only rows for the heat map: the Heat Map tab's located alerts (heatmap.data, 7 days, geo.db), else /map's points.
+    Cached 60 s in one slot. Never writes, never geocodes, never scores."""
+    import time, sys
+    with _HLOCK:
+        if _HEAT["v"] is not None and time.time() - _HEAT["t"] < 60: return _HEAT["v"]
+    body = None
+    try:
+        hm = sys.modules.get("heatmap")
+        if hm is None:
+            import heatmap as hm
+        d = hm.data()
+        rows = []
+        for x in d.get("items") or []:
+            try: lat, lon = round(float(x["lat"]), 4), round(float(x["lon"]), 4)
+            except Exception: continue
+            ln = (x.get("links") or [{}])[0] or {}
+            rows.append([x.get("id"), lat, lon, int(x.get("rank") or 0), x.get("cat") or "", x.get("t") or "",
+                         (x.get("title") or "")[:220], x.get("place") or x.get("cn") or "", x.get("prec") or "", int(x.get("watch") or 0),
+                         ln.get("s") or "", ln.get("u") or "", x.get("cc") or "", int(x.get("fam") or 0)])
+        cov = d.get("coverage") or {}
+        body = {"generated": d.get("generated"), "source": "heatmap", "window_days": d.get("window_days") or 7,
+                "coverage": {"located": cov.get("located"), "total": cov.get("total"), "pct": cov.get("pct")}, "rows": rows}
+    except Exception as ex:
+        print("signal_map heat: falling back to points:", ex, flush=True)
+    if body is None:
+        p = points_payload() or {}
+        rows = []
+        for x in p.get("points") or []:
+            ln = (x.get("links") or [{}])[0] or {}
+            rows.append([x.get("cluster_id"), x.get("lat"), x.get("lon"), int(x.get("rank") or 0), x.get("category") or "", x.get("event_time") or "",
+                         (x.get("title") or "")[:220], x.get("place") or "", x.get("precision") or "", int(x.get("watchlist") or 0),
+                         ln.get("source") or "", ln.get("url") or "", x.get("cc") or "", 0])
+        body = {"generated": p.get("generated"), "source": "points", "window_days": 7,
+                "coverage": {"located": len(rows), "total": len(rows) + int(p.get("unmapped") or 0), "pct": None}, "rows": rows}
+    body["cols"] = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam"]
+    with _HLOCK: _HEAT.update(t=time.time(), v=body)
+    return body
+
 def handle_get(path, qs):
     if path in ("/map", "/map/"):
+        if new_map_on() and (qs or {}).get("classic", [""])[0] != "1":
+            return 200, page2(qs or {}), "text/html"
         return 200, page(qs or {}), "text/html"
+    if path == "/api/signal/heat":
+        return 200, heat_payload()
     if path == "/api/signal/points":
         return 200, points_payload()
     if path.startswith("/api/signal/"):

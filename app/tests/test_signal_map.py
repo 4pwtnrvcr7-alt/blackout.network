@@ -21,8 +21,23 @@ class Routes(unittest.TestCase):
         self.assertEqual(hit("/api/signal/world.geojson"), "signal_map")
         self.assertNotEqual(hit("/api/signals"), "signal_map")
 
-    def test_page_and_files(self):
+    def test_new_heat_map_page(self):
         code, body, ctype = signal_map.handle_get("/map", {"rank": ["7"], "window": ["24"], "topic": ["cyber"]})
+        self.assertEqual((code, ctype), (200, "text/html"))
+        self.assertIn('id="bnm_map"', body)
+        self.assertIn('"rank": "7"', body)
+        self.assertIn('"topic": "cyber"', body)
+        self.assertIn("/api/signal/maplibre-gl.js?v=", body)
+        self.assertIn('id="bnm_x"', body)
+        code, body, _ = signal_map.handle_get("/map", {"topic": ["<script>"]})
+        self.assertNotIn("<script>\"", body)
+        for name in ("maplibre-gl.js", "maplibre-gl.css", "map2.js", "map2.css"):
+            c, b, ct = signal_map.handle_get("/api/signal/" + name, {})
+            self.assertEqual(c, 200, name)
+
+    def test_page_and_files(self):
+        # Nov 17 2026: the Leaflet page is the classic fallback (?classic=1 or BN_NEW_MAP=0); /map is the MapLibre heat map
+        code, body, ctype = signal_map.handle_get("/map", {"rank": ["7"], "window": ["24"], "topic": ["cyber"], "classic": ["1"]})
         self.assertEqual(code, 200)
         self.assertEqual(ctype, "text/html")
         html = body if isinstance(body, str) else body
