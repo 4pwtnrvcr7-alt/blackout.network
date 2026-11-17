@@ -145,12 +145,12 @@ def menu_html():
 def shell(title, desc, body, path):
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network{E(path)}">
-<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=5"></head>
+<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=6"></head>
 <body class="w2"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
-<button type="button" class="w2-mbtn" id="w2_open" aria-controls="w2_menu" aria-expanded="false"><span>MENU</span><i></i></button></header>
+<button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu_html()}<main id="w2_main">{body}</main>
 <footer class="w2-foot"><p class="w2-tag">Signal over noise.</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
-<script src="{ST}/wire2.js?v=2" defer></script></body></html>'''
+<script src="{ST}/wire2.js?v=3" defer></script></body></html>'''
 
 def srcset(f):   # Push F: portrait mobile crop (wire_v2_static/img/*_m.webp, 720x1280) for phones
     m = f.replace(".webp", "_m.webp")

@@ -2,9 +2,12 @@
 (function(){"use strict";
 var d=document,b=d.body,bar=d.getElementById("w2_bar"),menu=d.getElementById("w2_menu"),op=d.getElementById("w2_open"),cl=d.getElementById("w2_close");
 var RM=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches,last=0;
-function openM(){menu.hidden=false;requestAnimationFrame(function(){menu.classList.add("open")});b.classList.add("w2-lock");op.setAttribute("aria-expanded","true");cl.focus()}
-function closeM(){menu.classList.remove("open");b.classList.remove("w2-lock");op.setAttribute("aria-expanded","false");setTimeout(function(){menu.hidden=true},200);op.focus()}
-op&&op.addEventListener("click",openM);cl&&cl.addEventListener("click",closeM);
+var closing=false,ct=0;
+function hx(on){if(op){op.setAttribute("data-bn-hx",on?"open":"close");op.setAttribute("aria-label",on?"Close menu":"Open menu");op.setAttribute("aria-expanded",on?"true":"false")}}
+function finishClose(){closing=false;if(ct){clearTimeout(ct);ct=0}menu.classList.remove("open","w2-closing");menu.hidden=true;b.classList.remove("w2-lock");bar&&bar.classList.remove("w2-open");hx(false);op&&op.focus()}
+function openM(){if(ct){clearTimeout(ct);ct=0}if(closing)menu.classList.remove("w2-closing");closing=false;menu.hidden=false;requestAnimationFrame(function(){menu.classList.add("open")});b.classList.add("w2-lock");bar&&bar.classList.add("w2-open");hx(true);try{op&&op.focus()}catch(e){}}
+function closeM(){if(menu.hidden&&!closing)return;if(RM){hx(false);finishClose();return}if(closing)return;hx(false);closing=true;menu.classList.add("w2-closing");ct=setTimeout(finishClose,680)}
+op&&op.addEventListener("click",function(){(menu.hidden||closing)?openM():closeM()});cl&&cl.addEventListener("click",closeM);
 d.addEventListener("keydown",function(e){if(menu.hidden)return;if(e.key==="Escape")closeM();if(e.key==="Tab"){var f=menu.querySelectorAll("a,button"),a=f[0],z=f[f.length-1];if(e.shiftKey&&d.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&d.activeElement===z){e.preventDefault();a.focus()}}});
 var heroes=[].slice.call(d.querySelectorAll("[data-par]")),tick=false;
 function frame(){tick=false;var y=window.scrollY,vh=window.innerHeight;
