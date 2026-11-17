@@ -10,21 +10,21 @@
 html.bnal-lock,html.bnal-lock body{overflow:hidden}
 
 /* ---- sheet tokens. Dark uses #F2F2F4 for the check and the primary fill (both pass AA on this sheet).
-   Light keeps #F2F2F4 as the primary fill (near-black label). The check uses #8C5800 because #F2F2F4 on white is about 1.6:1. ---- */
+   Light keeps #F2F2F4 as the primary fill (near-black label). The check uses #1D1D1F because #F2F2F4 on white is about 1.6:1. ---- */
 .bnal{
  --bnal-sheet:#1C1C1E;--bnal-group:#2C2C2E;--bnal-ink:#F5F5F7;--bnal-sub:#A1A1A6;--bnal-sep:rgba(255,255,255,.14);
  --bnal-mark:#F2F2F4;--bnal-go:#F2F2F4;--bnal-go-ink:#0B0D10;--bnal-link:#4AA3FF;--bnal-stop:#FF7A7C;
  --bnal-fill:rgba(255,255,255,.16);--bnal-x:#F5F5F7;--bnal-grab:rgba(255,255,255,.38);--bnal-focus:#F2F2F4;
  --bnal-hover:rgba(255,255,255,.06);--bnal-scrim:rgba(0,0,0,.5);--bnal-edge:rgba(255,255,255,.08);
  --bnal-font:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;
- --bnal-ok:#3DDC97;
+ --bnal-ok:#C9CDD3;
 }
 :root[data-theme="light"] .bnal{
  --bnal-sheet:#F2F2F7;--bnal-group:#FFFFFF;--bnal-ink:#1D1D1F;--bnal-sub:#5B6573;--bnal-sep:rgba(60,60,67,.22);
- --bnal-mark:#8C5800;--bnal-go:#F2F2F4;--bnal-go-ink:#0B0D10;--bnal-link:#0A5FC2;--bnal-stop:#C8102E;
- --bnal-fill:rgba(120,120,128,.18);--bnal-x:#1D1D1F;--bnal-grab:rgba(60,60,67,.42);--bnal-focus:#8C5800;
+ --bnal-mark:#1D1D1F;--bnal-go:#F2F2F4;--bnal-go-ink:#0B0D10;--bnal-link:#0A5FC2;--bnal-stop:#C8102E;
+ --bnal-fill:rgba(120,120,128,.18);--bnal-x:#1D1D1F;--bnal-grab:rgba(60,60,67,.42);--bnal-focus:#1D1D1F;
  --bnal-hover:rgba(0,0,0,.045);--bnal-scrim:rgba(0,0,0,.36);--bnal-edge:rgba(0,0,0,.08);
- --bnal-ok:#1D7350;
+ --bnal-ok:#3A3F45;
 }
 
 .bnal{position:fixed;inset:0;z-index:5500;display:flex;align-items:flex-end;justify-content:center}
@@ -91,7 +91,7 @@ html.bnal-lock,html.bnal-lock body{overflow:hidden}
 .bnal .bnal-link+.bnal-link{box-shadow:inset 0 1px 0 var(--bnal-sep)}
 .bnal .bnal-stop{color:var(--bnal-stop)}
 .bnal .bnal-go{display:flex;align-items:center;justify-content:center;width:100%;min-height:50px;margin:16px 0 0;padding:0 18px;border:0;border-radius:980px;background:var(--bnal-go);color:var(--bnal-go-ink);font:600 17px/1 var(--bnal-font);letter-spacing:-.01em}
-:root[data-theme="light"] .bnal .bnal-go{box-shadow:inset 0 0 0 1px #8C5800}
+:root[data-theme="light"] .bnal .bnal-go{box-shadow:inset 0 0 0 1px #1D1D1F}
 .bnal .bnal-go:disabled,.bnal .bnal-link:disabled{opacity:.55;cursor:progress}
 .bnal .bnal-go:focus-visible,.bnal .bnal-link:focus-visible,.bnal-more summary:focus-visible,.bnal-x:focus-visible{outline:2px solid var(--bnal-focus);outline-offset:-2px}
 .bnal-msg{margin:10px 4px 0;min-height:0;font-size:13px;line-height:1.35;color:var(--bnal-sub)}

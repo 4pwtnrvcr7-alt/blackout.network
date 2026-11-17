@@ -493,6 +493,8 @@ def page2(qs):
 <a class="skip" href="#bnm_map">Skip to the map</a>
 <div class="bnm-head" id="bnm_head">{top}</div>
 <button type="button" class="bnm-x" id="bnm_x" aria-label="Close the map and go back" title="Close map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+<a class="bnm-mb bn-burger" id="bnm_mb" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog" title="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></a>
+<script>/* Nov 17: the header slides (transform), which would clip the fixed full-screen menu; the menu lives on <body> */(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
 <div class="bnm-edge" id="bnm_edge" aria-hidden="true"></div>
 <main id="bnm_main">
 <h1 class="bnm-vh">Heat map</h1>
