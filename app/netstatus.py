@@ -102,14 +102,14 @@ def meta():
     d = json.loads(get("https://metastatus.com/data/orgs.json")); bad = [(o["name"], s) for o in d for s in o.get("services", []) if s.get("status") not in (None, "No known issues")]
     lvl = max([3 if "outage" in s["status"].lower() or "major" in s["status"].lower() else 2 for _, s in bad] or [0])
     return R("Meta (Facebook, Instagram, WhatsApp, Messenger)", "Apps & social", lvl, "No known issues" if not bad else f"{len(bad)} service(s) with issues", "; ".join(f'{o}/{s["name"]}: {s["status"]}' for o, s in bad[:4]), "https://metastatus.com")
-def ioda_isp(name, asns, hours=24):
+def ioda_isp(name, asns, hours=24, timeout=15):
     """Normal / Degraded / Outage from IODA per-ASN alerts. IODA alerts are state changes (critical, then normal on recovery), so an
     ASN counts as affected while its latest alert on a data source in the last `hours` is still critical."""
     if not asns: return R(name, "ISPs", -1, "No public status feed", "", "", "isp")
     src = "Source: IODA, Georgia Tech"
     url = IODA_UI + str(asns[0][0]); now = int(time.time()); hit = []; ok = 0
     for asn, lab in asns:
-        try: d = json.loads(get(f"{IODA}/outages/alerts?from={now - hours * 3600}&until={now}&entityType=asn&entityCode={asn}", timeout=15)).get("data") or []
+        try: d = json.loads(get(f"{IODA}/outages/alerts?from={now - hours * 3600}&until={now}&entityType=asn&entityCode={asn}", timeout=timeout)).get("data") or []
         except Exception: continue
         ok += 1; last = {}
         for x in d:
@@ -225,6 +225,30 @@ def plain(r):
             if det.startswith("DNS ") and not det.startswith("DNS lookup"): det = "DNS lookup " + det[4:]
     r["status"], r["detail"] = st, det
     return r
+# Read-side fallback for the ISP rows. The poller's host stores a grey "Status temporarily unavailable" row when none of its
+# IODA requests answer (that host's network path, not an ISP problem). When every stored ISP row is grey, the web process asks
+# IODA itself (same public per-ASN alert API, same rules as ioda_isp), at most once per ISP_EVERY, with a short time budget, and
+# shows the answer for that row. Nothing is written to netstatus.db; history bars keep the stored readings; a single live reading
+# never raises an alert on its own (streak rule). If IODA does not answer here either, the grey rows are shown unchanged.
+ISP_WEB = {"t": 0.0, "rows": {}}; _isp_lock = threading.Lock()
+def isp_fallback(rows, budget=6.0):
+    isp = [r for r in rows if r.get("kind") == "isp" and r.get("grp") == "ISPs"]
+    if not isp or any(r["level"] >= 0 for r in isp): return rows
+    if time.time() - ISP_WEB["t"] >= ISP_EVERY and _isp_lock.acquire(blocking=False):
+        try:
+            ex = ThreadPoolExecutor(len(ISPS)); fut = {ex.submit(ioda_isp, n, a, 24, 5): n for n, a in ISPS}
+            done = {}
+            t_end = time.time() + budget
+            for f, n in fut.items():
+                try:
+                    r = f.result(timeout=max(0.1, t_end - time.time()))
+                    if r["level"] >= 0: done[n] = r
+                except Exception: pass
+            ex.shutdown(wait=False)
+            ISP_WEB["rows"] = {n: dict(r, ts=iso()) for n, r in done.items()}; ISP_WEB["t"] = time.time()
+        finally: _isp_lock.release()
+    live = ISP_WEB["rows"]
+    return [dict(live[r["src"]]) if r in isp and r["src"] in live else r for r in rows]
 def latest(c):
     lp = (c.execute("SELECT v FROM meta WHERE k='last_poll'").fetchone() or [None])[0]
     if not lp: return None, []
@@ -233,6 +257,7 @@ def latest(c):
     if not any(r["kind"] == "isp" for r in rows):
         t = c.execute("SELECT MAX(ts) FROM checks WHERE kind='isp' AND grp='ISPs'").fetchone()[0]
         if t: rows += [dict(r) for r in c.execute("SELECT * FROM checks WHERE ts=? AND kind='isp' AND grp='ISPs'", (t,))]
+    rows = isp_fallback(rows)
     for r in rows:
         prev = c.execute("SELECT level FROM checks WHERE src=? AND ts<? ORDER BY ts DESC LIMIT 1", (r["src"], r["ts"])).fetchone()
         r["streak"] = 2 if prev and prev[0] >= 2 else 1

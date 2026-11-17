@@ -4,6 +4,7 @@
 (function (global) {
   "use strict";
   var GEO = "/api/signal/world.geojson";
+  var STATES = "/api/signal/us_states.geojson";
   var LOW = "#55b7ff", MID = "#F5A524", HIGH = "#FF4D4F";
 
   function band(rank) {
@@ -531,6 +532,10 @@
       world = L.geoJSON(geo, { style: { color: "#364158", weight: 0.6, fillColor: "#192538", fillOpacity: 0.7 }, interactive: false }).addTo(map);
       if (world.bringToBack) world.bringToBack();
       map.invalidateSize();
+      // US state borders (Natural Earth 110m admin-1 lines, same scale as the world outline), drawn above the fill, below the dots
+      fetch(STATES).then(function (r) { if (!r.ok) throw new Error("states"); return r.json(); }).then(function (lines) {
+        L.geoJSON(lines, { style: { color: "#5A6B8C", weight: 0.9, opacity: 0.85, fill: false }, interactive: false }).addTo(map);
+      }).catch(function () {});
     }).catch(function () { say("World outline could not load. Dots still use real coordinates."); });
 
     function pull(first) {

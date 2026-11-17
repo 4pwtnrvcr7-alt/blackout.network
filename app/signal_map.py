@@ -9,7 +9,8 @@ the row has one. Otherwise a place is inferred offline from the headline and loc
 (signal_place.py, the bundled gazetteer). Nothing here calls a geocoder, scores, or writes.
 
 Vendored in signal_map_static/: Leaflet 1.9.4 (BSD-2-Clause) and Natural Earth 110m admin-0
-(public domain), copied from the panel package. MapLibre is not shipped.
+(public domain), copied from the panel package, and Natural Earth 110m admin-1 US state lines
+(us_states.geojson, public domain, properties trimmed to the name). MapLibre is not shipped.
 """
 import os, re
 import html as _html
@@ -23,6 +24,7 @@ FILES = {
     "leaflet.js": "application/javascript",
     "leaflet.css": "text/css",
     "world.geojson": "application/json",
+    "us_states.geojson": "application/json",
 }
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
