@@ -5,7 +5,7 @@
   "use strict";
   var GEO = "/api/signal/world.geojson";
   var STATES = "/api/signal/us_states.geojson";
-  var LOW = "#55b7ff", MID = "#F5A524", HIGH = "#FF4D4F";
+  var LOW = "#55b7ff", MID = "#C9CDD3", HIGH = "#FF4D4F";
 
   function band(rank) {
     var r = Math.max(0, Math.min(10, Math.round(+rank || 0)));

@@ -208,7 +208,7 @@ def preview_svg(pts):
     """Static first-paint map: the US view with the seed dots, drawn exactly where Leaflet will put them. app.js removes it
     once the live map has drawn its first dots. Decorative (the live map carries the accessible labels)."""
     x0, y0 = _merc(US_VIEW[2], US_VIEW[1]); x1, y1 = _merc(US_VIEW[0], US_VIEW[3])
-    col = lambda r: "#FF4D4F" if r >= 7 else "#F5A524" if r >= 4 else "#55b7ff"
+    col = lambda r: "#FF4D4F" if r >= 7 else "#C9CDD3" if r >= 4 else "#6B7076"   # Push G: rank option A
     dots = []
     for p in pts:
         if not _in_us(p): continue
