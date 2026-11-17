@@ -562,6 +562,23 @@ def menu_fallback(b, path=""):
     except Exception:
         traceback.print_exc(); return b
 
+def credits_link(b, path=""):
+    """Matt 12:07 PM: credits never sit on top of images/video; every full page footer links "Image credits" (/credits, this page's section)."""
+    try:
+        if os.environ.get("BN_CREDITS_PAGE", "1") == "0" or path.startswith(("/api/", "/internal/", "/embed", "/wire2/")): return b
+        lo = b[:4000].lower()
+        if b"<html" not in lo or b'href="/credits' in b: return b
+        p = path.split("?", 1)[0]
+        key = {"/": "intro", "/live": "live", "/dashboard": "live", "/wire": "wire"}.get(p) or ("wire" if p.startswith("/wire/") else "")
+        link = ('<span class="bn-cred-link"> \u00b7 <a href="/credits' + ("#" + key if key else "") + '">Image credits</a></span>').encode("utf-8")
+        j = b.lower().rfind(b"</footer>")
+        if j >= 0: return b[:j] + link + b[j:]
+        k = b.lower().rfind(b"</body>")
+        if k >= 0: return b[:k] + b'<footer class="bn-cred-ft" style="text-align:center;font:12px/1.6 Inter,system-ui,sans-serif;color:#8b95a3;padding:0 12px 24px"><a href="/credits" style="color:inherit">Image credits</a></footer>' + b[k:]
+        return b
+    except Exception:
+        traceback.print_exc(); return b
+
 def error_page_html():
     """HTML 500 for people (API clients keep JSON); no exception text. Gets the shared header + menu."""
     try:
@@ -649,6 +666,7 @@ class H(BaseHTTPRequestHandler):
         if ctype.startswith("text/html; "): b = theme_assets(b)   # Nov 17 push B: shared theme on "text/html; charset=utf-8" pages (/stats, /midterms, /mesh*)
         if ctype.startswith("text/html"): b = menu_fallback(b, self.path)   # Nov 17: menu on every full page
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
+        if ctype.startswith("text/html"): b = credits_link(b, self.path)   # Nov 17 (Matt 12:07): "Image credits" footer link on every page
         if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")

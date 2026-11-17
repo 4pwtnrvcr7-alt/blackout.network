@@ -8,7 +8,7 @@ var sfx=portrait()?"m":"d",media=function(k,ext){return "/bnt/media/"+k+"-"+sfx+
 /* posters, credits, pager */
 var pager=$("h_pager");
 secs.forEach(function(s,i){var k=s.getAttribute("data-clip");s.style.backgroundImage="url("+media(k,"jpg")+")";
- var b=d.createElement("button");b.type="button";b.setAttribute("aria-label","Go to section "+(i+1));b.onclick=function(){s.scrollIntoView({behavior:reduce?"auto":"smooth"})};pager.appendChild(b)});
+ var b=d.createElement("button");b.type="button";b.setAttribute("aria-label","Go to section "+(i+1));b.onclick=function(){if(window.BNSnap)BNSnap.go(i);else s.scrollIntoView({behavior:reduce?"auto":"smooth"})};pager.appendChild(b)});
 function mount(s){if(reduce||s.querySelector("video"))return;var k=s.getAttribute("data-clip"),v=d.createElement("video");
  v.muted=true;v.defaultMuted=true;v.loop=true;v.playsInline=true;v.setAttribute("playsinline","");v.setAttribute("muted","");v.setAttribute("aria-hidden","true");v.preload="auto";v.poster=media(k,"jpg");
  v.src=media(k,"mp4");v.addEventListener("playing",function(){v.classList.add("on")},{once:true});s.insertBefore(v,s.firstChild)}
@@ -16,7 +16,7 @@ var nav=$("h_nav");
 if("IntersectionObserver" in window){
  var near=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)mount(e.target)})},{rootMargin:"100% 0px"});
  var vis=new IntersectionObserver(function(es){es.forEach(function(e){var s=e.target,v=s.querySelector("video");
-  if(e.isIntersecting){s.classList.add("in");var i=secs.indexOf(s);[].forEach.call(pager.children,function(b,j){b.classList.toggle("on",j===i)});nav.classList.toggle("solid",i>0);if(v){var p=v.play();if(p&&p.catch)p.catch(function(){})}}
+  if(e.isIntersecting){s.classList.add("in");var i=secs.indexOf(s);[].forEach.call(pager.children,function(b,j){b.classList.toggle("on",j===i)});nav.classList.toggle("solid",i>0);if(v){var go=function(){if(s.getBoundingClientRect().bottom>0&&s.getBoundingClientRect().top<innerHeight){var p=v.play();if(p&&p.catch)p.catch(function(){})}};if(d.documentElement.classList.contains("bn-snapping"))addEventListener("bnsnap:end",go,{once:true});else go()}}
   else if(v)v.pause()})},{threshold:.5});
  secs.forEach(function(s){near.observe(s);vis.observe(s)});
 }else secs.forEach(function(s){s.classList.add("in")});

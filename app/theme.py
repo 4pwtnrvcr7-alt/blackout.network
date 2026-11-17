@@ -14,8 +14,8 @@ STATIC = os.path.join(BASE, "theme_static")
 MEDIA = os.path.join(STATIC, "media")
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 TYPES = {".css": "text/css", ".js": "application/javascript", ".json": "application/json"}
-ASSETS = ("theme.css", "theme.js", "home.css", "home.js", "live.css", "live.js", "land.json")
-MTYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg"}
+ASSETS = ("theme.css", "theme.js", "home.css", "home.js", "live.css", "live.js", "land.json", "snap.js")
+MTYPES = {".mp4": "video/mp4", ".jpg": "image/jpeg", ".webm": "video/webm"}
 
 def enabled(): return os.environ.get("BN_NEW_HOME", "1").strip() != "0"
 
@@ -43,12 +43,16 @@ def head_links():
 # ---------- media (Range) ----------
 _media, _mlock = {}, threading.Lock()
 def _media_bytes(name):
-    if not re.fullmatch(r"[a-z]+-[dm]\.(mp4|jpg)", name): return None
+    if not re.fullmatch(r"[a-z]+-[dm]\.(mp4|jpg|webm)", name): return None
     with _mlock:
         if name not in _media:
             p = os.path.join(MEDIA, name + ".b64")
-            if not os.path.exists(p): return None
-            _media[name] = base64.b64decode(open(p, "rb").read())
+            if os.path.exists(p): raw = open(p, "rb").read()
+            else:   # large clips ship as ordered text parts (<name>.b64.p00, .p01, ...) because the repo tools commit text only
+                parts = sorted(f for f in os.listdir(MEDIA) if re.fullmatch(re.escape(name) + r"\.b64\.p\d\d", f))
+                if not parts: return None
+                raw = b"".join(open(os.path.join(MEDIA, f), "rb").read() for f in parts)
+            _media[name] = base64.b64decode(raw)
         return _media[name]
 
 def _raw(h, code, body, ctype, cache, extra=()):
@@ -166,6 +170,8 @@ def handle_stream(path, qs, h):
     if a in ASSETS:
         b = open(os.path.join(STATIC, a), "rb").read()
         return _raw(h, 200, b, TYPES[os.path.splitext(a)[1]] + "; charset=utf-8", "public, max-age=31536000, immutable" if qs.get("v") else "public, max-age=300")
+    if path in ("/credits", "/credits/"):
+        return h.send(200, credits_page(), "text/html")
     if a == "credits.txt":
         return _raw(h, 200, CREDITS.encode(), "text/plain; charset=utf-8", "public, max-age=3600")
     return _raw(h, 404, b'{"error":"not found"}', "application/json; charset=utf-8", "no-store")
@@ -183,6 +189,52 @@ Section 6 (newsletter): NASA, International Space Station, Earth from orbit, 201
 Section 7 (dashboard): BLACKOUT.NETWORK live dashboard, own capture.
 NASA imagery is used under NASA's media usage guidelines; NASA does not endorse BLACKOUT.NETWORK.
 """
+
+
+# ---------- /credits (Matt 12:07 PM: one shared credits page fed from this ledger; footer link "Image credits" on every page) ----------
+CREDITS_LEDGER = [
+ ("intro", "Intro (/)", [
+  ("Section 1 background video", "NASA, International Space Station imagery of Hurricane Erin, 2025", "Public domain (NASA media guidelines)"),
+  ("Section 2 background video", "BLACKOUT.NETWORK Heat Map, own screen capture", "BLACKOUT.NETWORK"),
+  ("Section 3 background video", "NASA, International Space Station imagery of Hurricane Dorian, 2019", "Public domain"),
+  ("Section 4 background video", "NASA Goddard / Solar Dynamics Observatory, solar flare, 2016", "Public domain"),
+  ("Section 5 background video", "NASA, International Space Station, Earth limb, 2024", "Public domain"),
+  ("Section 6 background video", "NASA, International Space Station, Earth from orbit, 2019", "Public domain"),
+  ("Section 7 background video", "BLACKOUT.NETWORK live dashboard, own capture", "BLACKOUT.NETWORK")]),
+ ("live", "Live (/live)", [
+  ("Hero background video (desktop/tablet)", "NASA, \"Earth Views from the ISS - No Music\" (NHQ_2020_1221), 2020; segment graded grey with a cool tone, crossfaded loop", "Public domain"),
+  ("Hero image (phones, reduced motion, Save-Data)", "NASA JSC, ISS Expedition 60, iss060e022358 (stars over Earth's limb); grey with a cool tone", "Public domain")]),
+ ("wire", "The Wire (/wire and story pages)", [
+  ("List hero", "NASA JSC, ISS Expedition 70, iss070e062746 (city lights of North America), 2024", "Public domain"),
+  ("Tropical cyclone stories (illustrative)", "NASA JSC, ISS Expedition 63, iss063e057876 (Hurricane Hanna), 2020. Illustrative, not the storm in the story", "Public domain"),
+  ("Second cyclone story (illustrative)", "NASA JSC, ISS Expedition 57, iss057e023128 (Hurricane Michael), 2018. Illustrative", "Public domain"),
+  ("Section band \"Watchlist\"", "NASA JSC, ISS Expedition 67, iss067e302248 (Mediterranean at night), 2022", "Public domain"),
+  ("Health, conflict, finance and cyber graphics", "Original abstract graphics made for BLACKOUT.NETWORK (no real event)", "BLACKOUT.NETWORK"),
+  ("Note on illustrative photos", "Storm and other story photos are illustrative: they show the same kind of event seen from orbit, not the specific event in the story.", "")]),
+]
+CREDITS_PAGE_KEY = {"/": "intro", "/live": "live", "/dashboard": "live", "/wire": "wire"}
+
+def credits_page():
+    try:
+        import sitenav as SN, sitenav_ui as UI
+        top, head = SN.header_html(""), UI.THEME_SCRIPT + '<script src="/sitenav.js" defer></script>'
+    except Exception:
+        top, head = "", ""
+    secs = "".join(
+        f'<section class="cr-sec" id="{k}"><h2>{html.escape(name)}</h2><ul>'
+        + "".join(f'<li><b>{html.escape(a)}</b><span>{html.escape(b)}</span><em>{html.escape(c)}</em></li>' for a, b, c in rows)
+        + "</ul></section>" for k, name, rows in CREDITS_LEDGER)
+    return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>Image credits | BLACKOUT.NETWORK</title><meta name="description" content="Sources and licences for the images and video used on BLACKOUT.NETWORK.">'
+            '<link rel="canonical" href="https://blackout.network/credits"><link rel="stylesheet" href="/sitenav.css">' + head +
+            '<style>body{margin:0;background:#05060a;color:#ECEEF5;font:15px/1.6 Inter,system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:48px 20px 64px}'
+            'h1{font:800 clamp(30px,4vw,46px)/1.05 Montserrat,system-ui,sans-serif;text-transform:uppercase;margin:0 0 10px}main>p.cr-lede{color:#9aa0aa;margin:0 0 36px;max-width:640px;display:block!important;-webkit-line-clamp:unset!important;overflow:visible!important;text-overflow:clip!important;white-space:normal!important}'
+            '.cr-sec{border-top:1px solid rgba(236,238,245,.14);padding:22px 0 8px;scroll-margin-top:80px}.cr-sec h2{font:700 13px/1.2 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;margin:0 0 14px}'
+            '.cr-sec ul{list-style:none;margin:0;padding:0}.cr-sec li{display:grid;grid-template-columns:190px minmax(0,1fr) 210px;gap:6px 18px;padding:10px 0;border-bottom:1px solid rgba(236,238,245,.07)}'
+            '.cr-sec b{font-weight:600}.cr-sec span{color:#C9CDD3}.cr-sec em{font-style:normal;color:#8b9099;font-size:13px}'
+            '.cr-sec:target h2{color:#fff}@media(max-width:700px){.cr-sec li{grid-template-columns:1fr}}</style></head><body>' + top +
+            '<main id="main"><h1>Image credits</h1><p class="cr-lede">Where every photo and video on this site comes from. NASA imagery is used under NASA\'s media usage guidelines; '
+            'NASA does not endorse BLACKOUT.NETWORK.</p>' + secs + '</main></body></html>')
 
 # ---------- "/" ----------
 def _ic(p): return f'<svg viewBox="0 0 24 24" aria-hidden="true">{p}</svg>'
@@ -230,7 +282,7 @@ HEAD_JS = ("(function(){try{var h=location.hash,s=location.search;"
 DESC = "Independent, sourced early-warning signals on US and global threats: threat alerts and breaking news, updated around the clock. Not official alerts."
 ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 2v12M3 9l5 5 5-5"/></svg>'
 
-def home_page():
+def _home_page_raw():
     _, mv = versions()
     chips = "".join(
         f'<div class="h-chip bnt-peek" tabindex="0" aria-expanded="false"><span class="h-ct">{_ic(ic)}{E(t)}</span>'
@@ -241,6 +293,9 @@ def home_page():
     m4btn = '<span class="h-ml">Menu</span>' if m4 else ""
     mlead = ('<div class="h-m4lead"><a href="#s1" data-h-close>Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>' if m4
              else '<a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>')
+    snap = snap_on()
+    snapattr = " data-bn-snap" if snap else ""
+    snapjs = f'<script src="{url("snap.js")}" defer></script>' if snap else ""
     return f'''<!doctype html><html lang="en" data-bnt-home><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <script>{HEAD_JS}</script>
 <title>BLACKOUT.NETWORK · Signal over noise.™</title>
@@ -264,15 +319,15 @@ def home_page():
  <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{m4btn}<i></i><i></i><i></i></button></div>
 </header>
 <ol class="h-pager" id="h_pager" aria-hidden="true"></ol>
-<main id="flow">
-<section class="h-sec" id="s1" data-clip="hero"><div class="h-copy">
+<main id="flow"{snapattr}>
+<section class="h-sec"{" data-snap" if snap else ""} id="s1" data-clip="hero"><div class="h-copy">
  <p class="bnt-eyebrow">Early-warning signals &middot; 24/7</p>
  <h1 class="h-h">This is where<br>the news gets<br>its news</h1>
  <p class="h-lede">We scan official agencies, sensors and wires around the clock. Most events land here within minutes. Some reach the headlines hours or days later. Some never do.</p>
  <a class="bnt-btn" href="#s2">See what's happening {ARROW}</a>
 </div><p class="h-credit">Footage: NASA (ISS, Hurricane Erin, 2025)</p></section>
 
-<section class="h-sec" id="s2" data-clip="live"><div class="h-copy">
+<section class="h-sec"{" data-snap" if snap else ""} id="s2" data-clip="live"><div class="h-copy">
  <p class="bnt-eyebrow">The live scanner</p>
  <h2 class="h-h">Watch the world<br>as it happens</h2>
  <p class="h-lede">Quakes, storms, outbreaks, outages and conflict, pinned to one live map and sorted by what matters most.</p>
@@ -280,7 +335,7 @@ def home_page():
  <a class="bnt-btn" href="/live#heatmap">Open the live map</a>
 </div><p class="h-credit">Screen capture: BLACKOUT.NETWORK Heat Map</p></section>
 
-<section class="h-sec" id="s3" data-clip="noise"><div class="h-copy">
+<section class="h-sec"{" data-snap" if snap else ""} id="s3" data-clip="noise"><div class="h-copy">
  <p class="bnt-eyebrow">Signal over noise.</p>
  <h2 class="h-h">Every alert,<br>ranked 0 to 10</h2>
  <p class="h-lede">Each item is scored on impact and on how many independent sources back it up. The serious ones rise to the top. Nothing is hidden: the full feed is always one tap away.</p>
@@ -289,14 +344,14 @@ def home_page():
  <a class="bnt-btn" href="/scoring">How we score</a>
 </div><p class="h-credit">Footage: NASA (ISS, Hurricane Dorian, 2019)</p></section>
 
-<section class="h-sec" id="s4" data-clip="cover"><div class="h-copy">
+<section class="h-sec"{" data-snap" if snap else ""} id="s4" data-clip="cover"><div class="h-copy">
  <p class="bnt-eyebrow">What we watch</p>
  <h2 class="h-h">One screen for<br>every kind of threat</h2>
  <div class="h-chips">{chips}</div>
  <button class="bnt-btn" type="button" data-h-menu>Explore every section</button>
 </div><p class="h-credit">Footage: NASA Goddard / SDO (solar flare, 2016)</p></section>
 
-<section class="h-sec" id="s5" data-clip="planet"><div class="h-copy">
+<section class="h-sec"{" data-snap" if snap else ""} id="s5" data-clip="planet"><div class="h-copy">
  <p class="bnt-eyebrow">For everyone, everywhere</p>
  <h2 class="h-h"><span class="h-rot" id="h_rot">Free for everyone<br>on the planet</span></h2>
  <p class="h-lede">Read the whole site in your language. No account and no paywall. Built for professionals, businesses, families, and anyone coordinating or getting prepared.</p>
@@ -304,7 +359,7 @@ def home_page():
  <a class="bnt-btn" href="#h_foot" id="h_lang_btn">Choose your language</a>
 </div><p class="h-credit">Footage: NASA (ISS, Earth limb, 2024)</p></section>
 
-<section class="h-sec" id="s6" data-clip="email"><div class="h-copy">
+<section class="h-sec"{" data-snap" if snap else ""} id="s6" data-clip="email"><div class="h-copy">
  <p class="bnt-eyebrow">Stay connected</p>
  <h2 class="h-h">Get the brief.<br>Get the alerts.</h2>
  <p class="h-lede">A sourced brief at 7 AM and 7 PM ET, plus emergency email alerts when something serious breaks. Email is your backup: it still reaches you on any device if you lose your phone.</p>
@@ -316,7 +371,7 @@ def home_page():
  </div>
 </div><p class="h-credit">Footage: NASA (ISS, Earth from orbit, 2019)</p></section>
 
-<section class="h-sec" id="s7" data-clip="dash"><div class="h-copy c">
+<section class="h-sec"{" data-snap" if snap else ""} id="s7" data-clip="dash"><div class="h-copy c">
  <p class="bnt-eyebrow">The live dashboard</p>
  <h2 class="h-h">Signal over noise.</h2>
  <p class="h-lede">Everything in one place, updated around the clock.</p>
@@ -337,13 +392,43 @@ def home_page():
  {_menu()}
  <div class="h-mfoot"><a class="bnt-btn y" href="#s6" data-h-close>Get the free brief</a><a class="bnt-btn" href="/live">Open dashboard</a></div>
 </aside>
-<script src="{url("theme.js")}"></script><script src="{url("home.js")}" defer></script>
+<script src="{url("theme.js")}"></script><script src="{url("home.js")}" defer></script>{snapjs}
 <script src="/api/newsletter/app.js" defer></script><script src="/api/translate/app.js" defer></script>
 </body></html>'''
 
+def home_page():
+    h = _home_page_raw()
+    if credits_page_on():
+        h = re.sub(r'<p class="h-credit">[^<]*</p>', "", h)
+        h = h.replace('<a href="/bnt/credits.txt">Footage credits</a>', '<a href="/credits#intro">Image credits</a>')
+    return h
+
 # ---------- "/live" overview (top of the dashboard home view) ----------
+def snap_on():
+    """Shared full-section snapping (theme_static/snap.js). BN_SNAP=0 = off (free scrolling everywhere)."""
+    return os.environ.get("BN_SNAP", "1") != "0"
+
+def credits_page_on():
+    """Matt 12:07 PM: no credits on top of images/video; every page links "Image credits" -> /credits. BN_CREDITS_PAGE=0 = old overlays."""
+    return os.environ.get("BN_CREDITS_PAGE", "1") != "0"
+
+def live_hero_on():
+    """Live full-bleed hero (SpaceX-style imagery rollout, step 1). BN_LIVE_HERO=0 = off (previous look)."""
+    return os.environ.get("BN_LIVE_HERO", "1") != "0"
+
 def live_overview_html():
-    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live" id="bntl" aria-label="Live overview"><div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
+    hero = live_hero_on()
+    bg = ('<div class="l-bg" aria-hidden="true"><picture><source media="(max-width:700px)" srcset="/bnt/media/lvhero-m.jpg?v=1">'
+          '<img src="/bnt/media/lvvid-d.jpg?v=1" alt="" decoding="async" fetchpriority="high"></picture>'
+          '<video class="l-vid" muted loop playsinline preload="none" disablepictureinpicture tabindex="-1"'
+          ' data-webm="/bnt/media/lvvid-d.webm?v=1" data-mp4="/bnt/media/lvvid-d.mp4?v=1"></video></div>'
+          '<script>(function(){var v=document.currentScript.previousElementSibling.querySelector("video"),n=navigator.connection||{},'
+          'mm=function(q){return window.matchMedia&&matchMedia(q).matches};'
+          'if(!v||innerWidth<=700||mm("(prefers-reduced-motion: reduce)")||n.saveData)return;'
+          '[["webm","video/webm"],["mp4","video/mp4"]].forEach(function(a){var s=document.createElement("source");s.src=v.getAttribute("data-"+a[0]);s.type=a[1];v.appendChild(s)});'
+          'v.muted=true;v.autoplay=true;v.preload="auto";v.addEventListener("playing",function(){v.classList.add("on")},{once:true});'
+          'v.load();var p=v.play();if(p&&p.catch)p.catch(function(){})})()</script>') if hero else ""
+    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview">{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>
