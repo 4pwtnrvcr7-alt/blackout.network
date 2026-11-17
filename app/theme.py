@@ -342,8 +342,16 @@ def home_page():
 </body></html>'''
 
 # ---------- "/live" overview (top of the dashboard home view) ----------
+def live_hero_on():
+    """Live full-bleed hero (SpaceX-style imagery rollout, step 1). BN_LIVE_HERO=0 = off (previous look)."""
+    return os.environ.get("BN_LIVE_HERO", "1") != "0"
+
 def live_overview_html():
-    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live" id="bntl" aria-label="Live overview"><div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
+    hero = live_hero_on()
+    bg = ('<div class="l-bg" aria-hidden="true"><picture><source media="(max-width:700px)" srcset="/bnt/media/lvhero-m.jpg?v=1">'
+          '<img src="/bnt/media/lvhero-d.jpg?v=1" alt="" decoding="async" fetchpriority="high"></picture></div>'
+          '<p class="l-credit">Image: NASA (ISS Expedition 60)</p>') if hero else ""
+    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview">{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>

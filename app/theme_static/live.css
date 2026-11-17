@@ -128,3 +128,16 @@
 .bnt-live .l-hc{flex:none;display:inline-flex;align-items:baseline;gap:1px;padding:4px 7px;border:1px solid var(--c);border-radius:8px;color:var(--c)}
 .bnt-live .l-hc b{font:800 17px/1 var(--bnt-hd)}.bnt-live .l-hc small{font:600 10px var(--bnt-hd);opacity:.75}
 .bnt-live .l-htt{font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Live full-bleed hero (BN_LIVE_HERO, default on). Public-domain NASA still (ledger: previews/live_hero/IMAGE_LEDGER.md), desaturated; fades into the dashboard */
+.bnt-live.l-hasbg .l-bg{position:absolute;left:0;right:0;top:0;height:min(88vh,860px);z-index:-1;pointer-events:none;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 0%,#000 68%,rgba(0,0,0,.5) 86%,transparent 100%);mask-image:linear-gradient(180deg,#000 0%,#000 68%,rgba(0,0,0,.5) 86%,transparent 100%)}
+.bnt-live.l-hasbg .l-bg img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 50%;opacity:.78;transform:scale(1.04);animation:lbgin 2.4s cubic-bezier(.2,.7,.2,1) both}
+.bnt-live.l-hasbg .l-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,6,10,.72) 0%,rgba(5,6,10,.25) 46%,rgba(5,6,10,0) 70%)}
+@keyframes lbgin{from{opacity:0;transform:scale(1.1)}to{opacity:.78;transform:scale(1.04)}}
+.bnt-live.l-hasbg .l-glow{opacity:.5}
+.bnt-live.l-hasbg .l-intro{min-height:clamp(260px,40vh,420px);align-items:flex-end;align-content:flex-end;margin-bottom:34px}
+.bnt-live.l-hasbg h2.l-h1{font-size:clamp(46px,7.2vw,104px);letter-spacing:-.01em;text-shadow:0 2px 30px rgba(0,0,0,.45)}
+.bnt-live .l-credit{position:absolute;z-index:1;right:clamp(16px,3.4vw,44px);top:calc(min(88vh,860px) * .5);margin:0;font:500 10px/1.2 var(--bnt-tx);letter-spacing:.12em;text-transform:uppercase;color:rgba(236,238,245,.45);writing-mode:vertical-rl;transform:rotate(180deg)}
+@media (max-width:700px){.bnt-live.l-hasbg .l-bg{height:min(82svh,720px)}.bnt-live.l-hasbg .l-bg img{object-position:50% 50%}.bnt-live.l-hasbg .l-bg::after{background:linear-gradient(180deg,rgba(5,6,10,.35) 0%,rgba(5,6,10,0) 40%)}.bnt-live.l-hasbg .l-intro{min-height:clamp(260px,44svh,380px)}.bnt-live .l-credit{writing-mode:horizontal-tb;transform:none;top:14px;right:16px;font-size:9px}}
+@media (prefers-reduced-motion:reduce){.bnt-live.l-hasbg .l-bg img{animation:none}}
+html[data-theme="light"] .bnt-live.l-hasbg .l-bg img{opacity:.9}
