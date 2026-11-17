@@ -90,7 +90,7 @@ setInterval(function(){UPS.forEach(upPaint)},15000);
    if(plain(p)&&p.textContent.trim().length>260){p.classList.add("bnt-clamp");p.title="Tap to read more"}})}
  function emoText(){var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n,L=[];while((n=w.nextNode())){if(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/u.test(n.nodeValue)&&!n.parentNode.closest("script,style,textarea,input,form,svg,[data-bnt-skip]"))L.push(n)}
    L.forEach(function(n){n.nodeValue=n.nodeValue.replace(EMO,"")})}
- function mbtn(){document.querySelectorAll("main button,.np button,.bn-page button,main a.btn,.np a.np-btn").forEach(function(b){if(b.dataset.bntB||skip(b)||/(^|\s)bnt-/.test(b.className))return;b.dataset.bntB=1;
+ function mbtn(){document.querySelectorAll("main button,.np button,.bn-page button,main a.btn,.np a.np-btn").forEach(function(b){if(b.dataset.bntB||skip(b)||b.hidden||b.classList.contains("bng-mesh")||/(^|\s)bnt-/.test(b.className))return;b.dataset.bntB=1;
    var bt=b.textContent.trim();if(bt.length>=3&&bt.length<=28&&b.children.length<=1&&!b.closest(".tabs,.hw-p,.bnm,[role=tablist]")&&!b.classList.contains("hw-i"))b.classList.add("bnt-mbtn")})}
  function etAt(txt){var m=String(txt).match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);if(!m)return Date.now();var h=+m[1]%12+(/p/i.test(m[3])?12:0),now=new Date();
    var et=new Date(now.toLocaleString("en-US",{timeZone:"America/New_York"}));var d=new Date(now.getTime()+((h*60+ +m[2])-(et.getHours()*60+et.getMinutes()))*60000);if(d-now>36e5)d=new Date(d-864e5);return d.getTime()}

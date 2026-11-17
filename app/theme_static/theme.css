@@ -168,3 +168,7 @@ html body main select{border-radius:0!important}
 /* Nov 17 push C: square monochrome section-nav chips */
 body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a{border-radius:0!important;border:1px solid rgba(242,242,244,.55)!important;background:transparent!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.1em;font-size:11px!important}
 body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a:hover{background:#F2F2F4!important;color:#000!important}
+
+/* Nov 17 push D: Push to Mesh stays hidden unless BN_MESH_SHARE=1 unhides it; story headline in sentence case */
+html body .bng-mesh[hidden]{display:none!important}
+body:has(#bn_story) h1.t{text-transform:none!important;letter-spacing:-.01em}
