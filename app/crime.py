@@ -20,7 +20,7 @@ E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 TITLE = "Crime map and statistics near you: ZIP, city, county, country | BLACKOUT.NETWORK"
 DESC = ("Look up crime for any US ZIP code, city, county or state, or any country: official FBI rates per 100,000 with trends, "
         "near-real-time incident heat maps for 16 US cities, a US county map and a world homicide map. Free, sourced, no sign-up.")
-VCOL, PCOL, OCOL = "#FF4D4F", "#F5A524", "#8B95A3"
+VCOL, PCOL, OCOL = "#E5E5EA", "#8E8E93", "#48484A"   # Nov 17 2026 (Matt): greys only (was red / amber / grey); red is reserved for rank 7+
 
 # ------------------------------------------------------------------------------------------------ data access
 _C = {}
@@ -569,7 +569,7 @@ def render_page(q=""):
     nl = ('<section class="cr-cta"><div><div class="cr-kick">FREE · 7 AM &amp; 7 PM ET</div><h2>Get your area\'s crime numbers in the brief</h2>'
           '<p>Add your ZIP, city or country, then tick <b>Include local crime summary in my briefs</b> and, if you want them, '
           '<b>Real-time crime alerts for my area</b>. Both start off and you can change them any time in Manage preferences. Nothing is sent until you confirm by email.</p></div>'
-          '<div class="bng-inline-slot" data-src="crime"><a class="cr-btn red" href="/newsletter?utm_source=crime&amp;utm_medium=cta&amp;utm_campaign=crime">✉ Get the free brief</a></div>'
+          '<div class="bng-inline-slot" data-src="crime"><a class="cr-btn red" href="/newsletter?utm_source=crime&amp;utm_medium=cta&amp;utm_campaign=crime">Get the free brief</a></div>'
           '<p class="cr-mu">Follow us on YouTube and X too. Links are at the top of every page on blackout.network.</p></section>')
     how = ('<section class="cr-card cr-how"><h3>How this works, and what we never show</h3><ul>'
            '<li><b>Official rates</b> come from the FBI Crime Data Explorer (UCR/NIBRS): offenses reported by city police and sheriffs, divided by the population those agencies cover. '
@@ -606,7 +606,7 @@ def render_page(q=""):
     head = (sitenav.head_html("crime", path) + '<meta name="robots" content="index,follow,max-image-preview:large">'
             '<meta name="keywords" content="crime map, crime rate by ZIP code, crime statistics, county crime rate, violent crime rate, property crime, crime near me, homicide rate by country, FBI crime data">'
             '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
-            '<link rel="stylesheet" href="/api/crime/app.css">')
+            '<link rel="stylesheet" href="/api/crime/app.css?v=2">')
     if title != TITLE: head = head.replace(f"<title>{E(TITLE)}</title>", f"<title>{E(title)}</title>", 1)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
