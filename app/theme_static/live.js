@@ -19,7 +19,7 @@ function gauge(v,top,S){S=S||{};var A0=150,A1=390,cx=200,cy=190,r=150,ang=functi
  requestAnimationFrame(function(){if(!reduce){ar.style.transition="stroke-dasharray 1.6s cubic-bezier(.2,.7,.2,1)";dot.style.transition="transform 1.6s cubic-bezier(.2,.7,.2,1)"}
   setTimeout(function(){ar.setAttribute("stroke-dasharray",(v*10)+" 100");dot.style.transform="rotate("+ang(v)+"deg)"},120)});
  count($("bntl_num"),v,1);
- $("bntl_gt").innerHTML="The "+(S.level_n||"")+" top stories right now"+(S.level_hi?" (every High alert, rank 7+, on The Wire)":" (the highest-ranked alerts on The Wire)")+" average <b>"+v.toFixed(1)+"</b> out of 10."+(top?' The highest active alert is a <b style="color:'+col[band(top)]+'">'+top+" ("+(rname[top]||word[band(top)])+")</b>.":"")}
+ var H=S.hi;$("bntl_gt").innerHTML=H&&H.title?'<span class="l-hk">Highest threat right now</span><a class="l-ht" href="'+esc(H.url)+'"><span class="l-hc" style="--c:'+col[band(H.rank)]+'"><b>'+(H.rank|0)+'</b><small>/10</small></span><span class="l-htt">'+esc(H.title)+'</span></a>':'<span class="l-hk">Highest threat right now</span><span class="l-htt">No active alerts</span>'}
 var ICON={"natural disaster":'<path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18z"/>',"disease":'<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>',"war/conflict":'<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>',"financial":'<path d="M3 20h18M5 16l4-5 4 3 6-8"/>',"political":'<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>',"cyber":'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'};
 var CAT={"natural disaster":"Weather & quakes","disease":"Health","war/conflict":"Conflict","financial":"Markets","political":"Politics","cyber":"Cyber"};
 function render(S,land,only){var on=function(k){return !only||only===k};LAST=S;stamps(S,only);
@@ -40,14 +40,17 @@ if(on("m")){ var W=360,H=155,x=function(l){return l+180},y=function(a){return (8
  var pts=S.geo.slice().sort(function(a,b){return a[2]-b[2]}),cn={c:0,e:0,h:0};
  pts.forEach(function(g,i){var b=band(g[2]),rad=b==="h"?2.1:b==="e"?1.5:1.1;cn[b]++;if(g[0]<-73||g[0]>82)return;
   s+='<circle cx="'+x(g[1]).toFixed(1)+'" cy="'+y(g[0]).toFixed(1)+'" r="'+rad+'" fill="'+col[b]+'" fill-opacity="'+(b==="c"?.7:.95)+'" filter="url(#bntl_g3)">'+""/* Nov 17 1:45 AM: SMIL pulse removed, it repainted the blurred SVG every frame and caused most scroll jank on /live */+"</circle>"});
- $("bntl_map").innerHTML=s+"</svg>";$("bntl_maph").textContent=pts.length+" located alerts · "+cn.h+" high, "+cn.e+" elevated, "+cn.c+" calm";}
+ /* Nov 17 push 2: ~4,000 SVG nodes + 100 blur filters re-rasterised while scrolling; draw them once into an image instead */
+ var svgS=(s+"</svg>").replace("<svg ",'<svg xmlns="http://www.w3.org/2000/svg" '),im=new Image();im.alt="";im.decoding="async";im.setAttribute("role","img");
+ im.setAttribute("aria-label",pts.length+" located alerts on a world map");im.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svgS);
+ var mp=$("bntl_map");if(im.decode)im.decode().then(function(){mp.replaceChildren(im)},function(){mp.innerHTML=svgS});else{mp.innerHTML="";mp.appendChild(im)}$("bntl_maph").textContent=pts.length+" located alerts · "+cn.h+" high, "+cn.e+" elevated, "+cn.c+" calm";}
  // rank spread
 if(on("d")){ var mx=1;for(var k=0;k<=10;k++)mx=Math.max(mx,S.ranks[k]||0);var h="";
  for(k=0;k<=10;k++){var n=S.ranks[k]||0,b2=band(k);h+='<div><em>'+(n||"")+'</em><i data-h="'+(n?Math.max(4,100*n/mx):2)+'" style="background:linear-gradient(180deg,'+col[b2]+","+col[b2]+'55);box-shadow:0 0 14px '+col[b2]+'40"></i><span>'+k+"</span></div>"}
  $("bntl_dist").innerHTML=h;setTimeout(function(){[].forEach.call(d.querySelectorAll("#bntl_dist i"),function(e){e.style.height=e.getAttribute("data-h")+"%"})},200);}
  // alerts per day
 if(on("v")){ var M=innerWidth<=900,VW=M?340:520,VH=M?220:200,pl=40,pr=10,pt=24,pb=30,V=S.volume||[],vm=1;V.forEach(function(v){vm=Math.max(vm,v.n)});var bw=(VW-pl-pr)/Math.max(1,V.length);
- var vs='<svg viewBox="0 0 '+VW+" "+VH+'" role="img" aria-label="Alerts logged per day"><defs><linearGradient id="bntl_vb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC21A"/><stop offset="1" stop-color="#FFC21A" stop-opacity=".25"/></linearGradient></defs>';
+ var vs='<svg viewBox="0 0 '+VW+" "+VH+'" role="img" aria-label="Alerts logged per day"><defs><linearGradient id="bntl_vb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E9EAF0"/><stop offset="1" stop-color="#E9EAF0" stop-opacity=".25"/></linearGradient></defs>';
  [0,.5,1].forEach(function(f){var yy=pt+(VH-pt-pb)*(1-f);vs+='<line x1="'+pl+'" x2="'+(VW-pr)+'" y1="'+yy+'" y2="'+yy+'" stroke="rgba(240,240,250,.07)"/><text x="'+(pl-8)+'" y="'+(yy+4)+'" text-anchor="end" font-family="Montserrat" font-size="10.5" fill="rgba(240,240,250,.45)">'+Math.round(vm*f).toLocaleString()+"</text>"});
  V.forEach(function(v,i){var hh=(VH-pt-pb)*v.n/vm,xx=pl+i*bw+bw*.18,ww=bw*.64;vs+='<rect x="'+xx+'" y="'+(VH-pb-hh)+'" width="'+ww+'" height="'+hh+'" rx="5" fill="url(#bntl_vb)"/><text x="'+(xx+ww/2)+'" y="'+(VH-pb-hh-7)+'" text-anchor="middle" font-family="Montserrat" font-weight="700" font-size="11" fill="#F0F0FA">'+v.n.toLocaleString()+'</text><text x="'+(xx+ww/2)+'" y="'+(VH-9)+'" text-anchor="middle" font-family="Montserrat" font-weight="600" font-size="11" fill="rgba(240,240,250,.55)">'+esc(v.d)+"</text>"});
  $("bntl_vol").innerHTML=vs+"</svg>";}

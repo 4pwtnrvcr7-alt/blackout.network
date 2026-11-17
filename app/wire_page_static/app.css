@@ -78,3 +78,39 @@
   .rk{flex-basis:38px;width:38px;height:38px}
   .rk b{font-size:16px}
 }
+
+/* Nov 17 2026 new theme: calmer top of page (peek explainer, two bulletin lines first, notice folds open) */
+.bn-wire .w-how{display:inline-block;margin:0 0 14px;padding:8px 14px;border:1px solid var(--bnt-ink-15,#2a2f3a);border-radius:99px;max-width:46rem}
+.bn-wire .w-how-t{font:700 11.5px/1 var(--bnt-hd,Montserrat,sans-serif);letter-spacing:.14em;text-transform:uppercase;color:var(--bnt-y,var(--bnt-y,#F2F2F4))}
+.bn-wire .w-how-t::after{content:" +";opacity:.7}
+.bn-wire .w-how.open{border-radius:14px}
+.bn-wire .w-how.open .w-how-t::after{content:" \2212"}
+.bn-wire .w-how p{margin:10px 0 10px;font-size:14.5px;line-height:1.5;opacity:.85}
+.bulletin ul.fold:not(.all) li:nth-child(n+3){display:none}
+.w-allb{all:unset;cursor:pointer;display:inline-block;margin:0 0 10px;font:700 11.5px/1 var(--bnt-hd,Montserrat,sans-serif);letter-spacing:.14em;text-transform:uppercase;color:var(--bnt-y,var(--bnt-y,#F2F2F4))}
+.w-allb:focus-visible{outline:2px solid var(--bnt-y,var(--bnt-y,#F2F2F4));outline-offset:3px}
+.coming .w-nh{padding:4px 0;align-items:flex-start}
+.coming .w-nh>span{display:flex;flex-direction:column;gap:4px;font:inherit;letter-spacing:0;text-transform:none}
+.coming .w-nh strong{font-size:14.5px;line-height:1.35}
+.coming .bnt-acc-in{font-size:14px;line-height:1.5;padding:2px 0 8px}
+.coming .w-nl{color:var(--bnt-y,var(--bnt-y,#F2F2F4));text-decoration:none;font-weight:600;white-space:nowrap}
+.bulletin h2{font-family:var(--bnt-hd,Montserrat,sans-serif);text-transform:uppercase;letter-spacing:.06em;font-size:15px;font-weight:700}
+.w-uprow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 18px}
+.w-uprow .updated{margin:0!important}
+.bn-wire .w-how:not(.open) .bnt-peek-d{width:0;height:0}
+.bn-wire .w-uprow .updated{font-size:12px;color:var(--bnt-ink-60,#8b95a3);flex:1 1 260px}
+.bulletin h2{font-size:15px!important}
+.bulletin a{text-decoration-color:rgba(240,240,250,.25)}
+/* Nov 17 Phase 2 push 2: reserve space while the feed loads (layout shift), skeleton shimmer, content-visibility below the fold */
+.w-uprow{min-height:28px}
+.bulletin li.sk{list-style:none;height:2.9em;margin:0 0 10px -18px;border-radius:8px;background:linear-gradient(90deg,rgba(240,240,250,.05),rgba(240,240,250,.09),rgba(240,240,250,.05));background-size:200% 100%;animation:w-sh 1.4s linear infinite}
+.w-loading .bulletin{min-height:300px;box-sizing:border-box}
+.w-loading #w-feed{min-height:100vh}
+.sk-row{height:62px;margin:0 0 8px;border-radius:12px;border:1px solid var(--bd,#252b33);background:linear-gradient(90deg,rgba(240,240,250,.03),rgba(240,240,250,.07),rgba(240,240,250,.03));background-size:200% 100%;animation:w-sh 1.4s linear infinite}
+@keyframes w-sh{to{background-position:-200% 0}}
+@media (max-width:700px){.w-loading .bulletin{min-height:480px}.sk-row{height:110px}}
+@media (prefers-reduced-motion:reduce){.bulletin li.sk,.sk-row{animation:none}}
+#w-feed>section>.acc:nth-child(n+14){content-visibility:auto;contain-intrinsic-size:auto 70px}
+/* Nov 17 2:37 AM: monochrome outlined controls (SpaceX-style) */
+.bn-wire .w-how{border-radius:0;border-color:rgba(242,242,244,.5);color:#F2F2F4;letter-spacing:.18em;font-size:11px}
+.bn-wire .w-how:hover,.bn-wire .w-how:focus-visible{background:#F2F2F4;color:#05060a}

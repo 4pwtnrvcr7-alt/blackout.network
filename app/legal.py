@@ -3,7 +3,7 @@ t285: Privacy adds 'YouTube and Google user data' (Google OAuth consent screen /
 Terms adds 'YouTube content'. Static, self-contained HTML (no scripts, no data reads), so both pages are served even while the public node warms up.
 Styled like /scoring: shared /theme.css palette plus a small inline stylesheet. Never touches scanner.py, scoring,
 push.py, jets.py, aviation_watch.py or config.json."""
-import html
+import html, os, re
 import sitenav   # shared header, tab bar and SEO tags (t301/t302)
 
 EFFECTIVE = "October 31, 2026"
@@ -503,6 +503,8 @@ def _html(which):
         else:
             _CACHE[which] = _build("tos", "Terms of Service", "Terms of Service for blackout.network, an informational research tool. "
                                    "Not an emergency alerting service.", TOS_INTRO, TOS_PARTS).encode()
+        if os.environ.get("BN_TIPS", "0") != "1":   # Nov 17 2026: Support Us / tips hidden, so the privacy policy's Tips paragraph is dropped (text kept above)
+            _CACHE[which] = re.sub(rb"<h3>Tips</h3>\s*<p>[^<]*</p>\s*", b"", _CACHE[which])
     return _CACHE[which]
 
 def handle_get(path, qs):

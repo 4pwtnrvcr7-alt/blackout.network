@@ -117,6 +117,9 @@ def summary(fresh=False):
     # (The Wire's High section, the Top Signals / newsletter pool). Fewer than 3 -> the top 10 by rank. Read-only; no scoring change.
     lead = [x for x in m if rk(x) >= 7]
     if len(lead) < 3: lead = sorted(m, key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:10]
+    # Gauge explainer (Matt Nov 17 2:26 AM): just the highest threat right now, the top-ranked active alert on the main feed.
+    hx = max(m, key=lambda x: (rk(x), x.get("score") or 0)) if m else None
+    hi = {"title": _short(_clean(hx.get("title")), 200), "rank": rk(hx), "url": "/wire/" + str(hx.get("cluster_id") or "")} if hx else None
     vol = {}
     for v in st.get("volume") or []:
         dd = vol.setdefault(v.get("d"), {}); dd[v.get("category")] = dd.get(v.get("category"), 0) + int(v.get("n") or 0)
@@ -128,7 +131,7 @@ def summary(fresh=False):
     last = sc.get("finished") or st.get("generated")
     out = {"generated": st.get("generated"), "wire": len(m), "watch": st.get("watchlist_count") or 0, "ranks": ranks, "bands": bands,
            "level": round(sum(rk(x) for x in lead) / len(lead), 1) if lead else 0.0, "level_n": len(lead), "level_hi": len(lead) > 0 and all(rk(x) >= 7 for x in lead),
-           "wire_avg": round(sum(rk(x) for x in m) / len(m), 1) if m else 0.0, "max_rank": max([rk(x) for x in m] or [0]),
+           "wire_avg": round(sum(rk(x) for x in m) / len(m), 1) if m else 0.0, "max_rank": max([rk(x) for x in m] or [0]), "hi": hi,
            "top": top, "geo": [[round(float(x["lat"]), 2), round(float(x["lon"]), 2), rk(x)] for x in m if x.get("lat") is not None and x.get("lon") is not None],
            "volume": [{"d": lab(k, "%a"), "n": sum(vol[k].values())} for k in days], "cats": cats, "today": lab(today, "%a %b %-d") if today else "",
            "sources_ok": sum(1 for s in src if s.get("ok")), "sources_total": len(src),
@@ -318,7 +321,7 @@ def home_page():
 
 # ---------- "/live" overview (top of the dashboard home view) ----------
 def live_overview_html():
-    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live" id="bntl" aria-label="Live overview"><div class="l-glow" aria-hidden="true"><i></i><i></i><i></i></div><div class="l-wrap">
+    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live" id="bntl" aria-label="Live overview"><div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>

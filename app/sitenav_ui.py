@@ -65,7 +65,7 @@ MENU_META = {
  "Community": ("Crowd rankings, videos, public stats and the newsletter", f'<svg {_GI}><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.6c3 .1 6 2 6 5.4"/></svg>'),
  "Reference": ("Local resources, maps, bushcraft, first aid and preppers", f'<svg {_GI}><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7M8 11h7"/></svg>'),
  "Play": ("Original 8-bit games", f'<svg {_GI}><rect x="2.5" y="7" width="19" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3M15.5 12h.01M18 14h.01"/></svg>'),
- "About": ("How we score, sources and tips", f'<svg {_GI}><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'),
+ "About": ("How we score, sources and tips" if __import__("os").environ.get("BN_TIPS", "0") == "1" else "How we score, sources and public stats", f'<svg {_GI}><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'),
 }
 
 def menu_sections(sn):
@@ -165,6 +165,11 @@ MENU3 = [
  ("about", "About", "Our sources, scoring and public numbers.",
   [("sources", "Sources"), ("@scoring", "How We Score"), ("@stats", "Public Stats"), ("tips", "Support Us")]),
 ]
+# Nov 17 2026: no Support Us link unless BN_TIPS=1 (see sitenav.TIPS_ON)
+import os as _os
+if _os.environ.get("BN_TIPS", "0") != "1":
+    MENU3 = [(a, b, c, [x for x in its if x[0] != "tips"]) for a, b, c, its in MENU3]
+    MENU = [(g, [k for k in ks if k != "tips"]) for g, ks in MENU]
 # empty preview slots, filled by bn-v3.js from same-origin endpoints only when the menu opens (nothing is fetched at first paint)
 M3_PV = {
  "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
