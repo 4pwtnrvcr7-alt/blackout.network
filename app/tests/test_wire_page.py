@@ -112,7 +112,9 @@ class NavHrefs(unittest.TestCase):
         html = sitenav.header_html("threat")
         self.assertRegex(html, r'href="/wire"[^>]*>The Wire</a>')
         self.assertNotIn('href="/#wire">The Wire</a>', html)
-        self.assertIn('class="bn-word bna-wm"', html)
+        self.assertIn('class="bn-word bna-wm bnt-wm"', html)   # Nov 17 2026: plain-text lowercase wordmark, no logo
+        self.assertIn('>blackout.network</span>', html)
+        self.assertNotIn('href="/#', html)   # dashboard tabs moved to /live
         self.assertNotIn("bn-icon", html)  # apple-style text wordmark, no old logo mark
         self.assertIn('data-tab="threat"', html)
         for m in re.finditer(r'<a[^>]*>The Wire</a>', html):
