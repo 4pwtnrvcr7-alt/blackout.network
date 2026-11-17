@@ -170,6 +170,10 @@ import os as _os
 if _os.environ.get("BN_TIPS", "0") != "1":
     MENU3 = [(a, b, c, [x for x in its if x[0] != "tips"]) for a, b, c, its in MENU3]
     MENU = [(g, [k for k in ks if k != "tips"]) for g, ks in MENU]
+# Nov 17 2026 (Matt, 8:19 AM): no off-grid menu links unless BN_MESH_UI=1 (pages stay reachable by URL)
+if _os.environ.get("BN_MESH_UI", "0") != "1":
+    MENU3 = [(a, b, c, [x for x in its if x[0] not in ("@mesh", "meshguide")]) for a, b, c, its in MENU3]
+    MENU = [(g, [k for k in ks if k not in ("@mesh", "meshguide")]) for g, ks in MENU]
 # empty preview slots, filled by bn-v3.js from same-origin endpoints only when the menu opens (nothing is fetched at first paint)
 M3_PV = {
  "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
