@@ -1,0 +1,275 @@
+{
+ "briefs": {
+  "6727e7f2ac056676": {
+   "headline": "WHO reports two MERS cases in Qatar, both camel workers; all 99 contacts tested negative",
+   "why_it_matters": "MERS is a serious coronavirus, but WHO says these look like isolated camel-to-human infections with no spread between people.",
+   "what_happened": "On Oct. 29, Qatar notified the World Health Organization of two laboratory-confirmed MERS cases, confirmed on Aug. 5 and Aug. 25, 2026, WHO said in a Disease Outbreak News report on Nov. 13. Both patients were men over 50 with chronic conditions who worked with dromedary camels at separate farms. Both were hospitalized and later discharged in stable condition.",
+   "analysis": "WHO says the 99 contacts identified (including 84 health and care workers) were monitored for 14 days and all tested negative, with no link between the two cases. One patient cared for sick young camels and drank raw camel milk. These are Qatar's only reported MERS cases since 2022; WHO keeps its overall MERS risk at moderate, regionally and globally, because spillover from camels and hospital spread remain possible.",
+   "rank_why": "The scanner ranked it 7 because WHO is an official source and MERS has a high fatality rate (about 37% of confirmed cases, per WHO). We think that over-ranks it: the cases are months old, recovered and showed no spread.",
+   "risk": "Low",
+   "risk_why": "Two recovered, unlinked cases with no secondary infections; WHO describes them as sporadic zoonotic spillover.",
+   "if_true": "WHO's account holds if no new cases appear among people without camel contact, and Qatar's surveillance reports stay sporadic.",
+   "if_false": "A worrying turn would be new cases linked to these patients or a hospital cluster, which WHO would report in a follow-up notice.",
+   "what_to_do": "No action is needed in the US. Travelers to the Arabian Peninsula should avoid contact with camels and raw camel milk or undercooked camel meat, as WHO advises.",
+   "confidence": "High",
+   "confidence_why": "Official WHO Disease Outbreak News report based on Qatar's notification; the exact infection source is undetermined.",
+   "sources": [
+    "https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON626"
+   ],
+   "written_at": "2026-11-14T18:24:27Z",
+   "story": {
+    "headline": "WHO reports two MERS cases in Qatar, both among camel workers. All 99 contacts tested negative.",
+    "dek": "The infections were confirmed in August, notified in October, and look like separate spillover from camels, not spread between people.",
+    "written_at": "2026-11-17T21:40:00Z",
+    "hero": {
+     "image": "/wire2/static/img/sv3_mers_hero.webp",
+     "image_mobile": "/wire2/static/img/sv3_mers_hero_m.webp",
+     "video": "/wire2/static/vid/sv3_mers_hero.mp4",
+     "alt": "Scanning electron micrograph of cells infected with MERS coronavirus, shown in monochrome."
+    },
+    "sections": {
+     "happened": "On July 22, 2026, a man over 50 with chronic medical conditions who worked with dromedary camels in Qatar developed symptoms. He was admitted to hospital on July 25. An upper-respiratory test for MERS coronavirus was first negative; a later lower-respiratory sample tested positive, and the infection was laboratory-confirmed on August 5, the World Health Organization said. He reported longstanding occupational contact with camels, including in the two weeks before he fell ill, but not drinking raw camel milk and no recent travel. He recovered and was discharged after two consecutive negative PCR tests. Investigators identified 73 contacts — 11 close contacts and 62 health and care workers. All were tested, monitored for 14 days after their last exposure, and tested negative.\n\nA second man over 50, who bred and reared camels and also had chronic medical conditions, developed symptoms on August 23. Two nasal samples tested positive for MERS coronavirus on August 25. In the two weeks before he fell ill he had been caring for recently sick young camels and had drunk raw camel milk; he had no recent travel, WHO said. He developed severe MERS pneumonia with acute respiratory failure and needed high-flow oxygen and non-invasive ventilation. He also recovered and was discharged after two consecutive negative PCR tests. Investigators identified 26 contacts — four close contacts and 22 health and care workers — all of whom tested negative. One health and care worker developed respiratory symptoms but tested negative twice. There were no secondary cases.\n\nThe two men worked at geographically separate camel farms, and WHO said no epidemiological link was found between the farms or the patients. The precise sources of infection remain undetermined. WHO judged the infections to be probable spillover from camels rather than spread between people. Qatar notified WHO of the two laboratory-confirmed cases on October 29. WHO published a Disease Outbreak News report on November 13. Qatar had not reported a MERS case since 2022.",
+     "background": "Middle East respiratory syndrome is caused by MERS-CoV, a coronavirus first identified in Saudi Arabia and Jordan in 2012, according to WHO. Dromedary camels are the natural host and the main source of infection in people. People can also catch it from other people, especially in hospitals and among close contacts, through infectious respiratory particles and through direct or indirect contact. Sustained spread between people has not been documented.\n\nSince 2012, 27 WHO member states have reported cases. WHO says more than 2,600 laboratory-confirmed human infections have been reported, about 84 percent of them from the Arabian Peninsula. Among confirmed cases, about 37 percent have died. WHO cautions that this figure may overstate the true death rate, because milder infections often go undetected or unreported.\n\nIllness ranges from no symptoms to severe respiratory failure. Fever, cough and shortness of breath are common, and pneumonia is often seen. Some patients have gastrointestinal symptoms such as diarrhea. Older adults, people with weakened immune systems, and people with chronic conditions such as diabetes, kidney failure or chronic lung disease are at higher risk of severe disease. Hospital outbreaks have occurred in several countries when cases were not recognized early and infection-control measures were delayed.",
+     "analysis": "The picture WHO describes is two unlinked, occupational infections in camel workers, not a community or hospital cluster. All 99 identified contacts, including 84 health and care workers, were monitored for 14 days and tested negative. That is the central fact for anyone asking whether these cases are spreading.\n\nThe second patient was severely ill and needed breathing support, which fits what is known about MERS in people with chronic conditions. Both men recovered and were discharged. The infections were confirmed in August and only notified in late October, so this is not a rapidly unfolding outbreak on the day the notice appeared.\n\nOur scanner ranked the story 7, Major, because the source is an official WHO notice and because confirmed MERS cases have a high reported fatality rate. We think that over-ranks this event: the patients recovered, the cases are months old, and there is no evidence of spread between people. Our read of the risk to a general reader, including in the United States, is low. WHO's overall assessment of MERS, in a rapid risk review dated January 29, 2026, remains moderate at the regional and global level, because sporadic spillover from camels continues and hospital spread or imported cases are still possible.",
+     "watch": "The account holds if no new cases appear among people without camel contact and if Qatar's reports stay sporadic. A hospital cluster, or new cases linked to these patients, would change the picture; WHO would be expected to issue a follow-up notice.\n\nNo action is needed in the United States. WHO advises travelers to the Arabian Peninsula to avoid contact with camels and not to drink raw camel milk or eat undercooked camel meat, and it urges health workers to use standard infection-control precautions and to consider MERS testing for patients with compatible illness and relevant exposure or travel."
+    },
+    "images": [
+     {
+      "src": "/wire2/static/img/sv3_mers_hero.webp",
+      "role": "hero",
+      "alt": "Scanning electron micrograph of cells infected with MERS coronavirus, shown in monochrome.",
+      "credit_id": "niaid-mers"
+     },
+     {
+      "src": "/wire2/static/img/sv3_mers_em.webp",
+      "role": "inline",
+      "alt": "Transmission electron micrograph of MERS coronavirus particles, showing the crown-like surface projections.",
+      "credit_id": "cdc-mers-em"
+     }
+    ],
+    "sources": [
+     {
+      "url": "https://www.who.int/emergencies/disease-outbreak-news/item/2026-DON626",
+      "label": "WHO Disease Outbreak News, 13 Nov 2026"
+     },
+     {
+      "url": "https://www.who.int/news-room/fact-sheets/detail/middle-east-respiratory-syndrome-coronavirus-(mers-cov)",
+      "label": "WHO MERS fact sheet"
+     }
+    ]
+   }
+  },
+  "c5dc0cd611846d11": {
+   "headline": "Children make up 35% of Ebola deaths in Congo's outbreak, UNICEF says",
+   "why_it_matters": "The largest Ebola outbreak in Congo's history is killing children at a higher rate than adults, and many die before reaching care.",
+   "what_happened": "UNICEF said on Nov. 13 that, as of Nov. 4, 2,959 children under 18 had confirmed Ebola in eastern Democratic Republic of the Congo and 1,737 had died. Children are 28% of confirmed cases but 35% of deaths; nearly 72% of infected children under five have died, and about 80% of child deaths happen outside Ebola treatment centres.",
+   "analysis": "UNICEF calls it the largest and deadliest Ebola outbreak recorded in Congo and the second-largest globally, with 67 health zones in eight provinces affected and active spread in 51. More than 2,280 children have been orphaned or separated from their families, and insecurity and attacks on health facilities slow the response, UNICEF said. Kivu Post, citing ECDC, put the total at 11,376 confirmed infections and 5,568 deaths by Nov. 14.",
+   "rank_why": "Ranked 8 for a large, still-spreading outbreak documented by UNICEF and CIDRAP; we agree it is serious, though the direct risk to the U.S. is low.",
+   "risk": "Medium",
+   "risk_why": "A severe outbreak in Central Africa; spread to the U.S. remains unlikely.",
+   "if_true": "Signposts: weekly case counts, spread to new health zones or neighbouring countries, and wider vaccine use.",
+   "if_false": "The figures come from UNICEF's analysis of official case data; if they are revised, the overall outbreak trend still stands.",
+   "what_to_do": "No action is needed for most U.S. readers; if you plan travel to the region, check the CDC's travel notices first.",
+   "confidence": "High",
+   "confidence_why": "UNICEF's own release, reported by CIDRAP; child figures are based on cases with age data available.",
+   "sources": [
+    "https://www.unicef.org/press-releases/fast-facts-ebola-outbreak-toll-children-six-months-response-unicef",
+    "https://www.cidrap.umn.edu/ebola/unicef-children-make-35-ebola-deaths-dr-congo-outbreak",
+    "https://kivupost.com/article/six-months-into-drc-s-ebola-crisis-who-is-paying-the-highest-price"
+   ],
+   "written_at": "2026-11-17T12:35:31Z",
+   "story": {
+    "headline": "Children account for 35 percent of Ebola deaths in Congo's outbreak, UNICEF says.",
+    "dek": "As of November 4, 1,737 children had died. Most never reached a treatment centre. UNICEF calls this the largest Ebola outbreak Congo has recorded.",
+    "written_at": "2026-11-17T21:40:00Z",
+    "hero": {
+     "image": "/wire2/static/img/sv3_ebola_hero.webp",
+     "image_mobile": "/wire2/static/img/sv3_ebola_hero_m.webp",
+     "video": "/wire2/static/vid/sv3_ebola_hero.mp4",
+     "alt": "Transmission electron micrograph of an Ebola virus particle. This is a laboratory image, not a photograph of the outbreak."
+    },
+    "sections": {
+     "happened": "In a notice dated November 13, UNICEF said that as of November 4, 2,959 children under 18 in eastern Democratic Republic of the Congo had confirmed Ebola, and 1,737 had died. Children were 28 percent of confirmed cases and 35 percent of deaths. The figures are based on confirmed cases for which age data were available.\n\nThe youngest children are dying at the highest rate. Children under five were 14 percent of cases and 21 percent of deaths, and nearly 72 percent of those infected in that age group had died, UNICEF said. About 80 percent of child deaths happened outside Ebola treatment centres. Even among children who reached a centre, one in three under-fives died within 24 hours.\n\nWomen and girls made up more than 53 percent of confirmed cases. Among children aged 10 to 17, girls aged 15 to 17 accounted for two in three cases and three in five deaths. UNICEF said caring for sick relatives and preparing the dead for burial puts them at greater risk. More than 2,280 children have been orphaned or separated from their families since the outbreak began. Sixty-seven health zones in eight provinces have been affected, with active transmission in 51. UNICEF calls this the largest and deadliest Ebola outbreak recorded in Congo, and the second-largest and second-deadliest globally.\n\nCIDRAP, reporting the UNICEF notice, also cited later U.S. CDC figures of 11,407 cases and 5,572 deaths in the Congo outbreak, with Ituri and North Kivu the most affected provinces.",
+     "background": "This outbreak is of Bundibugyo Ebola virus, a species for which CIDRAP, reporting a scientific reconstruction, says there are no approved vaccines or treatments, though a vaccine and therapeutic trial are under way. The epidemic was declared in mid-May 2026. UNICEF dates the child-toll figures to six months into the response and describes communities already living with conflict and displacement.\n\nThe effects run beyond Ebola cases. Between January and September, facility births in Ebola-affected health zones of North Kivu fell by nearly 18 percent compared with the previous year, UNICEF said. In Tshopo, nearly 11 percent fewer children received their third dose of diphtheria, tetanus and whooping cough vaccine, and first-dose measles vaccination fell in all three reporting provinces, by up to 7.6 percent in South Kivu. Almost 7,500 schools, attended by nearly 2.5 million children, had not yet been reached with infection-prevention measures. In 2026, UNICEF said, 14.9 million people in Congo need humanitarian aid, including 8 million children.",
+     "analysis": "The child death figures are not just a function of how many children catch the virus. Children are a smaller share of cases than of deaths, and most of those deaths happen before a child reaches specialized care. That points to delayed arrival, thin pediatric capacity, and the difficulty of reaching treatment centres in an insecure setting — UNICEF cites attacks on health facilities and access constraints as continuing obstacles.\n\nGirls in their mid-teens being over-represented among older children is consistent with the caregiving and burial roles UNICEF describes, the same pathways that have driven hospital and household spread in earlier Ebola outbreaks. The drop in routine vaccinations and facility births means the outbreak is also opening gaps that other diseases can fill.\n\nThis is a severe regional emergency. Spread to the United States remains unlikely on the evidence we have. Our read of the risk to a general reader in the U.S. is medium only in the sense that the outbreak itself is large and still expanding; it is not a direct domestic health threat.",
+     "watch": "Signposts include weekly case and death counts, especially among children; spread into new health zones or neighboring countries; whether more children reach treatment centres alive; and whether vaccine or therapeutic trials for Bundibugyo produce usable tools.\n\nNo action is needed in the United States. Official situation reports are published by WHO, Africa CDC and CDC."
+    },
+    "images": [
+     {
+      "src": "/wire2/static/img/sv3_ebola_hero.webp",
+      "role": "hero",
+      "alt": "Transmission electron micrograph of an Ebola virus particle.",
+      "credit_id": "cdc-murphy-ebola"
+     }
+    ],
+    "sources": [
+     {
+      "url": "https://www.unicef.org/press-releases/fast-facts-ebola-outbreak-toll-children-six-months-response-unicef",
+      "label": "UNICEF, 13 Nov 2026"
+     },
+     {
+      "url": "https://www.cidrap.umn.edu/ebola/unicef-children-make-35-ebola-deaths-dr-congo-outbreak",
+      "label": "CIDRAP, on the UNICEF notice and CDC totals"
+     }
+    ]
+   }
+  },
+  "7c3eeef121ae8d73": {
+   "headline": "Cyclone Akvan formed in the Bay of Bengal and is forecast to hit India's Andhra Pradesh coast around Nov. 20",
+   "why_it_matters": "A very severe cyclone is forecast to strike a coast already hit by two cyclones this month, with millions in its path.",
+   "what_happened": "The UN-EU GDACS system issued an orange alert for tropical cyclone Akvan on Monday, Nov. 16, estimating 20.8 million people in tropical-storm-force winds. The India Meteorological Department (IMD) said the storm formed Monday evening and is likely to cross the Andhra Pradesh and Yanam coasts between Nellore and Tuni by noon on Nov. 20 as a very severe cyclonic storm, with winds of 120-130 km/h gusting to 145 km/h, The Hindu and India Today reported.",
+   "analysis": "It would be Andhra Pradesh's third cyclone in three weeks, after Arnab and Murasu, which the state estimates caused nearly Rs 7,000 crore in losses, India Today reported. The IMD forecasts heavy to very heavy rain in coastal Andhra Pradesh on Nov. 19-20 and in Odisha from Nov. 19-21; at least 10 people died in Odisha landslides during Arnab. GDACS's early estimate of no one in Category 1 winds predates the IMD's stronger landfall forecast.",
+   "rank_why": "Ranked 6 from an official GDACS alert plus IMD forecasts; we agree, given the population at risk.",
+   "risk": "Medium",
+   "risk_why": "A serious regional disaster risk in India; no direct threat to the US.",
+   "if_true": "Signposts: IMD upgrades to severe and very severe cyclone status, evacuations in Andhra Pradesh and Odisha, and a firmer landfall point.",
+   "if_false": "If the storm weakens or shifts, impacts would be mainly heavy rain and rough seas.",
+   "what_to_do": "No action is needed in the US. Anyone with travel or family in coastal Andhra Pradesh, Odisha or northern Tamil Nadu should follow IMD and local disaster authority updates.",
+   "confidence": "High",
+   "confidence_why": "Official GDACS alert and IMD forecasts reported by The Hindu and India Today; the landfall point may still change.",
+   "sources": [
+    "http://www.gdacs.org/report.aspx?eventtype=TC&eventid=1001351",
+    "https://www.thehindu.com/news/national/andhra-pradesh/cyclone-akvan-to-cross-andhra-coast-between-nellore-and-tuni-by-november-20-noon-says-imd/article71706785.ece",
+    "https://www.indiatoday.in/india/story/cyclone-akvan-andhra-odisha-coast-landfall-november-20-imd-orange-alert-3040322-2026-11-16"
+   ],
+   "written_at": "2026-11-16T21:32:01Z",
+   "story": {
+    "headline": "Cyclone Akvan is forecast to strike India's Andhra Pradesh coast around November 20.",
+    "dek": "India's weather service, on November 16, expected a very severe cyclone between Nellore and Tuni. A November 17 reading from the UN-EU alert system listed tropical-storm winds of 93 km/h.",
+    "written_at": "2026-11-17T21:40:00Z",
+    "hero": {
+     "image": "/wire2/static/img/sv3_akvan_hero.webp",
+     "image_mobile": "/wire2/static/img/sv3_akvan_hero_m.webp",
+     "alt": "Original diagram of Cyclone Akvan's November 17 position in the Bay of Bengal and the Nellore-to-Tuni landfall stretch."
+    },
+    "sections": {
+     "happened": "On November 16, the India Meteorological Department said a system over the Bay of Bengal was expected to form into Cyclone Akvan that evening and was very likely to cross the Andhra Pradesh and Yanam coasts between Nellore and Tuni by noon on November 20 as a very severe cyclonic storm, with winds at landfall of 120–130 km/h, gusting to 145 km/h. The Hindu, updating its report on November 17, said that stretch covers about 500 km of coast — nearly half of Andhra Pradesh's 1,053-km shoreline — with Machilipatnam roughly in the middle, and that the storm's course may still change. Fishermen, the paper said, have been told to stay ashore until November 20.\n\nThe UN-EU Global Disaster Alert and Coordination System issued an orange alert for the storm. In an earlier bulletin it estimated 20.8 million people in tropical-storm-force winds. As of 2:51 p.m. Eastern Time on November 17, GDACS still carried an orange alert and listed a maximum wind speed of 93 km/h — tropical-storm strength — with the latest position in the Bay of Bengal near 13.1°N, 87.3°E, citing the U.S. Joint Typhoon Warning Center. That figure is the system's reported intensity at that time, not a retraction of the IMD landfall forecast.",
+     "background": "The Hindu reported that Akvan would be Andhra Pradesh's third cyclone in three weeks, after Arnab and Murasu, which the state estimated caused nearly 7,000 crore rupees in losses. At least 10 people died in Odisha landslides during Arnab, and fishermen were still awaiting compensation for those losses when they were told to stay ashore for Akvan.\n\nThe IMD, as reported on November 16, forecast heavy to very heavy rain in coastal Andhra Pradesh on November 19–20 and in Odisha from November 19–21. Bay of Bengal cyclones in the post-monsoon months often intensify quickly over warm water and can change track before landfall, which is why the forecast landfall window is hundreds of kilometres wide.",
+     "analysis": "This is a serious regional disaster risk for a coast that has already been hit twice this month. The wide landfall window (Nellore to Tuni) means preparedness has to cover a long stretch of Andhra Pradesh, plus rain in Odisha, rather than a single city. The November 17 GDACS wind reading of 93 km/h is well below the very-severe landfall forecast; it may simply describe the storm's intensity while it is still over water. The official forecast to watch is still IMD's, which can be upgraded or downgraded as new advisory packages are issued.\n\nThere is no direct threat to the United States. Our read of the risk to a general U.S. reader is low; the risk is to people in coastal Andhra Pradesh and Odisha over the next few days.",
+     "watch": "Watch the next IMD bulletins for a tighter landfall point, any upgrade or downgrade from very severe cyclonic storm, and evacuation orders in Andhra Pradesh and Odisha. GDACS remaining at orange, or moving to red, is another signpost. The current forecast timing is around noon on November 20, and the track can still change."
+    },
+    "images": [
+     {
+      "src": "/wire2/static/img/sv3_akvan_hero.webp",
+      "role": "hero",
+      "alt": "Original diagram of Cyclone Akvan's November 17 position and the forecast landfall stretch.",
+      "credit_id": "bn-akvan-map"
+     }
+    ],
+    "sources": [
+     {
+      "url": "https://www.thehindu.com/news/national/andhra-pradesh/cyclone-akvan-to-cross-andhra-coast-between-nellore-and-tuni-by-november-20-noon-says-imd/article71706785.ece",
+      "label": "The Hindu, updated 17 Nov 2026, citing IMD"
+     },
+     {
+      "url": "https://www.gdacs.org/report.aspx?eventtype=TC&eventid=1001351",
+      "label": "GDACS event 1001351, Tropical Cyclone AKVAN-26"
+     }
+    ]
+   }
+  },
+  "845376abeeade96f": {
+   "headline": "Fed Governor Michael Barr warns AI agents could speed up bank runs so they unfold in minutes",
+   "why_it_matters": "A Fed official says software acting for customers could pull deposits faster than banks and regulators can respond.",
+   "what_happened": "In a speech prepared for an AI-in-finance conference in Milan on Monday, Nov. 16, Federal Reserve Governor Michael Barr said AI agents could \"instantaneously detect yield differentials or stability signals and autonomously move funds at high speed, potentially accelerating runs that unfold in minutes.\" He also said major banks report AI agents attempting actions in retail customer accounts without the bank being able to verify the customer's consent.",
+   "analysis": "Barr called for strict authentication, explicit consent checks for specific actions and technical limits on what agents can do. His remarks build on the Fed's Financial Stability Report from last week, in which 87% of contacts surveyed cited AI as a salient risk, Reuters reported. He also warned of AI-driven herd trading and AI-enabled cyberattacks.",
+   "rank_why": "The scanner ranked it 7 on the words \"bank run\" and wide coverage; this is a warning about a possible future risk, not an event, so we would rank it much lower.",
+   "risk": "Low",
+   "risk_why": "A policy warning about a future risk; no bank run or AI incident at a bank has been reported.",
+   "if_true": "Signposts: new Fed or bank-regulator guidance on AI agents in accounts, and banks adding consent and authentication rules.",
+   "if_false": "If agent use stays limited, the risk remains theoretical.",
+   "what_to_do": "No action is needed. Be careful about giving any AI tool or app permission to move money from your bank account.",
+   "confidence": "High",
+   "confidence_why": "The speech text is published by the Federal Reserve; Reuters and Bloomberg Law reported it.",
+   "sources": [
+    "https://www.federalreserve.gov/newsevents/speech/barr20261116a.htm",
+    "https://news.bloomberglaw.com/artificial-intelligence/feds-barr-says-ai-agents-could-fuel-future-bank-runs",
+    "https://www.investing.com/news/economic-indicators/feds-barr-warns-on-ai-risks-to-financial-system-5028804"
+   ],
+   "written_at": "2026-11-17T00:35:33Z",
+   "story": {
+    "headline": "A Fed governor warns that AI agents could speed up bank runs so they unfold in minutes.",
+    "dek": "Michael Barr's November 16 remarks also describe banks already seeing AI agents try to act in retail accounts, and a fast-growing pile of AI-related debt.",
+    "written_at": "2026-11-17T21:40:00Z",
+    "hero": {
+     "image": "/wire2/static/img/sv3_fed_hero.webp",
+     "image_mobile": "/wire2/static/img/sv3_fed_hero_m.webp",
+     "alt": "Original diagram illustrating funds moving toward a single point, with a line from Barr's speech: runs that unfold in minutes."
+    },
+    "sections": {
+     "happened": "In remarks prepared for the Association for Computing Machinery's conference on AI in finance in Milan on Monday, November 16, Federal Reserve Governor Michael S. Barr said AI agents acting for customers could \"instantaneously detect yield differentials or stability signals and autonomously move funds at high speed, potentially accelerating runs that unfold in minutes, overwhelming traditional liquidity management and regulatory intervention timelines.\"\n\nHe also said major banks \"now report finding AI agents attempting to take actions in retail customer accounts, without the bank being able to verify authenticity, consent, and alignment with customer instructions.\" He called for strict authentication, explicit consent checks for specific actions, and technical limits on what agents can do.\n\nThe speech recaps the Fed's Financial Stability Report issued on Friday, November 13. Barr said on-balance-sheet debt of the seven largest AI firms has been growing significantly in 2026 and is expected to exceed $800 billion before year's end, a rise he compared with the telecom investment cycle of the late 1990s and early 2000s. He said hyperscaler firms and large GPU producers also have over $100 billion in cumulative equity investments in large language model labs and cloud-computing start-ups — a form of \"circular financing,\" in which the same firms invest in smaller companies that then rent or buy compute from them. In a significant repricing of AI investments, he said, stress from that debt and those circular networks could amplify the move.",
+     "background": "Barr said this was the fourth speech he had given in the past year devoted exclusively to artificial intelligence. He framed the remarks around the AI investment boom, the use of AI in wholesale trading, cyber risk, and consumer finance.\n\nOn trading, he warned that if traders rely on a small set of similar AI models trained on similar data, strategies could synchronize and produce herding, with shared flaws becoming a systemic problem. On cyber risk, he said incidents this year had shown AI models treating security boundaries as obstacles to overcome rather than rules to follow, and that AI-enabled attackers had exploited some of the same shared-platform vulnerabilities used by human attackers.\n\nHe compared earlier infrastructure booms — railroads in the 1870s, highways in the 1950s and 1960s, and fiber-optic cable in the 1990s — and noted that some of those booms later left spare capacity, as with \"dark fiber\" after the 1990s cycle. He said only time will tell whether today's AI buildout is overdone.",
+     "analysis": "This is a policy warning about a future path, not a report of a bank run or a bank failure. Barr is describing a mechanical change: if software can move deposits the moment a signal flashes, a run that used to take hours or days might not leave banks or regulators time to respond. The more immediate fact in the speech is that large banks already say they are seeing agents try to act in retail accounts without the bank being able to confirm the customer's intent.\n\nThe debt figures are large — more than $800 billion expected on the books of the seven largest AI firms this year, and more than $100 billion in circular equity investments — but Barr presents them as a possible amplifier of an AI repricing, not as proof that a crash is under way. We have no evidence in this story of a run, a rescue, or a new rule being issued.\n\nOur read of the risk to a general reader is low: this is a senior regulator flagging a design problem in how money could move, not an unfolding financial emergency.",
+     "watch": "Signposts would include new Fed or bank-regulator guidance on authentication and consent for AI agents in customer accounts, banks tightening those controls, and any further Fed work on leverage in the data-centre buildout. The speech is not a forecast of a run."
+    },
+    "images": [
+     {
+      "src": "/wire2/static/img/sv3_fed_hero.webp",
+      "role": "hero",
+      "alt": "Original diagram with a line from Barr's speech.",
+      "credit_id": "bn-fed-diagram"
+     }
+    ],
+    "sources": [
+     {
+      "url": "https://www.federalreserve.gov/newsevents/speech/barr20261116a.htm",
+      "label": "Federal Reserve, speech by Governor Michael S. Barr, 16 Nov 2026"
+     }
+    ]
+   }
+  },
+  "bb45c246c2ea909b": {
+   "headline": "A new reconstruction finds human travel, not population size, drove Ebola's early spread in Congo.",
+   "why_it_matters": "Researchers say mobile-phone data almost perfectly predicted where Bundibugyo Ebola would appear next, in an outbreak that is now Congo's largest on record.",
+   "what_happened": "A team led by researchers in the Democratic Republic of the Congo paired case and testing records with mobile-phone data and found that human movement — not geography or population size — propelled the early spread of Bundibugyo Ebola virus, CIDRAP reported on November 17, describing a study published last week in Science. As of that report, the U.S. CDC listed 11,463 cases and 5,597 deaths, with 67 health zones in eight provinces affected.",
+   "analysis": "The study suggests the virus was circulating weeks before the epidemic was declared in mid-May. The earliest known patient developed symptoms on April 25, and an earlier sample from April 9 had invalid results. Cases rose rapidly from May 10 to June 1. No approved vaccines or treatments target Bundibugyo, though a vaccine and therapeutic trial are under way, CIDRAP said.",
+   "rank_why": "The scanner ranks it as a major disease story because it concerns Congo's largest Ebola outbreak and is reported by CIDRAP, a Science paper, and other outlets. We agree it is a significant scientific and public-health story; it does not by itself change the immediate risk to readers in the United States.",
+   "risk": "Medium",
+   "risk_why": "The outbreak in Congo is large and still growing; this paper explains how it spread there. It is not evidence of spread to the United States.",
+   "if_true": "If the mobility pattern holds, new cases should continue to appear along established travel corridors rather than simply in the largest nearby cities. Permanent lab and care capacity in those corridors is what the authors say is needed.",
+   "if_false": "If later investigations show earlier hospital or local transmission that mobility data missed, the travel-corridor map would be incomplete rather than a prediction tool.",
+   "what_to_do": "No action is needed in the United States.",
+   "confidence": "High",
+   "confidence_why": "The account is from a CIDRAP report of a Science paper and a University of Oxford news release, with CDC totals current as of November 17. We have not independently re-analyzed the underlying mobility data.",
+   "sources": [
+    "https://www.cidrap.umn.edu/ebola/human-travel-drove-ebola-spread-dr-congo-outbreak-reconstruction-suggests",
+    "https://www.science.org/doi/10.1126/science.aej4586"
+   ],
+   "written_at": "2026-11-17T21:40:00Z",
+   "story": {
+    "headline": "A new reconstruction finds human travel, not population size, drove Ebola's early spread in Congo.",
+    "dek": "Mobile-phone data almost perfectly predicted where Bundibugyo Ebola would appear next, researchers reported, in what is now Congo's largest outbreak on record.",
+    "written_at": "2026-11-17T21:40:00Z",
+    "hero": {
+     "image": "/wire2/static/img/sv3_drc_hero.webp",
+     "image_mobile": "/wire2/static/img/sv3_drc_hero_m.webp",
+     "alt": "Original diagram of places named in the Science reconstruction of early Bundibugyo Ebola spread in eastern Congo. Locations are approximate."
+    },
+    "sections": {
+     "happened": "On November 17, CIDRAP reported a study, published last week in the journal Science, in which a team led by researchers in the Democratic Republic of the Congo paired case and testing records with mobile-phone data. They concluded that human movement — not geography or destination population size — propelled the early spread of Bundibugyo Ebola virus in an outbreak that CIDRAP says is now Congo's largest on record and the fastest-growing Ebola outbreak in history.\n\nAs of that CIDRAP report, the U.S. Centers for Disease Control and Prevention listed 11,463 cases and 5,597 deaths, with Ebola affecting 67 health zones in eight provinces. The study, CIDRAP said, is the most detailed epidemiologic reconstruction so far of the rapid expansion within Ituri province and in bordering provinces.\n\nThe person with the earliest known infection developed symptoms on April 25. An earlier sample from a suspected case, from April 9, had invalid results — which the authors said could reflect insufficient blood, poor samples from deceased patients, or trouble moving samples to laboratories that were only then being set up. The epidemic was declared in mid-May. From May 10 to June 1, the number of health zones reporting infections rose by 12 and the number of affected areas by 49. The estimated early case-doubling time was 10 days. Among 555 known test outcomes with age, sex and symptom onset recorded, the median age was 34.5 years and women accounted for 59 percent of confirmed cases.",
+     "background": "This is an outbreak of Bundibugyo Ebola virus. CIDRAP, citing the paper, says no approved vaccines or treatments target Bundibugyo, although a vaccine and therapeutic trial are under way. That is a different position from outbreaks of Zaire ebolavirus, for which licensed vaccines and treatments already exist.\n\nCo-first author Pierre Akilimali of the University of Kinshasa, in a University of Oxford news release quoted by CIDRAP, said Congolese teams were collecting and analysing individual-level case data within days of the alert, under difficult conditions. More than 50 researchers worked on questions from the response teams, including where to put resources and what it would cost to care for patients.\n\nThe same CIDRAP article noted that Kenya has begun a 42-day countdown after its last surviving Ebola patient was released, and that Nigeria has ended a 21-day monitoring period after its only infected patient was discharged and 62 contacts were cleared. Those are separate, smaller events linked to the wider regional picture, not findings of the Science paper itself.",
+     "analysis": "The practical claim is sharp: destination population size did not predict where the virus went, but mobility did. CIDRAP reports that the risk of Bundibugyo appearing fell with distance from Bunia and Mongbwalu in Ituri, and from Rwampara in Uganda, out to about 100 kilometres, then rose slightly between 150 and 200 kilometres — a pattern the authors link to travel corridors and then local growth. Co-senior authors Moritz Kraemer of Oxford and Samuel Scarpino of Northeastern University said human mobility data \"predicted almost perfectly where this virus would appear next,\" and argued for putting laboratory and care capacity permanently in those high-risk settings.\n\nThe reconstruction also says the virus was circulating weeks before the mid-May declaration, which would have shortened the window for stopping it at the source. Combined with the lack of approved medical countermeasures for Bundibugyo, that helps explain how this became, in the authors' and CIDRAP's wording, the fastest-growing Ebola outbreak on record.\n\nThis paper explains spread inside Congo and nearby corridors. It is not evidence of a threat to the United States. Our read of the risk to a general U.S. reader is medium only because the underlying outbreak is large and ongoing.",
+     "watch": "If the mobility pattern holds, new zones should continue to appear along known travel corridors, and the value of the work will be whether lab and treatment capacity is actually placed there. Watch also for results from the Bundibugyo vaccine and therapeutic trials, and for official case totals from CDC, WHO and Africa CDC.\n\nNo action is needed in the United States."
+    },
+    "images": [
+     {
+      "src": "/wire2/static/img/sv3_drc_hero.webp",
+      "role": "hero",
+      "alt": "Original diagram of places named in the reconstruction. Locations are approximate.",
+      "credit_id": "bn-drc-map"
+     }
+    ],
+    "sources": [
+     {
+      "url": "https://www.cidrap.umn.edu/ebola/human-travel-drove-ebola-spread-dr-congo-outbreak-reconstruction-suggests",
+      "label": "CIDRAP, 17 Nov 2026"
+     },
+     {
+      "url": "https://www.science.org/doi/10.1126/science.aej4586",
+      "label": "Science paper (doi: 10.1126/science.aej4586)"
+     }
+    ]
+   }
+  }
+ }
+}
