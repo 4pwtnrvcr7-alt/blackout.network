@@ -22,6 +22,11 @@ IMG = {
     "geo":       ("gen_geo_lines.webp", "Graphic: BLACKOUT.NETWORK"),
     "signal":    ("gen_signal_lines.webp", "Graphic: BLACKOUT.NETWORK"),
 }
+def credit_html(k):
+    """Matt 12:07 PM: no source credits on images (they live on /credits, linked from every page footer). BN_CREDITS_PAGE=0 = old overlays."""
+    import os as _o
+    if _o.environ.get("BN_CREDITS_PAGE", "1") == "0": return f'<p class="w2-credit">{E(IMG[k][1])}</p>'
+    return ""  # Matt 1:19 PM: no labels on photos at all; the illustrative note lives on /credits#wire
 CYC = re.compile(r"\b(tropical cyclone|cyclone|hurricane|typhoon|tropical storm)\b", re.I)
 
 def img_keys(it):
@@ -157,7 +162,7 @@ def hero(img_key, eyebrow, title, line, btn=None, cls="", h1=True, credit=True):
     return (f'<section class="w2-hero {cls}"><div class="w2-hi"><picture>{srcset(f)}<img src="{ST}/img/{f}" alt="" decoding="async" fetchpriority="high" data-par></picture></div>'
             f'<div class="w2-hc w2-rv"><p class="w2-eb">{eyebrow}</p><{tag} class="w2-ht">{E(title)}</{tag}>'
             + (f'<p class="w2-hl">{E(line)}</p>' if line else "") + (btn or "") + '</div>'
-            + (f'<p class="w2-credit">{E(cr)}</p>' if credit else "") + '</section>')
+            + (credit_html(img_key) if credit else "") + '</section>')
 
 def btn(href, label, cls=""):
     return f'<a class="w2-btn {cls}" href="{E(href)}">{E(label)}<svg viewBox="0 0 20 10" aria-hidden="true"><path d="M0 5h18M14 1l4 4-4 4" fill="none" stroke="currentColor"/></svg></a>'
@@ -181,7 +186,7 @@ def render_list(state):
         body += (f'<section class="w2-hero w2-hero-top" id="w2_top"><div class="w2-hi"><picture>{srcset(IMG[k][0])}<img src="{ST}/img/{IMG[k][0]}" alt="" loading="lazy" decoding="async" data-par></picture></div>'
                  f'<div class="w2-hc w2-rv"><p class="w2-eb">TOP STORY · {E((top.get("category") or "").upper())}</p>{rank_block(top.get("rank"), True)}'
                  f'<h2 class="w2-ht w2-ht-s">{E(headline(top.get("title")))}</h2><p class="w2-hl">{E(dek_for(top, headline(top.get("title"))))}</p>'
-                 f'{btn("/wire/" + top["cluster_id"], "Read story")}</div><p class="w2-credit">{E(IMG[k][1])}</p></section>')
+                 f'{btn("/wire/" + top["cluster_id"], "Read story")}</div>{credit_html(k)}</section>')
     rest = m[1:]; bands = []
     for it in rest:                       # up to 2 full-bleed feature bands, each with a fresh, relevant image
         if len(bands) == 2: break
@@ -193,7 +198,7 @@ def render_list(state):
         h = headline(it.get("title"))
         return (f'<section class="w2-hero w2-hero-band w2-feat"><div class="w2-hi"><picture>{srcset(IMG[k][0])}<img src="{ST}/img/{IMG[k][0]}" alt="" loading="lazy" decoding="async" data-par></picture></div>'
                 f'<div class="w2-hc w2-rv"><p class="w2-eb">{E((it.get("category") or "").upper())}</p>{rank_block(it.get("rank"), True)}<h2 class="w2-ht w2-ht-s">{E(h)}</h2>'
-                f'<p class="w2-hl">{E(dek_for(it, h))}</p>{btn("/wire/" + it["cluster_id"], "Read story")}</div><p class="w2-credit">{E(IMG[k][1])}</p></section>')
+                f'<p class="w2-hl">{E(dek_for(it, h))}</p>{btn("/wire/" + it["cluster_id"], "Read story")}</div>{credit_html(k)}</section>')
     rows = []
     for i, it in enumerate(rest[:40]):
         p = brief_parts(it.get("brief")); cid = it["cluster_id"]
@@ -227,7 +232,7 @@ def render_story(state, cid):
     body = (f'<section class="w2-hero w2-hero-story"><div class="w2-hi"><picture>{srcset(IMG[k][0])}<img src="{ST}/img/{IMG[k][0]}" alt="" decoding="async" fetchpriority="high" data-par></picture></div>'
             f'<div class="w2-hc w2-rv"><p class="w2-eb"><a href="/wire">THE WIRE</a> / {E(cat)}</p>{rank_block(r, True)}<h1 class="w2-ht w2-ht-s">{E(h)}</h1>'
             + (f'<p class="w2-hl">{E(first_sentence(full, 140))}</p>' if h != full else "") + f'<p class="w2-meta">{E(meta)}</p></div>'
-            f'<p class="w2-credit">{E(IMG[k][1])}</p></section>')
+            f'{credit_html(k)}</section>')
     nf = it.get("n_families") or 1
     bottom = (f"A {RANK_NAMES.get(r, '').lower()} {(it.get('category') or 'story').lower()} story, reported by {nf} independent source{'s' if nf != 1 else ''}"
               + (", none of them official yet." if r and nf < 2 else "."))
