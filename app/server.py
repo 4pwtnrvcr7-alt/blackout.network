@@ -726,7 +726,7 @@ class H(BaseHTTPRequestHandler):
         if given and hmac.compare_digest(given.encode(), passcode().encode()): return "ok"
         fails[ip].append(t); return "bad"
 
-    TAB_PATHS = set("wire noise thread broadcasts streams radio network grid ai solar heatmap midterms spacex figures preppers tips weather trends "
+    TAB_PATHS = set("wire noise thread broadcasts streams radio network grid ai solar midterms spacex figures preppers tips weather trends "
                     "politics gunlaws finance jets medical resources bushcraft intel ranked games government maps".split())
     def not_found_page(self, path):
         """t347: a dashboard tab name typed as a path (/maps) -> 302 to /#maps; any other unknown non-API path -> the HTML 404 page.
@@ -741,6 +741,10 @@ class H(BaseHTTPRequestHandler):
         if seg in ("tips", "support", "support-us", "donate", "tip") and os.environ.get("BN_TIPS", "0") != "1":   # Nov 17 2026: Support Us page hidden (BN_TIPS=1 restores)
             self.send_response(301); self.send_header("Location", "/live"); self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "public, max-age=3600"); self.end_headers(); return True
+        if seg in ("heatmap", "heat-map", "heat_map"):   # Matt 5:25 PM: always the full-screen /map, never the old /live#heatmap panel
+            q = urlparse(self.path).query
+            self.send_response(302); self.send_header("Location", "/map" + ("?" + q if q else "")); self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store"); self.end_headers(); return True
         if seg in self.TAB_PATHS:
             q = urlparse(self.path).query   # seo/batch-1: keep ?utm_* (and any other query) through the tab redirect
             self.send_response(302); self.send_header("Location", ("/live" if new_home_on() else "/") + ("?" + q if q else "") + "#" + seg); self.send_header("Content-Length", "0")

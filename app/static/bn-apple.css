@@ -131,7 +131,7 @@ html.bna-pg .bng-inline{background:var(--a-sf)!important;border:0!important;box-
 /* report-a-problem: same quiet corner pill as the homepage */
 @media(min-width:601px){html.bna-pg .bnr-fab{left:auto!important;right:20px!important;bottom:20px!important;background:var(--a-bg)!important;border:1px solid var(--a-ln)!important;box-shadow:none!important;color:var(--a-mu)!important;opacity:.85;min-height:44px}}
 /* follow block above the dashboard footer: same links, no orange wash */
-html.bna-pg .bng-foot{background:var(--a-sf)!important;border:0!important;box-shadow:var(--a-sh)!important;border-radius:var(--a-r)!important}
+html.bna-pg .bng-foot{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}
 html.bna-pg body>footer,html.bna-pg .bn-dfoot-site{max-width:calc(var(--a-max) + 2*var(--a-gut))!important;margin-left:auto!important;margin-right:auto!important;padding-left:var(--a-gut)!important;padding-right:var(--a-gut)!important;box-sizing:border-box}
 /* standalone heroes (/crime, /network): drop the logo tile, the gradient wash, the kicker and the two-colour title; keep title, lede and search */
 html.bna-pg .cr-hero,html.bna-pg .np-hero{background:none!important;border:0!important;box-shadow:none!important;padding:clamp(28px,4vw,56px) 0 clamp(16px,2vw,28px)!important;margin:0!important;overflow:visible!important}
