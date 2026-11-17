@@ -164,3 +164,7 @@ html body .bnt-tstamp{margin:-6px 0 18px}
 html body main .hw-i{border-radius:0!important;border-color:rgba(242,242,244,.3)!important}
 details.bnt-leg{margin:6px 0 12px}
 html body main select{border-radius:0!important}
+
+/* Nov 17 push C: square monochrome section-nav chips */
+body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a{border-radius:0!important;border:1px solid rgba(242,242,244,.55)!important;background:transparent!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.1em;font-size:11px!important}
+body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a:hover{background:#F2F2F4!important;color:#000!important}
