@@ -219,3 +219,5 @@ html.bn-snap-js body{overscroll-behavior-y:none}
 
 
 html.bn-menu-on body header.bn-top{z-index:2700!important}
+/* Matt 5:25 PM: old regional heat map tab is retired; Heat Map opens /map */
+nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:none!important}

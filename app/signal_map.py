@@ -520,7 +520,7 @@ def page2(qs):
 <div class="bnm-key"><span class="c">Calm 0–3</span><span class="e">Elevated 4–6</span><span class="h">High 7–10</span></div>
 <p class="bnm-note" id="bnm_note">Heat weighs each located alert by its rank. Dots appear as you zoom in; tap one for the headline, rank and sources.</p>
 <p class="bnm-note" id="bnm_cov"></p></div>
-<div class="bnm-links"><a href="/wire">The Wire</a><a href="/live#heatmap">Heat map tab</a><a href="/scoring">How we score</a><button type="button" id="bnm_report">Report a problem</button></div>
+<div class="bnm-links"><a href="/wire">The Wire</a><a href="/scoring">How we score</a><button type="button" id="bnm_report">Report a problem</button></div>
 <p class="bnm-attr">Map data &copy; <a href="https://www.openstreetmap.org/copyright" rel="noopener" target="_blank">OpenStreetMap</a> contributors · <a href="https://openfreemap.org" rel="noopener" target="_blank">OpenFreeMap</a> · <a href="https://openmaptiles.org/" rel="noopener" target="_blank">OpenMapTiles</a></p>
 </section>
 <aside class="bnm-card" id="bnm_card" hidden aria-live="polite"></aside>

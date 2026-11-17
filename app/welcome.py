@@ -125,7 +125,7 @@ TOOLS = [
     ("social", "Videos & posts", "Our YouTube and X reports, each with a sourced write-up on this site.", "/social"),
 ]
 ALSO = [
-    ("Heat Map", "/#heatmap"), ("Local Resources", "/#resources"), ("Offline Maps", "/#maps"),
+    ("Heat Map", "/map"), ("Local Resources", "/#resources"), ("Offline Maps", "/#maps"),
     ("First Aid", "/#medical"), ("Everyday Readiness", "/ready"), ("Crime", "/crime"),
     ("Midterms 2026", "/midterms"), ("Public stats", "/stats"),
 ]
