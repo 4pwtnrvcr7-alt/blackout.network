@@ -467,7 +467,7 @@
   }
   var IOS_ART = '<figure class="bnal-ios" aria-label="Three steps: tap Share, tap Add to Home Screen, open BLACKOUT and tap the bell">'
     + '<svg viewBox="0 0 330 150" role="img" aria-hidden="true" focusable="false">'
-    + '<defs><linearGradient id="bnalm" x1="0" x2="1"><stop offset=".333" stop-color="#2BB673"/><stop offset=".333" stop-color="#F5A524"/><stop offset=".666" stop-color="#F5A524"/><stop offset=".666" stop-color="#FF4D4F"/></linearGradient></defs>'
+    + '<defs><linearGradient id="bnalm" x1="0" x2="1"><stop offset=".333" stop-color="#6B7076"/><stop offset=".333" stop-color="#C9CDD3"/><stop offset=".666" stop-color="#C9CDD3"/><stop offset=".666" stop-color="#FF4D4F"/></linearGradient></defs>'
     + [0, 1, 2].map(function (k) { return '<rect x="' + (14 + k * 108) + '" y="6" width="86" height="138" rx="14" fill="#14181D" stroke="#2f3742" stroke-width="2"/>'; }).join("")
     // 1: Safari bar with Share highlighted
     + '<rect x="22" y="112" width="70" height="22" rx="7" fill="#1d232b"/><circle cx="57" cy="123" r="10" fill="#FF4D4F" fill-opacity=".2" stroke="#FF4D4F" stroke-width="1.6"/>'

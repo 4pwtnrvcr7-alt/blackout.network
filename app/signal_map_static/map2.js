@@ -6,7 +6,7 @@
   "use strict";
   var d = document, $ = function (id) { return d.getElementById(id); };
   var CFG = window.BNM_CFG || {};
-  var C = { calm: "#3DDC97", elev: "#FFB020", high: "#FF4D4F", y: "#FFC21A", ink: "#F0F0FA" };
+  var C = { calm: "#6B7076", elev: "#C9CDD3", high: "#FF4D4F", y: "#F2F2F4", ink: "#F0F0FA" };
   var RN = ["Noise", "Low", "Low", "Guarded", "Elevated", "Elevated", "Elevated", "Major", "Severe", "Critical", "Catastrophic"];
   var TOPIC = { "war/conflict": "Conflict", "natural disaster": "Weather & quakes", "disease": "Health", "cyber": "Cyber", "political": "Politics", "financial": "Markets", "space weather": "Space weather", "infrastructure": "Infrastructure" };
   var state = { view: CFG.view || "world", rank: CFG.rank || "", window: CFG.window || "168", topic: CFG.topic || "" };
@@ -188,8 +188,8 @@
         "heatmap-radius": ["interpolate", ["exponential", 1.6], ["zoom"], 0, 9, 2, 16, 4, 28, 7, 48, 10, 70],
         "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 0, 0.9, 6, 0.85, 9, 0.55, 12, 0.25],
         "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
-          0, "rgba(0,0,0,0)", 0.06, "rgba(124,196,255,0.10)", 0.18, "rgba(61,220,151,0.30)", 0.36, "rgba(255,194,26,0.50)",
-          0.58, "rgba(255,176,32,0.70)", 0.8, "rgba(255,77,79,0.85)", 1, "rgba(255,226,205,0.95)"] } }, before);
+          0, "rgba(0,0,0,0)", 0.06, "rgba(124,196,255,0.10)", 0.18, "rgba(107,112,118,0.30)", 0.36, "rgba(242,242,244,0.50)",
+          0.58, "rgba(201,205,211,0.70)", 0.8, "rgba(255,77,79,0.85)", 1, "rgba(255,226,205,0.95)"] } }, before);
       map.addLayer({ id: "cl", type: "circle", source: "dots", filter: ["has", "point_count"], minzoom: 2.6, paint: {
         "circle-color": ["step", ["get", "mx"], C.calm, 4, C.elev, 7, C.high], "circle-opacity": ["interpolate", ["linear"], ["zoom"], 2.6, 0, 3.4, 0.22],
         "circle-stroke-color": ["step", ["get", "mx"], C.calm, 4, C.elev, 7, C.high], "circle-stroke-width": 1, "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 2.6, 0, 3.4, 0.85],
