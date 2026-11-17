@@ -92,6 +92,14 @@ def videos_for(cid):
         return [s for s in social.stories(public_only=True) if cid in (s.get("cluster_ids") or [])]
     except Exception: return []
 
+def _h1(full, what=""):
+    """Nov 17 push C: short clean headline (theme._headline, display only); the full wording stays just below as the dek."""
+    try:
+        import theme; short = theme._headline(full)
+    except Exception: short = full
+    dek = full if short != full else (what if what and what != full else "")
+    return f'<h1 class="t">{S.E(short)}</h1>' + (f'<p class="dek">{S.E(dek)}</p>' if dek else "")
+
 def render(cid, since=""):
     r, al = load(cid)
     if not r:
@@ -166,17 +174,16 @@ def render(cid, since=""):
             f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>'
             f'<div><span class="pill" style="color:{col};border-color:{col}">RANK {rank}/10 · {tname.upper()}</span>'
             f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill" style="color:#f5a524">WATCHLIST</span>' if watch == 1 else "") + '</div>'
-            f'<h1 class="t">{S.E(S.clean_title(dek_note).rstrip(". ") if dek_note else title)}</h1>'   # t1276u: the analyst headline (sourced, no hype) when a note exists
-            + ("" if dek_note else (f'<p class="dek">{S.E(what)}</p>' if what and what != title else ""))
+            + _h1(S.clean_title(dek_note).rstrip(". ") if dek_note else title, what if not dek_note else "")
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
             + g_ppl + g_share + upd + report + breakdown + (g_short if report else (g_short or g_loc))
             + vhtml + elec
             + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
-            + '<section class="card"><h2>How confident are we?</h2><p>'
+            + '<details class="card bnt-sacc"><summary><h2>How confident are we?</h2></summary><p>'
             + S.E(f"{eff} independent source{'' if eff == 1 else 's'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
-            + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></section>'
-            + f'<section class="card"><h2>Timeline and sources</h2><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></section>'
+            + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></details>'
+            + f'<details class="card bnt-sacc"><summary><h2>Timeline and sources</h2></summary><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></details>'
             + '<section class="card" id="follow"><h2>' + _ic("star") + 'Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
               'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
               + g_follow + '<p class="meta"><a href="/wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
