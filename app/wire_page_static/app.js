@@ -374,15 +374,30 @@
       }
       bullets.push(line + "</li>");
     }
-    $("w-bullets").innerHTML = bullets.join("");
+    var ul = $("w-bullets");
+    ul.innerHTML = bullets.join("");
+    var allb = $("w-allb");
+    if (bullets.length > 2) {   // new theme: two headlines first, the rest one tap away
+      if (!allb) {
+        allb = document.createElement("button"); allb.type = "button"; allb.id = "w-allb"; allb.className = "w-allb";
+        allb.setAttribute("aria-controls", "w-bullets");
+        allb.addEventListener("click", function () { var o = !ul.classList.contains("all"); ul.classList.toggle("all", o); allb.setAttribute("aria-expanded", o ? "true" : "false"); allb.textContent = o ? "Show fewer" : "Show all " + ul.children.length + " changes"; });
+        ul.parentNode.insertBefore(allb, ul.nextSibling);
+      }
+      ul.classList.add("fold");
+      if (!ul.classList.contains("all")) { allb.setAttribute("aria-expanded", "false"); allb.textContent = "Show all " + bullets.length + " changes"; }
+      allb.hidden = false;
+    } else { ul.classList.remove("fold"); if (allb) allb.hidden = true; }
     var notice = window.BN_WIRE_NOTICE;
     var coming = $("w-coming");
     if (notice && notice.title) {
       coming.hidden = false;
-      coming.innerHTML = '<div class="k">' + esc(notice.kicker || "Featured notice") +
-        (notice.tag ? " · " + esc(notice.tag) : "") + "</div>" +
-        "<strong>" + (notice.href ? '<a href="' + esc(notice.href) + '">' + esc(notice.title) + "</a>" : esc(notice.title)) + "</strong>" +
-        (notice.text ? " — " + esc(notice.text) : "");
+      var open = coming.querySelector(".bnt-acc-h[aria-expanded=true]");   // keep it open across refreshes
+      coming.innerHTML = '<button type="button" class="bnt-acc-h w-nh" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="w-nb"><span>' +
+        '<span class="k">' + esc(notice.kicker || "Featured notice") + (notice.tag ? " · " + esc(notice.tag) : "") + "</span>" +
+        "<strong>" + esc(notice.title) + "</strong></span></button>" +
+        '<div class="bnt-acc-b" id="w-nb"' + (open ? "" : " hidden") + '><div class="bnt-acc-in">' + (notice.text ? esc(notice.text) : "") +
+        (notice.href ? ' <a class="w-nl" href="' + esc(notice.href) + '">Read the notice &rarr;</a>' : "") + "</div></div>";
     } else {
       coming.hidden = true;
       coming.innerHTML = "";
@@ -395,8 +410,8 @@
     var main = (state.main || []).map(function (c) { return norm(c, false); });
     var watch = (state.watchlist || []).map(function (c) { return norm(c, true); });
     var gen = parseT(state.generated);
-    $("w-updated").textContent = "Updated " + (gen ? fmtET(gen, true) : "") +
-      " · scanner checks about every " + (state.interval_minutes || 5) + " minutes · " +
+    stampUp(gen);
+    $("w-updated").textContent = "Scanner checks about every " + (state.interval_minutes || 5) + " minutes · " +
       main.length + " stories on The Wire · " + (state.watchlist_count || watch.length) + " single-source on the watchlist";
     bulletin(main);
     var nHigh = main.filter(function (c) { return c.band === "high"; }).length;
@@ -437,6 +452,7 @@
         ". The live watchlist is longer; this page keeps the list short on purpose.</p></section>";
     }
     $("w-feed").innerHTML = html;
+    var mn = $("main"); if (mn) { mn.classList.remove("w-loading"); mn.removeAttribute("aria-busy"); }
     fillOpen();
   }
 
@@ -525,6 +541,20 @@
     }
   });
 
+  /* per-module refresh (Matt Nov 17 1:10 AM): "Updated h:mm AM ET · next in Xm" + a button that reloads just the feed */
+  function stampUp(gen) {
+    if (!window.BNT || !BNT.up) return;
+    var iv = ((state && state.interval_minutes) || 5) * 60000, at = gen || Date.now(), nx = at + iv;
+    while (nx < Date.now() - 30000) nx += iv;
+    BNT.up($("w-up"), { label: "The Wire", at: at, next: nx, run: function () { return loadState(); } });
+  }
+  function loadState() {
+    return fetch("/api/state", { credentials: "same-origin", cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("state " + r.status);
+      return r.json();
+    }).then(function (j) { state = j; render(); }).catch(function () {});
+  }
+  setInterval(function () { if (!document.hidden && state) loadState(); }, 300000);
   function boot() {
     var err = $("w-err");
     fetch("/api/state", { credentials: "same-origin" }).then(function (r) {
@@ -537,6 +567,8 @@
       err.hidden = false;
       err.textContent = "The live feed could not be loaded. Refresh the page, or open the dashboard at the homepage.";
       $("w-updated").textContent = "The live feed is unavailable right now.";
+      var mn = $("main"); if (mn) { mn.classList.remove("w-loading"); mn.removeAttribute("aria-busy"); }
+      $("w-feed").innerHTML = ""; $("w-bulletin").hidden = true;
     });
     fetch("/api/social", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       social = j;
