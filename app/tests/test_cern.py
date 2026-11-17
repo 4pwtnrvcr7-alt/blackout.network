@@ -35,7 +35,7 @@ class Page(unittest.TestCase):
                   'id="myths"', 'id="live"', 'id="dots"', 'id="sources"', "CERN and the Large Hadron Collider", "Mark Thomson",
                   "Stéphane Willocq", "Anadi Canepa", "Kai Schweda", "Tim Gershon", "$531 million", "4 332", "Long Shutdown 3",
                   "BLACKOUT.NETWORK analysis", "Illustration · not to scale", "Illustration · not real collision data",
-                  "Not affiliated with or endorsed by CERN", "Signal over noise."):
+                  "Not affiliated with or endorsed by CERN", "Global threat monitoring"):
             self.assertIn(s, h, s)
 
     def test_interactive_hooks_present(self):

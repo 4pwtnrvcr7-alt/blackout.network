@@ -19,7 +19,7 @@ class WelcomePage(unittest.TestCase):
         h = html()
         self.assertIn("Welcome in.", h)
         self.assertIn("Created by humans. Powered by Superintelligence.", h)
-        self.assertIn("Signal over noise.", h)
+        self.assertIn("Global threat monitoring", h)
         self.assertIn("Get the Free brief.", h)
         self.assertIn("hello@blackout.network", h)
         self.assertIn("Confirm your BLACKOUT.NETWORK newsletter subscription", h)

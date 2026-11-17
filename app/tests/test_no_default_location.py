@@ -232,7 +232,7 @@ def _quiet_issue():
         "updates": [], "follow": [], "politics": [], "developing": [], "quiet": True,
         "start": end - timedelta(hours=12), "end": end, "slot": "evening",
         "empty": False, "rule": {"rank": 5, "sources": 2}, "crime": None,
-        "videos": [], "featured": [], "bluf": "Signal over noise.", "analysis": {},
+        "videos": [], "featured": [], "bluf": "Global threat monitoring", "analysis": {},
     }
 
 
