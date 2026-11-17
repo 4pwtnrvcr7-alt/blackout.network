@@ -14,7 +14,7 @@ import os, sys, json, html
 BASE = os.path.dirname(os.path.abspath(__file__))
 SITE = "https://blackout.network"
 BRAND = "BLACKOUT.NETWORK"
-TAGLINE = "Signal over noise."
+TAGLINE = "Global threat monitoring"
 YT_URL = "https://www.youtube.com/@blkoutntw"
 X_URL = "https://x.com/BlkoutNtw"
 HANDLE = "@BlkoutNtw"
@@ -116,7 +116,7 @@ if not MESH_ON:
 
 # Standalone pages: path -> (active nav key, title, meta description, visible one-line description).
 PAGES = {
- "home": ("threat", "BLACKOUT.NETWORK · Signal over noise.™",
+ "home": ("threat", "BLACKOUT.NETWORK · Global threat monitoring",
           "Independent, sourced early-warning signals on US and global threats: threat alerts and breaking news, updated around the clock. Not official alerts.",
           "Free early-warning threat monitor: threats ranked 0–10, every one linked to its sources."),
  "wire": ("threat", "The Wire: live threat feed | BLACKOUT.NETWORK",

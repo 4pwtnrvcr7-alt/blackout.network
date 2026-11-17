@@ -184,8 +184,8 @@ def addon_for(path):
 # "Report a problem" widget (reports.py): added to every HTML page that doesn't already load it (dashboard.html loads it itself).
 _RW = b'<link rel="stylesheet" href="/api/report/app.css"><script src="/api/report/app.js" defer></script>'
 # PWA / home-screen support + site title (pwa.py, static/pwa/): every full HTML page served through send() gets the manifest, icons,
-# iOS/Android web-app meta tags and the install guide in its <head>, and the public title "BLACKOUT.NETWORK · Signal over noise.™" (Compliance format, TM never R) (tagline Nov 1; never shown without the brand).
-SITE_TITLE = "BLACKOUT.NETWORK · Signal over noise.™".encode("utf-8")
+# iOS/Android web-app meta tags and the install guide in its <head>, and the public title "BLACKOUT.NETWORK · Global threat monitoring" (Compliance format, TM never R) (tagline Nov 1; never shown without the brand).
+SITE_TITLE = "BLACKOUT.NETWORK · Global threat monitoring".encode("utf-8")
 # Light/dark theme (t323): set data-theme on <html> before first paint (saved choice, else the OS setting) + preload the self-hosted fonts.
 THEME_HEAD = (b'<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
               b't="dark";'
