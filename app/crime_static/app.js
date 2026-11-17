@@ -95,6 +95,8 @@ function initNews(){var s=document.querySelector(".cr-nw[data-nwq]");if(!s)retur
  getJ("/api/crime/news?q="+encodeURIComponent(s.getAttribute("data-nwq"))).then(function(d){if(d&&d.html)b.innerHTML=d.html}).catch(function(){b.innerHTML='<div class="cr-nw-empty">Local reports are not available right now. The statistics below are still current.</div>'})}
 var form=$(".cr-search");if(form)form.addEventListener("submit",function(e){e.preventDefault();go(inp.value,true)});
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-q]");if(!a||e.metaKey||e.ctrlKey||e.shiftKey)return;e.preventDefault();go(a.dataset.q,true)});
-addEventListener("popstate",function(){var q=new URLSearchParams(location.search).get("place");if(q)go(q,false)});
+addEventListener("popstate",function(){var u=new URLSearchParams(location.search),q=u.get("place")||u.get("q");if(q)go(q,false)});
+/* ?q= is the same lookup as ?place=: keep the address canonical (/crime?place=...) without reloading */
+(function(){try{var u=new URLSearchParams(location.search),q=u.get("q");if(q&&!u.get("place"))history.replaceState(history.state,"","/crime?place="+encodeURIComponent(q.slice(0,80))+location.hash)}catch(e){}})();
 initHeat();initNews();initUS();initWorld();
 })();
