@@ -528,13 +528,47 @@ def _file(name):
     ct = {"js": "application/javascript", "css": "text/css", "json": "application/json"}.get(name.rsplit(".", 1)[-1], "application/octet-stream")
     with open(p, "rb") as fh: return 200, fh.read(), ct
 
+# ------------------------------------------------------------------------------------------------ full-screen media (Nov 17 2026, Matt)
+# Same treatment as the Wire and the Latest tab heroes: a full-screen looping, silent, graded video hero (still image on phones,
+# reduced motion and Save-Data) reusing tabhero.css (.bn-th*), then full-bleed sticky image panels behind the data sections.
+# Media: theme_static/media/cr*.b64 served by /bnt/media; credits on /credits#crime, never on the images.
+MEDIA_V = "1"
+def media_hero():
+    import theme as T
+    v = MEDIA_V
+    return (f'<link rel="stylesheet" href="{T.url("tabhero.css")}">'
+            '<section id="bn_th" class="bn-th cr-th" aria-label="Crime near you">'
+            '<div class="bn-th-s"><div class="bn-th-bg" aria-hidden="true">'
+            f'<picture><source media="(max-width:700px)" srcset="/bnt/media/crhero-m.jpg?v={v}">'
+            f'<img src="/bnt/media/crvid-d.jpg?v={v}" alt="" decoding="async" fetchpriority="high"></picture>'
+            f'<video class="bn-th-v" muted loop playsinline preload="none" disablepictureinpicture tabindex="-1" '
+            f'data-webm="/bnt/media/crvid-d.webm?v={v}" data-mp4="/bnt/media/crvid-d.mp4?v={v}"></video></div>'
+            '<div class="bn-th-c"><p class="bn-th-k">Crime data</p><h1 class="cr-th-t">Crime near you</h1>'
+            '<p class="cr-th-l">Real reports from local police and news, official rates and live heat maps for any US ZIP, city, county or state, or any country.</p></div>'
+            '<a class="bn-th-cue" href="#cr-look" aria-label="Scroll to the lookup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></a>'
+            '</div></section><div id="cr-look"></div>'
+            '<script>(function(){var v=document.querySelector("#bn_th .bn-th-v"),n=navigator.connection||{},'
+            'mm=function(q){return window.matchMedia&&matchMedia(q).matches};'
+            'if(!v||innerWidth<=700||mm("(prefers-reduced-motion: reduce)")||n.saveData)return;'
+            '[["webm","video/webm"],["mp4","video/mp4"]].forEach(function(a){var s=document.createElement("source");s.src=v.getAttribute("data-"+a[0]);s.type=a[1];v.appendChild(s)});'
+            'v.muted=true;v.autoplay=true;v.preload="auto";v.addEventListener("playing",function(){v.classList.add("on")},{once:true});'
+            'v.load();var p=v.play();if(p&&p.catch)p.catch(function(){})})()</script>')
+
+def panel(key, inner, label):
+    """Full-bleed panel: the image stays pinned full-screen behind the section while its data scrolls over it."""
+    v = MEDIA_V
+    return (f'<section class="cr-pan cr-pan-{key}" aria-label="{E(label)}"><div class="cr-pan-bg" aria-hidden="true"><picture>'
+            f'<source media="(max-width:700px)" srcset="/bnt/media/crp{key}-m.jpg?v={v}">'
+            f'<img src="/bnt/media/crp{key}-d.jpg?v={v}" alt="" loading="lazy" decoding="async"></picture></div>'
+            f'<div class="cr-pan-in">{inner}</div></section>')
+
 def render_page(q=""):
     fs = feeds(); nat = national() or {}; d = None
     if q: d = lookup(q)
     fm = meta("fbi_meta"); cm = meta("countries_meta")
     newest = max((x["newest"] for x in fs), default=None)
     hero = (f'<section class="cr-hero"><div class="cr-row">{TILE}<div class="cr-ht"><div class="cr-live"><i></i>BLACKOUT.NETWORK · CRIME DATA</div>'
-            '<h1>Crime near you</h1>'
+            '<h2 class="cr-h2">Look up a place</h2>'
             '<p>Type a US ZIP code, city, county or state, or any country. You get official rates per 100,000 people, how they compare and how they are trending, '
             'plus a live heat map of recent police reports where the city publishes them.</p></div></div>'
             f'<form class="cr-search" action="/crime" method="get" role="search"><label for="cr-q" class="cr-vh">Place</label>'
@@ -585,9 +619,14 @@ def render_page(q=""):
            f'{_src("OpenFreeMap", "https://openfreemap.org/")} © {_src("OpenMapTiles", "https://www.openmaptiles.org/")} data © {_src("OpenStreetMap contributors", "https://www.openstreetmap.org/copyright")}. '
            f'FBI data last refreshed {E(_ago(fm.get("fetched")))}; homicide data updated by the World Bank {E(cm.get("lastupdated") or "")}.</li>'
            '<li>Research only: BLACKOUT.NETWORK is not a police or emergency service. In an emergency call 911 (or your local number).</li></ul></section>')
-    body = f'<main class="cr" id="main">{hero}{result}{cities}{usmap}{world}{nl}{how}</main>'
+    body = (f'<main class="cr cr-full" id="main">{media_hero()}'
+            f'<div class="cr-in">{hero}</div>'
+            + panel("a", f'<div class="cr-in">{result}</div>', "Reports, statistics and the local heat map")
+            + panel("b", f'<div class="cr-in">{cities}{usmap}</div>', "Cities and US counties")
+            + panel("c", f'<div class="cr-in">{world}</div>', "World")
+            + f'<div class="cr-in">{nl}{how}</div></main>')
     foot = ('<footer class="cr-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/#weather">Weather</a> · <a href="/#preppers">Preppers</a> · '
-            '<a href="/newsletter">Newsletter</a> · <a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></footer>')
+            '<a href="/newsletter">Newsletter</a> · <a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/credits#crime">Image credits</a></footer>')
     path = "/crime" + (f"?place={urllib.parse.quote(q)}" if q else "")
     ld = {"@context": "https://schema.org", "@graph": [
         {"@type": "WebPage", "@id": f"{SITE}/crime#page", "url": f"{SITE}/crime", "name": TITLE, "description": DESC, "inLanguage": "en-US",
@@ -606,11 +645,11 @@ def render_page(q=""):
     head = (sitenav.head_html("crime", path) + '<meta name="robots" content="index,follow,max-image-preview:large">'
             '<meta name="keywords" content="crime map, crime rate by ZIP code, crime statistics, county crime rate, violent crime rate, property crime, crime near me, homicide rate by country, FBI crime data">'
             '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
-            '<link rel="stylesheet" href="/api/crime/app.css?v=3">')
+            '<link rel="stylesheet" href="/api/crime/app.css?v=4">')
     if title != TITLE: head = head.replace(f"<title>{E(TITLE)}</title>", f"<title>{E(title)}</title>", 1)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
-            '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}</style></head><body><a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>'
+            '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden;overflow-x:clip}</style></head><body><a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>'
             + sitenav.header_html("@crime") + body + foot + '<script src="/api/crime/app.js" defer></script></body></html>').encode("utf-8")
 
 def handle_get(path, qs):
