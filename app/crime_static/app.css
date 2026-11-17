@@ -118,3 +118,27 @@
 .cr-nw-list .cr-nw-none{color:#8E8E93;font-size:14px}
 .cr-nw-empty{color:#8E8E93;font-size:14px;padding:6px 0 10px}
 .cr-nw p.cr-mu{margin:12px 0 0}
+/* Nov 17 2026 (Matt): reports list: even dividers (a global li max-width in ch made the label row narrower) */
+.cr-nw-list{max-width:880px;width:100%}.cr-nw-list li{max-width:none;width:100%;box-sizing:border-box}.cr-nw p.cr-mu{max-width:880px}
+/* Nov 17 2026 (Matt): current palette for the older /crime blocks: black, white and greys; no amber/yellow glow; red reserved for rank 7+; monochrome outlined buttons */
+.cr{--cr-red:#FFFFFF;--cr-card:#0E0F11;--cr-line:#26282C;--cr-mu:#8E8E93}
+.cr-hero{background:#000;border-color:var(--cr-line)}
+.cr-hero h1 em{color:#fff}
+.cr-live{color:#8E8E93}.cr-live i{background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.12);animation:crp2 2s infinite}
+@keyframes crp2{50%{box-shadow:0 0 0 7px rgba(255,255,255,.04)}}@media(prefers-reduced-motion:reduce){.cr-live i{animation:none}}
+.cr-search input{background:#000;border-color:#3A3A3C}.cr-search input:focus{outline:1px solid #fff;outline-offset:1px}
+.cr-search button,.cr-btn{background:transparent;border:1px solid #fff;color:#fff;border-radius:999px;font:600 13px/1 var(--bn-font-ui,Montserrat,sans-serif);letter-spacing:.14em;text-transform:uppercase;padding:0 24px}
+.cr-search button:hover,.cr-btn:hover{background:#fff;color:#000}
+.cr-search button:focus-visible,.cr-btn:focus-visible{outline:1px solid #fff;outline-offset:3px}
+.cr-chip{background:transparent;border-color:#3A3A3C;color:#C7C7CC}.cr-chip:hover{border-color:#fff;color:#fff}
+.cr-kick{color:#8E8E93}
+.cr-k:before{background:var(--c,#fff)}
+.cr-chg.up{color:#fff;background:rgba(255,255,255,.10)}.cr-chg.dn{color:#C7C7CC;background:rgba(255,255,255,.05)}.cr-chg.eq{color:#8E8E93;background:rgba(255,255,255,.05)}
+.cr-recent b{color:#fff}
+.cr-note.warn{border-left-color:#fff}.cr-note a,.cr-how a{color:#fff;text-underline-offset:3px}
+.cr-maptools button{background:transparent;border-color:#3A3A3C;color:#C7C7CC}.cr-maptools button.on{background:transparent;border-color:#fff;color:#fff}
+.cr-city:before{background:linear-gradient(90deg,rgba(255,255,255,.5),transparent)}
+.cr-rank li a:hover{color:#fff;text-decoration:underline;text-underline-offset:3px}
+.cr-cta{border-color:var(--cr-line);background:var(--cr-card)}
+html body>main#main .cr-nw-list li,html body>main .cr-nw-list li{max-width:none}
+.cr-tb i.v{background:#E5E5EA}.cr-tb i.p{background:#8E8E93}
