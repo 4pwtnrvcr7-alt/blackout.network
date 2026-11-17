@@ -19,7 +19,7 @@
 .bnt-btn svg{width:14px;height:14px}
 .bnt-eyebrow{font:700 12px/1.2 var(--bnt-hd);letter-spacing:.24em;text-transform:uppercase;color:var(--bnt-y)}
 /* glass cards */
-.bnt-card{position:relative;background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.015));border:1px solid var(--bnt-ink-08);border-radius:20px;padding:24px;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 30px 60px -30px rgba(0,0,0,.8)}
+.bnt-card{position:relative;background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(255,255,255,.015));border:1px solid var(--bnt-ink-08);border-radius:20px;padding:24px;box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 14px 22px -16px rgba(0,0,0,.75)}/* Nov 17: smaller shadow blur, the 60px one was the main scroll cost */
 /* accordion: <div class="bnt-acc"><button class="bnt-acc-h" aria-expanded="false">Title</button><div class="bnt-acc-b">...</div></div> */
 .bnt-acc{border-top:1px solid var(--bnt-ink-08)}
 .bnt-acc:last-child{border-bottom:1px solid var(--bnt-ink-08)}

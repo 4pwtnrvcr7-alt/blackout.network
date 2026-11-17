@@ -52,3 +52,16 @@ BNT.up=function(el,o){if(!el)return;var u=null;for(var i=0;i<UPS.length;i++)if(U
  for(var k in o)u.o[k]=o[k];upPaint(u)};
 setInterval(function(){UPS.forEach(upPaint)},15000);
 })();
+
+/* Nov 17: very subtle GPU parallax for a few hero backdrops. Opt in with data-bn-par="0.12".
+   transform only, one rAF per frame, passive listener, off under reduced motion, only while on screen. */
+(function(){try{
+ if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+ var els=[].slice.call(document.querySelectorAll("[data-bn-par]"));if(!els.length)return;
+ var vis=new Set(),tick=false;
+ function frame(){tick=false;var y=window.pageYOffset;vis.forEach(function(e){var f=parseFloat(e.getAttribute("data-bn-par"))||.1;
+  e.style.transform="translate3d(0,"+Math.min(y*f,160).toFixed(1)+"px,0)"})}
+ function req(){if(!tick&&vis.size){tick=true;requestAnimationFrame(frame)}}
+ if("IntersectionObserver"in window){var io=new IntersectionObserver(function(es){es.forEach(function(x){x.isIntersecting?vis.add(x.target):vis.delete(x.target)});req()});els.forEach(function(e){io.observe(e)})}else els.forEach(function(e){vis.add(e)});
+ window.addEventListener("scroll",req,{passive:true});req();
+}catch(x){}})();
