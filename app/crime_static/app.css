@@ -142,3 +142,6 @@
 .cr-cta{border-color:var(--cr-line);background:var(--cr-card)}
 html body>main#main .cr-nw-list li,html body>main .cr-nw-list li{max-width:none}
 .cr-tb i.v{background:#E5E5EA}.cr-tb i.p{background:#8E8E93}
+/* the shared Apple-style layer (bn-apple.css) fills this button with !important; keep it outlined on /crime */
+html.bna-pg body .cr-search button,html.bna-pg body .cr-btn{background:transparent!important;color:#fff!important;border:1px solid #fff!important}
+html.bna-pg body .cr-search button:hover,html.bna-pg body .cr-btn:hover{background:#fff!important;color:#000!important}
