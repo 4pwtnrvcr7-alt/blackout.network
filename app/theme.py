@@ -316,7 +316,8 @@ def _home_page_raw():
     wm = '<span class="bnt-wm">blackout.network</span>'
     m4 = __import__("os").environ.get("BN_MENU_V2", "1") != "0"   # Push H: SpaceX-language full-screen menu (BN_MENU_V2=0 = side drawer)
     m4cls = " h-menu4" if m4 else ""
-    m4btn = '<span class="h-ml">Menu</span>' if m4 else ""
+    m4btn = ('<span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span>' if m4 else "")
+    hx = '<span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span>'
     mlead = ('<div class="h-m4lead"><a href="#s1" data-h-close>Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>' if m4
              else '<a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>')
     snap = snap_on() and home_snap_on()   # Matt 4:07 PM: the intro scrolls freely and smoothly like the Wire, no section snap
@@ -342,7 +343,7 @@ def _home_page_raw():
 <header class="h-nav" id="h_nav">
  <a class="h-wm" href="/live" aria-label="BLACKOUT.NETWORK live dashboard">{wm}</a>
  <nav class="h-links" aria-label="Primary"><a href="/live#heatmap">Live map</a><a href="/wire">The Wire</a><a href="#s3">How it ranks</a><a href="#s6">Free brief</a></nav>
- <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{m4btn}<i></i><i></i><i></i></button></div>
+ <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{hx}{m4btn}</button></div>
 </header>
 <ol class="h-pager" id="h_pager" aria-hidden="true"></ol>
 <main id="flow"{snapattr}>

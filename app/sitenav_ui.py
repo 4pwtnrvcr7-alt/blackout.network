@@ -28,7 +28,8 @@ def logo_html():
 PRIMARY = [("threat", "/wire", "The Wire"), ("sources", "/sources", "Sources"), ("newsletter", "/newsletter", "Newsletter")]
 
 _SVG = 'aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"'
-I_MENU = f'<svg {_SVG}><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>'
+I_MENU = ('<span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span>')
+BN_BL = '<span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span>'
 I_CLOSE = f'<svg {_SVG}><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>'
 I_SEARCH = f'<svg {_SVG}><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
 # t397: symmetrical 8-tooth gear (generated: teeth every 45°, tip r 9.5, root r 7.2, hole r 3), same 1.8 stroke as the other bar icons
@@ -138,7 +139,7 @@ def topbar(sn, active="", ctl_html=""):
             f'<a class="bn-ib bn-js-only bn-searchbtn" href="#bn-menu" role="button" aria-label="Search" title="Search (/)">{I_SEARCH}</a>'
             + refresh_btn() + theme_btn("bn-js-only bn-theme-bar") +
             f'<button type="button" class="bn-ib bn-js-only bn-gear" aria-label="Settings and scan status" aria-expanded="false" aria-controls="bn_settings" title="Settings">{I_GEAR}</button>'
-            f'<a class="bn-ib bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">{I_MENU}<span class="bn-bl">Menu</span></a>'
+            f'<a class="bn-ib bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">{I_MENU}{BN_BL}</a>'
             '</div></div>'
             '<div class="bn-pop" id="bn_settings" role="dialog" aria-label="Settings" hidden><div class="bn-pop-h">Settings'
             f'<button type="button" class="bn-pop-x" aria-label="Close settings">{I_CLOSE}</button></div>'
@@ -302,9 +303,9 @@ LOADER = ('<script>addEventListener("load",function(){var d=document,r=d.documen
 M4_LEAD = ('<div class="m4-lead"><a href="/?intro=1">Intro</a><a href="/wire" data-tab="threat">The Wire</a>'
            '<a href="/live">Live</a><a href="/newsletter" data-tab="newsletter">Newsletter</a></div>')
 M4_CSS = ('<style id="bn_m4">'
-  'html .bn-top4 .bn-tbar .bn-burger .bn-bl{display:inline!important;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;margin:0 10px 0 0!important;width:auto!important;height:auto!important;clip:auto!important;clip-path:none!important;position:static!important;overflow:visible!important;white-space:nowrap;color:#fff!important}'
+  'html .bn-top4 .bn-tbar .bn-burger .bn-bl{display:inline-grid!important;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;margin:0 10px 0 0!important;width:auto!important;height:auto!important;clip:auto!important;clip-path:none!important;position:static!important;overflow:visible!important;white-space:nowrap;color:#fff!important}'
   'html .bn-top4 .bn-tbar .bn-theme-bar{display:none!important}'
-  'html .bn-top4 .bn-burger{display:inline-flex!important;flex-direction:row-reverse;align-items:center;width:auto!important;padding:0 4px!important;background:none!important;border:0!important}'
+  'html .bn-top4 .bn-burger{display:inline-flex!important;flex-direction:row-reverse;align-items:center;width:auto!important;padding:0 4px!important;background:none!important;border:0!important;overflow:visible!important}'
   'html .bn-m4 .bn-panel{background:#000!important;border:0!important;box-shadow:none!important}'
   'html .bn-m4 .bn-scrim{background:#000!important;opacity:1!important}'
   'html .bn-m4 .m3-art,html .bn-m4 .bn-gd,html .bn-m4 .m3-pv,html .bn-m4 .m3-n,html .bn-m4 .m3-rule,html .bn-m4 .m3-stamp,html .bn-m4 .m3-cta,html .bn-m4 .bn-theme-row,html .bn-m4 .m3-soon{display:none!important}'

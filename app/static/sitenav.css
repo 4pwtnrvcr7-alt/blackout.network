@@ -401,3 +401,67 @@ body .bn-pop .ctl:empty::before{content:none}
 body #bn_settings .ctl>#bntr_bar:first-child{border-top:0;padding-top:0}
 /* the panel is moved to <body> while open (so it sits above the menu); on wide screens anchor it under the top bar, not under the page */
 @media(min-width:821px){body>.bn-pop{position:fixed;top:calc(var(--bn-tbar-h) + 8px);right:max(var(--bn-pad-x),env(safe-area-inset-right));left:auto;bottom:auto;width:380px;max-height:calc(100vh - var(--bn-tbar-h) - 24px)}}
+
+/* Nov 17 2026 (Matt): even 3-bar icon. Open: bars fall, settle, stand up as an X. Close: reverse. Reduced motion = instant. */
+.bn-hx{position:relative;display:block;width:22px;height:14px;flex:none;overflow:visible}
+.bn-hx-bar{position:absolute;left:0;right:0;top:50%;height:1.5px;margin-top:-.75px;background:currentColor;border-radius:1px;transform-origin:50% 50%;pointer-events:none}
+.bn-hx-bar:nth-child(1){transform:translateY(-6px)}
+.bn-hx-bar:nth-child(2){transform:none}
+.bn-hx-bar:nth-child(3){transform:translateY(6px)}
+.bn-bl{display:inline-grid;align-items:center;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#fff;white-space:nowrap}
+.bn-bl-a,.bn-bl-b{grid-area:1/1;transition:opacity .28s ease}
+.bn-bl-b{opacity:0}
+[aria-expanded="true"] .bn-bl-a{opacity:0}
+[aria-expanded="true"] .bn-bl-b{opacity:1}
+[aria-expanded="true"]:not([data-bn-hx="close"]) .bn-hx-bar:nth-child(1),[data-bn-hx="open"] .bn-hx-bar:nth-child(1){transform:rotate(45deg)}
+[aria-expanded="true"]:not([data-bn-hx="close"]) .bn-hx-bar:nth-child(2),[data-bn-hx="open"] .bn-hx-bar:nth-child(2){transform:scaleX(0);opacity:0}
+[aria-expanded="true"]:not([data-bn-hx="close"]) .bn-hx-bar:nth-child(3),[data-bn-hx="open"] .bn-hx-bar:nth-child(3){transform:rotate(-45deg)}
+@media (prefers-reduced-motion:reduce){.bn-hx-bar,.bn-bl-a,.bn-bl-b{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion:no-preference){
+[data-bn-hx="open"] .bn-hx-bar:nth-child(1){animation:bn-hx-a-open .6s linear both}
+[data-bn-hx="open"] .bn-hx-bar:nth-child(2){animation:bn-hx-b-open .6s linear both}
+[data-bn-hx="open"] .bn-hx-bar:nth-child(3){animation:bn-hx-c-open .6s linear both}
+[data-bn-hx="close"] .bn-hx-bar:nth-child(1){animation:bn-hx-a-close .6s linear both}
+[data-bn-hx="close"] .bn-hx-bar:nth-child(2){animation:bn-hx-b-close .6s linear both}
+[data-bn-hx="close"] .bn-hx-bar:nth-child(3){animation:bn-hx-c-close .6s linear both}
+}
+@keyframes bn-hx-a-open{0%{transform:translateY(-6px) rotate(0deg)}18%{transform:translateY(-2px) rotate(12deg)}36%{transform:translateY(9px) rotate(78deg)}44%{transform:translateY(7.5px) rotate(68deg)}52%{transform:translateY(8px) rotate(72deg)}75%{transform:translateY(2px) rotate(50deg)}100%{transform:translateY(0) rotate(45deg)}}
+@keyframes bn-hx-c-open{0%{transform:translateY(6px) rotate(0deg)}18%{transform:translateY(8px) rotate(-14deg)}36%{transform:translateY(11px) rotate(-84deg)}44%{transform:translateY(9px) rotate(-72deg)}52%{transform:translateY(9.5px) rotate(-76deg)}75%{transform:translateY(2px) rotate(-52deg)}100%{transform:translateY(0) rotate(-45deg)}}
+@keyframes bn-hx-b-open{0%{transform:translateY(0) rotate(0deg) scaleX(1);opacity:1}28%{transform:translateY(9px) rotate(16deg) scaleX(.9);opacity:.85}42%{transform:translateY(11px) rotate(22deg) scaleX(.35);opacity:.25}55%{transform:translateY(10px) scaleX(0);opacity:0}100%{transform:translateY(0) scaleX(0);opacity:0}}
+@keyframes bn-hx-a-close{0%{transform:translateY(0) rotate(45deg)}18%{transform:translateY(3px) rotate(58deg)}36%{transform:translateY(10px) rotate(96deg)}44%{transform:translateY(8px) rotate(86deg)}52%{transform:translateY(8.5px) rotate(90deg)}75%{transform:translateY(-3px) rotate(12deg)}100%{transform:translateY(-6px) rotate(0deg)}}
+@keyframes bn-hx-c-close{0%{transform:translateY(0) rotate(-45deg)}18%{transform:translateY(4px) rotate(-58deg)}36%{transform:translateY(11px) rotate(-100deg)}44%{transform:translateY(9px) rotate(-88deg)}52%{transform:translateY(9.5px) rotate(-92deg)}75%{transform:translateY(4px) rotate(-10deg)}100%{transform:translateY(6px) rotate(0deg)}}
+@keyframes bn-hx-b-close{0%{transform:translateY(0) scaleX(0);opacity:0}45%{transform:translateY(9px) scaleX(0);opacity:0}60%{transform:translateY(8px) rotate(8deg) scaleX(.5);opacity:.5}80%{transform:translateY(2px) rotate(2deg) scaleX(1);opacity:1}100%{transform:translateY(0) rotate(0deg) scaleX(1);opacity:1}}
+@keyframes bn-rise{from{transform:translateY(56px);opacity:0}to{transform:none;opacity:1}}
+@keyframes bn-fall{from{transform:none;opacity:1}to{transform:translateY(72vh);opacity:0}}
+
+/* raised header so the morphing icon stays tappable above the open menu (menu 2600) */
+html.bn-menu-on body header.bn-top{z-index:2700!important}
+html.bn-menu-on #bn-menu{z-index:2600}
+html.bn-menu-on .bn-m4 .bn-mhead .bn-logo,html.bn-menu-on .bn-m4 .bn-close{visibility:hidden}
+html.bn-menu-on .bn-m4 .bn-mhead{padding-top:calc(var(--bn-tbar-h) + var(--bn-safe-top) + 8px)!important}
+html.bn-m4.bn-closing .bn-panel{opacity:1!important}
+/* menu items: rise in on open, fall out on close (staggered, gravity-like) */
+#bn-menu .m4-lead a:nth-child(1),#bn-menu .m3-grid>.bn-grp:nth-child(1){--bn-i:0}
+#bn-menu .m4-lead a:nth-child(2),#bn-menu .m3-grid>.bn-grp:nth-child(2){--bn-i:1}
+#bn-menu .m4-lead a:nth-child(3),#bn-menu .m3-grid>.bn-grp:nth-child(3){--bn-i:2}
+#bn-menu .m4-lead a:nth-child(4),#bn-menu .m3-grid>.bn-grp:nth-child(4){--bn-i:3}
+#bn-menu .m3-grid>.bn-grp:nth-child(5){--bn-i:4}
+#bn-menu .m3-grid>.bn-grp:nth-child(6){--bn-i:5}
+#bn-menu .m3-grid>.bn-grp:nth-child(7){--bn-i:6}
+#bn-menu .m3-foot{--bn-i:7}
+#bn-menu .m4-lead a{--bn-i:0}
+@media (prefers-reduced-motion:no-preference){
+#bn-menu.bn-open:not(.bn-closing) .m4-lead a,#bn-menu.bn-open:not(.bn-closing) .m3-grid>.bn-grp,#bn-menu.bn-open:not(.bn-closing) .m3-foot{animation:bn-rise .5s cubic-bezier(.16,.84,.28,1) both;animation-delay:calc(var(--bn-i,0)*28ms)}
+#bn-menu.bn-open:not(.bn-closing) .m4-lead a:nth-child(1){animation-delay:0ms}
+#bn-menu.bn-open:not(.bn-closing) .m4-lead a:nth-child(2){animation-delay:28ms}
+#bn-menu.bn-open:not(.bn-closing) .m4-lead a:nth-child(3){animation-delay:56ms}
+#bn-menu.bn-open:not(.bn-closing) .m4-lead a:nth-child(4){animation-delay:84ms}
+#bn-menu.bn-closing .m4-lead a,#bn-menu.bn-closing .m3-grid>.bn-grp,#bn-menu.bn-closing .m3-foot{animation:bn-fall .48s cubic-bezier(.45,.02,.88,.28) both;animation-delay:calc(var(--bn-i,0)*24ms)}
+#bn-menu.bn-closing .m4-lead a:nth-child(1){animation-delay:0ms}
+#bn-menu.bn-closing .m4-lead a:nth-child(2){animation-delay:24ms}
+#bn-menu.bn-closing .m4-lead a:nth-child(3){animation-delay:48ms}
+#bn-menu.bn-closing .m4-lead a:nth-child(4){animation-delay:72ms}
+}
+@media (prefers-reduced-motion:reduce){
+#bn-menu .m4-lead a,#bn-menu .m3-grid>.bn-grp,#bn-menu .m3-foot{animation:none!important}
+}
