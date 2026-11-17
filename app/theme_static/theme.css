@@ -2,7 +2,7 @@
    hover/tap "peek" panels, tabs and "more" expanders. Every class is prefixed bnt- so existing pages are unaffected
    until they opt in. Loaded on every full HTML page (server.py BNT_HEAD). Kill switch: BN_NEW_HOME=0. */
 :root{--bnt-bg:#05060a;--bnt-ink:rgba(240,240,250,1);--bnt-ink-80:rgba(240,240,250,.8);--bnt-ink-60:rgba(240,240,250,.62);--bnt-ink-35:rgba(240,240,250,.35);
---bnt-ink-15:rgba(240,240,250,.15);--bnt-ink-08:rgba(240,240,250,.08);--bnt-y:#F2F2F4;--bnt-y-legacy:#FFC21A;--bnt-calm:#3DDC97;--bnt-elev:#FFB020;--bnt-high:#FF4D4F;--bnt-sky:#7CC4FF;
+--bnt-ink-15:rgba(240,240,250,.15);--bnt-ink-08:rgba(240,240,250,.08);--bnt-y:#F2F2F4;--bnt-y-legacy:#F2F2F4;--bnt-calm:#6B7076;--bnt-elev:#C9CDD3;--bnt-high:#FF4D4F;--bnt-sky:#7CC4FF;
 --bnt-hd:Montserrat,"Noto Sans",Arial,sans-serif;--bnt-tx:Inter,"Noto Sans",Arial,sans-serif;--bnt-ease:cubic-bezier(.2,.7,.2,1)}
 /* plain-text wordmark (replaces every logo image on the site, Matt Nov 17 12:11 AM) */
 .bnt-wm{font-family:var(--bnt-hd)!important;font-weight:700!important;letter-spacing:.08em!important;text-transform:lowercase!important;white-space:nowrap;line-height:1!important;color:inherit}
@@ -51,7 +51,7 @@
 .bnt-key span{font:600 12.5px/1 var(--bnt-tx);padding:9px 13px;border-radius:99px;background:rgba(255,255,255,.04);border:1px solid var(--bnt-ink-08);color:var(--bnt-ink-80);display:flex;align-items:center;gap:8px}
 .bnt-key b{font-weight:500;color:var(--bnt-ink-60)}
 .bnt-key span::before{content:"";width:9px;height:9px;border-radius:50%}
-.bnt-key .c::before{background:var(--bnt-calm);box-shadow:0 0 10px var(--bnt-calm)}.bnt-key .e::before{background:var(--bnt-elev);box-shadow:0 0 10px var(--bnt-elev)}.bnt-key .h::before{background:var(--bnt-high);box-shadow:0 0 10px var(--bnt-high)}
+.bnt-key .c::before{background:rgba(255,255,255,.3)}.bnt-key .e::before{background:rgba(255,255,255,.75)}.bnt-key .h::before{background:#E5484D}
 @media (prefers-reduced-motion:reduce){.bnt-acc-b,.bnt-peek .bnt-peek-d,.bnt-btn,.bnt-btn::before{transition:none!important}}
 
 /* Nov 17 2026 Phase 2: one dark top bar on every page, in both themes (CoS 1:00 AM: no white header over dark content) */
@@ -60,9 +60,9 @@ html .bn-top{background:rgba(5,6,10,.9)!important;border-bottom:1px solid rgba(2
 html .bn-top .bn-tbar{color:#F0F0FA!important}
 html .bn-top .bn-logo,html .bn-top .bn-ib,html .bn-top .bn-follow,html .bn-top .bn-burger,html .bn-top .bn-rf-st{color:#F0F0FA!important}
 html .bn-top .bn-primary a:not(.bna-cta){color:rgba(240,240,250,.78)!important}
-html .bn-top .bn-primary a:not(.bna-cta):hover,html .bn-top .bn-primary a[aria-current="page"]:not(.bna-cta){color:#FFC21A!important}
+html .bn-top .bn-primary a:not(.bna-cta):hover,html .bn-top .bn-primary a[aria-current="page"]:not(.bna-cta){color:#F2F2F4!important}
 html .bn-top .bn-ib:hover{background:rgba(240,240,250,.08)!important}
-html .bn-top .bn-ib:focus-visible,html .bn-top .bn-logo:focus-visible{outline:2px solid #FFC21A!important;outline-offset:2px}
+html .bn-top .bn-ib:focus-visible,html .bn-top .bn-logo:focus-visible{outline:2px solid #F2F2F4!important;outline-offset:2px}
 /* skip link: hidden until focused (it showed on /wire) */
 a.skip:not(:focus){position:absolute!important;left:-9999px!important;top:auto!important;width:1px;height:1px;overflow:hidden}
 a.skip:focus{position:fixed;left:12px;top:12px;z-index:10000;padding:10px 14px;border-radius:10px;background:#F2F2F4;color:#05060a;font-weight:700;text-decoration:none}

@@ -131,7 +131,7 @@ def menu_html():
         groups = [("Latest", [("The Wire", "/wire"), ("Live", "/live"), ("Map", "/map")])]
     cols = "".join(f'<div class="w2-mg"><p class="w2-mgl">{E(n)}</p><ul>' + "".join(f'<li><a href="{E(h)}">{E(l)}</a></li>' for l, h in links) + '</ul></div>' for n, links in groups)
     return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
-            '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">BLACKOUT.NETWORK</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
+            '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
             '<nav class="w2-mnav"><div class="w2-mlead"><a href="/?intro=1">Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>'
             f'<div class="w2-mgrid">{cols}</div></nav>'
             '<div class="w2-mfoot"><a href="/scoring">How we score</a><a href="/sources">Sources</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a>'
@@ -140,8 +140,8 @@ def menu_html():
 def shell(title, desc, body, path):
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network{E(path)}">
-<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=3"></head>
-<body class="w2"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">BLACKOUT.NETWORK</a>
+<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=4"></head>
+<body class="w2"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-controls="w2_menu" aria-expanded="false"><span>MENU</span><i></i></button></header>
 {menu_html()}<main id="w2_main">{body}</main>
 <footer class="w2-foot"><p class="w2-tag">Signal over noise.</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
