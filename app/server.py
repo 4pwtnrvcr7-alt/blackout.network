@@ -249,6 +249,11 @@ def live_page():
         k = b.find(b"</h1>", k) + 5 if k >= 0 else -1
         if k > 4: b = b[:k] + ov + b[k:]
     except Exception: traceback.print_exc()
+    try:   # Latest tab heroes (theme.tab_hero_html, BN_TAB_HERO): sits right above the tab page head; tabhero.js shows it on Latest tabs only
+        th = _addon_mod("theme").tab_hero_html().encode("utf-8")
+        j = b.find(b'<div class="bn-pagehead">')
+        if th and j >= 0: b = b[:j] + th + b[j:]
+    except Exception: traceback.print_exc()
     return b
 
 def new_home_on():
