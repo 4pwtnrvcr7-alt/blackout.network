@@ -192,7 +192,7 @@ class Static(unittest.TestCase):
         self.assertIn("bna-rk grn", self.js); self.assertIn('href="/wire/\'+f.cluster_id+\'"', self.js)
         self.assertIn("Date.now()>=u", self.js)                    # hides itself at show_until even from a stale snapshot
     def test_css_green(self):
-        self.assertIn(".bna-it.bna-feat{", self.css); self.assertIn("#3fa66a", self.css); self.assertIn(".bna-rk.grn{", self.css)
+        self.assertIn(".bna-it.bna-feat{", self.css); self.assertIn("#6B7076", self.css)   # Push G: rank option A (featured card grey, was green #3fa66a); self.assertIn(".bna-rk.grn{", self.css)
     def test_no_banned_words(self):
         for src in (self.js, self.css, open(os.path.join(APP, "home_feed.py"), encoding="utf-8").read()):
             self.assertNotRegex(src, re.compile(r"meshtastic|\blora\b", re.I))

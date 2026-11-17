@@ -17,9 +17,9 @@
  /* palette: brand A "Signal", dark (default) */
  --bn-bg:#0B0D10;--bn-tbar-bg:rgba(11,13,16,.97);--bn-surface-0:#0f1317;--bn-surface:#14181D;--bn-raised:#1B2027;--bn-surface-2:#1d232b;
  --bn-line:#252B33;--bn-line-2:#2f3742;--bn-text:#E6E9EE;--bn-text-2:#c9d0d9;--bn-muted:#8B95A3;
- --bn-brand:#FF4D4F;--bn-ink-on-brand:#0B0D10;--bn-accent:var(--bn-brand);--bn-link:#4aa3ff;--bn-mark-bg:#0B0D10;--bn-mark-fg:#FFFFFF;--bn-mark-line:#252B33;--bn-mark-hi:#FFC21A;--bn-mark-lo:#3FAE80;--bn-mark-crit:#C8102E;
+ --bn-brand:#FF4D4F;--bn-ink-on-brand:#0B0D10;--bn-accent:var(--bn-brand);--bn-link:#4aa3ff;--bn-mark-bg:#0B0D10;--bn-mark-fg:#FFFFFF;--bn-mark-line:#252B33;--bn-mark-hi:#F2F2F4;--bn-mark-lo:#6B7076;--bn-mark-crit:#C8102E;
  --bn-hover:rgba(255,255,255,.06);--bn-active:rgba(255,77,79,.10);--bn-scrim:rgba(0,0,0,.62);--bn-shadow:0 12px 40px rgba(0,0,0,.5);
- --bn-sev-lo:#2BB673;--bn-sev-md:#F5A524;--bn-sev-hi:#FF4D4F;--bn-seg-off:#252B33;
+ --bn-sev-lo:#6B7076;--bn-sev-md:#C9CDD3;--bn-sev-hi:#FF4D4F;--bn-seg-off:#252B33;
  --bn-rule-h:3px;--bn-icon:30px;
  /* standalone / viewport-fit=cover: 0 in a browser tab, the status-bar inset when installed */
  --bn-safe-top:env(safe-area-inset-top, 0px);
@@ -29,7 +29,7 @@
  --bn-bg:#F6F7F9;--bn-tbar-bg:rgba(246,247,249,.97);--bn-surface-0:#EEF0F3;--bn-surface:#FFFFFF;--bn-raised:#FBFBFC;--bn-surface-2:#EEF0F3;
  --bn-line:#DDE1E6;--bn-line-2:#C5CCD5;--bn-text:#0B0D10;--bn-text-2:#2C333C;--bn-muted:#5B6573;
  --bn-brand:#D92D30;--bn-ink-on-brand:#FFFFFF;--bn-link:#0a5fc2;
- --bn-mark-bg:#FFFFFF;--bn-mark-fg:#0B0D10;--bn-mark-line:#DDE1E6;--bn-mark-hi:#C97B00;--bn-mark-lo:#1D7350;--bn-mark-crit:#C8102E; /* logo V2 light version on a bordered white tile */
+ --bn-mark-bg:#FFFFFF;--bn-mark-fg:#0B0D10;--bn-mark-line:#DDE1E6;--bn-mark-hi:#1D1D1F;--bn-mark-lo:#5E5E63;--bn-mark-crit:#C8102E; /* logo V2 light version on a bordered white tile */
  --bn-hover:rgba(11,13,16,.05);--bn-active:rgba(217,45,48,.08);--bn-scrim:rgba(11,13,16,.38);--bn-shadow:0 12px 40px rgba(20,30,45,.18);
  --bn-sev-lo:#16884B;--bn-sev-md:#C77700;--bn-sev-hi:#D92D30;--bn-seg-off:#DDE1E6;
  /* the site's legacy palette names follow the tokens, so every tab and page switches with them */
@@ -368,7 +368,7 @@ html.bn-js .bn-tbar .bn-refresh{display:inline-flex!important;position:relative;
 .bn-rf-ico{transform-origin:50% 50%}
 [data-bn-refresh].bn-rf-spin .bn-rf-ico{animation:bn-rf-spin .9s linear infinite}
 [data-bn-refresh][aria-disabled="true"]{cursor:progress}
-[data-bn-refresh].bn-rf-done{color:var(--bn-sev-lo,#3FAE80)}
+[data-bn-refresh].bn-rf-done{color:var(--bn-sev-lo,#6B7076)}
 @keyframes bn-rf-spin{to{transform:rotate(360deg)}}
 .bn-rf-tip{position:absolute;top:calc(100% + 6px);left:50%;transform:translate(-50%,-4px);padding:6px 10px;border-radius:8px;white-space:nowrap;pointer-events:none;
  font:600 12px/1.2 var(--bn-font-ui);letter-spacing:.01em;color:var(--bn-bg,#0b0d10);background:var(--bn-text,#e8eaed);box-shadow:0 6px 18px rgba(0,0,0,.28);
@@ -381,7 +381,7 @@ header.bn-top .bn-tbar{position:relative}
  opacity:0;transform:translateY(-4px);transition:opacity .2s ease,transform .2s ease}
 .bn-rf-st:empty{display:none}
 .bn-rf-st.bn-rf-ok,.bn-rf-st.bn-rf-err{opacity:1;transform:none}
-.bn-rf-st.bn-rf-ok::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--bn-sev-lo,#3FAE80);vertical-align:1px}
+.bn-rf-st.bn-rf-ok::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--bn-sev-lo,#6B7076);vertical-align:1px}
 .bn-rf-st.bn-rf-err{color:var(--bn-sev-hi,#ff6b6b)}
 @media (prefers-reduced-motion:reduce){[data-bn-refresh].bn-rf-spin .bn-rf-ico{animation-duration:2.4s}.bn-rf-tip,.bn-rf-st{transition:none!important}}
 /* Settings panel (Nov 13): opened from the menu's Settings item or the gear; scrim behind it, Close button, theme + Refresh data rows */
