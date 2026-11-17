@@ -189,14 +189,14 @@ SITE_TITLE = "BLACKOUT.NETWORK · Signal over noise.™".encode("utf-8")
 # Light/dark theme (t323): set data-theme on <html> before first paint (saved choice, else the OS setting) + preload the self-hosted fonts.
 THEME_HEAD = (b'<script>(function(){var d=document.documentElement,t;try{t=localStorage.getItem("bn_theme")}catch(e){}'
               b't="dark";'
-              b'd.setAttribute("data-theme",t);d.style.colorScheme=t;var m=document.querySelector(\'meta[name="theme-color"]\');if(m)m.content=t=="light"?"#f6f7f9":"#0b0d10"})()</script>'
+              b'd.setAttribute("data-theme",t);d.style.colorScheme=t;var m=document.querySelector(\'meta[name="theme-color"]\');if(m)m.content="#05060a"})()</script>'
               b'<link rel="icon" type="image/svg+xml" href="/img/favicon.svg?v=3">'
               b'<link rel="preload" href="/fonts/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>'
               b'<link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>')
 _BRANDED = b"BLACKOUT.NETWORK"
 PWA_HEAD = (b'<link rel="manifest" href="/manifest.webmanifest?v=3"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">'
             b'<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png?v=3"><link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png?v=3">'
-            b'<meta name="theme-color" content="#0b0d10"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
+            b'<meta name="theme-color" content="#05060a"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">'
             b'<meta name="apple-mobile-web-app-title" content="BLACKOUT"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">'
             b'<link rel="icon" type="image/png" sizes="96x96" href="/icons/icon-96-v2.png?v=3"><link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192-v2.png?v=3">'   # BN favicons, new names so Google's favicon cache (YouTube channel links) refetches
             b'<link rel="icon" href="/favicon.ico?v=3" sizes="48x48"><link rel="mask-icon" href="/img/safari-pinned-tab.svg?v=3" color="#0B0D10">'   # BN master tile icon set (t333)
@@ -491,6 +491,9 @@ def pwa_head(b):
         lo = b[:20000].lower(); i = lo.find(b"</head>")
         if i < 0 or b"<html" not in lo: return b          # fragments (cards, iframes, JSON) are left alone
         if b"/manifest.webmanifest" not in lo[:i]: b = b[:i] + PWA_HEAD + b[i:]
+        # one theme-color, matching the solid top bar (#05060a), so iOS Safari tints the status area the same near-black (Matt 4:10 PM)
+        if b"<head>" in b[:20000]:
+            b = re.sub(rb'<meta name="theme-color" content="[^"]*">', b"", b[:20000]).replace(b"<head>", b'<head><meta name="theme-color" content="#05060a">', 1) + b[20000:]
         # per-page titles such as "How we score | BLACKOUT.NETWORK" (sitenav.py, t302) are kept; any other title becomes the site title
         b = re.sub(rb"<title>([^<]*)</title>", lambda m: m.group(0) if _BRANDED in m.group(1) else b"<title>" + SITE_TITLE + b"</title>", b, count=1)
         b = re.sub(rb'(<meta (?:property="og:title"|name="twitter:title") content=")([^"]*)(")', lambda m: m.group(0) if _BRANDED in m.group(2) else m.group(1) + SITE_TITLE + m.group(3), b)
