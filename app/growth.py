@@ -209,10 +209,15 @@ def short_html(cid, title):
     return h, f"https://i.ytimg.com/vi/{y}/hqdefault.jpg"
 
 def follow_html():
-    return ('<section class="card bng-follow-card" id="bng_follow"><h2>Follow BLACKOUT.NETWORK</h2><p>Ranked, sourced alerts as they happen, from BLACKOUT.NETWORK '
-            'at <b>blackout.network</b>.</p><div class="btns">'
-            f'<a class="btn p" href="/newsletter">Get the free brief</a><a class="btn" href="{X_URL}" target="_blank" rel="noopener">Follow @BlkoutNtw on X</a>'
-            f'<a class="btn" href="{YT_SUB}" target="_blank" rel="noopener">Subscribe on YouTube</a></div></section>')
+    """Site-wide follow band (Matt 5:28 PM): no card box, outlined monochrome buttons, email first."""
+    ix = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-7.6 8.7L23 22h-6.8l-5.3-6.9L4.8 22H1.7l8.1-9.3L1 2h7l4.8 6.3L18.9 2zm-1.2 18h1.7L7.1 3.9H5.3L17.7 20z"/></svg>'
+    iy = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.7 15.1V8.9l5.8 3.1-5.8 3.1z"/></svg>'
+    im = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 2.3V17h16V7.3l-8 5.3-8-5.3zM5.6 7l6.4 4.2L18.4 7H5.6z"/></svg>'
+    return ('<section class="bng-foot" id="bng_follow" aria-labelledby="bng_follow_h"><p class="bng-follow-k" id="bng_follow_h">Follow</p>'
+            '<p class="bng-follow-l">Ranked, sourced alerts as they happen.</p><div class="bng-btns">'
+            f'<a class="bng-btn" href="/newsletter">{im}<span>Get the free brief</span></a>'
+            f'<a class="bng-btn" href="{X_URL}" target="_blank" rel="noopener">{ix}<span>Follow @BlkoutNtw</span></a>'
+            f'<a class="bng-btn" href="{YT_SUB}" target="_blank" rel="noopener">{iy}<span>Subscribe on YouTube</span></a></div></section>')
 
 def org_ld():
     return {"@type": ["Organization", "NewsMediaOrganization"], "@id": SITE + "/#org", "name": BRAND, "alternateName": ["BLACKOUT NETWORK", "blackout.network"], "url": SITE + "/",
