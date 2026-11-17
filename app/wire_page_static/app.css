@@ -114,3 +114,10 @@
 /* Nov 17 2:37 AM: monochrome outlined controls (SpaceX-style) */
 .bn-wire .w-how{border-radius:0;border-color:rgba(242,242,244,.5);color:#F2F2F4;letter-spacing:.18em;font-size:11px}
 .bn-wire .w-how:hover,.bn-wire .w-how:focus-visible{background:#F2F2F4;color:#05060a}
+
+/* Nov 17 3 AM (Matt): simplify. One-line bulletin headlines, neutral notice label, quieter meta. */
+.bn-wire #w-bullets li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bn-wire #w-bullets.all li{white-space:normal}
+.bn-wire .coming .k{color:rgba(242,242,244,.62)!important;letter-spacing:.18em}
+.bn-wire .dek{color:rgba(242,242,244,.62)}
+.bn-wire #w-updated{color:rgba(242,242,244,.5)}
