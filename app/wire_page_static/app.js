@@ -43,6 +43,17 @@
     t = t.replace(HYPE, "").replace(LEAD, "").trim();
     t = t.replace(/(\s+@[A-Za-z0-9_.]{2,30})+\.?$/, "").trim();
     t = t.replace(/\s+\S+\.(wordpress\.com|blogspot\.com)\S*$/, "").trim();
+    // Nov 17 3 AM: clean short display titles (display only; scanner data and scoring untouched)
+    var g = t.match(/^(Green|Orange|Red) (?:notification|alert) for (.+?)(?:\.\s|\.$|$)/i);
+    if (g) { var gev = g[2].replace(/^(an?|the) /i, ""); return gev.charAt(0).toUpperCase() + gev.slice(1) + " (" + g[1].toLowerCase() + " alert)"; }
+    var g2 = t.match(/^(Green|Orange|Red) (earthquake|flood|drought|tropical cyclone|volcano|wildfire|forest fire)\b.{0,80}?\bin ([A-Z][A-Za-z .-]{1,40}?)(?= \d| \(|,|\.|$)/);
+    if (g2) return g2[2].charAt(0).toUpperCase() + g2[2].slice(1) + " in " + g2[3].trim() + " (" + g2[1].toLowerCase() + " alert)";
+    var bar = t.match(/^[A-Za-z /&-]{3,40} \| (.{12,})$/);
+    if (bar) t = bar[1];
+    t = t.replace(/^\d{1,2}\/10\s+/, "");
+    var ro = t.match(/^(.{30,160}?[a-z0-9)]) (?:At least|According to|Officials|Authorities|It is|This is)\b/);
+    if (ro) t = ro[1];
+    if (t.length > 120) t = t.slice(0, 117).replace(/\s+\S*$/, "") + "\u2026";
     var m = t.match(/^(.+? (?:Warning|Watch|Advisory)) issued (.+?) until (.+?) by NWS (.+)$/);
     if (m) {
       var office = m[4].replace(/\s+[A-Z]{2}$/, "").trim();
@@ -333,15 +344,13 @@
     if (highNew.length) {
       var h = highNew[0];
       var extra = /Ocean Shores/i.test(h.title) ? " A boil-water advisory is in the latest local coverage." : "";
-      bullets.push("<li><a href=\"#s-" + esc(h.id) + "\"><strong>New high.</strong> " + esc(h.title) +
-        (h.families_n ? " — confirmed by " + h.families_n + " newsrooms." : ".") + extra + "</a></li>");
+      bullets.push("<li><a href=\"#s-" + esc(h.id) + "\"><strong>New high.</strong> " + esc(h.title) + "</a></li>");
     } else {
       bullets.push("<li><strong>No new high-rank items</strong> in the last 24 hours.</li>");
     }
     var rising = main.filter(function (c) { return c.rising; }).sort(function (a, b) { return b.rank - a.rank; })[0];
     if (rising) {
-      bullets.push("<li><a href=\"#s-" + esc(rising.id) + "\"><strong>Rising.</strong> " + esc(rising.title) +
-        " — " + rising.families_n + " source families, first seen " + esc(rising.when_full) + ".</a></li>");
+      bullets.push("<li><a href=\"#s-" + esc(rising.id) + "\"><strong>Rising.</strong> " + esc(rising.title) + "</a></li>");
     }
     var bliz = main.filter(function (c) { return /Blizzard Warning/i.test(c.raw_title) && c.new24; })[0];
     if (bliz) {
@@ -367,10 +376,9 @@
       return m ? { c: c, mag: parseFloat(m[1]) } : null;
     }).filter(Boolean).sort(function (a, b) { return b.mag - a.mag; });
     if (ndNew.length) {
-      var line = "<li><strong>Hazards.</strong> " + ndNew.length + " new natural-hazard items in 24 hours, mostly quakes and U.S. warnings.";
+      var line = "<li><strong>Hazards.</strong> " + ndNew.length + " new in 24 hours.";
       if (quakes.length) {
-        line += " Strongest new quake: M" + quakes[0].mag + " — " + esc(quakes[0].c.title) + ".";
-        if (quakes[0].mag < 6) line += " No new M6+ in the last 24 hours.";
+        line += " Strongest quake M" + quakes[0].mag + ".";
       }
       bullets.push(line + "</li>");
     }
@@ -411,8 +419,8 @@
     var watch = (state.watchlist || []).map(function (c) { return norm(c, true); });
     var gen = parseT(state.generated);
     stampUp(gen);
-    $("w-updated").textContent = "Scanner checks about every " + (state.interval_minutes || 5) + " minutes · " +
-      main.length + " stories on The Wire · " + (state.watchlist_count || watch.length) + " single-source on the watchlist";
+    $("w-updated").textContent = main.length + " stories";
+    $("w-updated").title = "Scanner checks about every " + (state.interval_minutes || 5) + " minutes · " + main.length + " stories on The Wire · " + (state.watchlist_count || watch.length) + " single-source on the watchlist";
     bulletin(main);
     var nHigh = main.filter(function (c) { return c.band === "high"; }).length;
     var nElev = main.filter(function (c) { return c.band === "elev"; }).length;

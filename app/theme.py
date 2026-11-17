@@ -91,6 +91,20 @@ def _et(s, fmt="%-I:%M %p ET"):
 
 _EMO = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D]")
 def _clean(t): return re.sub(r"\s{2,}", " ", _EMO.sub("", str(t or ""))).strip()
+def _headline(t):
+    """Nov 17 3 AM: clean short display headline (display only; scanner data/scoring untouched). Mirrors wire_page_static/app.js cleanTitle."""
+    t = _clean(t)
+    g = re.match(r"^(Green|Orange|Red) (?:notification|alert) for (.+?)(?:\.\s|\.$|$)", t, re.I)
+    if g:
+        ev = re.sub(r"^(an?|the) ", "", g.group(2), flags=re.I); return ev[:1].upper() + ev[1:] + " (" + g.group(1).lower() + " alert)"
+    g = re.match(r"^(Green|Orange|Red) (earthquake|flood|drought|tropical cyclone|volcano|wildfire|forest fire)\b.{0,80}?\bin ([A-Z][A-Za-z .-]{1,40}?)(?= \d| \(|,|\.|$)", t)
+    if g: return g.group(2)[:1].upper() + g.group(2)[1:] + " in " + g.group(3).strip() + " (" + g.group(1).lower() + " alert)"
+    b = re.match(r"^[A-Za-z /&-]{3,40} \| (.{12,})$", t)
+    if b: t = b.group(1)
+    t = re.sub(r"^\d{1,2}/10\s+", "", t)
+    r = re.match(r"^(.{30,160}?[a-z0-9)]) (?:At least|According to|Officials|Authorities|It is|This is)\b", t)
+    if r: t = r.group(1)
+    return _short(t, 120)
 def _short(t, n):
     if len(t) <= n: return t
     return t[:n].rsplit(" ", 1)[0].rstrip(" ,;:|-") + "\u2026"
@@ -110,7 +124,7 @@ def summary(fresh=False):
     bands = {"calm": sum(1 for x in m if rk(x) <= 3), "elevated": sum(1 for x in m if 4 <= rk(x) <= 6), "high": sum(1 for x in m if rk(x) >= 7)}
     fam = lambda x: int(x.get("n_families") or x.get("eff_families") or len(x.get("families") or []) or 0)
     tops = sorted([x for x in m if fam(x) >= 2], key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:6]
-    top = [{"title": _short(_clean(x.get("title")), 400), "loc": _clean(x.get("location"))[:60], "cat": x.get("category") or "", "rank": rk(x),
+    top = [{"title": _headline(x.get("title")), "full": _short(_clean(x.get("title")), 400), "loc": _clean(x.get("location"))[:60], "cat": x.get("category") or "", "rank": rk(x),
             "sources": fam(x), "rising": bool(x.get("rising")), "first_seen_et": _et(x.get("first_seen"), "%b %-d, %-I:%M %p ET"),
             "url": "/wire/" + str(x.get("cluster_id") or "")} for x in tops]
     # Gauge (Matt Nov 17 1:08 AM): average rank of the current top stories, i.e. the rank 7+ items on the main feed
@@ -119,7 +133,7 @@ def summary(fresh=False):
     if len(lead) < 3: lead = sorted(m, key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:10]
     # Gauge explainer (Matt Nov 17 2:26 AM): just the highest threat right now, the top-ranked active alert on the main feed.
     hx = max(m, key=lambda x: (rk(x), x.get("score") or 0)) if m else None
-    hi = {"title": _short(_clean(hx.get("title")), 200), "rank": rk(hx), "url": "/wire/" + str(hx.get("cluster_id") or "")} if hx else None
+    hi = {"title": _headline(hx.get("title")), "rank": rk(hx), "url": "/wire/" + str(hx.get("cluster_id") or "")} if hx else None
     vol = {}
     for v in st.get("volume") or []:
         dd = vol.setdefault(v.get("d"), {}); dd[v.get("category")] = dd.get(v.get("category"), 0) + int(v.get("n") or 0)
@@ -327,17 +341,17 @@ def live_overview_html():
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>
 <div class="l-hero"><div class="bnt-card l-gcard"><div class="l-kr"><p class="k">Top stories · Average rank</p><span id="bntl_ug"></span></div><div class="l-gauge" id="bntl_g"></div><div class="l-gtext"><p class="plain" id="bntl_gt">&nbsp;</p></div></div>
 <div class="l-tiles">
-<a class="bnt-card l-tile h" href="/wire"><p class="k">High &middot; 7&ndash;10</p><b id="bntl_th">&ndash;</b><p class="plain">Major events. Start here.</p><div class="l-meter" id="bntl_mh"></div></a>
-<a class="bnt-card l-tile e" href="/wire"><p class="k">Elevated &middot; 4&ndash;6</p><b id="bntl_te">&ndash;</b><p class="plain">Worth keeping an eye on.</p><div class="l-meter" id="bntl_me"></div></a>
-<a class="bnt-card l-tile c" href="/wire"><p class="k">Calm &middot; 0&ndash;3</p><b id="bntl_tc">&ndash;</b><p class="plain">Local or minor.</p><div class="l-meter" id="bntl_mc"></div></a>
+<a class="bnt-card l-tile h" href="/wire"><p class="k">High &middot; 7&ndash;10</p><b id="bntl_th">&ndash;</b><div class="l-meter" id="bntl_mh"></div></a>
+<a class="bnt-card l-tile e" href="/wire"><p class="k">Elevated &middot; 4&ndash;6</p><b id="bntl_te">&ndash;</b><div class="l-meter" id="bntl_me"></div></a>
+<a class="bnt-card l-tile c" href="/wire"><p class="k">Calm &middot; 0&ndash;3</p><b id="bntl_tc">&ndash;</b><div class="l-meter" id="bntl_mc"></div></a>
 <a class="bnt-card l-tile s" href="/sources"><div class="l-ring" id="bntl_ring"></div><div><p class="k">Sources online</p><p class="plain" id="bntl_src">&nbsp;</p></div></a>
 <div class="l-tstamp"><span id="bntl_ut"></span></div>
 </div></div>
-<div class="l-head"><h3>Top signals</h3><span class="l-hint">Highest ranked, confirmed by two or more independent sources</span><span id="bntl_us"></span><a class="l-more" href="/wire">Full Wire &rarr;</a></div>
+<div class="l-head"><h3>Top signals</h3><span id="bntl_us"></span><a class="l-more" href="/wire">Full Wire &rarr;</a></div>
 <div class="l-sigs" id="bntl_sigs"></div>
-<div class="l-split"><div class="bnt-card"><div class="l-head"><h3>Where it's happening</h3><span class="l-hint" id="bntl_maph"></span><span id="bntl_um"></span><a class="l-more" href="/map">Full-screen map &rarr;</a></div><div class="l-map" id="bntl_map"></div></div>
-<div class="bnt-card"><div class="l-head"><h3>Rank spread</h3><span class="l-hint">Alerts on The Wire by rank</span><span id="bntl_ud"></span></div><div class="l-dist" id="bntl_dist"></div><p class="plain">Most alerts are calm or elevated. The few red ones are what to watch.</p></div></div>
-<div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Alerts per day</h3><span class="l-hint">Last 7 days, Eastern Time</span><span id="bntl_uv"></span></div><div id="bntl_vol"></div></div>
-<div class="bnt-card"><div class="l-head"><h3>What's moving today</h3><span class="l-hint" id="bntl_cath"></span><span id="bntl_uc"></span></div><div class="l-cats" id="bntl_cats"></div></div></div>
-<div class="bnt-card l-cta"><div><h3>Get the brief</h3><p class="plain">A sourced brief at 7 AM and 7 PM ET, plus email alerts when something serious breaks.</p></div><a class="bnt-btn y" href="/newsletter">Get the free brief</a></div>
+<div class="l-split"><div class="bnt-card"><div class="l-head"><h3>Map</h3><span class="l-hint" id="bntl_maph"></span><span id="bntl_um"></span><a class="l-more" href="/map">Full-screen map &rarr;</a></div><div class="l-map" id="bntl_map"></div></div>
+<div class="bnt-card"><div class="l-head"><h3>Rank spread</h3><span id="bntl_ud"></span></div><div class="l-dist" id="bntl_dist"></div></div></div>
+<div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Per day</h3><span class="l-hint">7 days</span><span id="bntl_uv"></span></div><div id="bntl_vol"></div></div>
+<div class="bnt-card"><div class="l-head"><h3>Today</h3><span class="l-hint" id="bntl_cath"></span><span id="bntl_uc"></span></div><div class="l-cats" id="bntl_cats"></div></div></div>
+<div class="bnt-card l-cta"><div><h3>Get the brief</h3><p class="plain">7 AM and 7 PM ET.</p></div><a class="bnt-btn y" href="/newsletter">Get the free brief</a></div>
 </div></section><script src="{url("live.js")}" defer></script>'''
