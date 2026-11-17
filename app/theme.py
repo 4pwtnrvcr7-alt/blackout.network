@@ -219,6 +219,11 @@ CREDITS_LEDGER = [
   ("Section band \"Watchlist\"", "NASA JSC, ISS Expedition 67, iss067e302248 (Mediterranean at night), 2022", "Public domain"),
   ("Health, conflict, finance and cyber graphics", "Original abstract graphics made for BLACKOUT.NETWORK (no real event)", "BLACKOUT.NETWORK"),
   ("Note on illustrative photos", "Storm and other story photos are illustrative: they show the same kind of event seen from orbit, not the specific event in the story.", "")]),
+ ("crime", "Crime (/crime)", [
+  ("Hero background video (desktop/tablet) and still", "\"Time Lapse 4K Midnight City\" (view from Blackpool Tower at night) by netLike, via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:Time_Lapse_4K_Midnight_City.webm); 10-second segment, graded grey with a cool tone, cropped", "CC BY 3.0"),
+  ("Reports and statistics panel", "\"Las Vegas Metropolitan Police\" by Tom\u00e1s Del Coro, via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:Las_Vegas_Metropolitan_Police_(51346158527).jpg); graded grey with a cool tone, cropped", "CC BY-SA 2.0"),
+  ("Cities and US counties panel; World panel", "\"City Timelapse - Free video\" (Stockholm at night) by Free Videos, via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:City_Timelapse_-_Free_video.webm); two still frames, graded grey with a cool tone, cropped", "CC BY 3.0"),
+  ("Note", "Atmospheric background imagery only. It does not show any incident, place or person named in the reports on the page.", "")]),
  ("stories", "Story pages (/wire/<id>, when Story v3 is on)", [
   ("MERS in Qatar hero (desktop video and still; phone still)", "NIAID, colorized scanning electron micrograph of Vero E6 cells infected with MERS-CoV (Flickr, 2017); graded monochrome for this page. Not a photograph of the patients or farms in this story.", "Public domain (U.S. government work)"),
   ("MERS in Qatar inline micrograph", "CDC / Maureen Metcalfe, Cynthia Goldsmith and Azaibi Tamin, transmission electron micrograph of MERS-CoV particles.", "Public domain"),

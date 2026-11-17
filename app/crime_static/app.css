@@ -145,3 +145,24 @@ html body>main#main .cr-nw-list li,html body>main .cr-nw-list li{max-width:none}
 /* the shared Apple-style layer (bn-apple.css) fills this button with !important; keep it outlined on /crime */
 html.bna-pg body .cr-search button,html.bna-pg body .cr-btn{background:transparent!important;color:#fff!important;border:1px solid #fff!important}
 html.bna-pg body .cr-search button:hover,html.bna-pg body .cr-btn:hover{background:#fff!important;color:#000!important}
+/* Nov 17 2026 (Matt): full-screen media like the Wire / Latest tab heroes. Hero reuses tabhero.css (.bn-th*); panels pin a full-screen still behind each data section */
+main.cr.cr-full,html body>main#main.cr-full,html.bna-pg body>main#main.cr-full{margin:0!important;padding:0 0 48px!important;max-width:none!important;width:100%}
+html body:has(>main#main.cr-full){overflow-x:clip!important}
+html body .cr-in{max-width:1312px!important;margin-left:auto!important;margin-right:auto!important;padding:0 16px!important;box-sizing:border-box}
+html body .cr-pan-in .cr-in>*{margin-left:0!important;margin-right:0!important}
+.cr-th{margin:0 0 6px}
+#bn_th.cr-th .bn-th-s{padding-left:max(20px,calc((100vw - 1280px) / 2));padding-right:max(20px,calc((100vw - 1280px) / 2))}
+.cr-th-t{margin:0 0 14px;font:800 clamp(40px,7.2vw,96px)/.98 Montserrat,system-ui,sans-serif;text-transform:uppercase;letter-spacing:-.01em;color:#F3F4F8}
+.cr-th-l{margin:0;max-width:620px;color:#C9CDD3;font:400 clamp(15px,1.3vw,18px)/1.5 Inter,system-ui,sans-serif}
+@media (max-width:700px){.cr-th-t{font-size:clamp(36px,11vw,52px)}}
+.cr-hero .cr-h2{margin:0;font:800 clamp(22px,3vw,30px)/1.1 var(--bn-font-ui,Montserrat,system-ui,sans-serif);color:#fff;letter-spacing:-.01em}
+.cr-pan{position:relative;isolation:isolate;clip-path:inset(0);margin:36px 0 0;padding:clamp(56px,12vh,140px) 0 clamp(48px,8vh,96px)}
+.cr-pan-bg{position:sticky;top:0;height:100vh;height:100svh;margin-bottom:-100vh;margin-bottom:-100svh;z-index:-1;overflow:hidden;pointer-events:none}
+.cr-pan-bg picture,.cr-pan-bg img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.cr-pan-bg img{object-fit:cover}
+.cr-pan-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#000 0,rgba(5,6,10,.55) 14%,rgba(5,6,10,.62) 60%,rgba(5,6,10,.9) 100%)}
+.cr-pan-in{position:relative}
+.cr-pan::after{content:"";position:absolute;left:0;right:0;bottom:0;height:120px;background:linear-gradient(180deg,rgba(0,0,0,0),#000);z-index:-1;pointer-events:none}
+.cr-pan .cr-card,.cr-pan .cr-k,.cr-pan .cr-city,.cr-pan .cr-note,.cr-pan .cr-mapwrap{background:rgba(10,11,13,.86)}
+.cr-pan .cr-nw{background:rgba(10,11,13,.78);border:1px solid var(--cr-line);border-radius:14px;padding:22px 20px 14px}
+@media (max-width:700px){.cr-pan{padding-top:72px}.cr-pan .cr-nw{padding:18px 16px 10px}}
