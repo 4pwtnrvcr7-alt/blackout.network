@@ -223,6 +223,11 @@ def lookup(q):
         f = feed_for(p.get("lat"), p.get("lon")) if p["kind"] in ("zip", "city", "county") else None
         if f: out["feed"] = _feed_summary(f)
     out["html"] = render_result(out)
+    try:
+        sec = news_section(q, p)
+        if sec: out["html"] = out["html"].replace("</div>", "</div>" + sec, 1)   # right under the place heading
+    except Exception:
+        pass
     return out
 
 # ------------------------------------------------------------------------------------------------ formatting
@@ -387,6 +392,57 @@ def _ago(iso):
     if s < 86400: return f"{int(s // 3600)} h ago"
     return t.astimezone(ET).strftime("%b %-d, %-I:%M %p ET")
 
+# ------------------------------------------------------------------------------------------------ local crime reports (Nov 17 2026)
+def news_area(p):
+    """crime_news area for a resolved place: city/county names from the FBI agency list of the same county."""
+    try:
+        import crime_news as CN
+        if not p or p.get("kind") not in ("zip", "city", "county") or p.get("cc") != "US": return None
+        cn = county(p["fips"]) if p.get("fips") else None; cities = []
+        if p.get("fips"):
+            for r in qa("SELECT name FROM agencies WHERE fips=? AND type='City' ORDER BY pop DESC LIMIT 12", (p["fips"],)):
+                m = re.match(r"(.+?)\s+(Police|Department of Public Safety|Public Safety)\b", r["name"] or "")
+                if m: cities.append(m.group(1).strip())
+        return CN.area_for(p, county_name=(cn or {}).get("name"), agency_cities=cities)
+    except Exception:
+        return None
+
+def news_json(q):
+    import crime_news as CN
+    p = resolve(q); a = news_area(p)
+    if not a: return {"ok": False, "items": [], "html": news_html(None, None)}
+    d = CN.reports(a)
+    return {"ok": True, "area": a["label"], "items": d["items"], "fetched": d.get("fetched"), "stale": d.get("stale"), "html": news_html(a, d)}
+
+def news_html(a, d):
+    """Recent local crime reports: headline, date, place, source link. Monochrome; no images."""
+    import crime_news as CN
+    items = (d or {}).get("items") or []
+    if not a or not items:
+        return ('<div class="cr-nw-empty">No recent local crime reports found from police or local news sources for this area in the last 7 days. '
+                'The statistics below are still current.</div>')
+    row = lambda x: (f'<li><a href="{E(x["url"])}" target="_blank" rel="noopener nofollow">{E(x["title"])}</a>'
+                     f'<span>{E(CN.fmt_date(x["date"]))} &middot; {E(x["place"])} &middot; {E(x["source"])}{" &middot; official release" if x.get("official") else ""}</span></li>')
+    rec = [x for x in items if not x.get("earlier")][:10]; old = [x for x in items if x.get("earlier")][:6]
+    li = ("".join(row(x) for x in rec) if rec else '<li class="cr-nw-none">No new reports in the last 7 days.</li>') + \
+         (('<li class="cr-nw-sep">Earlier, last 30 days</li>' + "".join(row(x) for x in old)) if old else "")
+    return (f'<ul class="cr-nw-list">{li}</ul><p class="cr-mu">Headlines as published by each police agency or news outlet, last 7 days '
+            f'(earlier items fill in a quiet week). Open a headline to read the original report. Updated {E(CN.fmt_date((d or {}).get("fetched") or ""))}'
+            f'{", showing the last good list" if (d or {}).get("stale") else ""}.</p>')
+
+def news_section(q, p):
+    """Server-side shell for the reports block; app.js fills it from /api/crime/news (cached lists render immediately)."""
+    a = news_area(p)
+    if not a: return ""
+    try:
+        import crime_news as CN
+        d = CN.reports(a, allow_fetch=False)
+    except Exception:
+        d = None
+    inner = news_html(a, d) if d and d.get("items") else '<div class="cr-nw-empty">Loading recent reports from local police and news sources&hellip;</div>'
+    return (f'<section class="cr-nw" data-nwq="{E(q)}" aria-labelledby="cr-nw-h"><span class="cr-kick">Latest reports</span>'
+            f'<h3 id="cr-nw-h">Crime reports near {E(a["label"])}</h3><div class="cr-nw-body"{"" if d and d.get("items") else " data-load=1"}>{inner}</div></section>')
+
 # ------------------------------------------------------------------------------------------------ newsletter hooks
 def brief_for(sub):
     """Local crime section for one subscriber's brief, or None. sub: dict with loc_label, loc_lat, loc_lon, loc_cc, loc_kind."""
@@ -416,7 +472,18 @@ def brief_for(sub):
                          + (f"; {st['name']} {r1(st['v_rate'])} and {r1(st['p_rate'])}" if st and st.get("v_rate") else "") + (f"; US {r1(nat['v_rate'])} and {r1(nat['p_rate'])}." if nat.get("v_rate") else "."))
         elif st and st.get("v_rate") is not None:
             lines.append(f"{st['name']} ({st['year']}, FBI): violent crime {r1(st['v_rate'])} and property crime {r1(st['p_rate'])} per 100,000" + (f" (US {r1(nat['v_rate'])} and {r1(nat['p_rate'])})." if nat.get("v_rate") else "."))
-        return {"label": d["place"]["label"], "url": url, "lines": lines, "source": "Police open data and FBI Crime Data Explorer"} if lines else None
+        items = []
+        try:
+            import crime_news as CN
+            a = news_area(d["place"])
+            if a:
+                al = CN.reports(a).get("items") or []
+                items = ([x for x in al if not x.get("earlier")] or al)[:5]   # real headlines + links only; [] on any failure (stats only)
+        except Exception:
+            items = []
+        if not lines and not items: return None
+        return {"label": d["place"]["label"], "url": url, "lines": lines, "items": items,
+                "source": "Local police and news reports, police open data and FBI Crime Data Explorer"}
     except Exception:
         return None
 
@@ -553,6 +620,8 @@ def handle_get(path, qs):
     if path == "/api/crime/search":
         d = lookup(g("q"))
         return (200 if d.get("ok") else 404), d
+    if path == "/api/crime/news":
+        return 200, news_json(g("q").strip()[:80])
     if path == "/api/crime/heat":
         fid = re.sub(r"[^a-z]", "", g("feed"))[:8]
         return 200, heat(fid)

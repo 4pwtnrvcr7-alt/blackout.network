@@ -86,13 +86,15 @@ var crH=null;function crHost(){if(!crH){crH=document.createElement("div");crH.id
 function go(q,push){q=(q||"").trim();if(!q)return;res.classList.add("busy");if(inp)inp.value=q;var BP=window.BNProgress,pg=null;
  var pt=setTimeout(function(){if(BP){pg=BP.create(crHost(),{label:"Finding "+q.slice(0,60)+"…",name:"Crime lookup"});pg.stage(null,0.05).ease(0.9,8000)}},150);
  getJ("/api/crime/search?q="+encodeURIComponent(q)).then(function(d){clearTimeout(pt);if(pg)pg.done(d.place?"Done":"No match");res.innerHTML=d.html||'<div class="cr-empty">'+esc(d.message||"Not found")+'</div>';
-  if(d.place){document.title="Crime in "+d.place.label+": rates, trends and map | BLACKOUT.NETWORK"}if(push)history.pushState({q:q},"","/crime?place="+encodeURIComponent(q));initHeat()})
+  if(d.place){document.title="Crime in "+d.place.label+": rates, trends and map | BLACKOUT.NETWORK"}if(push)history.pushState({q:q},"","/crime?place="+encodeURIComponent(q));initHeat();initNews()})
  .catch(function(st){clearTimeout(pt);if(st===404){if(pg)pg.done("No match");return fetch("/api/crime/search?q="+encodeURIComponent(q)).then(function(r){return r.json()}).then(function(d){res.innerHTML='<div class="cr-empty">'+esc(d.message||"We couldn't find that place.")+'</div>'})}
   if(BP){if(!pg)pg=BP.create(crHost(),{label:"Crime lookup"});pg.fail("Something went wrong loading that place.",function(){go(q,false)});res.innerHTML=""}
   else res.innerHTML='<div class="cr-empty">Something went wrong loading that place. Please try again.</div>'})
  .then(function(){res.classList.remove("busy");var y=res.getBoundingClientRect().top+scrollY-80;if(Math.abs(scrollY-y)>200)scrollTo({top:y,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})})}
+function initNews(){var s=document.querySelector(".cr-nw[data-nwq]");if(!s)return;var b=s.querySelector(".cr-nw-body[data-load]");if(!b)return;b.removeAttribute("data-load");   // Nov 17 2026: local crime reports
+ getJ("/api/crime/news?q="+encodeURIComponent(s.getAttribute("data-nwq"))).then(function(d){if(d&&d.html)b.innerHTML=d.html}).catch(function(){b.innerHTML='<div class="cr-nw-empty">Local reports are not available right now. The statistics below are still current.</div>'})}
 var form=$(".cr-search");if(form)form.addEventListener("submit",function(e){e.preventDefault();go(inp.value,true)});
 document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("[data-q]");if(!a||e.metaKey||e.ctrlKey||e.shiftKey)return;e.preventDefault();go(a.dataset.q,true)});
 addEventListener("popstate",function(){var q=new URLSearchParams(location.search).get("place");if(q)go(q,false)});
-initHeat();initUS();initWorld();
+initHeat();initNews();initUS();initWorld();
 })();

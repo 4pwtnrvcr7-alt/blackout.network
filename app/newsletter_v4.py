@@ -220,7 +220,16 @@ def render(issue, links, c):
     if issue.get("crime"):
         cr = issue["crime"]
         B.append(_section(f"Crime near you · {cr['label']}"))
-        B.append(_row("".join(_summary(x) for x in cr["lines"][:3]) + button("See the numbers", cr["url"]), "14px 24px 0 24px"))
+        its = [x for x in (cr.get("items") or []) if x.get("title") and x.get("url")][:5]   # real local police / news headlines (crime_news), links to the source
+        if its:
+            B.append('<tr><td style="font-size:0;line-height:10px;height:10px">&nbsp;</td></tr>')
+            try:
+                import crime_news as _CN; _d = _CN.fmt_date
+            except Exception:
+                _d = lambda x: str(x)[:10]
+            for x in its:
+                B.append(_line(N._cut(x["title"], 140), x["url"], f'{E(_d(x.get("date")))} &middot; {E(x.get("place") or "")} &middot; {E(x.get("source") or "")}'))
+        B.append(_row("".join(_summary(x) for x in cr["lines"][:2 if its else 3]) + button("See the numbers", cr["url"]), "14px 24px 0 24px"))
     others = [it for it in issue.get("developing") or [] if not it.get("lead") and it.get("cluster_id") not in seen]
     if others or issue.get("watchlist"):
         B.append(_section("Also on the wire"))   # short list, no divider image
