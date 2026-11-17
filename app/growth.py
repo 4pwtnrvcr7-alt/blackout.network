@@ -72,6 +72,7 @@ def sitemap():
     def build():
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         pages = STATIC_PAGES   # seo/batch-1: /stats was listed twice
+        if os.environ.get("BN_MESH_UI", "0") != "1": pages = [x for x in pages if not x[0].startswith("/mesh")]   # Nov 17 (Matt 8:19 AM): /mesh unlisted
         u = [(SITE + p, now if f in ("hourly", "daily") else None, f, pr) for p, f, pr in pages]
         try:
             import social
@@ -235,7 +236,9 @@ def _file(name, ctype):
 
 def handle_get(path, qs):
     if path == "/robots.txt": return 200, ROBOTS.encode(), "text/plain; charset=utf-8"
-    if path == "/llms.txt": return 200, LLMS.encode(), "text/plain; charset=utf-8"
+    if path == "/llms.txt":   # Nov 17 (Matt 8:19 AM): /mesh lines unlisted unless BN_MESH_UI=1
+        txt = LLMS if os.environ.get("BN_MESH_UI", "0") == "1" else "\n".join(l for l in LLMS.split("\n") if "/mesh" not in l)
+        return 200, txt.encode(), "text/plain; charset=utf-8"
     if path == "/sitemap.xml": return 200, sitemap(), "application/xml; charset=utf-8"
     if path == "/news-sitemap.xml": return 200, news_sitemap(), "application/xml; charset=utf-8"
     if path == "/api/growth/app.js": return _file("app.js", "application/javascript; charset=utf-8")

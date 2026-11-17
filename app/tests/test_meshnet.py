@@ -82,7 +82,10 @@ class Pages(unittest.TestCase):
     def test_menu_has_mesh(self):
         import sitenav
         h = sitenav.header_html("@mesh")
-        self.assertIn('href="/mesh"', h); self.assertIn('href="/mesh/guide"', h)
+        if os.environ.get("BN_MESH_UI", "0") == "1":
+            self.assertIn('href="/mesh"', h); self.assertIn('href="/mesh/guide"', h)
+        else:   # Nov 17 (Matt 8:19 AM): off-grid links hidden from the menu by default; routes stay reachable
+            self.assertNotIn('href="/mesh"', h); self.assertNotIn('href="/mesh/guide"', h)
 
 class Collector(unittest.TestCase):
     def test_dropoff_flags_after_baseline_and_persist(self):

@@ -108,6 +108,11 @@ TIPS_ON = os.environ.get("BN_TIPS", "0") == "1"
 if not TIPS_ON:
     NAV = [(g, [it for it in its if it[0] != "tips"]) for g, its in NAV]
     NAV = [(g, its) for g, its in NAV if its]
+# Nov 17 2026 (Matt, 8:19 AM): off-grid (/mesh) links hidden from menus, sitemap and llms.txt. BN_MESH_UI=1 brings them back; /mesh* routes stay reachable.
+MESH_ON = os.environ.get("BN_MESH_UI", "0") == "1"
+if not MESH_ON:
+    NAV = [(g, [it for it in its if it[0] != "@mesh"]) for g, its in NAV]
+    NAV = [(g, its) for g, its in NAV if its]
 
 # Standalone pages: path -> (active nav key, title, meta description, visible one-line description).
 PAGES = {

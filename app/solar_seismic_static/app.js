@@ -114,8 +114,7 @@ const SCI=[
 // ---------- skeleton ----------
 function skeleton(){
  $("ss_app").innerHTML=`<div class=ss-status id=ss_status></div>
- <div class=ss-lead><div><p><b>Space weather and earthquakes, side by side.</b> The Sun constantly sends out a magnetized wind and, now and then, flares and billion-ton eruptions. Earth's magnetic field deflects most of it, but some of that energy reaches the ground as electric currents, radio blackouts and aurora. This tab explains the physics, shows NOAA's and the USGS's live readings, and runs an open-ended experiment: does the bot's own data show any pattern between geomagnetic activity and earthquake timing?</p>
- <p class=meta>Click any heading to expand it in place; click again to collapse it.</p></div><div>${FIG.chain}</div></div>
+ <div class="ss-lead ss-lead-fig"><div>${FIG.chain}</div></div>
  <h3 class=ss-h>① The science, from the Sun to the ground</h3><div id=ss_sci>${SCI.map(([k,ic,t,s,b])=>acc(k,`<b>${t}</b><small>${s}</small>`,b,{ic,cls:k=="sci_quake"?"mu":"sol"})).join("")}</div>`;
  const live=document.createElement("section");live.className="pn";live.id="ss_live";
  live.innerHTML=`<h2>② Live conditions <span class=meta>— NOAA Space Weather Prediction Center, USGS and tsunami.gov</span></h2><div class=ss-tiles id=ss_tiles></div>
@@ -160,7 +159,7 @@ async function load(force){if(SS.busy)return;SS.busy=true;const st=$("ss_status"
  catch(err){if(st)st.innerHTML=`<span class=bad>Solar &amp; Seismic data unavailable: ${e_(err)}</span>`}finally{SS.busy=false;const l=$("ss_ld");if(l)l.remove()}}
 function render(){if(!SS.built)skeleton();const D=SS.d;
  const ok=D.sources.filter(s=>s.ok).length,n=D.sources.length,stale=D.sources.filter(s=>!s.ok&&s.has_data).length;
- $("ss_status").innerHTML=`<span><span class="ss-dot ${ok==n?"":ok>=n-2?"warn":"bad"}"></span>${ok}/${n} live sources OK${stale?` · ${stale} showing cached data`:""}</span><span>Updated ${e_(D.generated_et)}</span><span>Upstream data refreshes at most every 5 min · next in ${Math.ceil(D.next_fetch_s/60)} min</span><span>Evidence log: <b>${D.log.bins}</b> windows since ${e_(etF(D.log.since))}</span>`;
+ $("ss_status").innerHTML=`<span><span class="ss-dot ${ok==n?"":ok>=n-2?"warn":"bad"}"></span>${ok}/${n} live sources OK${stale?` · ${stale} showing cached data`:""}</span>`;
  renderTiles();renderAlerts();renderQuakes();renderExtra();renderLab();if(SS.shown)drawLab()}
 const spark=(vals,col,o={})=>{const v=vals.filter(x=>x!=null);if(v.length<2)return"";const mn=o.min??Math.min(...v),mx=o.max??Math.max(...v),W=200,H=30,sp=mx-mn||1;
  const pts=vals.map((x,i)=>x==null?null:[(i/(vals.length-1))*W,H-2-((x-mn)/sp)*(H-4)]);let d="",pen=false;pts.forEach(p=>{if(!p){pen=false;return}d+=(pen?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);pen=true});
