@@ -29,14 +29,14 @@
  var K=["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"],k=0;
  d.addEventListener("keydown",function(e){var key=e.key&&e.key.length===1?e.key.toLowerCase():e.key;k=(key===K[k])?k+1:(key===K[0]?1:0);if(k<K.length)return;k=0;if(busy())return;
   var c=card('<div class="m" aria-hidden="true">'+"<i></i>".repeat(10)+'</div><b>All clear.</b>For about one second, anyway. Signal over noise.',6000),seg=c.querySelectorAll(".m i");
-  var col=function(i){return i<3?"var(--bn-sev-lo,#2BB673)":i<6?"var(--bn-sev-md,#F5A524)":"var(--bn-sev-hi,#FF4D4F)"};
-  if(RM){seg.forEach(function(s){s.style.background="var(--bn-sev-lo,#2BB673)"});return}
+  var col=function(i){return i<3?"var(--bn-sev-lo,#6B7076)":i<6?"var(--bn-sev-md,#C9CDD3)":"var(--bn-sev-hi,#FF4D4F)"};
+  if(RM){seg.forEach(function(s){s.style.background="var(--bn-sev-lo,#6B7076)"});return}
   seg.forEach(function(s,i){setTimeout(function(){s.style.background=col(i)},90*i)});
-  setTimeout(function(){seg.forEach(function(s,i){setTimeout(function(){s.style.background="var(--bn-sev-lo,#2BB673)"},60*(9-i))})},1200)});
+  setTimeout(function(){seg.forEach(function(s,i){setTimeout(function(){s.style.background="var(--bn-sev-lo,#6B7076)"},60*(9-i))})},1200)});
  // 2. seven quick clicks on the footer BN tile -> hidden card
  function tile(){var f=d.querySelector("#site_foot,body>footer,footer.ft");if(!f||f.querySelector(".bn-ftile"))return;css();
   var t=d.createElementNS("http://www.w3.org/2000/svg","svg");t.setAttribute("class","bn-ftile");t.setAttribute("aria-hidden","true");
-  t.setAttribute("viewBox","0 0 16 16");t.innerHTML='<rect width="16" height="16" rx="3" fill="#0B0D10"/><path fill="#FFFFFF" d="M3 4h3v1h-3zM8 4h3v1h-3zM13 4h2v1h-2zM5 5h2v1h-2zM8 5h3v1h-3zM13 5h2v1h-2zM5 6h2v1h-2zM8 6h4v1h-4zM13 6h2v1h-2zM3 7h3v1h-3zM8 7h2v1h-2zM11 7h1v1h-1zM13 7h2v1h-2zM5 8h2v1h-2zM8 8h2v1h-2zM11 8h1v1h-1zM13 8h2v1h-2zM5 9h2v1h-2zM8 9h2v1h-2zM11 9h4v1h-4zM5 10h2v1h-2zM8 10h2v1h-2zM12 10h3v1h-3zM3 11h3v1h-3zM8 11h2v1h-2zM12 11h3v1h-3z"/><path fill="#C8102E" d="M1 4h2v1h-2zM1 5h2v1h-2z"/><path fill="#FFC21A" d="M1 7h2v1h-2zM1 8h2v1h-2z"/><path fill="#3FAE80" d="M1 10h2v1h-2zM1 11h2v1h-2z"/>';   // logo V2-final, 16 px pixel-fitted master
+  t.setAttribute("viewBox","0 0 16 16");t.innerHTML='<rect width="16" height="16" rx="3" fill="#0B0D10"/><path fill="#FFFFFF" d="M3 4h3v1h-3zM8 4h3v1h-3zM13 4h2v1h-2zM5 5h2v1h-2zM8 5h3v1h-3zM13 5h2v1h-2zM5 6h2v1h-2zM8 6h4v1h-4zM13 6h2v1h-2zM3 7h3v1h-3zM8 7h2v1h-2zM11 7h1v1h-1zM13 7h2v1h-2zM5 8h2v1h-2zM8 8h2v1h-2zM11 8h1v1h-1zM13 8h2v1h-2zM5 9h2v1h-2zM8 9h2v1h-2zM11 9h4v1h-4zM5 10h2v1h-2zM8 10h2v1h-2zM12 10h3v1h-3zM3 11h3v1h-3zM8 11h2v1h-2zM12 11h3v1h-3z"/><path fill="#C8102E" d="M1 4h2v1h-2zM1 5h2v1h-2z"/><path fill="#F2F2F4" d="M1 7h2v1h-2zM1 8h2v1h-2z"/><path fill="#6B7076" d="M1 10h2v1h-2zM1 11h2v1h-2z"/>';   // logo V2-final, 16 px pixel-fitted master
   f.insertBefore(t,f.firstChild);var n=0,tm=0;t.addEventListener("click",function(){n++;clearTimeout(tm);tm=setTimeout(function(){n=0},2500);if(n>=7){n=0;if(!busy())card("<b>Signal over noise.</b>Who says so? How do they know? What would change your mind? Every alert on this site links to its sources, so you can check.",12000)}})}
  // 3. console greeting
  try{console.log("%cBLACKOUT.NETWORK%c  Signal over noise.\nEvery rank is explained at "+location.origin+"/scoring \u2014 and every alert links to its sources.","font:800 14px Montserrat,system-ui,sans-serif;color:#FF4D4F","font:500 12px Inter,system-ui,sans-serif;color:inherit")}catch(e){}

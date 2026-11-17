@@ -14,7 +14,7 @@ body.w2{margin:0;background:#000;color:var(--w2-body);font:400 16px/1.6 Inter,sy
 .w2-mbtn i::before,.w2-mbtn i::after{content:"";position:absolute;left:0}.w2-mbtn i::before{top:-6px}.w2-mbtn i::after{top:6px}
 .w2-mbtn:focus-visible,.w2-close:focus-visible,.w2-btn:focus-visible,.w2 a:focus-visible{outline:2px solid #fff;outline-offset:3px}
 /* full-screen menu */
-.w2-menu{position:fixed;inset:0;z-index:100;background:#000;overflow:auto;display:flex;flex-direction:column;padding:0 var(--w2-gut) 40px;opacity:0;transition:opacity .2s ease}
+.w2-menu{position:fixed;inset:0;z-index:7000;background:#000;overflow:auto;display:flex;flex-direction:column;padding:0 var(--w2-gut) 40px;opacity:0;transition:opacity .2s ease}
 .w2-menu.open{opacity:1}.w2-menu[hidden]{display:none}
 .w2-mtop{height:64px;display:flex;align-items:center;justify-content:space-between;flex:none}
 .w2-close i{width:18px;height:18px;position:relative}.w2-close i::before,.w2-close i::after{content:"";position:absolute;left:0;top:8px;width:18px;height:1.5px;background:#fff;transform:rotate(45deg)}.w2-close i::after{transform:rotate(-45deg)}

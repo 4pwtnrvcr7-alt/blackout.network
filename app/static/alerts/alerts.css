@@ -2,26 +2,26 @@
    The Alerts sheet follows apple.com: grabber, inset grouped list, system type, no severity bar. */
 .bnal-bell{position:relative}
 .bnal-bell .bnal-bl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.bnal-bell .bnal-dot{position:absolute;top:10px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--bn-sev-lo,#2BB673);box-shadow:0 0 0 2px var(--bn-bg,#0B0D10);display:none}
+.bnal-bell .bnal-dot{position:absolute;top:10px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--bn-sev-lo,#6B7076);box-shadow:0 0 0 2px var(--bn-bg,#0B0D10);display:none}
 .bnal-bell.bnal-on .bnal-dot{display:block}
 @media(min-width:1200px){body .bn-ib.bnal-bell{width:auto;padding:0 10px;gap:6px}.bnal-bell .bnal-bl{position:static;width:auto;height:auto;clip:auto;font:600 14px/1 var(--bn-font-ui,system-ui)}.bnal-bell .bnal-dot{top:9px;left:22px;right:auto}}
 .bnal-row small{display:block;font:500 12.5px/1.3 var(--bn-font-body,system-ui);color:var(--bn-muted,#8B95A3)}
 .bnal-row span{text-align:left}
 html.bnal-lock,html.bnal-lock body{overflow:hidden}
 
-/* ---- sheet tokens. Dark uses #FFC21A for the check and the primary fill (both pass AA on this sheet).
-   Light keeps #FFC21A as the primary fill (near-black label). The check uses #8C5800 because #FFC21A on white is about 1.6:1. ---- */
+/* ---- sheet tokens. Dark uses #F2F2F4 for the check and the primary fill (both pass AA on this sheet).
+   Light keeps #F2F2F4 as the primary fill (near-black label). The check uses #8C5800 because #F2F2F4 on white is about 1.6:1. ---- */
 .bnal{
  --bnal-sheet:#1C1C1E;--bnal-group:#2C2C2E;--bnal-ink:#F5F5F7;--bnal-sub:#A1A1A6;--bnal-sep:rgba(255,255,255,.14);
- --bnal-mark:#FFC21A;--bnal-go:#FFC21A;--bnal-go-ink:#0B0D10;--bnal-link:#4AA3FF;--bnal-stop:#FF7A7C;
- --bnal-fill:rgba(255,255,255,.16);--bnal-x:#F5F5F7;--bnal-grab:rgba(255,255,255,.38);--bnal-focus:#FFC21A;
+ --bnal-mark:#F2F2F4;--bnal-go:#F2F2F4;--bnal-go-ink:#0B0D10;--bnal-link:#4AA3FF;--bnal-stop:#FF7A7C;
+ --bnal-fill:rgba(255,255,255,.16);--bnal-x:#F5F5F7;--bnal-grab:rgba(255,255,255,.38);--bnal-focus:#F2F2F4;
  --bnal-hover:rgba(255,255,255,.06);--bnal-scrim:rgba(0,0,0,.5);--bnal-edge:rgba(255,255,255,.08);
  --bnal-font:-apple-system,BlinkMacSystemFont,Inter,system-ui,sans-serif;
  --bnal-ok:#3DDC97;
 }
 :root[data-theme="light"] .bnal{
  --bnal-sheet:#F2F2F7;--bnal-group:#FFFFFF;--bnal-ink:#1D1D1F;--bnal-sub:#5B6573;--bnal-sep:rgba(60,60,67,.22);
- --bnal-mark:#8C5800;--bnal-go:#FFC21A;--bnal-go-ink:#0B0D10;--bnal-link:#0A5FC2;--bnal-stop:#C8102E;
+ --bnal-mark:#8C5800;--bnal-go:#F2F2F4;--bnal-go-ink:#0B0D10;--bnal-link:#0A5FC2;--bnal-stop:#C8102E;
  --bnal-fill:rgba(120,120,128,.18);--bnal-x:#1D1D1F;--bnal-grab:rgba(60,60,67,.42);--bnal-focus:#8C5800;
  --bnal-hover:rgba(0,0,0,.045);--bnal-scrim:rgba(0,0,0,.36);--bnal-edge:rgba(0,0,0,.08);
  --bnal-ok:#1D7350;
@@ -117,7 +117,7 @@ html.bnal-lock,html.bnal-lock body{overflow:hidden}
 .bnal-sample{margin:14px 0 0;display:grid;gap:10px;min-width:0}
 .bnal-sample[hidden]{display:none}
 .bnal-sh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--bn-muted,#8B95A3)}
-.bnal-tagS{padding:3px 8px;border-radius:6px;background:var(--bn-sev-md,#F5A524);color:#0B0D10;font:800 11.5px/1.1 var(--bnal-font,system-ui);letter-spacing:.08em}
+.bnal-tagS{padding:3px 8px;border-radius:6px;background:var(--bn-sev-md,#C9CDD3);color:#0B0D10;font:800 11.5px/1.1 var(--bnal-font,system-ui);letter-spacing:.08em}
 .bnal-notif{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:16px;background:rgba(120,130,145,.16);border:1px solid var(--bn-line,#252B33);min-width:0}
 .bnal-notif img{width:38px;height:38px;border-radius:9px;flex:none}
 .bnal-notif>div{min-width:0;flex:1}
@@ -132,7 +132,7 @@ html.bnal-lock,html.bnal-lock body{overflow:hidden}
 .bnal-brand{font:800 13px/1 var(--bnal-font,system-ui);letter-spacing:.02em;color:var(--bn-text,#E6E9EE);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bnal-brand b{color:var(--bn-brand,#FF4D4F)}
 .bnal-rk{padding:4px 8px;border-radius:999px;font:800 11.5px/1 var(--bnal-font,system-ui);letter-spacing:.06em;flex:none}
-.bnal-rkh{background:var(--bn-sev-hi,#FF4D4F);color:#0B0D10}.bnal-rkm{background:var(--bn-sev-md,#F5A524);color:#0B0D10}
+.bnal-rkh{background:var(--bn-sev-hi,#FF4D4F);color:#0B0D10}.bnal-rkm{background:var(--bn-sev-md,#C9CDD3);color:#0B0D10}
 .bnal-mt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 6px}
 .bnal-ct{font:700 12px/1 var(--bnal-font,system-ui);text-transform:uppercase;letter-spacing:.08em;color:var(--bn-muted,#8B95A3)}
 .bnal-t{margin:0 0 6px;font:800 16.5px/1.3 var(--bnal-font,system-ui);color:var(--bn-text,#E6E9EE);overflow-wrap:anywhere}
