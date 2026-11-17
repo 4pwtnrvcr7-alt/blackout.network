@@ -4,7 +4,7 @@
 .bnt-live a{color:inherit;text-decoration:none}
 .bnt-live .l-glow{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
 .bnt-live .l-glow i{position:absolute;border-radius:50%;animation:ldrift 26s ease-in-out infinite alternate;will-change:transform}/* Nov 17: no filter:blur (the radial gradient is already soft); blur re-rasterised three viewport-size layers while scrolling */
-.bnt-live .l-glow i:nth-child(1){width:52vw;height:52vw;left:-12vw;top:-18vw;background:radial-gradient(circle,rgba(255,194,26,.9) 0%,rgba(255,194,26,.35) 30%,rgba(255,194,26,0) 70%);opacity:.15}
+.bnt-live .l-glow i:nth-child(1){width:52vw;height:52vw;left:-12vw;top:-18vw;background:radial-gradient(circle,rgba(236,238,245,.9) 0%,rgba(236,238,245,.35) 30%,rgba(236,238,245,0) 70%);opacity:.15}
 .bnt-live .l-glow i:nth-child(2){width:46vw;height:46vw;right:-14vw;top:20%;background:radial-gradient(circle,rgba(43,108,255,.9) 0%,rgba(43,108,255,.35) 30%,rgba(43,108,255,0) 70%);opacity:.17;animation-duration:32s}
 .bnt-live .l-glow i:nth-child(3){width:40vw;height:40vw;left:30vw;bottom:-22vw;background:radial-gradient(circle,rgba(255,77,79,.9) 0%,rgba(255,77,79,.35) 30%,rgba(255,77,79,0) 70%);opacity:.07;animation-duration:38s}
 @keyframes ldrift{to{transform:translate(6vw,4vh) scale(1.12)}}
@@ -66,9 +66,9 @@
 .bnt-live .l-cats{display:flex;flex-direction:column;gap:14px}
 .bnt-live .l-catrow{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:12px;font-size:14px;color:var(--bnt-ink-80)}
 .bnt-live .l-catrow .b{height:10px;border-radius:9px;background:rgba(255,255,255,.06);overflow:hidden}
-.bnt-live .l-catrow .b i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,rgba(255,194,26,.5),#FFC21A);width:0;transition:width 1.4s var(--bnt-ease)}
+.bnt-live .l-catrow .b i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,rgba(236,238,245,.5),var(--bnt-y,#F2F2F4));width:0;transition:width 1.4s var(--bnt-ease)}
 .bnt-live .l-catrow b{font:700 14px var(--bnt-hd);text-align:right}
-.bnt-live .l-cta{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;padding:28px;background:linear-gradient(120deg,rgba(255,194,26,.14),rgba(255,255,255,.02) 60%)}
+.bnt-live .l-cta{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;padding:28px;background:linear-gradient(120deg,rgba(236,238,245,.14),rgba(255,255,255,.02) 60%)}
 .bnt-live .l-cta h3{font-size:19px;margin-bottom:6px}
 .bnt-live .l-empty{color:var(--bnt-ink-60);font-size:14px}
 @media (max-width:900px){
@@ -122,7 +122,7 @@
 
 /* Nov 17 2:26 AM (Matt): gauge explainer = "Highest threat right now" + the top alert's headline and rank chip, nothing else */
 .bnt-live .l-gtext .plain{max-width:420px}
-.bnt-live .l-hk{display:block;font:700 11px/1.2 var(--bnt-hd);letter-spacing:.14em;text-transform:uppercase;color:#FFC21A;margin-bottom:8px}
+.bnt-live .l-hk{display:block;font:700 11px/1.2 var(--bnt-hd);letter-spacing:.14em;text-transform:uppercase;color:var(--bnt-y,#F2F2F4);margin-bottom:8px}
 .bnt-live .l-ht{display:flex;align-items:flex-start;gap:10px;text-align:left;color:inherit;text-decoration:none}
 .bnt-live .l-ht:hover .l-htt,.bnt-live .l-ht:focus-visible .l-htt{text-decoration:underline;text-underline-offset:3px}
 .bnt-live .l-hc{flex:none;display:inline-flex;align-items:baseline;gap:1px;padding:4px 7px;border:1px solid var(--c);border-radius:8px;color:var(--c)}
