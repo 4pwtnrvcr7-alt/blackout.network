@@ -48,25 +48,34 @@ function init(){
  if(dr&&panel){
   panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.setAttribute("aria-label","Site menu");panel.setAttribute("tabindex","-1");dr.setAttribute("aria-hidden","true");
   var focusables=function(){return $$('a[href],button:not([disabled]),input:not([disabled]),select,summary,[tabindex]:not([tabindex="-1"])',panel).filter(function(x){return x.offsetParent!==null||x===document.activeElement})};
-  var setExp=function(v){$$('[aria-controls="bn-menu"]').forEach(function(b){b.setAttribute("aria-expanded",v?"true":"false")})};
+  var setExp=function(v){$$('[aria-controls="bn-menu"]').forEach(function(b){b.setAttribute("aria-expanded",v?"true":"false");if(b.classList.contains("bn-burger"))b.setAttribute("aria-label",v?"Close menu":"Open menu")})};var RM=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches,closeTimer=0;var hx=function(v){if(burger)burger.setAttribute("data-bn-hx",v?"open":"close")};
   var menuHist=false;
   var desk=function(){return window.matchMedia&&matchMedia("(min-width:768px)").matches};
   var collapseMenu=function(){$$("details.bn-grp",panel).forEach(function(d){d.open=false;if(d.dataset)delete d.dataset.v3auto;d.classList.remove("m3-shut");var b=$(".m3-body",d);if(b){b._m3g=(b._m3g||0)+1;b.classList.remove("m3-dz","m3-dz0");b.style.height=""}})};
-  window.bnMenuOpen=function(opts){opts=opts||{};if(dr.classList.contains("bn-open")){if(opts.search)focusSearch();return}lastFocus=document.activeElement;closePop();
-   if(!desk())collapseMenu();
-   dr.classList.add("bn-open");dr.removeAttribute("aria-hidden");R.classList.add("bn-lock");setExp(true);
-   if(!menuHist){try{history.pushState({bnMenu:1},"");menuHist=true}catch(e){}}
-   if(opts.search)focusSearch();else{var c=$(".bn-close",panel);(c||panel).focus({preventScroll:true})}};
-  window.bnMenuClose=function(noFocus,opts){opts=opts||{};if(!dr.classList.contains("bn-open"))return false;dr.classList.remove("bn-open");dr.setAttribute("aria-hidden","true");R.classList.remove("bn-lock");setExp(false);
+  var finishClose=function(noFocus,opts){opts=opts||{};if(closeTimer){clearTimeout(closeTimer);closeTimer=0}
+   if(!dr.classList.contains("bn-open")&&!dr.classList.contains("bn-closing"))return false;
+   dr.classList.remove("bn-open","bn-closing");dr.setAttribute("aria-hidden","true");R.classList.remove("bn-lock","bn-menu-on");setExp(false);
    if(opts.noHist){if(menuHist){menuHist=false;try{history.replaceState(null,"",location.pathname+location.search+((location.hash&&location.hash!=="#bn-menu")?location.hash:""))}catch(e){}}}
    else if(opts.replace){if(menuHist&&history.state&&history.state.bnMenu){try{history.replaceState(null,"",opts.replace)}catch(e){}}else try{history.pushState(null,"",opts.replace)}catch(e){}menuHist=false}
    else if(menuHist&&!opts.fromPop&&history.state&&history.state.bnMenu){menuHist=false;try{history.back()}catch(e){}}
    else{menuHist=false;if(location.hash==="#bn-menu")try{history.replaceState(null,"",location.pathname+location.search)}catch(e){}}
    if(!noFocus){var f=lastFocus&&document.contains(lastFocus)&&lastFocus.offsetParent!==null?lastFocus:burger;if(f)try{f.focus({preventScroll:true})}catch(e){}}return true};
+  window.bnMenuOpen=function(opts){opts=opts||{};if(closeTimer){clearTimeout(closeTimer);closeTimer=0}
+   if(dr.classList.contains("bn-closing"))dr.classList.remove("bn-closing");
+   if(dr.classList.contains("bn-open")){hx(true);if(opts.search)focusSearch();return}lastFocus=document.activeElement;closePop();
+   if(!desk())collapseMenu();
+   hx(true);dr.classList.add("bn-open");dr.removeAttribute("aria-hidden");R.classList.add("bn-lock","bn-menu-on");setExp(true);
+   if(!menuHist){try{history.pushState({bnMenu:1},"");menuHist=true}catch(e){}}
+   if(opts.search)focusSearch();else if(lastFocus&&lastFocus.closest&&lastFocus.closest(".bn-burger")){try{burger&&burger.focus({preventScroll:true})}catch(e){}}else{var c=$(".bn-close",panel);(c||panel).focus({preventScroll:true})}};
+  window.bnMenuClose=function(noFocus,opts){opts=opts||{};if(!dr.classList.contains("bn-open"))return false;hx(false);
+   if(RM)return finishClose(noFocus,opts);
+   if(dr.classList.contains("bn-closing"))return true;
+   dr.classList.add("bn-closing");R.classList.add("bn-menu-on");
+   closeTimer=setTimeout(function(){finishClose(noFocus,opts)},680);return true};
   addEventListener("popstate",function(){if(dr.classList.contains("bn-open"))bnMenuClose(false,{fromPop:true})});
   var focusSearch=function(){var i=document.getElementById("bns_q");if(i&&panel.contains(i)){i.focus();try{i.select()}catch(e){}}else{var c=$(".bn-close",panel);c&&c.focus()}};
   document.addEventListener("click",function(e){var t=e.target.closest&&e.target.closest("a,button");if(!t)return;
-   if(t.matches(".bn-burger")){e.preventDefault();dr.classList.contains("bn-open")?bnMenuClose():bnMenuOpen();return}
+   if(t.matches(".bn-burger")){e.preventDefault();(dr.classList.contains("bn-open")&&!dr.classList.contains("bn-closing"))?bnMenuClose():bnMenuOpen();return}
    if(t.matches(".bn-searchbtn")){e.preventDefault();bnMenuOpen({search:true});return}
    if(t.matches(".bn-close,.bn-scrim")){e.preventDefault();bnMenuClose();return}
    if(t.matches(".bn-gear-row")){e.preventDefault();e.stopPropagation();bnMenuClose(true,{noHist:true});openPop(t);return}});
@@ -74,7 +83,7 @@ function init(){
    if(e.key==="Escape"){var p=$("#bns_pop.on");if(p&&p.contains(document.activeElement))return;e.preventDefault();bnMenuClose();return}
    if(e.key!=="Tab")return;var f=focusables();if(!f.length)return;var a=f[0],z=f[f.length-1];
    if(e.shiftKey&&(document.activeElement===a||document.activeElement===panel)){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}});
-  document.addEventListener("focusin",function(e){if(dr.classList.contains("bn-open")&&!panel.contains(e.target)&&!(document.getElementById("bns_panel")||{contains:function(){return false}}).contains(e.target)){var c=$(".bn-close",panel);c&&c.focus()}});
+  document.addEventListener("focusin",function(e){if(dr.classList.contains("bn-open")&&!panel.contains(e.target)&&!(burger&&burger.contains(e.target))&&!(document.getElementById("bns_panel")||{contains:function(){return false}}).contains(e.target)){var c=$(".bn-close",panel);c&&c.focus()}});
   if(location.hash==="#bn-menu")bnMenuOpen();
   // sections: do not restore or remember open/closed state (leftover bn_grp_* keys are ignored).
   // Close only on phones here; the desktop board is opened by bn-v3.js m3desk.
