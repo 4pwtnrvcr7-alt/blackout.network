@@ -9,7 +9,7 @@ body.bnt-home #bng_bar,body.bnt-home .bng-foot,body.bnt-home #bng_prompt{display
 @font-face{font-family:"Inter";font-style:normal;font-weight:100 900;font-display:swap;src:url(/fonts/inter-latin-wght-normal.woff2) format("woff2")}
 /* top nav */
 .h-nav{position:fixed;inset:0 0 auto 0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px clamp(18px,4vw,48px);padding-top:max(20px,env(safe-area-inset-top));transition:background .4s}
-.h-nav.solid{background:linear-gradient(rgba(0,0,0,.85),rgba(0,0,0,0))}
+.h-nav,.h-nav.solid{background:#05060a;background-image:none;border-bottom:1px solid rgba(240,240,250,.08);z-index:2400}   /* iOS: solid near-black bar, no gradient shade (Matt 4:10 PM) */
 .h-nav .h-wm{font-size:17px;color:var(--bnt-ink)}
 .h-links{display:flex;gap:28px;font:600 12.5px/1 var(--bnt-hd);letter-spacing:.12em;text-transform:uppercase}
 .h-links a{color:var(--bnt-ink-80);padding:6px 0;border-bottom:1px solid transparent;transition:color .2s,border-color .2s}
