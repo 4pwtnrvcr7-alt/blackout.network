@@ -45,7 +45,7 @@
   var n=list.length?(+a.count||list.length):0,ph=d.querySelector("#bn-menu .bn-ph"),box=d.getElementById("bna_malert"),b=d.querySelector("header.bn-top .bn-burger");
   if(b){var dot=b.querySelector(".bna-dot");if(dot)dot.remove()}   // no notification dot on the menu button (Matt, Nov 12); alerts stay inside the menu
   if(!ph)return;if(!n){box&&box.remove();return}
-  if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/#network";var anchor=ph.closest(".bn-mhead")||ph;anchor.parentNode.insertBefore(box,anchor.nextSibling);
+  if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/live#network";var anchor=ph.closest(".bn-mhead")||ph;anchor.parentNode.insertBefore(box,anchor.nextSibling);
    box.addEventListener("click",function(e){if(!window.bnMenuClose)return;e.preventDefault();e.stopPropagation();try{bnMenuClose(true,{replace:"/#network"})}catch(err){}})}
   box.innerHTML='<span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
  function load(){fetch("/api/netstatus/alerts",{cache:"no-store"}).then(function(r){return r.json()}).then(alerts).catch(function(){})}
@@ -112,7 +112,7 @@
    group by group via ON. Nothing here runs when BN_APPLE=0 (this file is not served then). */
 (function(){
  var d=document,ON=[/^(wire|streams|noise|heatmap|trends|broadcasts|radio)$/,/^(ranked|intel|ai|finance|weather|grid|solar|network|jets|spacex|maps|politics|government)$/];
- function key(){var p=location.pathname,h=location.hash.replace(/^#/,"");return p=="/"?(h||"home"):p}
+ function key(){var p=location.pathname,h=location.hash.replace(/^#/,"");return (p=="/"||p=="/live")?(h||"home"):p}
  function on(){var k=key();return d.documentElement.classList.contains("bna-pg")&&ON.some(function(r){return r.test(k)})}
  function mainEl(){var ms=d.querySelectorAll("body>main");for(var i=0;i<ms.length;i++){var r=ms[i].getBoundingClientRect();if(r.height>0&&getComputedStyle(ms[i]).display!="none")return ms[i]}return null}
  function setOpen(p,open){p.classList.toggle("bna-shut",!open);var h=p.querySelector(":scope>h2,:scope>h3");if(h)h.setAttribute("aria-expanded",open?"true":"false");
