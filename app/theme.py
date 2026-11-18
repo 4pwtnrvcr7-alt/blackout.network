@@ -482,6 +482,10 @@ def live_hero_on():
     """Live full-bleed hero (SpaceX-style imagery rollout, step 1). BN_LIVE_HERO=0 = off (previous look)."""
     return os.environ.get("BN_LIVE_HERO", "1") != "0"
 
+def live_acq_on():
+    """Compact /live vacuum-strip loader. Default on; BN_LIVE_ACQ=0 restores a bare first paint."""
+    return os.environ.get("BN_LIVE_ACQ", "1") != "0"
+
 def tab_hero_on():
     """Latest tab heroes (/live#streams, #noise, #heatmap, #trends, #broadcasts, #radio): full-screen looping NASA video on
     desktop/tablet, still image on phones / reduced motion / Save-Data, snapped (BN_SNAP), data below scrolls freely. BN_TAB_HERO=0 = off."""
@@ -506,32 +510,13 @@ def tab_hero_html():
             f'<script>window.BN_TAB_HEROES={_j.dumps(TAB_HEROES)};window.BN_TAB_HERO_TITLES={_j.dumps(TAB_HERO_TITLES)};</script><script src="{url("tabhero.js")}" defer></script>' + snap)
 
 
-# First-paint /live acquisition stage (Matt 7:10 PM ET, Nov 17): CSS/SVG only, no image assets.
-# The overlay covers the first viewport; modules below ship with thin-line skeletons so nothing is blank.
+# First-paint /live vacuum strip (Matt 8:19–8:20 PM ET, Nov 17): compact 52px widget under the
+# header. Canvas particles drift in from the edges and are pulled into an intake that rides a
+# hairline bar; the only readout is a tabular 0–100%. BN_LIVE_ACQ=0 turns the strip off.
 _LIVE_ACQ = (
-    '<div class="l-acq" id="bntl_acq" role="status" aria-live="polite">'
-    '<svg class="l-acq-globe" viewBox="0 0 240 240" aria-hidden="true" focusable="false">'
-    '<g fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">'
-    '<circle cx="120" cy="120" r="92"/>'
-    '<circle cx="120" cy="120" r="92" class="l-acq-rim"/>'
-    '<ellipse cx="120" cy="120" rx="36" ry="92"/>'
-    '<ellipse cx="120" cy="120" rx="68" ry="92"/>'
-    '<path d="M28 120h184M46 72h148M46 168h148M68 42h104M68 198h104"/>'
-    '</g>'
-    '<g class="l-acq-sweep" aria-hidden="true">'
-    '<path d="M120 120 L120 28" fill="none" stroke="currentColor" stroke-width="1.25"/>'
-    '<path d="M120 120 L208 86" fill="none" stroke="currentColor" stroke-width="1" opacity=".35"/>'
-    '<circle cx="120" cy="28" r="2.2" fill="currentColor"/>'
-    '</g>'
-    '<circle cx="168" cy="78" r="2.4" fill="currentColor" class="l-acq-fix"/>'
-    '</svg>'
-    '<p class="l-acq-wm">blackout.network</p>'
-    '<p class="l-acq-k">Acquiring signals</p>'
-    '<p class="l-acq-tick" aria-hidden="true">'
-    '<span>Wire desk</span><span>Seismic net</span><span>Aviation feeds</span>'
-    '<span>Weather watches</span><span>Network probes</span><span>Broadcast ingest</span>'
-    '</p>'
-    '<p class="l-acq-n"><b id="bntl_acq_n">00</b> <span>channels</span></p>'
+    '<div class="l-acq" id="bntl_acq" role="status" aria-live="polite" aria-label="Loading 0 percent">'
+    '<canvas class="l-acq-cv" id="bntl_acq_cv" width="640" height="52" aria-hidden="true"></canvas>'
+    '<div class="l-acq-readout"><span class="l-acq-pct" id="bntl_acq_pct">00</span><span class="l-acq-unit">%</span></div>'
     '</div>'
 )
 _LIVE_SK_SIG = (
@@ -548,6 +533,7 @@ _LIVE_SK_CAT = (
 
 def live_overview_html():
     hero = live_hero_on()
+    acq = live_acq_on()
     bg = ('<div class="l-bg" aria-hidden="true"><picture><source media="(max-width:700px)" srcset="/bnt/media/lvhero-m.jpg?v=1">'
           '<img src="/bnt/media/lvvid-d.jpg?v=1" alt="" decoding="async" fetchpriority="high"></picture>'
           '<video class="l-vid" muted loop playsinline preload="none" disablepictureinpicture tabindex="-1"'
@@ -560,8 +546,8 @@ def live_overview_html():
           'v.muted=true;v.autoplay=true;v.preload="auto";v.addEventListener("playing",function(){v.classList.add("on")},{once:true});'
           'v.load();var p=v.play();if(p&&p.catch)p.catch(function(){});return true}'
           'setTimeout(function(){if(!go()){var iv=setInterval(function(){if(go())clearInterval(iv)},1000)}},400)})()</script>') if hero else ""
-    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live l-loading{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview" aria-busy="true">{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
-{_LIVE_ACQ}
+    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live{' l-loading' if acq else ''}{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview"{' aria-busy="true"' if acq else ''}>{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
+{_LIVE_ACQ if acq else ""}
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>
