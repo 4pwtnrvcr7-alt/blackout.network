@@ -896,3 +896,12 @@ EXT_FAILED = [
     ("X (Twitter)", "https://x.com/", "Not reachable by the scanner; the hourly chat check runs X searches and feeds results via ingest_external.py"),
     ("CENAPRED Mexico (Popocatépetl report)", "https://www.cenapred.unam.mx/", "2026-10-31 t225: home page is a Radware bot-challenge shell (no content to scripts), report URLs 404, no RSS/JSON; not bypassed - Popocatépetl still covered via GDACS/NASA EONET/news"),
 ]
+
+# ---- 2026-11-18 (pt1653u) wide-net sources: sources_wide.py, ~125 keyless feeds, each its own source_health row.
+# Isolated: prefetch in parallel (20 s timeout), per-source cap, low base scores. Kill switches: env BN_SOURCES_WIDE=0,
+# a file named sources_wide_off next to this module (all off), or keys listed in sources_wide_disabled.json (single feeds off).
+try:
+    import sources_wide as _W
+    EXT_SOURCES += _W.WIDE_SOURCES
+except Exception as _ex:
+    EXT_FAILED.append(("[wide] sources_wide module", "sources_wide.py", f"import failed: {type(_ex).__name__}: {_ex}"[:300]))
