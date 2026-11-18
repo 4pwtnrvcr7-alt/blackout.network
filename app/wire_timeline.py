@@ -2,9 +2,12 @@
 
 GET /wire                      the live Wire timeline (indexable). BN_WIRE_TIMELINE=0 lets story.py restore the previous listing.
 GET /wire-next                 301 to /wire (old preview URL). Redirects even when the flag is off.
-GET /api/wire_tl               items, newest first. before=<cursor> (older) or after=<cursor> (newer), limit 1..200,
-                               q=<keywords> (all words, title/place), bg=1 adds background signals.
+GET /api/wire_tl               items, newest first by last activity (COALESCE(updated, first_seen)). before=<cursor>
+                               (older) or after=<cursor> (newer), limit 1..200, q=<keywords> (all words, title/place),
+                               bg=1 adds background signals, lat/lon/r=miles limits to a radius.
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
+GET /api/wire_tl/geo?q=        keyless ZIP/place geocode (US Census ZCTA table + offline gazetteer).
+GET /api/wire_tl/crime?q=      local crime headlines for a US place when BN_CRIME_NEWS is on (cached).
 GET /api/wire_tl/app.js|app.css
 
 Data: blackout.db clusters (live scanner) + trends_history.db stories (archive backfill), both opened read-only
@@ -37,24 +40,43 @@ def _j(s, d):
 # ------------------------------------------------------------------ display categories (colour keys)
 CATS = [  # key, label, colour (muted; red is reserved for rank 7+, no yellow)
     ("conflict", "War & conflict", "#B98466"),
-    ("disease", "Disease", "#6FA88C"),
+    ("politics", "Political", "#8D93DA"),
+    ("scandal", "Scandals", "#A8907A"),
+    ("unrest", "Civil unrest", "#9A7A8C"),
+    ("crime", "Crime", "#8A8E9A"),
+    ("deaths", "Obituaries", "#7A8490"),
+    ("people", "People", "#8B8FA3"),
+    ("disease", "Health alerts", "#6FA88C"),
     ("quake", "Quakes & volcanoes", "#9A86C4"),
     ("weather", "Weather & fire", "#5E95C8"),
+    ("wreck", "Wrecks & crashes", "#7E8A96"),
+    ("infra", "Infrastructure", "#6E8B8A"),
     ("hazard", "Other hazards", "#8C99A6"),
     ("space", "Space weather", "#C58FB6"),
     ("cyber", "Cyber", "#4EAAA6"),
-    ("markets", "Markets", "#86A96A"),
-    ("politics", "Politics", "#8D93DA"),
+    ("markets", "Finance", "#86A96A"),
     ("uap", "UFO / UAP", "#A7B4C4"),
     ("faith", "Religion", "#AC94A4"),
     ("other", "Other", "#73787F"),
 ]
 _QK = re.compile(r"\b(earthquakes?|quakes?|tsunami|seismic|aftershock|volcan\w*|eruption|ash (?:plume|advisory)|magnitude)\b|^M\s?\d(?:\.\d)?\b", re.I)
+_AG = re.compile(r"\b(USGS|GEOFON|EMSC|INGV|CSN|PTWC|JMA|BMKG)\b:\s*M\s?\d", re.I)
 _WX = re.compile(r"\b(cyclone|hurricane|typhoon|tropical (?:storm|depression)|storm|floods?|flooding|flash flood|rain\w*|tornado\w*|wild ?fires?|forest ?fires?|bush ?fires?|fire weather|red flag|drought|heat ?wave|excessive heat|heat (?:advisory|warning)|snow\w*|blizzard|ice storm|winter (?:storm|weather)|freez\w+|frost|wind|gale|monsoon|landslides?|mudslides?|avalanche|dust storm|fog|weather|cold wave)\b", re.I)
 _DZ = re.compile(r"\b(outbreak|cholera|ebola|marburg|mpox|measles|dengue|malaria|influenza|avian flu|h5n1|bird flu|covid|virus|polio|yellow fever|epidemic|pandemic|meningitis|anthrax|plague|diphtheria|nipah|mers|lassa|hepatitis)\b", re.I)
+_WRECK = re.compile(r"\b(plane crash|air crash|airliner crash|crashed|mid-air|derail\w*|train crash|shipwreck|capsized|sank|sinking|multi-vehicle|pile-?up|traffic fatality|fatal crash|helicopter crash|vessel sunk|maritime accident|ferry (?:sink|capsiz)|road crash|car crash|bus crash|truck crash)\b", re.I)
+_INFRA = re.compile(r"\b(power outage|blackout|grid (?:fail|collapse|down)|substation|water main|boil[- ]water|pipeline (?:rupture|leak|explosion)|bridge collapse|dam (?:fail|breach|burst)|internet outage|fiber cut|gas leak|sewage (?:spill|overflow)|runway closed|port closed|rail (?:outage|suspended)|transformer fire)\b", re.I)
+_OBIT = re.compile(r"\b(obituar\w*|dies at \d+|has died|dead at \d+|passed away)\b", re.I)
+_CRIME = re.compile(r"\b(homicide|murder(?:ed)?|manslaughter|mass shooting|shooting|shot dead|stabbed|stabbing|robbery|burglary|carjack\w*|kidnapp\w*|arrested|serial (?:killer|rapist)|gang (?:violence|shooting)|sexual assault)\b", re.I)
+_SCANDAL = re.compile(r"\b(scandal|corruption|embezzl\w*|bribery|kickback|impeach\w*|ethics (?:probe|investigation)|cover-?up|campaign finance|resigned amid)\b", re.I)
+_UNREST = re.compile(r"\b(civil unrest|riot\w*|protest\w*|demonstrat\w*|looting|curfew|martial law|clashes with police|tear gas|anti-government)\b", re.I)
+_PEOPLE = re.compile(r"\b(assassina\w*|assassination attempt)\b", re.I)
 _RW = re.compile(r"^[^:]{2,60}:\s*(.+?)\s+-\s+[A-Z][a-z]{2} \d{4}$")   # ReliefWeb "Country: Floods - Aug 2026"
+_STORED = {"war/conflict": "conflict", "disease": "disease", "space weather": "space", "cyber": "cyber",
+           "financial": "markets", "political": "politics", "ufo/uap": "uap", "spiritual/religious": "faith",
+           "crime": "crime", "people": "people"}
 
 def cat_key(category, title, archive):
+    """Display category. Title rules run first so a stored war/conflict tag on a quake (or similar mislabel) is corrected."""
     c = (category or "").lower(); t = title or ""
     m = _RW.match(t) if archive else None
     if m:   # archive ReliefWeb items carry a coarse stored category; their own type label is better for display
@@ -64,12 +86,22 @@ def cat_key(category, title, archive):
         if _WX.search(ty): return "weather"
         if re.search(r"conflict|violence|displacement|refugee|unrest|crisis", ty, re.I): return "conflict"
         return "hazard"
+    # Title-first: fix known quake-as-conflict (and similar) mislabels regardless of stored category.
+    if _QK.search(t) or _AG.search(t): return "quake"
+    if _DZ.search(t): return "disease"
+    if _WRECK.search(t): return "wreck"
+    if _INFRA.search(t): return "infra"
     if c == "natural disaster":
-        if _QK.search(t): return "quake"
         if _WX.search(t): return "weather"
         return "hazard"
-    return {"war/conflict": "conflict", "disease": "disease", "space weather": "space", "cyber": "cyber", "financial": "markets",
-            "political": "politics", "ufo/uap": "uap", "spiritual/religious": "faith"}.get(c, "other")
+    if _OBIT.search(t): return "deaths"
+    if c != "war/conflict":
+        if _UNREST.search(t): return "unrest"
+        if _CRIME.search(t): return "crime"
+        if _PEOPLE.search(t): return "people"
+    if _SCANDAL.search(t): return "scandal"
+    if _WX.search(t) and c not in ("war/conflict", "political"): return "weather"
+    return _STORED.get(c, "other")
 
 # ------------------------------------------------------------------ regions (display only)
 REGIONS = [("na", "North America"), ("la", "Latin America"), ("eu", "Europe"), ("me", "Middle East"), ("af", "Africa"),
@@ -193,16 +225,25 @@ def _item(r, archive):
     try: rk = int(rk) if rk is not None else None
     except (TypeError, ValueError): rk = None
     t = r["t"]
+    def _ll(v):
+        try:
+            return float(v) if v is not None and v != "" else None
+        except (TypeError, ValueError):
+            return None
+    fs = r["fs"] if "fs" in r.keys() else None
     return {"id": r["id"], "t": t, "h": h, "s": s, "d": d, "k": cat_key(r["category"], title, archive),
             "g": region_key(loc, title, r["lat"], r["lon"]), "r": rk, "c": r["confidence"] or "", "loc": loc,
             "n": int(r["n_items"] or 0), "f": len(fams), "src": srcs, "l": links, "a": 1 if archive else 0,
             "w": r["watchlist"] or 0, "et": r["event_time"] if not archive else None,
-            "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0}   # archive items dated by day only (no time given)
+            "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
+            "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
 
-_LIVE_COLS = ("cluster_id id, first_seen t, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
+# t = last activity so newly collected signals on an existing cluster rise to the tip.
+_LIVE_COLS = ("cluster_id id, COALESCE(updated, first_seen) t, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
               "n_items, families, links, brief, NULL sources")
-_ARCH_COLS = ("id, t, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
+_ARCH_COLS = ("id, t, t fs, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
               "NULL brief, sources")
+_TCOL = "COALESCE(updated, first_seen)"
 
 def _qwhere(words, cols):
     w, a = "", []
@@ -211,7 +252,30 @@ def _qwhere(words, cols):
         a += ["%" + x.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"] * len(cols)
     return w, a
 
-def page(before=None, after=None, limit=100, q="", bg=False):
+def _miles(a, b, c, d):
+    import math
+    p = math.pi / 180
+    x = 0.5 - math.cos((c - a) * p) / 2 + math.cos(a * p) * math.cos(c * p) * (1 - math.cos((d - b) * p)) / 2
+    return 3958.8 * 2 * math.asin(math.sqrt(max(0, x)))
+
+def _geo_clause(lat, lon, r_mi):
+    """Bounding-box SQL plus args. Tight enough that a follow-up haversine drops almost nothing."""
+    if lat is None or lon is None or not r_mi:
+        return "", []
+    import math
+    dlat = float(r_mi) / 69.0
+    dlon = float(r_mi) / (69.0 * max(0.2, abs(math.cos(math.radians(float(lat))))))
+    return (" AND lat IS NOT NULL AND lon IS NOT NULL AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+            [float(lat) - dlat, float(lat) + dlat, float(lon) - dlon, float(lon) + dlon])
+
+def _near(r, lat, lon, r_mi):
+    if lat is None or lon is None or not r_mi: return True
+    try:
+        return _miles(float(lat), float(lon), float(r["lat"]), float(r["lon"])) <= float(r_mi) + 0.05
+    except (TypeError, ValueError):
+        return False
+
+def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None):
     limit = max(1, min(MAXL, int(limit)))
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -222,22 +286,26 @@ def page(before=None, after=None, limit=100, q="", bg=False):
     else:
         ct, cid = ("0000-01-01T00:00:00Z", "") if newer else ("9999-12-31T23:59:59Z", "~")
     op, order = (">", "ASC") if newer else ("<", "DESC")
+    geo, ga = _geo_clause(lat, lon, r_mi)
+    fetch_n = (limit + 1) if not geo else min(MAXL, max(limit * 8, 80))
     rows = []
     c = _ro(DB)
     try:
         qw, qa = _qwhere(words, ("title", "location"))
-        sql = (f"SELECT {_LIVE_COLS} FROM clusters WHERE (first_seen{op}? OR (first_seen=? AND cluster_id{op}?)) "
-               f"AND watchlist IN ({','.join('?' * len(lists))}){qw} ORDER BY first_seen {order}, cluster_id {order} LIMIT ?")
-        rows += [(r, False) for r in c.execute(sql, [ct, ct, cid, *lists, *qa, limit + 1])]
+        sql = (f"SELECT {_LIVE_COLS} FROM clusters WHERE ({_TCOL}{op}? OR ({_TCOL}=? AND cluster_id{op}?)) "
+               f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo} ORDER BY {_TCOL} {order}, cluster_id {order} LIMIT ?")
+        rows += [(r, False) for r in c.execute(sql, [ct, ct, cid, *lists, *qa, *ga, fetch_n])]
     finally: c.close()
     h = _hdb()
     if h is not None:
         try:
             qw, qa = _qwhere(words, ("title", "location"))
             sql = (f"SELECT {_ARCH_COLS} FROM stories WHERE (t{op}? OR (t=? AND id{op}?)) "
-                   f"AND watchlist IN ({','.join('?' * len(lists))}){qw} ORDER BY t {order}, id {order} LIMIT ?")
-            rows += [(r, True) for r in h.execute(sql, [ct, ct, cid, *lists, *qa, limit + 1])]
+                   f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo} ORDER BY t {order}, id {order} LIMIT ?")
+            rows += [(r, True) for r in h.execute(sql, [ct, ct, cid, *lists, *qa, *ga, fetch_n])]
         finally: h.close()
+    if geo:
+        rows = [(r, a) for r, a in rows if _near(r, lat, lon, r_mi)]
     rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
     more = len(rows) > limit
     rows = rows[:limit]
@@ -254,7 +322,7 @@ def count(q="", bg=False):
     c = _ro(DB)
     try:
         qw, qa = _qwhere(words, ("title", "location"))
-        r = c.execute(f"SELECT COUNT(*), MIN(first_seen), MAX(first_seen) FROM clusters WHERE watchlist IN ({','.join('?' * len(lists))}){qw}", [*lists, *qa]).fetchone()
+        r = c.execute(f"SELECT COUNT(*), MIN(first_seen), MAX({_TCOL}) FROM clusters WHERE watchlist IN ({','.join('?' * len(lists))}){qw}", [*lists, *qa]).fetchone()
         n += r[0] or 0; lo, hi = r[1], r[2]
     finally: c.close()
     h = _hdb()
@@ -379,11 +447,23 @@ def page_html():
  <div class="tl-row1">
   <label class="tl-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.4"/></svg>
    <input id="tl_q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" spellcheck="false" placeholder="Search every signal" aria-label="Search every signal"><button type="button" id="tl_qx" class="tl-qx" aria-label="Clear search" hidden>&times;</button></label>
+  <button type="button" class="tl-b" id="tl_filt" aria-expanded="false" aria-controls="tl_sheet" aria-label="Filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span>Filters</span><b class="tl-fbadge" id="tl_fbadge" hidden></b></button>
   <button type="button" class="tl-b" id="tl_when" aria-expanded="false" aria-controls="tl_jump"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 10h16M9 3.5v4M15 3.5v4" stroke="currentColor" stroke-width="1.4"/></svg><span>Date</span></button>
   <button type="button" class="tl-b tl-cond" id="tl_cond" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6m0 0-3-3m3 3 3-3M12 21v-6m0 0-3 3m3-3 3 3M4 12h16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="tl-cl">Condense</span></button>
   <button type="button" class="tl-b" id="tl_ref" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span>Refresh</span></button>
  </div>
- <div class="tl-row2"><div class="tl-chips" id="tl_chips" role="group" aria-label="Filter by type and region"></div></div>
+ <div class="tl-sheet" id="tl_sheet" hidden>
+  <div class="tl-sheet-h"><span>Filters</span><button type="button" class="tl-clear" id="tl_fclear">Clear all</button></div>
+  <div class="tl-fg"><span class="tl-cg">Type</span><div class="tl-chips wrap" id="tl_chips_c" role="group" aria-label="Type"></div></div>
+  <div class="tl-fg"><span class="tl-cg">Region</span><div class="tl-chips wrap" id="tl_chips_r" role="group" aria-label="Region"></div></div>
+  <div class="tl-fg" role="group" aria-label="Location"><span class="tl-cg">Location</span>
+   <form class="tl-loc" id="tl_locf"><input id="tl_loc" type="text" inputmode="search" enterkeyhint="search" autocomplete="off" spellcheck="false" maxlength="80" placeholder="ZIP or place" aria-label="ZIP or place"><button type="submit" class="tl-b" id="tl_locgo">Set</button></form>
+   <div class="tl-chips wrap" id="tl_rad" role="group" aria-label="Radius"><button type="button" class="tl-chip" data-r="10">10 mi</button><button type="button" class="tl-chip" data-r="25">25 mi</button><button type="button" class="tl-chip" data-r="50">50 mi</button><button type="button" class="tl-chip" data-r="100">100 mi</button></div>
+   <p class="tl-loclab" id="tl_loclab" hidden></p>
+  </div>
+  <div class="tl-fg"><span class="tl-cg">Time</span><div class="tl-chips wrap" id="tl_time" role="group" aria-label="Time"><button type="button" class="tl-chip" data-t="">All</button><button type="button" class="tl-chip" data-t="today">Today</button><button type="button" class="tl-chip" data-t="1">24 hours</button><button type="button" class="tl-chip" data-t="7">7 days</button><button type="button" class="tl-chip" data-t="30">30 days</button></div></div>
+  <div class="tl-fg"><span class="tl-cg">Severity</span><div class="tl-chips wrap" id="tl_sev" role="group" aria-label="Severity"><button type="button" class="tl-chip" data-s="">Any</button><button type="button" class="tl-chip" data-s="lo">0–3</button><button type="button" class="tl-chip" data-s="mid">4–6</button><button type="button" class="tl-chip" data-s="hi">7–10</button></div></div>
+ </div>
  <div class="tl-jump" id="tl_jump" hidden><div class="tl-jq" id="tl_jq"></div><label class="tl-jd"><span>Go to date</span><input type="date" id="tl_date"></label></div>
  <div class="tl-stat"><button type="button" class="tl-now" id="tl_now" aria-label="Current date; tap to jump"></button><span id="tl_stat" aria-live="polite"></span><span id="tl_upd" class="tl-upd" hidden></span><button type="button" class="tl-clear" id="tl_clear" hidden>Clear</button></div>
 </div>
@@ -394,6 +474,70 @@ def page_html():
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
 <script>window.BN_TL={json.dumps(cfg)};</script>
 <script src="{w2}/wire2.js?v=3" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
+
+# ------------------------------------------------------------------ location (keyless) + local crime
+_ZIP = None
+def _zip_table():
+    global _ZIP
+    if _ZIP is None:
+        try:
+            with open(os.path.join(BASE, "newsletter_zip.json"), encoding="utf-8") as fh:
+                _ZIP = json.load(fh)
+        except Exception:
+            _ZIP = {}
+    return _ZIP
+
+def geocode_q(q):
+    """US ZIP (full-precision Census ZCTA centroid) or a place name via the offline gazetteer. No API key."""
+    q = re.sub(r"\s+", " ", str(q or "")).strip()[:80]
+    if not q:
+        return {"ok": False, "message": "Enter a US ZIP code or a place name."}
+    m = re.fullmatch(r"(\d{5})(?:-\d{4})?", q)
+    if m:
+        z = _zip_table().get(m.group(1))
+        if z:
+            lab = (z[2] or "").strip() or ("ZIP " + m.group(1))
+            return {"ok": True, "place": {"label": lab, "lat": float(z[0]), "lon": float(z[1]), "cc": "US", "kind": "zip", "zip": m.group(1)}}
+    try:
+        from newsletter import geocode_place
+        p = geocode_place(q)
+    except Exception:
+        p = None
+    if not p:
+        return {"ok": False, "message": "We couldn't find that place. Try a US ZIP or a city like Sanford, FL."}
+    return {"ok": True, "place": p}
+
+def local_crime(q):
+    """Cached local crime headlines for a US ZIP or city. Empty (not an error) when the flag is off or the place is outside the US."""
+    q = re.sub(r"\s+", " ", str(q or "")).strip()[:80]
+    if not q:
+        return {"ok": False, "items": [], "message": "Enter a US ZIP or city."}
+    try:
+        import crime, crime_news
+        if not crime_news.on():
+            return {"ok": True, "items": [], "off": True}
+        p = crime.resolve(q)
+        a = crime_news.area_for(p) if p else None
+        if not a:
+            return {"ok": True, "items": [], "place": p}
+        d = crime_news.reports(a, allow_fetch=True)
+        items = []
+        for i, r in enumerate(d.get("items") or []):
+            when = r.get("date") or ""
+            try:
+                from datetime import datetime as _dt
+                t = _dt.fromisoformat(when).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            except Exception:
+                t = when
+            items.append({"id": "cr-%s-%s" % (i, (r.get("url") or "")[-16:]), "t": t, "h": r.get("title") or "",
+                          "s": r.get("place") or r.get("source") or "", "d": "", "k": "crime", "g": "na", "r": None,
+                          "c": "", "loc": r.get("place") or "", "n": 1, "f": 0, "src": [r.get("source") or ""],
+                          "l": [{"u": r.get("url"), "s": r.get("source") or ""}], "a": 0, "w": 0, "et": None, "do": 0,
+                          "lat": None, "lon": None, "fs": t, "crime": 1, "official": bool(r.get("official"))})
+        return {"ok": True, "items": items, "fetched": d.get("fetched"), "place": p}
+    except Exception as ex:
+        return {"ok": False, "items": [], "error": str(ex)[:160]}
+
 
 def handle_get(path, qs):
     if path in ("/wire-next", "/wire-next/"):
@@ -414,6 +558,10 @@ def handle_get(path, qs):
             q = (g("q", "") or "")[:80]
             try: return 200, count(q, g("bg") == "1")
             except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
+        if n == "geo":
+            return 200, geocode_q((g("q", "") or "")[:80])
+        if n == "crime":
+            return 200, local_crime((g("q", "") or "")[:80])
         return 404, {"error": "not found"}
     if path == "/api/wire_tl":
         before, after = g("before"), g("after")
@@ -424,6 +572,20 @@ def handle_get(path, qs):
         except ValueError: return 400, {"error": "limit must be a number"}
         if not 1 <= lim <= MAXL: return 400, {"error": f"limit must be 1..{MAXL}"}
         q = (g("q", "") or "")[:80]
-        try: return 200, page(before, after, lim, q, g("bg") == "1")
+        lat = lon = rmi = None
+        try:
+            if g("lat"): lat = float(g("lat"))
+            if g("lon"): lon = float(g("lon"))
+            if g("r"): rmi = float(g("r"))
+        except (TypeError, ValueError):
+            return 400, {"error": "lat, lon and r must be numbers"}
+        if (lat is None) != (lon is None):
+            return 400, {"error": "lat and lon are required together"}
+        if lat is not None and not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            return 400, {"error": "lat/lon out of range"}
+        if lat is not None and rmi is None: rmi = 25
+        if rmi is not None and not (1 <= rmi <= 500):
+            return 400, {"error": "r must be 1..500 miles"}
+        try: return 200, page(before, after, lim, q, g("bg") == "1", lat, lon, rmi)
         except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
     return 404, {"error": "not found"}
