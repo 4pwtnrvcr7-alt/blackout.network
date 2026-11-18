@@ -1,6 +1,7 @@
 """Wire timeline (preview, Nov 18 2026, Matt 1:23 AM ET): one chronological research timeline of everything collected.
 
-GET /wire-next                 unlinked, noindex preview page (not in menus or the sitemap). BN_WIRE_TIMELINE=0 = 404.
+GET /wire                      the live Wire timeline (indexable). BN_WIRE_TIMELINE=0 lets story.py restore the previous listing.
+GET /wire-next                 301 to /wire (old preview URL). Redirects even when the flag is off.
 GET /api/wire_tl               items, newest first. before=<cursor> (older) or after=<cursor> (newer), limit 1..200,
                                q=<keywords> (all words, title/place), bg=1 adds background signals.
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
@@ -350,9 +351,16 @@ def page_html():
         except Exception: since = ""
     line = f"{tot:,} signals since {since}. Newest at the top." if tot and since else "Every signal we have collected, newest at the top."
     v_css, v_js = _ver("app.css"), _ver("app.js")
+    title = "The Wire: live threat feed | BLACKOUT.NETWORK"
+    desc = "Every signal BLACKOUT.NETWORK has collected, in one timeline."
+    try:
+        import og
+        ogmeta = og.tags(title=title, desc=desc, url="https://blackout.network/wire", key="wire", og_type="website")
+    except Exception:
+        ogmeta = ""
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2 data-bn-tl><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>The Wire timeline (preview) | BLACKOUT.NETWORK</title><meta name="description" content="Every signal BLACKOUT.NETWORK has collected, in one timeline.">
-<meta name="robots" content="noindex,nofollow,noarchive"><meta name="theme-color" content="#000">
+<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/wire">
+{ogmeta}<meta name="theme-color" content="#000">
 <!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->
 <link rel="stylesheet" href="{w2}/wire2.css?v=6"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}">
 <link rel="preload" as="image" href="/bnt/media/wthero-m.jpg?v=1" media="(max-width:700px)"><link rel="preload" as="image" href="/bnt/media/wtvid-d.jpg?v=1" media="(min-width:701px)"></head>
@@ -385,9 +393,11 @@ def page_html():
 <script src="{w2}/wire2.js?v=3" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
 
 def handle_get(path, qs):
+    if path in ("/wire-next", "/wire-next/"):
+        return 301, b"", "text/html", {"Location": "/wire"}
     if not on(): return 404, {"error": "not found"}
     g = lambda k, d=None: ((qs.get(k) or [d])[0] or d)
-    if path in ("/wire-next", "/wire-next/"):
+    if path in ("/wire", "/wire/"):
         return 200, page_html(), "text/html"
     if path.startswith("/api/wire_tl/"):
         n = path[len("/api/wire_tl/"):]

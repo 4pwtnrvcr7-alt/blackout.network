@@ -92,10 +92,11 @@ ROUTES = {
     "/api/newsletter": "newsletter",
     "/sources": "sources",
     "/api/sources": "sources",
-    "/wire-next": "wire_timeline",   # Nov 18 (Matt 1:23 AM ET): unlinked noindex preview of the Wire timeline redesign; BN_WIRE_TIMELINE=0 = 404
+    "/wire-next": "wire_timeline",   # Nov 18: 301 to /wire (timeline is now the listing). Listed before /wire for clarity.
+    "/wire-classic": "story",        # Nov 18: previous /wire listing, unlinked and noindex. Not under /wire/ so it needs its own prefix.
     "/api/wire_tl": "wire_timeline",  # its API: /api/wire_tl?before|after=<cursor>&q=&limit=, /api/wire_tl/meta|count|app.js|app.css
     "/wire2": "story",              # Push F: Wire v2 static assets (/wire2/static/*, wire_v2.handle_static)
-    "/wire": "story",               # /wire/<cluster_id>: one page per scanner story, every source (story.py, t303); newsletter items link here
+    "/wire": "story",               # /wire = timeline (BN_WIRE_TIMELINE=0 restores the previous listing); /wire/<cluster_id> stays a story page
     "/social": "social",            # Videos & posts hub + /social/thumb/<file> hosted thumbnails (social.py, t303)
     "/api/social": "social",
     "/story": "social",             # /story/<slug>: one page per launch video (article + nocookie embed), hidden until publish_at (t311)
