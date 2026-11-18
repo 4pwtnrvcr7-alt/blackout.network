@@ -243,7 +243,7 @@ def live_page():
     b = dashboard_page()
     b = b.replace(b'<link rel="canonical" href="https://blackout.network/">', b'<link rel="canonical" href="https://blackout.network/live">', 1)
     b = b.replace(b'<meta property="og:url" content="https://blackout.network/">', b'<meta property="og:url" content="https://blackout.network/live">', 1)
-    b = b.replace(b'https://blackout.network/og/home.png?v=4', b'https://blackout.network/og/live.png?v=4')
+    b = b.replace(b'https://blackout.network/og/home.png?v=5', b'https://blackout.network/og/live.png?v=5')
     try:
         ov = _addon_mod("theme").live_overview_html().encode("utf-8")
         k = b.find(b'<h1 class="bna-vh">')
