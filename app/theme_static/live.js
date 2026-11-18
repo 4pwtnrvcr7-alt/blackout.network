@@ -1,7 +1,15 @@
-/* /live overview: gauges, tiles, top signals, dot map, rank spread, alerts per day, categories. Data: /api/live/summary (60 s cache). */
+/* /live overview: gauges, tiles, top signals, dot map, rank spread, alerts per day, categories. Data: /api/live/summary (60 s cache).
+   Acquisition overlay + per-module skeletons (Nov 17): first paint is never blank; overlay min display <= 600 ms (0 if reduced-motion or already ready); interval refresh does not retrigger it. */
 (function(){
 var d=document,$=function(id){return d.getElementById(id)},root=$("bntl");if(!root)return;
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+var t0=performance.now(),revealed=!!root.classList.contains("l-ready"),MIN=reduce?0:600;
+function reveal(){if(revealed||!root.classList.contains("l-loading"))return;revealed=true;
+ var go=function(){root.classList.remove("l-loading");root.classList.add("l-ready");root.removeAttribute("aria-busy");
+  var acq=$("bntl_acq");if(acq)acq.setAttribute("aria-hidden","true")};
+ var w=Math.max(0,MIN-(performance.now()-t0));if(w)setTimeout(go,w);else go()}
+function failSoft(){var el=$("bntl_asof");if(el&&/Loading the latest/.test(el.textContent||""))el.innerHTML='<i></i>Signals delayed &middot; <a href="/?intro=1">Watch the intro</a>';reveal()}
+if(!reduce){var n=0,nc=$("bntl_acq_n"),niv=setInterval(function(){if(revealed||!nc){clearInterval(niv);return}n=Math.min(96,n+1);nc.textContent=(n<10?"0":"")+n},90)}
 var band=function(r){return r>=7?"h":r>=4?"e":"c"},col={c:"#6B7076",e:"#C9CDD3",h:"#FF4D4F"},word={c:"Calm",e:"Elevated",h:"High"};
 var rname={0:"Noise",1:"Background",2:"Minor",3:"Minor regional",4:"Regional",5:"Significant",6:"Serious",7:"Major",8:"Severe",9:"Critical",10:"Catastrophic"};
 var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
@@ -70,6 +78,6 @@ function stamps(S,only){if(!window.BNT||!BNT.up)return;var at=Date.parse(S.last_
  MODS.forEach(function(m){if(only&&m[0]!==only)return;var el=$(m[1]);if(el)BNT.up(el,{label:m[2],at:at,next:nx,run:function(){return fetchS(true).then(function(T){if(T)render(T,land,m[0])})}})})}
 function fetchS(fresh){return fetch("/api/live/summary"+(fresh?"?fresh=1":""),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){return j&&j.ranks?j:null}).catch(function(){return null})}
 function load(){Promise.all([fetch("/api/live/summary",{cache:"no-store"}).then(function(r){return r.json()}),land?Promise.resolve(land):fetch("/bnt/land.json").then(function(r){return r.json()}).catch(function(){return []})])
- .then(function(a){land=a[1];if(a[0]&&a[0].ranks)render(a[0],land)}).catch(function(){})}
+ .then(function(a){land=a[1];if(a[0]&&a[0].ranks){render(a[0],land);if(!revealed)reveal()}else if(!revealed)failSoft()}).catch(function(){if(!revealed)failSoft()})}
 load();setInterval(function(){if(!d.hidden&&root.getBoundingClientRect().height>0)load()},120000);
 })();

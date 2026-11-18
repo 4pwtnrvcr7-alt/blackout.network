@@ -505,6 +505,47 @@ def tab_hero_html():
             '</div></section><div id="bn_th_end"></div>'
             f'<script>window.BN_TAB_HEROES={_j.dumps(TAB_HEROES)};window.BN_TAB_HERO_TITLES={_j.dumps(TAB_HERO_TITLES)};</script><script src="{url("tabhero.js")}" defer></script>' + snap)
 
+
+# First-paint /live acquisition stage (Matt 7:10 PM ET, Nov 17): CSS/SVG only, no image assets.
+# The overlay covers the first viewport; modules below ship with thin-line skeletons so nothing is blank.
+_LIVE_ACQ = (
+    '<div class="l-acq" id="bntl_acq" role="status" aria-live="polite">'
+    '<svg class="l-acq-globe" viewBox="0 0 240 240" aria-hidden="true" focusable="false">'
+    '<g fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round">'
+    '<circle cx="120" cy="120" r="92"/>'
+    '<circle cx="120" cy="120" r="92" class="l-acq-rim"/>'
+    '<ellipse cx="120" cy="120" rx="36" ry="92"/>'
+    '<ellipse cx="120" cy="120" rx="68" ry="92"/>'
+    '<path d="M28 120h184M46 72h148M46 168h148M68 42h104M68 198h104"/>'
+    '</g>'
+    '<g class="l-acq-sweep" aria-hidden="true">'
+    '<path d="M120 120 L120 28" fill="none" stroke="currentColor" stroke-width="1.25"/>'
+    '<path d="M120 120 L208 86" fill="none" stroke="currentColor" stroke-width="1" opacity=".35"/>'
+    '<circle cx="120" cy="28" r="2.2" fill="currentColor"/>'
+    '</g>'
+    '<circle cx="168" cy="78" r="2.4" fill="currentColor" class="l-acq-fix"/>'
+    '</svg>'
+    '<p class="l-acq-wm">blackout.network</p>'
+    '<p class="l-acq-k">Acquiring signals</p>'
+    '<p class="l-acq-tick" aria-hidden="true">'
+    '<span>Wire desk</span><span>Seismic net</span><span>Aviation feeds</span>'
+    '<span>Weather watches</span><span>Network probes</span><span>Broadcast ingest</span>'
+    '</p>'
+    '<p class="l-acq-n"><b id="bntl_acq_n">00</b> <span>channels</span></p>'
+    '</div>'
+)
+_LIVE_SK_SIG = (
+    '<div class="bnt-card l-sig l-sk-card" aria-hidden="true">'
+    '<span class="l-sk l-sk-sm"></span><span class="l-sk l-sk-lg"></span><span class="l-sk l-sk-md"></span>'
+    '</div>'
+)
+_LIVE_SK_MAP = '<div class="l-sk-map" aria-hidden="true"><i></i></div>'
+_LIVE_SK_DIST = "".join(f'<div aria-hidden="true"><i class="l-sk-bar"></i><span>{k}</span></div>' for k in range(11))
+_LIVE_SK_CAT = (
+    '<div class="l-catrow l-sk-row" aria-hidden="true"><span class="l-sk l-sk-sm"></span>'
+    '<div class="b"><i class="l-sk-scan"></i></div><b class="l-sk l-sk-xs"></b></div>'
+)
+
 def live_overview_html():
     hero = live_hero_on()
     bg = ('<div class="l-bg" aria-hidden="true"><picture><source media="(max-width:700px)" srcset="/bnt/media/lvhero-m.jpg?v=1">'
@@ -519,23 +560,24 @@ def live_overview_html():
           'v.muted=true;v.autoplay=true;v.preload="auto";v.addEventListener("playing",function(){v.classList.add("on")},{once:true});'
           'v.load();var p=v.play();if(p&&p.catch)p.catch(function(){});return true}'
           'setTimeout(function(){if(!go()){var iv=setInterval(function(){if(go())clearInterval(iv)},1000)}},400)})()</script>') if hero else ""
-    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview">{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
+    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live l-loading{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview" aria-busy="true">{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
+{_LIVE_ACQ}
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
 <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>
-<div class="l-hero"><div class="bnt-card l-gcard"><div class="l-kr"><p class="k">Top stories · Average rank</p><span id="bntl_ug"></span></div><div class="l-gauge" id="bntl_g"></div><div class="l-gtext"><p class="plain" id="bntl_gt">&nbsp;</p></div></div>
+<div class="l-hero"><div class="bnt-card l-gcard"><div class="l-kr"><p class="k">Top stories · Average rank</p><span id="bntl_ug"></span></div><div class="l-gauge" id="bntl_g"><div class="l-sk-gauge" aria-hidden="true"></div></div><div class="l-gtext"><p class="plain" id="bntl_gt">&nbsp;</p></div></div>
 <div class="l-tiles">
 <a class="bnt-card l-tile h" href="/wire"><p class="k">High &middot; 7&ndash;10</p><b id="bntl_th">&ndash;</b><div class="l-meter" id="bntl_mh"></div></a>
 <a class="bnt-card l-tile e" href="/wire"><p class="k">Elevated &middot; 4&ndash;6</p><b id="bntl_te">&ndash;</b><div class="l-meter" id="bntl_me"></div></a>
 <a class="bnt-card l-tile c" href="/wire"><p class="k">Calm &middot; 0&ndash;3</p><b id="bntl_tc">&ndash;</b><div class="l-meter" id="bntl_mc"></div></a>
-<a class="bnt-card l-tile s" href="/sources"><div class="l-ring" id="bntl_ring"></div><div><p class="k">Sources online</p><p class="plain" id="bntl_src">&nbsp;</p></div></a>
+<a class="bnt-card l-tile s" href="/sources"><div class="l-ring" id="bntl_ring"><span class="l-sk-ring" aria-hidden="true"></span></div><div><p class="k">Sources online</p><p class="plain" id="bntl_src">&nbsp;</p></div></a>
 <div class="l-tstamp"><span id="bntl_ut"></span></div>
 </div></div>
 <div class="l-head"><h3>Top signals</h3><span id="bntl_us"></span><a class="l-more" href="/wire">Full Wire &rarr;</a></div>
-<div class="l-sigs" id="bntl_sigs"></div>
-<div class="l-split"><div class="bnt-card"><div class="l-head"><h3>Map</h3><span class="l-hint" id="bntl_maph"></span><span id="bntl_um"></span><a class="l-more" href="/map">Full-screen map &rarr;</a></div><div class="l-map" id="bntl_map"></div></div>
-<div class="bnt-card"><div class="l-head"><h3>Rank spread</h3><span id="bntl_ud"></span></div><div class="l-dist" id="bntl_dist"></div></div></div>
-<div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Per day</h3><span class="l-hint">7 days</span><span id="bntl_uv"></span></div><div id="bntl_vol"></div></div>
-<div class="bnt-card"><div class="l-head"><h3>Today</h3><span class="l-hint" id="bntl_cath"></span><span id="bntl_uc"></span></div><div class="l-cats" id="bntl_cats"></div></div></div>
+<div class="l-sigs" id="bntl_sigs">{(_LIVE_SK_SIG * 3)}</div>
+<div class="l-split"><div class="bnt-card"><div class="l-head"><h3>Map</h3><span class="l-hint" id="bntl_maph"></span><span id="bntl_um"></span><a class="l-more" href="/map">Full-screen map &rarr;</a></div><div class="l-map" id="bntl_map">{_LIVE_SK_MAP}</div></div>
+<div class="bnt-card"><div class="l-head"><h3>Rank spread</h3><span id="bntl_ud"></span></div><div class="l-dist" id="bntl_dist">{_LIVE_SK_DIST}</div></div></div>
+<div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Per day</h3><span class="l-hint">7 days</span><span id="bntl_uv"></span></div><div id="bntl_vol"><div class="l-sk-vol" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
+<div class="bnt-card"><div class="l-head"><h3>Today</h3><span class="l-hint" id="bntl_cath"></span><span id="bntl_uc"></span></div><div class="l-cats" id="bntl_cats">{(_LIVE_SK_CAT * 4)}</div></div></div>
 <div class="bnt-card l-cta"><div><h3>Get the brief</h3><p class="plain">7 AM and 7 PM ET.</p></div><a class="bnt-btn y" href="/newsletter">Get the free brief</a></div>
 </div></section><script src="{url("live.js")}" defer></script>'''

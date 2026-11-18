@@ -86,6 +86,12 @@ function init(){
    if(e.key==="Escape"){var p=$("#bns_pop.on");if(p&&p.contains(document.activeElement))return;e.preventDefault();bnMenuClose();return}
    if(e.key!=="Tab")return;var f=focusables();if(!f.length)return;var a=f[0],z=f[f.length-1];
    if(e.shiftKey&&(document.activeElement===a||document.activeElement===panel)){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}});
+  document.addEventListener("keydown",function(e){if(e.key!=="Escape"||e.ctrlKey||e.metaKey||e.altKey)return;
+   if(!dr.classList.contains("bn-open")&&!dr.classList.contains("bn-closing"))return;
+   if(document.documentElement.classList.contains("bn-settings-open"))return;
+   var popEl=document.getElementById("bn_settings");if(popEl&&!popEl.hidden)return;
+   var p=$("#bns_pop.on");if(p&&p.contains(document.activeElement))return;
+   e.preventDefault();bnMenuClose()});
   document.addEventListener("focusin",function(e){if(dr.classList.contains("bn-open")&&!panel.contains(e.target)&&!(burger&&burger.contains(e.target))&&!(document.getElementById("bns_panel")||{contains:function(){return false}}).contains(e.target)){var c=$(".bn-close",panel);c&&c.focus()}});
   if(location.hash==="#bn-menu")bnMenuOpen();
   // sections: do not restore or remember open/closed state (leftover bn_grp_* keys are ignored).
