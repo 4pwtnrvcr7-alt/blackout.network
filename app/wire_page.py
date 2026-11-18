@@ -108,13 +108,15 @@ def _shell():
     _SHELL["html"] = html
     return html
 
-def page():
+def page(noindex=False):
     """HTML shell with the current featured notice swapped in. The shell itself is cached in one slot."""
     html = _shell().replace(
         "window.BN_WIRE_NOTICE=null;",
         "window.BN_WIRE_NOTICE=" + json.dumps(_notice(), ensure_ascii=False) + ";",
         1,
     )
+    if noindex and 'name="robots"' not in html:
+        html = html.replace("</head>", '<meta name="robots" content="noindex,nofollow,noarchive"></head>', 1)
     return 200, html.encode("utf-8"), "text/html"
 
 def handle_get(path, qs):

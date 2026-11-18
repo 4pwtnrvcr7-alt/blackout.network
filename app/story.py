@@ -212,7 +212,25 @@ def render(cid, since=""):
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
 def handle_get(path, qs):
-    try:   # Push F: Wire v2 (wire_v2.py) on /wire, /wire/<id>, /wire2/static/*; BN_WIRE_V2=0 = the pages below
+    # Nov 18: the Wire timeline is /wire going forward. Hide the previous listing at /wire-classic (noindex).
+    # BN_WIRE_TIMELINE=0 restores the previous listing at /wire. /wire/<cluster_id> is unchanged.
+    if path in ("/wire-classic", "/wire-classic/"):
+        try:
+            import wire_v2
+            r = wire_v2.handle("/wire-classic", qs)
+            if r: return r
+        except Exception:
+            import traceback; traceback.print_exc()
+        import wire_page
+        return wire_page.page(noindex=True)
+    if path in ("/wire", "/wire/"):
+        try:
+            import wire_timeline
+            if wire_timeline.on():
+                return 200, wire_timeline.page_html(), "text/html"
+        except Exception:
+            import traceback; traceback.print_exc()
+    try:   # Push F: Wire v2 (wire_v2.py) on /wire (flag off), /wire/<id>, /wire2/static/*; BN_WIRE_V2=0 = the pages below
         import wire_v2
         if path.startswith(wire_v2.ST + "/"):
             return wire_v2.handle_static(path) or (404, {"error": "not found"})

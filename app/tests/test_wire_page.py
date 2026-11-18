@@ -20,6 +20,7 @@ class Routes(unittest.TestCase):
         self.assertEqual(hit("/api/wire_history"), "wire_history")
         self.assertEqual(hit("/wire/0123456789abcdef"), "story")
         self.assertEqual(hit("/wire"), "story")
+        self.assertEqual(hit("/wire-classic"), "story")
 
 class Page(unittest.TestCase):
     def test_listing_html(self):
@@ -47,7 +48,25 @@ class Page(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(ctype, "text/html")
         html = body.decode() if isinstance(body, (bytes, bytearray)) else body
-        self.assertIn("What matters now", html)
+        self.assertIn("data-bn-tl", html)
+        self.assertIn("Every signal", html)
+        self.assertNotIn('content="noindex', html)
+        self.assertIn("<title>The Wire: live threat feed | BLACKOUT.NETWORK</title>", html)
+        code_c, body_c, ctype_c = story.handle_get("/wire-classic", {})
+        self.assertEqual(code_c, 200)
+        self.assertEqual(ctype_c, "text/html")
+        html_c = body_c.decode() if isinstance(body_c, (bytes, bytearray)) else body_c
+        self.assertIn("What matters now", html_c)
+        self.assertIn('content="noindex', html_c)
+        os.environ["BN_WIRE_TIMELINE"] = "0"
+        try:
+            code0, body0, ctype0 = story.handle_get("/wire", {})
+            self.assertEqual(code0, 200)
+            html0 = body0.decode() if isinstance(body0, (bytes, bytearray)) else body0
+            self.assertIn("What matters now", html0)
+            self.assertNotIn("data-bn-tl", html0)
+        finally:
+            del os.environ["BN_WIRE_TIMELINE"]
         code2, body2 = story.handle_get("/wire/not-an-id", {})[:2]
         self.assertEqual(code2, 404)
         # A well-formed id still goes to story.py (not found without a live row is OK).

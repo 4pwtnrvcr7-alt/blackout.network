@@ -1,4 +1,4 @@
-"""Wire timeline preview (/wire-next). Run: cd app && python3 -m unittest tests.test_wire_timeline -v"""
+"""Wire timeline (/wire; /wire-next 301s here). Run: cd app && python3 -m unittest tests.test_wire_timeline -v"""
 import os, sqlite3, sys, tempfile, unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import addons, wire_timeline as W
@@ -15,11 +15,19 @@ class Routes(unittest.TestCase):
         self.assertEqual(hit("/api/wire_tl/meta"), "wire_timeline")
         self.assertEqual(hit("/wire"), "story")
         self.assertEqual(hit("/wire/0123456789abcdef"), "story")
+        self.assertEqual(hit("/wire-classic"), "story")
+        self.assertEqual(hit("/wire-classic/x"), "story")
 
     def test_not_linked_or_indexed(self):
         app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        for f in ("sitenav.py", "sitenav_ui.py", "growth.py", "wire_v2.py", "theme.py"):
-            self.assertNotIn("/wire-next", open(os.path.join(app, f), encoding="utf-8").read(), f)
+        # Menus, sitemap and the shared theme must not link the preview URL or the hidden classic listing.
+        for needle in ("/wire-next", "/wire-classic"):
+            for f in ("sitenav.py", "sitenav_ui.py", "growth.py", "theme.py"):
+                self.assertNotIn(needle, open(os.path.join(app, f), encoding="utf-8").read(), f"{f} {needle}")
+        # The v2 menu (used on story pages and the classic listing) still points at /wire, not the hidden path or old preview.
+        w2 = open(os.path.join(app, "wire_v2.py"), encoding="utf-8").read()
+        self.assertNotIn("/wire-next", w2)
+        self.assertNotIn('href="/wire-classic"', w2)
 
 class Display(unittest.TestCase):
     def test_categories(self):
@@ -67,12 +75,22 @@ class Paging(unittest.TestCase):
         code, body = W.handle_get("/api/wire_tl", {"q": ["number 12"], "limit": ["5"]})
         self.assertEqual(code, 200); self.assertEqual(len(body["items"]), 1)
         self.assertEqual(W.handle_get("/api/wire_tl", {"before": ["nope"]})[0], 400)
-        code, html, ct = W.handle_get("/wire-next", {})
-        self.assertEqual(code, 200); self.assertIn('content="noindex', html); self.assertIn("data-bnt-home", html[:200])
+        code, body, ct, hdr = W.handle_get("/wire-next", {})
+        self.assertEqual(code, 301); self.assertEqual(hdr["Location"], "/wire")
+        code, html, ct = W.handle_get("/wire", {})
+        self.assertEqual(code, 200); self.assertEqual(ct, "text/html")
+        self.assertNotIn('content="noindex', html)
+        self.assertIn("data-bn-tl", html[:300])
+        self.assertIn("<title>The Wire: live threat feed | BLACKOUT.NETWORK</title>", html)
+        self.assertIn('rel="canonical" href="https://blackout.network/wire"', html)
 
     def test_flag_off(self):
         os.environ["BN_WIRE_TIMELINE"] = "0"
-        try: self.assertEqual(W.handle_get("/wire-next", {})[0], 404)
+        try:
+            r = W.handle_get("/wire-next", {})
+            self.assertEqual(r[0], 301); self.assertEqual(r[3]["Location"], "/wire")
+            self.assertEqual(W.handle_get("/wire", {})[0], 404)
+            self.assertEqual(W.handle_get("/api/wire_tl", {})[0], 404)
         finally: del os.environ["BN_WIRE_TIMELINE"]
 
 if __name__ == "__main__": unittest.main()
