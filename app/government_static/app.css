@@ -43,23 +43,23 @@
 .gv .gv-hl>.gv-row{background:#24303d;box-shadow:inset 3px 0 0 var(--ac)}
 .gv .gv-more{margin:6px 0 6px 32px;background:var(--bn-surface-2,#1d232b);color:var(--tx);border:1px solid var(--bd2);border-radius:6px;padding:5px 10px;cursor:pointer}
 .gv .gv-cov{margin-top:8px;font-size:12px;line-height:1.6}.gv .gv-warn{color:var(--md)}
-.gv-dlg{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:5vh 12px;overflow:auto}
+.gv-dlg{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.62);display:flex;align-items:flex-start;justify-content:center;padding:5vh 12px;overflow:auto}
 .gv-dlg[hidden]{display:none}
-.gv-dbox{position:relative;background:var(--pn);color:var(--tx);border:1px solid var(--bd2);border-radius:12px;box-shadow:var(--shadow);max-width:720px;width:100%;display:grid;grid-template-columns:170px 1fr;gap:16px;padding:18px;outline:none}
-.gv-dbox h3{margin:0 0 2px;font-size:20px}.gv-dbox p{font-size:14px;line-height:1.5}
-.gv-x{position:absolute;top:8px;right:8px;background:var(--bn-surface-2,#1d232b);border:1px solid var(--bd2);color:var(--tx);border-radius:6px;width:32px;height:32px;cursor:pointer}
-.gv-dbox .gv-img.big{width:160px;height:192px;object-fit:cover;border-radius:8px;border:1px solid var(--bd2);background:var(--bn-surface-0,#0f1317)}
+.gv-dbox{position:relative;background:rgba(5,6,10,.94);color:#F5F5F7;border:1px solid rgba(255,255,255,.12);border-radius:0;box-shadow:none;max-width:720px;width:100%;display:grid;grid-template-columns:170px 1fr;gap:16px;padding:22px;outline:none;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.gv-dbox h3{margin:0 0 8px;font:600 18px/1.2 Inter,system-ui,sans-serif}.gv-dbox p{font-size:14px;line-height:1.5;color:#C9CDD3}
+.gv-x{position:absolute;top:8px;right:8px;background:transparent;border:0;color:#F2F2F4;border-radius:0;width:44px;height:44px;cursor:pointer}
+.gv-dbox .gv-img.big{width:160px;height:192px;object-fit:cover;border-radius:0;border:1px solid rgba(255,255,255,.12);background:#05060a}
 .gv-dbox .gv-ph{margin:0}.gv-dbox .gv-ph svg{width:160px;height:192px;display:block}
 .gv-ph figcaption{font-size:12px;color:var(--md);margin-top:4px;max-width:160px}
 .gv-dbox .gv-cred{font-size:11px;margin-top:4px;max-width:165px}
 .gv-dbox .gv-kic{font-size:60px;width:160px;height:120px;display:flex;align-items:center;justify-content:center;color:var(--mu)}.gv-dbox .gv-kic .gv-ic{width:72px;height:72px}
 .gv-f{display:grid;grid-template-columns:120px 1fr;gap:8px;padding:6px 0;border-top:1px solid var(--bd);font-size:14px}.gv-f>span{color:var(--mu)}
-.gv-f a,.gv-dbox .gv-link{color:var(--ac);word-break:break-word}
-.gv-dbox .gv-nd{color:var(--mu);font-style:italic}.gv-dbox .gv-n.g{color:var(--lo)}.gv-dbox .gv-n.m{color:var(--md)}.gv-dbox .gv-n.b{color:var(--hi)}
-.gv-dbox .gv-bar{display:inline-block;width:80px;height:6px;background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:4px;vertical-align:middle;overflow:hidden}
-.gv-dbox .gv-bar i{display:block;height:100%}.gv-dbox .gv-bar i.g{background:var(--lo)}.gv-dbox .gv-bar i.m{background:var(--md)}.gv-dbox .gv-bar i.b{background:var(--hi)}
+.gv-f a,.gv-dbox .gv-link{color:#F2F2F4;word-break:break-word;text-underline-offset:3px}
+.gv-dbox .gv-nd{color:#9AA0A8;font-style:italic}.gv-dbox .gv-n.g{color:#C9CDD3}.gv-dbox .gv-n.m{color:#C9CDD3}.gv-dbox .gv-n.b{color:#E5484D}
+.gv-dbox .gv-bar{display:inline-block;width:80px;height:4px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:0;vertical-align:middle;overflow:hidden}
+.gv-dbox .gv-bar i{display:block;height:100%}.gv-dbox .gv-bar i.g{background:#C9CDD3}.gv-dbox .gv-bar i.m{background:#9AA0A8}.gv-dbox .gv-bar i.b{background:#E5484D}
 .gv-dbox .gv-comp{list-style:none;padding:0;margin:6px 0}.gv-dbox .gv-comp li{padding:5px 0;border-top:1px solid var(--bd);font-size:13px}
-.gv-dbox .gv-psc{margin-top:10px;padding:8px 10px;background:var(--bn-surface-0,#0f1317);border:1px solid var(--bd);border-radius:8px}
+.gv-dbox .gv-psc{margin-top:10px;padding:8px 0;background:transparent;border:0;border-top:1px solid rgba(255,255,255,.12);border-radius:0}
 .gv-dbox .gv-link{background:none;border:0;cursor:pointer;padding:0;font:inherit;text-align:left}
 .gv-dbox .gv-srcl{margin-top:10px;font-size:12px}.gv-dbox .gv-crumbs{margin:4px 0 8px}
 @media(max-width:700px){

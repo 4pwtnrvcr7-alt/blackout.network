@@ -147,8 +147,8 @@ html.bn-lock,html.bn-lock body{overflow:hidden!important}
 .bn-dsearch #bns #bns_pop.on{display:block!important}
 
 /* ---- settings popover (dashboard scan status / refresh / interval, language) ---- */
-.bn-pop{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:var(--bn-z-pop);max-height:75vh;overflow:auto;padding:14px 16px 16px;
- background:var(--bn-surface);color:var(--bn-text);border:1px solid var(--bn-line-2);border-radius:var(--bn-radius);box-shadow:var(--bn-shadow);text-align:left}
+.bn-pop{position:fixed;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));z-index:var(--bn-z-pop);max-height:75vh;overflow:auto;padding:20px 22px 22px;
+ background:rgba(5,6,10,.94);color:#F5F5F7;border:1px solid rgba(255,255,255,.12);border-radius:0;box-shadow:none;text-align:left;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
 .bn-pop[hidden]{display:none!important}
 .bn-pop-h{font:700 12px/1 var(--bn-font-ui);letter-spacing:.14em;text-transform:uppercase;color:var(--bn-muted);margin:0 0 12px}
 body .bn-pop .ctl{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center;justify-content:flex-start;color:var(--bn-muted);font:14px/1.45 var(--bn-font-body)}
@@ -385,20 +385,23 @@ header.bn-top .bn-tbar{position:relative}
 .bn-rf-st.bn-rf-err{color:var(--bn-sev-hi,#ff6b6b)}
 @media (prefers-reduced-motion:reduce){[data-bn-refresh].bn-rf-spin .bn-rf-ico{animation-duration:2.4s}.bn-rf-tip,.bn-rf-st{transition:none!important}}
 /* Settings panel (Nov 13): opened from the menu's Settings item or the gear; scrim behind it, Close button, theme + Refresh data rows */
-.bn-pop-scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:calc(var(--bn-z-drawer) + 205)}
+.bn-pop-scrim{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:calc(var(--bn-z-drawer) + 205)}
 .bn-pop-scrim[hidden]{display:none!important}
-.bn-pop-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.bn-pop-x{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;margin:-10px -8px -10px 0;padding:0;border:0;border-radius:var(--bn-radius-sm);background:none;color:var(--bn-text);cursor:pointer}
-.bn-pop-x:hover{background:var(--bn-hover)}
-.bn-pop-rows{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:0 0 12px;border-bottom:1px solid var(--bn-line)}
-.bn-pop-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:1px solid var(--bn-line);border-radius:var(--bn-radius-sm);background:none;color:var(--bn-text);font:600 14px/1 var(--bn-font-ui);cursor:pointer}
-.bn-pop-btn:hover{background:var(--bn-hover)}
-.bn-pop-btn svg{width:18px;height:18px;flex:none}
+.bn-pop-h{display:flex;align-items:center;justify-content:space-between;gap:12px;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#F5F5F7}
+.bn-pop-x{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin:-10px -8px -10px 0;padding:0;border:0;border-radius:0;background:none;color:#F2F2F4;cursor:pointer;position:relative}
+.bn-pop-x:hover{background:transparent;opacity:.7}
+.bn-pop-rows{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px;padding:0 0 16px;border-bottom:1px solid rgba(255,255,255,.12)}
+.bn-pop-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 18px;border:1px solid #F2F2F4;border-radius:999px;background:none;color:#F2F2F4;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+.bn-pop-btn:hover,.bn-pop-btn:focus-visible{background:#F2F2F4;color:#05060a}
+.bn-pop-btn svg{width:16px;height:16px;flex:none}
 .bn-pop-theme .bn-sun,.bn-pop-theme .bn-moon{display:none}
 html[data-theme="light"] .bn-pop-theme .bn-moon,html:not([data-theme="light"]) .bn-pop-theme .bn-sun{display:block}
 body .bn-pop .ctl:empty{display:none}
 body .bn-pop .ctl:empty::before{content:none}
 body #bn_settings .ctl>#bntr_bar:first-child{border-top:0;padding-top:0}
+body .bn-pop .ctl button,body .bn-pop .ctl .pri,body .bn-pop .ctl button.pri{border:1px solid #F2F2F4;border-radius:999px;background:transparent;color:#F2F2F4;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;min-height:44px;padding:0 16px}
+body .bn-pop .ctl button:hover,body .bn-pop .ctl .pri:hover,body .bn-pop .ctl button.pri:hover{background:#F2F2F4;color:#05060a}
+body .bn-pop .ctl select{background:rgba(255,255,255,.03);color:#F5F5F7;border:1px solid rgba(255,255,255,.16);border-radius:0;min-height:40px}
 /* the panel is moved to <body> while open (so it sits above the menu); on wide screens anchor it under the top bar, not under the page */
 @media(min-width:821px){body>.bn-pop{position:fixed;top:calc(var(--bn-tbar-h) + 8px);right:max(var(--bn-pad-x),env(safe-area-inset-right));left:auto;bottom:auto;width:380px;max-height:calc(100vh - var(--bn-tbar-h) - 24px)}}
 
