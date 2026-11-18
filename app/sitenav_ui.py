@@ -192,7 +192,7 @@ M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near", "meshgui
 M3_SOON = set()
 # Menu items that open a full page rather than their /live tab (Matt 5:25 PM: Heat Map is always the full-screen /map).
 # No data-tab on these links so dashboard JS cannot intercept the click as a tab switch.
-M3_PAGE = {"heatmap": ("@map", "/map")}
+M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets")}   # Nov 18 (pt1661u): Markets opens the /markets overview
 
 def menu3_sections(sn):
     nav = {it[0]: it for g, its in sn.NAV for it in its}
@@ -254,7 +254,7 @@ def drawer(sn, active=""):
                 out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
             else:
                 cur = ' aria-current="page"' if key == active else ""
-                tab = "" if (href or "").split("?")[0] in ("/map",) or key in ("@map",) else f' data-tab="{E(key)}"'
+                tab = "" if (href or "").split("?")[0] in ("/map", "/markets") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
                 out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
     out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'
