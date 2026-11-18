@@ -39,5 +39,7 @@ class Home(unittest.TestCase):
     def test_overview(self):
         h = theme.live_overview_html()
         self.assertIn('id="bntl"', h); self.assertIn('/?intro=1', h)
+        self.assertIn('id="bntl_acq"', h); self.assertIn("Acquiring signals", h)
+        self.assertIn("l-loading", h)
 
 if __name__ == "__main__": unittest.main()
