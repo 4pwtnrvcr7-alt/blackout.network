@@ -332,7 +332,7 @@ def render(state, cid):
                     f'<div class="w2-morew">{W.btn("/wire", "All stories")}</div></div></section>')
     body.append("</article>")
     html_out = W.shell(f"{a['headline']} | BLACKOUT.NETWORK", a["dek"] or W.first_sentence(it.get("title") or "", 150),
-                       "".join(body), f"/wire/{cid}")
+                       "".join(body), f"/wire/{cid}", rank=r)
     html_out = re.sub(r'(wire2\.css\?v=\d+">)', lambda m: m.group(1) + '<link rel="stylesheet" href="' + ST_CSS + '">', html_out, count=1)   # any wire2.css version
     html_out = html_out.replace('<body class="w2">', '<body class="w2 sv3">')
     # no snap on story pages even if a later shared stylesheet adds it

@@ -142,10 +142,21 @@ def menu_html():
             '<div class="w2-mfoot"><a href="/scoring">How we score</a><a href="/sources">Sources</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a>'
             '<a href="https://x.com/BlkoutNtw" rel="noopener" target="_blank">X</a><a href="https://www.youtube.com/@blkoutntw" rel="noopener" target="_blank">YouTube</a></div></div>')
 
-def shell(title, desc, body, path):
+def shell(title, desc, body, path, rank=None):
+    try:
+        import og, re as _re
+        m = _re.match(r"/wire/([0-9a-f]{16})", path or "")
+        if m:
+            meta = og.tags(title=title, desc=desc, url="https://blackout.network" + path,
+                           story_id=m.group(1), rank=rank, og_type="article")
+        else:
+            meta = og.tags(title=title, desc=desc, url="https://blackout.network" + path,
+                           key="wire", og_type="website")
+    except Exception:
+        meta = ""
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network{E(path)}">
-<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=6"></head>
+{meta}<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=6"></head>
 <body class="w2"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu_html()}<main id="w2_main">{body}</main>
@@ -268,7 +279,7 @@ def render_story(state, cid):
                  + "".join(f'<article class="w2-row w2-rv">{rank_block(x.get("rank"))}<div class="w2-rb"><p class="w2-eb">{E((x.get("category") or "").upper())}</p>'
                            f'<h3 class="w2-rh"><a href="/wire/{E(x["cluster_id"])}">{E(headline(x.get("title")))}</a></h3><p class="w2-meta">{E(ago(x.get("updated")))}</p></div></article>' for x in nxt)
                  + f'</div><div class="w2-morew">{btn("/wire", "All stories")}</div></div></section>')
-    return shell(f"{h} | BLACKOUT.NETWORK", first_sentence(full, 150), body, f"/wire/{cid}")
+    return shell(f"{h} | BLACKOUT.NETWORK", first_sentence(full, 150), body, f"/wire/{cid}", rank=int(it.get("rank") or 0))
 
 _IMGC = {}
 def handle_static(path):

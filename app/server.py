@@ -243,6 +243,7 @@ def live_page():
     b = dashboard_page()
     b = b.replace(b'<link rel="canonical" href="https://blackout.network/">', b'<link rel="canonical" href="https://blackout.network/live">', 1)
     b = b.replace(b'<meta property="og:url" content="https://blackout.network/">', b'<meta property="og:url" content="https://blackout.network/live">', 1)
+    b = b.replace(b'https://blackout.network/og/home.png?v=4', b'https://blackout.network/og/live.png?v=4')
     try:
         ov = _addon_mod("theme").live_overview_html().encode("utf-8")
         k = b.find(b'<h1 class="bna-vh">')
@@ -747,6 +748,12 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store"); self.end_headers(); return True
         if seg in self.TAB_PATHS:
             q = urlparse(self.path).query   # seo/batch-1: keep ?utm_* (and any other query) through the tab redirect
+            try:
+                import og
+                if og.is_crawler(self.headers.get("User-Agent")) and seg in og.TAB_SHARE and seg not in og.REAL_PATHS:
+                    return self.send(200, og.share_page(seg), "text/html")
+            except Exception:
+                pass
             self.send_response(302); self.send_header("Location", ("/live" if new_home_on() else "/") + ("?" + q if q else "") + "#" + seg); self.send_header("Content-Length", "0")
             self.send_header("Cache-Control", "no-store"); self.end_headers(); return True
         try:

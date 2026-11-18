@@ -222,7 +222,7 @@ def follow_html():
 def org_ld():
     return {"@type": ["Organization", "NewsMediaOrganization"], "@id": SITE + "/#org", "name": BRAND, "alternateName": ["BLACKOUT NETWORK", "blackout.network"], "url": SITE + "/",
             "logo": {"@type": "ImageObject", "url": SITE + "/icons/icon-512.png", "width": 512, "height": 512},
-            "image": SITE + "/icons/icon-og-v2-1200x630.png?v=3", "slogan": "Global threat monitoring", "email": "hello@blackout.network", "publishingPrinciples": SITE + "/scoring",
+            "image": SITE + "/og/home.png?v=4", "slogan": "Global threat monitoring", "email": "hello@blackout.network", "publishingPrinciples": SITE + "/scoring",
             "sameAs": [X_URL, YT_URL], "address": {"@type": "PostalAddress", "postOfficeBoxNumber": "1228", "addressLocality": "Lake Mary",
             "addressRegion": "FL", "postalCode": "32746", "addressCountry": "US"}}
 

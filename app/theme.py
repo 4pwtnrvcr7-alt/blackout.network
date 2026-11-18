@@ -245,6 +245,22 @@ def _nl_credits():
 CREDITS_LEDGER += _nl_credits()
 CREDITS_PAGE_KEY = {"/": "intro", "/live": "live", "/dashboard": "live", "/wire": "wire"}
 
+def _credits_og():
+    try:
+        import og
+        return og.tags(title="Image credits | BLACKOUT.NETWORK",
+                       desc="Sources and licences for the images and video used on BLACKOUT.NETWORK.",
+                       url="https://blackout.network/credits", key="credits")
+    except Exception:
+        return ('<meta property="og:type" content="website"><meta property="og:site_name" content="BLACKOUT.NETWORK">'
+                '<meta property="og:title" content="Image credits | BLACKOUT.NETWORK">'
+                '<meta property="og:description" content="Sources and licences for the images and video used on BLACKOUT.NETWORK.">'
+                '<meta property="og:url" content="https://blackout.network/credits">'
+                '<meta property="og:image" content="https://blackout.network/og/credits.png?v=4">'
+                '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
+                '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/credits.png?v=4">'
+                '<meta name="twitter:title" content="Image credits | BLACKOUT.NETWORK">')
+
 def credits_page():
     try:
         import sitenav as SN, sitenav_ui as UI
@@ -257,7 +273,8 @@ def credits_page():
         + "</ul></section>" for k, name, rows in CREDITS_LEDGER)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>Image credits | BLACKOUT.NETWORK</title><meta name="description" content="Sources and licences for the images and video used on BLACKOUT.NETWORK.">'
-            '<link rel="canonical" href="https://blackout.network/credits"><link rel="stylesheet" href="/sitenav.css">' + head +
+            '<link rel="canonical" href="https://blackout.network/credits">' + _credits_og() +
+            '<link rel="stylesheet" href="/sitenav.css">' + head +
             '<style>body{margin:0;background:#05060a;color:#ECEEF5;font:15px/1.6 Inter,system-ui,sans-serif}main{max-width:900px;margin:0 auto;padding:48px 20px 64px}'
             'h1{font:800 clamp(30px,4vw,46px)/1.05 Montserrat,system-ui,sans-serif;text-transform:uppercase;margin:0 0 10px}main>p.cr-lede{color:#9aa0aa;margin:0 0 36px;max-width:640px;display:block!important;-webkit-line-clamp:unset!important;overflow:visible!important;text-overflow:clip!important;white-space:normal!important}'
             '.cr-sec{border-top:1px solid rgba(236,238,245,.14);padding:22px 0 8px;scroll-margin-top:80px}.cr-sec h2{font:700 13px/1.2 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;margin:0 0 14px}'
@@ -336,8 +353,8 @@ def _home_page_raw():
 <link rel="canonical" href="https://blackout.network/">
 <meta property="og:type" content="website"><meta property="og:site_name" content="BLACKOUT.NETWORK"><meta property="og:title" content="Global threat monitoring | BLACKOUT.NETWORK">
 <meta property="og:description" content="{E(DESC)}"><meta property="og:url" content="https://blackout.network/">
-<meta property="og:image" content="https://blackout.network/icons/icon-og-v2-1200x630.png?v=3"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/icons/icon-og-v2-1200x630.png?v=3"><meta name="twitter:site" content="@BlkoutNtw">
+<meta property="og:image" content="https://blackout.network/og/home.png?v=4"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Global threat monitoring | BLACKOUT.NETWORK">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/home.png?v=4"><meta name="twitter:site" content="@BlkoutNtw">
 <meta name="twitter:title" content="Global threat monitoring | BLACKOUT.NETWORK"><meta name="twitter:description" content="{E(DESC)}">
 <link rel="preload" href="/fonts/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" as="image" href="/bnt/media/hero-d.jpg?v={mv}" media="(min-width:901px)"><link rel="preload" as="image" href="/bnt/media/hero-m.jpg?v={mv}" media="(max-width:900px)">

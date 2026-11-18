@@ -219,19 +219,22 @@ def dashboard_top():
     return UI.topbar(m, "threat", DASH_CTL) + UI.drawer(m, "threat") + UI.pagehead("The Wire", PAGES["home"][3])
 
 # Per-page share cards (BN Signal tile). New filenames bust YouTube/X/Facebook link-preview caches (pulse-logo cleanup, Nov 1).
-OG_IMAGES = {"newsletter": "/icons/icon-og-newsletter-v2.png?v=3"}
-
 def head_html(page, path=None):
     """<title>, description, canonical, Open Graph and Twitter tags + the shared nav stylesheet, for a standalone page's <head>."""
     _, title, desc, _ = PAGES[page]
     url = SITE + (path if path is not None else "/" + page)
     E = lambda s: html.escape(s, quote=True)
-    img = SITE + OG_IMAGES.get(page, "/icons/icon-og-v2-1200x630.png?v=3")
+    try:
+        import og
+        meta = og.tags(title=title, desc=desc, url=url, key=page, og_type="website")
+    except Exception:
+        meta = (f'<meta property="og:type" content="website"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(title)}">'
+                f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{SITE}/og/{page}.png?v=4">'
+                f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
+                f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{SITE}/og/{page}.png?v=4"><meta name="twitter:site" content="{HANDLE}">'
+                f'<meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">')
     return (UI.THEME_SCRIPT + scroll_script() + f'<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
-            f'<meta property="og:type" content="website"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(title)}">'
-            f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{img}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
-            f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{img}"><meta name="twitter:site" content="{HANDLE}"><meta name="twitter:title" content="{E(title)}">'
-            f'<meta name="twitter:description" content="{E(desc)}"><link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
+            + meta + '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
 
 def data():
     t = []
