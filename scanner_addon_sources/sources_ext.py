@@ -905,3 +905,11 @@ try:
     EXT_SOURCES += _W.WIDE_SOURCES
 except Exception as _ex:
     EXT_FAILED.append(("[wide] sources_wide module", "sources_wide.py", f"import failed: {type(_ex).__name__}: {_ex}"[:300]))
+
+# ---- 2026-11-18 (pt1661u) layer sources: sources_layers.py = [rare] rare signals, [fin] finance alerts, [people] notable people.
+# Kill switches: env BN_SOURCES_LAYERS=0, file sources_layers_off (all off), keys in sources_layers_disabled.json (single adapters off).
+try:
+    import sources_layers as _L
+    EXT_SOURCES += _L.LAYER_SOURCES
+except Exception as _ex:
+    EXT_FAILED.append(("[layers] sources_layers module", "sources_layers.py", f"import failed: {type(_ex).__name__}: {_ex}"[:300]))

@@ -109,6 +109,8 @@ ROUTES = {
     "/api/media": "people",         # /api/media/<id>.<ext>: same-origin copies of the images listed in story_reports.json
     "/api/figures": "figures",      # Key Figures tab #figures (t353): neutral people-in-the-news cards
     "/api/finance": "finance",
+    "/markets": "markets",           # Nov 18 (pt1661u): finance overview page + debt clock (markets.py, request-time cache, no threads)
+    "/api/markets": "markets",       # /api/markets/data|app.js|app.css
     "/api/intel": "intel_streams",
     "/api/ai": "aithreats",          # tab #ai (t231; in the nav since t233)
     "/api/grid": "gridwatch",        # tab #grid (t231; in the nav since t233)

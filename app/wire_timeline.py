@@ -86,6 +86,8 @@ def cat_key(category, title, archive):
         if _WX.search(ty): return "weather"
         if re.search(r"conflict|violence|displacement|refugee|unrest|crisis", ty, re.I): return "conflict"
         return "hazard"
+    if c == "people":   # scanner [people] layer (sources_layers.py): keep it under People; its death notices go to Obituaries
+        return "deaths" if (_OBIT.search(t) or t.startswith("Death: ")) else "people"
     # Title-first: fix known quake-as-conflict (and similar) mislabels regardless of stored category.
     if _QK.search(t) or _AG.search(t): return "quake"
     if _DZ.search(t): return "disease"
