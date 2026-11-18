@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "4"  # bump to force social CDNs to refetch
+VERSION = "5"  # bump to force social CDNs to refetch
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -663,9 +663,19 @@ def image_url(key="home", story_id=None, title=None, rank=None):
     return f"{SITE}/og/{key}.png?v={VERSION}"
 
 
+def attr(s):
+    """Escape a string for an HTML attribute exactly once.
+
+    Callers may pass plain text ('Live TV & Radio') or already-escaped text
+    ('Live TV &amp; Radio'). Social crawlers must see a single &amp; so the
+    decoded title and description read as '&', never a literal '&amp;'.
+    """
+    return html.escape(html.unescape(str(s if s is not None else "")), quote=True)
+
+
 def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og_type="website"):
     """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id."""
-    E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
+    E = attr
     img = image or image_url(key or "home", story_id=story_id, title=title, rank=rank)
     t = title if title else BRAND
     d = desc or TAGLINE
@@ -697,7 +707,7 @@ def share_page(seg):
     url = SITE + path
     img_key = seg if seg in PAGES else "live"
     dest = "/live#" + seg
-    E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
+    E = attr
     meta = tags(title=title, desc=desc, url=url, key=img_key, og_type="website")
     return (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
