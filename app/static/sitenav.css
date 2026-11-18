@@ -90,9 +90,9 @@ body .bn-pagehead .bn-tabdesc{margin:6px 0 0;padding:0;max-width:72ch;font:400 1
 .bn-drawer{position:fixed;inset:0;z-index:var(--bn-z-drawer);visibility:hidden;pointer-events:none;transition:visibility 0s linear var(--bn-speed)}
 .bn-drawer:target,.bn-drawer.bn-open{visibility:visible;pointer-events:auto;transition:none}
 html.bn-js .bn-drawer:target:not(.bn-open){visibility:hidden;pointer-events:none}
-.bn-scrim{position:absolute;inset:0;background:var(--bn-scrim);opacity:0;transition:opacity var(--bn-speed)}
+.bn-scrim{position:absolute;inset:0;z-index:0;background:var(--bn-scrim);opacity:0;transition:opacity var(--bn-speed)}
 .bn-drawer:target .bn-scrim,.bn-drawer.bn-open .bn-scrim{opacity:1}
-.bn-panel{position:absolute;top:0;right:0;bottom:0;width:var(--bn-panel-w);display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+.bn-panel{position:absolute;top:0;right:0;bottom:0;z-index:1;width:var(--bn-panel-w);display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
  background:var(--bn-surface);color:var(--bn-text);border-left:1px solid var(--bn-line);box-shadow:var(--bn-shadow);transform:translateX(100%);transition:transform var(--bn-speed) ease;
  font:var(--bn-nav-size)/1.35 var(--bn-font-ui);text-align:left;padding-bottom:env(safe-area-inset-bottom)}
 .bn-drawer:target .bn-panel,.bn-drawer.bn-open .bn-panel{transform:none}
@@ -436,7 +436,10 @@ body #bn_settings .ctl>#bntr_bar:first-child{border-top:0;padding-top:0}
 
 /* raised header so the morphing icon stays tappable above the open menu (menu 2600) */
 html.bn-menu-on body header.bn-top{z-index:2700!important}
-html.bn-menu-on #bn-menu{z-index:2600}
+html.bn-menu-on #bn-menu{z-index:2600;isolation:isolate}
+/* iPad/Safari: keep the menu panel above its sibling scrim (opacity/backdrop-filter layers can invert paint order) */
+html.bn-menu-on #bn-menu .bn-scrim,#bn-menu .bn-scrim{z-index:0;-webkit-backdrop-filter:none;backdrop-filter:none}
+html.bn-menu-on #bn-menu .bn-panel,#bn-menu .bn-panel{z-index:1;-webkit-backdrop-filter:none;backdrop-filter:none}
 html.bn-menu-on .bn-m4 .bn-mhead .bn-logo,html.bn-menu-on .bn-m4 .bn-close{visibility:hidden}
 html.bn-menu-on .bn-m4 .bn-mhead{padding-top:calc(var(--bn-tbar-h) + var(--bn-safe-top) + 8px)!important}
 html.bn-m4.bn-closing .bn-panel{opacity:1!important}
