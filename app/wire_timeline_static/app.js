@@ -185,7 +185,7 @@ function toggle(key){
 }
 list.addEventListener("click",function(e){var hd=e.target.closest(".tl-hd");if(!hd)return;var n=hd.parentNode;if(n&&n._k)toggle(n._k)});
 /* ---------- data */
-function api(qs){return fetch("/api/wire_tl?"+qs,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
+function api(qs){return fetch("/api/wire_tl?"+qs+(qs?"&":"")+"_="+Date.now(),{credentials:"same-origin",cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
 function qp(){var p=[];if(Q)p.push("q="+encodeURIComponent(Q));return p.join("&")}
 function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){seen[it.id]=1;fresh.push(it)}});measure(fresh,false);
   if(where==="top")items=fresh.concat(items);else items=items.concat(fresh);return fresh.length}
@@ -204,6 +204,15 @@ function loadNewer(){
 }
 function nearTop(){return W.scrollY<=tlTop+24}
 function stamp(){if(!elUpd)return;elUpd.hidden=false;elUpd.textContent="Updated "+fS.format(new Date())+" ET"}
+var noneT=0;
+function sinceLabel(){return items[0]?fT.format(dt(items[0].t)):fT.format(new Date())}
+function showNone(){
+  if(!elUpd)return;
+  elUpd.hidden=false;elUpd.textContent="No new signals since "+sinceLabel()+" ET";
+  if(stat)stat.style.visibility="hidden";
+  clearTimeout(noneT);
+  noneT=setTimeout(function(){if(stat)stat.style.visibility="";stamp()},3200);
+}
 function showPill(){if(!bNew)return;bNew.hidden=pending<=0;if(pending>0)bNew.textContent=pending+" new"}
 function busy(on){if(!bRef)return;bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
 function arrive(arr){
@@ -229,8 +238,19 @@ function pollNewer(manual){
 function startPoll(){stopPoll();pollT=setInterval(function(){if(!d.hidden&&topEnd)pollNewer(false)},POLL)}
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=0}}
 function refresh(){
-  if(!topEnd){busy(true);reset();scrollToList();loadOlder().then(function(){busy(false);stamp()});return}
-  pollNewer(true);
+  /* Always re-fetch the top of the timeline (not only after=). Visibly stamp, or say nothing new.
+     Do not bail if a background poll is in flight — Refresh must always do something visible. */
+  busy(true);var g=gen;loading.n=1;
+  if(!topEnd){
+    reset();scrollToList();
+    return loadOlder().then(function(){if(g!==gen)return;loading.n=0;busy(false);stamp()});
+  }
+  return api("limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
+    var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]});
+    if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
+    topEnd=true;
+    if(fresh.length){arrive(fresh);stamp()}else showNone();
+  }).catch(function(){}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
 }
 var chk=0;
 function check(){if(chk)return;chk=requestAnimationFrame(function(){chk=0;if(anim)return;
