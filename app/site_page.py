@@ -58,12 +58,26 @@ def _title_tag(title):
     return t
 
 def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=None, og_type="article", script=False):
-    t = _title_tag(title); url = SITE + path; img = image or f"{SITE}/icons/icon-og-v2-1200x630.png?v=3"  # BN master tile og:image (t333)
+    t = _title_tag(title); url = SITE + path
+    try:
+        import og, re as _re
+        m = _re.match(r"/wire/([0-9a-f]{16})", path or "")
+        if m:
+            img = og.image_url("wire", story_id=m.group(1), title=t)
+            meta = og.tags(title=t, desc=desc, url=url, image=img, og_type=og_type)
+        else:
+            key = (path or "/").strip("/").split("/")[0] or "home"
+            img = image or og.image_url(key)
+            meta = og.tags(title=t, desc=desc, url=url, image=img, key=key, og_type=og_type)
+    except Exception:
+        img = image or f"{SITE}/og/home.png?v=4"
+        meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
+                f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
+                f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(t)}">'
+                f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'
+                f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">')
     head = ((sitenav.UI.THEME_SCRIPT if sitenav is not None else "") + (sitenav.scroll_script() if sitenav is not None else "") + f'<title>{E(t)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
-            f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
-            f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">' + ('<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">' if not image else '') + f'<meta property="og:image:alt" content="{E(t)}"><meta property="og:locale" content="en_US">'
-            f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'
-            f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">'
+            + meta + '<meta property="og:locale" content="en_US">'
             '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
     head += '<meta name="robots" content="noindex,nofollow">' if noindex else '<meta name="robots" content="index,follow,max-image-preview:large">'   # seo/batch-1
     if jsonld: head += '<script type="application/ld+json">' + json.dumps(jsonld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
