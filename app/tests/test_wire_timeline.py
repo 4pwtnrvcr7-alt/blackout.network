@@ -83,6 +83,16 @@ class Paging(unittest.TestCase):
         self.assertIn("data-bn-tl", html[:300])
         self.assertIn("<title>The Wire: live threat feed | BLACKOUT.NETWORK</title>", html)
         self.assertIn('rel="canonical" href="https://blackout.network/wire"', html)
+        self.assertIn('id="tl_ref"', html)
+        self.assertIn('id="tl_new"', html)
+        self.assertIn('id="tl_upd"', html)
+        self.assertIn(">Refresh</span>", html)
+        css=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.css"), encoding="utf-8").read()
+        self.assertIn(".tl-newp", css)
+        self.assertNotIn("#FFC", css)
+        js=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
+        self.assertIn("pollNewer", js)
+        self.assertIn("d.hidden", js)
 
     def test_flag_off(self):
         os.environ["BN_WIRE_TIMELINE"] = "0"
