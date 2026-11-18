@@ -38,7 +38,7 @@ class Render(unittest.TestCase):
         h, dek = SR.render(CID, CL, [ROW(1)], 7, "Major", CL["title"], "", "", [], 1, ["USGS"])
         self.assertEqual(dek, NOTE["headline"])
         for s in ("Bottom line", "Why it matters", "If it\u2019s true", "More incidents are likely within 72 hours.", "confidence in the reporting is high",
-                  "example.org", "Nov 11 evening brief", "Risk: High"):
+                  "example.org", "Nov 11 evening brief", "Risk \u00b7 High"):
             self.assertIn(s, h)
         self.assertNotIn("Quick brief", h)
         self.assertIn("new reports since", h)        # story updated after the note was written
@@ -69,7 +69,7 @@ class Render(unittest.TestCase):
         SR = load({"notes": {CID: dict(NOTE, risk="Low", risk_why="Officials say there is no wider risk")}})
         self.assertEqual(SR.risk(3)[0], "Low"); self.assertEqual(SR.risk(4)[0], "Medium"); self.assertEqual(SR.risk(6)[0], "Medium"); self.assertEqual(SR.risk(7)[0], "High")
         h, _ = SR.render(CID, CL, [ROW(1)], 7, "Major", CL["title"], "", "", [], 1, ["USGS"])
-        self.assertIn("Risk: Low", h); self.assertIn("Our analysts rate this low: Officials say there is no wider risk.", h)
+        self.assertIn("Risk \u00b7 Low", h); self.assertIn("Our analysts rate this low: Officials say there is no wider risk.", h)
 
     def test_alias_and_share_cards_need_approval(self):
         sh = {"src": "https://img.example.org/a.jpg", "link": "https://example.org/a", "site": "Example", "title": "T", "ok": False}

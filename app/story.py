@@ -17,8 +17,8 @@ ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?Z$")
 TIERS = [(10, "Catastrophic"), (9, "Critical"), (8, "Severe"), (7, "Major"), (6, "Serious"), (5, "Significant"), (4, "Regional"),
          (3, "Minor regional"), (2, "Minor"), (1, "Background"), (0, "Noise")]   # t1276u: one name per rank, same as /scoring and the brief
 # Three-band severity colour (site rule): red only at rank 7+, brand yellow 4-6, neutral 0-3.
-COLORS = {10: "#ff3b3b", 9: "#ff3b3b", 8: "#ff3b3b", 7: "#ff3b3b", 5: "var(--bn-sev-mid,#FFC21A)", 3: "var(--bn-sev-mid,#FFC21A)", 0: "#8a94a3"}
-SEV_CSS = '<style>:root{--bn-sev-mid:#FFC21A}html[data-theme="light"]{--bn-sev-mid:#C97B00}</style>'
+COLORS = {10: "#ff3b3b", 9: "#ff3b3b", 8: "#ff3b3b", 7: "#ff3b3b", 5: "var(--bn-sev-mid,#E5E5EA)", 3: "var(--bn-sev-mid,#E5E5EA)", 0: "#8a94a3"}   # Nov 17: rank option A, no yellow
+SEV_CSS = '<style>:root{--bn-sev-mid:#E5E5EA}html[data-theme="light"]{--bn-sev-mid:#3A3A3C}</style>'
 _C = {}
 
 def tier(r):
@@ -169,7 +169,7 @@ def render(cid, since=""):
         try:
             import desk_stories as DS; breakdown = DS.sections_html(cid)
         except Exception: breakdown = ""
-    upd = (f'<section class="card" style="border-color:#f5a524"><h2>What\'s new since {S.E(et(since))}</h2><p>{len(new)} new report(s), marked NEW below.</p></section>'
+    upd = (f'<section class="card"><h2>What\'s new since {S.E(et(since))}</h2><p>{len(new)} new report(s), marked NEW below.</p></section>'
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
     loc = r.get("location") or ""
@@ -182,8 +182,8 @@ def render(cid, since=""):
     except Exception: elec = ""
     body = (SEV_CSS + f'<span id="bn_story" hidden data-rank="{rank}" data-tier="{S.E(tname.lower())}" data-cat="{S.E((r.get("category") or "").lower())}"></span>'   # seo/batch-1: GA4 story_view params
             f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>'
-            f'<div><span class="pill" style="color:{col};border-color:{col}">RANK {rank}/10 · {tname.upper()}</span>'
-            f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill" style="color:#f5a524">WATCHLIST</span>' if watch == 1 else "") + '</div>'
+            f'<div><span class="pill{" pill-hi" if rank >= 7 else ""}">RANK {rank}/10 · {tname.upper()}</span>'
+            f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill">WATCHLIST</span>' if watch == 1 else "") + '</div>'
             + _h1(S.clean_title(dek_note).rstrip(". ") if dek_note else title, what if not dek_note else "")
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
@@ -194,7 +194,7 @@ def render(cid, since=""):
             + S.E(f"{eff} independent source{'' if eff == 1 else 's'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
             + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></details>'
             + f'<details class="card bnt-sacc"><summary><h2>Timeline and sources</h2></summary><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></details>'
-            + '<section class="card" id="follow"><h2>' + _ic("star") + 'Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
+            + '<section class="card" id="follow" data-bnt-skip><h2>Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
               'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
               + g_follow + '<p class="meta"><a href="/wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
     ld = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": title[:110], "description": desc,
