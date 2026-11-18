@@ -395,18 +395,18 @@ if(/[?&]utm_(source=push|medium=alert)/.test(location.search))T('alert_view',{al
 if(window.bnShare&&!window.bnShare.bnWrapped){var s0=window.bnShare;window.bnShare=function(){T('share',{method:navigator.share?'native':'copy_link',content_category:cat()});return s0.apply(this,arguments);};window.bnShare.bnWrapped=1;}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',onReady);else onReady();
 /* ---- cookie consent banner (consent region; reopened anywhere by footer "Cookie settings" or [data-bn-cookie-settings]) ---- */
-var CSS='#bn_cb{position:fixed;left:0;right:0;bottom:0;z-index:4950;box-sizing:border-box;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#0b0d10;color:#e6e9ee;border-top:2px solid #c8102e;font:13px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:0 -6px 24px rgba(0,0,0,.35)}'
-+'#bn_cb .bn-cb-in{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:10px}'
-+'#bn_cb p{margin:0}#bn_cb b.bn-cb-h{font:700 14px/1.3 Montserrat,Inter,system-ui,sans-serif;color:#fff;display:block;margin-bottom:2px}'
-+'#bn_cb .bn-cb-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}'
-+'#bn_cb .bn-cb-btn{flex:1 1 0;min-width:0;min-height:44px;padding:0 14px;border-radius:8px;border:2px solid #c8102e;background:#c8102e;color:#fff;font:700 14px/1 Montserrat,Inter,system-ui,sans-serif;cursor:pointer}'
-+'#bn_cb .bn-cb-btn:focus-visible{outline:3px solid #fff;outline-offset:2px}#bn_cb .bn-cb-btn[disabled]{opacity:.45;cursor:not-allowed}'
-+'#bn_cb a{color:#ff8a9a}#bn_cb .bn-cb-lk{flex:0 0 100%;text-align:center;font-size:12.5px}#bn_cb .bn-cb-st{font-size:12px;color:#aab3bf}'
-+'#bn_cb .bn-cb-x{position:absolute;top:4px;right:6px;width:36px;height:36px;border:0;background:none;color:#aab3bf;font-size:20px;cursor:pointer}'
-+'@media(min-width:760px){#bn_cb{padding:12px 20px}#bn_cb .bn-cb-in{flex-direction:row;align-items:center;gap:18px}#bn_cb .bn-cb-tx{flex:1}#bn_cb .bn-cb-row{flex:0 0 auto;flex-wrap:nowrap}#bn_cb .bn-cb-btn{flex:0 0 150px}#bn_cb .bn-cb-lk{flex:0 0 auto}}'
+var CSS='#bn_cb{position:fixed;left:0;right:0;bottom:0;z-index:4950;box-sizing:border-box;padding:18px 20px calc(18px + env(safe-area-inset-bottom));background:rgba(5,6,10,.94);color:#F5F5F7;border-top:1px solid rgba(255,255,255,.12);font:13px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}'
++'#bn_cb .bn-cb-in{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:14px}'
++'#bn_cb p{margin:0}#bn_cb b.bn-cb-h{font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#F5F5F7;display:block;margin-bottom:8px}'
++'#bn_cb .bn-cb-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}'
++'#bn_cb .bn-cb-btn{flex:1 1 0;min-width:0;min-height:44px;padding:0 18px;border-radius:999px;border:1px solid #F2F2F4;background:transparent;color:#F2F2F4;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}'
++'#bn_cb .bn-cb-btn:hover{background:#F2F2F4;color:#05060a}#bn_cb .bn-cb-btn:focus-visible{outline:1px solid #fff;outline-offset:3px}#bn_cb .bn-cb-btn[disabled]{opacity:.45;cursor:not-allowed}'
++'#bn_cb a{color:#C9CDD3;text-underline-offset:3px}#bn_cb .bn-cb-lk{flex:0 0 100%;text-align:left;font-size:12px;letter-spacing:.08em;text-transform:uppercase}#bn_cb .bn-cb-st{font-size:12px;color:#9AA0A8}'
++'#bn_cb .bn-cb-x{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;color:#F2F2F4;cursor:pointer;display:grid;place-items:center;padding:0}'
++'#bn_cb .bn-cb-x i{display:block;width:16px;height:16px;position:relative}#bn_cb .bn-cb-x i::before,#bn_cb .bn-cb-x i::after{content:"";position:absolute;left:0;top:7px;width:16px;height:1.5px;background:currentColor}#bn_cb .bn-cb-x i::before{transform:rotate(45deg)}#bn_cb .bn-cb-x i::after{transform:rotate(-45deg)}'
++'@media(min-width:760px){#bn_cb{padding:18px 24px}#bn_cb .bn-cb-in{flex-direction:row;align-items:center;gap:22px}#bn_cb .bn-cb-tx{flex:1}#bn_cb .bn-cb-row{flex:0 0 auto;flex-wrap:nowrap}#bn_cb .bn-cb-btn{flex:0 0 auto;min-width:160px}#bn_cb .bn-cb-lk{flex:0 0 auto}}'
 +'html.bn-cb-on body{padding-bottom:var(--bn-cb-h,140px)}html.bn-cb-on #toasts,html.bn-cb-on .bnr-fab,html.bn-cb-on .bnig-toast{bottom:calc(var(--bn-cb-h,140px) + 12px)!important}'
-+'html.bn-cb-on .bng-bar,html.bn-cb-on .bng-prompt{display:none!important}'
-+'[data-theme=light] #bn_cb{background:#fff;color:#1b2129;box-shadow:0 -6px 24px rgba(0,0,0,.12)}[data-theme=light] #bn_cb b.bn-cb-h{color:#0b0d10}[data-theme=light] #bn_cb a{color:#c8102e}[data-theme=light] #bn_cb .bn-cb-st{color:#5b6573}';
++'html.bn-cb-on .bng-bar,html.bn-cb-on .bng-prompt{display:none!important}';
 function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function fmtD(iso){try{return new Date(iso).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});}catch(e){return iso;}}
 var UI={el:null,ro:null,
@@ -419,7 +419,7 @@ open:function(reopen){if(!document.body)return;if(!document.getElementById('bn_c
  d.innerHTML='<div class="bn-cb-in"><div class="bn-cb-tx"><p><b class="bn-cb-h">Can we count your visit?</b> We\'d like to use Google Analytics to see which pages are useful. It sets cookies on your device and sends usage data to Google. It\'s off unless you say yes, and the site works the same either way.</p>'
   +'<p class="bn-cb-st" aria-live="polite">'+esc(this.status())+'</p></div>'
   +'<div class="bn-cb-row"><button type="button" class="bn-cb-btn" data-cb="granted"'+(off?' disabled':'')+'>Accept analytics</button><button type="button" class="bn-cb-btn" data-cb="denied"'+(off?' disabled':'')+'>Reject</button>'
-  +'<span class="bn-cb-lk"><a href="/cookies">Cookie Policy</a></span></div></div>'+(reopen||off?'<button type="button" class="bn-cb-x" aria-label="Close cookie settings">×</button>':'');
+  +'<span class="bn-cb-lk"><a href="/cookies">Cookie Policy</a></span></div></div>'+(reopen||off?'<button type="button" class="bn-cb-x" aria-label="Close cookie settings"><i aria-hidden="true"></i></button>':'');
  if(!d.parentNode)document.body.appendChild(d);document.documentElement.classList.add('bn-cb-on');this.size();
  var me=this;if(window.ResizeObserver&&!this.ro){this.ro=new ResizeObserver(function(){me.size();});this.ro.observe(d);}
  if(reopen){var b=d.querySelector('.bn-cb-btn:not([disabled])')||d.querySelector('.bn-cb-x');if(b)try{b.focus({preventScroll:true});}catch(e){}}},

@@ -69,7 +69,7 @@
 
   // ---------------- icons ----------------
   var BELL = '<svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 1.8H4.4z"/><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" d="M10 20.6a2.2 2.2 0 0 0 4 0"/></svg>';
-  var X = '<span class="bnal-xb"><svg aria-hidden="true" focusable="false" viewBox="0 0 12 12"><path d="M2.2 2.2l7.6 7.6M9.8 2.2L2.2 9.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg></span>';
+  var X = '<i aria-hidden="true"></i>';
   var CHECK = '<svg class="bnal-check" aria-hidden="true" focusable="false" viewBox="0 0 20 20"><path d="M4.2 10.4l3.6 3.6 8-8.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var CHEV = '<svg class="bnal-chev" aria-hidden="true" focusable="false" viewBox="0 0 8 14"><path d="M1 1l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var PAGEMENU = '<svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="-10 -10 20 20"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M-6.5 -4.5h13M-6.5 0h13M-6.5 4.5h8"/></svg>';
@@ -199,7 +199,54 @@
     });
     return el;
   }
-  function body(h) { shell().querySelector(".bnal-body").innerHTML = h; }
+  function emailBlock() {
+    return '<section class="bnal-email"><p class="bnal-k">Email</p>'
+      + '<p class="bnal-lead">The free brief, twice a day. Ranked and sourced.</p>'
+      + '<form class="bnal-nl" method="post" action="/api/newsletter/subscribe" novalidate>'
+      + '<label class="bnal-sr" for="bnal_email">Email address</label>'
+      + '<input id="bnal_email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" placeholder="you@example.org">'
+      + '<input type="hidden" name="source" value="alerts"><input type="hidden" name="frequency" value="twice">'
+      + '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
+      + '<button type="submit" class="bnal-go">Get the free brief</button>'
+      + '<p class="bnal-nl-msg" role="status" aria-live="polite"></p>'
+      + '<p class="bnal-note">7 AM and 7 PM ET. A confirmation email is sent; nothing else arrives until you confirm.</p></form></section>';
+  }
+  function bindEmail() {
+    var f = el && el.querySelector("form.bnal-nl");
+    if (!f || f.dataset.ready) return;
+    f.dataset.ready = "1";
+    var em = f.querySelector('input[name=email]'), msg = f.querySelector(".bnal-nl-msg"), btn = f.querySelector("button[type=submit]");
+    var RE = /^[^\s@"<>(),;:\\[\]]{1,64}@[^\s@"<>(),;:\\[\]]+\.[A-Za-z]{2,63}$/;
+    function sayNl(t, ok) { if (!msg) return; msg.textContent = t || ""; msg.className = "bnal-nl-msg" + (t ? (ok ? " ok" : " err") : ""); }
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = ((em && em.value) || "").trim();
+      if (!v) { sayNl("Enter your email address."); if (em) { em.setAttribute("aria-invalid", "true"); em.focus(); } return; }
+      if (v.length > 254 || !RE.test(v)) { sayNl("That doesn't look like a valid email address."); if (em) { em.setAttribute("aria-invalid", "true"); em.focus(); } return; }
+      if (btn) { btn.disabled = true; btn.textContent = "Subscribing…"; }
+      sayNl("");
+      var body = { email: v, frequency: "twice", interests: ["all"], website: (f.querySelector('input[name=website]') || {}).value || "", source: "alerts", location: "", crime_brief: 0, crime_alerts: 0, track_consent: 0, trk_shown: 0, csrf: "" };
+      var send = function (csrf) {
+        body.csrf = csrf || "";
+        return fetch("/api/newsletter/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify(body) })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, j: j }; }); });
+      };
+      fetch("/api/newsletter/meta", { cache: "no-store", credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; })
+        .then(function (m) { return send(m && m.csrf); })
+        .then(function (r) {
+          if (r.status === 403) return fetch("/api/newsletter/meta", { cache: "no-store", credentials: "same-origin" }).then(function (x) { return x.json(); }).then(function (m) { return send(m && m.csrf); });
+          return r;
+        })
+        .then(function (r) {
+          sayNl((r.j && r.j.message) || ("Something went wrong (" + r.status + "). Please try again."), r.ok);
+          if (r.ok && em) em.value = "";
+          else if (r.j && r.j.field === "email" && em) { em.setAttribute("aria-invalid", "true"); em.focus(); }
+        })
+        .catch(function () { sayNl("Network error. Please try again."); })
+        .then(function () { if (btn) { btn.disabled = false; btn.textContent = "Get the free brief"; } });
+    });
+  }
+  function body(h) { shell().querySelector(".bnal-body").innerHTML = emailBlock() + '<section class="bnal-push"><p class="bnal-k">Push</p>' + h + "</section>"; bindEmail(); }
   function say(msg, kind) { var n = el && el.querySelector(".bnal-msg"); if (n) { n.className = "bnal-msg" + (kind ? " bnal-" + kind : ""); n.textContent = msg; } }
 
   function choices(c, s) {
@@ -422,7 +469,7 @@
       + '<div class="bnal-notif" aria-label="How the notification looks on your lock screen"><img src="/icons/icon-192.png" alt="" width="38" height="38">'
       + '<div><div class="bnal-nt"><b>BLACKOUT</b><span>now</span></div><div class="bnal-nh">' + r + '/10 · ' + esc(cat.toUpperCase()) + '</div><div class="bnal-nb">' + esc(head) + '</div></div></div>'
       + '<article class="bnal-card2"><div class="bnal-cb"><img class="bnal-logo" src="/icons/icon-192.png" alt="BLACKOUT.NETWORK" width="28" height="28">'
-      + '<span class="bnal-brand">BLACKOUT.<b>NETWORK</b></span><span class="bnal-rk bnal-rk' + (r >= 8 ? "h" : "m") + '">RANK ' + r + '</span></div>'
+      + '<span class="bnal-brand">blackout.network</span><span class="bnal-rk bnal-rk' + (r >= 7 ? "h" : "m") + '">RANK ' + r + '</span></div>'
       + '<div class="bnal-mt">' + meter(r) + '<span class="bnal-ct">' + esc(cat) + '</span></div>'
       + '<h3 class="bnal-t">' + esc(head) + '</h3><p class="bnal-p">' + esc(brief(it)) + '</p>'
       + '<dl class="bnal-meta"><div><dt>Time</dt><dd>' + esc(etTime(it.high_at)) + '</dd></div><div><dt>Confidence</dt><dd>' + esc(it.confidence || "—") + '</dd></div></dl>'
@@ -467,28 +514,33 @@
   }
   var IOS_ART = '<figure class="bnal-ios" aria-label="Three steps: tap Share, tap Add to Home Screen, open BLACKOUT and tap the bell">'
     + '<svg viewBox="0 0 330 150" role="img" aria-hidden="true" focusable="false">'
-    + '<defs><linearGradient id="bnalm" x1="0" x2="1"><stop offset=".333" stop-color="#6B7076"/><stop offset=".333" stop-color="#C9CDD3"/><stop offset=".666" stop-color="#C9CDD3"/><stop offset=".666" stop-color="#FF4D4F"/></linearGradient></defs>'
+    + '<defs><linearGradient id="bnalm" x1="0" x2="1"><stop offset="0" stop-color="#6B7076"/><stop offset="1" stop-color="#F2F2F4"/></linearGradient></defs>'
     + [0, 1, 2].map(function (k) { return '<rect x="' + (14 + k * 108) + '" y="6" width="86" height="138" rx="14" fill="#14181D" stroke="#2f3742" stroke-width="2"/>'; }).join("")
     // 1: Safari bar with Share highlighted
-    + '<rect x="22" y="112" width="70" height="22" rx="7" fill="#1d232b"/><circle cx="57" cy="123" r="10" fill="#FF4D4F" fill-opacity=".2" stroke="#FF4D4F" stroke-width="1.6"/>'
+    + '<rect x="22" y="112" width="70" height="22" rx="7" fill="#1d232b"/><circle cx="57" cy="123" r="10" fill="none" stroke="#F2F2F4" stroke-width="1.6"/>'
     + '<path d="M57 117v9M53.5 120.5l3.5-3.5 3.5 3.5M52.5 123.5h-1.5v6h12v-6h-1.5" fill="none" stroke="#E6E9EE" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
     + '<rect x="24" y="22" width="66" height="8" rx="3" fill="#252B33"/><rect x="24" y="38" width="50" height="6" rx="3" fill="#252B33"/><rect x="24" y="50" width="58" height="6" rx="3" fill="#252B33"/>'
     // 2: share sheet row "Add to Home Screen"
-    + '<rect x="130" y="70" width="70" height="66" rx="8" fill="#1d232b"/><rect x="134" y="78" width="62" height="18" rx="5" fill="#FF4D4F" fill-opacity=".18" stroke="#FF4D4F" stroke-width="1.4"/>'
+    + '<rect x="130" y="70" width="70" height="66" rx="8" fill="#1d232b"/><rect x="134" y="78" width="62" height="18" rx="5" fill="none" stroke="#F2F2F4" stroke-width="1.4"/>'
     + '<rect x="138" y="81" width="12" height="12" rx="3" fill="none" stroke="#E6E9EE" stroke-width="1.4"/><path d="M144 84v6M141 87h6" stroke="#E6E9EE" stroke-width="1.4" stroke-linecap="round"/>'
     + '<text x="154" y="90.5" fill="#E6E9EE" font-size="7.4" font-family="Inter,system-ui" font-weight="700">Add to Home</text>'
     + '<rect x="136" y="102" width="50" height="6" rx="3" fill="#252B33"/><rect x="136" y="114" width="40" height="6" rx="3" fill="#252B33"/>'
     // 3: home screen with BN app + notification badge
     + '<rect x="248" y="44" width="38" height="38" rx="9" fill="#0B0D10" stroke="#3a4350"/><text x="267" y="69" text-anchor="middle" fill="#fff" font-size="15" font-family="Montserrat,Inter,system-ui" font-weight="800">BN</text>'
-    + '<rect x="254" y="74" width="26" height="3" rx="1.5" fill="url(#bnalm)"/><circle cx="285" cy="45" r="7" fill="#FF4D4F"/><text x="285" y="48.5" text-anchor="middle" fill="#fff" font-size="9" font-weight="800" font-family="Inter,system-ui">1</text>'
+    + '<rect x="254" y="74" width="26" height="3" rx="1.5" fill="url(#bnalm)"/><circle cx="285" cy="45" r="7" fill="#F2F2F4"/><text x="285" y="48.5" text-anchor="middle" fill="#fff" font-size="9" font-weight="800" font-family="Inter,system-ui">1</text>'
     + '<text x="267" y="96" text-anchor="middle" fill="#c9d0d9" font-size="8" font-family="Inter,system-ui" font-weight="600">BLACKOUT</text>'
     + [[228, 22], [292, 22], [228, 104], [292, 104]].map(function (q) { return '<rect x="' + (q[0] - 8) + '" y="' + q[1] + '" width="16" height="16" rx="4" fill="#252B33"/>'; }).join("")
-    + [0, 1, 2].map(function (k) { return '<circle cx="' + (57 + k * 108) + '" cy="6" r="10" fill="#FF4D4F"/><text x="' + (57 + k * 108) + '" y="10" text-anchor="middle" fill="#0B0D10" font-size="11" font-weight="800" font-family="Inter,system-ui">' + (k + 1) + '</text>'; }).join("")
+    + [0, 1, 2].map(function (k) { return '<circle cx="' + (57 + k * 108) + '" cy="6" r="10" fill="none" stroke="#F2F2F4" stroke-width="1.2"/><text x="' + (57 + k * 108) + '" y="10" text-anchor="middle" fill="#F2F2F4" font-size="11" font-weight="800" font-family="Inter,system-ui">' + (k + 1) + '</text>'; }).join("")
     + '<path d="M103 75h8M211 75h8" stroke="#8B95A3" stroke-width="2" stroke-linecap="round"/><path d="M108 71l4 4-4 4M216 71l4 4-4 4" fill="none" stroke="#8B95A3" stroke-width="2" stroke-linecap="round"/>'
     + '</svg><figcaption>Add to Home Screen to get alerts</figcaption></figure>';
 
   BN.enableAlerts = function (opts) {
     opts = opts || {};
+    try { if (window.bnMenuClose) bnMenuClose(true); } catch (er) {}
+    try {
+      var mx = document.querySelector(".bn-drawer .bn-close, .w2-menu.open .w2-close, #bn-menu .bn-close, .w2-bar.w2-open .w2-close");
+      if (mx) mx.click();
+    } catch (er) {}
     shell(); lastFocus = document.activeElement; render(opts);
     if (E.api && !(E.ios && !E.standalone)) { getReg().catch(function () {}); getCfg(); }   // warm up so the tap goes straight to the permission prompt
     el.hidden = false; document.documentElement.classList.add("bnal-lock");
@@ -503,7 +555,6 @@
     if (!t) return;
     if (t.hasAttribute("data-bn-alerts")) {
       e.preventDefault();
-      try { if (t.closest(".bn-drawer")) { var cx = document.querySelector(".bn-drawer .bn-close"); if (cx) cx.click(); } } catch (er) {}
       BN.enableAlerts({ from: t.getAttribute("data-bn-alerts") || "" }); return;
     }
     var a = t.getAttribute("data-bnal");
