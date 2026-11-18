@@ -665,24 +665,27 @@ class H(BaseHTTPRequestHandler):
     server_version = "Blackout/1.0"
     def log_message(self, fmt, *a): pass
     def ip(self): return self.headers.get("CF-Connecting-IP") or self.client_address[0]
-    def send(self, code, body, ctype="application/json"):
+    def send(self, code, body, ctype="application/json", headers=None):
         b = body if isinstance(body, bytes) else (json.dumps(body, default=str) if ctype == "application/json" else body).encode()
         if ctype == "application/json" and b"://" in b:   # t347: show people the human page, not the raw API/RSS endpoint (display only)
             try: b = display_links.rewrite_json(b.decode("utf-8")).encode("utf-8")
             except Exception: pass
         if code >= 500 and ctype == "application/json" and not self.path.startswith(("/api/", "/internal/")) and "text/html" in (self.headers.get("Accept") or ""):
             b, ctype = error_page_html().encode("utf-8"), "text/html"   # Nov 17: people get an HTML error page with the menu, not raw JSON
-        if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
-        if ctype.startswith("text/html; "): b = apple_assets(b)   # apple_style_v1 on /midterms and /stats
-        if ctype.startswith("text/html; "): b = theme_assets(b)   # Nov 17 push B: shared theme on "text/html; charset=utf-8" pages (/stats, /midterms, /mesh*)
-        if ctype.startswith("text/html"): b = menu_fallback(b, self.path)   # Nov 17: menu on every full page
-        if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
-        if ctype.startswith("text/html"): b = credits_link(b, self.path)   # Nov 17 (Matt 12:07): "Image credits" footer link on every page
-        if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
-        if ctype.startswith("text/html"):
-            try: b = _addon_mod("perf_load").rewrite(b)
-            except Exception: traceback.print_exc()
+        if code < 300:   # skip HTML rewrites on redirects (e.g. /wire-next 301)
+            if ctype == "text/html": b = version_assets(report_widget(pwa_head(b)))
+            if ctype.startswith("text/html; "): b = apple_assets(b)   # apple_style_v1 on /midterms and /stats
+            if ctype.startswith("text/html; "): b = theme_assets(b)   # Nov 17 push B: shared theme on "text/html; charset=utf-8" pages (/stats, /midterms, /mesh*)
+            if ctype.startswith("text/html"): b = menu_fallback(b, self.path)   # Nov 17: menu on every full page
+            if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
+            if ctype.startswith("text/html"): b = credits_link(b, self.path)   # Nov 17 (Matt 12:07): "Image credits" footer link on every page
+            if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
+            if ctype.startswith("text/html"):
+                try: b = _addon_mod("perf_load").rewrite(b)
+                except Exception: traceback.print_exc()
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
+        if headers:
+            for k, v in headers.items(): self.send_header(k, v)
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
         wimg = code == 200 and ctype == "image/webp" and self.path.startswith("/wire2/static/img/")   # Push F: Wire v2 hero images (renamed, never edited in place)
         self.send_header("Cache-Control", "public, max-age=2592000, immutable" if ctype.startswith("font/") or wimg else "public, max-age=31536000, immutable" if versioned else "no-store"); self.send_header("X-Content-Type-Options", "nosniff")

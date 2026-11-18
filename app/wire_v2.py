@@ -142,7 +142,7 @@ def menu_html():
             '<div class="w2-mfoot"><a href="/scoring">How we score</a><a href="/sources">Sources</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a>'
             '<a href="https://x.com/BlkoutNtw" rel="noopener" target="_blank">X</a><a href="https://www.youtube.com/@blkoutntw" rel="noopener" target="_blank">YouTube</a></div></div>')
 
-def shell(title, desc, body, path, rank=None):
+def shell(title, desc, body, path, rank=None, noindex=False):
     try:
         import og, re as _re
         m = _re.match(r"/wire/([0-9a-f]{16})", path or "")
@@ -154,9 +154,10 @@ def shell(title, desc, body, path, rank=None):
                            key="wire", og_type="website")
     except Exception:
         meta = ""
+    robots = '<meta name="robots" content="noindex,nofollow,noarchive">' if noindex else ""
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network{E(path)}">
-{meta}<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=6"></head>
+{robots}{meta}<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=6"></head>
 <body class="w2"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu_html()}<main id="w2_main">{body}</main>
@@ -185,7 +186,7 @@ def items(state):
     return m
 
 # ---------------------------------------------------------------- /wire
-def render_list(state):
+def render_list(state, path="/wire", noindex=False):
     m = items(state); used = Used(); used.take(["list_hero"])
     gen = et(state.get("generated"))
     top = m[0] if m else None
@@ -230,7 +231,7 @@ def render_list(state):
     wl = state.get("watchlist_count") or len(state.get("watchlist") or [])
     body += hero("night", "WATCHLIST", f"{wl} signals waiting", "Single-source reports wait here until a second, independent source confirms them.",
                  btn("/live#threat", "Open watchlist"), cls="w2-hero-band", h1=False)
-    return shell("The Wire: ranked threat alerts | BLACKOUT.NETWORK", "Every ranked alert, sorted by rank, with the latest changes on top.", body, "/wire")
+    return shell("The Wire: ranked threat alerts | BLACKOUT.NETWORK", "Every ranked alert, sorted by rank, with the latest changes on top.", body, path, noindex=noindex)
 
 # ---------------------------------------------------------------- /wire/<id>
 def render_story(state, cid):
@@ -303,10 +304,14 @@ def handle_static(path):
 
 _C = {}
 def handle(path, qs=None):
-    """(code, body, ctype) for /wire, /wire/<id> when ON, else None (caller falls back to the old pages)."""
+    """(code, body, ctype) for /wire, /wire-classic, /wire/<id> when ON, else None (caller falls back to the old pages)."""
     if not ON: return None
     srv = __import__("theme")._srv()
-    if path in ("/wire", "/wire/"): key = "/wire"
+    list_path, noindex = "/wire", False
+    if path in ("/wire-classic", "/wire-classic/"):
+        key, list_path, noindex = "/wire-classic", "/wire-classic", True
+    elif path in ("/wire", "/wire/"):
+        key = "/wire"
     else:
         m = re.match(r"^/wire/([0-9a-f]{16})/?$", path)
         if not m or (qs or {}).get("since"): return None
@@ -314,7 +319,7 @@ def handle(path, qs=None):
     hit = _C.get(key)
     if hit and time.time() - hit[0] < 60: return 200, hit[1], "text/html"
     st = srv.api_state()
-    body = render_list(st) if key == "/wire" else render_story(st, key)
+    body = render_list(st, path=list_path, noindex=noindex) if key in ("/wire", "/wire-classic") else render_story(st, key)
     if not body: return None   # story no longer on the board: old story page (DB history) handles it
     if len(_C) > 300: _C.clear()
     _C[key] = (time.time(), body)
