@@ -218,6 +218,7 @@ CREDITS_LEDGER = [
   ("Second cyclone story (illustrative)", "NASA JSC, ISS Expedition 57, iss057e023128 (Hurricane Michael), 2018. Illustrative", "Public domain"),
   ("Section band \"Watchlist\"", "NASA JSC, ISS Expedition 67, iss067e302248 (Mediterranean at night), 2022", "Public domain"),
   ("Health, conflict, finance and cyber graphics", "Original abstract graphics made for BLACKOUT.NETWORK (no real event)", "BLACKOUT.NETWORK"),
+  ("Timeline background video (desktop/tablet) and still (phones)", "NASA JSC, \"4K Earth Views Extended Cut for Earth Day 2021\" (jsc2021m000138), cloud fields over the Earth limb (segment at 50:40); graded grey with a cool tone, crossfaded loop", "Public domain"),
   ("Note on illustrative photos", "Storm and other story photos are illustrative: they show the same kind of event seen from orbit, not the specific event in the story.", "")]),
  ("crime", "Crime (/crime)", [
   ("Hero background video (desktop/tablet) and still", "\"Time Lapse 4K Midnight City\" (view from Blackpool Tower at night) by netLike, via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:Time_Lapse_4K_Midnight_City.webm); 10-second segment, graded grey with a cool tone, cropped", "CC BY 3.0"),
