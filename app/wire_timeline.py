@@ -334,7 +334,8 @@ def _file(name):
     data = open(p, "rb").read(); _FILE[name] = (mt, data); return data
 
 def _ver(name):
-    try: return str(int(os.path.getmtime(os.path.join(STATIC, name))))
+    # suffix busts a Cloudflare immutable cache if a previous probe used this mtime as ?v=
+    try: return str(int(os.path.getmtime(os.path.join(STATIC, name)))) + "b"
     except OSError: return "0"
 
 def page_html():
