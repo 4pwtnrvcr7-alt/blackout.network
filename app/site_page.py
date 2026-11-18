@@ -70,7 +70,7 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
             img = image or og.image_url(key)
             meta = og.tags(title=t, desc=desc, url=url, image=img, key=key, og_type=og_type)
     except Exception:
-        img = image or f"{SITE}/og/home.png?v=4"
+        img = image or f"{SITE}/og/home.png?v=5"
         meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
                 f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
                 f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(t)}">'
