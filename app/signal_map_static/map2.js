@@ -151,11 +151,29 @@
   }
 
   /* ---------- header: slides away, small X stays ---------- */
-  var headT = 0;
+  var headT = 0, wasMenu = false;
+  function menuOpen() {
+    var r = d.documentElement, m = d.getElementById("bn-menu");
+    return !!(r && r.classList.contains("bn-menu-on")) || !!(m && (m.classList.contains("bn-open") || m.classList.contains("bn-closing") || (m.id && location.hash === "#bn-menu")));
+  }
   function head(show) {
     d.body.classList.toggle("bnm-hd-on", !!show); clearTimeout(headT);
-    if (show) headT = setTimeout(function () { if (!d.querySelector(".bnm-head :focus") && !d.querySelector(".bnm-head .bn-menu[open], .bn-drawer.open, body.bn-menu-open")) head(false); }, 3200);
+    if (show) headT = setTimeout(function () {
+      if (menuOpen() || d.querySelector(".bnm-head :focus")) return;
+      head(false);
+    }, 3200);
   }
+  function syncMenuHead() {
+    var on = menuOpen();
+    if (on) { wasMenu = true; head(true); }
+    else if (wasMenu) { wasMenu = false; head(true); }
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(syncMenuHead).observe(d.documentElement, { attributes: true, attributeFilter: ["class"] });
+    var _mn = d.getElementById("bn-menu");
+    if (_mn) new MutationObserver(syncMenuHead).observe(_mn, { attributes: true, attributeFilter: ["class"] });
+  }
+  d.addEventListener("click", function (e) { if (e.target.closest && e.target.closest(".bn-burger")) setTimeout(syncMenuHead, 0); }, true);
   function back() {
     var ref = d.referrer || "";
     try { if (ref && new URL(ref).origin === location.origin && history.length > 1 && !/\/map(\?|$)/.test(new URL(ref).pathname)) { history.back(); return; } } catch (e) {}
