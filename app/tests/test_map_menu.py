@@ -53,8 +53,9 @@ class IpadPanelAboveScrim(unittest.TestCase):
         self.assertIn("html.bn-menu-on #bn-menu .bn-scrim", css)
         self.assertIn("html.bn-menu-on #bn-menu .bn-panel", css)
         self.assertIn("html.bn-menu-on #bn-menu{z-index:2600;isolation:isolate}", css)
-        # do not retouch the alert / settings pop (another worker)
-        self.assertIn(".bn-pop-scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:calc(var(--bn-z-drawer) + 205)}", css)
+        # settings / alert pop (restyled in #39) stays its own layer above the drawer
+        self.assertIn(".bn-pop-scrim{position:fixed;inset:0;", css)
+        self.assertIn("z-index:calc(var(--bn-z-drawer) + 205)", css)
 
     def test_m4_css_panel_stacks_above_scrim(self):
         css = UI.M4_CSS
