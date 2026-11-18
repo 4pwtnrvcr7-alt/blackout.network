@@ -1,14 +1,14 @@
-/* BLACKOUT.NETWORK "Add to Home Screen" sheet (install-guide.js, t339). Signal tokens from sitenav.css, with fallbacks for pages without it.
-   Mobile-first bottom sheet (~40-50% of a phone screen), left-aligned, 44px+ tap targets, dark/light, reduced motion = static. */
-.bnig{--g-bg:var(--bn-surface,#14181D);--g-raised:var(--bn-raised,#1B2027);--g-line:var(--bn-line-2,#2f3742);--g-tx:var(--bn-text,#E6E9EE);--g-mu:var(--bn-muted,#8B95A3);
- --g-brand:var(--bn-brand,#FF4D4F);--g-ink:var(--bn-ink-on-brand,#0B0D10);--g-lo:var(--bn-sev-lo,#6B7076);--g-md:var(--bn-sev-md,#C9CDD3);--g-hi:var(--bn-sev-hi,#FF4D4F);
+/* BLACKOUT.NETWORK "Add to Home Screen" sheet. SpaceX language: near-black glass, hairlines, monochrome pills. */
+.bnig{--g-bg:rgba(5,6,10,.94);--g-raised:transparent;--g-line:rgba(255,255,255,.12);--g-tx:#F5F5F7;--g-mu:#9AA0A8;
+ --g-brand:#F2F2F4;--g-ink:#05060a;--g-lo:#6B7076;--g-md:#C9CDD3;--g-hi:#C9CDD3;
  position:fixed;left:0;right:0;bottom:0;z-index:4950;box-sizing:border-box;max-width:560px;margin:0 auto;
  max-height:min(62vh,calc(100vh - 76px));max-height:min(62dvh,calc(100dvh - 76px));overflow:auto;overscroll-behavior:contain;
- background:var(--g-bg);color:var(--g-tx);border:1px solid var(--g-line);border-bottom:0;border-radius:20px 20px 0 0;box-shadow:0 -10px 40px rgba(0,0,0,.45);
- padding:0 max(16px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
- font:15px/1.4 var(--bn-font-body,"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);text-align:left;
+ background:var(--g-bg);color:var(--g-tx);border:1px solid var(--g-line);border-bottom:0;border-radius:0;box-shadow:none;
+ backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+ padding:0 max(20px,env(safe-area-inset-right)) calc(18px + env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));
+ font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:left;
  transform:translateY(105%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
-.bnig::before{content:"";display:block;height:4px;margin:0 -16px 12px;background:linear-gradient(90deg,var(--g-lo) 0 33.33%,var(--g-md) 33.33% 66.66%,var(--g-hi) 66.66%)}
+.bnig::before{content:"";display:block;height:1px;margin:14px auto 10px;width:32px;background:rgba(255,255,255,.16)}
 .bnig.bnig-on{transform:none}
 html.bn-lock .bnig{visibility:hidden}   /* sidebar menu open: step aside (z above the report button 4900, below toasts 5000) */
 .bnig[hidden]{display:none}
@@ -16,9 +16,9 @@ html.bn-lock .bnig{visibility:hidden}   /* sidebar menu open: step aside (z abov
 .bnig-hd{display:flex;align-items:center;gap:12px;margin:0 0 12px}
 .bnig-hd img{width:44px;height:44px;border-radius:10px;flex:none;box-shadow:0 0 0 1px var(--g-line)}
 .bnig-tt{flex:1;min-width:0}
-.bnig-t{margin:0;font:800 18px/1.2 var(--bn-font-ui,"Montserrat",system-ui,sans-serif);letter-spacing:-.01em;color:var(--g-tx)}
+.bnig-t{margin:0;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--g-tx)}
 .bnig-sub{margin:3px 0 0;color:var(--g-mu);font-size:13px}
-.bnig .bnig-x{flex:none;align-self:flex-start;width:44px;height:44px;margin:-4px -8px 0 0;padding:0;border:0;border-radius:12px;background:transparent;color:var(--g-mu);cursor:pointer;display:grid;place-items:center}
+.bnig .bnig-x{flex:none;align-self:flex-start;width:44px;height:44px;margin:-4px -8px 0 0;padding:0;border:0;border-radius:0;background:transparent;color:#F2F2F4;cursor:pointer;display:grid;place-items:center}
 .bnig .bnig-x svg{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 .bnig .bnig-x:hover{color:var(--g-tx);background:var(--bn-hover,rgba(255,255,255,.06))}
 /* the big picture of the button to tap */
@@ -35,10 +35,10 @@ html.bn-lock .bnig{visibility:hidden}   /* sidebar menu open: step aside (z abov
 .bnig-svg .mt{fill:var(--g-mu);font:700 10px var(--bn-font-ui,system-ui,sans-serif);text-transform:uppercase;letter-spacing:.06em}
 .bnig-svg .rt{fill:var(--g-mu);font:500 12.5px var(--bn-font-body,system-ui,sans-serif)}
 .bnig-svg .rt.on{fill:var(--g-tx);font-weight:700}
-.bnig-svg .row.on{fill:var(--bn-active,rgba(255,77,79,.12));stroke:var(--g-brand);stroke-width:1.5}
+.bnig-svg .row.on{fill:rgba(255,255,255,.06);stroke:#F2F2F4;stroke-width:1.5}
 .bnig-svg .ap{fill:var(--bn-line,#252B33)}
-.bnig-ring{fill:none;stroke:var(--g-brand);stroke-width:2.5}
-.bnig-pulse{fill:none;stroke:var(--g-brand);stroke-width:2.5;transform-box:fill-box;transform-origin:center;animation:bnig-pulse 1.4s ease-out infinite}
+.bnig-ring{fill:none;stroke:#F2F2F4;stroke-width:1.5}
+.bnig-pulse{fill:none;stroke:#F2F2F4;stroke-width:1.5;transform-box:fill-box;transform-origin:center;animation:bnig-pulse 1.4s ease-out infinite}
 .bnig-drop{animation:bnig-drop 1.6s cubic-bezier(.2,.8,.2,1) both}
 @keyframes bnig-pulse{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.9);opacity:0}}
 @keyframes bnig-drop{0%{transform:translateY(-30px);opacity:0}60%{opacity:1}100%{transform:none;opacity:1}}
@@ -47,26 +47,27 @@ html.bn-lock .bnig{visibility:hidden}   /* sidebar menu open: step aside (z abov
 .bnig .bnig-step{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:6px 10px;margin:0;border:1px solid transparent;border-radius:12px;background:transparent;
  color:var(--g-mu);font:500 15px/1.3 var(--bn-font-body,"Inter",system-ui,sans-serif);text-align:left;cursor:pointer}
 .bnig .bnig-step .n{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:2px solid var(--g-line);font:800 14px/1 var(--bn-font-ui,"Montserrat",system-ui,sans-serif);color:var(--g-mu)}
-.bnig .bnig-step.on{color:var(--g-tx);background:var(--g-raised);border-color:var(--g-line)}
-.bnig .bnig-step.on .n{background:var(--g-brand);border-color:var(--g-brand);color:var(--g-ink)}
+.bnig .bnig-step.on{color:var(--g-tx);background:transparent;border-color:var(--g-line)}
+.bnig .bnig-step.on .n{background:#F2F2F4;border-color:#F2F2F4;color:#05060a}
 .bnig .bnig-step b{color:inherit;font-weight:700}
 .bnig-ic{display:inline-block;vertical-align:-3px;width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .bnig-note{margin:0 0 10px;color:var(--g-mu);font-size:13px}
 .bnig-row{display:flex;gap:10px}
-.bnig .bnig-row button{flex:1;min-height:52px;padding:12px 16px;border-radius:14px;cursor:pointer;font:700 16px/1.2 var(--bn-font-ui,"Montserrat",system-ui,sans-serif);
- border:1px solid var(--g-line);background:var(--g-raised);color:var(--g-tx)}
-.bnig .bnig-row .bnig-pri{flex:2;background:var(--g-brand);border-color:var(--g-brand);color:var(--g-ink)}
-.bnig button:focus-visible{outline:2px solid var(--bn-link,#4aa3ff);outline-offset:2px}
-.bnig-toast{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5000;background:var(--bn-raised,#1B2027);color:var(--bn-text,#E6E9EE);
- border:1px solid var(--bn-line-2,#2f3742);border-radius:12px;padding:10px 16px;font:600 14px var(--bn-font-ui,system-ui,sans-serif)}
-@media (min-width:600px){.bnig{bottom:16px;border-bottom:1px solid var(--g-line);border-radius:20px;overflow:hidden auto}.bnig-svg{max-height:170px}}
+.bnig .bnig-row button{flex:1;min-height:48px;padding:12px 18px;border-radius:999px;cursor:pointer;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;
+ border:1px solid #F2F2F4;background:transparent;color:#F2F2F4}
+.bnig .bnig-row .bnig-pri{flex:2;background:transparent;border-color:#F2F2F4;color:#F2F2F4}
+.bnig .bnig-row button:hover,.bnig .bnig-row .bnig-pri:hover{background:#F2F2F4;color:#05060a}
+.bnig button:focus-visible{outline:1px solid #fff;outline-offset:3px}
+.bnig-toast{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:5000;background:rgba(5,6,10,.94);color:#F5F5F7;
+ border:1px solid rgba(255,255,255,.12);border-radius:0;padding:12px 16px;font:600 12px/1.3 Inter,system-ui,sans-serif;letter-spacing:.04em;backdrop-filter:blur(16px)}
+@media (min-width:600px){.bnig{bottom:16px;border-bottom:1px solid var(--g-line);border-radius:0;overflow:hidden auto}.bnig-svg{max-height:170px}}
 @media (min-width:900px){.bnig{left:auto;right:24px;bottom:24px;width:420px}}
 @media (prefers-reduced-motion:reduce){.bnig{transition:none}.bnig-pulse,.bnig-drop{animation:none}}
 @media print{.bnig,.bnig-toast{display:none!important}}
 /* installed (standalone) app: keep content clear of the iOS status bar (black-translucent) */
 @media (display-mode:standalone){body{padding-top:env(safe-area-inset-top)}}
-/* Home Screen app: notifications soft-ask (install-guide.js maybeAsk). Same sheet as the install guide; V2 yellow on dark, red only as accent. */
-.bnna{--na-y:#F2F2F4;--na-yi:#0B0D10}
+/* Home Screen app: notifications soft-ask (install-guide.js maybeAsk). Same sheet as the install guide; monochrome. */
+.bnna{--na-y:#F2F2F4;--na-yi:#05060a}
 html[data-theme="light"] .bnna{--na-y:#1D1D1F;--na-yi:#fff}
 .bnna .bnna-badge{width:44px;height:44px;flex:none;border-radius:12px;display:grid;place-items:center;background:rgba(242,242,244,.12);box-shadow:0 0 0 1px rgba(242,242,244,.35);color:var(--na-y)}
 .bnna .bnna-badge.ok{background:rgba(43,182,115,.14);box-shadow:0 0 0 1px rgba(43,182,115,.4);color:var(--g-lo)}
@@ -76,7 +77,7 @@ html[data-theme="light"] .bnna{--na-y:#1D1D1F;--na-yi:#fff}
 .bnna-svg .bnna-n{fill:var(--g-raised);stroke:var(--g-line)}
 .bnna-svg .bnna-a{fill:var(--g-tx);font:700 11px var(--bn-font-ui,system-ui,sans-serif);letter-spacing:.04em}
 .bnna-svg .bnna-t{fill:var(--g-mu);font:500 10px var(--bn-font-body,system-ui,sans-serif)}
-.bnna-svg .bnna-rk{fill:var(--g-hi)}
+.bnna-svg .bnna-rk{fill:#E5484D}
 .bnna-svg .bnna-rkt{fill:#fff;font:800 9.5px var(--bn-font-ui,system-ui,sans-serif)}
 .bnna-svg .bnna-c{fill:var(--g-tx);font:700 9.5px var(--bn-font-ui,system-ui,sans-serif);letter-spacing:.05em}
 .bnna-svg .bnna-l{fill:var(--bn-line,#2a313a)}
@@ -88,5 +89,5 @@ html[data-theme="light"] .bnna{--na-y:#1D1D1F;--na-yi:#fff}
 .bnna-steps li{display:flex;gap:12px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--g-tx)}
 .bnna-steps .n{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:2px solid var(--g-line);font:800 13px/1 var(--bn-font-ui,"Montserrat",system-ui,sans-serif);color:var(--g-mu)}
 .bnna .bnna-err{color:var(--g-hi)}
-.bnna .bnig-row .bnna-pri{background:var(--na-y);border-color:var(--na-y);color:var(--na-yi);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.bnna .bnig-row .bnna-pri{background:transparent;border-color:#F2F2F4;color:#F2F2F4;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .bnna .bnna-bti{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
