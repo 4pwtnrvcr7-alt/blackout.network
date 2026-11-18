@@ -36,6 +36,22 @@ class Display(unittest.TestCase):
         self.assertEqual(W.cat_key("war/conflict", "Nepal: Flash Floods - Aug 2026", True), "weather")
         self.assertEqual(W.cat_key("war/conflict", "Strikes on Kyiv", False), "conflict")
         self.assertEqual(W.cat_key("financial", "x", False), "markets")
+        # Title-first rules: quake-as-conflict mislabels, plus new type keys
+        self.assertEqual(W.cat_key("war/conflict", "INGV: M6.1 earthquake Peru (Peruvian point of view) [Sea]", False), "quake")
+        self.assertEqual(W.cat_key("war/conflict", "GEOFON: M5.8 earthquake Papua New Guinea Region", False), "quake")
+        self.assertEqual(W.cat_key("war/conflict", "Strikes on Kyiv", False), "conflict")
+        self.assertEqual(W.cat_key("political", "Governor resigns amid corruption scandal", False), "scandal")
+        self.assertEqual(W.cat_key("", "Four dead in a plane crash near Denver", False), "wreck")
+        self.assertEqual(W.cat_key("", "City-wide power outage after substation fire", False), "infra")
+        self.assertEqual(W.cat_key("", "Former senator dies at 82", False), "deaths")
+        self.assertEqual(W.cat_key("", "Protesters clash with police after curfew", False), "unrest")
+        self.assertEqual(W.cat_key("", "Two arrested after a shooting in Orlando", False), "crime")
+        self.assertEqual(W.cat_key("war/conflict", "Shooting in Gaza leaves 12 dead", False), "conflict")
+        labels = {k: lab for k, lab, _ in W.CATS}
+        for k in ("crime", "deaths", "people", "scandal", "unrest", "wreck", "infra", "markets", "disease"):
+            self.assertIn(k, labels)
+        self.assertEqual(labels["markets"], "Finance")
+        self.assertEqual(labels["disease"], "Health alerts")
         keys = [k for k, _, _ in W.CATS]
         for c in ("#E5484D",): self.assertNotIn(c, [x[2] for x in W.CATS])   # red is reserved for rank 7+
 
@@ -87,6 +103,14 @@ class Paging(unittest.TestCase):
         self.assertIn('id="tl_new"', html)
         self.assertIn('id="tl_upd"', html)
         self.assertIn(">Refresh</span>", html)
+        self.assertIn('id="tl_filt"', html)
+        self.assertIn('id="tl_sheet"', html)
+        self.assertIn(">Filters</span>", html)
+        self.assertIn("Clear all", html)
+        self.assertIn("ZIP or place", html)
+        self.assertIn("aria-label=\"Location\"", html)
+        self.assertIn("aria-label=\"Severity\"", html)
+        self.assertIn("aria-label=\"Type\"", html)
         css=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.css"), encoding="utf-8").read()
         self.assertIn(".tl-newp", css)
         self.assertNotIn("#FFC", css)
@@ -96,7 +120,12 @@ class Paging(unittest.TestCase):
         self.assertIn("no-store", js)
         self.assertIn("No new signals since", js)
         self.assertIn("function refresh", js)
+        self.assertIn("openSheet", js)
+        self.assertIn("/api/wire_tl/geo", js)
+        self.assertIn("function nFilt", js)
         self.assertIn("(hover:hover)", css)
+        self.assertIn(".tl-sheet", css)
+        self.assertIn(".tl-fbadge", css)
 
     def test_flag_off(self):
         os.environ["BN_WIRE_TIMELINE"] = "0"
@@ -106,5 +135,43 @@ class Paging(unittest.TestCase):
             self.assertEqual(W.handle_get("/wire", {})[0], 404)
             self.assertEqual(W.handle_get("/api/wire_tl", {})[0], 404)
         finally: del os.environ["BN_WIRE_TIMELINE"]
+
+    def test_sort_uses_updated_not_just_first_seen(self):
+        """Scanner merges into existing clusters bump updated, not first_seen. The tip must follow last activity."""
+        c = sqlite3.connect(W.DB)
+        c.execute("INSERT INTO clusters VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("aaaupdated000001", "Existing story with later activity", "political", "Florida", 28.81, -81.32,
+                   None, "2026-11-18T07:00:00Z", "2026-12-31T23:59:00Z", 10, "High", 2, 1, '["official"]',
+                   '[{"source":"AP","url":"https://apnews.com/x"}]', 0, "WHAT: Update.", 4))
+        c.execute("INSERT INTO clusters VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("farawayitem00002", "A far-away later update", "political", "Tokyo", 35.68, 139.76,
+                   None, "2026-11-18T07:05:10Z", "2026-12-31T23:58:00Z", 10, "High", 1, 1, '[]', '[]', 0, "", 2))
+        c.commit(); c.close()
+        a = W.page(limit=5)
+        self.assertEqual(a["items"][0]["id"], "aaaupdated000001")
+        self.assertEqual(a["items"][0]["t"], "2026-12-31T23:59:00Z")
+        self.assertEqual(a["items"][0]["fs"], "2026-11-18T07:00:00Z")
+        self.assertEqual(a["items"][0]["lat"], 28.81)
+        near = W.page(limit=10, lat=28.81, lon=-81.32, r_mi=25)
+        ids = [x["id"] for x in near["items"]]
+        self.assertIn("aaaupdated000001", ids)
+        self.assertNotIn("farawayitem00002", ids)
+
+    def test_geocode_zip_and_filters_api(self):
+        g = W.geocode_q("32771")
+        self.assertTrue(g["ok"], g)
+        self.assertAlmostEqual(g["place"]["lat"], 28.81, places=1)
+        self.assertAlmostEqual(g["place"]["lon"], -81.32, places=1)
+        self.assertIn("Sanford", g["place"]["label"])
+        miss = W.geocode_q("00000")
+        self.assertFalse(miss["ok"])
+        code, body = W.handle_get("/api/wire_tl/geo", {"q": ["32746"]})
+        self.assertEqual(code, 200)
+        self.assertTrue(body["ok"])
+        self.assertIn("Lake Mary", body["place"]["label"])
+        self.assertEqual(W.handle_get("/api/wire_tl", {"lat": ["28.8"], "limit": ["5"]})[0], 400)
+        code, body = W.handle_get("/api/wire_tl", {"lat": ["28.81"], "lon": ["-81.32"], "r": ["25"], "limit": ["10"]})
+        self.assertEqual(code, 200)
+        self.assertTrue(all((it["lat"] is not None and it["lon"] is not None) for it in body["items"]))
 
 if __name__ == "__main__": unittest.main()
