@@ -250,6 +250,7 @@ def page(qs):
 <meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website">
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/leaflet.css"><link rel="stylesheet" href="/api/signal/app.css">
+<script src="/sitenav.js" defer></script>
 </head><body>
 <a class="bn-sig-skip" href="#bn_sig_map">Skip to the map</a>
 {top}
@@ -489,6 +490,7 @@ def page2(qs):
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={_v("maplibre-gl.css")}"><link rel="stylesheet" href="/api/signal/map2.css?v={_v("map2.css")}">
+<script src="/sitenav.js" defer></script>
 </head><body class="bnm" data-bn-map2="1">
 <a class="skip" href="#bnm_map">Skip to the map</a>
 <div class="bnm-head" id="bnm_head">{top}</div>
