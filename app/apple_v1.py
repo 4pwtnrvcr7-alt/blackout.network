@@ -1,3 +1,4 @@
+import hashlib
 """BLACKOUT.NETWORK apple_style_v1, Phase 2 (Nov 3 2026): minimal site chrome + new homepage.
 
 Kill switch: on by default; BN_APPLE=0 turns it off, and the site renders exactly as before
@@ -5,7 +6,7 @@ Kill switch: on by default; BN_APPLE=0 turns it off, and the site renders exactl
 Serves /bn-apple.css, /bn-apple.js and /api/apple/home (a slim same-origin summary of /api/state, /api/solar_seismic,
 /api/grid and /api/sources/catalog, built in-process so the homepage never downloads the full payloads).
 Nothing here is invented: every number comes from those endpoints, with its own timestamp."""
-import os, sys, json, time, html, threading
+import os, hashlib, sys, json, time, html, threading
 import et_days
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -652,15 +653,26 @@ def _cold_kick():
     t = threading.Thread(target=run, name="bna-snap-cold", daemon=True); _cold["t"] = t; t.start()
     return t
 def _snap_js():
-    # Cold start (first "/" after a deploy): kick the single-flight build and wait at most 2 s; if it is not ready the page
-    # ships without a snapshot and bn-apple-home.js fills it from /api/apple/home (never blocks on data).
-    if not _cache["v"] or not _dcache["v"]:
-        try: _cold_kick().join(2.0)
-        except Exception: pass
-    try: js = open(os.path.join(BASE, "static", "bn-apple-home.js"), encoding="utf-8").read()
-    except Exception: return ""
-    dump = lambda v: json.dumps(v, separators=(",", ":"), default=str).replace("</", "<\\/") if v else "null"
-    return f'<script>{js}</script><script>window.BNA&&BNA.render({dump(_cache["v"])},{dump(_dcache["v"])})</script>'
+    # Prefetch home data; the renderer is an external hashed file so the HTML stays small.
+    # BN_PERF=0 restores the previous inlined snapshot (first paint already filled).
+    try: _cold_kick()
+    except Exception: pass
+    if os.environ.get("BN_PERF", "1").strip() == "0":
+        if not _cache["v"] or not _dcache["v"]:
+            try: _cold_kick().join(2.0)
+            except Exception: pass
+        try: js = open(os.path.join(BASE, "static", "bn-apple-home.js"), encoding="utf-8").read()
+        except Exception: return ""
+        dump = lambda v: json.dumps(v, separators=(",", ":"), default=str).replace("</", "<\\/") if v else "null"
+        return f'<script>{js}</script><script>window.BNA&&BNA.render({dump(_cache["v"])},{dump(_dcache["v"])})</script>'
+    try:
+        raw = open(os.path.join(BASE, "static", "bn-apple-home.js"), "rb").read()
+        ver = hashlib.sha1(raw).hexdigest()[:10]
+    except Exception:
+        ver = "1"
+    return (f'<link rel="preload" href="/api/apple/home" as="fetch" crossorigin>'
+            f'<link rel="preload" href="/api/apple/dash" as="fetch" crossorigin>'
+            f'<script src="/bn-apple-home.js?v={ver}" defer></script>')
 
 _CSS_V = {}
 def _css_v():
@@ -723,6 +735,7 @@ def handle_get(path, qs):
     if not ENABLED(): return 404, {"error": "not found"}
     if path == "/bn-apple.css": return _static("bn-apple.css", "text/css")
     if path == "/bn-apple.js": return _static("bn-apple.js", "application/javascript")
+    if path == "/bn-apple-home.js": return _static("bn-apple-home.js", "application/javascript")
     if path in ("/api/apple/home", "/api/apple/dash"):
         return 200, home_data() if path.endswith("home") else dash_data()   # cached 60 s / 90 s; "/" embeds the last result
     return 404, {"error": "not found"}
