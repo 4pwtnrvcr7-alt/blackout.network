@@ -52,7 +52,11 @@ class HeatMapNav(unittest.TestCase):
         self.assertIn('k==="heatmap"||href==="/map"', js)
         self.assertIn('pending==="heatmap"||pending==="map"', js)
         dash = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dashboard.html"), encoding="utf-8").read()
-        self.assertIn('if(h==="heatmap"||h==="map"){location.replace("/map"', dash)
+        self.assertIn('src="/cohesion.js"', dash)
+        coh = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "cohesion.js"), encoding="utf-8").read()
+        self.assertIn('location.replace("/map"', coh)
+        self.assertIn('"heatmap"', coh)
+        self.assertIn('"map"', coh)
 
     def test_heatmap_path_redirects_to_map(self):
         self.assertNotIn("heatmap", server.H.TAB_PATHS)
