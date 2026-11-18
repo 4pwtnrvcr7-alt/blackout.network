@@ -189,6 +189,8 @@ html[data-theme="light"] .bnt-live.l-hasbg .l-bg img{opacity:.9}
 .bnt-live.l-loading .l-meter::after{content:"";position:absolute;inset:0 auto 0 -40%;width:40%;background:linear-gradient(90deg,transparent,rgba(240,240,250,.1),transparent);animation:l-scan 1.6s ease-in-out infinite}
 .bnt-live.l-loading .l-tile>b{opacity:.18}
 @keyframes l-scan{to{transform:translateX(420%)}}
+/* Data modules stay dark while the strip is vacuuming; they light up after it folds. */
+.bnt-live.l-loading .l-hero,.bnt-live.l-loading .l-sigs,.bnt-live.l-loading .l-split,.bnt-live.l-loading .l-cta{opacity:0}
 /* Modules light up in sequence after the strip folds away. */
 .bnt-live.l-ready .l-intro{animation:l-up .42s cubic-bezier(.2,.7,.2,1) both}
 .bnt-live.l-ready .l-hero{animation:l-up .46s cubic-bezier(.2,.7,.2,1) .08s both}

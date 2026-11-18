@@ -1,7 +1,7 @@
 /* /live overview: gauges, tiles, top signals, dot map, rank spread, alerts per day, categories. Data: /api/live/summary (60 s cache).
    Vacuum-strip loader (Nov 17, 8:20 PM ET): compact canvas under the header vacuums grey particles into a moving intake; only readout is 0–100%. Tied to real fetches, min ~1.2s (0 if reduced-motion), 120s refresh does not retrigger. */
 (function(){
-var d=document,$=function(id){return d.getElementById(id)},root=$("bntl");if(!root)return;
+var d=document,$=function(id){return d.getElementById(id)},root=$("bntl");if(!root||window.__bnLive)return;window.__bnLive=1;
 var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 var t0=performance.now(),revealed=!!root.classList.contains("l-ready");
 var acqPart=function(){},reveal=function(){},failSoft=function(){};

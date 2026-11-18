@@ -546,7 +546,7 @@ def live_overview_html():
           'v.muted=true;v.autoplay=true;v.preload="auto";v.addEventListener("playing",function(){v.classList.add("on")},{once:true});'
           'v.load();var p=v.play();if(p&&p.catch)p.catch(function(){});return true}'
           'setTimeout(function(){if(!go()){var iv=setInterval(function(){if(go())clearInterval(iv)},1000)}},400)})()</script>') if hero else ""
-    return f'''<link rel="stylesheet" href="{url("live.css")}"><section class="bnt-live{' l-loading' if acq else ''}{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview"{' aria-busy="true"' if acq else ''}>{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
+    return f'''<link rel="stylesheet" href="{url("live.css")}"><link rel="preload" href="{url("live.js")}" as="script"><section class="bnt-live{' l-loading' if acq else ''}{' l-hasbg' if hero else ''}" id="bntl" aria-label="Live overview"{' aria-busy="true"' if acq else ''}>{bg}<div class="l-glow" aria-hidden="true" data-bn-par="0.12"><i></i><i></i><i></i></div><div class="l-wrap">
 {_LIVE_ACQ if acq else ""}
 <div class="l-intro"><div><p class="bnt-eyebrow">Live &middot; worldwide</p><h2 class="l-h1">Right now</h2>
 <p class="l-sub" id="bntl_asof"><i></i>Loading the latest scan&hellip; &middot; <a href="/?intro=1">Watch the intro</a></p></div>
@@ -566,4 +566,4 @@ def live_overview_html():
 <div class="l-split even"><div class="bnt-card l-vol"><div class="l-head"><h3>Per day</h3><span class="l-hint">7 days</span><span id="bntl_uv"></span></div><div id="bntl_vol"><div class="l-sk-vol" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div>
 <div class="bnt-card"><div class="l-head"><h3>Today</h3><span class="l-hint" id="bntl_cath"></span><span id="bntl_uc"></span></div><div class="l-cats" id="bntl_cats">{(_LIVE_SK_CAT * 4)}</div></div></div>
 <div class="bnt-card l-cta"><div><h3>Get the brief</h3><p class="plain">7 AM and 7 PM ET.</p></div><a class="bnt-btn y" href="/newsletter">Get the free brief</a></div>
-</div></section><script src="{url("live.js")}" defer></script>'''
+</div></section><script src="{url("live.js")}"></script>'''
