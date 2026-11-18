@@ -117,8 +117,8 @@ def chart_tests(credit=""):
         g.append(f'<line x1="{L}" y1="{y(v):.1f}" x2="{W - 8}" y2="{y(v):.1f}" class="ds-grid"/><text x="{L - 8}" y="{y(v) + 4:.1f}" text-anchor="end" class="ds-ax">{v}%</text>')
     for i, (yr, rc, rl, nt) in enumerate(TESTS):
         x0 = L + i * slot + slot * 0.18
-        g.append(f'<rect x="{x0:.1f}" y="{y(rc):.1f}" width="{bw:.1f}" height="{B - y(rc):.1f}" rx="3" class="ds-b1"><title>{yr}: {rc}% received</title></rect>')
-        g.append(f'<rect x="{x0 + bw + 4:.1f}" y="{y(rl):.1f}" width="{bw:.1f}" height="{B - y(rl):.1f}" rx="3" class="ds-b2"><title>{yr}: {rl}% relayed</title></rect>')
+        g.append(f'<rect x="{x0:.1f}" y="{y(rc):.1f}" width="{bw:.1f}" height="{B - y(rc):.1f}" class="ds-b1"><title>{yr}: {rc}% received</title></rect>')
+        g.append(f'<rect x="{x0 + bw + 4:.1f}" y="{y(rl):.1f}" width="{bw:.1f}" height="{B - y(rl):.1f}" class="ds-b2"><title>{yr}: {rl}% relayed</title></rect>')
         g.append(f'<text x="{x0 + bw / 2:.1f}" y="{y(rc) - 6:.1f}" text-anchor="middle" class="ds-v">{rc:g}</text>')
         g.append(f'<text x="{x0 + bw * 1.5 + 4:.1f}" y="{y(rl) - 6:.1f}" text-anchor="middle" class="ds-v">{rl:g}</text>')
         g.append(f'<text x="{x0 + bw + 2:.1f}" y="{B + 20}" text-anchor="middle" class="ds-yr">{yr}</text>')
@@ -135,7 +135,7 @@ def chart_tests(credit=""):
 
 def chart_chain():
     """Alert path diagram: FEMA IPAWS -> CAP over the internet, and the broadcast daisy chain via PEP stations (FCC/FEMA descriptions)."""
-    box = lambda x, y, w, t1, t2, cls="ds-n": (f'<rect x="{x}" y="{y}" width="{w}" height="54" rx="10" class="{cls}"/>'
+    box = lambda x, y, w, t1, t2, cls="ds-n": (f'<rect x="{x}" y="{y}" width="{w}" height="54" class="{cls}"/>'
                                                 f'<text x="{x + w / 2}" y="{y + 23}" text-anchor="middle" class="ds-nt">{t1}</text>'
                                                 f'<text x="{x + w / 2}" y="{y + 41}" text-anchor="middle" class="ds-ns">{t2}</text>')
     arr = lambda x1, y1, x2, y2, cls="ds-a": f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" class="{cls}" marker-end="url(#ds_ah)"/>'
@@ -198,23 +198,24 @@ def lead_html(cid):
 
 CSS = """
 .ds{margin:6px 0 28px}.ds-sec{margin:0 0 26px;border-top:1px solid var(--sr-ln,#2A2D33);padding-top:22px}
-.ds-sec h2{font:700 21px/1.3 Inter,system-ui,sans-serif;margin:0 0 12px;color:var(--sr-ink,#e6e9ee)}
+html body main .ds .ds-sec h2,html[data-theme] body main .ds .ds-sec h2{font:600 13px/1.3 Inter,system-ui,sans-serif!important;letter-spacing:.2em!important;text-transform:uppercase!important;margin:0 0 16px!important;color:#F2F2F4!important}
+html body main .ds-cap,html body main .ds-cap b{font:600 11px/1.2 Inter,system-ui,sans-serif!important;letter-spacing:.2em;text-transform:uppercase;color:rgba(242,242,244,.55)!important}.ds-sec{border-top-color:rgba(242,242,244,.14)!important}
 .ds-sec p,.ds-sec li{font-size:17px;line-height:1.65;color:var(--sr-ink2,#D2D2D7);overflow-wrap:anywhere}.ds-sec p{margin:0 0 14px}
 .ds-sec ul{margin:0 0 14px;padding-left:20px}.ds-sec li{margin:0 0 9px}
-.ds-an{background:var(--sr-sf,#16181C);box-shadow:var(--sr-sh,0 0 0 1px #23262B);border-radius:18px;padding:18px 20px;border-top:0}
-.ds-lab{display:inline-block;font:700 11.5px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--sr-ln,#2A2D33);border-radius:999px;padding:6px 10px;margin:0 0 10px;color:var(--sr-ink,#e6e9ee)}
+.ds-an{background:transparent!important;box-shadow:none!important;border-radius:0!important;padding:22px 0 0!important}
+.ds-lab{display:block;font:600 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;border:0;border-radius:0;padding:0;margin:0 0 10px;color:rgba(242,242,244,.55)}
 .ds-sec p.ds-anote{font-size:14px;color:var(--sr-mu,#8a94a3)}
 .ds-scen{list-style:none;padding:0!important;margin:4px 0 16px!important;display:grid;gap:10px}
-.ds-scen li{margin:0!important;border-left:3px solid var(--sr-ln,#2A2D33);padding:2px 0 2px 12px}.ds-scen b{color:var(--sr-ink,#e6e9ee)}
-.ds-fig{background:var(--sr-sf,#16181C);box-shadow:var(--sr-sh,0 0 0 1px #23262B);border-radius:14px;padding:14px 16px}
+.ds-scen li{margin:0!important;border-left:1px solid rgba(242,242,244,.3);padding:2px 0 2px 12px}.ds-scen b{color:var(--sr-ink,#e6e9ee)}
+.ds-fig{background:transparent;box-shadow:none;border-radius:0;border-top:1px solid rgba(242,242,244,.14);border-bottom:1px solid rgba(242,242,244,.14);padding:18px 0}
 .ds-svg{display:block;width:100%;height:auto;max-width:680px}.ds-cap{margin:0 0 8px!important;color:var(--sr-ink,#e6e9ee)!important;font-size:15px!important}
 .ds-grid{stroke:var(--sr-ln,#2A2D33);stroke-width:1}.ds-ax{fill:var(--sr-mu,#8a94a3);font:500 12px Inter,system-ui,sans-serif}
 .ds-yr{fill:var(--sr-ink,#e6e9ee);font:700 13px Inter,system-ui,sans-serif}.ds-v{fill:var(--sr-ink2,#D2D2D7);font:600 11.5px Inter,system-ui,sans-serif}
-.ds-b1{fill:#6DB2B5}.ds-b2{fill:#B8B7FE}html[data-theme="light"] .ds-b1{fill:#1F6F73}html[data-theme="light"] .ds-b2{fill:#5B4BC4}
+.ds-b1{fill:#636366}.ds-b2{fill:#F2F2F4}html[data-theme="light"] .ds-b1{fill:#8E8E93}html[data-theme="light"] .ds-b2{fill:#1C1C1E}
 .ds-leg{font-size:13px!important;color:var(--sr-ink2,#D2D2D7)!important;margin:8px 0 4px!important;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
-.ds-k{display:inline-block;width:12px;height:12px;border-radius:3px}.ds-k1{background:#6DB2B5}.ds-k2{background:#B8B7FE}
-html[data-theme="light"] .ds-k1{background:#1F6F73}html[data-theme="light"] .ds-k2{background:#5B4BC4}.ds-mu{color:var(--sr-mu,#8a94a3)}
-.ds-n{fill:var(--sr-bg,transparent);stroke:var(--sr-ln,#3a3f47);stroke-width:1.5}.ds-n2{stroke:#6DB2B5}.ds-n3{stroke:#B8B7FE}
+.ds-k{display:inline-block;width:12px;height:2px;border-radius:0;vertical-align:middle}.ds-k1{background:#636366}.ds-k2{background:#F2F2F4}
+html[data-theme="light"] .ds-k1{background:#8E8E93}html[data-theme="light"] .ds-k2{background:#1C1C1E}.ds-mu{color:var(--sr-mu,#8a94a3)}
+.ds-n{fill:var(--sr-bg,transparent);stroke:var(--sr-ln,#3a3f47);stroke-width:1.5}.ds-n2{stroke:#8E8E93}.ds-n3{stroke:#F2F2F4}
 .ds-nt{fill:var(--sr-ink,#e6e9ee);font:700 14px Inter,system-ui,sans-serif}.ds-ns{fill:var(--sr-mu,#8a94a3);font:500 11.5px Inter,system-ui,sans-serif}
 .ds-a{stroke:var(--sr-ink2,#D2D2D7);stroke-width:1.6}.ds-a2{stroke-dasharray:5 4}.ds-ah{fill:var(--sr-ink2,#D2D2D7)}
 .ds-flow{display:none;margin:4px 0 6px;padding-left:20px}.ds-flow li{font-size:15px;line-height:1.5;color:var(--sr-ink2,#D2D2D7);margin:0 0 6px}.ds-flow b{color:var(--sr-ink,#e6e9ee)}
@@ -246,7 +247,7 @@ def sections_html(cid):
     except Exception:
         return ""
     if not out: return ""
-    return (f'<style>{CSS}</style><article class="ds" id="breakdown" aria-label="Full breakdown">'
+    return (f'<style>{CSS}</style><article class="ds" id="breakdown" aria-label="Full breakdown" data-bnt-skip>'
             '<p class="sr-k" style="margin:0 0 6px">Full breakdown and analysis</p>' + "".join(out) + '</article>')
 
 # ---------------------------------------------------------------- homepage featured notice

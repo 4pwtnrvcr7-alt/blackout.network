@@ -160,11 +160,11 @@ def chart_time(rows):
     c, n = b["counts"], len(b["counts"]); mx = max(c) or 1
     W, H = 600, 120
     bw = W / n
-    bars = "".join(f'<rect x="{i * bw + bw * .14:.1f}" y="{H - (v / mx) * (H - 4):.1f}" width="{max(1.0, bw * .72):.1f}" height="{max(1.5, (v / mx) * (H - 4)):.1f}" rx="1.5">'
+    bars = "".join(f'<rect x="{i * bw + bw * .14:.1f}" y="{H - (v / mx) * (H - 4):.1f}" width="{max(1.0, bw * .72):.1f}" height="{max(1.5, (v / mx) * (H - 4)):.1f}">'
                    f'<title>{v} report{"" if v == 1 else "s"}</title></rect>' for i, v in enumerate(c) if v)
     first = b["lab"](b["start"]); last = b["lab"](b["start"] + b["step"] * (n - 1))
     total = sum(c)
-    return (f'<figure class="sr-chart"><figcaption class="sr-h3">{icon("chart")}Reports over time</figcaption>'
+    return (f'<figure class="sr-chart"><figcaption class="sr-lab">Reports over time</figcaption>'
             f'<p class="sr-peak">Peak: {mx} report{"" if mx == 1 else "s"} in one {b["unit"]}</p>'
             f'<svg class="sr-plot" viewBox="0 0 {W} {H}" role="img" aria-label="{total} reports by {b["unit"]}, from {E(first)} to {E(last)} Eastern Time; peak {mx} in one {b["unit"]}" preserveAspectRatio="none">{bars}</svg>'
             f'<div class="sr-axis"><span>{E(first)} ET</span><span>{E(last)} ET</span></div>'
@@ -179,7 +179,7 @@ def chart_sources(rows):
     top = sorted(cnt.items(), key=lambda x: (-x[1], x[0].lower()))[:8]; mx = top[0][1]
     li = "".join(f'<li><span class="sr-bl">{E(k)}</span><span class="sr-bar"><span class="sr-fill" style="width:{max(4, round(100 * v / mx))}%"></span></span><span class="sr-bn">{v}</span></li>' for k, v in top)
     more = len(cnt) - len(top)
-    return (f'<figure class="sr-chart"><figcaption class="sr-h3">{icon("facts")}Who is reporting</figcaption><ul class="sr-bars">{li}</ul>'
+    return (f'<figure class="sr-chart"><figcaption class="sr-lab">Who is reporting</figcaption><ul class="sr-bars">{li}</ul>'
             + (f'<p class="sr-note">Plus {more} more source famil{"y" if more == 1 else "ies"}.</p>' if more > 0 else "") + '</figure>')
 
 _LOADING = {True: 'fetchpriority="high"', False: 'loading="lazy"'}
@@ -218,16 +218,15 @@ def glance(rank, rows, officials, eff, loc, catn, r):
     bars = ""
     if b:
         c = b["counts"]; mx = max(c) or 1; n = len(c); bw = 440 / n
-        bars = "".join(f'<rect x="{330 + i * bw + bw * .15:.1f}" y="{270 - (v / mx) * 70:.1f}" width="{max(1.0, bw * .7):.1f}" height="{max(1.5, (v / mx) * 70):.1f}" rx="1.5" fill="{col}" opacity=".85"/>' for i, v in enumerate(c) if v)
+        bars = "".join(f'<rect x="{330 + i * bw + bw * .15:.1f}" y="{270 - (v / mx) * 70:.1f}" width="{max(1.0, bw * .7):.1f}" height="{max(1.5, (v / mx) * 70):.1f}" fill="{col}" opacity=".85"/>' for i, v in enumerate(c) if v)
     stats = [(str(len(rows)), "reports logged"), (str(eff), "independent sources"), (str(len(officials)), "official sources"), (span, "tracked so far")]
     st = "".join(f'<text x="{330 + (i % 2) * 230}" y="{70 + (i // 2) * 72}" class="g-n">{E(a)}</text><text x="{330 + (i % 2) * 230}" y="{94 + (i // 2) * 72}" class="g-l">{E(bl)}</text>' for i, (a, bl) in enumerate(stats))
     ring = 2 * 3.14159 * 92; frac = max(0.02, rank / 10)
     svg = (f'<svg class="sr-glance" viewBox="0 0 {W} {H}" role="img" aria-label="Story at a glance: rank {rank} of 10, {len(rows)} reports, {eff} independent sources, {len(officials)} official sources, tracked {span}">'
-           '<style>.g-n{font:700 34px Inter,system-ui,sans-serif;fill:currentColor}.g-l{font:500 15px Inter,system-ui,sans-serif;fill:currentColor;opacity:.65}'
-           '.g-k{font:700 13px Inter,system-ui,sans-serif;letter-spacing:.12em;fill:currentColor;opacity:.7}.g-big{font:800 64px Inter,system-ui,sans-serif;fill:currentColor}</style>'
-           f'<rect x="0" y="0" width="{W}" height="{H}" rx="22" fill="currentColor" opacity=".05"/>'
-           f'<circle cx="150" cy="150" r="92" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="16"/>'
-           f'<circle cx="150" cy="150" r="92" fill="none" stroke="{col}" stroke-width="16" stroke-linecap="round" stroke-dasharray="{ring * frac:.1f} {ring:.1f}" transform="rotate(-90 150 150)"/>'
+           '<style>.g-n{font:200 36px Inter,system-ui,sans-serif;fill:currentColor}.g-l{font:500 15px Inter,system-ui,sans-serif;fill:currentColor;opacity:.65}'
+           '.g-k{font:700 13px Inter,system-ui,sans-serif;letter-spacing:.12em;fill:currentColor;opacity:.7}.g-big{font:200 72px Inter,system-ui,sans-serif;fill:currentColor}</style>'
+           f'<circle cx="150" cy="150" r="92" fill="none" stroke="currentColor" stroke-opacity=".12" stroke-width="2"/>'
+           f'<circle cx="150" cy="150" r="92" fill="none" stroke="{col}" stroke-width="2" stroke-linecap="butt" stroke-dasharray="{ring * frac:.1f} {ring:.1f}" transform="rotate(-90 150 150)"/>'
            f'<text x="150" y="160" text-anchor="middle" class="g-big">{rank}</text><text x="150" y="190" text-anchor="middle" class="g-l">of 10 · {E(RANK_NAME.get(rank, ""))}</text>'
            f'<text x="330" y="36" class="g-k">{E((catn or "STORY").upper())}{(" · " + E(loc.upper()[:38])) if loc else ""}</text>{st}{bars}'
            + (f'<text x="330" y="292" class="g-l" style="font-size:12px">Reports by {b["unit"]}</text>' if b else "") + '</svg>')
@@ -241,7 +240,7 @@ TRAJ_ICON = {"Rising": "up", "Easing": "down", "Steady": "flat"}
 # do, sources. Desk notes (newsletter analyst notes, sourced) are used when the desk wrote one; otherwise every part is built only from
 # the scanner's own fields and published rules (scoring.RANKS), labelled as an automatic quick brief. Nothing is invented: numbers are
 # counted from the rows on the page, guidance links are official pages (Ready.gov, CDC, CISA, NWS, State Dept, FDIC, WHO).
-RISK = ((7, "High", "#ff3b3b"), (4, "Medium", "var(--sr-y)"), (0, "Low", "#3fa66a"))
+RISK = ((7, "High", "#FF3B3B"), (4, "Medium", "#E5E5EA"), (0, "Low", "#8E8E93"))   # Nov 17 (Matt 7:23 PM): rank option A, no green/yellow
 RANK_NAME = {0: "Noise", 1: "Background", 2: "Minor", 3: "Minor regional", 4: "Regional", 5: "Significant", 6: "Serious", 7: "Major",
              8: "Severe", 9: "Critical", 10: "Catastrophic"}
 
@@ -253,7 +252,7 @@ def _ranks():
 def risk(rank):
     for k, lab, col in RISK:
         if int(rank or 0) >= k: return lab, col
-    return "Low", "#3fa66a"
+    return "Low", "#8E8E93"
 
 def _sents(s, n):
     xs = [x for x in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\"\u201c'(])", (s or "").strip()) if x.strip()]
@@ -383,26 +382,31 @@ def _trend(rows):
         elif now - d <= timedelta(hours=48): b += 1
     return a, b
 
+def scale(rank, label=""):
+    """Thin 0-10 tick scale (rank option A): ticks brighten from grey to white up to the rank; the marker is red only at 7+."""
+    rank = max(0, min(10, int(rank or 0)))
+    grey = ["#3A3A3C", "#48484A", "#545458", "#636366", "#7C7C80", "#8E8E93", "#A1A1A6", "#B6B6BB", "#CACACF", "#E0E0E5", "#F2F2F4"]
+    ticks = "".join(f'<span class="sr-tk{" on" if i <= rank else ""}{" at" if i == rank else ""}" style="left:{i * 10}%;--tc:{grey[i] if i <= rank else "#2C2C2E"}"><i>{i}</i></span>' for i in range(11))
+    mk = "#FF3B3B" if rank >= 7 else "#F2F2F4"
+    return (f'<div class="sr-scale" role="img" aria-label="Rank {rank} of 10 on the BLACKOUT.NETWORK scale{(" (" + E(label) + ")") if label else ""}">'
+            f'<div class="sr-scale-l"><span class="sr-scale-f" style="width:{rank * 10}%"></span>{ticks}'
+            f'<span class="sr-scale-m" style="left:{rank * 10}%;--mk:{mk}"></span></div></div>')
+
 def snapshot(rank, rows, officials, eff, high_at=None, first=None):
-    """Generated context graphic, always available: where the story sits on our 0-10 scale, plus how many sources and how fast."""
+    """Generated context, always available: where the story sits on our 0-10 scale, plus how many sources and how fast.
+    Nov 17 2026 (Matt 7:23 PM): SpaceX language: one thin tick scale, large thin numerals, letterspaced labels, hairlines, no boxes."""
     rank = int(rank or 0); lab, col = risk(rank)
-    W, H, x0, x1 = 600, 46, 4, 596
-    seg = (x1 - x0) / 11
-    cells = []
-    for i in range(11):
-        c = "#3fa66a" if i <= 3 else ("var(--sr-y)" if i <= 6 else "#ff3b3b")
-        cells.append(f'<rect x="{x0 + i * seg + 2:.1f}" y="18" width="{seg - 4:.1f}" height="24" rx="5" fill="{c}" opacity="{1 if i <= rank else .18}"/>')
-    mx = x0 + rank * seg + seg / 2
-    svg = (f'<svg class="sr-snap" viewBox="0 0 {W} {H}" role="img" aria-label="Rank {rank} of 10 on the BLACKOUT.NETWORK scale ({RANK_NAME.get(rank, "")}); risk {lab.lower()}">'
-           f'{"".join(cells)}<path d="M{mx - 9:.1f} 2 L{mx + 9:.1f} 2 L{mx:.1f} 14 Z" fill="currentColor"/></svg>'
-           '<div class="sr-snap-ax"><span>0 Low</span><span>Medium</span><span>High 10</span></div>')
-    stats = [(str(rank) + "/10", RANK_NAME.get(rank, "")), (str(eff), "independent sources"), (str(len(officials)), "official sources"), (str(len(rows)), "reports logged")]
+    stats = [(str(rank), "/10", "Rank", RANK_NAME.get(rank, "")), (str(eff), "", "Independent sources", ""),
+             (str(len(officials)), "", "Official sources", ""), (str(len(rows)), "", "Reports logged", "")]
     d1, d2 = _dt(first), _dt(high_at)
     if d1 and d2 and d2 >= d1:
         hrs = (d2 - d1).total_seconds() / 3600
-        stats.append(("under 1 h" if hrs < 1 else f"{hrs:.0f} h", "to reach our alert line"))
-    li = "".join(f'<li><b>{E(a)}</b><span>{E(b)}</span></li>' for a, b in stats)
-    return (f'<figure class="sr-snapfig"><figcaption class="sr-h3">{icon("chart")}Signal snapshot</figcaption>{svg}<ul class="sr-stats">{li}</ul>'
+        stats.append(("<1", " h", "To reach our alert line", "") if hrs < 1 else (f"{hrs:.0f}", " h", "To reach our alert line", ""))
+    li = "".join(f'<div class="sr-st"><dt>{E(k)}</dt><dd><b>{E(a)}</b>{(f"<small>{E(u)}</small>") if u else ""}</dd>'
+                 + (f'<dd class="sr-st-s">{E(x)}</dd>' if x else "") + '</div>' for a, u, k, x in stats)
+    return (f'<figure class="sr-snapfig"><figcaption class="sr-lab">Signal snapshot</figcaption>{scale(rank, RANK_NAME.get(rank, ""))}'
+            f'<p class="sr-snap-ax">Rank {rank} of 10 \u00b7 {E(RANK_NAME.get(rank, ""))}</p>'
+            f'<dl class="sr-stats">{li}</dl>'
             f'<p class="sr-note">Built from the reports BLACKOUT.NETWORK logged for this story. Rank rules: <a href="/scoring">How we score</a>.</p></figure>')
 
 def share_card(sh):
@@ -478,7 +482,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     if ov:   # desk override (sourced note), shown as such; never above the story's colour band (pre-publish A14)
         order = ["Low", "Medium", "High"]
         ov = order[min(order.index(ov), order.index(lab))]
-        lab, col = ov, {"High": "#ff3b3b", "Medium": "var(--sr-y)", "Low": "#3fa66a"}[ov]
+        lab, col = ov, {"High": "#FF3B3B" if rank >= 7 else "#E5E5EA", "Medium": "#E5E5EA", "Low": "#8E8E93"}[ov]
     cat = (r.get("category") or "").lower(); catn = CAT.get(cat, cat.title() or "News")
     text = " ".join([title or "", what_b or "", what or "", cat, (note or {}).get("headline") or ""])
     if not (rows or note or what_b or (what and what != title)): return "", ""
@@ -508,15 +512,15 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     # ---- bottom line (top card)
     if desk and note.get("why_it_matters"): bl = note["why_it_matters"]
     else: bl = f"A {rname.lower()} {catn.lower()} story{(' in ' + loc) if loc else ''}, {conf}."
-    head = (f'<section class="sr-bline" aria-label="Bottom line"><div class="sr-bline-top"><span class="sr-k">{icon("star")}Bottom line</span>'
-            f'<span class="sr-risk" style="--rc:{col}"><span class="sr-dot"></span>Risk: {lab}</span></div><p class="sr-bline-p">{E(bl)}</p>'
+    head = (f'<section class="sr-bline" aria-label="Bottom line"><div class="sr-bline-top"><span class="sr-k">Bottom line</span>'
+            f'<span class="sr-risk{" hi" if (lab == "High" and rank >= 7) else ""}">Risk \u00b7 {lab}</span></div><p class="sr-bline-p">{E(bl)}</p>'
             + ('' if desk else '<p class="sr-auto">Quick brief, built automatically from the reports we track. Our analysts have not written this story up yet.</p>')
             + (f'<p class="sr-auto">{E(note.get("edition") or "BLACKOUT.NETWORK brief")}, written {E(et(note.get("generated_at"), True))} from the sources listed below.'
                + (" The story has had new reports since." if (_dt(r.get("updated")) or datetime.min.replace(tzinfo=UTC)) > (_dt(note.get("generated_at")) or datetime.max.replace(tzinfo=UTC)) else "")
                + '</p>' if desk else '') + '</section>')
     S = []
     def sec(n, key, ic, h, body):
-        if body: S.append(f'<section class="sr-sec sr-n" aria-labelledby="sr_{key}"><h2 class="sr-k" id="sr_{key}"><span class="sr-num">{n}</span>{icon(ic)}{h}</h2>{body}</section>')
+        if body: S.append(f'<section class="sr-sec sr-n" aria-labelledby="sr_{key}"><h2 class="sr-k" id="sr_{key}"><span class="sr-num">{n:02d}</span>{h}</h2>{body}</section>')
     sec(1, "what", "news", "What happened", "".join(('<p class="sr-lede">' if i == 0 else "<p>") + f'{E(p)}</p>' for i, p in enumerate(wh[:3])))
     # ---- 2 Why it matters / what we see
     b2 = []
@@ -551,9 +555,12 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     sec(3, "rank", "chart", "Why we ranked it this way", f'<ul class="sr-ul">{"".join(b3)}</ul>' + snapshot(rank, rows, officials, eff, r.get("high_at"), r.get("first_seen")))
     # ---- 4 Risk factor
     rw = {"High": "A major event with wide impact", "Medium": "A significant event, mostly regional for now", "Low": "Limited or local impact so far"}[lab]
-    meter = "".join(f'<span class="sr-m{" on" if l == lab else ""}" style="--rc:{c}">{l}</span>' for _, l, c in reversed(RISK))
+    band = {"Low": 0, "Medium": 1, "High": 2}[lab]
+    meter = (f'<p class="sr-rl"><span class="sr-rl-k">Risk</span><span class="sr-rl-d">\u00b7</span><span class="sr-rl-v">{E(lab)}</span></p>'
+             f'<span class="sr-rl-u"><i style="left:{band * 33.333:.3f}%;--rc:{"#FF3B3B" if (lab == "High" and rank >= 7) else "#F2F2F4"}"></i></span>'
+             '<span class="sr-rl-ax"><span>Low</span><span>Medium</span><span>High</span></span>')
     rline = (f"Our analysts rate this {lab.lower()}: {(note.get('risk_why') or '').rstrip('.')}".rstrip(": ") + "." if ov else f"{rw}, {conf}.")
-    sec(4, "risk", "shield", "Risk factor", f'<div class="sr-meter" role="img" aria-label="Risk {lab}">{meter}</div><p>{E(rline)}</p>')
+    sec(4, "risk", "shield", "Risk factor", f'<div class="sr-meter{" hi" if (lab == "High" and rank >= 7) else ""}" role="img" aria-label="Risk: {lab}">{meter}</div><p>{E(rline)}</p>')
     # ---- 5 If true / if overblown
     st = _first(SIGNS, text.replace(cat, " "), list(SIGN_DEFAULT))
     t_true = (note or {}).get("if_true") or ((note or {}).get("outlook") if desk else "") or st[0]
@@ -598,7 +605,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
             fb = None
         lead_vis = (figure(fb, True) if isinstance(fb, dict) else "") or glance(rank, rows, officials, eff, loc, catn, r)
     more_vis = figs[1:] + (cards if figs else cards[1:])
-    gallery = (f'<section class="sr-sec" aria-labelledby="sr_img"><h2 class="sr-k" id="sr_img">{icon("image")}Images</h2><div class="sr-gal">{"".join(more_vis)}</div></section>' if more_vis else "")
+    gallery = (f'<section class="sr-sec" aria-labelledby="sr_img"><h2 class="sr-k" id="sr_img">Images</h2><div class="sr-gal">{"".join(more_vis)}</div></section>' if more_vis else "")
     # ---- details (collapsed): key facts, key moments, charts
     f = [("Rank", f"{rank}/10, {rname}")]
     if cat: f.append(("Category", catn))
@@ -608,7 +615,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     if r.get("updated"): f.append(("Last update", et(r["updated"], True)))
     f.append(("Official sources", (", ".join(officials[:5]) + (" and others" if len(officials) > 5 else "")) if officials else "None yet"))
     f += bfacts
-    facts = (f'<section class="sr-card" aria-labelledby="sr_facts"><h2 class="sr-k" id="sr_facts">{icon("facts")}Key facts</h2><dl class="sr-dl">'
+    facts = (f'<section class="sr-card" aria-labelledby="sr_facts"><h2 class="sr-k" id="sr_facts">Key facts</h2><dl class="sr-dl">'
              + "".join(f"<div><dt>{E(k)}</dt><dd>{E(v)}</dd></div>" for k, v in f) + "</dl></section>")
     km = moments(rows, anchor) if len(rows) >= 2 else []
     kmh = ""
@@ -620,18 +627,18 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
             tl = f'<a href="{E(u)}" target="_blank" rel="noopener">{E(t)}</a>' if re.match(r"^https?://", u) else E(t)
             li.append(f'<li><span class="sr-mk">{E(lb)}</span><time datetime="{E(a.get("first_seen") or "")}">{E(et(a.get("first_seen"), True))}</time>'
                       f'<p>{tl}</p><span class="sr-ms">{E(_sname(a.get("source")))}{" · official source" if a.get("official") else ""}</span></li>')
-        kmh = "" if not li else f'<details class="sr-more"><summary>{icon("clock")}Key moments ({len(li)})</summary><ol class="sr-tl">{"".join(li)}</ol></details>'
+        kmh = "" if not li else f'<details class="sr-more"><summary>Key moments ({len(li)})</summary><ol class="sr-tl">{"".join(li)}</ol></details>'
     g = chart_time(rows) + chart_sources(rows)
     graphics = f'<section class="sr-card sr-graphics" aria-label="Graphics">{g}</section>' if g else ""
     main = head + (lead_vis if lead_vis else "") + (people or "") + "".join(S) + gallery + kmh
     side = (f'<div class="sr-loc">{locator}</div>' if locator else "") + facts + graphics
-    return (f'<style>{CSS}</style><article class="sr sr2" aria-label="Story brief"><div class="sr-grid"><div class="sr-main">{main}</div>'
+    return (f'<style>{CSS}</style><article class="sr sr2" aria-label="Story brief" data-bnt-skip><div class="sr-grid"><div class="sr-main">{main}</div>'
             f'<aside class="sr-side" aria-label="Key facts and graphics">{side}</aside></div></article>'), dek
 
 CSS = """
-.sr{--sr-y:var(--a-y,#FFC21A);--sr-ink:var(--a-ink,var(--tx,#e6e9ee));--sr-ink2:var(--a-ink2,#D2D2D7);--sr-mu:var(--a-mu,var(--mu,#8a94a3));
+.sr{--sr-y:#F2F2F4;--sr-ink:var(--a-ink,var(--tx,#e6e9ee));--sr-ink2:var(--a-ink2,#D2D2D7);--sr-mu:var(--a-mu,var(--mu,#8a94a3));
  --sr-sf:var(--a-sf,var(--pn,#16181C));--sr-ln:var(--a-ln,var(--bd,#2A2D33));--sr-sh:var(--a-sh,0 0 0 1px #23262B);margin:18px 0 24px;color:var(--sr-ink)}
-html[data-theme="light"] .sr{--sr-y:#C97B00}
+html[data-theme="light"] .sr{--sr-y:var(--sr-ink)}
 html body main .sr h2.sr-k,html[data-theme] body main .sr h2.sr-k,html body main .sr .sr-mk{color:var(--sr-y)!important;-webkit-text-fill-color:var(--sr-y)}
 html body main .sr h2.sr-k .sr-i{stroke:var(--sr-y)}
 .sr-grid{display:grid;grid-template-columns:minmax(0,1fr) 352px;gap:36px;align-items:start}
@@ -665,7 +672,7 @@ html body main .sr h2.sr-k .sr-i{stroke:var(--sr-y)}
 .sr-fig img{display:block;width:100%;height:auto;max-height:560px;object-fit:contain;background:#fff}
 .sr-fig figcaption{font-size:13.5px;line-height:1.5;color:var(--sr-ink2);margin-top:8px}.sr-cr{display:block;color:var(--sr-mu);font-size:12.5px}
 .sr-cr a{color:var(--sr-mu)}
-html:not([data-theme="light"]) .sr a:not([class]){color:var(--a-lk,#FFC21A)}
+html:not([data-theme="light"]) .sr a:not([class]){color:#F2F2F4}
 .sr-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:16px}.sr-gal .sr-fig{margin:0}
 .sr-tl{list-style:none;margin:0;padding:0}
 .sr-tl li{position:relative;padding:0 0 18px 22px;border-left:2px solid var(--sr-ln);margin-left:5px}
@@ -709,4 +716,71 @@ html:not([data-theme="light"]) .sr a:not([class]){color:var(--a-lk,#FFC21A)}
 .sr2 .sr-fig.sr-file img{object-fit:cover;object-position:50% 25%;max-height:380px;background:#0d0e10}
 @media(max-width:600px){.sr-if{grid-template-columns:1fr}.sr-share{grid-template-columns:1fr}.sr-share img{max-height:200px}.sr p.sr-bline-p{font-size:17px}.sr-ul li,.sr-ol li{font-size:15.5px}}
 
+
+/* ===== Nov 17 2026 (Matt 7:23 PM, "Ugly"): story brief in the SpaceX language. Open layout, 1px hairlines, small letterspaced
+   uppercase labels, large thin numerals, no boxes, no rounded cards, no green or yellow, no filled controls, no header icons.
+   Rank option A: greys brightening to white; red only at rank 7+ and only as a marker or a thin line. */
+html body .sr{--sr-hl:rgba(242,242,244,.14);--sr-lab:rgba(242,242,244,.55)}
+html body .sr :is(h2,h3,summary,figcaption,.sr-k,.sr-h3,.sr-lab)>svg.sr-i:not(.sr-i-s){display:none!important}
+html body main .sr h2.sr-k,html[data-theme] body main .sr h2.sr-k{display:flex;align-items:baseline;gap:14px;font:600 13px/1.3 Inter,system-ui,sans-serif!important;letter-spacing:.2em!important;text-transform:uppercase;color:#F2F2F4!important;-webkit-text-fill-color:#F2F2F4;margin:0 0 18px!important}
+html body .sr .sr-num{display:inline;min-width:0;height:auto;border:0!important;border-radius:0;padding:0;margin:0;font:400 12px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;color:rgba(242,242,244,.42);background:none}
+html body .sr .sr-lab,html body .sr .sr-k.sr-lab{display:block;font:600 11px/1.2 Inter,system-ui,sans-serif!important;letter-spacing:.2em!important;text-transform:uppercase;color:var(--sr-lab)!important;margin:0 0 14px!important}
+html body:has(#bn_story) main .sr .sr-sec,html body .sr .sr-sec{border:0!important;border-top:1px solid var(--sr-hl)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:28px 0 6px!important;margin:0!important}
+html body .sr .sr-bline{background:transparent!important;border:0!important;border-top:1px solid var(--sr-hl)!important;border-bottom:1px solid var(--sr-hl)!important;border-radius:0!important;box-shadow:none!important;padding:22px 0!important;margin:0 0 28px!important}
+html body .sr .sr-bline-top{margin-bottom:12px}
+html body .sr .sr-bline-top .sr-k{font:600 11px/1.2 Inter,system-ui,sans-serif!important;letter-spacing:.2em!important;color:var(--sr-lab)!important;-webkit-text-fill-color:var(--sr-lab)}
+html body .sr .sr-risk{border:0!important;border-radius:0!important;padding:0 0 6px!important;background:none!important;font:600 11px/1 Inter,system-ui,sans-serif!important;letter-spacing:.2em!important;color:#F2F2F4!important;border-bottom:1px solid rgba(242,242,244,.6)!important}
+html body .sr .sr-risk.hi{border-bottom-color:#FF3B3B!important}
+html body .sr .sr-dot{display:none}
+html body .sr p.sr-bline-p{font-weight:400!important;font-size:20px!important;line-height:1.5!important;letter-spacing:-.005em}
+/* Signal snapshot: one thin 0-10 tick scale, open stat grid */
+html body .sr .sr-snapfig{background:transparent!important;border:0!important;border-top:1px solid var(--sr-hl)!important;border-radius:0!important;box-shadow:none!important;padding:22px 0 0!important;margin:24px 0 0!important}
+html body .sr .sr-scale{max-width:640px;padding:22px 0 0}
+html body .sr .sr-scale-l{position:relative;height:1px;background:rgba(242,242,244,.16)}
+html body .sr .sr-scale-f{position:absolute;left:0;top:0;height:1px;background:linear-gradient(90deg,#48484A,#8E8E93 55%,#F2F2F4)}
+html body .sr .sr-tk{position:absolute;top:-4px;width:1px;height:9px;background:var(--tc);transform:translateX(-.5px)}
+html body .sr .sr-tk i{position:absolute;top:-17px;left:50%;transform:translateX(-50%);font:400 10px/1 Inter,system-ui,sans-serif;font-style:normal;letter-spacing:.06em;color:rgba(242,242,244,.32)}
+html body .sr .sr-tk.on i{color:rgba(242,242,244,.6)}
+html body .sr .sr-tk.at i{color:#F2F2F4;font-weight:600}
+html body .sr .sr-scale-m{position:absolute;top:-9px;width:2px;height:19px;margin-left:-1px;background:var(--mk)}
+html body .sr p.sr-snap-ax{display:block;max-width:640px;margin:16px 0 0!important;font:500 10.5px/1 Inter,system-ui,sans-serif!important;letter-spacing:.18em;text-transform:uppercase;color:var(--sr-lab)!important}
+html body .sr .sr-stats{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:0 28px;margin:26px 0 4px;padding:0}
+html body .sr .sr-st{border-top:1px solid var(--sr-hl);padding:14px 0 16px;min-width:0}
+html body .sr .sr-st dt{font:600 10.5px/1.3 Inter,system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:var(--sr-lab);margin:0 0 10px}
+html body .sr .sr-st dd{margin:0}
+html body .sr .sr-st b{font:200 46px/1 Inter,system-ui,sans-serif;letter-spacing:-.02em;color:#F2F2F4}
+html body .sr .sr-st small{font:300 18px/1 Inter,system-ui,sans-serif;color:rgba(242,242,244,.5);margin-left:3px}
+html body .sr .sr-st dd.sr-st-s{margin-top:8px;font:500 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,242,244,.7)}
+/* Risk factor: one label with a thin underline indicator */
+html body .sr .sr-meter{display:block!important;max-width:420px;margin:4px 0 18px!important;grid-template-columns:none}
+html body .sr p.sr-rl{display:flex;align-items:baseline;gap:12px;margin:0 0 12px!important;font:600 13px/1 Inter,system-ui,sans-serif!important;letter-spacing:.24em;text-transform:uppercase;color:#F2F2F4!important}
+html body .sr .sr-rl-k{color:var(--sr-lab)}.sr .sr-rl-d{color:rgba(242,242,244,.35)}
+html body .sr .sr-meter.hi .sr-rl-v{color:#FF3B3B}
+html body .sr .sr-rl-u{position:relative;display:block;height:1px;background:rgba(242,242,244,.16)}
+html body .sr .sr-rl-u i{position:absolute;top:-1px;width:33.333%;height:2px;background:var(--rc)}
+html body .sr .sr-rl-ax{display:flex;justify-content:space-between;margin-top:10px;font:500 10px/1 Inter,system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(242,242,244,.38)}
+html body .sr .sr-rl-ax span{flex:1}.sr .sr-rl-ax span:nth-child(2){text-align:center}.sr .sr-rl-ax span:last-child{text-align:right}
+html body .sr .sr-m{display:none}
+/* If true / if overblown: open two-column grid */
+html body .sr .sr-if{gap:0 32px}
+html body .sr .sr-if>div{background:transparent!important;box-shadow:none!important;border-radius:0!important;border:0!important;border-top:1px solid var(--sr-hl)!important;padding:16px 0 4px!important}
+html body .sr .sr-if .sr-h3{font:600 11px/1.2 Inter,system-ui,sans-serif!important;letter-spacing:.2em;text-transform:uppercase;color:var(--sr-lab)!important;margin:0 0 10px!important}
+/* side column, key facts, charts: no cards */
+html body:has(#bn_story) main .sr .sr-side>*,html body .sr .sr-card{background:transparent!important;border:0!important;border-top:1px solid var(--sr-hl)!important;border-radius:0!important;box-shadow:none!important;padding:22px 0 0!important}
+html body .sr .sr-card .sr-k{font:600 11px/1.2 Inter,system-ui,sans-serif!important;letter-spacing:.2em!important;color:var(--sr-lab)!important;-webkit-text-fill-color:var(--sr-lab)}
+html body .sr .sr-dl dt{font:600 10.5px/1.4 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--sr-lab)}
+html body .sr .sr-dl>div{border-top-color:var(--sr-hl)}
+html body .sr .sr-plot{color:#8E8E93}
+html body .sr .sr-bar{height:1px!important;border-radius:0!important;background:rgba(242,242,244,.14)!important;overflow:visible}
+html body .sr .sr-bar>*{height:1px!important;border-radius:0!important;background:#F2F2F4!important}
+/* timeline and key moments */
+html body .sr .sr-more{border-top:1px solid var(--sr-hl)}
+html body .sr .sr-more summary{font:600 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.2em;color:#F2F2F4}
+html body .sr .sr-tl li{border-left:1px solid var(--sr-hl)}
+html body .sr .sr-tl li:before{left:-3px;top:6px;width:5px;height:5px;border-radius:0;background:#8E8E93;border:0}
+html body .sr .sr-mk{color:rgba(242,242,244,.7)!important;-webkit-text-fill-color:currentColor;letter-spacing:.18em}
+html body .sr .sr-why{border-left:1px solid rgba(242,242,244,.4)}
+html body .sr .sr-traj{border:0;border-radius:0;padding:0;letter-spacing:.16em}
+html body .sr .sr-gfx{border:0}
+@media(max-width:600px){html body .sr .sr-if{grid-template-columns:1fr}html body .sr .sr-stats{grid-template-columns:1fr 1fr;gap:0 20px}html body .sr .sr-st b{font-size:40px}html body .sr p.sr-bline-p{font-size:18px!important}}
 """
