@@ -453,7 +453,9 @@ def ga_head(b, country=None, ga=True):
         lo = b[:6000].lower(); h = lo.find(b"<head>")
         if h < 0 or b"<html" not in lo: return b
         if ga and not _flag("BN_GA_OFF") and b"BN_GA_REGION" not in b[:60000]:
-            tag = ("<script>window.BN_GA_REGION=" + json.dumps(ga_region(country)) + ";window.BN_POLICY_V=" + json.dumps(CONSENT_POLICY_VERSION) + ";" + GA_JS + "</script><script src=\"/bn-ga-events.js\" defer></script>").encode("utf-8")
+            tag = ("<script>window.BN_GA_REGION=" + json.dumps(ga_region(country)) + ";window.BN_POLICY_V=" + json.dumps(CONSENT_POLICY_VERSION) + ";</script>"
+                   "<script src=\"/bn-ga.js?v=" + asset_version().decode() + "\" defer></script>"
+                   "<script src=\"/bn-ga-events.js\" defer></script>").encode("utf-8")
             m = re.search(rb"<meta charset=[^>]*>", b[:60000], re.I); i = m.end() if m and m.start() < b.lower().find(b"</head>") else h + 6   # after <meta charset>, else right after <head>
             b = b[:i] + tag + b[i:]
         lo = b.lower(); j = lo.rfind(b"</footer>"); fs = lo.rfind(b"<footer", 0, j) if j >= 0 else -1
@@ -506,7 +508,7 @@ def pwa_head(b):
 # t338/t343: Render's free tier drops some of a page's ~40 parallel requests (502/503). (1) every same-origin JS/CSS URL in a page gets
 # ?v=<build> so Cloudflare and browsers can cache it for a year (Cache-Control immutable below) and the origin rarely sees asset requests;
 # (2) BN_RETRY_HEAD retries a failed script/stylesheet (twice, with backoff) and same-origin GET fetches that come back 502/503/504.
-_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons|bn-v3|bn-apple)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
+_ASSET_RE = re.compile(rb'((?:src|href)=["\']?)(/?(?:api/[a-z_]+/[\w.-]+|sitenav|theme|install-guide|alerts|linkguard|bn-eggs|bn-icons|bn-v3|bn-apple-home|bn-apple|bn-lazy|bn-ga-events|bn-ga|bn-progress|cohesion)\.(?:js|css)|/?api/[a-z_]+/[\w.-]+\.(?:js|css))(["\'\s>])')
 _ASSET_V = {"t": 0, "v": b"0"}
 def asset_version():
     now = time.time()
@@ -677,6 +679,9 @@ class H(BaseHTTPRequestHandler):
         if ctype.startswith("text/html"): b = ga_head(b, self.headers.get("CF-IPCountry"))   # GA4 also on pages returned as "text/html; charset=utf-8" (e.g. /stats)
         if ctype.startswith("text/html"): b = credits_link(b, self.path)   # Nov 17 (Matt 12:07): "Image credits" footer link on every page
         if ctype.startswith("text/html"): b = hit_beacon(b)   # own visitor counter (public node only)
+        if ctype.startswith("text/html"):
+            try: b = _addon_mod("perf_load").rewrite(b)
+            except Exception: traceback.print_exc()
         self.send_response(code); self.send_header("Content-Type", ctype if ctype.startswith("image/") else ctype + "; charset=utf-8")
         versioned = "v=" in (self.path.split("?", 1)[1] if "?" in self.path else "") and code == 200 and ctype in ("application/javascript", "text/css")
         wimg = code == 200 and ctype == "image/webp" and self.path.startswith("/wire2/static/img/")   # Push F: Wire v2 hero images (renamed, never edited in place)

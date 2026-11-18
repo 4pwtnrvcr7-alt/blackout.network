@@ -308,4 +308,9 @@ function srcLine(x){var n=+x.n_families||0,g=+x.grouped||0,s=n+(n==1?" source":"
  function get(u,f){return fetch(u,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){if(j&&!j.pending)f(j)}).catch(function(){})}
  window.BNA={had:false,render:function(h,dd){try{if(h&&h.main&&h.main.length){renderHome(h);BNA.had=true}}catch(e){}try{if(dd&&dd.now)renderDash(dd)}catch(e){}},
   refresh:function(){get("/api/apple/home",function(j){BNA.render(j,null)});get("/api/apple/dash",function(j){BNA.render(null,j)})}};
+
+ if(!window.BNA.had){
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){if(!window.BNA.had)window.BNA.refresh();});
+  else window.BNA.refresh();
+ }
 })();
