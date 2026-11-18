@@ -93,6 +93,10 @@ class Paging(unittest.TestCase):
         js=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
         self.assertIn("pollNewer", js)
         self.assertIn("d.hidden", js)
+        self.assertIn("no-store", js)
+        self.assertIn("No new signals since", js)
+        self.assertIn("function refresh", js)
+        self.assertIn("(hover:hover)", css)
 
     def test_flag_off(self):
         os.environ["BN_WIRE_TIMELINE"] = "0"
