@@ -658,7 +658,8 @@ def run(trigger="timer", nom_budget=NOM_BUDGET, max_seconds=600):
     try:
         b = bdb()
         cut = iso(now() - timedelta(days=WINDOW_DAYS))
-        cls = [dict(r) for r in b.execute("SELECT cluster_id, title, category, location, lat, lon, n_items, brief, event_time, first_seen FROM clusters WHERE watchlist IN (0,1) AND (COALESCE(event_time, first_seen)>=? OR first_seen>=?)", (cut, cut))]
+        # Nov 20 2026 (pt1672u): also every cluster the Wire shows for the window (last activity = COALESCE(updated, first_seen)), so the map's set matches the Wire's
+        cls = [dict(r) for r in b.execute("SELECT cluster_id, title, category, location, lat, lon, n_items, brief, event_time, first_seen FROM clusters WHERE watchlist IN (0,1) AND (COALESCE(event_time, first_seen)>=? OR first_seen>=? OR COALESCE(updated, first_seen)>=?)", (cut, cut, cut))]
         with _lock:
             g = gdb(); have = {r["id"]: (r["sig"], r["reason_code"], r["version"]) for r in g.execute("SELECT id, sig, reason_code, version FROM geo")}; g.close()
         todo = [c for c in cls if c["cluster_id"] not in have or have[c["cluster_id"]][0] != sig_of(c) or have[c["cluster_id"]][1] in ("pending", "geocoder_error")]
