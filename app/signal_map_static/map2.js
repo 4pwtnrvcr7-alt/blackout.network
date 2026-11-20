@@ -113,7 +113,7 @@
     var hi = shown.filter(function (r) { return r.rank >= 7; }).length;
     var tot = shown.length + shownReg.length + shownTray.length, WL = { "24": "24 hours", "72": "3 days", "168": "7 days" }[state.window] || "";
     hi = shown.concat(shownReg, shownTray).filter(function (r) { return r.rank >= 7; }).length;
-    $("bnm_count").textContent = tot.toLocaleString() + (state.view === "us" ? " U.S. alerts" : " alerts") + (hi ? " · " + hi + " high" : "") + " · " + WL;
+    if (loadedAt) $("bnm_count").textContent = tot.toLocaleString() + (state.view === "us" ? " U.S. alerts" : " alerts") + (hi ? " · " + hi + " high" : "") + " · " + WL;
     var gb = $("bnm_gbtn"); if (gb) { gb.hidden = !shownTray.length; $("bnm_gn").textContent = shownTray.length.toLocaleString(); }
     var wc = ((meta.coverage || {}).wire_counts || {})[state.window], ex = shown.filter(function (r) { return r.tier !== "approx"; }).length;
     if ($("bnm_cov") && meta.coverage && meta.coverage.tiers) $("bnm_cov").innerHTML = (state.view === "us" ? "U.S. view: " + tot.toLocaleString() + " alerts with a U.S. position." :
@@ -139,7 +139,9 @@
     $("bnm_topic").value = state.topic;
   }
   function load(fresh) {
-    return fetch("/api/signal/heat", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+    /* first load: the loader (map2_loader.js) already started the request, streams it with real progress and retries on failure */
+    var L = window.BNML, first = !loadedAt && L && L.feed;
+    return (first ? L.feed() : fetch("/api/signal/heat", { cache: "no-store" }).then(function (r) { return r.json(); })).then(function (j) {
       var cols = j.cols || [], ix = {}; cols.forEach(function (c, i) { ix[c] = i; });
       rows = (j.rows || []).map(function (a, i) { return { i: i, id: a[ix.id], lat: +a[ix.lat], lon: +a[ix.lon], rank: +a[ix.rank] || 0, cat: a[ix.cat] || "", t: a[ix.t] || "", title: a[ix.title] || "",
         place: a[ix.place] || "", prec: a[ix.prec] || "", watch: +a[ix.watch] || 0, src: a[ix.src] || "", url: a[ix.url] || "", cc: a[ix.cc] || "", fam: +a[ix.fam] || 0,
@@ -155,6 +157,7 @@
       var cv = j.coverage || {};
       if (!cv.tiers) $("bnm_cov").textContent = (cv.located != null ? cv.located.toLocaleString() + " of " + (cv.total || 0).toLocaleString() + " alerts from the last " + (j.window_days || 7) + " days have a place" + (cv.pct != null ? " (" + cv.pct + "%)" : "") + ". " : "") + "Country-level places are approximate.";
       apply(false); stamp();
+      if (first) L.data(rows);
     }).catch(function () { $("bnm_count").textContent = "The map data did not load. Try the refresh button."; });
   }
   function stamp() {
@@ -226,7 +229,7 @@
 
   /* ---------- map ---------- */
   function boot() {
-    if (!window.maplibregl) { $("bnm_count").textContent = "The map could not start in this browser."; return; }
+    if (!window.maplibregl) { $("bnm_count").textContent = "The map could not start in this browser."; window.BNML && BNML.engineFail(); return; }
     var v = VIEWS[state.view] || VIEWS.world, t0 = Date.now();
     map = new maplibregl.Map({
       container: "bnm_map", style: style(), center: v.center || [-96, 38], zoom: v.zoom != null ? v.zoom : 3, minZoom: 0.4, maxZoom: 15,
@@ -239,6 +242,7 @@
     map.keyboard.disableRotation && map.keyboard.disableRotation();
     map.dragPan.enable({ linearity: 0.25, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, deceleration: 2200, maxSpeed: 1600 });
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }), "bottom-right");
+    map.on("data", function (e) { if (e.tile && window.BNML) BNML.tile((e.sourceId || "") + ":" + ((e.tile.tileID && e.tile.tileID.key) || "")); });   /* real basemap tile count for the loader */
     map.on("load", function () {
       map.addSource("heat", { type: "geojson", data: fc(shown), buffer: 64, tolerance: 0.4 });
       map.addSource("dots", { type: "geojson", data: fc(shown), cluster: true, clusterRadius: 34, clusterMaxZoom: 9,
@@ -282,7 +286,7 @@
         "text-letter-spacing": 0.06, "text-transform": "uppercase" }, paint: { "text-color": C.ink, "text-halo-color": "rgba(5,6,10,.9)", "text-halo-width": 1.2 } });
       ready = true; apply(false);
       /* fade in once tiles + heat have drawn (no flash, no layout shift); 5 s safety net */
-      var reveal = function () { d.body.classList.add("bnm-ready"); };
+      var reveal = function () { d.body.classList.add("bnm-ready"); window.BNML && BNML.mapReady(); };
       var tryReveal = function () { if (rows.length || Date.now() - t0 > 2500) { reveal(); map.off("idle", tryReveal); } };
       map.on("idle", tryReveal); setTimeout(reveal, 5000);
     });
