@@ -31,6 +31,7 @@ FILES = {
     "maplibre-LICENSE.txt": "text/plain",
     "map2.js": "application/javascript",
     "map2.css": "text/css",
+    "map2_loader.js": "application/javascript",   # Nov 20 2026 "Signal acquisition" loader (pt1675u)
 }
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
@@ -481,6 +482,7 @@ def page2(qs):
     cfg = _json.dumps({"rank": rank, "window": win, "view": view, "topic": topic}).replace("<", "\\u003c")
     return f'''<!doctype html><html lang="en" class="bnm-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
+<script>document.documentElement.classList.add("bnm-js")</script>
 <title>{E(title)}</title><meta name="description" content="{E(desc)}">
 <link rel="canonical" href="https://blackout.network/map">
 <meta name="robots" content="index,follow,max-image-preview:large">
@@ -501,6 +503,10 @@ def page2(qs):
 <main id="bnm_main">
 <h1 class="bnm-vh">Heat map</h1>
 <div id="bnm_map" class="bnm-map" role="region" aria-label="Heat map of ranked alerts. Drag to pan, pinch or scroll to zoom, tap a dot for the headline."></div>
+<div class="bnl" id="bnm_ld"><canvas aria-hidden="true"></canvas><div class="bnl-hud">
+<p class="bnl-k" aria-hidden="true"><span>Signal acquisition</span><span id="bnl_brg">BRG 000&deg;</span></p>
+<ol aria-hidden="true"><li data-s="link"><b>01</b><span>Wire feed</span><em>connecting</em></li><li data-s="exact"><b>02</b><span>Exact places</span><em>waiting</em></li><li data-s="approx"><b>03</b><span>Approximate</span><em>waiting</em></li><li data-s="region"><b>04</b><span>Region only</span><em>waiting</em></li><li data-s="global"><b>05</b><span>No location</span><em>waiting</em></li><li data-s="base"><b>06</b><span>Basemap</span><em>loading</em></li></ol>
+<div class="bnl-bar" aria-hidden="true"><i></i></div><p class="bnl-msg" id="bnl_msg" role="status" hidden></p></div></div>
 <div class="bnm-top"><div class="bnm-chip" id="bnm_chip"><i></i><span id="bnm_count" aria-live="polite">Loading alerts…</span></div><span class="bnm-upw" id="bnm_up"></span></div>
 <div class="bnm-ctl" id="bnm_ctl">
 <button type="button" class="bnm-b" id="bnm_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
@@ -530,7 +536,7 @@ def page2(qs):
 <noscript><p class="bnm-nojs">The map needs JavaScript. <a href="/wire">The Wire</a> lists the same stories.</p></noscript>
 </main>
 <script>window.BNM_CFG={cfg};</script>
-<script src="/api/signal/maplibre-gl.js?v={_v("maplibre-gl.js")}" defer></script><script src="/api/signal/map2.js?v={_v("map2.js")}" defer></script>
+<script src="/api/signal/map2_loader.js?v={_v("map2_loader.js")}" defer></script><script src="/api/signal/maplibre-gl.js?v={_v("maplibre-gl.js")}" defer></script><script src="/api/signal/map2.js?v={_v("map2.js")}" defer></script>
 </body></html>'''
 
 _HEAT = {"t": 0.0, "v": None}
