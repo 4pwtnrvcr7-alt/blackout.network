@@ -1,7 +1,9 @@
 /* BLACKOUT.NETWORK full-screen heat map (/map, Nov 17 2026).
    One MapLibre GL renderer: OpenFreeMap vector base restyled to the site theme, the heat as a native "heatmap" layer and the alerts
    as native circle layers in the same WebGL scene, so heat, dots and labels pan and zoom as one piece (no overlay canvas, no drift).
-   Data: /api/signal/heat (the Heat Map tab's located alerts, 60 s cache). Filters: view, rank, window, topic. Read-only. */
+   Data: /api/signal/heat (60 s cache). Since Nov 20 2026 (Matt pt1672u) that is every Wire item of the last 7 days, each at its best honest
+   precision: exact (solid dots + heat), approximate (hollow rings + heat), region only (labeled region rings, no heat) and no location
+   (the "No location" list). Window filtering uses the payload's own clock so counts match the Wire's. Filters: view, rank, window, topic. Read-only. */
 (function () {
   "use strict";
   var d = document, $ = function (id) { return d.getElementById(id); };
@@ -10,7 +12,7 @@
   var RN = ["Noise", "Low", "Low", "Guarded", "Elevated", "Elevated", "Elevated", "Major", "Severe", "Critical", "Catastrophic"];
   var TOPIC = { "war/conflict": "Conflict", "natural disaster": "Weather & quakes", "disease": "Health", "cyber": "Cyber", "political": "Politics", "financial": "Markets", "space weather": "Space weather", "infrastructure": "Infrastructure" };
   var state = { view: CFG.view || "world", rank: CFG.rank || "", window: CFG.window || "168", topic: CFG.topic || "" };
-  var rows = [], meta = {}, map = null, ready = false, loadedAt = 0;
+  var rows = [], meta = {}, map = null, ready = false, loadedAt = 0, tray = [], regs = [];
   var touch = matchMedia("(pointer:coarse)").matches;
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   var VIEWS = { world: { center: [15, 22], zoom: touch ? 0.9 : 1.75 }, us: { bounds: [[-125.5, 24], [-66.5, 49.6]] }, conflicts: { center: [35, 33], zoom: touch ? 2.1 : 2.8 } };
@@ -18,7 +20,8 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function band(r) { return r >= 7 ? "high" : r >= 4 ? "elev" : "calm"; }
   function et(iso) { var t = Date.parse(iso); if (!isFinite(t)) return ""; try { return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(t)) + " ET"; } catch (e) { return ""; } }
-  function inUS(r) { var lat = r.lat, lon = r.lon; if (String(r.cc).toUpperCase() === "US") return true;
+  function a_ok(r) { return r.lat !== null && r.lon !== null && isFinite(r.lat) && isFinite(r.lon) && !(r.lat === 0 && r.lon === 0) && Math.abs(r.lat) <= 90 && Math.abs(r.lon) <= 180; }
+  function inUS(r) { if (r.tier === "global" || r.tier === "region") return false; var lat = r.lat, lon = r.lon; if (String(r.cc).toUpperCase() === "US") return true;
     return (lat >= 24.5 && lat <= 49.5 && lon >= -125 && lon <= -66.5) || (lat >= 51 && lat <= 72 && lon >= -170 && lon <= -129) || (lat >= 18.5 && lat <= 22.5 && lon >= -161 && lon <= -154) || (lat >= 17.5 && lat <= 18.6 && lon >= -67.5 && lon <= -65); }
   function dest(r) {
     if (/^[0-9a-f]{16}$/.test(String(r.id))) return { href: "/wire/" + r.id, ext: false, label: "Read on blackout.network" };
@@ -76,29 +79,52 @@
     if (f.rank === "4" && (r.rank < 4 || r.rank > 6)) return false;
     if (f.rank === "0" && r.rank > 3) return false;
     if (f.topic && r.cat !== f.topic) return false;
-    if (f.window) { var t = Date.parse(r.t); if (!isFinite(t) || now - t > (+f.window) * 3600000) return false; }
+    if (f.window) { var t = Date.parse(r.t); if (!isFinite(t) || now - t > (+f.window) * 3600000) return false; }   /* same cut as the Wire: last activity >= now - window */
     if (!ignoreView && f.view === "conflicts" && r.cat !== "war/conflict") return false;
     return true;
   }
   function fc(list) {
     return { type: "FeatureCollection", features: list.map(function (r, i) {
       return { type: "Feature", id: i, geometry: { type: "Point", coordinates: [r.lon, r.lat] },
-        properties: { i: r.i, rank: r.rank, w: Math.max(0.08, Math.pow(r.rank / 10, 1.6)), b: band(r.rank) } }; }) };
+        properties: { i: r.i, rank: r.rank, w: Math.max(0.08, Math.pow(r.rank / 10, 1.6)), b: band(r.rank), a: r.tier === "approx" ? 1 : 0 } }; }) };
   }
+  /* region-only items: one labeled ring per region centre */
+  function regFC(list) {
+    var by = {}, out = [];
+    list.forEach(function (r) { var k = r.rid || (r.lat + "," + r.lon); var g = by[k] || (by[k] = { k: k, lat: r.lat, lon: r.lon, place: r.place, n: 0, mx: 0, ids: [] }); g.n++; g.mx = Math.max(g.mx, r.rank); g.ids.push(r.i); });
+    regs = Object.keys(by).map(function (k) { return by[k]; });
+    return { type: "FeatureCollection", features: regs.map(function (g, j) { return { type: "Feature", id: j, geometry: { type: "Point", coordinates: [g.lon, g.lat] },
+      properties: { j: j, n: g.n, mx: g.mx, label: g.place + " \u00b7 " + g.n } }; }) };
+  }
+  function nowRef() { var g = Date.parse(meta.generated || ""); return isFinite(g) ? g : Date.now(); }
   var shown = [];
+  var shownReg = [], shownTray = [];
+  function onMap(r) { return r.tier === "exact" || r.tier === "approx" || !r.tier; }
   function apply(fit) {
-    var now = Date.now(), base = rows.filter(function (r) { return pass(r, state, now, true); });
-    shown = base.filter(function (r) { return pass(r, state, now, false); });
-    if (state.view === "us") shown = shown.filter(inUS);
-    var n = { world: base.length, us: base.filter(inUS).length, conflicts: base.filter(function (r) { return r.cat === "war/conflict"; }).length };
+    var now = nowRef(), all = rows.filter(function (r) { return pass(r, state, now, true); }), base = all.filter(onMap);
+    var vis = all.filter(function (r) { return pass(r, state, now, false); });
+    shown = vis.filter(onMap);
+    shownReg = vis.filter(function (r) { return r.tier === "region"; });
+    shownTray = vis.filter(function (r) { return r.tier === "global"; });
+    if (state.view === "us") { shown = shown.filter(inUS); shownReg = []; shownTray = []; }
+    var usN = base.filter(inUS).length;
+    var n = { world: all.length, us: usN, conflicts: all.filter(function (r) { return r.cat === "war/conflict"; }).length };
     [].forEach.call(d.querySelectorAll("[data-n]"), function (e) { e.textContent = n[e.getAttribute("data-n")] || 0; });
     var hi = shown.filter(function (r) { return r.rank >= 7; }).length;
-    $("bnm_count").textContent = shown.length.toLocaleString() + " located alerts" + (hi ? " · " + hi + " high" : "") + " · " + ({ "24": "24 hours", "72": "3 days", "168": "7 days" }[state.window] || "");
+    var tot = shown.length + shownReg.length + shownTray.length, WL = { "24": "24 hours", "72": "3 days", "168": "7 days" }[state.window] || "";
+    hi = shown.concat(shownReg, shownTray).filter(function (r) { return r.rank >= 7; }).length;
+    $("bnm_count").textContent = tot.toLocaleString() + (state.view === "us" ? " U.S. alerts" : " alerts") + (hi ? " · " + hi + " high" : "") + " · " + WL;
+    var gb = $("bnm_gbtn"); if (gb) { gb.hidden = !shownTray.length; $("bnm_gn").textContent = shownTray.length.toLocaleString(); }
+    var wc = ((meta.coverage || {}).wire_counts || {})[state.window], ex = shown.filter(function (r) { return r.tier !== "approx"; }).length;
+    if ($("bnm_cov") && meta.coverage && meta.coverage.tiers) $("bnm_cov").innerHTML = (state.view === "us" ? "U.S. view: " + tot.toLocaleString() + " alerts with a U.S. position." :
+      "Every Wire alert from the last " + esc(WL) + " is on this map: <b>" + ex.toLocaleString() + "</b> at their exact place, <b>" + (shown.length - ex).toLocaleString() + "</b> approximate (hollow rings, usually a country centre), <b>" +
+      shownReg.length.toLocaleString() + "</b> region only (labeled rings) and <b>" + shownTray.length.toLocaleString() + "</b> with no place (the No location list).") +
+      (wc != null && !state.rank && !state.topic && state.view === "world" ? " The Wire shows " + (+wc).toLocaleString() + " for this window" + (+wc === tot ? ", the same set." : ".") : "");
     $("bnm_chip").className = "bnm-chip" + (hi ? " hot" : "");
     var active = (state.rank ? 1 : 0) + (state.topic ? 1 : 0) + (state.window !== "168" ? 1 : 0) + (state.view !== "world" ? 1 : 0);
     $("bnm_fn").hidden = !active; $("bnm_fn").textContent = active;
     paintSeg();
-    if (ready) { map.getSource("heat").setData(fc(shown)); map.getSource("dots").setData(fc(shown)); }
+    if (ready) { map.getSource("heat").setData(fc(shown)); map.getSource("dots").setData(fc(shown)); map.getSource("reg").setData(regFC(shownReg)); }
     if (fit) frame(true);
     try { var q = new URLSearchParams(); if (state.view !== "world") q.set("view", state.view); if (state.rank) q.set("rank", state.rank); if (state.window !== "168") q.set("window", state.window); if (state.topic) q.set("topic", state.topic);
       history.replaceState(null, "", "/map" + (q.toString() ? "?" + q : "")); } catch (e) {}
@@ -116,15 +142,18 @@
     return fetch("/api/signal/heat", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       var cols = j.cols || [], ix = {}; cols.forEach(function (c, i) { ix[c] = i; });
       rows = (j.rows || []).map(function (a, i) { return { i: i, id: a[ix.id], lat: +a[ix.lat], lon: +a[ix.lon], rank: +a[ix.rank] || 0, cat: a[ix.cat] || "", t: a[ix.t] || "", title: a[ix.title] || "",
-        place: a[ix.place] || "", prec: a[ix.prec] || "", watch: +a[ix.watch] || 0, src: a[ix.src] || "", url: a[ix.url] || "", cc: a[ix.cc] || "", fam: +a[ix.fam] || 0 }; })
-        .filter(function (r) { return isFinite(r.lat) && isFinite(r.lon) && !(r.lat === 0 && r.lon === 0) && Math.abs(r.lat) <= 90 && Math.abs(r.lon) <= 180; });
+        place: a[ix.place] || "", prec: a[ix.prec] || "", watch: +a[ix.watch] || 0, src: a[ix.src] || "", url: a[ix.url] || "", cc: a[ix.cc] || "", fam: +a[ix.fam] || 0,
+        tier: ix.tier != null ? a[ix.tier] || "" : "", how: ix.how != null ? a[ix.how] || "" : "", rid: ix.rid != null ? a[ix.rid] || "" : "" }; })
+        .filter(function (r) { if (r.tier === "global") { r.lat = r.lon = null; return true; }
+          return a_ok(r); });
+      rows.forEach(function (r, i) { r.i = i; });
       meta = j; loadedAt = Date.now();
       var cats = {}; rows.forEach(function (r) { if (r.cat) cats[r.cat] = (cats[r.cat] || 0) + 1; });
       var sel = $("bnm_topic"), keep = state.topic;
       sel.innerHTML = '<option value="">All topics</option>' + Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; }).map(function (k) { return '<option value="' + esc(k) + '">' + esc(TOPIC[k] || k) + " (" + cats[k] + ")</option>"; }).join("");
       if (keep && !cats[keep]) sel.insertAdjacentHTML("beforeend", '<option value="' + esc(keep) + '">' + esc(TOPIC[keep] || keep) + "</option>");
       var cv = j.coverage || {};
-      $("bnm_cov").textContent = (cv.located != null ? cv.located.toLocaleString() + " of " + (cv.total || 0).toLocaleString() + " alerts from the last " + (j.window_days || 7) + " days have a place" + (cv.pct != null ? " (" + cv.pct + "%)" : "") + ". " : "") + "Country-level places are approximate.";
+      if (!cv.tiers) $("bnm_cov").textContent = (cv.located != null ? cv.located.toLocaleString() + " of " + (cv.total || 0).toLocaleString() + " alerts from the last " + (j.window_days || 7) + " days have a place" + (cv.pct != null ? " (" + cv.pct + "%)" : "") + ". " : "") + "Country-level places are approximate.";
       apply(false); stamp();
     }).catch(function () { $("bnm_count").textContent = "The map data did not load. Try the refresh button."; });
   }
@@ -135,6 +164,21 @@
   }
 
   /* ---------- card (tap a dot) ---------- */
+  function where(r) {
+    if (r.tier === "global") return "No map location (" + esc(r.how || "no place named") + ")";
+    if (r.tier === "region") return esc(r.place) + " (region only)";
+    if (r.tier === "approx" || r.prec === "country") return esc(r.place) + " (approximate" + (r.how && r.how !== "geo" ? ": " + esc(r.how) : "") + ")";
+    return esc(r.place);
+  }
+  function listCard(head, note, list) {
+    var el = $("bnm_card"); list = list.slice().sort(function (a, b) { return b.rank - a.rank || (a.t < b.t ? 1 : -1); });
+    el.innerHTML = '<button type="button" class="bnm-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+      '<p class="bnm-eb">' + esc(head) + "</p><p class=\"bnm-cm bnm-cn\">" + esc(note) + '</p><ul class="bnm-gl">' + list.slice(0, 300).map(function (x) { var y = dest(x);
+        return '<li><a href="' + esc(y.href) + '"' + (y.ext ? ' target="_blank" rel="noopener"' : "") + '><span class="bnm-rk ' + band(x.rank) + '"><b>' + x.rank + "</b></span><span><span class=bnm-gt>" + esc(x.title) + "</span><small>" + [esc(TOPIC[x.cat] || x.cat), esc(et(x.t))].filter(Boolean).join(" · ") + "</small></span></a></li>"; }).join("") + "</ul>" +
+      (list.length > 300 ? '<p class="bnm-cm">Showing 300 of ' + list.length + '. <a href="/wire">The Wire</a> has them all.</p>' : "");
+    el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+    el.querySelector(".bnm-cx").onclick = function () { el.hidden = true; };
+  }
   function card(list) {
     var el = $("bnm_card"); if (!list.length) { el.hidden = true; return; }
     list.sort(function (a, b) { return b.rank - a.rank; });
@@ -142,7 +186,7 @@
     el.innerHTML = '<button type="button" class="bnm-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '<div class="bnm-ct"><span class="bnm-rk ' + b + '"><b>' + r.rank + "</b>/10 · " + RN[Math.max(0, Math.min(10, r.rank))] + "</span>" + (r.watch ? '<span class="bnm-tag">Single source</span>' : "") + "</div>" +
       "<h2>" + esc(r.title) + "</h2>" +
-      '<p class="bnm-cm">' + [esc(r.place) + (r.prec === "country" ? " (approximate)" : ""), esc(TOPIC[r.cat] || r.cat), esc(et(r.t)), r.fam > 1 ? r.fam + " sources" : ""].filter(Boolean).join(" · ") + "</p>" +
+      '<p class="bnm-cm">' + [where(r), esc(TOPIC[r.cat] || r.cat), esc(et(r.t)), r.fam > 1 ? r.fam + " sources" : ""].filter(Boolean).join(" · ") + "</p>" +
       '<a class="bnm-go" href="' + esc(dd.href) + '"' + (dd.ext ? ' target="_blank" rel="noopener"' : "") + ">" + esc(dd.label) + " &rarr;</a>" +
       (more ? '<details class="bnm-more"><summary>' + more + " more here</summary><ul>" + list.slice(1, 25).map(function (x) { var y = dest(x);
         return '<li><a href="' + esc(y.href) + '"' + (y.ext ? ' target="_blank" rel="noopener"' : "") + '><span class="bnm-rk ' + band(x.rank) + '"><b>' + x.rank + "</b></span>" + esc(x.title) + "</a></li>"; }).join("") + "</ul></details>" : "");
@@ -222,17 +266,38 @@
         "circle-blur": ["interpolate", ["linear"], ["zoom"], 1, 0.6, 5, 0.1] } });
       map.addLayer({ id: "pt-glow", type: "circle", source: "dots", filter: ["all", ["!", ["has", "point_count"]], [">=", ["get", "rank"], 7]], paint: {
         "circle-color": C.high, "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, 6, 8, 16], "circle-opacity": ["interpolate", ["linear"], ["zoom"], 2, 0, 3, 0.18], "circle-blur": 1 } }, "pt");
+      /* approximate positions: hollow rings in the band colour (never a solid "exact" dot) */
+      map.addLayer({ id: "pt-a", type: "circle", source: "dots", filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "a"], 1]], paint: {
+        "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": ["match", ["get", "b"], "high", C.high, "elev", C.elev, C.calm],
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 1, 1, 6, 1.6],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2, ["*", 0.3, ["get", "rank"]]], 6, ["+", 4, ["*", 0.6, ["get", "rank"]]], 12, ["+", 6, ["*", 0.7, ["get", "rank"]]]],
+        "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.0, 2.6, 0.8, 5, 0.95] } });
+      map.setFilter("pt", ["all", ["!", ["has", "point_count"]], ["!=", ["get", "a"], 1]]);
+      /* region-only items: a large labeled ring per region centre, visible at every zoom, never part of the heat */
+      map.addSource("reg", { type: "geojson", data: regFC(shownReg) });
+      map.addLayer({ id: "rg", type: "circle", source: "reg", paint: {
+        "circle-color": "rgba(240,240,250,0.04)", "circle-stroke-color": ["step", ["get", "mx"], C.calm, 4, C.elev, 7, C.high], "circle-stroke-width": 1.2, "circle-stroke-opacity": 0.7,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 0, ["+", 14, ["*", 2.2, ["sqrt", ["get", "n"]]]], 5, ["+", 28, ["*", 3.5, ["sqrt", ["get", "n"]]]]] } });
+      map.addLayer({ id: "rg-n", type: "symbol", source: "reg", layout: { "text-field": ["get", "label"], "text-font": FB, "text-size": 11, "text-allow-overlap": false,
+        "text-letter-spacing": 0.06, "text-transform": "uppercase" }, paint: { "text-color": C.ink, "text-halo-color": "rgba(5,6,10,.9)", "text-halo-width": 1.2 } });
       ready = true; apply(false);
       /* fade in once tiles + heat have drawn (no flash, no layout shift); 5 s safety net */
       var reveal = function () { d.body.classList.add("bnm-ready"); };
       var tryReveal = function () { if (rows.length || Date.now() - t0 > 2500) { reveal(); map.off("idle", tryReveal); } };
       map.on("idle", tryReveal); setTimeout(reveal, 5000);
     });
-    var hit = ["pt", "cl"];
+    var hit = ["pt", "pt-a", "cl", "rg"];
     map.on("click", function (e) {
       var f = map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: hit.filter(function (l) { return map.getLayer(l); }) });
       if (!f.length) { $("bnm_card").hidden = true; closePanel(); return; }
       var g = f[0];
+      var rg = f.filter(function (x) { return x.layer && x.layer.id === "rg"; });
+      if (rg.length && f.every(function (x) { return x.layer.id === "rg"; })) {
+        var R = regs[rg[0].properties.j]; if (!R) return;
+        listCard(R.place + " · region only", "These Wire alerts name only this region, not a specific place, so they sit on one labeled ring instead of a dot.",
+          R.ids.map(function (i) { return rows[i]; }).filter(Boolean)); return;
+      }
+      f = f.filter(function (x) { return x.layer.id !== "rg"; }); g = f[0];
       if (g.properties.cluster) {
         var src = map.getSource("dots"), cid = g.properties.cluster_id;
         if (map.getZoom() >= 9.5) {
@@ -261,7 +326,8 @@
         if (state[k] === v) return; state[k] = v; apply(k === "view"); }); });
     $("bnm_topic").onchange = function () { state.topic = this.value; apply(false); };
     $("bnm_lh").onchange = function () { if (ready) map.setLayoutProperty("heat", "visibility", this.checked ? "visible" : "none"); };
-    $("bnm_ld").onchange = function () { var on = this.checked ? "visible" : "none"; if (ready) ["pt", "pt-glow", "cl", "cl-n"].forEach(function (l) { map.setLayoutProperty(l, "visibility", on); }); };
+    $("bnm_ld").onchange = function () { var on = this.checked ? "visible" : "none"; if (ready) ["pt", "pt-a", "pt-glow", "cl", "cl-n", "rg", "rg-n"].forEach(function (l) { map.setLayoutProperty(l, "visibility", on); }); };
+    $("bnm_gbtn").onclick = function () { closePanel(); listCard("No location · " + shownTray.length, "These Wire alerts name no place (cyber, markets, space weather, statements). They are part of the map's count and listed here so nothing from the Wire is missing.", shownTray); };
     $("bnm_zin").onclick = function () { map && map.zoomIn({ duration: reduce ? 0 : 300 }); };
     $("bnm_zout").onclick = function () { map && map.zoomOut({ duration: reduce ? 0 : 300 }); };
     $("bnm_x").onclick = back;
