@@ -77,7 +77,7 @@
   /* ---------- state ---------- */
   var S = { link: { got: 0, total: 0 }, n: { exact: 0, approx: 0, region: 0, global: 0 }, shown: { exact: 0, approx: 0, region: 0, global: 0 }, regs: 0, tiles: 0,
     phase: "link", pass: 0, mapReady: false, speed: 1, out: false };
-  var PLACE_MS = 2000, ORDER = ["exact", "approx", "region", "global"], DUR = { exact: 1150, approx: 750, region: 520, global: 620 };
+  var PLACE_MS = 2000, ORDER = ["exact", "approx", "region", "global"], DUR = { exact: 760, approx: 490, region: 340, global: 410 };   /* sums to PLACE_MS: the whole sweep is ~2 s (Matt 10:12 AM Nov 20) */
   var pts = [], orbit = [], flashes = [];
   function setStage(k, st) { var li = root && root.querySelector('[data-s="' + k + '"]'); if (li) li.className = st || ""; }
   function setVal(k, t) { var li = root && root.querySelector('[data-s="' + k + '"] em'); if (li && li.textContent !== t) li.textContent = t; }

@@ -54,4 +54,10 @@ class LoaderBehaviour(unittest.TestCase):
         self.assertFalse(re.search("[\U0001F300-\U0001FAFF\u2600-\u27BF]", self.js))
         for w in ("verified", "before the news"): self.assertNotIn(w, self.js.lower())
 
+    def test_two_second_sweep(self):
+        import re as _re
+        self.assertIn("PLACE_MS = 2000", self.js)
+        d = _re.search(r"DUR = \{([^}]*)\}", self.js).group(1)
+        self.assertEqual(sum(int(x) for x in _re.findall(r"\d+", d)), 2000)
+
 if __name__ == "__main__": unittest.main()
