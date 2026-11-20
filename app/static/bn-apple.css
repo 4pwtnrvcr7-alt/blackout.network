@@ -15,7 +15,7 @@ html[data-theme="light"]{--a-bg:#F5F5F7;--a-sf:#FFFFFF;--a-sf2:#FBFBFD;--a-ink:#
 #bna_home{display:none}
 html.bna-home #bna_home{display:block}
 html.bna-home .bn-pagehead,html.bna-home #ns_gbanner,html.bna-home body>footer,html.bna-home .bn-dfoot-site{display:none!important}
-html.bna-home body{background:var(--a-bg)!important;overflow-x:hidden}
+html.bna-home body{background:var(--a-bg)!important;overflow-x:hidden;overflow-x:clip}/* Nov 20: clip, not hidden. hidden made body its own (non-scrolling) scroll box, which with overscroll-behavior trapped wheel/touch scroll on /live */
 /* The Wire stays laid out (off-screen, invisible, inert to pointer and AT) rather than display:none: its lazy loaders use
    IntersectionObserver and would otherwise keep fetching history pages into a zero-size list. */
 html.bna-home body>main#tab-threat{position:absolute!important;left:-12000px!important;top:0!important;width:1200px!important;height:100vh!important;overflow:hidden!important;visibility:hidden!important;pointer-events:none!important}
