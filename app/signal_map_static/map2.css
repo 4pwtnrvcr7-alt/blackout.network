@@ -143,3 +143,22 @@ body.bnm-hd-on .bnm-top{transform:translate(-50%,64px)}
 body.bnm-hd-on .bnm-mb{opacity:0;transform:translateY(-8px);pointer-events:none}
 @media (prefers-reduced-motion:reduce){.bnm-mb{transition:none!important}}
 @media (pointer:coarse),(max-width:700px){body.bnm:not(.bnm-hd-on) .bnm-top{transform:translateY(52px)}.bnm-mb{right:calc(12px + env(safe-area-inset-right));padding:0 12px}}
+
+/* Nov 20 2026 (Matt pt1672u): every Wire item on the map. "No location" list button (outlined, monochrome) + list card */
+.bnm-gbtn{all:unset;box-sizing:border-box;position:fixed;z-index:21;left:calc(16px + env(safe-area-inset-left));bottom:calc(74px + env(safe-area-inset-bottom));height:40px;padding:0 14px 0 12px;border-radius:99px;
+ display:flex;align-items:center;gap:8px;cursor:pointer;background:rgba(5,6,10,.7);border:1px solid rgba(240,240,250,.14);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+ font:700 11px/1 var(--bnt-hd,Montserrat,sans-serif);letter-spacing:.14em;text-transform:uppercase;color:#F0F0FA;transition:border-color .2s}
+.bnm-gbtn[hidden]{display:none}
+.bnm-gbtn:hover{border-color:rgba(236,238,245,.55)}
+.bnm-gbtn:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}
+.bnm-gbtn svg{width:16px;height:16px;fill:none;stroke:#F2F2F4;stroke-width:1.6}
+.bnm-gbtn b{min-width:18px;padding:0 5px;height:18px;border-radius:9px;border:1px solid rgba(240,240,250,.5);color:#F0F0FA;font-size:10.5px;letter-spacing:0;display:grid;place-items:center}
+.bnm-card .bnm-eb{margin:4px 40px 6px 0}
+.bnm-cn{margin:0 0 8px}
+.bnm-gl{list-style:none;margin:0;padding:0}
+.bnm-gl li{border-top:1px solid rgba(240,240,250,.06)}
+.bnm-gl a{display:flex;gap:10px;align-items:flex-start;padding:9px 0;color:#F0F0FA;text-decoration:none}
+.bnm-gl a:hover .bnm-gt{text-decoration:underline}
+.bnm-gl .bnm-rk{flex:none;padding:4px 7px;font-size:11px}
+.bnm-gt{display:block;font-size:13.5px;line-height:1.35}
+.bnm-gl small{display:block;font-size:11.5px;color:rgba(240,240,250,.5);margin-top:3px}

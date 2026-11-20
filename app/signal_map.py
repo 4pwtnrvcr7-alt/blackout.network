@@ -506,6 +506,7 @@ def page2(qs):
 <button type="button" class="bnm-b" id="bnm_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="bnm-b" id="bnm_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
 </div>
+<button type="button" class="bnm-gbtn" id="bnm_gbtn" hidden aria-controls="bnm_card" title="Wire alerts that name no place"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.9 5.2 3.9 8.5s-1.3 6.1-3.9 8.5M12 3.5C9.4 5.9 8.1 8.7 8.1 12s1.3 6.1 3.9 8.5"/></svg><span>No location</span><b id="bnm_gn">0</b></button>
 <button type="button" class="bnm-fbtn" id="bnm_fbtn" aria-expanded="false" aria-controls="bnm_panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"/></svg><span>Filters</span><b id="bnm_fn" hidden></b></button>
 <section class="bnm-panel" id="bnm_panel" hidden aria-label="Map filters and legend">
 <div class="bnm-grab" aria-hidden="true"></div>
@@ -520,7 +521,7 @@ def page2(qs):
 <div class="bnm-row bnm-lyr"><span class="bnm-l">Layers</span><label><input type="checkbox" id="bnm_lh" checked> Heat</label><label><input type="checkbox" id="bnm_ld" checked> Alert dots</label></div>
 <div class="bnm-leg"><div class="bnm-ramp" aria-hidden="true"></div><div class="bnm-rl"><span>Fewer, lower-ranked</span><span>More, higher-ranked</span></div>
 <div class="bnm-key"><span class="c">Calm 0–3</span><span class="e">Elevated 4–6</span><span class="h">High 7–10</span></div>
-<p class="bnm-note" id="bnm_note">Heat weighs each located alert by its rank. Dots appear as you zoom in; tap one for the headline, rank and sources.</p>
+<p class="bnm-note" id="bnm_note">Heat weighs each placed alert by its rank. Solid dots are exact places, hollow rings are approximate (usually a country centre), labeled rings are region only. Tap any of them for the headline, rank and sources.</p>
 <p class="bnm-note" id="bnm_cov"></p></div>
 <div class="bnm-links"><a href="/wire">The Wire</a><a href="/scoring">How we score</a><button type="button" id="bnm_report">Report a problem</button></div>
 <p class="bnm-attr">Map data &copy; <a href="https://www.openstreetmap.org/copyright" rel="noopener" target="_blank">OpenStreetMap</a> contributors · <a href="https://openfreemap.org" rel="noopener" target="_blank">OpenFreeMap</a> · <a href="https://openmaptiles.org/" rel="noopener" target="_blank">OpenMapTiles</a></p>
@@ -535,12 +536,22 @@ def page2(qs):
 _HEAT = {"t": 0.0, "v": None}
 _HLOCK = _th.Lock()
 def heat_payload():
-    """Slim, read-only rows for the heat map: the Heat Map tab's located alerts (heatmap.data, 7 days, geo.db), else /map's points.
+    """Slim, read-only rows for the heat map: every Wire item of the last 7 days with its best position (heat_all.build); if that fails,
+    the Heat Map tab's located alerts (heatmap.data, 7 days, geo.db), else /map's points.
     Cached 60 s in one slot. Never writes, never geocodes, never scores."""
     import time, sys
     with _HLOCK:
         if _HEAT["v"] is not None and time.time() - _HEAT["t"] < 60: return _HEAT["v"]
     body = None
+    # Nov 20 2026 (Matt pt1672u): every Wire item, placed at its best honest precision (heat_all.py). BN_MAP_ALL=0 restores the located-only feed.
+    try:
+        import heat_all
+        if heat_all.on(): body = heat_all.build()
+    except Exception as ex:
+        print("signal_map heat: every-Wire-item feed failed, using located-only:", ex, flush=True); body = None
+    if body is not None:
+        with _HLOCK: _HEAT.update(t=time.time(), v=body)
+        return body
     try:
         hm = sys.modules.get("heatmap")
         if hm is None:
