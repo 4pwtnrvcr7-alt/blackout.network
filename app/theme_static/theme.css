@@ -191,7 +191,7 @@ html body .bng-share .bng-sb[hidden]{display:none!important}
 html:has([data-bn-snap]:not([hidden]):not([data-snap-hero])){scroll-snap-type:y mandatory!important}html:has([data-snap-hero]:not([hidden])){scroll-snap-type:y proximity}
 [data-bn-snap] [data-snap]{min-height:100vh;min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always}
 html.bn-snap-js{scroll-snap-type:none!important;scroll-behavior:auto!important}
-html.bn-snap-js body{overscroll-behavior-y:none}
+/* Nov 20: removed "html.bn-snap-js body{overscroll-behavior-y:none}". On a body that is a scroll box it blocked scroll chaining to the page, so /live could not scroll (wheel or touch). */
 /* Nov 17 2026 (Matt): even 3-bar icon. Open: bars fall, settle, stand up as an X. Close: reverse. Reduced motion = instant. */
 .bn-hx{position:relative;display:block;width:22px;height:14px;flex:none;overflow:visible}
 .bn-hx-bar{position:absolute;left:0;right:0;top:50%;height:1.5px;margin-top:-.75px;background:currentColor;border-radius:1px;transform-origin:50% 50%;pointer-events:none}
