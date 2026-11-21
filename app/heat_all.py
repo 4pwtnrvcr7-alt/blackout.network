@@ -300,7 +300,19 @@ def build(days=7, now=None):
             try: items += [dict(r) for r in hd.execute(_ARCH, (cut,))]
             finally: hd.close()
         except sqlite3.Error: pass
-    geo_rows = _geo_rows(i["id"] for i in items if not i["a"])
+    rows, tiers, reasons = _rows(items, _geo_rows(i["id"] for i in items if not i["a"]))
+    rows.sort(key=lambda r: r[5], reverse=True)
+    wc = wire_counts(now)
+    n = len(rows)
+    return {"generated": _iso(now), "source": "wire", "window_days": days,
+            "coverage": {"total": n, "located": tiers["exact"] + tiers["approx"], "pct": round(100 * (n - tiers["global"]) / n, 1) if n else 0,
+                         "tiers": tiers, "fallbacks": dict(sorted(reasons.items(), key=lambda kv: -kv[1])), "wire_counts": wc},
+            "cols": COLS, "rows": rows}
+
+COLS = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam", "tier", "how", "rid", "arch", "fs"]
+
+def _rows(items, geo_rows):
+    """One map row per Wire item (column order = COLS). Shared by build() and rows_for() so the live stream and the full feed match."""
     rows, tiers, reasons = [], {"exact": 0, "approx": 0, "region": 0, "global": 0}, {}
     for it in items:
         g = geo_rows.get(it["id"])
@@ -315,12 +327,22 @@ def build(days=7, now=None):
         except (TypeError, ValueError): rk = 0
         rows.append([it["id"], p["lat"], p["lon"], rk, it["category"] or "", it["t"] or "", _title(it["title"]),
                      p.get("place") or "", p["prec"], int(it["watchlist"] or 0), (ln.get("source") or "")[:60], (ln.get("url") or "")[:500],
-                     p.get("cc") or "", int(it["eff_families"] or it["n_families"] or 0), p["tier"], p["how"], p.get("rid") or "", int(it["a"] or 0)])
+                     p.get("cc") or "", int(it["eff_families"] or it["n_families"] or 0), p["tier"], p["how"], p.get("rid") or "", int(it["a"] or 0),
+                     it.get("fs") or ""])
+    return rows, tiers, reasons
+
+def rows_for(ids, days=7, now=None):
+    """Map rows (COLS order) for these live cluster ids, same filter and window as build(). Used by the realtime stream (realtime.py)."""
+    ids = [i for i in dict.fromkeys(ids or []) if i][:2000]
+    if not ids: return []
+    now = now or _now(); cut = _iso(now - timedelta(days=days))
+    items = []
+    c = _ro(DB)
+    try:
+        for k in range(0, len(ids), 500):
+            q = ids[k:k + 500]
+            items += [dict(r) for r in c.execute(_LIVE + f" AND cluster_id IN ({','.join('?' * len(q))})", (cut, *q))]
+    finally: c.close()
+    rows, _, _ = _rows(items, _geo_rows(i["id"] for i in items))
     rows.sort(key=lambda r: r[5], reverse=True)
-    wc = wire_counts(now)
-    n = len(rows)
-    return {"generated": _iso(now), "source": "wire", "window_days": days,
-            "coverage": {"total": n, "located": tiers["exact"] + tiers["approx"], "pct": round(100 * (n - tiers["global"]) / n, 1) if n else 0,
-                         "tiers": tiers, "fallbacks": dict(sorted(reasons.items(), key=lambda kv: -kv[1])), "wire_counts": wc},
-            "cols": ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam", "tier", "how", "rid", "arch"],
-            "rows": rows}
+    return rows
