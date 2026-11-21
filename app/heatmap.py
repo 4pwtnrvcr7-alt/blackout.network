@@ -60,7 +60,7 @@ def data():
     b = sqlite3.connect(g.BDB, uri=True, timeout=30); b.row_factory = sqlite3.Row
     cut = g.iso(g.now() - timedelta(days=g.WINDOW_DAYS))
     cls = [dict(r) for r in b.execute("""SELECT cluster_id, title, category, score, rank, confidence, watchlist, links, n_items, n_families, eff_families,
-            event_time, first_seen, updated FROM clusters WHERE watchlist IN (0,1) AND (COALESCE(event_time, first_seen)>=? OR first_seen>=?)""", (cut, cut))]
+            event_time, first_seen, updated, brief FROM clusters WHERE watchlist IN (0,1) AND (COALESCE(event_time, first_seen)>=? OR first_seen>=?)""", (cut, cut))]
     b.close()
     with g._lock:
         c = g.gdb()
@@ -73,6 +73,10 @@ def data():
     items, unl = [], []
     for cl in cls:
         r = geo_rows.get(cl["cluster_id"])
+        try:
+            import geo_text
+            r = geo_text.enrich(cl, r)
+        except Exception: pass
         try: links = json.loads(cl["links"] or "[]")
         except Exception: links = []
         t = cl["event_time"] or cl["first_seen"]
