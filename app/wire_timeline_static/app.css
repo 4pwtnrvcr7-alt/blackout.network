@@ -181,3 +181,9 @@ body.tl{background:#000}
 @media (hover:hover) and (pointer:fine){
   .tl-chip:hover{border-color:#fff;color:#fff}
 }
+/* realtime (Nov 21 2026, pt1688u): live dot in the status line, soft fading highlight on items that just arrived */
+.tl-live{display:inline-block;width:6px;height:6px;margin:0 7px 1px 0;border-radius:50%!important;background:#F0F0FA;vertical-align:middle;animation:tllive 2.4s ease-in-out infinite}
+@keyframes tllive{0%,100%{opacity:.35}50%{opacity:1}}
+.tl-it.fresh{background:linear-gradient(90deg,rgba(240,240,250,.075),rgba(240,240,250,0) 70%);animation:tlarrive .55s ease both,tlfade 90s linear forwards}
+@keyframes tlfade{0%{background-color:rgba(240,240,250,.04)}100%{background-color:rgba(240,240,250,0)}}
+@media (prefers-reduced-motion:reduce){.tl-live{animation:none;opacity:.8}.tl-it.fresh{animation:none}}

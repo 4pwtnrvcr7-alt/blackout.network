@@ -214,54 +214,94 @@ function loadNewer(){
     keepAnchor(function(){add(j.items,"top");rebuild()});}).catch(function(){topEnd=true}).then(function(){if(g!==gen)return;loading.n=0;status();check()});
 }
 function nearTop(){return W.scrollY<=tlTop+24}
-function stamp(){if(!elUpd)return;elUpd.hidden=false;elUpd.textContent="Updated "+fS.format(new Date())+" ET"}
-var noneT=0;
+/* ---------- live status: "Live · updated just now", ticking (Nov 21 2026, pt1688u) */
+var stampAt=0,noneT=0,liveMode="off",tickT=0,msgUntil=0;
+function ago(t){var s=Math.max(0,Math.round((Date.now()-t)/1000));if(s<45)return"just now";var m=Math.round(s/60);if(m<60)return m+" min ago";var h=Math.floor(m/60);return h+" h "+(m%60)+" min ago"}
+function paintUpd(){if(!elUpd||!stampAt||Date.now()<msgUntil)return;elUpd.hidden=false;
+  elUpd.innerHTML=(liveMode==="live"?'<i class="tl-live" aria-hidden="true"></i>Live &middot; ':"")+"Updated "+ago(stampAt);elUpd.title="Last checked "+fS.format(new Date(stampAt))+" ET"}
+function stamp(){stampAt=Date.now();paintUpd()}
+function tick(){var k=dayKey(new Date().toISOString());if(k!==todayK){todayK=k;yK=dayKey(new Date(Date.now()-864e5).toISOString());relabel()}paintUpd()}
+tickT=setInterval(tick,15000);
+function relabel(){ /* re-render on-screen rows so day labels and times are current */
+  rebuild();layout();rendered.forEach(function(n){n.remove()});rendered.clear();render()}
 function sinceLabel(){return items[0]?fT.format(dt(items[0].t)):fT.format(new Date())}
-function showNone(){
-  if(!elUpd)return;
-  elUpd.hidden=false;elUpd.textContent="No new signals since "+sinceLabel()+" ET";
-  if(stat)stat.style.visibility="hidden";
-  clearTimeout(noneT);
-  noneT=setTimeout(function(){if(stat)stat.style.visibility="";stamp()},3200);
-}
+function flash(txt,ms){if(!elUpd)return;elUpd.hidden=false;elUpd.textContent=txt;msgUntil=Date.now()+(ms||3200);
+  if(stat)stat.style.visibility="hidden";clearTimeout(noneT);noneT=setTimeout(function(){msgUntil=0;if(stat)stat.style.visibility="";paintUpd()},ms||3200)}
+function showNone(){flash("Up to date · nothing new since "+sinceLabel()+" ET")}
 function showPill(){if(!bNew)return;bNew.hidden=pending<=0;if(pending>0)bNew.textContent=pending+" new"}
 function busy(on){if(!bRef)return;bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
+/* ---------- arrivals: near the top, new items slide in one at a time (oldest first, newest ends on top) */
+var drip=[],queued={},dripT=0;
+function gap(){return RM?0:Math.max(180,Math.min(700,4000/(drip.length+1)))}   /* a scan's batch streams in over about 4 s */
+function flipAdd(it){
+  var old=new Map();rendered.forEach(function(n,k){if(n._r)old.set(k,n._r.top)});
+  add([it],"top");rebuild();layout();render();
+  if(RM)return;
+  rendered.forEach(function(n,k){var r=n._r;if(!r)return;
+    if(k===it.id){n.animate([{opacity:0,transform:"translateY(-18px)"},{opacity:1,transform:"translateY(0)"}],{duration:520,easing:EASE});return}
+    var o=old.get(k);if(o==null||Math.abs(o-r.top)<.5)return;
+    n.animate([{transform:"translateY("+(o-r.top)+"px)"},{transform:"translateY(0)"}],{duration:520,easing:EASE})});
+}
+function dripNext(){dripT=0;
+  if(!drip.length)return;
+  if(!nearTop()||anim){var rest=drip.splice(0);rest.forEach(function(x){delete queued[x.id]});
+    keepAnchor(function(){var n=add(rest.slice().reverse(),"top");rebuild();pending+=n});showPill();return}
+  var it=drip.shift();delete queued[it.id];if(seen[it.id])return dripNext();
+  NEW[it.id]=Date.now();flipAdd(it);status();
+  if(drip.length)dripT=setTimeout(dripNext,gap());
+}
 function arrive(arr){
   if(!arr||!arr.length)return 0;
-  var t=Date.now();arr.forEach(function(it){NEW[it.id]=t});
+  var fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});if(!fresh.length)return 0;
+  var t=Date.now();fresh.forEach(function(it){NEW[it.id]=t});
+  if(nearTop()&&!RM){fresh.slice().reverse().forEach(function(it){queued[it.id]=1;drip.push(it)});if(!dripT)dripNext();return fresh.length}
   var n=0;
-  if(nearTop()){n=add(arr,"top");rebuild();layout();render()}
-  else{keepAnchor(function(){n=add(arr,"top");rebuild()});pending+=n;showPill()}
+  if(nearTop()){n=add(fresh,"top");rebuild();layout();render()}
+  else{keepAnchor(function(){n=add(fresh,"top");rebuild()});pending+=n;showPill()}
   return n;
 }
 function pollNewer(manual){
-  if(loading.n||!topCur)return Promise.resolve();
-  if(!manual&&d.hidden)return Promise.resolve();
-  loading.n=1;var g=gen;if(manual)busy(true);
+  if(loading.n||!topCur)return Promise.resolve(0);
+  if(!manual&&d.hidden)return Promise.resolve(0);
+  loading.n=1;var g=gen,got=0;if(manual)busy(true);
   return api("after="+encodeURIComponent(topCur)+"&limit=100&"+qp()).then(function(j){if(g!==gen)return;
     var arr=j.items||[];
     if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
     topEnd=arr.length<100;
-    if(arr.length)arrive(arr);
+    if(arr.length)got=arrive(arr);
     stamp();
-  }).catch(function(){}).then(function(){if(g!==gen)return;loading.n=0;if(manual)busy(false);status();check()});
+  }).catch(function(){}).then(function(){if(g!==gen)return got;loading.n=0;if(manual)busy(false);status();check();return got});
 }
-function startPoll(){stopPoll();pollT=setInterval(function(){if(!d.hidden&&topEnd)pollNewer(false)},POLL)}
+/* safety poll: every 12 s without a live connection, every 60 s with one (the stream rings the bell the moment items land) */
+function startPoll(){stopPoll();pollT=setInterval(function(){if(!d.hidden&&topEnd)pollNewer(false)},liveMode==="live"?60000:POLL)}
 function stopPoll(){if(pollT){clearInterval(pollT);pollT=0}}
+if(W.BNRT){
+  BNRT.onMode(function(m){var was=liveMode;liveMode=m;if(was!==m&&pollT)startPoll();paintUpd()});
+  BNRT.on(function(ev){ /* a scan landed on the server: fetch the new items through the normal API (keeps search/filters exact) */
+    if(!(ev.reset||(ev.new&&ev.new.length)||ev.more_new))return;
+    if(topEnd)pollNewer(false);else{pending+=(ev.new||[]).length+(ev.more_new||0);showPill()}});
+}
 function refresh(){
-  /* Always re-fetch the top of the timeline (not only after=). Visibly stamp, or say nothing new.
-     Do not bail if a background poll is in flight — Refresh must always do something visible. */
-  busy(true);var g=gen;loading.n=1;
-  if(!topEnd){
-    reset();scrollToList();
-    return loadOlder().then(function(){if(g!==gen)return;loading.n=0;busy(false);stamp()});
-  }
-  return api("limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
-    var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]});
-    if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
-    topEnd=true;
-    if(fresh.length){arrive(fresh);stamp()}else showNone();
-  }).catch(function(){}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
+  /* Real refresh: the server drops its caches and asks the scanner for anything newer (waits up to 6 s), then the page re-fetches the
+     top of the Wire and the totals, re-renders the on-screen times and says what happened ("3 new stories" / "Up to date"). */
+  if(bRef&&bRef.classList.contains("busy"))return Promise.resolve();
+  busy(true);var g=gen,t0=Date.now();
+  var srv=W.BNRT?BNRT.refresh():Promise.resolve({});
+  return srv.then(function(res){if(g!==gen)return;
+    fetch("/api/wire_tl/meta?_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(m){if(m&&m.total!=null){meta=m;total=m.total;status()}}).catch(function(){});
+    if(!topEnd){reset();scrollToList();return loadOlder().then(function(){busy(false);stamp();flash("Showing the latest stories")})}
+    loading.n=1;
+    return api("limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
+      var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});
+      if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
+      topEnd=true;todayK=dayKey(new Date().toISOString());yK=dayKey(new Date(Date.now()-864e5).toISOString());
+      if(!fresh.length&&!drip.length)relabel();
+      if(fresh.length)arrive(fresh);stamp();
+      var n=0;for(var k in NEW)if(NEW[k]>=t0)n++;   /* counts what the stream delivered during the refresh too */
+      var wait=Math.max(0,700-(Date.now()-t0));
+      setTimeout(function(){if(n)flash(n+" new stor"+(n===1?"y":"ies"));else showNone()},wait);
+    }).catch(function(){flash("Could not reach the server. Try again in a moment.")}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
+  });
 }
 var chk=0;
 function check(){if(chk)return;chk=requestAnimationFrame(function(){chk=0;if(anim)return;
@@ -367,7 +407,7 @@ qX.addEventListener("click",function(){qIn.value="";setQ("")});
 d.addEventListener("keydown",function(e){if(e.key==="/"&&d.activeElement!==qIn&&!/input|textarea/i.test((d.activeElement||{}).tagName||"")){e.preventDefault();scrollToList();qIn.focus()}});
 /* ---------- jump to date */
 function reset(){gen++;items=[];seen={};rows=[];rendered.forEach(function(n){n.remove()});rendered.clear();exp.clear();
-  topCur=null;topEnd=true;botCur=null;botEnd=false;loading={o:0,n:0};padX=0;NEW={};pending=0;showPill();layout();footState()}
+  topCur=null;topEnd=true;botCur=null;botEnd=false;loading={o:0,n:0};padX=0;NEW={};pending=0;drip=[];queued={};clearTimeout(dripT);dripT=0;showPill();layout();footState()}
 function scrollToList(){measureTop();var tgt=tlTop-(ctl.offsetHeight+barH())-4;if(W.scrollY<tgt-2||W.scrollY>tgt+2)W.scrollTo(0,tgt)}
 function barH(){return bar?bar.getBoundingClientRect().height:0}
 function endOfDayET(ymd){ /* ET day end in UTC: try both offsets, pick the one that maps back to the same ET day */
