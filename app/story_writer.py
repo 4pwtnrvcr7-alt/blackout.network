@@ -658,8 +658,10 @@ def _writer_worker(ready, paused):
             if paused(): STATE["paused"] = "deploy handoff"; time.sleep(5); continue
             if not enabled(): STATE["paused"] = "no API key" if not key_set() else "BN_WRITER=0"; time.sleep(30); continue
             STATE["paused"] = None
-            try: mt = os.path.getmtime(cfg()["blackout_db"])
-            except OSError: mt = None
+            mt = []
+            for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
+                try: mt.append(os.path.getmtime(cfg()["blackout_db"] + sfx))
+                except OSError: mt.append(None)
             if mt != last_mt or time.time() - (parse_t(STATE["last_scan"]) or now()).timestamp() > 120 or not STATE["initial_done"]:
                 scan(); last_mt = mt
             with _LK:
