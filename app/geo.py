@@ -18,7 +18,7 @@ UA = "blackout.network-heatmap/1.0 (+https://blackout.network; research dashboar
 NOM_URL = "https://nominatim.openstreetmap.org/search"
 NOM_BUDGET = 150            # max Nominatim requests per worker pass (cached forever, so each query is asked once)
 WINDOW_DAYS = 7
-VERSION = 9                 # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u)
+VERSION = 10                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u)
 _lock = threading.RLock()
 _nom_lock = threading.Lock()
 _last_nom = [0.0]
@@ -284,7 +284,14 @@ def extract(text, ctx_cc=None, trust=False):
             if n > 1 and any(_sent_start(t, toks, i + j) for j in range(1, n)): continue     # "NEW: Britain ..." is not New Britain
             if k in G.idx or k in SPECIAL_CITY:
                 # sentence position: first word of the text or after . ! ? : is "sentence start"
-                if not (caps[i] or (i > 0 and nw(words[i - 1]) in STRONG_CUES and not trust and k not in LOCATIONAL and k not in G.common and k not in GENERIC)): continue
+                if not (caps[i] or (i > 0 and nw(words[i - 1]) in STRONG_CUES and not trust and k not in LOCATIONAL and k not in G.common and k not in GENERIC
+                                    and len(k) >= 4 and any(r[0] in ("country", "admin1") for r in G.idx.get(k, [])))): continue   # v10: no lower-case towns
+                # v10: one half of a hyphenated name ("Miami-Dade") is not a place of its own
+                if n == 1 and not trust and not any(r[0] in ("country", "admin1", "demonym") for r in G.idx.get(k, [])) and (
+                        (i > 0 and t[toks[i - 1][2]:toks[i][1]] == "-" and caps[i - 1] and nw(words[i - 1]) not in HYPHEN_OK) or
+                        (i + 1 < len(toks) and t[toks[i][2]:toks[i + 1][1]] == "-" and caps[i + 1] and nw(words[i + 1]) not in HYPHEN_OK)): continue
+                # v10: "Macon County" is the county, not the city of Macon
+                if not trust and i + n < len(words) and nw(words[i + n]) in ("county", "parish") and not any(r[0] in ("country", "admin1") for r in G.idx.get(k, [])): continue
                 if n == 1 and k in G.common and trust and len(k) <= 3: continue
                 if n == 1 and words[i].replace(".", "").isupper() and len(words[i].replace(".", "")) <= 4 and k not in CAPS_ONLY and not trust and k not in SPECIAL_CITY: continue   # acronyms (NIS, SEC, WHO)
                 if n == 1 and k in CAPS_ONLY and not (words[i].replace(".", "").isupper() and not shouting): continue
@@ -369,6 +376,7 @@ def extract(text, ctx_cc=None, trust=False):
                     acc.append({"level": "state", "cc": pick[0].split(".")[0], "a1": pick[0], "i": i, "k": k, "text": " ".join(words[i:i + n]), "conf": "high" if trust else "medium", "cue": strong_cue}); continue
             elif len(a1s) > 1 and not cities:
                 rejected.append({"text": " ".join(words[i:i + n]), "why": "ambiguous", "cands": [f"{G.admin1[a]['name']} ({a.split('.')[0]})" for a in a1s[:5]]}); continue
+        if cities and n == 1 and k in GENERIC and not trust and not pair: cities = []     # v10: "Central Florida" is not Central, Louisiana
         if cities:
             C = [G.city(c) | {"i": c} for c in cities]
             if pair and pair[0]:
@@ -580,6 +588,7 @@ SOURCE_CC = [
     (r"Times of Israel|Haaretz|Jerusalem Post|\bYnet\b|i24NEWS|\.co\.il\b", "IL"),
     (r"Kyiv Independent|Ukrainska Pravda|Ukrinform|\.ua\b", "UA"),
     (r"\bNWS\b|api\.weather\.gov|National Weather Service|\bUSGS\b|\.gov/|\bFEMA\b|\bCDC\b|\bNOAA\b", "US"),
+    (r"Google News: (?!WION\b)[KW][A-Z]{2,3}(?:-TV)?\b(?![a-z])|@(?!wion|kyiv)[kw][a-z]{2,3}\d{0,2}(?:tv|news)?\.bsky\.social|@\d{3,4}[kw][a-z]{2,3}\.bsky", "US"),   # v10: US local TV/radio call letters (KETV, WGME, @wmur9)
 ]
 SOURCE_CC_RE = [(re.compile(rx), cc) for rx, cc in SOURCE_CC]
 def source_cc(members=(), extra=""):
@@ -735,6 +744,27 @@ def agree(ch, ex, prior, named):
         return dict(ch, conf="low", why=f"sources are from {prior}")
     return ch
 
+HYPHEN_OK = {"based", "born", "area", "bound", "led", "backed", "made", "style", "era", "ex", "pro", "anti", "post", "pre", "region", "wide"}
+
+def _better_than_weak(ch, ex, prior, named):
+    """v10 (Matt pt1686u, "never again"): a low-confidence town ("Abu" for "Abu Sharkh roundabout, Gaza Strip", "Grey Eagle" -> Eagle, Idaho,
+    "Town of Lyons" -> Lyon, France) is not used when the story names another country or its sources are from another country, . Returns a reduced ex, else None."""
+    if not ch or ch.get("level") != "city" or ch.get("conf") != "low": return None
+    acc = ex["acc"]; G = gaz()
+    neigh = set((G.countries.get(ch["cc"]) or {}).get("neighbours") or [])
+    weak_word = ch.get("k") in G.common or ch.get("k") in GIVEN_NAMES
+    c = ch.get("city") or {}
+    small = c.get("pop", 0) < 200000
+    alt = key_of(c.get("name") or "") != ch.get("k")          # matched through an alternate spelling ("Lyons" for Lyon)
+    if (named and ch["cc"] not in named and not (named & neigh) and small) or \
+            (prior and ch["cc"] != prior and ch["cc"] not in named and prior not in neigh and (small or alt) and not (prior == "US" and ch["cc"] in ("PR", "GU", "VI", "AS", "MP", "UM"))) or (not named and not prior and weak_word):
+        rest = [a for a in acc if not (a["level"] == "city" and a["k"] == ch.get("k") and a["cc"] == ch["cc"])]
+        spans = list(ex.get("spans") or [])
+        if prior and ch.get("cue") is not None and ch.get("text") and ch["text"] not in spans and (ch.get("cue") or len(ch["text"]) >= 4):
+            spans = [ch["text"]] + spans      # ask the online geocoder inside the sources' country instead ("Palo" -> Palo, Iowa)
+        return dict(ex, acc=rest, spans=spans[:2])
+    return None
+
 COUNTY_RE = re.compile(r"\b((?:St\.? |Saint |De |La |Le |Prince )?[A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}) (County|Parish)\b")
 POSTAL_RE = re.compile(r"(?:,\s*|\b)(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])\b")
 def county_place(text, prior=None):
@@ -755,6 +785,15 @@ def county_place(text, prior=None):
         if len(L) == 1:
             z = L[0]
             return {"lat": z["lat"], "lon": z["lon"], "st": z["st"], "name": f"{z['name']} County", "text": m.group(0)}
+    return None
+
+def us_county_any(text):
+    """'Santa Cruz County' when that county name exists in the NWS county table (any state), else None."""
+    N = nws_data()
+    if not N.get("byname"): return None
+    for m in COUNTY_RE.finditer(text or ""):
+        nm = re.sub(r"^Saint ", "St ", m.group(1))
+        if any(z["code"].startswith("C") for z in (N["byname"].get(("*", key_of(nm))) or [])): return m.group(0)
     return None
 
 def nws_counties(res):
@@ -897,9 +936,17 @@ def geocode(cl, members, budget):
                 far = nc or G.nearest_city(lat, lon, 250)
                 if far: cc = far["cc"]
         conf, extra = "high", ""
+        tnamed = _named_countries(title)
         if cc and named and cc not in named and not (cc == "US" and named & {"PR", "GU", "VI", "AS", "MP"}) and not any(G.nearest_city_cc(lat, lon, x, 300) for x in named):
             # the coordinates and the story disagree about the country (e.g. a merged GDACS fire: "in Australia" at a point in Brazil)
             conf, extra = "low", f"; text names {', '.join(sorted(named))} but the coordinates are in {cc}"
+        # v10 (pt1686u): the headline names one country and the coordinates are far outside it -> the headline wins (country-level pin there)
+        if cc and len(tnamed) == 1 and cc not in tnamed and not (cc == "US" and tnamed & {"PR", "GU", "VI", "AS", "MP"}):
+            tc = next(iter(tnamed)); lab = (G.countries.get(tc) or {}).get("label")
+            if lab and not G.nearest_city_cc(lat, lon, tc, 300):
+                return fill(lab[0], lab[1], tc, None, "country", "gazetteer", f"title names {tc}; {det} coordinates ({lat:.2f}, {lon:.2f}) are in {cc}", "medium",
+                            G.countries[tc].get("name", tc), evidence=f"headline country {tc} overrides source coordinates in {cc}")
+            if lab: cc, a1, conf = tc, None, "high"      # next to the border (MeteoAlarm "Israel: ..." at a West Bank point): the named country
         place = loc if loc and not loc.startswith("Global") else (title[:120])
         return fill(lat, lon, cc, a1, "point", "source_coords", det, conf, place, city=nc["name"] if nc else None, evidence=f"{det} lat/lon {lat:.3f}, {lon:.3f}{extra}")
     # brief "WHERE: ... (approx. lat, lon)" written by the scanner from source data
@@ -966,6 +1013,7 @@ def geocode(cl, members, budget):
     allnamed = set()
     for tx in texts: allnamed |= _named_countries(tx)
     first_fail = None; spans_all = []; quals = []; demonyms = set(); flags = set(); rejected = []
+    tnamed0 = {c for c in _named_countries(title) if c}
     for n, tx in enumerate(texts):
         cp = county_place(tx, prior)
         if cp and not (allnamed - {"US"}):
@@ -975,12 +1023,25 @@ def geocode(cl, members, budget):
         ex = extract(tx, ctx_cc=prior)
         if bw and tx == bw and n > 0: ex = dict(ex, acc=[a for a in ex["acc"] if a["level"] != "city" or a.get("cue")])
         ch, rc, rt, cands = choose(ex)
-        if ch:
+        for _try in range(4):
+            if not ch: break
             ch = agree(ch, ex, prior, allnamed)
+            alt = _better_than_weak(ch, ex, prior, allnamed)
+            if alt is None: break
+            ex = alt; ch, rc, rt, cands = choose(ex)
+        if ch and n > 0 and tnamed0 and ch["cc"] not in tnamed0:
+            ch = None     # v10: the headline names its countries; a later text may not move the story to a country the headline never names
+        if ch:
             if ch: return place_from(ch, out, fill, "gazetteer", ("title" if n == 0 else "the story's summary" if bw and tx == bw else "another source's title in this story")
                                      + (f" (source country prior {prior})" if prior else ""), tx)
         if rc and not first_fail: first_fail = (rc, rt, cands)
         rejected += ex["rejected"]; spans_all += [(s, ex["ctx"]) for s in ex["spans"]]; quals += ex["qual"]; demonyms |= set(ex["demonyms"]); flags |= set(ex["flags"])
+    if not first_fail and not quals and not (allnamed - {"US"}) and prior in (None, "US"):
+        cty = next((us_county_any(tx) for tx in texts if us_county_any(tx)), None)
+        lab = G.countries.get("US", {}).get("label")
+        if cty and lab:   # v10: "Santa Cruz County", "El Paso County": a US county name found in several states -> the US, approximate
+            return fill(lab[0], lab[1], "US", None, "country", "gazetteer", f"US county name in several states ({cty})", "medium", f"{cty}, United States",
+                        evidence=f"matched \"{cty}\" (NWS county table, more than one state)")
     if first_fail and not quals:
         return dict(out, reason_code=first_fail[0], reason_unlocated=first_fail[1], candidates=json.dumps(first_fail[2]))
     if rejected and not quals:

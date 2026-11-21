@@ -146,6 +146,27 @@ def _generic(place):
     except Exception:
         return head in {"north", "south", "east", "west", "central"}
 
+def _infer_agrees(item, hit):
+    """The classic offline match must agree with the story: its country is one the text names (when it names any), it matches the
+    sources' own country (local US TV is not China), and its name is not one half of a hyphenated name."""
+    cc = (hit.get("cc") or "").upper()
+    if not cc: return True
+    try:
+        import geo
+        named = geo._named_countries(item.get("title") or "") | geo._named_countries(item.get("loc") or "")     # countries/states named outright
+        try: links = json.loads(item.get("links") or "[]") if isinstance(item.get("links"), str) else (item.get("links") or [])
+        except Exception: links = []
+        prior = geo.source_cc([{"source": (l or {}).get("source") or (l or {}).get("s"), "source_url": (l or {}).get("url") or (l or {}).get("u")} for l in links if isinstance(l, dict)])
+    except Exception:
+        return True
+    if named and cc not in named: return False
+    if prior and cc != prior and cc not in named and not (prior == "US" and cc in ("PR", "GU", "VI", "AS", "MP", "UM")): return False
+    head = (hit.get("place") or "").split(",")[0].strip()
+    if head and re.search(r"(?:[A-Za-z]-" + re.escape(head) + r"\b|\b" + re.escape(head) + r"-[A-Za-z])", item.get("title") or "", re.I) and \
+            not re.search(r"(?<![-A-Za-z])" + re.escape(head) + r"(?![-A-Za-z])", item.get("title") or "", re.I):
+        return False
+    return True
+
 def _wire_region(item):
     try:
         import wire_timeline as W
@@ -209,6 +230,7 @@ def place(item, g):
     if rc not in ("global", "ambiguous"):
         hit = _infer(item)
         if hit and _generic(hit.get("place")): hit = None
+        if hit and not _infer_agrees(item, hit): hit = None     # v10 (pt1686u): "Miami-Dade" is not Dade, China
         if hit and _ok(hit.get("lat"), hit.get("lon")):
             prec = hit.get("precision") or "country"
             if prec == "country" and hit.get("cc"):
