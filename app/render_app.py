@@ -510,6 +510,9 @@ class RH(server.H):
         return self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or self.client_address[0]
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        if path == "/admin" or path.startswith("/admin/") or path == "/api/admin/status" or path.startswith("/api/admin/"):
+            import admin_portal
+            return admin_portal.handle(self)
         if path == "/healthz":
             r = ready()
             return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"]})
@@ -575,6 +578,9 @@ class RH(server.H):
         return super().do_GET()
     def do_POST(self):
         path = self.path.split("?", 1)[0]
+        if path == "/admin" or path.startswith("/admin/") or path.startswith("/api/admin"):
+            import admin_portal
+            return admin_portal.handle(self)
         if path == "/internal/sync/push": return self.send(*handle_push(self))
         if path in ("/internal/rt/push", "/internal/rt/poll"): return self.send(*handle_rt(self, path))
         if path == "/api/rt/refresh":       # public Refresh button (rate-limited per IP inside realtime.refresh)

@@ -125,7 +125,7 @@ def news_sitemap():
 
 # seo/batch-1: every crawler is allowed, including AI search and training crawlers named explicitly. A crawler that matches a
 # named group ignores the "*" group, so each group repeats the same private-path disallows.
-_PRIVATE = ["/internal/", "/api/reports/", "/newsletter/confirm", "/newsletter/manage", "/newsletter/unsubscribe", "/report-status", "/alerts/"]
+_PRIVATE = ["/internal/", "/api/reports/", "/newsletter/confirm", "/newsletter/manage", "/newsletter/unsubscribe", "/report-status", "/alerts/", "/admin", "/api/admin/"]
 _BOTS = ["*", "Googlebot", "Bingbot", "GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "PerplexityBot", "Google-Extended",
          "Applebot-Extended", "CCBot"]
 ROBOTS = ("# BLACKOUT.NETWORK crawl rules. All crawlers are welcome, including AI search and training crawlers.\n"
