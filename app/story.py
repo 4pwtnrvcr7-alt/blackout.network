@@ -173,6 +173,11 @@ def render(cid, since=""):
            if since_ok else "")
     desc = (f"{what[:150]}. Rank {rank}/10 ({tname}). {conf}. Every report linked to its source on BLACKOUT.NETWORK.")[:300]
     loc = r.get("location") or ""
+    try:   # Nov 21 2026 (Matt pt1682u): readable place label, never a raw NWS zone dump
+        import geo as _geo
+        loc = _geo.place_label(title or "", loc) or (loc if loc.count(";") < 2 else "")
+    except Exception:
+        loc = loc if loc.count(";") < 2 else ""
     elec = ""
     try:   # seo/midterms-phases: election-tagged stories (midterms_hub.is_election_story) link to the /midterms hub
         import midterms_hub as MH
