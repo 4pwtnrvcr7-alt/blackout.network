@@ -536,6 +536,13 @@ class RH(server.H):
                 try: os.unlink(tmp)
                 except FileNotFoundError: pass
         if path in ("/api/status", "/api/sync_status"): return self.send(200, public_status())
+        if path == "/internal/writer/status":   # Nov 21 2026: read-only story writer status; box-signed GET or the admin passcode header
+            ok, _ = verify(self, "GET", path, hashlib.sha256(b"").hexdigest())
+            if not ok: ok = _writer_admin_ok(self)
+            if ok is None: return self.send(429, {"error": "too many attempts, wait 10 min"})
+            if not ok: return self.send(403, {"error": "admin passcode required"})
+            import story_writer
+            return self.send(200, story_writer.status())
         if path == "/internal/sync/manifest":
             ok, why = verify(self, "GET", path, hashlib.sha256(b"").hexdigest())
             return self.send(200, manifest()) if ok else self.send(403, {"error": why})
@@ -624,6 +631,16 @@ class RH(server.H):
             self.body(); return self.send(503, {"error": "The site just restarted and is syncing. Please try again in a minute."})
         return super().do_POST()
 
+_WFAIL = {}
+def _writer_admin_ok(h):
+    """True / False, or None when this IP is locked out (5 bad tries in 10 min). Header X-Admin-Passcode only (never a query string)."""
+    ip = h.headers.get("X-Forwarded-For", "").split(",")[0].strip() or h.client_address[0]; t = time.time()
+    _WFAIL[ip] = [x for x in _WFAIL.get(ip, []) if t - x < 600]
+    if len(_WFAIL[ip]) >= 5: return None
+    given = str(h.headers.get("X-Admin-Passcode") or "")
+    if given and hmac.compare_digest(given.encode(), server.passcode().encode()): return True
+    _WFAIL[ip].append(t); return False
+
 def _render_bg():
     while True:
         _refresh_state()
@@ -656,6 +673,10 @@ if __name__ == "__main__":
     t = threading.Thread(target=_render_bg, daemon=True); t.start()
     start_handoff()
     print(f"deploy handoff: {HANDOFF['state']} (peer url set: {bool(HANDOFF_URL)})", flush=True)
+    try:   # Nov 21 2026: instant rank 5+ write-ups via the xAI API (story_writer.py; idle without XAI_API_KEY; BN_WRITER=0 = off)
+        import story_writer
+        story_writer.start(ready=lambda: has_data() and HANDOFF["state"] != "pending", paused=lambda: FREEZE["until"] > time.time())
+    except Exception: traceback.print_exc()
     wait_before_bind()
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True

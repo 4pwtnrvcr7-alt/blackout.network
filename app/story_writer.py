@@ -1,0 +1,701 @@
+"""Instant story write-ups for rank 5+ Wire stories via the xAI API (Nov 21 2026, Matt 2:12 PM ET).
+
+Runs on the Render web node as ONE background thread (never inside a request). Every few seconds it reads blackout.db
+read-only (file:...?mode=ro) and queues each main-feed cluster with rank >= BN_WRITER_MIN_RANK that has no write-up yet
+(new arrivals first, then a backfill of the last BN_WRITER_BACKFILL_H hours). For each job it fetches the cluster's own
+source URLs (timeouts, size caps, public hosts only), sends the extracted text to the model with a strict grounding prompt,
+validates the JSON against the desk brief v2 + Story v3 schema, checks the text (word rules, numbers and quotes must appear
+in the sources, cited links must be ones we fetched), retries once, and stores the brief in story_writer.db.
+
+Precedence (never overwrite the desk): a Story v3 brief file, a pushed desk brief / analyst note (story_reports.json notes or
+alias) always win. The writer skips those clusters and story_v3.note_for() only falls back to a writer brief when neither
+exists. Near-duplicates of a covered story alias to its brief instead of a new API call.
+
+No images are generated: the page keeps the existing licensed / place-matched Wire images.
+
+Env (all optional except the key):
+  XAI_API_KEY               required; the writer stays idle without it (never logged or printed)
+  BN_WRITER=0               kill switch
+  BN_WRITER_MODEL           default grok-4.3
+  BN_WRITER_API             default https://api.x.ai/v1
+  BN_WRITER_MIN_RANK        default 5
+  BN_WRITER_MAX_PER_HOUR    default 30 API write-ups per rolling hour
+  BN_WRITER_DAILY_USD       default 1.00 (ET day); the writer pauses when the day's spend reaches it
+  BN_WRITER_PRICE_IN/_OUT   USD per million tokens (default 1.25 / 2.50, grok-4.3 list price)
+  BN_WRITER_BACKFILL_H      default 24
+  BN_WRITER_POLL_S          default 10
+  BN_WRITER_REFRESH_MIN     default 60 (a story is rewritten at most this often, and only when 2+ new source links arrived)
+  BN_WRITER_DB              default <app>/story_writer.db (a Render-owned DB: handed to the next instance on every deploy)
+"""
+from __future__ import annotations
+import hashlib, html, ipaddress, json, os, re, socket, sqlite3, sys, threading, time, traceback, urllib.error, urllib.parse, urllib.request
+from datetime import datetime, timedelta, timezone
+from html.parser import HTMLParser
+from concurrent.futures import ThreadPoolExecutor
+
+try:
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+except Exception:  # pragma: no cover
+    ET = timezone(timedelta(hours=-5))
+UTC = timezone.utc
+HERE = os.path.dirname(os.path.abspath(__file__))
+DB_REL = "story_writer.db"
+
+def _env(k, d): return (os.environ.get(k) or "").strip() or d
+def _f(k, d):
+    try: return float(_env(k, str(d)))
+    except Exception: return float(d)
+def cfg():
+    return {"model": _env("BN_WRITER_MODEL", "grok-4.3"), "api": _env("BN_WRITER_API", "https://api.x.ai/v1").rstrip("/"),
+            "min_rank": int(_f("BN_WRITER_MIN_RANK", 5)), "max_per_hour": int(_f("BN_WRITER_MAX_PER_HOUR", 30)),
+            "daily_usd": _f("BN_WRITER_DAILY_USD", 1.0), "price_in": _f("BN_WRITER_PRICE_IN", 1.25), "price_out": _f("BN_WRITER_PRICE_OUT", 2.50),
+            "backfill_h": _f("BN_WRITER_BACKFILL_H", 24), "poll_s": max(2.0, _f("BN_WRITER_POLL_S", 10)),
+            "refresh_min": _f("BN_WRITER_REFRESH_MIN", 60), "db": _env("BN_WRITER_DB", os.path.join(HERE, DB_REL)),
+            "blackout_db": _env("BN_WRITER_SOURCE_DB", os.path.join(HERE, "blackout.db"))}
+def key_set(): return bool((os.environ.get("XAI_API_KEY") or "").strip())
+def enabled(): return _env("BN_WRITER", "1") != "0" and key_set()
+
+def now(): return datetime.now(UTC)
+def iso(d=None): return (d or now()).strftime("%Y-%m-%dT%H:%M:%SZ")
+def parse_t(s):
+    try: return datetime.fromisoformat(str(s).replace("Z", "+00:00")).astimezone(UTC)
+    except Exception: return None
+def et_day(d=None): return (d or now()).astimezone(ET).date().isoformat()
+def log(*a): print("story_writer:", *a, flush=True)
+
+# ---------------------------------------------------------------- store (story_writer.db)
+_LK = threading.RLock()
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS briefs(cid TEXT PRIMARY KEY, note TEXT, written_at TEXT, model TEXT, src_urls TEXT, alias_of TEXT,
+  tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, usd REAL DEFAULT 0, rank INTEGER, title TEXT);
+CREATE TABLE IF NOT EXISTS seen(cid TEXT PRIMARY KEY, first_seen TEXT, rank INTEGER, backfill INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY AUTOINCREMENT, cid TEXT, reason TEXT, status TEXT, enq_at TEXT, arrived_at TEXT,
+  started TEXT, finished TEXT, err TEXT, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, usd REAL DEFAULT 0,
+  latency_s REAL, calls INTEGER DEFAULT 0, rank INTEGER, title TEXT);
+CREATE INDEX IF NOT EXISTS ix_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS ix_jobs_cid ON jobs(cid);
+CREATE TABLE IF NOT EXISTS spend(day TEXT PRIMARY KEY, usd REAL DEFAULT 0, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, calls INTEGER DEFAULT 0);
+"""
+def db():
+    k = sqlite3.connect(cfg()["db"], timeout=20)
+    k.row_factory = sqlite3.Row
+    k.executescript(SCHEMA)
+    return k
+
+_NC = {"t": 0.0, "v": {}}
+def notes(max_age=5.0):
+    """{cid: note dict} of writer briefs (cached a few seconds; request threads call this)."""
+    if time.time() - _NC["t"] < max_age: return _NC["v"]
+    out = {}
+    try:
+        p = cfg()["db"]
+        if os.path.exists(p):
+            k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+            try:
+                rows = k.execute("SELECT cid, note, alias_of FROM briefs").fetchall()
+            finally: k.close()
+            for c, n, a in rows:
+                if a: out[c] = ("alias", a); continue
+                try: out[c] = json.loads(n) if n else None
+                except Exception: pass
+    except Exception: traceback.print_exc()
+    _NC.update(t=time.time(), v=out)
+    return out
+def note_for(cid):
+    """Writer brief for a cluster, or None. Callers must check desk content first (story_v3.note_for does)."""
+    if not cid: return None
+    allv = notes(); n = allv.get(cid)
+    if isinstance(n, tuple):   # near-duplicate: the covered story's desk brief, else its writer brief
+        tgt = n[1]
+        notes_, alias, v3 = _desk_maps()
+        d = v3.get(tgt) or notes_.get(tgt) or notes_.get(alias.get(tgt) or "")
+        if isinstance(d, dict): return d
+        n = allv.get(tgt)
+    return n if isinstance(n, dict) else None
+
+# ---------------------------------------------------------------- desk coverage (the routine's briefs win)
+def _desk_maps():
+    notes_, alias = {}, {}
+    try:
+        import story_report as SR
+        R = SR.reports() or {}
+        notes_ = R.get("notes") or {}; alias = R.get("alias") or {}
+    except Exception: pass
+    v3 = {}
+    try:
+        import story_v3 as V3
+        v3 = V3._load_v3() or {}
+    except Exception: pass
+    return notes_, alias, v3
+def desk_covered(cid, maps=None):
+    notes_, alias, v3 = maps or _desk_maps()
+    return bool(cid in v3 or cid in notes_ or (alias.get(cid) and alias.get(cid) in notes_))
+
+_STOP = set("the a an of in on at to for and or with by from is are was were has have be this that as near over after into its it new says said "
+            "update updates live report reports more than us u s".split())
+def _toks(t): return {w for w in re.findall(r"[a-z0-9]+", (t or "").lower()) if len(w) > 2 and w not in _STOP}
+def near_dup(a, b):
+    """Two cluster rows describe the same event: same category, close in time, headline tokens mostly shared."""
+    if (a.get("category") or "") != (b.get("category") or ""): return False
+    ta, tb = _toks(a.get("title")), _toks(b.get("title"))
+    if len(ta) < 3 or len(tb) < 3: return False
+    j = len(ta & tb) / max(1, len(ta | tb))
+    t1, t2 = parse_t(a.get("first_seen")), parse_t(b.get("first_seen"))
+    u1, u2 = parse_t(a.get("updated")), parse_t(b.get("updated"))
+    close = bool((t1 and t2 and abs((t1 - t2).total_seconds()) < 72 * 3600) or (u1 and u2 and abs((u1 - u2).total_seconds()) < 24 * 3600))
+    return close and j >= 0.6
+
+# ---------------------------------------------------------------- source DB (read-only)
+def _src():
+    p = cfg()["blackout_db"]
+    if not os.path.exists(p): return None
+    k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=10)
+    k.row_factory = sqlite3.Row
+    return k
+def candidates(hours):
+    k = _src()
+    if k is None: return []
+    try:
+        cut = iso(now() - timedelta(hours=hours))
+        rows = [dict(r) for r in k.execute(
+            "SELECT * FROM clusters WHERE watchlist=0 AND COALESCE(rank,0)>=? AND COALESCE(updated, first_seen)>=? ORDER BY rank DESC, updated DESC LIMIT 400",
+            (cfg()["min_rank"], cut))]
+    finally: k.close()
+    try:
+        import story_display as SD
+        rows = [SD.apply(r) for r in rows]
+        rows = [r for r in rows if SD.visible(r)]
+    except Exception: pass
+    return rows
+def cluster(cid):
+    k = _src()
+    if k is None: return None, []
+    try:
+        r = k.execute("SELECT * FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
+        al = [dict(x) for x in k.execute("SELECT source, family, title, source_url, event_time, first_seen, official, location FROM alerts "
+                                         "WHERE cluster_id=? ORDER BY official DESC, first_seen DESC LIMIT 80", (cid,))]
+    finally: k.close()
+    r = dict(r) if r else None
+    if r:
+        try:
+            import story_display as SD; r = SD.apply(r)
+        except Exception: pass
+    return r, al
+def source_urls(r, al):
+    urls = []
+    for a in al:
+        u = (a.get("source_url") or "").strip()
+        if u.startswith(("http://", "https://")) and u not in urls: urls.append(u)
+    try: links = json.loads(r.get("links") or "[]") if isinstance(r.get("links"), str) else (r.get("links") or [])
+    except Exception: links = []
+    for l in links:
+        u = str((l or {}).get("url") or "").strip()
+        if u.startswith(("http://", "https://")) and u not in urls: urls.append(u)
+    return urls
+
+# ---------------------------------------------------------------- fetching (public hosts only, capped)
+MAX_BYTES = 1_500_000; FETCH_TIMEOUT = 9; PER_SOURCE_CHARS = 9000; TOTAL_CHARS = 48000; MAX_SOURCES = 8
+UA = "Mozilla/5.0 (compatible; BLACKOUT.NETWORK story writer; +https://blackout.network/about)"
+_ALLOW_NETS = []
+for _n in (os.environ.get("BN_WRITER_FETCH_ALLOW_CIDR") or "").split(","):
+    try:
+        if _n.strip(): _ALLOW_NETS.append(ipaddress.ip_network(_n.strip()))
+    except ValueError: pass
+def _public_host(u):
+    try:
+        p = urllib.parse.urlsplit(u)
+        if p.scheme not in ("http", "https") or not p.hostname: return False
+        for fam, _, _, _, sa in socket.getaddrinfo(p.hostname, p.port or (443 if p.scheme == "https" else 80), proto=socket.IPPROTO_TCP):
+            ip = ipaddress.ip_address(sa[0])
+            if any(ip in n for n in _ALLOW_NETS): continue   # local testing behind an egress proxy only (unset on Render)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified: return False
+        return True
+    except Exception: return False
+class _NoPrivateRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _public_host(newurl): return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+_OPENER = urllib.request.build_opener(_NoPrivateRedirect())
+
+class _Text(HTMLParser):
+    SKIP = {"script", "style", "noscript", "svg", "nav", "footer", "header", "form", "aside", "button", "select", "iframe", "template"}
+    KEEP = {"p", "h1", "h2", "h3", "li", "td", "blockquote", "pre", "dd", "dt", "figcaption"}
+    def __init__(self):
+        super().__init__(convert_charrefs=True); self.skip = 0; self.cur = None; self.parts = []; self.meta = {}; self.title = ""; self._in_title = False
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag in self.SKIP: self.skip += 1
+        elif tag == "meta":
+            k = (a.get("property") or a.get("name") or "").lower()
+            if k in ("og:title", "og:description", "description", "article:published_time", "og:site_name") and a.get("content"): self.meta[k] = a["content"]
+        elif tag == "title": self._in_title = True
+        elif tag in self.KEEP and not self.skip: self.cur = []
+        elif tag == "br" and self.cur is not None: self.cur.append(" ")
+    def handle_endtag(self, tag):
+        if tag in self.SKIP and self.skip: self.skip -= 1
+        elif tag == "title": self._in_title = False
+        elif tag in self.KEEP and self.cur is not None:
+            t = " ".join("".join(self.cur).split())
+            if len(t) >= 25: self.parts.append(t)
+            self.cur = None
+    def handle_data(self, d):
+        if self._in_title: self.title += d
+        if self.skip: return
+        if self.cur is not None: self.cur.append(d)
+
+def _json_text(o, out, depth=0):
+    if depth > 8 or len(out) > 400: return
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if isinstance(v, str) and k.lower() in ("headline", "description", "instruction", "title", "place", "areadesc", "event", "severity",
+                                                    "certainty", "urgency", "sendername", "onset", "expires", "effective", "time", "summary", "text", "name", "status"):
+                if v.strip(): out.append(f"{k}: {' '.join(v.split())}")
+            elif isinstance(v, (int, float)) and k.lower() in ("mag", "magnitude", "depth", "felt", "tsunami", "alert", "cdi", "mmi", "sig"):
+                out.append(f"{k}: {v}")
+            else: _json_text(v, out, depth + 1)
+    elif isinstance(o, list):
+        for v in o[:60]: _json_text(v, out, depth + 1)
+
+def _rewrite(u):
+    """Machine-readable twins of pages that are JavaScript-only for a plain fetch."""
+    m = re.match(r"https?://earthquake\.usgs\.gov/earthquakes/eventpage/([a-z0-9]+)", u)
+    if m: return f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/{m.group(1)}.geojson"
+    return u
+
+def fetch(u):
+    """{url, final, ok, text, label, err}. Never raises."""
+    out = {"url": u, "final": u, "ok": False, "text": "", "label": "", "err": ""}
+    try:
+        fu = _rewrite(u)
+        if not _public_host(fu): out["err"] = "host not allowed"; return out
+        req = urllib.request.Request(fu, headers={"User-Agent": UA, "Accept": "text/html,application/json,application/geo+json,application/xml;q=0.8,*/*;q=0.5",
+                                                  "Accept-Language": "en-US,en;q=0.8"})
+        with _OPENER.open(req, timeout=FETCH_TIMEOUT) as r:
+            ct = (r.headers.get("Content-Type") or "").lower(); out["final"] = r.geturl()
+            raw = r.read(MAX_BYTES + 1)[:MAX_BYTES]
+        cs = re.search(r"charset=([\w-]+)", ct); body = raw.decode(cs.group(1) if cs else "utf-8", "replace")
+        host = urllib.parse.urlsplit(out["final"]).hostname or ""
+        if "json" in ct or body.lstrip()[:1] in ("{", "["):
+            try:
+                parts = []; _json_text(json.loads(body), parts); text = "\n".join(dict.fromkeys(parts))
+            except Exception: text = ""
+            label = host
+        elif "html" in ct or "<html" in body[:2000].lower():
+            p = _Text(); p.feed(body); p.close()
+            lead = [p.meta.get("og:title") or "", p.meta.get("og:description") or p.meta.get("description") or ""]
+            text = "\n".join(x for x in lead + p.parts if x)
+            label = " ".join((p.meta.get("og:site_name") or "").split()) or host
+            if p.meta.get("article:published_time"): text = f"Published: {p.meta['article:published_time']}\n" + text
+        elif "xml" in ct or "text/plain" in ct:
+            text = " ".join(re.sub(r"<[^>]+>", " ", body).split()); label = host
+        else:
+            out["err"] = f"unsupported type {ct[:40]}"; return out
+        text = html.unescape(text)
+        if "news.google." in host: out["err"] = "google news wrapper"; return out
+        if len(text) < 200: out["err"] = "too little text"; out["text"] = text[:PER_SOURCE_CHARS]; return out
+        out.update(ok=True, text=text[:PER_SOURCE_CHARS], label=label[:80])
+    except urllib.error.HTTPError as e: out["err"] = f"HTTP {e.code}"
+    except Exception as e: out["err"] = type(e).__name__
+    return out
+
+def fetch_all(urls):
+    urls = urls[:MAX_SOURCES * 2]
+    with ThreadPoolExecutor(max_workers=6) as ex: res = list(ex.map(fetch, urls))
+    good, total = [], 0
+    for f in res:
+        if not f["ok"]: continue
+        if total >= TOTAL_CHARS or len(good) >= MAX_SOURCES: break
+        f["text"] = f["text"][:max(800, TOTAL_CHARS - total)]; total += len(f["text"]); good.append(f)
+    return good, res
+
+# ---------------------------------------------------------------- prompt
+SYSTEM = """You write story pages for BLACKOUT.NETWORK, a global threat-monitoring news site. You are given the scanner's record of one story and the extracted text of its source pages, labelled S1, S2 and so on.
+
+Hard rules, no exceptions:
+1. Use ONLY facts found in the provided source texts or the scanner record. Never add facts from memory or general knowledge. No invented numbers, dates, names, places, quotes or casualty figures. Every number you write must appear in a source.
+2. Attribute claims ("USGS said...", "according to Reuters..."). A claim that appears in only one source is labelled as coming from that source and not independently confirmed. Quote only exact words that appear in a source, in double quotes.
+3. Place: the story happens where the scanner record's "place" says unless the sources clearly say otherwise. Never move a story to another country or state.
+4. Neutral, calm, plain English for an average reader. Political items strictly neutral. Never use: verified, first (as a boast), before the news, BREAKING, exclusive, shocking, terrifying, panic, hype or scare words. No "today in history" or anniversary framing. No emojis. Never mention a site owner. No internal notes. No scoring jargon in prose (no "severity", "score", "rank 7/10", "item(s)", "source family"); in rank_why say in plain words why it ranks where it does.
+5. If the sources are thin, say so honestly ("so far we have only the USGS notice") instead of padding. If you cannot source background history, leave story.sections.background as an empty string.
+6. Risk to an ordinary reader is never above the story's band: rank 0-3 Low, 4-6 Medium, 7-10 High. Use Low for over-ranked items (sports, entertainment, expired warnings) and say why.
+7. what_to_do starts with "No action is needed." when that is true for an ordinary reader in the United States.
+8. sources and story.sources may list ONLY URLs from the provided S-list, 2-6 of them when available, most authoritative first. Prefer official agencies and news outlets; cite a social media post only when nothing better covers that fact.
+9. Never write the S-labels (S1, S2), "scanner record" or other internal labels in any text field. Ignore source material about a different event; do not mention unrelated posts. If every source is a social media post, say which account posted it and that no news outlet or official source has confirmed it yet.
+10. US style: write numbers with commas (11,613), dates like "Nov. 21", times in ET when the record gives them.
+
+Return ONE JSON object, no markdown, exactly these keys:
+{"headline": "<one plain sentence with the key fact, under 110 characters>",
+ "why_it_matters": "<one sentence bottom line>",
+ "what_happened": "<2-3 sentences: who, what, where, when, with attribution>",
+ "analysis": "<2-3 sentences on what this means, from the sources>",
+ "rank_why": "<one sentence on why the story ranks where it does and whether we agree>",
+ "risk": "Low|Medium|High", "risk_why": "<one line>",
+ "if_true": "<signposts if the reporting holds>", "if_false": "<what it looks like if overblown or wrong>",
+ "what_to_do": "<1-2 practical sentences>",
+ "confidence": "High|Medium|Low", "confidence_why": "<which sources, and what is not confirmed>",
+ "sources": ["<url from the S-list>", "..."],
+ "story": {"headline": "<page H1, one sentence, under 140 characters>", "dek": "<one or two short sentences that add to the headline>",
+   "sections": {"happened": "<chronological narrative with dates, names, places and attribution; several short paragraphs separated by blank lines>",
+                "background": "<history and context ONLY from the sources, or empty string>",
+                "analysis": "<why it matters, who is affected, whether it is spreading or confirmed, whether the rank fits, in plain words>",
+                "watch": "<signposts to watch next and practical guidance>"},
+   "sources": [{"url": "<url from the S-list>", "label": "<outlet or agency, short title, date if known>"}]}}
+Aim for 450-900 words across the four story sections. Shorter is fine when the sources are thin."""
+
+def _et(s):
+    d = parse_t(s)
+    return d.astimezone(ET).strftime("%b %-d, %Y %-I:%M %p ET") if d else ""
+
+def place_of(r):
+    loc = r.get("location") or ""
+    try:
+        import geo
+        return geo.place_label(r.get("title") or "", loc) or (loc if loc.count(";") < 2 else "")
+    except Exception:
+        return loc if loc.count(";") < 2 else ""
+
+def build_prompt(r, al, srcs):
+    heads = []
+    for a in al[:25]:
+        t = " ".join((a.get("title") or "").split())
+        if t: heads.append(f"- {a.get('source') or a.get('family') or 'source'}{' (official)' if a.get('official') else ''}, {_et(a.get('event_time') or a.get('first_seen'))}: {t[:240]}")
+    rec = {"title": r.get("title"), "category": r.get("category"), "place": place_of(r), "rank": int(r.get("rank") or 0),
+           "first_seen": _et(r.get("first_seen")), "event_time": _et(r.get("event_time")), "updated": _et(r.get("updated")),
+           "independent_sources": int(r.get("eff_families") or r.get("n_families") or 0), "reports_logged": int(r.get("n_items") or 0)}
+    s = ["SCANNER RECORD:", json.dumps(rec, ensure_ascii=False), "", "HEADLINES FROM THE SOURCES WE TRACK (source data, not our words):", *heads, ""]
+    for i, f in enumerate(srcs, 1):
+        s += [f"[S{i}] URL: {f['url']}", f"[S{i}] Outlet: {f['label']}", f"[S{i}] TEXT:", f["text"], ""]
+    s.append("Write the JSON now.")
+    return "\n".join(s), rec
+
+# ---------------------------------------------------------------- validation + text QA
+V2 = ("headline", "why_it_matters", "what_happened", "analysis", "rank_why", "risk", "risk_why", "if_true", "if_false", "what_to_do", "confidence", "confidence_why")
+BANNED = re.compile(r"\b(verified|unverified|breaking|before the news|exclusive|shocking|terrifying|horrifying|panic|bombshell|apocalyptic|"
+                    r"today in history|anniversary|source famil(?:y|ies)|severity|item\(s\)|rank \d+\s*/\s*10|\d+\s*/\s*10|scanner scor|"
+                    r"\(?S\d{1,2}\)?(?=[\s,.;:)]|$)|scanner record|as an ai|language model|i cannot|matt johnston|meshtastic|lora|lorem ipsum)\b", re.I)
+EMOJI = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
+def _band(rank): return "Low" if rank <= 3 else ("Medium" if rank <= 6 else "High")
+_ORDER = {"Low": 0, "Medium": 1, "High": 2}
+def _norm(s): return " ".join(re.findall(r"[a-z0-9]+", (s or "").lower().replace(",", "")))
+_NUM = re.compile(r"(?<![\w.])\d[\d,]*(?:\.\d+)?")
+_WORDNUM = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+def _nums_in(text):
+    return {n.replace(",", "") for n in _NUM.findall(text or "")}
+_GROUPED = re.compile(r"(?<![\d.])\d{1,3}(?:[ \u00a0\u202f\u2009]\d{3})+(?![\d])")
+def _corpus_nums(corpus):
+    corpus = (corpus or "") + " " + " ".join(g.replace(" ", "").replace("\u00a0", "").replace("\u202f", "").replace("\u2009", "") for g in _GROUPED.findall(corpus or ""))
+    s = _nums_in(corpus)
+    out = set(s)
+    for n in s:   # 7.20 == 7.2, 030 == 30
+        try:
+            v = float(n); out.add(("%g" % v)); out.add(str(int(v)) if v == int(v) else n)
+        except Exception: pass
+    return out
+
+def validate(o, rank, fetched_urls, corpus):
+    """(clean note dict, [problems]). Problems mean reject (the caller retries once with them)."""
+    probs = []
+    if not isinstance(o, dict): return None, ["output is not a JSON object"]
+    note = {}
+    for k in V2:
+        v = o.get(k)
+        if not isinstance(v, str) or not v.strip(): probs.append(f"missing {k}")
+        else: note[k] = " ".join(v.split()) if k not in ("what_happened", "analysis") else v.strip()
+    if probs: return None, probs
+    if note["risk"] not in _ORDER: probs.append("risk must be Low, Medium or High")
+    if note["confidence"] not in _ORDER: probs.append("confidence must be High, Medium or Low")
+    band = _band(rank)
+    if note.get("risk") in _ORDER and _ORDER[note["risk"]] > _ORDER[band]: note["risk"] = band   # the page caps it too
+    st = o.get("story") if isinstance(o.get("story"), dict) else {}
+    secs = st.get("sections") if isinstance(st.get("sections"), dict) else {}
+    story = {"headline": " ".join(str(st.get("headline") or note["headline"]).split())[:180],
+             "dek": " ".join(str(st.get("dek") or "").split()),
+             "sections": {k: str(secs.get(k) or "").strip() for k in ("happened", "background", "analysis", "watch")}}
+    for k in ("happened", "analysis", "watch"):
+        if len(story["sections"][k].split()) < (40 if k == "happened" else 20): probs.append(f"story.sections.{k} too short")
+    if not story["dek"]: probs.append("missing story.dek")
+    fset = set(fetched_urls)
+    srcs = [u for u in (o.get("sources") or []) if isinstance(u, str) and u in fset]
+    bad = [u for u in (o.get("sources") or []) if isinstance(u, str) and u not in fset]
+    if bad: probs.append(f"sources not in the S-list: {bad[:3]}")
+    ss = []
+    for s in (st.get("sources") or []):
+        if isinstance(s, dict) and s.get("url") in fset and s["url"] not in [x["url"] for x in ss]:
+            ss.append({"url": s["url"], "label": " ".join(str(s.get("label") or "").split())[:140] or urllib.parse.urlsplit(s["url"]).hostname})
+    if not srcs: srcs = [s["url"] for s in ss]
+    if not srcs: probs.append("no sources from the S-list")
+    if not ss: ss = [{"url": u, "label": urllib.parse.urlsplit(u).hostname} for u in srcs]
+    note["sources"] = srcs[:6]; story["sources"] = ss[:6]
+    prose = "\n".join([note[k] for k in V2 if k not in ("risk", "confidence")] + [story["headline"], story["dek"]] + list(story["sections"].values()))
+    for m in BANNED.finditer(prose): probs.append(f"banned wording: {m.group(0)!r}")
+    if EMOJI.search(prose): probs.append("emoji in text")
+    cn = _corpus_nums(corpus)
+    def _ok(n):
+        try: return n in cn or ("%g" % float(n)) in cn
+        except Exception: return n in cn
+    miss = sorted({n for n in _nums_in(prose) if not _ok(n)})
+    if miss: probs.append(f"numbers not found in any source: {miss[:12]}")
+    nc = _norm(corpus)
+    for q in re.findall(r"[\"“]([^\"”]{12,400})[\"”]", prose):
+        if len(q.split()) >= 4 and _norm(q) not in nc: probs.append(f"quote not found in sources: {q[:80]!r}")
+    words = len(" ".join(story["sections"].values()).split())
+    if words > 1600: probs.append(f"story too long ({words} words)")
+    note["story"] = story
+    return note, list(dict.fromkeys(probs))
+
+# ---------------------------------------------------------------- API
+class APIError(Exception): pass
+def call_api(messages, max_tokens=6000):
+    """(content str, usage dict). Raises APIError. The key is read from the environment and never logged."""
+    c = cfg(); key = (os.environ.get("XAI_API_KEY") or "").strip()
+    if not key: raise APIError("no API key")
+    body = json.dumps({"model": c["model"], "messages": messages, "temperature": 0.2, "max_tokens": max_tokens,
+                       "response_format": {"type": "json_object"}}).encode()
+    req = urllib.request.Request(c["api"] + "/chat/completions", data=body, method="POST",
+                                 headers={"Authorization": "Bearer " + key, "Content-Type": "application/json", "User-Agent": "blackout-story-writer/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=180) as r: d = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        raise APIError(f"HTTP {e.code}: {e.read(300).decode('utf-8', 'replace')[:200]}")
+    except Exception as e:
+        raise APIError(type(e).__name__)
+    try: content = d["choices"][0]["message"]["content"]
+    except Exception: raise APIError("no content in response")
+    u = d.get("usage") or {}
+    tin = int(u.get("prompt_tokens") or 0); comp = int(u.get("completion_tokens") or 0)
+    reas = int((u.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0)
+    tot = int(u.get("total_tokens") or 0)
+    tout = max(comp, tot - tin) if tot else comp + reas   # reasoning tokens bill as output
+    return content, {"in": tin, "out": tout, "reasoning": reas}
+def _cost(usage):
+    c = cfg(); tin = usage["in"]; tout = usage["out"]
+    return tin, tout, round(tin * c["price_in"] / 1e6 + tout * c["price_out"] / 1e6, 6)
+def _parse_json(s):
+    s = (s or "").strip()
+    s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s)
+    try: return json.loads(s)
+    except Exception:
+        m = re.search(r"\{.*\}", s, re.S)
+        if m:
+            try: return json.loads(m.group(0))
+            except Exception: return None
+    return None
+
+# ---------------------------------------------------------------- spend / rate limits
+def spent_today(k=None):
+    own = k is None; k = k or db()
+    try:
+        r = k.execute("SELECT usd, tokens_in, tokens_out, calls FROM spend WHERE day=?", (et_day(),)).fetchone()
+        return dict(r) if r else {"usd": 0.0, "tokens_in": 0, "tokens_out": 0, "calls": 0}
+    finally:
+        if own: k.close()
+def _add_spend(k, tin, tout, usd):
+    k.execute("INSERT INTO spend(day, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,1) ON CONFLICT(day) DO UPDATE SET "
+              "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+1",
+              (et_day(), usd, tin, tout))
+def written_last_hour(k):
+    return k.execute("SELECT COUNT(*) FROM jobs WHERE status='done' AND calls>0 AND finished>=?", (iso(now() - timedelta(hours=1)),)).fetchone()[0]
+def blocked_reason(k):
+    c = cfg(); sp = spent_today(k)
+    if sp["usd"] >= c["daily_usd"]: return f"daily cap reached (${sp['usd']:.4f} of ${c['daily_usd']:.2f})"
+    if written_last_hour(k) >= c["max_per_hour"]: return f"hourly limit reached ({c['max_per_hour']}/h)"
+    return None
+
+# ---------------------------------------------------------------- queue
+STATE = {"thread": None, "started": None, "last_scan": None, "last_error": None, "scans": 0, "paused": None, "initial_done": False, "boot_backfill": 0}
+def _invalidate(cid):
+    _NC["t"] = 0.0
+    for mod, keyf in (("wire_v2", lambda k: k == cid), ("story", lambda k: isinstance(k, tuple) and k and k[0] == cid)):
+        m = sys.modules.get(mod)
+        try:
+            C = getattr(m, "_C", None)
+            if isinstance(C, dict):
+                for kk in [x for x in list(C) if keyf(x)]: C.pop(kk, None)
+        except Exception: pass
+
+def enqueue(k, cid, reason, arrived_at, rank, title):
+    if k.execute("SELECT 1 FROM jobs WHERE cid=? AND status IN ('queued','running')", (cid,)).fetchone(): return False
+    k.execute("INSERT INTO jobs(cid, reason, status, enq_at, arrived_at, rank, title) VALUES(?,?,?,?,?,?,?)",
+              (cid, reason, "queued", iso(), arrived_at, rank, (title or "")[:200]))
+    return True
+
+def scan():
+    """Queue new / risen / under-sourced rank 5+ clusters. Cheap: one read-only query + a few dict lookups."""
+    c = cfg(); maps = _desk_maps(); notes_, alias, v3 = maps
+    rows = candidates(max(c["backfill_h"], 2) + 0.0)
+    first = not STATE["initial_done"]
+    with _LK:
+        k = db()
+        try:
+            have = {r["cid"]: dict(r) for r in k.execute("SELECT cid, written_at, src_urls, alias_of FROM briefs")}
+            seen = {r["cid"]: dict(r) for r in k.execute("SELECT cid, first_seen, backfill FROM seen")}
+            covered_rows = [r for r in rows if desk_covered(r["cluster_id"], maps)]
+            queued = {x[0] for x in k.execute("SELECT cid FROM jobs WHERE status IN ('queued','running')")}
+            deferred = {x[0] for x in k.execute("SELECT cid FROM jobs WHERE status='deferred'")}
+            claimed = [r for r in rows if (r["cluster_id"] in have and not have[r["cluster_id"]].get("alias_of")) or r["cluster_id"] in queued]
+            for r in rows:
+                cid = r["cluster_id"]; rank = int(r.get("rank") or 0)
+                if cid not in seen:
+                    k.execute("INSERT OR IGNORE INTO seen(cid, first_seen, rank, backfill) VALUES(?,?,?,?)", (cid, iso(), rank, 1 if first else 0))
+                    seen[cid] = {"first_seen": iso(), "backfill": 1 if first else 0}
+                if desk_covered(cid, maps): continue
+                if cid in have:
+                    h = have[cid]
+                    if h.get("alias_of"): continue
+                    wt = parse_t(h.get("written_at"))
+                    if wt and (now() - wt).total_seconds() >= c["refresh_min"] * 60 and (parse_t(r.get("updated")) or wt) > wt:
+                        _, al = cluster(cid)
+                        new = set(source_urls(r, al)) - set(json.loads(h.get("src_urls") or "[]"))
+                        if len(new) >= 2: enqueue(k, cid, "refresh: new sources", seen[cid]["first_seen"], rank, r.get("title"))
+                    continue
+                if cid in queued: continue
+                dup = next((x for x in covered_rows if x["cluster_id"] != cid and near_dup(r, x)), None)
+                if dup is None:
+                    dup_w = next((x for x in claimed if x["cluster_id"] != cid and near_dup(r, x)), None)
+                else: dup_w = None
+                if dup is not None or dup_w is not None:
+                    tgt = (dup or dup_w)["cluster_id"]
+                    k.execute("INSERT OR REPLACE INTO briefs(cid, note, written_at, model, src_urls, alias_of, rank, title) VALUES(?,?,?,?,?,?,?,?)",
+                              (cid, None, iso(), "alias:desk" if dup is not None else "alias", "[]", tgt, rank, r.get("title")))
+                    k.execute("UPDATE jobs SET status='skipped', err=? WHERE cid=? AND status IN ('queued','deferred')", (f"near-duplicate of {tgt}", cid))
+                    _invalidate(cid); continue
+                if cid in deferred: claimed.append(r); continue
+                if enqueue(k, cid, "backfill" if seen[cid].get("backfill") else "new", seen[cid]["first_seen"], rank, r.get("title")):
+                    claimed.append(r); queued.add(cid)
+            k.commit()
+        finally: k.close()
+    STATE["initial_done"] = True; STATE["last_scan"] = iso(); STATE["scans"] += 1
+
+def next_job(k):
+    r = k.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY CASE reason WHEN 'new' THEN 0 WHEN 'refresh: new sources' THEN 2 ELSE 1 END, rank DESC, id LIMIT 1").fetchone()
+    return dict(r) if r else None
+
+def write_one(job, api=None):
+    """Fetch, write, validate, store. Returns the final job status."""
+    api = api or call_api
+    cid = job["cid"]; t0 = time.time()
+    with _LK:
+        k = db(); k.execute("UPDATE jobs SET status='running', started=? WHERE id=?", (iso(), job["id"])); k.commit(); k.close()
+    status, err, tin_t, tout_t, usd_t, calls = "failed", "", 0, 0, 0.0, 0
+    try:
+        r, al = cluster(cid)
+        if not r: raise RuntimeError("cluster gone")
+        if desk_covered(cid): status = "skipped"; err = "desk brief arrived"; raise StopIteration
+        with _LK:
+            k = db(); al_row = k.execute("SELECT alias_of FROM briefs WHERE cid=?", (cid,)).fetchone(); k.close()
+        if al_row and al_row[0]: status = "skipped"; err = f"near-duplicate of {al_row[0]}"; raise StopIteration
+        urls = source_urls(r, al)
+        srcs, tried = fetch_all(urls)
+        if not srcs:
+            status = "deferred"; err = "no readable source text yet (" + ", ".join(sorted({f['err'] for f in tried if f['err']}))[:120] + ")"; raise StopIteration
+        prompt, rec = build_prompt(r, al, srcs)
+        corpus = prompt
+        msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
+        note, probs = None, ["not run"]
+        for attempt in range(2):
+            with _LK:
+                k = db(); why = blocked_reason(k); k.close()
+            if why: status = "deferred"; err = why; raise StopIteration
+            content, usage = api(msgs)
+            calls += 1; tin, tout, usd = _cost(usage); tin_t += tin; tout_t += tout; usd_t += usd
+            with _LK:
+                k = db(); _add_spend(k, tin, tout, usd); k.commit(); k.close()
+            o = _parse_json(content)
+            note, probs = validate(o, int(r.get("rank") or 0), [f["url"] for f in srcs], corpus) if o is not None else (None, ["response was not valid JSON"])
+            if note and not probs: break
+            msgs = msgs + [{"role": "assistant", "content": content or ""},
+                           {"role": "user", "content": "Your JSON failed these checks; fix every one and return the full corrected JSON only:\n- " + "\n- ".join((probs or [])[:20])}]
+        if not note or probs:
+            err = "; ".join((probs or ["invalid"])[:6])[:400]; raise StopIteration
+        w = iso()
+        note.update({"written_at": w, "generated_at": w, "edition": "BLACKOUT.NETWORK desk brief", "desk": True, "file": "story_writer",
+                     "writer": {"model": cfg()["model"], "sources_read": len(srcs)}})
+        note["story"]["written_at"] = w
+        with _LK:
+            k = db()
+            if desk_covered(cid): status = "skipped"; err = "desk brief arrived during write"
+            else:
+                k.execute("INSERT OR REPLACE INTO briefs(cid, note, written_at, model, src_urls, alias_of, tokens_in, tokens_out, usd, rank, title) VALUES(?,?,?,?,?,NULL,?,?,?,?,?)",
+                          (cid, json.dumps(note, ensure_ascii=False), w, cfg()["model"], json.dumps(urls), tin_t, tout_t, usd_t, int(r.get("rank") or 0), r.get("title")))
+                status = "done"
+            k.commit(); k.close()
+        _invalidate(cid)
+    except StopIteration: pass
+    except APIError as e: status = "deferred"; err = f"API: {e}"
+    except Exception as e: err = f"{type(e).__name__}: {str(e)[:200]}"; traceback.print_exc()
+    fin = iso(); lat = None
+    a = parse_t(job.get("arrived_at"))
+    if status == "done" and a: lat = round((now() - a).total_seconds(), 1)
+    with _LK:
+        k = db()
+        k.execute("UPDATE jobs SET status=?, finished=?, err=?, tokens_in=?, tokens_out=?, usd=?, latency_s=?, calls=? WHERE id=?",
+                  (status, fin, err, tin_t, tout_t, usd_t, lat, calls, job["id"]))
+        k.commit(); k.close()
+    log(f"{cid} {job['reason']} -> {status} in {time.time() - t0:.1f}s tokens {tin_t}/{tout_t} ${usd_t:.4f}" + (f" ({err[:160]})" if err else ""))
+    return status
+
+_DEFER = {}
+def _requeue_deferred(k):
+    """Deferred jobs (no source text yet, cap, API error) go back in the queue after a back-off."""
+    for r in k.execute("SELECT id, cid, finished, err FROM jobs WHERE status='deferred'").fetchall():
+        f = parse_t(r["finished"]); wait = 900 if "cap" in (r["err"] or "") or "limit" in (r["err"] or "") else 300
+        n = _DEFER.get(r["cid"], 0)
+        if f and (now() - f).total_seconds() >= wait * (1 + min(n, 6)):
+            if n >= 8: k.execute("UPDATE jobs SET status='failed' WHERE id=?", (r["id"],)); continue
+            _DEFER[r["cid"]] = n + 1
+            k.execute("UPDATE jobs SET status='queued' WHERE id=?", (r["id"],))
+
+def _writer_worker(ready, paused):
+    """The one background thread. (Its name must not contain the words the web node's thread guard blocks.)"""
+    STATE["started"] = iso(); waited = 0
+    while not ready() and waited < 1800: time.sleep(5); waited += 5
+    with _LK:
+        k = db(); k.execute("UPDATE jobs SET status='queued' WHERE status='running'"); k.commit(); k.close()
+    last_mt = None
+    while True:
+        try:
+            if paused(): STATE["paused"] = "deploy handoff"; time.sleep(5); continue
+            if not enabled(): STATE["paused"] = "no API key" if not key_set() else "BN_WRITER=0"; time.sleep(30); continue
+            STATE["paused"] = None
+            mt = []
+            for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
+                try: mt.append(os.path.getmtime(cfg()["blackout_db"] + sfx))
+                except OSError: mt.append(None)
+            if mt != last_mt or time.time() - (parse_t(STATE["last_scan"]) or now()).timestamp() > 120 or not STATE["initial_done"]:
+                scan(); last_mt = mt
+            with _LK:
+                k = db(); _requeue_deferred(k); k.commit(); job = next_job(k); k.close()
+            if job: write_one(job); continue
+        except Exception as e:
+            STATE["last_error"] = f"{type(e).__name__}: {str(e)[:200]}"; traceback.print_exc()
+        time.sleep(cfg()["poll_s"])
+
+def start(ready=lambda: True, paused=lambda: False):
+    if STATE["thread"] is not None or _env("BN_WRITER", "1") == "0": return False
+    t = threading.Thread(target=_writer_worker, args=(ready, paused), name="story-writer", daemon=True)
+    t.start(); STATE["thread"] = t
+    return True
+
+# ---------------------------------------------------------------- admin status (read-only)
+def status(n=20):
+    c = cfg(); out = {"enabled": enabled(), "api_key_set": key_set(), "model": c["model"], "min_rank": c["min_rank"],
+                      "daily_cap_usd": c["daily_usd"], "max_per_hour": c["max_per_hour"], "backfill_hours": c["backfill_h"],
+                      "price_per_million": {"input": c["price_in"], "output": c["price_out"]},
+                      "thread_alive": bool(STATE["thread"] and STATE["thread"].is_alive()),
+                      **{k: STATE[k] for k in ("started", "last_scan", "last_error", "scans", "paused")}}
+    try:
+        with _LK:
+            k = db()
+            try:
+                out["spend_today"] = spent_today(k); out["spend_today"]["day_et"] = et_day()
+                out["queue"] = [dict(r) for r in k.execute("SELECT id, cid, reason, status, enq_at, arrived_at, rank, title, err FROM jobs WHERE status IN ('queued','running','deferred') ORDER BY id")]
+                out["recent"] = [dict(r) for r in k.execute("SELECT id, cid, reason, status, arrived_at, finished, latency_s, tokens_in, tokens_out, usd, calls, rank, title, err FROM jobs WHERE status NOT IN ('queued','running') ORDER BY id DESC LIMIT ?", (n,))]
+                out["written_last_hour"] = written_last_hour(k)
+                out["briefs"] = {"written": k.execute("SELECT COUNT(*) FROM briefs WHERE alias_of IS NULL AND model NOT LIKE 'alias%'").fetchone()[0],
+                                 "aliases": k.execute("SELECT COUNT(*) FROM briefs WHERE alias_of IS NOT NULL OR model LIKE 'alias%'").fetchone()[0]}
+                lat = [r[0] for r in k.execute("SELECT latency_s FROM jobs WHERE status='done' AND reason='new' AND latency_s IS NOT NULL ORDER BY id DESC LIMIT 50")]
+                out["latency_new_s"] = {"n": len(lat), "median": sorted(lat)[len(lat) // 2] if lat else None, "max": max(lat) if lat else None}
+            finally: k.close()
+    except Exception as e: out["db_error"] = f"{type(e).__name__}: {str(e)[:200]}"
+    return out

@@ -69,7 +69,13 @@ def note_for(cid):
     """v3 brief (with optional story) wins; else the pushed desk note."""
     v3 = _load_v3().get(cid)
     if isinstance(v3, dict): return v3
-    return _desk_note(cid)
+    d = _desk_note(cid)
+    if d: return d
+    try:   # Nov 21 2026 (Matt): instant API write-up (story_writer.py), only when the desk has nothing for this story
+        import story_writer as SW
+        return SW.note_for(cid)
+    except Exception:
+        return None
 
 # ---------------------------------------------------------------- prose helpers
 def paras(text):
