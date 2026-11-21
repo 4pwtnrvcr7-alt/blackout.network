@@ -200,6 +200,31 @@ def lead_for(cid, title="", loc="", text=""):
     first named public figure's Commons portrait, else a Commons photo of the country or region in the headline or location.
     Captions say "file photo" so nobody reads them as pictures of the event."""
     if not on() or os.environ.get("BN_STORY_LEAD_FALLBACK", "1") == "0": return None
+    v = _lead_for(cid, title, loc, text)
+    if isinstance(v, dict) and v.get("kind") != "person" and not place_photo_ok(v, title, loc):
+        return None      # the page's own "story at a glance" graphic leads instead
+    return v
+
+_PH_OK = {}
+def place_photo_ok(v, title="", loc=""):
+    """Nov 21 2026 (Matt pt1682u: Indianapolis on a Central Florida flood story): a file photo of a place may lead a story only when that
+    place is in the story's own country, and inside one country the same state. Topic photos (no place) stay allowed."""
+    name = re.sub(r"^File photo(?: of|:)\s*", "", (v.get("alt") or "").strip())
+    if not name:
+        m = re.match(r"File photo(?: of|:)\s*(.+?)(?: \(\d{4}\))?\. Not taken", v.get("caption") or "")
+        name = m.group(1) if m else ""
+    key = (name, title or "", loc or "")
+    if key in _PH_OK: return _PH_OK[key]
+    try:
+        import geo
+        ok = geo.photo_matches(name, title or "", loc or "")
+    except Exception:
+        ok = False
+    if len(_PH_OK) > 5000: _PH_OK.clear()
+    _PH_OK[key] = ok
+    return ok
+
+def _lead_for(cid, title="", loc="", text=""):
     b = block()
     hit = (b.get("lead") or {}).get(cid)
     if isinstance(hit, dict) and hit.get("src") and hit.get("kind") != "person": return hit
