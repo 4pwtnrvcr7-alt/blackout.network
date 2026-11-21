@@ -36,6 +36,34 @@ class HeadlineText(unittest.TestCase):
         self.assertEqual(NL.card_headline({"title": NL.tighten_title(ODESA)}), "Ballistic Missile Strike on Zatoka, Odesa Region - 2 OTRK-5")
         self.assertEqual(NL.card_headline({"title": NL.tighten_title(KYIV)}), "Ballistic Missiles Strike Bridges in Kyiv")
 
+    def test_flag_only_first_line_is_skipped(self):
+        raw = ("\U0001F534 Ballistic Missile Strike | 8/10 \U0001F1FE\U0001F1EA \U0001F1F8\U0001F1E6\n\n"
+               "Houthis Strike Saudi Arabia's Ash-Shaikh Power Station and Jizan Port\nHouthi forces claim a missile strike on the plant.")
+        self.assertEqual(NL.card_headline({"title": NL.tighten_title(raw)}), "Houthis Strike Saudi Arabia's Ash-Shaikh Power Station and Jizan Port")
+
+    def test_glued_body_without_line_break(self):
+        raw = ("\U0001F534 Ballistic Missile Attack | 10/10 \U0001F1FA\U0001F1E6 Ballistic Missile Strike on Kyiv Region - Air Alert Active "
+               "Ballistic missile launches detected from Voronezh Oblast (RU). Threat continues.")
+        self.assertEqual(NL.card_headline({"title": NL.tighten_title(raw)}), "Ballistic Missile Strike on Kyiv Region - Air Alert Active")
+        raw = "Ballistic Missile Attack | 9/10 Ballistic Missile Strike on Zatoka, Odesa Region - 2 OTRK-5 Two Russian ballistic missiles (OTRK-5 class) detected."
+        self.assertEqual(NL.card_headline({"title": NL.tighten_title(raw)}), "Ballistic Missile Strike on Zatoka, Odesa Region - 2 OTRK-5")
+        raw = "Military Strike | 9/10 IRGC Claims Strike on Isa Air Base in Bahrain Iranian IRGC claims attack on Isa Air Base (Bahrain) hosting US aircraft"
+        self.assertEqual(NL.card_headline({"title": NL.tighten_title(raw)}), "IRGC Claims Strike on Isa Air Base in Bahrain")
+        raw = "Military Strike | 10/10 US strikes on air defense systems at Qeshm Island, Iran"   # sentence-case headline: kept whole
+        self.assertEqual(NL.card_headline({"title": NL.tighten_title(raw)}), "US strikes on air defense systems at Qeshm Island, Iran")
+
+    def test_repeat_cut_never_ends_on_or(self):
+        raw = ("Air Defense Activity | 9/10 Active Air Defense Operations in Bryansk Region - Iskander/S-400 or S-300 Active air defense operations "
+               "detected from Bryansk Region (RF). Probable ballistic missile launches.")
+        h = NL.card_headline({"title": NL.tighten_title(raw)})
+        self.assertEqual(h, "Active Air Defense Operations in Bryansk Region - Iskander/S-400 or S-300")
+        self.assertIsNone(QA._dangling(h))
+
+    def test_quoted_first_sentence_is_not_shown_as_a_cut(self):
+        t = NL.tighten_title('I always ask myself of our soldiers, "Why hasn\'t there been a coup attempt yet?"\n\nThere has been more than an attempt.')
+        h = NL.card_headline({"title": t})
+        self.assertIsNone(QA._prefix_of(h, [t]), h)
+
     def test_never_the_bare_label(self):
         for raw in (ODESA, KYIV, "Naval/Missile Anomaly | 7/10 Explosion Reported from Sea off Sirik, Iran's Hormozgan Province\nResidents heard it."):
             h = NL.card_headline({"title": NL.tighten_title(raw)})
