@@ -9,17 +9,17 @@ CURRENT = re.compile(r'<a\b[^>]*aria-current="page"[^>]*>', re.I)
 
 class MenuCollapsed(unittest.TestCase):
     def test_drawer_has_no_preopened_sections(self):
-        for active in ("", "threat", "sources", "@stats", "net"):
+        for active in ("", "threat", "sources", "newsletter", "net"):
             html = UI.drawer(sitenav, active=active)
             self.assertNotRegex(html, DETAILS_OPEN, f"details pre-opened for active={active!r}")
-            self.assertGreaterEqual(html.count('<details class="bn-grp'), 7)
+            self.assertGreaterEqual(html.count('<details class="bn-grp'), 5)
             if active:
                 self.assertRegex(html, CURRENT)
 
     def test_current_page_is_highlighted_inside_a_closed_section(self):
         html = UI.drawer(sitenav, active="threat")
         self.assertIn('data-tab="threat" aria-current="page"', html)
-        # The Wire sits in 01 Latest; that details tag must not have the open attribute
+        # The Wire sits in 01 Live; that details tag must not have the open attribute
         m = re.search(r'<details class="bn-grp m3-p m3-latest"[^>]*>', html)
         self.assertIsNotNone(m)
         self.assertNotIn(" open", m.group(0))

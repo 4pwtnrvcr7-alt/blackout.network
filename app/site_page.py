@@ -91,7 +91,7 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any">'
             f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>{top}<main class="wrap" id="main">{body}</main>'
             '<footer class="ft">Research only: BLACKOUT.NETWORK is not an official warning service. Always follow official instructions from local authorities. · '
-            '<a href="/wire">The Wire</a> · <a href="/social">Videos &amp; posts</a> · <a href="/newsletter">Newsletter</a> · <a href="/scoring">How we score</a> · '
+            '<a href="/wire">The Wire</a> · <a href="/newsletter">Newsletter</a> · <a href="/scoring">How we score</a> · '
             '<a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></footer>'
             + (EMBED_JS if script else "") + '</body></html>').encode()
 

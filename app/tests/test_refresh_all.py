@@ -197,4 +197,4 @@ class PhoneMenuRow(unittest.TestCase):
     def test_wire_and_sources_stay_reachable_from_sections(self):
         dr = UI.drawer(sitenav, "")
         self.assertRegex(dr, r'<details class="bn-grp m3-p m3-latest"[\s\S]*?data-tab="threat"')
-        self.assertRegex(dr, r'<details class="bn-grp m3-p m3-about"[\s\S]*?data-tab="sources"')
+        self.assertRegex(dr, r'<details class="bn-grp m3-p m3-about"[\s\S]*?href="/sources"')

@@ -50,25 +50,21 @@ I_X = ('<svg class="bn-ico" aria-hidden="true" focusable="false" width="15" heig
 # Sidebar sections (brand A "Signal" menu). Keys are sitenav.NAV keys. A NAV tab not listed here goes into the section of the
 # tab listed before it in NAV (so a new tab added next to Politics/Government lands in Politics & Government), else the first section.
 MENU = [
- ("Live", ["threat", "noise", "bcast", "streams", "radio", "trends", "heatmap"]),
- ("Threat categories", ["net", "grid", "@mesh", "ai", "solar_seismic", "weather", "@crime", "finance", "jets", "spacex", "@cern", "intel"]),
- ("Politics & Government", ["politics", "gov"]),
- ("Community", ["ranked", "@social", "@stats", "newsletter"]),
- ("Reference", ["res", "maps", "bush", "med", "preppers", "figures"]),
- ("Play", ["games"]),
- ("About", ["@scoring", "sources", "tips"]),
+ ("Live", ["threat", "heatmap", "weather", "noise"]),
+ ("Threats", ["grid", "net", "solar_seismic", "ai", "@crime", "starlink"]),
+ ("News", ["newsletter", "midterms", "politics", "gov", "gunlaws", "figures", "finance"]),
+ ("Prepare", ["preppers", "res", "maps", "med", "bush"]),
+ ("More", ["sources", "@scoring", "spacex", "@cern", "jets", "games"]),
 ]
 
 # Design v3 full-page menu: a line icon and a one-line description per section (24px grid, 1.8 stroke, currentColor).
 _GI = 'aria-hidden="true" focusable="false" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
 MENU_META = {
- "Live": ("The Wire, broadcasts, streams, radio and trends", f'<svg {_GI}><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></svg>'),
- "Threat categories": ("Network, grid, AI, space weather, weather, crime and markets", f'<svg {_GI}><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16v.5"/></svg>'),
- "Politics & Government": ("Politics, midterms, gun laws and the government index", f'<svg {_GI}><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M2 10l10-6 10 6z"/></svg>'),
- "Community": ("Crowd rankings, videos, public stats and the newsletter", f'<svg {_GI}><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M15 14.6c3 .1 6 2 6 5.4"/></svg>'),
- "Reference": ("Local resources, maps, bushcraft, first aid and preppers", f'<svg {_GI}><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7M8 11h7"/></svg>'),
- "Play": ("Original 8-bit games", f'<svg {_GI}><rect x="2.5" y="7" width="19" height="11" rx="4"/><path d="M7 11v3M5.5 12.5h3M15.5 12h.01M18 14h.01"/></svg>'),
- "About": ("How we score, sources and tips" if __import__("os").environ.get("BN_TIPS", "0") == "1" else "How we score, sources and public stats", f'<svg {_GI}><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'),
+ "Live": ("The Wire, the heat map, weather and background noise", f'<svg {_GI}><path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/></svg>'),
+ "Threats": ("Grid, network, space weather, AI threats, crime and Starlink", f'<svg {_GI}><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8v5M12 16v.5"/></svg>'),
+ "News": ("The brief, midterms, politics, government and markets", f'<svg {_GI}><path d="M3 21h18M5 21V10M19 21V10M9 21v-7M15 21v-7M2 10l10-6 10 6z"/></svg>'),
+ "Prepare": ("Local resources, maps, bushcraft, first aid and preppers", f'<svg {_GI}><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M8 7h7M8 11h7"/></svg>'),
+ "More": ("Sources, how we score, launches and games", f'<svg {_GI}><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>'),
 }
 
 def menu_sections(sn):
@@ -150,23 +146,22 @@ def topbar(sn, active="", ctl_html=""):
 # preview slot and its links. Labels follow review/menu/structure.json (option A); hrefs come from sitenav.NAV so every
 # existing link keeps its exact href. An item with no live route ("soon") renders as plain tagged text, never a link.
 # A NAV tab not listed here lands in the section of the tab before it (so new tabs still appear).
+# Nov 21 2026 (Matt pt1687u): five sections, most-used first. Hidden pages are omitted (routes stay up).
+# Section ids (latest, threats, prepare, politics, about) are unchanged so menu art and live previews still match.
 MENU3 = [
- ("latest", "Latest", "The live feed, ranked as it happens.",
-  [("threat", "The Wire"), ("streams", "Live TV & Radio"), ("noise", "Background Noise"), ("heatmap", "Heat Map"), ("trends", "Trends"),
-   ("bcast", "Broadcast transcripts"), ("radio", "Live Radio")]),
- ("threats", "Threats", "Weather, space, grid and network risks.",
-  [("weather", "Weather"), ("solar_seismic", "Solar & Seismic"), ("grid", "Energy Grid"), ("net", "Network Status"),
-   ("starlink", "Starlink"), ("netnear", "Networks near me"), ("@mesh", "Off-grid Network"), ("ai", "AI Threats"), ("@crime", "Crime")]),
+ ("latest", "Live", "The Wire, the heat map and what's happening now.",
+  [("threat", "The Wire"), ("heatmap", "Heat Map"), ("weather", "Weather"), ("noise", "Background Noise")]),
+ ("threats", "Threats", "Grid, network, space weather, AI and crime.",
+  [("grid", "Energy Grid"), ("net", "Network Status"), ("solar_seismic", "Solar & Seismic"),
+   ("ai", "AI Threats"), ("@crime", "Crime"), ("starlink", "Starlink")]),
+ ("politics", "News", "The brief, politics, elections and markets.",
+  [("newsletter", "Newsletter"), ("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"),
+   ("gunlaws", "Gun Laws"), ("figures", "Key Figures"), ("finance", "Markets")]),
  ("prepare", "Prepare", "Guides and tools to get ready.",
   [("preppers", "Preppers"), ("res", "Local Resources"), ("maps", "Offline Maps"), ("med", "First Aid"), ("bush", "Bushcraft"), ("meshguide", "Off-grid Setup Guide")]),
- ("politics", "Politics & Government", "Elections, laws and the people in power.",
-  [("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"), ("gunlaws", "Gun Laws"), ("figures", "Key Figures")]),
- ("markets", "Markets & Tech", "Money, intel streams, launches, physics and jets.",
-  [("finance", "Markets"), ("intel", "Intel Streams"), ("spacex", "SpaceX"), ("@cern", "CERN & LHC"), ("jets", "Private Jets")]),
- ("community", "Community", "Briefs, videos and what readers rank.",
-  [("newsletter", "Newsletter"), ("@social", "Videos & Posts"), ("ranked", "Ranked by Users"), ("games", "Games")]),
- ("about", "About", "Our sources, scoring and public numbers.",
-  [("sources", "Sources"), ("@scoring", "How We Score"), ("@stats", "Public Stats"), ("tips", "Support Us")]),
+ ("about", "More", "Sources, scoring, launches and games.",
+  [("sources", "Sources"), ("@scoring", "How We Score"), ("spacex", "SpaceX"), ("@cern", "CERN & LHC"),
+   ("jets", "Private Jets"), ("games", "Games"), ("tips", "Support Us")]),
 ]
 # Nov 17 2026: no Support Us link unless BN_TIPS=1 (see sitenav.TIPS_ON)
 import os as _os
@@ -184,7 +179,7 @@ M3_PV = {
  "prepare": '<a class="m3-h" href="/ready"><span class="m3-k">Everyday Readiness</span><span style="display:flex;margin:4px 0"><img src="/static/ready/01-72-hour-home-kit.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(242,242,244,.35);margin-right:4px"><img src="/static/ready/02-water-at-home.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/03-power-outage-readiness.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/04-family-communication-plan.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"><img src="/static/ready/05-first-aid-and-medication-basics.webp" alt="" width="34" height="44" loading="lazy" style="border:1px solid rgba(255,194,26,.35);margin-right:4px"></span><span class="m3-sm">Five printable one-page guides (PDF)</span></a>',
  "politics": '<span class="m3-k">Midterms 2026</span><span><b class="m3-big" data-pv="midterms">&ndash;</b> <span class="m3-sm" data-pv="midterms-unit"></span></span>',
  "markets": '<span class="m3-k" data-pv="spx-label">S&amp;P 500</span><span class="m3-sprow"><svg class="m3-spark" viewBox="0 0 200 40" aria-hidden="true" focusable="false"><polyline data-pv="spark" points=""/></svg><b class="m3-mid" data-pv="spx">&ndash;</b><span class="m3-chg" data-pv="spx-chg"></span></span><span class="m3-k">Next SpaceX launch</span><span class="m3-sm m3-strong" data-pv="launch">&ndash;</span><span class="m3-asof" data-pv="markets-asof"></span>',
- "community": '<a class="m3-trailer" href="/social"><span class="m3-k">Videos &amp; posts</span><span class="m3-sm">Our latest videos, Shorts and posts in one place</span><b class="m3-big" data-pv="sources-c" hidden></b></a>',
+ "community": '',
  "about": '<span class="m3-k">Sources in the feed</span><b class="m3-big" data-pv="sources">&ndash;</b><span class="m3-asof" data-pv="sources-asof"></span>',
 }
 # Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
@@ -192,7 +187,9 @@ M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near", "meshgui
 M3_SOON = set()
 # Menu items that open a full page rather than their /live tab (Matt 5:25 PM: Heat Map is always the full-screen /map).
 # No data-tab on these links so dashboard JS cannot intercept the click as a tab switch.
-M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets")}   # Nov 18 (pt1661u): Markets opens the /markets overview
+M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets"),   # Nov 18 (pt1661u): Markets opens the /markets overview
+           "newsletter": ("newsletter", "/newsletter"), "sources": ("sources", "/sources"),
+           "midterms": ("midterms", "/midterms")}   # Nov 21: menu opens the standalone pages, same as the top bar
 
 def menu3_sections(sn):
     nav = {it[0]: it for g, its in sn.NAV for it in its}
@@ -254,14 +251,14 @@ def drawer(sn, active=""):
                 out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
             else:
                 cur = ' aria-current="page"' if key == active else ""
-                tab = "" if (href or "").split("?")[0] in ("/map", "/markets") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
+                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
                 out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
     out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'
                f'<a href="{E(sn.YT_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on YouTube {sn.HANDLE} (opens in a new tab)">YouTube</a>'
                f'<a href="{E(sn.X_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on X {sn.HANDLE} (opens in a new tab)">X</a></div>'
                '<div class="m3-stamp" id="m3_stamp" aria-live="off"></div>'
-               '<p class="bn-dfoot m3-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/stats">Stats</a><a href="/report-status">Report status</a></p>'
+               '<p class="bn-dfoot m3-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/report-status">Report status</a></p>'
                '</div></nav></div>')
     if m4: out.append(M4_JS)
     return "".join(out)

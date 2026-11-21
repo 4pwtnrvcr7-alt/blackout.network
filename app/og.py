@@ -709,11 +709,13 @@ def share_page(seg):
     dest = "/live#" + seg
     E = attr
     meta = tags(title=title, desc=desc, url=url, key=img_key, og_type="website")
+    # Nov 21 (Matt pt1687u): unlisted tab hubs stay reachable but are not indexed
+    robots = '<meta name="robots" content="noindex,nofollow">' if seg in ("streams", "trends", "broadcasts", "radio", "intel", "ranked") else ""
     return (
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         f"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         f"<title>{E(title)}</title><meta name=\"description\" content=\"{E(desc)}\">"
-        f"<link rel=\"canonical\" href=\"{E(url)}\">{meta}"
+        f"<link rel=\"canonical\" href=\"{E(url)}\">{robots}{meta}"
         f"<script>location.replace({dest!r})</script>"
         f"</head><body style=\"background:#05060a;color:#ECEEF5;font:15px/1.5 Inter,system-ui,sans-serif;padding:48px 24px\">"
         f"<p><a href=\"{E(dest)}\" style=\"color:#fff\">{E(spec.get('card') or title)}</a></p>"

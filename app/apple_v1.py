@@ -725,7 +725,7 @@ def home_html(sn):
 <a class="bna-btn" href="/newsletter">Get the Free brief</a></div><p class="bna-asof" data-bna="asof"></p></section>
 <footer class="bna-foot"><div class="bna-wrap"><nav class="bna-cols" aria-label="Site">{cols}</nav>
 <div class="bna-bot"><p class="bna-fol">Follow <a href="{E(sn.YT_URL)}" target="_blank" rel="noopener me">YouTube</a><a href="{E(sn.X_URL)}" target="_blank" rel="noopener me">X</a></p>
-<p class="bna-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/stats">Stats</a><a href="/report-status">Report status</a></p></div>
+<p class="bna-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/report-status">Report status</a></p></div>
 <p class="bna-copy">BLACKOUT.NETWORK. Global threat monitoring</p></div></footer></div>'''
 
 def _static(name, ctype):

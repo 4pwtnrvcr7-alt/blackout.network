@@ -117,17 +117,15 @@ TOOLS = [
     ("ai", "AI Threats", "AI-assisted attacks, deepfake fraud and model misuse, ranked 0–10.", "/#ai"),
     ("solar", "Solar & Seismic", "Solar flares, geomagnetic storms, the Kp index and live global quakes.", "/#solar"),
     ("weather", "Weather", "Conditions, official severe-weather alerts and the forecast for any place.", "/#weather"),
-    ("bcast", "Live Broadcasts", "Live wire, TV and radio, searched for threat keywords around the clock.", "/#broadcasts"),
     ("net", "Network Status", "Internet, cloud, apps and ISPs, with outage alerts and recent history.", "/#network"),
     ("bush", "Bushcraft", "A grid-down guide: water, fire, shelter, food, navigation and signaling.", "/#bushcraft"),
     ("gov", "Government", "A 0–100 U.S. government health index, plus who holds office.", "/#government"),
     ("sources", "Sources", "Every source we use, with a transparent 0–10 confidence rating.", "/sources"),
-    ("social", "Videos & posts", "Our YouTube and X reports, each with a sourced write-up on this site.", "/social"),
 ]
 ALSO = [
     ("Heat Map", "/map"), ("Local Resources", "/#resources"), ("Offline Maps", "/#maps"),
     ("First Aid", "/#medical"), ("Everyday Readiness", "/ready"), ("Crime", "/crime"),
-    ("Midterms 2026", "/midterms"), ("Public stats", "/stats"),
+    ("Midterms 2026", "/midterms"),
 ]
 
 

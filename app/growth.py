@@ -73,6 +73,7 @@ def sitemap():
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         pages = STATIC_PAGES   # seo/batch-1: /stats was listed twice
         if os.environ.get("BN_MESH_UI", "0") != "1": pages = [x for x in pages if not x[0].startswith("/mesh")]   # Nov 17 (Matt 8:19 AM): /mesh unlisted
+        pages = [x for x in pages if x[0] not in ("/social", "/stats", "/network/near")]   # Nov 21 (Matt pt1687u): unlisted hubs stay reachable by URL
         u = [(SITE + p, now if f in ("hourly", "daily") else None, f, pr) for p, f, pr in pages]
         try:
             import social
@@ -150,9 +151,6 @@ and situational awareness only; it is not an official warning service. Follow of
 - [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
 - [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
 - [Off-grid network map]({SITE}/mesh): live map of public off-grid mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
-- [Videos & posts]({SITE}/social): our YouTube and X updates, each with a sourced story page
-- [Public stats]({SITE}/stats): our open traffic and audience numbers
-
 ## Dashboard tabs
 
 - [Network Status]({SITE}/network), [Energy Grid]({SITE}/#grid), [Solar & Seismic]({SITE}/#solar), [Weather]({SITE}/#weather)
