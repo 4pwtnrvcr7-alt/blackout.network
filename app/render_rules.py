@@ -28,6 +28,7 @@ MAX_IMAGE_FILE = 20 * 1024 * 1024        # files above this stay box-only (e.g. 
 # Written by the public on Render. Render is the source of truth while it runs; the box mirrors them to render_mirror/
 # and restores them after a Render restart (free-tier disk is wiped on spin-down/redeploy).
 RENDER_OWNED = [x for x in os.environ.get("BN_RENDER_OWNED", "votes.db,newsletter.db,source_submissions.db,webpush.db").split(",") if x]
+if "story_writer.db" not in RENDER_OWNED: RENDER_OWNED.append("story_writer.db")   # Nov 21 2026: instant write-ups (story_writer.py) survive deploys via the handoff
 
 # Box -> Render live data. Top-level *.db (snapshotted read-only), selected JSON state and generated media dirs.
 SYNC_DIRS = ["snapshots", "static/vsubs", "video_subs", "static/social", "data"]   # static/social: story thumbnails (t303); data: design v3 Wire band files (top_of_mind.json, whats_coming.json)
