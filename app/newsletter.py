@@ -902,9 +902,38 @@ def clean_title(t):
     t = re.sub(r"\s+([.,;:!?])", r"\1", t); t = re.sub(r"(?<!\.)\.\.(?!\.)", ".", t)   # "million ." / "Moscow.." -> one full stop
     return t or re.sub(r"\s+", " ", t or "").strip()
 
+# Nov 21 2026 fix (7 AM brief blocked for 2 of 5 subscribers): alert-card titles look like
+# "Ballistic Missile Attack | 9/10 <flag> Ballistic Missile Strike on Zatoka, Odesa Region - 2 OTRK-5\nTwo Russian ballistic ...".
+# The card headline used to keep only the text before the first " | ", so the reader got the bare label "Ballistic Missile Attack",
+# a cut-short prefix of the story title, and the QA gate (rightly) blocked the issue. The headline is the line after the score.
+_ALERT_CARD = re.compile(r"^\s*(?P<label>[^|\n]{2,60}?)\s*\|\s*(?P<score>\d{1,2})\s*/\s*10\b[\s:.\-\u2013\u2014]*(?P<rest>\S.*)$", re.S)
+_AGG_TAIL = re.compile(r"\s*(?:\n\s*)?->\s*[^\n]*\|\s*More on\b.*$", re.S | re.I)   # "Headline\n->UN News | More on \"...\""
+_OUTLET_TAIL = re.compile(r"^(?P<head>.+?)\s+\|\s+(?P<tail>[^|\n]{2,40})\s*$", re.S)                # "Headline | Daily Sabah"
+_VERBISH = re.compile(r"\b(?:is|are|was|were|has|have|had|will|says?|said|warns?|kills?|hits?|strikes?|launch(?:es)?|attacks?|over|after|amid|as|to|of|in|on|for)\b", re.I)
+
+def headline_text(t):
+    """The story's own headline out of a structured scanner title, never a bare label or a fragment of it (Nov 21 2026):
+    - alert card "Label | 9/10 Headline\nBody" -> "Headline" (the label and the score are metadata, the body is the report);
+    - aggregator "Headline\n->Outlet | More on ..." -> "Headline";
+    - "Headline | Outlet" (short trailing outlet/show name) -> "Headline".
+    Anything else is returned as is (other " | " titles are kept whole, not cut at the bar). Idempotent; wording never changed."""
+    raw = str(t or "")
+    m = _ALERT_CARD.match(raw)
+    if m:
+        rest = m.group("rest")
+        first = rest.split("\n", 1)[0].strip()
+        raw = first if len(re.findall(r"[A-Za-z0-9]+", clean_title(first))) >= 3 else rest
+    raw = _AGG_TAIL.sub("", raw)
+    m = _OUTLET_TAIL.match(raw.strip())
+    if m and "|" not in m.group("head") and "\n" not in m.group("tail"):
+        head, tail = m.group("head").strip(), m.group("tail").strip()
+        if len(head.split()) >= 5 and len(tail.split()) <= 4 and not _VERBISH.search(tail) and not tail.endswith(("?", "!")):
+            raw = head
+    return raw.strip()
+
 def tighten_title(t):
     """A scanner title sometimes glues the headline to a second sentence that says the same thing. Keep the headline."""
-    t = clean_title(t)
+    t = clean_title(headline_text(t))
     words = re.findall(r"[A-Za-z0-9.]+", t)
     if len(words) < 8: return t
     key = " ".join(w.lower() for w in words[:3])
@@ -943,8 +972,11 @@ def _strip_stop(t):
 def _fit_headline(t, n=140):
     """One headline. Never sliced mid-sentence without saying so: the first full sentence when it fits, else the whole
     title when it fits, else cut on a word with an ellipsis (an explicit, visible cut). (t1134 fix)"""
-    t = clean_title(t)
-    t = re.split(r"\s+\|\s+|\s+->\s+|>>", t, maxsplit=1)[0].strip(" -|")
+    t = clean_title(headline_text(t))
+    # Nov 21 2026: no more cutting at the first " | " / "->" / ">>". The part before the bar is a label or a fragment
+    # ("Ballistic Missile Attack", "Missile Strike"), a cut-short prefix of the story title. headline_text() already took
+    # out the structured parts (alert-card label + score, aggregator tail, trailing outlet); what is left is the headline.
+    t = t.strip(" -|")
     sents = _sentences(t)
     if len(sents) > 1 and len(sents[0]) >= 20 and len(sents[0]) <= n:
         t = sents[0]
