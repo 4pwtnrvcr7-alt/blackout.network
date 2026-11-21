@@ -206,6 +206,11 @@ def place(item, g):
             r = geo_text.enrich(item, old, lede_only=True)
             if r and r is not old and r.get("located") and _ok(r.get("lat"), r.get("lon")) and (r.get("country") or "") == (base.get("cc") or ""):
                 return _from_geo(r, "published write-up")
+        elif base["how"] == "geo" and base.get("prec") == "state" and (g or {}).get("method") in ("gazetteer", "nominatim") and base.get("cc"):
+            # v11: a state pin read from the headline ("... in Sask." -> Manitoba) yields to the city the write-up's lede names, same country
+            r = geo_text.enrich(item, {"located": 1, "precision": "country", "country": base["cc"], "admin1_code": None}, lede_only=True)
+            if r and r.get("located") and r.get("precision") in ("city", "county") and _ok(r.get("lat"), r.get("lon")) and (r.get("country") or "") == base["cc"]:
+                return _from_geo(r, "published write-up")
     except Exception as ex:
         print("heat_all: write-up place failed:", str(ex)[:160], flush=True)
     return base

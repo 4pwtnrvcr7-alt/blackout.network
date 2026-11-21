@@ -262,6 +262,14 @@ class WriteupPlace(unittest.TestCase):
         self.assertNotEqual(ch("Coup de vent en Loire-Atlantique : y a-t-il un risque").get("cc"), "BJ")
         self.assertNotEqual(ch("The carrier group has left the Persian Gulf and is heading to Japan").get("cc"), "IR")
 
+    def test_state_pin_yields_to_writeup_city(self):
+        import heat_all
+        self._wu("mj", "The Canadian Food Inspection Agency confirmed avian influenza linked to the Canadian National Poultry Show held Nov. 7 in Moose Jaw, Saskatchewan, CBC reports.")
+        it = {"id": "mj", "title": "Breeders cull birds after avian flu outbreak at national poultry show in Sask.", "loc": None, "lat": None, "lon": None, "a": 0, "category": "disease", "links": "[]"}
+        g = {"located": 1, "lat": 54.85, "lon": -97.38, "precision": "state", "country": "CA", "admin1_code": "CA.03", "place": "Manitoba, Canada", "method": "gazetteer", "confidence": "medium"}
+        p = heat_all.place(it, g)
+        self.assertIn("Moose Jaw", p["place"]); self.assertEqual(p["cc"], "CA")
+
     def test_milan_as_adjective(self):
         r = geo.locate_texts({"title": "Fed\u2019s Barr flags bank run"}, geo.lead_sentences("In remarks for a Milan conference on Nov. 16, Barr said AI agents could speed up runs."))
         self.assertEqual(r["country"], "IT"); self.assertEqual(r["city"], "Milan")

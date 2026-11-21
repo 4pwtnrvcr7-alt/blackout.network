@@ -1178,7 +1178,10 @@ def locate_texts(cl, texts, members=(), method="writeup", what="the story's writ
         if ch and ch["level"] == "city":
             same = {x for x in nstates if x.split(".")[0] == ch["cc"]}
             if same and (ch.get("city") or {}).get("a1") not in same: ch = None
-        if ch and refine and ch.get("others"): ch = None; multi = True     # "struck Saada, Taiz, Lahj and al-Jawf": several places, keep the country
+        if ch and refine and ch.get("others"):
+            own = (ch.get("city") or {}).get("a1") or ch.get("a1")
+            own_names = {key_of(G.admin1.get(own, {}).get("name") or ""), key_of(G.countries.get(ch["cc"], {}).get("name") or "")}
+            if [o for o in ch["others"] if key_of(o) not in own_names]: ch = None; multi = True     # "Moose Jaw, Saskatchewan" is one place     # "struck Saada, Taiz, Lahj and al-Jawf": several places, keep the country
         if ch and refine and ch["level"] in ("city", "state"):
             ks = {a["k"] for a in ex["acc"] if a["level"] in ("city", "state") and a["cc"] == ch["cc"]}
             own = (ch.get("city") or {}).get("a1") or ch.get("a1")
