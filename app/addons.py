@@ -27,6 +27,7 @@ ROUTES = {
     "/api/solar_seismic": "solar_seismic",
     "/api/solar_quake": "solar_quake",   # Solar–Earthquake Correlation Lab (t242), precomputed by tools/solar_quake_build.py
     "/api/heatmap": "heatmap",
+    "/api/rt": "realtime",           # Nov 21 2026 (pt1688u): live Wire + map stream: /api/rt/stream (SSE), /since, /status, /client.js
     "/og": "og",                     # per-page Open Graph / Twitter share images (1200x630)
     "/map": "signal_map",             # Global signal map (Control panel v2 look): /map page. Not /maps (printable maps tab).
     "/api/signal": "signal_map",      # /api/signal/app.js, leaflet, world.geojson. Dots come from /api/state, not a new feed.

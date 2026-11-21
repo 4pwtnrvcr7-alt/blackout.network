@@ -317,6 +317,20 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
     return {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
 
+def items_for(ids):
+    """Wire items (same shape as /api/wire_tl) for these live cluster ids, newest first. Used by the realtime stream (realtime.py)."""
+    ids = [i for i in dict.fromkeys(ids or []) if i][:500]
+    if not ids: return []
+    c = _ro(DB)
+    try: rows = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) AND cluster_id IN ({','.join('?' * len(ids))})", ids))
+    finally: c.close()
+    rows.sort(key=lambda r: (r["t"] or "", r["id"]), reverse=True)
+    return [_item(r, False) for r in rows]
+
+def bust_meta():
+    """Forget the cached meta (totals) so the next read rebuilds it (realtime.py calls this at most every 2 minutes)."""
+    with _LK: _M["t"] = 0
+
 def count(q="", bg=False):
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -408,6 +422,10 @@ def _ver(name):
     try: return str(int(os.path.getmtime(os.path.join(STATIC, name)))) + "b"
     except OSError: return "0"
 
+def _rt_ver():
+    try: return str(int(os.path.getmtime(os.path.join(BASE, "realtime_static", "client.js")))) + "r"
+    except OSError: return "0"
+
 def page_html():
     try:
         import wire_v2; menu = wire_v2.menu_html(); w2 = wire_v2.ST
@@ -475,7 +493,7 @@ def page_html():
 </main>
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
 <script>window.BN_TL={json.dumps(cfg)};</script>
-<script src="{w2}/wire2.js?v=3" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
+<script src="{w2}/wire2.js?v=3" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
 
 # ------------------------------------------------------------------ location (keyless) + local crime
 _ZIP = None

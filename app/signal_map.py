@@ -507,7 +507,7 @@ def page2(qs):
 <p class="bnl-k" aria-hidden="true"><span>Signal acquisition</span><span id="bnl_brg">BRG 000&deg;</span></p>
 <ol aria-hidden="true"><li data-s="link"><b>01</b><span>Wire feed</span><em>connecting</em></li><li data-s="exact"><b>02</b><span>Exact places</span><em>waiting</em></li><li data-s="approx"><b>03</b><span>Approximate</span><em>waiting</em></li><li data-s="region"><b>04</b><span>Region only</span><em>waiting</em></li><li data-s="global"><b>05</b><span>No location</span><em>waiting</em></li><li data-s="base"><b>06</b><span>Basemap</span><em>loading</em></li></ol>
 <div class="bnl-bar" aria-hidden="true"><i></i></div><p class="bnl-msg" id="bnl_msg" role="status" hidden></p></div></div>
-<div class="bnm-top"><div class="bnm-chip" id="bnm_chip"><i></i><span id="bnm_count" aria-live="polite">Loading alerts…</span></div><span class="bnm-upw" id="bnm_up"></span></div>
+<div class="bnm-top"><div class="bnm-chip" id="bnm_chip"><i></i><span id="bnm_count" aria-live="polite">Loading alerts…</span></div><span class="bnm-rt" id="bnm_rt" hidden aria-live="polite"></span><span class="bnm-upw" id="bnm_up"></span></div>
 <div class="bnm-ctl" id="bnm_ctl">
 <button type="button" class="bnm-b" id="bnm_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="bnm-b" id="bnm_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
@@ -536,8 +536,12 @@ def page2(qs):
 <noscript><p class="bnm-nojs">The map needs JavaScript. <a href="/wire">The Wire</a> lists the same stories.</p></noscript>
 </main>
 <script>window.BNM_CFG={cfg};</script>
-<script src="/api/signal/map2_loader.js?v={_v("map2_loader.js")}" defer></script><script src="/api/signal/maplibre-gl.js?v={_v("maplibre-gl.js")}" defer></script><script src="/api/signal/map2.js?v={_v("map2.js")}" defer></script>
+<script src="/api/signal/map2_loader.js?v={_v("map2_loader.js")}" defer></script><script src="/api/signal/maplibre-gl.js?v={_v("maplibre-gl.js")}" defer></script><script src="/api/rt/client.js?v={_rt_v()}" defer></script><script src="/api/signal/map2.js?v={_v("map2.js")}" defer></script>
 </body></html>'''
+
+def _rt_v():
+    try: return str(int(os.path.getmtime(os.path.join(os.path.dirname(os.path.abspath(__file__)), "realtime_static", "client.js")))) + "r"
+    except OSError: return "0"
 
 _HEAT = {"t": 0.0, "v": None}
 _HLOCK = _th.Lock()
@@ -548,6 +552,7 @@ def heat_payload():
     import time, sys
     with _HLOCK:
         if _HEAT["v"] is not None and time.time() - _HEAT["t"] < 60: return _HEAT["v"]
+        g0 = _HEAT.get("g", 0)   # Nov 21 2026: realtime.bust() bumps "g"; a build that started before a bust must not cache its older rows
     body = None
     # Nov 20 2026 (Matt pt1672u): every Wire item, placed at its best honest precision (heat_all.py). BN_MAP_ALL=0 restores the located-only feed.
     try:
@@ -556,7 +561,8 @@ def heat_payload():
     except Exception as ex:
         print("signal_map heat: every-Wire-item feed failed, using located-only:", ex, flush=True); body = None
     if body is not None:
-        with _HLOCK: _HEAT.update(t=time.time(), v=body)
+        with _HLOCK:
+            if _HEAT.get("g", 0) == g0: _HEAT.update(t=time.time(), v=body)
         return body
     try:
         hm = sys.modules.get("heatmap")
@@ -587,7 +593,8 @@ def heat_payload():
         body = {"generated": p.get("generated"), "source": "points", "window_days": 7,
                 "coverage": {"located": len(rows), "total": len(rows) + int(p.get("unmapped") or 0), "pct": None}, "rows": rows}
     body["cols"] = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam"]
-    with _HLOCK: _HEAT.update(t=time.time(), v=body)
+    with _HLOCK:
+        if _HEAT.get("g", 0) == g0: _HEAT.update(t=time.time(), v=body)
     return body
 
 def handle_get(path, qs):

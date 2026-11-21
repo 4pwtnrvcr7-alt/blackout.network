@@ -212,12 +212,35 @@ def handle_push(h):
         if meta.get("restore_done"): SYNC["restored"] = True
         SYNC.update(last_push=time.time(), pushes=SYNC["pushes"] + 1, files=SYNC["files"] + len(done))
         _refresh_state()
+        try: _rt().after_sync(done)        # Nov 21 2026 (pt1688u): re-apply realtime deltas the upload raced past, push new items to browsers
+        except Exception: traceback.print_exc()
         return 200, {"status": "ok", "installed": len(done), "refused": refused[:50], "boot_id": BOOT_ID}
     except Exception as ex:
         SYNC["last_error"] = str(ex)[:300]; traceback.print_exc(); return 500, {"error": str(ex)[:300]}
     finally:
         try: os.unlink(tmp)
         except FileNotFoundError: pass
+
+# ---------- realtime stream (Nov 21 2026, Matt pt1688u): small signed deltas from the Mac's rt_push.py, see realtime.py ----------
+RT_MAX = int(os.environ.get("BN_RT_MAX_MB", "16")) * 1024 * 1024
+def _rt():
+    return server._addon_mod("realtime")
+def handle_rt(h, path):
+    n = int(h.headers.get("Content-Length") or 0)
+    if n < 0 or n > RT_MAX: return 413, {"error": f"delta must be 0..{RT_MAX} bytes"}
+    raw = h.rfile.read(n) if n else b""
+    if len(raw) != n: return 400, {"error": "short body"}
+    ok, why = verify(h, "POST", path, hashlib.sha256(raw).hexdigest())
+    if not ok: return 403, {"error": why}
+    if not has_data(): return 409, {"error": "no data yet; the full sync fills this node first"}
+    try:
+        rt = _rt()
+        if path == "/internal/rt/poll": return rt.poll(raw)
+        code, body = rt.ingest(raw)
+        if code == 200 and body.get("scans"): _refresh_state()
+        return code, body
+    except Exception as ex:
+        traceback.print_exc(); return 500, {"error": str(ex)[:200]}
 
 def manifest():
     owned = {}
@@ -255,7 +278,10 @@ def public_status():
             "pushes_since_boot": SYNC["pushes"], "files_installed_since_boot": SYNC["files"], "owned_restored": SYNC["restored"],
             "last_scan": _iso(ls), "last_scan_age_s": round(time.time() - ls) if ls else None, "now": _iso(time.time()),
             "deploy_handoff": {k: HANDOFF[k] for k in ("state", "files", "bytes", "seconds")}, "writes_paused": FREEZE["until"] > time.time(),
-            "memory": {**_mem(), "limit_mb": 512, "malloc_arena_max": os.environ.get("MALLOC_ARENA_MAX")}}
+            "memory": {**_mem(), "limit_mb": 512, "malloc_arena_max": os.environ.get("MALLOC_ARENA_MAX")}, "realtime": _rt_public()}
+def _rt_public():
+    try: return _rt().public()
+    except Exception as ex: return {"enabled": False, "error": str(ex)[:120]}
 
 # ---------- keep "last scan / next scan" meaningful from synced data ----------
 def _refresh_state():
@@ -543,6 +569,11 @@ class RH(server.H):
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/internal/sync/push": return self.send(*handle_push(self))
+        if path in ("/internal/rt/push", "/internal/rt/poll"): return self.send(*handle_rt(self, path))
+        if path == "/api/rt/refresh":       # public Refresh button (rate-limited per IP inside realtime.refresh)
+            self.body()
+            try: return self.send(*_rt().refresh(self.ip()))
+            except Exception as ex: traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
         if path in ("/internal/newsletter/test", "/internal/newsletter/status", "/internal/newsletter/send_now"):   # t373: box-signed (BN_SYNC_SECRET HMAC) newsletter ops
             self.body(); raw = getattr(self, "_raw", b"") or b""
             ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())

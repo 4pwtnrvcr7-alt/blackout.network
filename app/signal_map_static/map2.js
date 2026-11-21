@@ -120,6 +120,9 @@
       "Every Wire alert from the last " + esc(WL) + " is on this map: <b>" + ex.toLocaleString() + "</b> at their exact place, <b>" + (shown.length - ex).toLocaleString() + "</b> approximate (hollow rings, usually a country centre), <b>" +
       shownReg.length.toLocaleString() + "</b> region only (labeled rings) and <b>" + shownTray.length.toLocaleString() + "</b> with no place (the No location list).") +
       (wc != null && !state.rank && !state.topic && state.view === "world" ? " The Wire shows " + (+wc).toLocaleString() + " for this window" + (+wc === tot ? ", the same set." : ".") : "");
+    if (wc != null && +wc === tot) resyncN = 0;
+    if (wc != null && +wc !== tot && !state.rank && !state.topic && state.view === "world" && rtMode === "live" && resyncN < 3 && Date.now() - resyncAt > 30000) {
+      resyncN++; resyncAt = Date.now(); clearTimeout(reloadT); reloadT = setTimeout(function () { load(true); }, 1500 + Math.random() * 3000); }   /* live counts drifted from the Wire: one quiet full re-read */
     $("bnm_chip").className = "bnm-chip" + (hi ? " hot" : "");
     var active = (state.rank ? 1 : 0) + (state.topic ? 1 : 0) + (state.window !== "168" ? 1 : 0) + (state.view !== "world" ? 1 : 0);
     $("bnm_fn").hidden = !active; $("bnm_fn").textContent = active;
@@ -143,11 +146,8 @@
     var L = window.BNML, first = !loadedAt && L && L.feed;
     return (first ? L.feed() : fetch("/api/signal/heat", { cache: "no-store" }).then(function (r) { return r.json(); })).then(function (j) {
       var cols = j.cols || [], ix = {}; cols.forEach(function (c, i) { ix[c] = i; });
-      rows = (j.rows || []).map(function (a, i) { return { i: i, id: a[ix.id], lat: +a[ix.lat], lon: +a[ix.lon], rank: +a[ix.rank] || 0, cat: a[ix.cat] || "", t: a[ix.t] || "", title: a[ix.title] || "",
-        place: a[ix.place] || "", prec: a[ix.prec] || "", watch: +a[ix.watch] || 0, src: a[ix.src] || "", url: a[ix.url] || "", cc: a[ix.cc] || "", fam: +a[ix.fam] || 0,
-        tier: ix.tier != null ? a[ix.tier] || "" : "", how: ix.how != null ? a[ix.how] || "" : "", rid: ix.rid != null ? a[ix.rid] || "" : "" }; })
-        .filter(function (r) { if (r.tier === "global") { r.lat = r.lon = null; return true; }
-          return a_ok(r); });
+      var before = loadedAt ? onMapIds() : null;
+      rows = (j.rows || []).map(function (a, i) { return parseRow(a, ix, i); }).filter(keepRow);
       rows.forEach(function (r, i) { r.i = i; });
       meta = j; loadedAt = Date.now();
       var cats = {}; rows.forEach(function (r) { if (r.cat) cats[r.cat] = (cats[r.cat] || 0) + 1; });
@@ -158,12 +158,83 @@
       if (!cv.tiers) $("bnm_cov").textContent = (cv.located != null ? cv.located.toLocaleString() + " of " + (cv.total || 0).toLocaleString() + " alerts from the last " + (j.window_days || 7) + " days have a place" + (cv.pct != null ? " (" + cv.pct + "%)" : "") + ". " : "") + "Country-level places are approximate.";
       apply(false); stamp();
       if (first) L.data(rows);
+      var born = before ? rows.filter(function (r) { return placed(r) && !before[r.id]; }) : [];
+      if (born.length) arrival(born);
+      return born.length;
     }).catch(function () { $("bnm_count").textContent = "The map data did not load. Try the refresh button."; });
+  }
+  /* ---------- realtime (Nov 21 2026, Matt pt1688u / 2:02 PM): new items drop in live, with an arrival effect ---------- */
+  function parseRow(a, ix, i) {
+    return { i: i, id: a[ix.id], lat: +a[ix.lat], lon: +a[ix.lon], rank: +a[ix.rank] || 0, cat: a[ix.cat] || "", t: a[ix.t] || "", title: a[ix.title] || "",
+      place: a[ix.place] || "", prec: a[ix.prec] || "", watch: +a[ix.watch] || 0, src: a[ix.src] || "", url: a[ix.url] || "", cc: a[ix.cc] || "", fam: +a[ix.fam] || 0,
+      tier: ix.tier != null ? a[ix.tier] || "" : "", how: ix.how != null ? a[ix.how] || "" : "", rid: ix.rid != null ? a[ix.rid] || "" : "", fs: ix.fs != null ? a[ix.fs] || "" : "" };
+  }
+  function keepRow(r) { if (r.tier === "global") { r.lat = r.lon = null; return true; } return a_ok(r); }
+  function placed(r) { return r && onMap(r) && r.lat !== null && isFinite(r.lat); }
+  function onMapIds() { var o = {}; rows.forEach(function (r) { if (placed(r)) o[r.id] = 1; }); return o; }
+  var ARR = {}, fx = [], FX_MAX = 40, FX_LIFE = reduce ? 90000 : 75000;
+  function isNewRow(r) { var a = ARR[r.id], f = Date.parse(r.fs || ""); return (a && Date.now() - a < 900000) || (isFinite(f) && Date.now() - f < 900000); }
+  function fxColor(r) { return r.rank >= 7 ? "high" : r.rank >= 4 ? "elev" : "calm"; }
+  function arrival(list) {   /* list: rows that just became pins. Flash, three sonar rings, then a soft halo that fades back to the pin. */
+    if (!map || !ready || !window.maplibregl || !list.length) return;
+    var now = Date.now(), vis = {}; shown.forEach(function (r) { vis[r.id] = 1; });
+    list = list.filter(function (r) { ARR[r.id] = now; return vis[r.id] && placed(r); }).sort(function (a, b) { return b.rank - a.rank; }).slice(0, FX_MAX);
+    list.forEach(function (r, k) {
+      setTimeout(function () {
+        while (fx.length >= FX_MAX) { var o = fx.shift(); o.m.remove(); clearTimeout(o.t); }
+        var el = d.createElement("div"); el.className = "bnm-new " + fxColor(r) + (r.tier === "approx" ? " ap" : "") + (reduce ? " still" : "");
+        el.setAttribute("aria-hidden", "true");
+        el.innerHTML = '<i class="h"></i><i class="r r1"></i><i class="r r2"></i><i class="r r3"></i><i class="f"></i>';
+        var m = new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([r.lon, r.lat]).addTo(map);
+        var rec = { m: m, el: el, t: 0 };
+        rec.t = setTimeout(function () { el.classList.add("out"); setTimeout(function () { m.remove(); fx = fx.filter(function (x) { return x !== rec; }); }, 1400); }, FX_LIFE);
+        fx.push(rec);
+      }, reduce ? 0 : Math.min(k * 260, 6000));   /* several at once arrive in a quick cascade, not all on the same frame */
+    });
+  }
+  function upsert(ev) {
+    var hv = ev.heat || {}, cols = hv.cols || meta.cols || [], ix = {}; cols.forEach(function (c, i) { ix[c] = i; });
+    var by = {}; rows.forEach(function (r) { by[r.id] = r; });
+    var born = [];
+    (hv.rows || []).forEach(function (a) {
+      var nr = parseRow(a, ix, 0); if (!keepRow(nr)) return;
+      var old = by[nr.id], was = placed(old);
+      if (old) { nr.i = old.i; rows[old.i] = nr; } else { nr.i = rows.length; rows.push(nr); }
+      by[nr.id] = nr; if (!was && placed(nr)) born.push(nr);
+    });
+    if (ev.wire_counts) { meta.coverage = meta.coverage || {}; meta.coverage.wire_counts = ev.wire_counts; }
+    if (ev.at) meta.generated = ev.at;
+    if (born.length || (hv.rows || []).length) apply(false);
+    arrival(born);
+    return born.length;
+  }
+  var rtMsgT = 0, rtMode = "off";
+  function rtLine(txt, ms) {
+    var el = $("bnm_rt"); if (!el) return;
+    clearTimeout(rtMsgT);
+    if (txt) { el.textContent = txt; el.className = "bnm-rt msg"; el.hidden = false; rtMsgT = setTimeout(function () { rtLine(""); }, ms || 3200); return; }
+    el.hidden = rtMode !== "live"; el.className = "bnm-rt"; el.innerHTML = '<i aria-hidden="true"></i>Live';
+  }
+  var reloadT = 0, resyncN = 0, resyncAt = 0;
+  if (window.BNRT) {
+    BNRT.onMode(function (m) { rtMode = m; rtLine(""); });
+    BNRT.on(function (ev) {
+      if (!loadedAt) return;
+      if (ev.reset || (ev.heat && ev.heat.reload)) { clearTimeout(reloadT); reloadT = setTimeout(function () { load(true); }, 1500 + Math.random() * 6000); return; }
+      upsert(ev); stamp();
+    });
+  }
+  function refreshNow() {   /* the refresh button: server drops caches and asks the scanner for anything newer, then the map re-fetches */
+    var t0 = Date.now();
+    return (window.BNRT ? BNRT.refresh() : Promise.resolve({})).then(function () { return load(true); }).then(function () {
+      var n = 0; for (var k in ARR) if (ARR[k] >= t0) n++;   /* pins that dropped in during the refresh, by the stream or the re-read */
+      rtLine(n ? n + " new pin" + (n === 1 ? "" : "s") : "Up to date"); return n;
+    });
   }
   function stamp() {
     var el = $("bnm_up"); if (!el || !window.BNT || !BNT.up) return;
     var at = Date.parse(meta.generated || "") || loadedAt, nx = loadedAt + 300000;
-    BNT.up(el, { label: "the heat layer", at: at, next: nx, run: function () { return load(true); } });
+    BNT.up(el, { label: "the heat layer", at: at, next: nx, run: refreshNow });
   }
 
   /* ---------- card (tap a dot) ---------- */
@@ -177,7 +248,7 @@
     var el = $("bnm_card"); list = list.slice().sort(function (a, b) { return b.rank - a.rank || (a.t < b.t ? 1 : -1); });
     el.innerHTML = '<button type="button" class="bnm-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '<p class="bnm-eb">' + esc(head) + "</p><p class=\"bnm-cm bnm-cn\">" + esc(note) + '</p><ul class="bnm-gl">' + list.slice(0, 300).map(function (x) { var y = dest(x);
-        return '<li><a href="' + esc(y.href) + '"' + (y.ext ? ' target="_blank" rel="noopener"' : "") + '><span class="bnm-rk ' + band(x.rank) + '"><b>' + x.rank + "</b></span><span><span class=bnm-gt>" + esc(x.title) + "</span><small>" + [esc(TOPIC[x.cat] || x.cat), esc(et(x.t))].filter(Boolean).join(" · ") + "</small></span></a></li>"; }).join("") + "</ul>" +
+        return '<li><a href="' + esc(y.href) + '"' + (y.ext ? ' target="_blank" rel="noopener"' : "") + '><span class="bnm-rk ' + band(x.rank) + '"><b>' + x.rank + "</b></span><span><span class=bnm-gt>" + (isNewRow(x) ? '<span class="bnm-newtag">New</span> ' : "") + esc(x.title) + "</span><small>" + [esc(TOPIC[x.cat] || x.cat), esc(et(x.t))].filter(Boolean).join(" · ") + "</small></span></a></li>"; }).join("") + "</ul>" +
       (list.length > 300 ? '<p class="bnm-cm">Showing 300 of ' + list.length + '. <a href="/wire">The Wire</a> has them all.</p>' : "");
     el.hidden = false; el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
     el.querySelector(".bnm-cx").onclick = function () { el.hidden = true; };
@@ -187,7 +258,7 @@
     list.sort(function (a, b) { return b.rank - a.rank; });
     var r = list[0], b = band(r.rank), dd = dest(r), more = list.length - 1;
     el.innerHTML = '<button type="button" class="bnm-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
-      '<div class="bnm-ct"><span class="bnm-rk ' + b + '"><b>' + r.rank + "</b>/10 · " + RN[Math.max(0, Math.min(10, r.rank))] + "</span>" + (r.watch ? '<span class="bnm-tag">Single source</span>' : "") + "</div>" +
+      '<div class="bnm-ct"><span class="bnm-rk ' + b + '"><b>' + r.rank + "</b>/10 · " + RN[Math.max(0, Math.min(10, r.rank))] + "</span>" + (r.watch ? '<span class="bnm-tag">Single source</span>' : "") + (isNewRow(r) ? '<span class="bnm-tag bnm-newtag">New</span>' : "") + "</div>" +
       "<h2>" + esc(r.title) + "</h2>" +
       '<p class="bnm-cm">' + [where(r), esc(TOPIC[r.cat] || r.cat), esc(et(r.t)), r.fam > 1 ? r.fam + " sources" : ""].filter(Boolean).join(" · ") + "</p>" +
       '<a class="bnm-go" href="' + esc(dd.href) + '"' + (dd.ext ? ' target="_blank" rel="noopener"' : "") + ">" + esc(dd.label) + " &rarr;</a>" +
