@@ -152,7 +152,7 @@ MENU3 = [
  ("latest", "Live", "The Wire, the heat map and what's happening now.",
   [("threat", "The Wire"), ("heatmap", "Heat Map"), ("weather", "Weather"), ("noise", "Background Noise")]),
  ("threats", "Threats", "Grid, network, space weather, AI and crime.",
-  [("grid", "Energy Grid"), ("net", "Network Status"), ("solar_seismic", "Solar & Seismic"),
+  [("grid", "The Grid"), ("net", "Network Status"), ("solar_seismic", "Solar & Seismic"),
    ("ai", "AI Threats"), ("@crime", "Crime"), ("starlink", "Starlink")]),
  ("politics", "News", "The brief, politics, elections and markets.",
   [("newsletter", "Newsletter"), ("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"),
@@ -189,7 +189,8 @@ M3_SOON = set()
 # No data-tab on these links so dashboard JS cannot intercept the click as a tab switch.
 M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets"),   # Nov 18 (pt1661u): Markets opens the /markets overview
            "newsletter": ("newsletter", "/newsletter"), "sources": ("sources", "/sources"),
-           "midterms": ("midterms", "/midterms")}   # Nov 21: menu opens the standalone pages, same as the top bar
+           "midterms": ("midterms", "/midterms"),
+           "grid": ("grid", "/grid")}   # Nov 21 2026 (pt1737u): The Grid opens the full-screen /grid page, not the old /live#grid dashboard tab   # Nov 21: menu opens the standalone pages, same as the top bar
 
 def menu3_sections(sn):
     nav = {it[0]: it for g, its in sn.NAV for it in its}
@@ -251,7 +252,7 @@ def drawer(sn, active=""):
                 out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
             else:
                 cur = ' aria-current="page"' if key == active else ""
-                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
+                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms", "/grid") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
                 out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
     out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'

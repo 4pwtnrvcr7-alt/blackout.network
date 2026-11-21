@@ -35,7 +35,7 @@ HIDDEN_LABELS = [
 
 SECTIONS = [
     ("latest", "Live", ["The Wire", "Heat Map", "Weather", "Background Noise"]),
-    ("threats", "Threats", ["Energy Grid", "Network Status", "Solar & Seismic", "AI Threats", "Crime", "Starlink"]),
+    ("threats", "Threats", ["The Grid", "Network Status", "Solar & Seismic", "AI Threats", "Crime", "Starlink"]),
     ("politics", "News", ["Newsletter", "Midterms 2026", "Politics", "Government", "Gun Laws", "Key Figures", "Markets"]),
     ("prepare", "Prepare", ["Preppers", "Local Resources", "Offline Maps", "First Aid", "Bushcraft"]),
     ("about", "More", ["Sources", "How We Score", "SpaceX", "CERN & LHC", "Private Jets", "Games"]),

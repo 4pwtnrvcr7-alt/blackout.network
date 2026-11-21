@@ -290,7 +290,7 @@ def credits_page():
 # ---------- "/" ----------
 def _ic(p): return f'<svg viewBox="0 0 24 24" aria-hidden="true">{p}</svg>'
 CHIPS = [
- ("Energy grid", '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>', "Grid load, outages and stress across North American power regions.", "/live#grid"),
+ ("Energy grid", '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>', "Grid load, outages and stress across North American power regions.", "/grid"),
  ("Markets & banking", '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>', "Index moves, bank stress and the money stories behind them.", "/live#finance"),
  ("Solar & seismic", '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>', "Solar flares, the Kp index and earthquakes worldwide.", "/live#solar"),
  ("Health & outbreaks", '<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>', "Outbreak reports from health agencies, ranked on The Wire.", "/wire"),
