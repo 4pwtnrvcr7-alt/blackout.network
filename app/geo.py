@@ -18,7 +18,7 @@ UA = "blackout.network-heatmap/1.0 (+https://blackout.network; research dashboar
 NOM_URL = "https://nominatim.openstreetmap.org/search"
 NOM_BUDGET = 150            # max Nominatim requests per worker pass (cached forever, so each query is asked once)
 WINDOW_DAYS = 7
-VERSION = 8                 # bump to re-geocode everything after rule changes
+VERSION = 9                 # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u)
 _lock = threading.RLock()
 _nom_lock = threading.Lock()
 _last_nom = [0.0]
@@ -69,7 +69,7 @@ MONTHS = {"january", "february", "march", "april", "may", "june", "july", "augus
           "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "today", "tonight", "yesterday", "tomorrow"}
 GENERIC = {"central", "north", "south", "east", "west", "northern", "southern", "eastern", "western", "centre", "center", "capital", "national", "federal",
            "city", "islands", "island", "coast", "north east", "north west", "south east", "south west", "northeast", "northwest", "southeast", "southwest",
-           "middle", "upper", "lower", "interior", "highlands", "lakes", "mountain", "mountains", "river", "valley", "plains", "metro", "region", "district",
+           "east coast", "west coast", "gulf coast", "north coast", "south coast", "middle", "upper", "lower", "interior", "highlands", "lakes", "mountain", "mountains", "river", "valley", "plains", "metro", "region", "district",
            "border", "frontier", "littoral", "orient", "oriental", "occidental", "sud", "nord", "est", "ouest", "centro", "norte", "sur", "oeste", "leste"}
 COMMON_HARD = {"police", "most", "split", "nice", "mobile", "deal", "bar", "hit", "hope", "reading", "bath", "of", "san", "university", "union", "independence",
                "liberty", "victoria", "florence", "lincoln", "jackson", "hamilton", "marion", "warren", "clinton", "douglas", "lawrence", "madison", "franklin",
@@ -82,7 +82,7 @@ COMMON_HARD = {"police", "most", "split", "nice", "mobile", "deal", "bar", "hit"
                "sanders", "adams", "lafayette", "austin", "charlotte", "elizabeth", "tyler", "dallas", "houston", "aurora", "columbia", "cleveland", "mesa",
                "nato", "isis", "hamas", "hezbollah", "houthi", "houthis", "idf", "un", "eu", "who", "cia", "fbi", "nsa", "kgb", "ira", "fed", "sec", "x",
                "ai", "gaming", "cruz", "chicago fire", "brent", "wti", "ukrainian-", "banda", "batman", "superman", "bolt", "mosquito", "sabotage", "kansas city chiefs", "patriot", "patriots",
-               "said", "says", "news", "live", "breaking", "update", "alert", "watch", "warning", "drone", "drones", "flood", "storm", "fire", "tornado"}
+               "mass", "miss", "wash", "ind", "ill", "ore", "conn", "penn", "tenn", "minn", "wis", "neb", "colo", "okla", "ariz", "nev", "ala", "fla", "said", "says", "news", "live", "breaking", "update", "alert", "watch", "warning", "drone", "drones", "flood", "storm", "fire", "tornado"}
 COUNTRY_ALIASES = {"US": ["United States", "USA", "U.S", "US", "U.S.A", "United States of America", "the States"], "GB": ["UK", "U.K", "Britain", "Great Britain", "England", "Scotland", "Wales", "Northern Ireland", "United Kingdom"],
                    "RU": ["Russia", "Russian Federation"], "KR": ["South Korea", "Republic of Korea", "ROK"], "KP": ["North Korea", "DPRK"], "IR": ["Iran"], "SY": ["Syria"],
                    "CD": ["DRC", "DR Congo", "Democratic Republic of the Congo", "Democratic Republic of Congo", "Congo-Kinshasa", "Congo"], "CG": ["Republic of the Congo", "Congo-Brazzaville"],
@@ -195,6 +195,16 @@ class Gaz:
                     if d <= max_km and (best is None or d < best[0]): best = (d, i)
         return self.city(best[1]) if best else None
 
+    def nearest_city_cc(self, lat, lon, cc, max_km=300):
+        """Is there a town of country cc within max_km of the point? (quake feeds say '107 km E of Ollague, Chile' for a point in Bolivia)"""
+        r = int(max_km // 100) + 1
+        for dx in range(-r, r + 1):
+            for dy in range(-r - 1, r + 2):
+                for i in self.grid.get((int(lat // 1) + dx, int(lon // 1) + dy), []):
+                    c = self.cities[i]
+                    if c[4] == cc and hav(lat, lon, c[2], c[3]) <= max_km: return True
+        return False
+
     # ---- point in polygon (Natural Earth, simplified) for coordinates
     def _load_polys(self):
         P = {"a0": [], "a1": []}
@@ -269,14 +279,17 @@ def extract(text, ctx_cc=None, trust=False):
         for n in (5, 4, 3, 2, 1):
             if i + n > len(words): continue
             seg = words[i:i + n]
-            if n > 1 and any(nw(s) in CONNECT for s in (seg[0], seg[-1])): continue
+            if n > 1 and any(nw(s) in CONNECT for s in (seg[0], seg[-1])) and not any(r[0] == "country" for r in G.idx.get(" ".join(nw(x) for x in seg), [])): continue   # but "El Salvador"
             k = " ".join(nw(s) for s in seg)
+            if n > 1 and any(_sent_start(t, toks, i + j) for j in range(1, n)): continue     # "NEW: Britain ..." is not New Britain
             if k in G.idx or k in SPECIAL_CITY:
                 # sentence position: first word of the text or after . ! ? : is "sentence start"
-                if not (caps[i] or trust or (i > 0 and nw(words[i - 1]) in STRONG_CUES)): continue
+                if not (caps[i] or (i > 0 and nw(words[i - 1]) in STRONG_CUES and not trust and k not in LOCATIONAL and k not in G.common and k not in GENERIC)): continue
+                if n == 1 and k in G.common and trust and len(k) <= 3: continue
                 if n == 1 and words[i].replace(".", "").isupper() and len(words[i].replace(".", "")) <= 4 and k not in CAPS_ONLY and not trust and k not in SPECIAL_CITY: continue   # acronyms (NIS, SEC, WHO)
                 if n == 1 and k in CAPS_ONLY and not (words[i].replace(".", "").isupper() and not shouting): continue
                 if (k in CAPS_ONLY or k.replace(" ", "") in CAPS_ONLY) and not words[i][0].isupper(): continue
+                if n == 1 and k in ORG_WORDS and not trust: continue
                 hit = (i, n, k, list(G.idx.get(k, [])))
                 break
         if hit: found.append(hit); i += hit[1]
@@ -285,7 +298,7 @@ def extract(text, ctx_cc=None, trust=False):
     def bump(cc, w):
         if cc: ctx[cc] = ctx.get(cc, 0) + w
     for cc in flags: bump(cc, 0.5)
-    if ctx_cc: bump(ctx_cc, 2)
+    if ctx_cc: bump(ctx_cc, 1)
     demonyms = []
     for (i, n, k, refs) in found:
         kinds = {r[0] for r in refs}
@@ -311,6 +324,7 @@ def extract(text, ctx_cc=None, trust=False):
     if m and m.group(1) in US_POSTAL: bump("US", 2); pairs["__nws__"] = ("US", US_POSTAL[m.group(1)])
     ctx_a1 = {v[1] for v in pairs.values() if v[1]}
     acc, rejected, qual = [], [], []
+    rejected_people = []
     for (i, n, k, refs) in found:
         prev = nw(words[i - 1]) if i > 0 else ""
         cue = prev in LOC_CUES
@@ -318,6 +332,8 @@ def extract(text, ctx_cc=None, trust=False):
         before_cap = i > 0 and caps[i - 1] and prev not in CONNECT and not cue and not _sent_start(t, toks, i)
         after_cap = i + n < len(words) and caps[i + n] and nw(words[i + n]) not in CONNECT and not _sent_start(t, toks, i + n)
         person_like = (before_cap or after_cap) and not title_case and not trust
+        if i > 0 and not trust and (nw(words[i - 1]) in GIVEN_NAMES or nw(words[i - 1]) in HONORIFICS) and caps[i - 1] and nw(words[i - 1]) not in STRONG_CUES:
+            rejected_people.append(" ".join(words[i - 1:i + n])); continue
         common = k in G.common
         pair = pairs.get(k)
         cands = []
@@ -340,7 +356,7 @@ def extract(text, ctx_cc=None, trust=False):
                 acc.append({"level": "country", "cc": cc, "a1": None, "i": i, "k": k, "text": " ".join(words[i:i + n]), "conf": "high" if trust else "medium", "cue": strong_cue}); continue
         if a1s:
             # prefer admin1 in a context country; US states win by default only with US context or when unique
-            pick = [a for a in a1s if a.split(".")[0] in ctx] or ([a for a in a1s if a.startswith("US.")] if "US" in ctx or len(a1s) == 1 else [])
+            pick = [a for a in a1s if a.split(".")[0] in ctx] or ([a for a in a1s if a.startswith("US.")] if "US" in ctx else []) or (a1s if len(a1s) == 1 and (trust or k in ADMIN_OK or (strong_cue and not common and len(k) >= 5 and nxt != "of")) else [])
             if k == "georgia":
                 if "GE" in ctx and "US" not in ctx: acc.append({"level": "country", "cc": "GE", "a1": None, "i": i, "k": k, "text": "Georgia", "conf": "medium"}); continue
                 if "US" not in ctx: rejected.append({"text": "Georgia", "why": "ambiguous", "cands": ["Georgia (US state)", "Georgia (country)"]}); continue
@@ -418,6 +434,10 @@ def choose(ex):
     """Pick the most specific consistent place. Returns (result_dict | None, reason_code, reason_text, candidates)."""
     G = gaz(); acc = ex["acc"]
     if not acc: return None, None, None, None
+    if ex.get("trust"):     # a location field ending in a country ("Off East Coast of Honshu, Japan"): everything else must be in that country
+        cl = [a["cc"] for a in acc if a["level"] == "country"]
+        if len(set(cl)) == 1:
+            acc = [a for a in acc if a["cc"] == cl[0]]
     for lvl in ("city", "state", "country"):
         L = [a for a in acc if a["level"] == lvl]
         if not L: continue
@@ -436,6 +456,16 @@ def choose(ex):
             L = bycc[best[0][0]]
         else: L = list(bycc.values())[0]
         a = sorted(L, key=lambda a: a["i"])[0]
+        if lvl == "city" and not ex.get("trust"):
+            dist = []
+            for x in sorted(L, key=lambda a: a["i"]):
+                if not any(hav(x["city"]["lat"], x["city"]["lon"], d["city"]["lat"], d["city"]["lon"]) < 60 for d in dist): dist.append(x)
+            if len(dist) >= 2:
+                a1s = {x["a1"] for x in dist}
+                names = ", ".join(x["text"] for x in dist[:4])
+                if len(a1s) == 1 and next(iter(a1s)) in G.admin1 and G.admin1[next(iter(a1s))].get("label"):
+                    return dict(a, level="state", a1=next(iter(a1s)), conf="medium", text=names, others=[]), None, None, None
+                return dict(a, level="country", a1=None, conf="medium", text=names, others=[]), None, None, None
         if lvl == "city" and len({x["a1"] for x in L}) > 1 and a["conf"] == "high": a = dict(a, conf="medium")
         others = sorted({x["text"] for x in acc if x is not a and x["cc"] == a["cc"]})
         return dict(a, others=others), None, None, None
@@ -505,6 +535,333 @@ def nom_to_geo(r):
     city = ad.get("city") or ad.get("town") or ad.get("village") or ad.get("municipality")
     return {"lat": float(r["lat"]), "lon": float(r["lon"]), "cc": cc, "a1": a1, "prec": prec, "place": r.get("display_name", "")[:160], "city": city}
 
+# ------------------------------------------------------------------ context rules (v9, Nov 21 2026, Matt pt1682u)
+# Regions abroad that headlines name on their own and that are unambiguous (other foreign states/provinces need "in/near ..." or context).
+ADMIN_OK = {"crimea", "donetsk", "luhansk", "kherson", "zaporizhzhia", "zaporizhia", "kharkiv", "kursk", "belgorod", "bryansk", "kashmir", "xinjiang",
+            "tibet", "chechnya", "dagestan", "balochistan", "baluchistan", "khyber pakhtunkhwa", "darfur", "tigray", "amhara", "kurdistan", "sinai",
+            "quebec", "ontario", "alberta", "british columbia", "queensland", "new south wales", "tasmania", "western australia", "south australia",
+            "northern territory", "bavaria", "catalonia", "sicily", "sardinia", "lombardy", "andalusia", "kerala", "tamil nadu", "uttar pradesh",
+            "maharashtra", "west bengal", "manipur", "assam", "sindh", "mindanao", "papua", "aceh", "okinawa", "hokkaido", "kyushu", "zhejiang",
+            "guangdong", "sichuan", "yunnan", "hebei", "shandong", "jalisco", "sinaloa", "chihuahua", "guerrero", "michoacan", "tamaulipas",
+            "oaxaca", "chiapas", "sonora", "borno", "zamfara", "kaduna", "kano", "kwara", "north kivu", "south kivu", "ituri", "kivu", "cabo delgado"}
+ORG_WORDS = {"university", "college", "school", "hospital", "airport", "police", "union", "city", "port", "harbor", "station", "church", "temple", "mission", "embassy", "parliament", "congress", "senate", "court", "palace", "academy", "institute", "center", "centre"}
+# People are not places: "Joe Wilson", "Ben Norton", "Rep. Lincoln". A capitalised given name or honorific right before a place name
+# makes it a person.
+GIVEN_NAMES = set("""joe john james robert michael william david richard joseph thomas charles chris christopher daniel matthew anthony mark donald steven
+paul andrew joshua kenneth kevin brian george timothy ronald edward jason jeffrey ryan jacob gary nicholas eric jonathan stephen larry justin scott brandon
+benjamin ben samuel gregory alexander frank patrick raymond jack dennis jerry tyler aaron jose adam nathan henry douglas zachary peter kyle ethan walter
+noah jeremy christian keith roger terry gerald harold sean austin carl arthur lawrence dylan jesse jordan bryan billy bruce gabriel logan albert willie
+alan juan wayne elijah randy roy vincent ralph eugene russell bobby mason philip louis mary patricia jennifer linda elizabeth barbara susan jessica sarah
+karen lisa nancy betty margaret sandra ashley kimberly emily donna michelle carol amanda dorothy melissa deborah stephanie rebecca sharon laura cynthia
+kathleen amy angela shirley anna brenda pamela emma nicole helen samantha katherine christine debra rachel carolyn janet catherine maria heather diane
+ruth julie olivia joyce virginia victoria kelly lauren christina joan evelyn judith megan andrea cheryl hannah jacqueline martha gloria teresa ann sara
+madison frances kathryn janice jean abigail alice judy sophia grace denise amber doris marilyn danielle beverly isabella theresa diana natalie brittany
+charlotte marie kayla alexis lori kamala hillary nancy marco ted rand mitch chuck kash pete tulsi marjorie lindsey elon vladimir volodymyr benjamin
+emmanuel keir rishi justin narendra recep xi kim shinzo fumio jair javier claudia gustavo nicolas luiz""".split())
+HONORIFICS = {"mr", "mrs", "ms", "dr", "sen", "senator", "rep", "representative", "gov", "governor", "president", "minister", "gen", "general", "judge",
+              "justice", "secretary", "mayor", "sir", "lord", "lady", "prince", "princess", "king", "queen", "pope", "rev", "father", "officer", "sheriff",
+              "commissioner", "chairman", "speaker", "professor", "prof", "coach", "captain", "capt", "sgt", "lt", "col", "councilman", "councilwoman", "councillor"}
+
+# Where a source is published is a prior, not proof: it only breaks ties between same-named places and limits online lookups.
+SOURCE_CC = [
+    (r"\.com\.au\b|\.net\.au\b|\.gov\.au\b|\.org\.au\b|\babc\.net\.au|\bSMH\b|\bThe Age\b|The Australian\b|news\.com\.au|9news|7news|Sky News Australia|\bSBS\b|Guardian Australia|Geoscience Australia|\bBoM\b|Bureau of Meteorology|Brisbane Times|WAtoday|Perth Now|PerthNow|Courier[- ]Mail|Herald Sun|Daily Telegraph \(AU\)|\bABC \(AU\)|#auspol", "AU"),
+    (r"\.co\.nz\b|\.govt\.nz\b|\.org\.nz\b|\bGeoNet\b|\bRNZ\b|NZ Herald|nzherald|Stuff\.co|1News|Newshub|#eqnz|nzquake|MetService", "NZ"),
+    (r"\.co\.uk\b|\.gov\.uk\b|\.org\.uk\b|\bBBC\b|Met Office|Sky News(?! Australia)|\bITV\b|Evening Standard|Manchester Evening|Liverpool Echo|Wales Online|The Scotsman|Daily Record|Belfast Telegraph", "GB"),
+    (r"\.ca/|\.ca\b|\bCBC\b|\bCTV\b|Global News|Toronto Star|Globe and Mail|National Post|Environment Canada|EarthquakesCanada|Earthquakes Canada", "CA"),
+    (r"\.ie\b|\bRT[EÉ]\b|Irish Times|Irish Independent|TheJournal\.ie|Met [EÉ]ireann", "IE"),
+    (r"\.co\.za\b|News24|\bSABC\b|Daily Maverick|IOL\b", "ZA"),
+    (r"\.co\.in\b|\.gov\.in\b|Times of India|Hindustan Times|NDTV|The Hindu\b|Indian Express|\bANI\b|\bPTI\b|\bIMD\b", "IN"),
+    (r"\.com\.ng\b|\.ng\b|Punch Newspapers|Vanguard News|Premium Times|Channels TV|\bTheCable\b|Daily Trust|Sahara Reporters", "NG"),
+    (r"\.ph\b|Inquirer\.net|Rappler|GMA News|ABS-CBN|PHIVOLCS|PAGASA", "PH"),
+    (r"\bJMA\b|NHK|Japan Times|Kyodo|Mainichi|Asahi|緊急地震速報", "JP"),
+    (r"\bBMKG\b|\.co\.id\b|\.go\.id\b|Jakarta Post|Antara|Tempo\.co", "ID"),
+    (r"\bINGV\b|\.it/|ANSA", "IT"),
+    (r"\bAFAD\b|\bKandilli\b|Daily Sabah|Hurriyet|\.com\.tr\b", "TR"),
+    (r"Times of Israel|Haaretz|Jerusalem Post|\bYnet\b|i24NEWS|\.co\.il\b", "IL"),
+    (r"Kyiv Independent|Ukrainska Pravda|Ukrinform|\.ua\b", "UA"),
+    (r"\bNWS\b|api\.weather\.gov|National Weather Service|\bUSGS\b|\.gov/|\bFEMA\b|\bCDC\b|\bNOAA\b", "US"),
+]
+SOURCE_CC_RE = [(re.compile(rx), cc) for rx, cc in SOURCE_CC]
+def source_cc(members=(), extra=""):
+    """Most common publishing country of a story's sources (None when unknown or split)."""
+    votes = {}
+    for m in list(members) + ([{"source": extra}] if extra else []):
+        s = " ".join(str(m.get(k) or "") for k in ("source", "source_url", "url"))
+        for rx, cc in SOURCE_CC_RE:
+            if rx.search(s): votes[cc] = votes.get(cc, 0) + 1; break
+    if not votes: return None
+    best = sorted(votes.items(), key=lambda kv: -kv[1])
+    return best[0][0] if len(best) == 1 or best[0][1] > best[1][1] else None
+
+# ------------------------------------------------------------------ NWS / CAP zone lists (offline NWS zone, county and marine tables)
+FE_NAMES = {"n": "North", "s": "South", "e": "East", "w": "West", "c": "Central", "nc": "North Central", "sc": "South Central", "ec": "East Central",
+            "wc": "West Central", "ne": "Northeast", "nw": "Northwest", "se": "Southeast", "sw": "Southwest", "pa": "Panhandle", "pd": "Panhandle",
+            "bb": "Big Bend", "mi": "Middle", "ee": "Eastern", "er": "East", "su": "Upper", "uc": "Upper", "cc": "Central"}
+NWS_URL = "https://raw.githubusercontent.com/4pwtnrvcr7-alt/blackout.network/main/app/heatmap_data/nws_zones.json"
+_NWS_TRY = [0.0]
+def _nws_load():
+    """The NWS zone table ships in heatmap_data/. A Mac install that only copied geo.py fetches the same public file once and keeps it."""
+    for p in (os.path.join(DATA, "nws_zones.json"), os.path.join(BASE, "nws_zones.json")):
+        try:
+            with open(p, encoding="utf-8") as f: return json.load(f)
+        except Exception: pass
+    if time.time() - _NWS_TRY[0] < 3600: return None
+    _NWS_TRY[0] = time.time()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(NWS_URL, headers={"User-Agent": UA}), timeout=30) as r: raw = r.read()
+        d = json.loads(raw.decode())
+        if not d.get("zones"): return None
+        for p in (os.path.join(DATA, "nws_zones.json"), os.path.join(BASE, "nws_zones.json")):
+            try:
+                with open(p + ".tmp", "wb") as f: f.write(raw)
+                os.replace(p + ".tmp", p); break
+            except Exception: continue
+        return d
+    except Exception:
+        return None
+
+_NWS = {}
+def nws_data():
+    if not _NWS:
+        d = _nws_load()
+        if not d: return {}
+        off = {}
+        for cwa, nm in d["offices"].items():
+            k = key_of(nm.replace(",", " ")); off[k] = cwa
+            off[key_of(nm.split(",")[0])] = off.get(key_of(nm.split(",")[0]), cwa)
+        byname, bycode = {}, {}
+        for cwa, L in d["zones"].items():
+            for name, st, lat, lon, code, fe in L:
+                z = {"name": name, "st": st, "lat": lat, "lon": lon, "code": code, "fe": fe, "cwa": cwa}
+                byname.setdefault((cwa, key_of(name)), []).append(z)
+                byname.setdefault(("*", key_of(name)), []).append(z)
+                if code.startswith("Z"): bycode[f"{st}Z{code[-3:]}"] = z
+                elif code.startswith("C"): bycode.setdefault(f"{st}C{code[-3:]}", z)
+                else: bycode[code[1:]] = z
+        _NWS.update(off=off, byname=byname, bycode=bycode)
+    return _NWS
+
+NWS_OFFICE_RE = re.compile(r"\bNWS ([A-Z][A-Za-z.'/ -]+?),? ([A-Z]{2})\b")
+UGC_RE = re.compile(r"\b([A-Z]{2})([CZ])(\d{3})\b")
+_ZPRE = re.compile(r"^(Coastal|Inland|Mainland|Northern|Southern|Eastern|Western|Central|North|South|East|West|Northwest|Northeast|Southwest|Southeast|Upper|Lower|Interior|Greater)\s+", re.I)
+def nws_resolve(title, loc):
+    """NWS / CAP alerts: the issuing office + the zone or county list (or UGC codes) -> the real counties and their state.
+    Returns dict(lat, lon, states, n, matched, total, fe, office, spread_km, zones) or None."""
+    N = nws_data(); gaz()
+    if not N.get("byname"): return None
+    m = NWS_OFFICE_RE.search(title or "")
+    cwa = None
+    if m:
+        cwa = N["off"].get(key_of(f"{m.group(1)} {m.group(2)}")) or N["off"].get(key_of(m.group(1)))
+    pts, seen = [], set()
+    for st, kind, num in UGC_RE.findall(f"{title or ''} {loc or ''}"):
+        z = N["bycode"].get(f"{st}{kind}{num}")
+        if z and z["code"] not in seen: seen.add(z["code"]); pts.append(z)
+    parts = [x.strip() for x in re.split(r";", loc or "") if x.strip()]
+    if not pts and not m: return None
+    off_st = m.group(2) if m else None
+    total = 0
+    for part in parts:
+        pm = re.match(r"^(.*?),\s*([A-Z]{2})$", part)
+        name, st = (pm.group(1), pm.group(2)) if pm else (part, None)
+        name = re.sub(r"\s+(County|Parish|Borough|Census Area|Municipality)$", "", name.strip())
+        if len(key_of(name)) < 3: continue          # a list cut off mid-word ("Inland ")
+        total += 1
+        cands = []
+        for scope in ([cwa] if cwa else []) + ["*"]:
+            cands = N["byname"].get((scope, key_of(name))) or []
+            if st: cands = [z for z in cands if z["st"] == st] or ([] if scope == "*" else cands)
+            if scope == "*" and not st and off_st: cands = [z for z in cands if z["st"] == off_st or z["cwa"] == cwa]
+            if cands: break
+        if not cands and part is parts[-1] and cwa and len(key_of(name)) >= 6:   # the stored list was cut off mid-name ("Coastal Indian Riv")
+            pre = [z for (sc, kk), L in N["byname"].items() if sc == cwa and kk.startswith(key_of(name)) for z in L]
+            if len({z["code"] for z in pre}) == 1: cands = pre
+        if not cands:
+            nm2 = _ZPRE.sub("", name)
+            if nm2 != name:
+                cands = [z for z in (N["byname"].get((cwa or "*", key_of(nm2))) or []) if not st or z["st"] == st]
+        if not cands: continue
+        # one row per real place: prefer the forecast zone over the county row with the same name, and the issuing office's state
+        cands.sort(key=lambda z: (z["code"][0] != "Z", z["st"] != (st or off_st)))
+        z = cands[0]
+        if z["code"] not in seen: seen.add(z["code"]); pts.append(z)
+    if not pts: return None
+    lat = sum(z["lat"] for z in pts) / len(pts); lon = sum(z["lon"] for z in pts) / len(pts)
+    spread = max(hav(lat, lon, z["lat"], z["lon"]) for z in pts)
+    states = [s for s in dict.fromkeys(z["st"] for z in pts) if s in US_POSTAL]
+    if not states and off_st in US_POSTAL: states = [off_st]
+    fe = {}
+    for z in pts:
+        if z["fe"]: fe[z["fe"]] = fe.get(z["fe"], 0) + 1
+    return {"lat": lat, "lon": lon, "states": states, "n": len(pts), "matched": len(pts), "total": max(total, len(pts)), "fe": fe,
+            "office": (f"{m.group(1)} {m.group(2)}" if m else None), "spread_km": round(spread), "zones": [z["name"] for z in pts], "marine": all(z["code"].startswith("M") for z in pts)}
+
+def nws_area_label(res, state_name=None):
+    """'Central and East Central Florida' style label from the NWS forecast-area codes of the matched zones."""
+    if not res: return ""
+    stn = state_name or ""
+    fe = [FE_NAMES.get(k) for k, _ in sorted(res["fe"].items(), key=lambda kv: -kv[1]) if FE_NAMES.get(k)]
+    fe = list(dict.fromkeys(fe))[:2]
+    if res.get("marine"): return f"coastal waters off {stn}".strip()
+    return (" and ".join(fe) + " " + stn).strip() if fe and stn else stn
+
+def _named_countries(text):
+    """Countries the text names outright (a country, or a state/province that belongs to exactly one country). Lower-case words never count."""
+    if not text: return set()
+    try: ex = extract(text)
+    except Exception: return set()
+    return {a["cc"] for a in ex["acc"] if a["level"] in ("country", "state") and a["cc"]}
+
+def brief_where(brief):
+    """The scanner's own summary of the story: its WHERE line first, then the first part of WHAT."""
+    b = brief or ""
+    if not b.strip(): return ""
+    out = []
+    for k in ("WHERE", "WHAT"):
+        m = re.search(k + r":\s*(.+?)(?=\s+(?:WHAT|WHERE|WHEN|CONFIDENCE|VERIFY):|$)", b, re.S)
+        if m: out.append(m.group(1).strip()[:300])
+    return ". ".join(out) if out else b.strip()[:300]
+
+def agree(ch, ex, prior, named):
+    """Country agreement: a place in a country the story never names (and its sources are not from) is only an approximate spot."""
+    if not ch or ch["level"] == "country": return ch
+    if ch.get("conf") == "high": return ch
+    others = named - {ch["cc"]}
+    big = ch["level"] == "city" and ((ch.get("city") or {}).get("pop", 0) >= 200000 or ch.get("k") in SPECIAL_CITY)
+    if big or ch.get("cue"): return ch
+    if named and ch["cc"] not in named and others:
+        return dict(ch, conf="low", why=f"names {', '.join(sorted(others))}, not {ch['cc']}")
+    if prior and ch["level"] == "city" and ch["cc"] != prior and ch["cc"] not in named:
+        return dict(ch, conf="low", why=f"sources are from {prior}")
+    return ch
+
+COUNTY_RE = re.compile(r"\b((?:St\.? |Saint |De |La |Le |Prince )?[A-Z][a-z]+(?:[ -][A-Z][a-z]+){0,2}) (County|Parish)\b")
+POSTAL_RE = re.compile(r"(?:,\s*|\b)(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])\b")
+def county_place(text, prior=None):
+    """'Bernalillo County', 'Baltimore County ... Dundalk' -> the US county (NWS county table), only when the county name is unique
+    or the text names its state."""
+    if prior and prior != "US": return None
+    N = nws_data(); G = gaz()
+    if not N.get("byname"): return None
+    for m in COUNTY_RE.finditer(text or ""):
+        nm = re.sub(r"^Saint ", "St ", m.group(1))
+        rows = {z["code"]: z for z in (N["byname"].get(("*", key_of(nm))) or []) if z["code"].startswith("C")}
+        if not rows: continue
+        L = list(rows.values())
+        if len({z["st"] for z in L}) > 1:
+            sts = {a["a1"].split(".")[1] for a in extract(text)["acc"] if a["level"] == "state" and (a.get("a1") or "").startswith("US.")}
+            sts |= {x for x in POSTAL_RE.findall(text[m.end():m.end() + 40]) if x in US_POSTAL}
+            L = [z for z in L if z["st"] in sts]
+        if len(L) == 1:
+            z = L[0]
+            return {"lat": z["lat"], "lon": z["lon"], "st": z["st"], "name": f"{z['name']} County", "text": m.group(0)}
+    return None
+
+def nws_counties(res):
+    """Distinct counties behind a zone list ('Inland Volusia' + 'Coastal Volusia' = Volusia)."""
+    out = []
+    for z in (res or {}).get("zones") or []:
+        c = _ZPRE.sub("", z)
+        c = re.sub(r"\s+(County|Parish|Barrier Islands|Plains|Mountains|Mtns|Coast|Valley|Lowlands|Highlands|Foothills|Beaches)$", "", c)
+        c = _ZPRE.sub("", c)
+        if c and c not in out: out.append(c)
+    return out
+
+_MON = {m: m[:3] for m in ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")}
+def _nws_time(s):
+    m = re.match(r"(\w+) (\d+) at (\d+):(\d+)\s*([AP]M) ?([A-Z]{3,4})?", s or "")
+    if not m: return (s or "").strip()
+    mo, d, h, mi, ap, tz = m.groups()
+    return f"{_MON.get(mo, mo)} {d} at {int(h)}{'' if mi == '00' else ':' + mi} {ap}" + (f" {tz}" if tz else "")
+
+def nws_sentence(title, loc):
+    """'Flood Watch for 9 East Central Florida counties from NWS Melbourne, through Nov 20 at 7 PM EST.' (None when not an NWS alert)."""
+    m = re.match(r"^(.+?) issued (.+?)(?: until (.+?))? by NWS (.+?),? ([A-Z]{2})$", (title or "").strip())
+    if not m: return None
+    ev, _iss, until, office, st = m.groups()
+    res = nws_resolve(title, loc)
+    G = gaz()
+    stn = G.admin1.get(US_POSTAL.get((res or {}).get("states", [st])[0] if res and res.get("states") else st, ""), {}).get("name") or st
+    if res and res["states"] and len(res["states"]) > 1:
+        stn = " and ".join(G.admin1[US_POSTAL[x]]["name"] for x in res["states"][:2] if x in US_POSTAL)
+    where = ""
+    if res:
+        lab = nws_area_label(res, stn)
+        if res.get("marine"): where = f"the {lab}" if lab else f"coastal waters off {stn}"
+        else:
+            cs = nws_counties(res)
+            where = (f"{cs[0]} County, {stn}" if len(cs) == 1 else
+                     (", ".join(cs[:-1]) + " and " + cs[-1] + f" counties in {lab or stn}") if len(cs) <= 3 else f"{len(cs)} {lab or stn} counties")
+    else: where = stn
+    return f"{ev} for {where} from NWS {office}" + (f", through {_nws_time(until)}" if until else "") + "."
+
+def place_label(title, loc, max_len=90):
+    """A readable place for story pages: never a raw NWS zone dump ('Inland Volusia; Orange; ...')."""
+    loc = (loc or "").strip()
+    if not loc: return ""
+    if ";" not in loc and len(loc) <= max_len: return loc
+    res = nws_resolve(title, loc)
+    if res and res["states"]:
+        G = gaz(); stn = " and ".join(G.admin1[US_POSTAL[x]]["name"] for x in res["states"][:2] if x in US_POSTAL)
+        if res.get("marine"): return f"coastal waters off {stn}"
+        cs = nws_counties(res); lab = nws_area_label(res, stn)
+        return f"{cs[0]} County, {stn}" if len(cs) == 1 else f"{len(cs)} counties in {lab or stn}"
+    parts = [p.strip() for p in loc.split(";") if len(p.strip()) > 2]
+    if len(parts) > 2: return f"{parts[0]}, {parts[1]} and {len(parts) - 2} other areas"
+    return " and ".join(parts)[:max_len]
+
+def story_place(title, loc):
+    """(cc, admin1) the story is about, or (None, None): NWS zones, then the location field, then the headline."""
+    G = gaz()
+    res = nws_resolve(title, loc)
+    if res and res["states"]: return "US", (US_POSTAL.get(res["states"][0]) if len(res["states"]) == 1 else None)
+    for tx, tr in ((loc, True), (title, False)):
+        if not tx or BROAD_RE.fullmatch(fold(tx).strip()): continue
+        try: ch, *_ = choose(extract(tx, trust=tr))
+        except Exception: ch = None
+        if ch: return ch["cc"], ch.get("a1")
+    return None, None
+
+def photo_place(name):
+    """(cc, admin1) of a file photo's subject when it is a place, else (None, None) (topics such as 'martial law')."""
+    G = gaz(); k = key_of(name or "")
+    if not k: return None, None
+    refs = G.idx.get(k) or []
+    for r in refs:
+        if r[0] == "country": return r[1], None
+    a1 = [r[1] for r in refs if r[0] == "admin1"]
+    cities = sorted((G.city(r[1]) for r in refs if r[0] == "city"), key=lambda c: -c["pop"])
+    if cities and (not a1 or cities[0]["pop"] >= 100000): return cities[0]["cc"], cities[0]["a1"]
+    if len(a1) == 1: return a1[0].split(".")[0], a1[0]
+    try: ch, *_ = choose(extract(name, trust=True))
+    except Exception: ch = None
+    return (ch["cc"], ch.get("a1")) if ch else (None, None)
+
+def story_ccs(title, loc):
+    """Every country the headline or location names, including through demonyms and flags ('Palestinian' -> PS)."""
+    out = set()
+    for tx, tr in ((loc, True), (title, False)):
+        if not tx: continue
+        try: ex = extract(tx, trust=tr)
+        except Exception: continue
+        out |= {a["cc"] for a in ex["acc"] if a.get("cc")} | set(ex["flags"])
+        for (d) in ex["demonyms"]:
+            cc = DEMONYMS.get(nw(d)) or DEMONYMS.get(d.lower())
+            if cc: out.add(cc)
+    return out
+
+def photo_matches(name, title, loc):
+    """A file photo of a place may lead a story only when it is the story's own country (and, inside one country, the same state)."""
+    pc, pa = photo_place(name)
+    if not pc: return True             # not a place (a topic photo): no location claim
+    sc, sa = story_place(title, loc)
+    if not sc:     # no single place: a country-level photo of a country the story names is fine (a Palestine photo for "Palestinian ...")
+        return pa is None and pc in story_ccs(title, loc)
+    if pc != sc: return False
+    if pa and sa and pa != sa: return False
+    if pc == "US" and pa and not sa: return False
+    return True
+
 # ------------------------------------------------------------------ one alert
 def geocode(cl, members, budget):
     """cl: cluster row (dict). members: member alert rows. Returns dict for geo.db."""
@@ -532,22 +889,42 @@ def geocode(cl, members, budget):
         loc = (srcs[0].get("location") if srcs else None) or cl.get("location") or ""
         pc, pa = G.pip(lat, lon)
         cc, a1 = pc, pa
-        if not cc and loc:      # offshore: take the country named in the location text
-            ex = extract(loc, trust=True); ch, *_ = choose(ex)
-            if ch: cc = ch["cc"]
         nc = G.nearest_city(lat, lon)
+        named = _named_countries(loc) or _named_countries(title)
+        if not cc:              # coast or offshore (the simplified borders miss it): the country named in the place text, else the nearest town's
+            if len(named) == 1: cc = next(iter(named))
+            else:
+                far = nc or G.nearest_city(lat, lon, 250)
+                if far: cc = far["cc"]
+        conf, extra = "high", ""
+        if cc and named and cc not in named and not (cc == "US" and named & {"PR", "GU", "VI", "AS", "MP"}) and not any(G.nearest_city_cc(lat, lon, x, 300) for x in named):
+            # the coordinates and the story disagree about the country (e.g. a merged GDACS fire: "in Australia" at a point in Brazil)
+            conf, extra = "low", f"; text names {', '.join(sorted(named))} but the coordinates are in {cc}"
         place = loc if loc and not loc.startswith("Global") else (title[:120])
-        return fill(lat, lon, cc, a1, "point", "source_coords", det, "high", place, city=nc["name"] if nc else None, evidence=f"{det} lat/lon {lat:.3f}, {lon:.3f}")
+        return fill(lat, lon, cc, a1, "point", "source_coords", det, conf, place, city=nc["name"] if nc else None, evidence=f"{det} lat/lon {lat:.3f}, {lon:.3f}{extra}")
     # brief "WHERE: ... (approx. lat, lon)" written by the scanner from source data
     m = re.search(r"WHERE: (.+?) \(approx\. (-?\d+\.\d+), (-?\d+\.\d+)\)", cl.get("brief") or "")
     if m:
         la, lo = float(m.group(2)), float(m.group(3))
         nc = G.nearest_city(la, lo)
-        return fill(la, lo, None, None, "point", "source_coords", "scanner brief (source coordinates)", "high", m.group(1), city=nc["name"] if nc else None, evidence=m.group(0)[:200])
+        pc, _pa = G.pip(la, lo)
+        return fill(la, lo, pc or (nc or {}).get("cc"), None, "point", "source_coords", "scanner brief (source coordinates)", "high", m.group(1), city=nc["name"] if nc else None, evidence=m.group(0)[:200])
     # 2a) the alert's existing location field
     for loc in locs:
         if loc.startswith("Global"):
             out.update(reason_code="global", reason_unlocated=f"Source marks the location as \"{loc}\", not a place on the map"); return out
+    nres = nws_resolve(title, locs[0] if locs else "")
+    if nres and nres["states"]:
+        sts = nres["states"]; a1 = US_POSTAL[sts[0]] if len(sts) == 1 else None
+        stn = " and ".join(G.admin1[US_POSTAL[x]]["name"] for x in sts[:2] if x in US_POSTAL)
+        prec = "county" if nres["spread_km"] <= 150 else "state"
+        lab = nws_area_label(nres, stn)
+        place = place_label(title, locs[0] if locs else "") or f"{nres['n']} NWS zones in {lab or stn}"
+        return fill(nres["lat"], nres["lon"], "US", a1, prec, "location_field",
+                    f"NWS zone list (offline NWS zone tables): {nres['matched']} of {nres['total']} zones" + (f", NWS {nres['office']}" if nres["office"] else ""),
+                    "high" if nres["matched"] >= max(1, nres["total"] // 2) else "medium", place,
+                    evidence="zones: " + "; ".join(nres["zones"][:8]) + (f" (+{nres['n'] - 8})" if nres["n"] > 8 else ""))
+    locs = [l for l in locs if not BROAD_RE.fullmatch(fold(l).strip())]
     for loc in locs:
         nws = re.search(r"\bby NWS ([A-Za-z./ -]+?) ([A-Z]{2})\b", title)
         zones = [z.strip() for z in loc.split(";") if z.strip()]
@@ -583,11 +960,25 @@ def geocode(cl, members, budget):
             return fill(g["lat"], g["lon"], g["cc"], g["a1"], g["prec"], "nominatim", f"location field → Nominatim \"{loc[:60]}\"", "medium", g["place"], city=g["city"], evidence=loc)
     # 2b) place names in the title (then the other source titles in the story)
     texts = [title] + [m["title"] for m in sorted(members, key=lambda m: -(m.get("official") or 0)) if m.get("title") and m["title"] != title][:5]
+    bw = brief_where(cl.get("brief"))
+    if bw: texts.append(bw)
+    prior = source_cc(members, cl.get("source_hint") or "")
+    allnamed = set()
+    for tx in texts: allnamed |= _named_countries(tx)
     first_fail = None; spans_all = []; quals = []; demonyms = set(); flags = set(); rejected = []
     for n, tx in enumerate(texts):
-        ex = extract(tx)
+        cp = county_place(tx, prior)
+        if cp and not (allnamed - {"US"}):
+            a1 = US_POSTAL.get(cp["st"])
+            return fill(cp["lat"], cp["lon"], "US", a1, "county", "gazetteer", ("title" if n == 0 else "the story's text") + " (US county, NWS county table)", "high",
+                        f"{cp['name']}, {G.admin1.get(a1, {}).get('name', cp['st'])}", evidence=f"matched \"{cp['text']}\"")
+        ex = extract(tx, ctx_cc=prior)
+        if bw and tx == bw and n > 0: ex = dict(ex, acc=[a for a in ex["acc"] if a["level"] != "city" or a.get("cue")])
         ch, rc, rt, cands = choose(ex)
-        if ch: return place_from(ch, out, fill, "gazetteer", "title" if n == 0 else "another source's title in this story", tx)
+        if ch:
+            ch = agree(ch, ex, prior, allnamed)
+            if ch: return place_from(ch, out, fill, "gazetteer", ("title" if n == 0 else "the story's summary" if bw and tx == bw else "another source's title in this story")
+                                     + (f" (source country prior {prior})" if prior else ""), tx)
         if rc and not first_fail: first_fail = (rc, rt, cands)
         rejected += ex["rejected"]; spans_all += [(s, ex["ctx"]) for s in ex["spans"]]; quals += ex["qual"]; demonyms |= set(ex["demonyms"]); flags |= set(ex["flags"])
     if first_fail and not quals:
@@ -613,7 +1004,7 @@ def geocode(cl, members, budget):
             return fill(g["lat"], g["lon"], g["cc"], g["a1"], g["prec"], "nominatim", f"\"{q}\" → Nominatim", "medium", g["place"], city=g["city"], evidence=q)
         tried.append(q)
     for s, ctx in spans_all[:2]:
-        cc = max(ctx, key=ctx.get) if ctx else None
+        cc = max(ctx, key=ctx.get) if ctx else prior
         st, res = nominatim(s, cc, budget)
         if st == "skipped": return dict(out, reason_code="pending", reason_unlocated=f"\"{s}\" queued for the online geocoder")
         if st == "error": return dict(out, reason_code="geocoder_error", reason_unlocated=f"Nominatim error for \"{s}\": {(res[0].get('error') if res else '')[:80]}")

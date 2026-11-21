@@ -488,6 +488,14 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     if not (rows or note or what_b or (what and what != title)): return "", ""
     conf = confirmation(officials, eff)
     desk = bool(note and note.get("what_happened"))
+    # Nov 21 2026 (Matt pt1682u): never print a raw NWS zone dump; say what and where in one readable line
+    raw_loc, nws_bl = loc, None
+    try:
+        import geo as _geo
+        nws_bl = _geo.nws_sentence(title or "", raw_loc or "")
+        loc = _geo.place_label(title or "", raw_loc or "") or loc
+    except Exception:
+        loc = loc if (loc or "").count(";") < 2 else ""
     # ---- 1 What happened
     if desk:
         wh = [note["what_happened"]]; dek = note.get("headline") or ""
@@ -511,6 +519,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
         if not wh and rows: wh.append(f"BLACKOUT.NETWORK has logged {_plural(len(rows), 'report')} on this story.")
     # ---- bottom line (top card)
     if desk and note.get("why_it_matters"): bl = note["why_it_matters"]
+    elif nws_bl: bl = f"{nws_bl} {conf[:1].upper() + conf[1:]}."
     else: bl = f"A {rname.lower()} {catn.lower()} story{(' in ' + loc) if loc else ''}, {conf}."
     head = (f'<section class="sr-bline" aria-label="Bottom line"><div class="sr-bline-top"><span class="sr-k">Bottom line</span>'
             f'<span class="sr-risk{" hi" if (lab == "High" and rank >= 7) else ""}">Risk \u00b7 {lab}</span></div><p class="sr-bline-p">{E(bl)}</p>'
@@ -600,7 +609,7 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
         # then a generated graphic drawn only from this story's own reports.
         try:
             import people as PP
-            fb = PP.lead_for(cid, title or "", loc or "", " ".join(a.get("title") or "" for a in rows[:40]))
+            fb = PP.lead_for(cid, title or "", raw_loc or "", " ".join(a.get("title") or "" for a in rows[:40]))
         except Exception:
             fb = None
         lead_vis = (figure(fb, True) if isinstance(fb, dict) else "") or glance(rank, rows, officials, eff, loc, catn, r)

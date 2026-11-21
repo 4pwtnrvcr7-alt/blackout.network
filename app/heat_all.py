@@ -167,7 +167,9 @@ def place(item, g):
     """-> dict(lat, lon, prec, tier, place, cc, how, rid). lat/lon None only for tier 'global'."""
     if g and g.get("located") and _ok(g.get("lat"), g.get("lon")):
         prec = g.get("precision") or "point"
-        return {"lat": round(float(g["lat"]), 4), "lon": round(float(g["lon"]), 4), "prec": prec, "tier": "exact" if prec in PREC_EXACT else "approx",
+        # Nov 21 2026 (pt1682u): a low-confidence match (weak town name, or coordinates that contradict the story's country) is drawn as approximate
+        exact = prec in PREC_EXACT and (g.get("confidence") or "") != "low"
+        return {"lat": round(float(g["lat"]), 4), "lon": round(float(g["lon"]), 4), "prec": prec, "tier": "exact" if exact else "approx",
                 "place": g.get("place") or g.get("country_name") or "", "cc": g.get("country") or "", "how": "geo"}
     if _ok(item.get("lat"), item.get("lon")):
         return {"lat": round(float(item["lat"]), 4), "lon": round(float(item["lon"]), 4), "prec": "point", "tier": "exact",
