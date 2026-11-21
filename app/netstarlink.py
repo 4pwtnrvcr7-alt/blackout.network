@@ -501,7 +501,7 @@ def render(np):
             f'<div class="np-kpi"><b>{_fmt(op)}</b><span>operational ({_pct(op, ino)} of those in orbit)</span></div>'
             f'<div class="np-kpi"><b>{_fmt(sc.get("launches_month"))}</b><span>Starlink launches in {E(mon)} so far ({_fmt(sc.get("sats_month"))} satellites). {E(pmon)}: {_fmt(sc.get("launches_prev"))} launches, {_fmt(sc.get("sats_prev"))} satellites.</span></div></div>'
             + ioda_html +
-            f'<div class="np-btns"><a class="np-btn p" href="#constellation">{ic("satellite", "np-ic sm")}See the constellation</a><a class="np-btn" href="/network/near">{ic("pin", "np-ic sm")}Networks and weather near you</a>'
+            f'<div class="np-btns"><a class="np-btn p" href="#constellation">{ic("satellite", "np-ic sm")}See the constellation</a>'
             f'<a class="np-btn" href="https://www.starlink.com/support" target="_blank" rel="noopener">{ic("link", "np-ic sm")}Starlink support</a></div>'
             + (f'<p class="np-note">The satellite catalog is not available right now ({E(sc.get("error"))}). Counts show as dashes until it loads; we don\'t guess them.</p>' if not ok else "")
             + (f'<p class="np-note">Showing the last good catalog copy (refresh failed: {E(sc.get("error"))}). As CelesTrak asks, we wait 2 hours before trying again.</p>' if ok and sc.get("error") else "") + '</section>')
@@ -546,8 +546,7 @@ def render(np):
     sec_sp = (f'<section class="np-sec"><h2>{ic("speed")}Speeds</h2><p class="np-sub">Typical speeds from published measurements, each with its source and date. We don\'t know the speed at your address; these are medians.</p><div class="sl-spd">{cards}</div>{radar_html}</section>')
     sec_wx = (f'<section class="np-sec" id="weather"><h2>{ic("storm")}Weather and Starlink</h2><p class="np-sub">Starlink says its dish handles snow, sleet, heavy rain and strong wind, but heavy rain or wind can still cause slower speeds or a rare outage, '
               f'and snow piling up around the dish can block its view (<a href="{WX_HELP}" target="_blank" rel="noopener">Starlink Help Center</a>). Storms also cut power, and the dish and router need power.</p>'
-              f'<form class="nm-form" action="/network/near" method="get" role="search"><label class="np-mu" for="sl_q" style="flex-basis:100%">See weather alerts and network status for a place</label>'
-              f'<input id="sl_q" name="where" placeholder="ZIP code or city, e.g. 80202, Denver or Mumbai" maxlength="120"><button class="np-btn p" type="submit">{ic("search", "np-ic sm")}Check this place</button></form></section>')
+              '</section>')
     steps = ["Open the Starlink app: it reports known outages, obstructions and the dish's status.", "Check the sky view: the app's obstruction check shows trees or buildings in the way.",
              "Restart the dish and router by unplugging power for about a minute.", "Look at the weather where the dish is; heavy rain, snow or strong wind can slow it.",
              "Compare with the outage signals above. If they show a drop, the problem is probably not only yours."]
@@ -564,7 +563,7 @@ def render(np):
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=starlink">Get the free newsletter</a></div>')
     body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/#net">Network Status</a> › <a href="/network">Providers</a> › Starlink</p>'
             + hero + sec_glb + f'<div class="np-grid2 np-gap">{sec_st}{sec_h}</div>' + sec_sp + sec_wx + nl + sec_ck + sec_ln
-            + f'<p class="np-mu">Other providers: {others} · <a href="/network/near">Networks near me</a>. Research only; not affiliated with SpaceX. Names identify services only.</p></div>'
+            + f'<p class="np-mu">Other providers: {others}. Research only; not affiliated with SpaceX. Names identify services only.</p></div>'
             f'<style>{np.CSS}{SL_CSS}</style>{GLOBE_JS}')
     title = "Is Starlink down? Live status, satellites in orbit and speeds"
     desc = "Starlink network status from independent measurements, a live map of Starlink satellites, operational counts, launches, published speeds and how weather affects Starlink."
@@ -784,7 +783,7 @@ def render_near(np):
             f'<style>{np.CSS}{SL_CSS}</style>{NEAR_JS}')
     desc = "Type a ZIP code or city to see the internet networks that serve it, their status right now, and active weather alerts that can affect them, including Starlink."
     ld = {"@context": "https://schema.org", "@type": "WebPage", "name": "Networks near me: internet status and weather", "url": f"{SITE}/network/near", "description": desc}
-    return np.site_page.page("Is the internet down near me? Network status and weather by ZIP code", desc, body, "/network/near", active="net", jsonld=ld, og_type="website")
+    return np.site_page.page("Is the internet down near me? Network status and weather by ZIP code", desc, body, "/network/near", active="net", jsonld=ld, og_type="website", noindex=True)
 
 def handle_get(path, qs, np, headers=None):
     """Returns a response tuple, or None when the path is not ours.

@@ -698,7 +698,7 @@ def render(slug):
              + f'<li>{ic("phone")}<div><b>Phone support</b><small style="font-size:13px">{p["phone"]}</small></div></li>'
              + li("x", [(h, u, "Official account on X") for h, u in p["x"]]) + li("bell", [(t, u, "Get alerts") for t, u in p["subscribe"]]))
     sec_ln = f'<section class="np-sec"><h2>{ic("link")}Official links, contacts and alerts</h2><p class="np-sub">Every link checked before publishing. Phone numbers only where {E(p["name"])} publishes them.</p><ul class="np-links">{links}</ul></section>'
-    others = " · ".join(f'<a href="/network/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug) + ' · <a href="/network/starlink">Starlink</a> · <a href="/network/near">Networks near me</a>'
+    others = " · ".join(f'<a href="/network/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug) + ' · <a href="/network/starlink">Starlink</a>'
     nl = ('<div class="np-nl"><div><b>Know about the next big outage first</b><div class="np-mu">The free BLACKOUT.NETWORK newsletter: major outages, threats and what to do. Follow us on YouTube and X too.</div></div>'
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=' + slug + '">Get the free newsletter</a></div>')
     body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/#net">Network Status</a> › <a href="/network">Providers</a> › {E(p["name"])}</p>'
@@ -757,8 +757,7 @@ def render_hub():
             f'<section class="np-sum"><div class="np-big">{E(big)}</div><p class="np-mu">{E(sub)}</p><div class="bnt-tstamp">Updated {stamp} ET · next in 1m</div></section>'
             + f'<div class="np-accs">{"".join(cards)}</div>'
             + '<details class="bnt-more np-key"><summary>Key</summary>' + LEG + '<p class="np-mu" style="margin-top:8px">Bars: incidents per week over the last 13 weeks from each official feed (Starlink: IODA outage signals).</p></details>'
-            + HUBQ.replace("{pin}", ic("network"))
-            + '<p class="np-mu" style="margin-top:18px"><a href="/#net">Every network check</a> · <a href="/network/near">Networks near me</a></p></div>'
+            + '<p class="np-mu" style="margin-top:18px"><a href="/#net">Every network check</a></p></div>'
             + f'<style>{CSS}{HUBCSS}</style>')
     desc = "Is AWS, Azure, Microsoft 365, Google Cloud, Google Workspace, Cloudflare, Akamai or Starlink down? Live status, incidents, root causes and what to do, plus a networks-near-me check."
     ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Cloud and network provider status", "url": SITE + "/network", "description": desc,
@@ -838,7 +837,7 @@ function slFetch(){if(Date.now()-SLT<300000)return;SLT=Date.now();fetch("/api/ne
  var w=document.querySelector('.nsa[data-slug="starlink"]');if(w){var st=w.querySelector(".nsa-b .st"),d=w.querySelector(".nsa-b .d");if(st&&b.status)st.textContent=b.status;if(d&&b.level!=null&&b.level>=0)d.className="d ns-l"+b.level}
  var row=document.querySelector(".ns-row[data-sl]");if(row){var st2=row.querySelector(".st");if(st2&&b.status)st2.textContent=b.status}}).catch(function(){})}
 function enhance(){var list=document.getElementById("ns_list");if(!list)return;css();if(list.querySelector(".ns-row")){slRow(list);slFetch()}
- list.querySelectorAll("h3").forEach(function(h){if(h.querySelector(".nsa-hub"))return;var n=h.firstChild,t=((n&&n.nodeType===3?n.textContent:h.textContent)||"").trim();if(t==="Big cloud"||t==="DNS & CDN"){h.insertAdjacentHTML("beforeend",' <a class="nsa-hub" href="'+(t==="Big cloud"?"/network/near":"/network")+'" style="float:right;font-size:11px;letter-spacing:.04em;color:#ff6b6e;text-decoration:none;text-transform:none">'+(t==="Big cloud"?"Networks near me &rarr;":"Provider pages &rarr;")+'</a>')}});
+ list.querySelectorAll("h3").forEach(function(h){if(h.querySelector(".nsa-hub"))return;var n=h.firstChild,t=((n&&n.nodeType===3?n.textContent:h.textContent)||"").trim();if(t==="DNS & CDN"){h.insertAdjacentHTML("beforeend",' <a class="nsa-hub" href="/network" style="float:right;font-size:11px;letter-spacing:.04em;color:#ff6b6e;text-decoration:none;text-transform:none">Provider pages &rarr;</a>')}});
  list.querySelectorAll(".ns-row").forEach(function(r){var nmEl=r.children[1],nm=(nmEl&&nmEl.textContent||"").trim(),slug=MAP[nm];if(!slug)return;
   var w=document.createElement("div");w.className="nsa";w.dataset.slug=slug;var id="nsa-p-"+slug;
   w.innerHTML='<button type="button" class="nsa-b" aria-expanded="false" aria-controls="'+id+'">'+r.children[0].outerHTML+'<span class="nm">'+esc(nm)+'<small>DETAILS &amp; WHAT TO DO</small></span><span class="c3">'+(r.children[2]?r.children[2].innerHTML:"")+'</span>'+(r.children[3]?r.children[3].outerHTML:"")+CHEV+'</button><div class="nsa-p" id="'+id+'" role="region" aria-hidden="true" aria-label="'+esc(nm)+' details"><div></div></div>';
