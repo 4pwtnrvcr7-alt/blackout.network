@@ -1225,22 +1225,23 @@ _SOE = re.compile(r"^([A-Z][A-Za-z.'\- ]{2,40}?) (?:declares|declared|extends|is
 _SP = {"db": None}
 _SP_LOCK = threading.Lock()
 def _small_db():
-    """heatmap_data/small_places.tsv (GeoNames cities500 towns missing from cities.json, CC BY 4.0) -> an indexed SQLite copy in the
+    """heatmap_data/small_places_*.tsv (GeoNames cities500 towns of 1,000+ towns missing from cities.json, CC BY 4.0) -> an indexed SQLite copy in the
     temp dir, built once per process (about a second). Never written next to the app's databases; read-only after it is built."""
-    src = os.path.join(DATA, "small_places.tsv")
-    if not os.path.exists(src): return None
+    import glob
+    srcs = sorted(glob.glob(os.path.join(DATA, "small_places_*.tsv")))     # sharded (each file under 1 MB)
+    if not srcs: return None
     if _SP["db"] and os.path.exists(_SP["db"]): return _SP["db"]
     with _SP_LOCK:
         if _SP["db"] and os.path.exists(_SP["db"]): return _SP["db"]
         import tempfile
-        mt = int(os.path.getmtime(src)); dst = os.path.join(tempfile.gettempdir(), f"bn_small_places_{os.path.getsize(src)}_{mt}.db")
+        mt = max(int(os.path.getmtime(x)) for x in srcs); dst = os.path.join(tempfile.gettempdir(), f"bn_small_places_{sum(os.path.getsize(x) for x in srcs)}_{mt}.db")
         if not os.path.exists(dst):
             tmp = dst + f".{os.getpid()}.tmp"
             try:
                 c = sqlite3.connect(tmp); c.execute("CREATE TABLE p(k TEXT, name TEXT, lat REAL, lon REAL, cc TEXT, a1 TEXT, pop INTEGER)")
                 rows = []
-                with open(src, encoding="utf-8") as fh:
-                    for line in fh:
+                for line in (ln for src in srcs for ln in open(src, encoding="utf-8")):
+                    if True:
                         f = line.rstrip("\n").split("\t")
                         if len(f) < 7: continue
                         a1 = f"{f[4]}.{f[5]}"
