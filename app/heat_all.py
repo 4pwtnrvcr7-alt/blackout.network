@@ -185,7 +185,38 @@ def _ok(lat, lon):
 PREC_EXACT = {"point", "city", "county", "state", "facility"}
 
 def place(item, g):
-    """-> dict(lat, lon, prec, tier, place, cc, how, rid). lat/lon None only for tier 'global'."""
+    """-> dict(lat, lon, prec, tier, place, cc, how, rid). lat/lon None only for tier 'global'.
+    v11 (Matt pt1718u, Nov 21 2026): the story's published write-up (desk brief, Story v3 or the instant writer; the same text the
+    story page prints under "What happened") is read here, on the server, so a place it names reaches the map without a Mac install:
+      - tray / region-only items: the lede, then places later sentences mark with "in / near / at"; with no write-up, a small town the
+        headline marks the same way (offline GeoNames table)
+      - a country-only pin or an approximate fallback: refined only by the lede, only inside the same country, only to one single place
+    Never touches source coordinates or a geo.db point / city / county / state pin."""
+    base = _place_base(item, g)
+    if base.get("how") == "source coordinates": return base
+    try:
+        import geo_text
+        if base["tier"] in ("global", "region"):
+            r = geo_text.enrich(item, g if (g and g.get("located")) else (g or None))
+            if r and r.get("located") and _ok(r.get("lat"), r.get("lon")) and r is not g:
+                return _from_geo(r, "published write-up" if "write-up" in (r.get("method_detail") or "") else "headline town")
+        elif base["how"] != "geo" or base.get("prec") == "country":
+            old = g if (g and g.get("located")) else {"located": 1, "precision": "country", "country": base.get("cc") or None, "admin1_code": None}
+            if base["how"] != "geo" and base.get("prec") != "country": return base      # an offline town match already: keep it
+            r = geo_text.enrich(item, old, lede_only=True)
+            if r and r is not old and r.get("located") and _ok(r.get("lat"), r.get("lon")) and (r.get("country") or "") == (base.get("cc") or ""):
+                return _from_geo(r, "published write-up")
+    except Exception as ex:
+        print("heat_all: write-up place failed:", str(ex)[:160], flush=True)
+    return base
+
+def _from_geo(g, how):
+    prec = g.get("precision") or "point"
+    exact = prec in PREC_EXACT and (g.get("confidence") or "") != "low"
+    return {"lat": round(float(g["lat"]), 4), "lon": round(float(g["lon"]), 4), "prec": prec, "tier": "exact" if exact else "approx",
+            "place": g.get("place") or g.get("country_name") or "", "cc": g.get("country") or "", "how": "geo"}
+
+def _place_base(item, g):
     if g and g.get("located") and _ok(g.get("lat"), g.get("lon")):
         prec = g.get("precision") or "point"
         # Nov 21 2026 (pt1682u): a low-confidence match (weak town name, or coordinates that contradict the story's country) is drawn as approximate

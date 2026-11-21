@@ -256,6 +256,10 @@ def gaz():
     return _GAZ[0]
 
 # ------------------------------------------------------------------ text extraction
+def _hyph(t, toks, i, n):
+    """v11: the name is one half of a hyphenated name ("Loire-Atlantique")."""
+    return (i > 0 and t[toks[i - 1][2]:toks[i][1]] == "-") or (i + n < len(toks) and t[toks[i + n - 1][2]:toks[i + n][1]] == "-")
+
 def extract(text, ctx_cc=None, trust=False):
     """Find place mentions in free text. Returns dict with accepted matches, context countries, rejected/ambiguous info, unmatched locative spans.
     trust=True for a location field (every capitalised span there is meant to be a place)."""
@@ -336,7 +340,7 @@ def extract(text, ctx_cc=None, trust=False):
         prev = nw(words[i - 1]) if i > 0 else ""
         cue = prev in LOC_CUES
         strong_cue = prev in STRONG_CUES
-        before_cap = i > 0 and caps[i - 1] and prev not in CONNECT and not cue and not _sent_start(t, toks, i)
+        before_cap = i > 0 and caps[i - 1] and prev not in CONNECT and not cue and not _sent_start(t, toks, i) and not (prev in ("a", "an") and _sent_start(t, toks, i - 1))   # v11: "A Krasnoyarsk apartment"
         after_cap = i + n < len(words) and caps[i + n] and nw(words[i + n]) not in CONNECT and not _sent_start(t, toks, i + n)
         person_like = (before_cap or after_cap) and not title_case and not trust
         if i > 0 and not trust and (nw(words[i - 1]) in GIVEN_NAMES or nw(words[i - 1]) in HONORIFICS) and caps[i - 1] and nw(words[i - 1]) not in STRONG_CUES:
@@ -363,7 +367,9 @@ def extract(text, ctx_cc=None, trust=False):
                 acc.append({"level": "country", "cc": cc, "a1": None, "i": i, "k": k, "text": " ".join(words[i:i + n]), "conf": "high" if trust else "medium", "cue": strong_cue}); continue
         if a1s:
             # prefer admin1 in a context country; US states win by default only with US context or when unique
-            pick = [a for a in a1s if a.split(".")[0] in ctx] or ([a for a in a1s if a.startswith("US.")] if "US" in ctx else []) or (a1s if len(a1s) == 1 and (trust or k in ADMIN_OK or (strong_cue and not common and len(k) >= 5 and nxt != "of")) else [])
+            pick = [a for a in a1s if a.split(".")[0] in ctx] or ([a for a in a1s if a.startswith("US.")] if "US" in ctx else []) or (a1s if len(a1s) == 1 and (trust or k in ADMIN_OK or (strong_cue and not common and len(k) >= 5 and nxt != "of")
+                                                                                                                                       or (not common and not person_like and not org_next and not cities and len(k) >= 8 and k not in GENERIC and nxt != "of" and not trust
+                                                                                                                                           and (n >= 2 or _sent_start(t, toks, i) or i == 0) and not _hyph(t, toks, i, n) and not BROAD_RE.fullmatch(" ".join(words[i:i + n])))) else [])   # v11: "Canary Islands state of emergency", "in ... Saskatchewan"
             if k == "georgia":
                 if "GE" in ctx and "US" not in ctx: acc.append({"level": "country", "cc": "GE", "a1": None, "i": i, "k": k, "text": "Georgia", "conf": "medium"}); continue
                 if "US" not in ctx: rejected.append({"text": "Georgia", "why": "ambiguous", "cands": ["Georgia (US state)", "Georgia (country)"]}); continue
@@ -911,6 +917,18 @@ def photo_matches(name, title, loc):
     if pc == "US" and pa and not sa: return False
     return True
 
+def supplemental_texts(cl, members=()):
+    """Factual prose only. Do not geocode advice, source URLs, analysis or HQ guesses."""
+    out = []
+    for key in ("writeup", "summary", "body"):
+        tx = cl.get(key)
+        if isinstance(tx, str) and tx.strip(): out.append(tx.strip()[:6000])
+    for m in members:
+        for key in ("summary", "body"):
+            tx = m.get(key)
+            if isinstance(tx, str) and tx.strip(): out.append(tx.strip()[:6000])
+    return out
+
 # ------------------------------------------------------------------ one alert
 def geocode(cl, members, budget):
     """cl: cluster row (dict). members: member alert rows. Returns dict for geo.db."""
@@ -1018,7 +1036,12 @@ def geocode(cl, members, budget):
     # 2b) place names in the title (then the other source titles in the story)
     texts = [title] + [m["title"] for m in sorted(members, key=lambda m: -(m.get("official") or 0)) if m.get("title") and m["title"] != title][:5]
     bw = brief_where(cl.get("brief"))
-    if bw: texts.append(bw)
+    # v11: published write-ups and source summaries are evidence, not just titles.
+    # Keep these separate: concatenating unrelated paragraphs can make equal-country
+    # conflicts and the source's home country must never move a venue overseas.
+    for tx in supplemental_texts(cl, members):
+        if tx and tx not in texts: texts.append(tx)
+    if bw and bw not in texts: texts.append(bw)
     prior = source_cc(members, cl.get("source_hint") or "")
     allnamed = set()
     for tx in texts: allnamed |= _named_countries(tx)
@@ -1094,6 +1117,172 @@ def geocode(cl, members, budget):
     if cat in NONGEO_CATS:
         return dict(out, reason_code="non_geo", reason_unlocated=f"Non-geographic topic ({cat}) and no place named")
     return dict(out, reason_code="no_place", reason_unlocated="The source text names no place")
+
+_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\u201c\"])")
+def lead_sentences(text, n=3):
+    """The first sentences of a write-up, one per item: the lede says where the event or remarks happened."""
+    t = re.sub(r"\s+", " ", text or "").strip()
+    if not t: return []
+    t = re.sub(r"\b(Nov|Dec|Jan|Feb|Mar|Apr|Aug|Sept?|Oct|Gov|Sen|Rep|Gen|Lt|Col|St|Mt|Dr|Mr|Mrs|Ms|U\.S|U\.K|No)\.\s", lambda m: m.group(1) + "\u2024 ", t)
+    return [x.replace("\u2024", ".").strip() for x in _SENT.split(t) if x.strip()][:n]
+
+def locate_texts(cl, texts, members=(), method="writeup", what="the story's write-up", span_texts=(), cue_only=False, refine=False):
+    """v11 (Matt pt1718u): offline only, no Nominatim, no database. Places a story from prose the scanner title never carried
+    (desk / API write-up, source summaries). Texts are tried in order, lede sentence first; the first confident place wins.
+    Keeps the v10 guards: weak towns yield to the story's context, and a place in a country the headline never names
+    (when the headline names one) is never used. Returns a geo.db-shaped row (located=1) or None."""
+    G = gaz(); title = cl.get("title") or ""
+    texts = [t for t in texts if isinstance(t, str) and t.strip()]
+    if not texts and not span_texts: return None
+    out = {"id": cl.get("cluster_id"), "lat": None, "lon": None, "place": None, "country": None, "country_name": None, "admin1": None, "admin1_code": None,
+           "city": None, "precision": None, "method": None, "method_detail": None, "confidence": None, "located": 0, "reason_code": None,
+           "reason_unlocated": None, "candidates": None, "evidence": None}
+    def fill(lat, lon, cc, a1, prec, method, detail, conf, place, city=None, evidence=None):
+        if (cc is None or a1 is None) and lat is not None and prec in ("point", "city", "county"):
+            pc, pa = G.pip(lat, lon)
+            cc = cc or pc; a1 = a1 or (pa if (pa or "").split(".")[0] == cc else None)
+        if a1 and not cc: cc = a1.split(".")[0]
+        out.update(lat=round(lat, 5), lon=round(lon, 5), country=cc, country_name=G.countries.get(cc, {}).get("name") if cc else None,
+                   admin1_code=a1, admin1=G.admin1.get(a1, {}).get("name") if a1 else None, city=city, precision=prec, method=method,
+                   method_detail=detail, confidence=conf, place=(place or "")[:200], located=1, evidence=(evidence or "")[:300])
+        return out
+    prior = source_cc(members, cl.get("source_hint") or "")
+    tnamed0 = {c for c in _named_countries(title) if c}
+    allnamed = set(tnamed0)
+    for tx in texts: allnamed |= _named_countries(tx)
+    # states / provinces the texts name ("Florida's health department ... Hillsborough"): a town in another state of that country is not it
+    nstates = set()
+    for tx in [title] + texts:
+        for a in extract(tx)["acc"]:
+            if a["level"] == "state" and a.get("a1"): nstates.add(a["a1"])
+    spans_all = []; multi = False
+    for i, tx in enumerate(texts):
+        if refine and i > 0 and not cue_only: break     # refining a country pin: the lede only ("Two days earlier ... in Khan Younis" is not this strike)
+        cp = county_place(tx, prior)
+        if cp and not (allnamed - {"US"}):
+            a1 = US_POSTAL.get(cp["st"])
+            return fill(cp["lat"], cp["lon"], "US", a1, "county", method, what + " (US county, NWS county table)", "high",
+                        f"{cp['name']}, {G.admin1.get(a1, {}).get('name', cp['st'])}", evidence=f"matched \"{cp['text']}\" in: {tx[:200]}")
+        ex = extract(tx, ctx_cc=prior)
+        if i > 0 or cue_only:     # after the lede only a place the sentence marks as one ("in Rakhine State"): "Canada's cyber centre also warned" is who, not where
+            ex = dict(ex, acc=[a for a in ex["acc"] if a.get("cue")])
+        ch = choose(ex)[0]
+        for _try in range(4):
+            if not ch: break
+            ch = agree(ch, ex, prior, allnamed)
+            alt = _better_than_weak(ch, ex, prior, allnamed)
+            if alt is None: break
+            ex = alt; ch = choose(ex)[0]
+        if ch and tnamed0 and ch["cc"] not in tnamed0:
+            ch = None
+        if ch and ch["level"] == "city":
+            same = {x for x in nstates if x.split(".")[0] == ch["cc"]}
+            if same and (ch.get("city") or {}).get("a1") not in same: ch = None
+        if ch and refine and ch.get("others"): ch = None; multi = True     # "struck Saada, Taiz, Lahj and al-Jawf": several places, keep the country
+        if ch and refine and ch["level"] in ("city", "state"):
+            ks = {a["k"] for a in ex["acc"] if a["level"] in ("city", "state") and a["cc"] == ch["cc"]}
+            own = (ch.get("city") or {}).get("a1") or ch.get("a1")
+            ks -= {a["k"] for a in ex["acc"] if a["level"] == "state" and a.get("a1") == own}
+            if len(ks) > 1: ch = None; multi = True     # "five in Rogaland, one in Vennesla ... one in Vestby": no single spot, keep the country
+        if ch and ch["level"] == "city" and re.search(r"\b" + re.escape(ch.get("text") or "~~") + r"\s+(?:Oblast|Province|Region|Governorate|Prefecture|Voivodeship|Krai|Raion|District|region|province|oblast)\b", tx):
+            # "the city of Hlukhiv in Sumy Oblast": the oblast, not its capital; a town the sentence names inside it wins
+            a1 = (ch.get("city") or {}).get("a1")
+            for sp in (ex.get("spans") or []) + re.findall(r"\b(?:city|town|village|settlement) of ([A-Z][\w'\-]+(?: [A-Z][\w'\-]+)?)", tx):
+                hit = small_place(sp, {ch["cc"]}) or next((dict(name=c[0], lat=c[2], lon=c[3], cc=c[4], a1=c[5], pop=c[6]) for c in G.cities
+                                                           if c[4] == ch["cc"] and c[5] == a1 and key_of(c[0]) == key_of(sp)), None)
+                if hit and (not a1 or hit["a1"] == a1):
+                    return fill(hit["lat"], hit["lon"], hit["cc"], hit["a1"] if hit["a1"] in G.admin1 else None, "city", method, what, "medium",
+                                f"{hit['name']}, {G.admin1.get(hit['a1'], {}).get('name', '')}, {G.countries.get(hit['cc'], {}).get('name', hit['cc'])}".replace(", ,", ","),
+                                city=hit["name"], evidence=f"matched \"{sp}\" in {ch['text']} region in: \u201c{tx[:200]}\u201d")
+            if a1 in G.admin1: ch = dict(ch, level="state", a1=a1)
+        if ch:
+            r = place_from(ch, out, fill, method, what + (f" (source country prior {prior})" if prior else ""), tx)
+            if r and r.get("located"):
+                r["evidence"] = ((r.get("evidence") or "") + f" in: \u201c{tx[:200]}\u201d")[:300]
+                return r
+            out.update(located=0)
+        spans_all += [x for x in (ex.get("spans") or []) if x not in spans_all]
+    for tx in list(texts) + [t for t in span_texts if isinstance(t, str)]:
+        if tx not in texts:
+            spans_all += [x for x in (extract(tx, ctx_cc=prior).get("spans") or []) if x not in spans_all]
+        m = _SOE.match(tx.strip())
+        if m and m.group(1) not in spans_all: spans_all.append(m.group(1))
+    # Small towns the 34k-city gazetteer lacks ("in Riverhead", "Ocean Shores declares a state of emergency"): the offline GeoNames
+    # 500+ table, only for a capitalised name the text itself marks as a place, inside a country the story names or its sources are from.
+    alltx = " ".join(list(texts) + [t for t in span_texts if isinstance(t, str)])
+    for sp in ([] if multi else spans_all[:4]):
+        if not re.search(r"\b(?:in|near|outside|at|of|from)\s+(?:the\s+)?" + re.escape(sp) + r"\b", alltx) and not any(_SOE.match(t.strip() or "") and _SOE.match(t.strip()).group(1) == sp for t in alltx.split("\n")): continue
+        ccs = (allnamed - {None}) or ({prior} if prior else set())
+        hit = small_place(sp, ccs)
+        if hit:
+            return fill(hit["lat"], hit["lon"], hit["cc"], hit["a1"] if hit["a1"] in G.admin1 else None, "city", method,
+                        what + " (offline GeoNames town table)", "medium" if ccs else "low",
+                        f"{hit['name']}, {G.admin1.get(hit['a1'], {}).get('name', '')}, {G.countries.get(hit['cc'], {}).get('name', hit['cc'])}".replace(", ,", ","),
+                        city=hit["name"], evidence=f"matched \"{sp}\"")
+    return None
+
+_SOE = re.compile(r"^([A-Z][A-Za-z.'\- ]{2,40}?) (?:declares|declared|extends|issues|issued) (?:a |an )?(?:local )?(?:state of emergency|emergency declaration)")
+_SP = {"db": None}
+_SP_LOCK = threading.Lock()
+def _small_db():
+    """heatmap_data/small_places_*.tsv (GeoNames cities500 towns of 1,000+ towns missing from cities.json, CC BY 4.0) -> an indexed SQLite copy in the
+    temp dir, built once per process (about a second). Never written next to the app's databases; read-only after it is built."""
+    import glob
+    srcs = sorted(glob.glob(os.path.join(DATA, "small_places_*.tsv")))     # sharded (each file under 1 MB)
+    if not srcs: return None
+    if _SP["db"] and os.path.exists(_SP["db"]): return _SP["db"]
+    with _SP_LOCK:
+        if _SP["db"] and os.path.exists(_SP["db"]): return _SP["db"]
+        import tempfile
+        mt = max(int(os.path.getmtime(x)) for x in srcs); dst = os.path.join(tempfile.gettempdir(), f"bn_small_places_{sum(os.path.getsize(x) for x in srcs)}_{mt}.db")
+        if not os.path.exists(dst):
+            tmp = dst + f".{os.getpid()}.tmp"
+            try:
+                c = sqlite3.connect(tmp); c.execute("CREATE TABLE p(k TEXT, name TEXT, lat REAL, lon REAL, cc TEXT, a1 TEXT, pop INTEGER)")
+                rows = []
+                for line in (ln for src in srcs for ln in open(src, encoding="utf-8")):
+                    if True:
+                        f = line.rstrip("\n").split("\t")
+                        if len(f) < 7: continue
+                        a1 = f"{f[4]}.{f[5]}"
+                        for nm in {f[0], f[1] or f[0]}:
+                            k = key_of(nm)
+                            if len(k) >= 4: rows.append((k, f[0], float(f[2]), float(f[3]), f[4], a1, int(f[6] or 0)))
+                c.executemany("INSERT INTO p VALUES(?,?,?,?,?,?,?)", rows); c.execute("CREATE INDEX pk ON p(k)"); c.commit(); c.close()
+                os.replace(tmp, dst)
+            except Exception as ex:
+                print("geo small_places build failed:", str(ex)[:120], flush=True)
+                try: os.remove(tmp)
+                except OSError: pass
+                return None
+        _SP["db"] = dst
+        return dst
+SMALL_STOP = {"congress", "parliament", "senate", "house", "white house", "court", "government", "police", "army", "navy", "state", "city", "county", "union",
+              "republic", "kingdom", "ministry", "capitol", "pentagon", "kremlin", "democrats", "republicans", "america", "media", "europe", "office",
+              "department", "embassy", "consulate", "headquarters", "downtown", "midtown", "uptown", "camp", "center", "centre", "market", "station",
+              "national", "federal", "global", "international", "breaking", "update", "live", "video", "watch", "read more", "news", "today", "tonight"}
+def small_place(name, ccs):
+    """name -> {name, lat, lon, cc, a1, pop} from heatmap_data/small_places.db (GeoNames cities500 minus the main gazetteer), or None.
+    ccs: allowed countries (named in the story or the sources' country). With none, only a name that exists in a single country."""
+    k = key_of(re.sub(r"^(?:the|in|near|at)\s+", "", (name or "").strip(), flags=re.I))
+    G = gaz()
+    if k in SMALL_STOP or k.split(" ")[-1] in {"county", "parish", "university", "college", "hospital", "airport", "base", "school", "court", "street", "road"}: return None
+    if len(k) < 4 or k in GENERIC or k in G.common or k in GIVEN_NAMES or len(k.split()) > 4: return None
+    p = _small_db()
+    if not p: return None
+    try:
+        c = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+        try: rows = c.execute("SELECT name, lat, lon, cc, a1, pop FROM p WHERE k=? ORDER BY pop DESC", (k,)).fetchall()
+        finally: c.close()
+    except sqlite3.Error: return None
+    if not rows: return None
+    L = [dict(zip(("name", "lat", "lon", "cc", "a1", "pop"), r)) for r in rows]
+    if ccs:
+        L = [x for x in L if x["cc"] in ccs]
+        if not L: return None
+    elif len({x["cc"] for x in L}) > 1 and not (L[0]["pop"] >= 5000 and L[1]["pop"] * 3 <= L[0]["pop"]): return None
+    if len(L) > 1 and L[1]["pop"] * 3 > L[0]["pop"]: return None       # two similar-sized towns of that name: not guessed
+    return L[0]
 
 def place_from(ch, out, fill, method, detail, text):
     G = gaz(); cc, a1 = ch["cc"], ch.get("a1")

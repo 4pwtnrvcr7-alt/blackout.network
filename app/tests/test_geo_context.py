@@ -1,7 +1,7 @@
 """Contextual geocoder rules (geo.py v9+v10, Nov 21 2026, Matt pt1682u + pt1686u: pins in the wrong place, "No location" when the story names one).
 Every case is a real item from the live Wire, Nov 13-20 2026. Offline only (Nominatim budget 0).
 Run: cd app && python3 -m unittest tests.test_geo_context -v"""
-import os, sys, tempfile, unittest
+import os, sys, json, tempfile, unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import geo
 
@@ -226,3 +226,90 @@ class HeatFallback(unittest.TestCase):
         self.assertFalse(heat_all._infer_agrees(it, {"cc": "CN", "place": "Dade", "lat": 30.0, "lon": 110.0}))
         it = {"id": "z", "title": "Tsunami threat ABOUT 94 MILES SOUTHWEST OF GUAM", "loc": "", "links": json.dumps([{"source": "NWS", "url": ""}])}
         self.assertTrue(heat_all._infer_agrees(it, {"cc": "GU", "place": "Guam", "lat": 13.4, "lon": 144.7}))
+
+
+class WriteupPlace(unittest.TestCase):
+    """v11 (Matt pt1718u): a place the published write-up names reaches the map, server-side; the v10 guards still hold."""
+    BARR = ("In remarks prepared for the Association for Computing Machinery's conference on AI in finance in Milan on Monday, November 16, "
+            "Federal Reserve Governor Michael S. Barr said AI agents acting for customers could move funds at high speed.")
+    def _wu(self, cid, what, story=None):
+        import geo_text
+        orig = geo_text.note_for
+        geo_text.note_for = lambda c: ({"what_happened": what, **({"story": story} if story else {})} if c == cid else {})
+        self.addCleanup(setattr, geo_text, "note_for", orig)
+
+    def test_barr_remarks_in_milan(self):
+        import heat_all
+        self._wu("barr", self.BARR)
+        it = {"id": "barr", "title": "Fed\u2019s Barr flags bank run and debt risks from rapid AI adoption", "loc": None, "lat": None, "lon": None, "a": 0,
+              "category": "financial", "brief": "WHAT: Fed\u2019s Barr flags bank run and debt risks from rapid AI adoption.", "links": "[]"}
+        g = {"located": 0, "reason_code": "non_geo", "reason_unlocated": "Non-geographic topic (financial) and no place named"}
+        p = heat_all.place(it, g)
+        self.assertEqual(p["cc"], "IT"); self.assertIn("Milan", p["place"]); self.assertNotEqual(p["tier"], "global")
+
+    def test_v3_sections_happened_and_template_ignored(self):
+        import geo_text
+        orig = geo_text.note_for; self.addCleanup(setattr, geo_text, "note_for", orig)
+        geo_text.note_for = lambda c: {"story": {"sections": {"happened": self.BARR, "background": "In 2019 a run in Paris ..."}}}
+        self.assertIn("Milan", geo_text.factual_text("x")[0]); self.assertEqual(geo_text.factual_text("x")[1], "")
+        geo_text.note_for = lambda c: {"what_happened": "1 independent source is reporting this, none of them official yet. Times of Israel reported: x"}
+        self.assertEqual(geo_text.factual_text("x")[0], "")
+
+    def test_v11_unique_region_and_sentence_article(self):
+        ch = lambda t: (geo.choose(geo.extract(t))[0] or {})
+        self.assertEqual(ch("A Krasnoyarsk apartment was flooded with foam through the toilet").get("cc"), "RU")
+        self.assertEqual(ch("Canary Islands state of emergency as 2,200 migrants arrive in 48 hours").get("a1"), "ES.53")
+        self.assertNotEqual(ch("Coup de vent en Loire-Atlantique : y a-t-il un risque").get("cc"), "BJ")
+        self.assertNotEqual(ch("The carrier group has left the Persian Gulf and is heading to Japan").get("cc"), "IR")
+
+    def test_milan_as_adjective(self):
+        r = geo.locate_texts({"title": "Fed\u2019s Barr flags bank run"}, geo.lead_sentences("In remarks for a Milan conference on Nov. 16, Barr said AI agents could speed up runs."))
+        self.assertEqual(r["country"], "IT"); self.assertEqual(r["city"], "Milan")
+
+    def test_later_sentence_needs_a_cue_and_cyber_issuer_is_not_a_place(self):
+        import heat_all
+        self._wu("cve", "Oracle disclosed a critical Java flaw on Nov. 18. Canada's Centre for Cyber Security issued alert AL26-029 on the same flaw.")
+        it = {"id": "cve", "title": "AL26-029 - Critical vulnerability impacting Oracle Java", "loc": None, "lat": None, "lon": None, "a": 0, "category": "cyber", "links": "[]"}
+        self.assertNotEqual(heat_all.place(it, {"located": 0, "reason_code": "global"}).get("cc"), "CA")
+
+    def test_refine_keeps_country_and_lede_only(self):
+        import heat_all
+        self._wu("gz", "Several Palestinians were hurt near Abu Sharkh roundabout in the northern Gaza Strip on Nov. 14. Two days earlier, a strike in Khan Younis killed six.")
+        it = {"id": "gz", "title": "Several Palestinians were injured in an Israeli attack near Abu Sharkh roundabout in the northern Gaza Strip.", "loc": None,
+              "lat": None, "lon": None, "a": 0, "category": "war/conflict", "links": "[]"}
+        g = {"located": 1, "lat": 31.4, "lon": 34.35, "precision": "country", "country": "PS", "place": "Gaza Strip", "confidence": "medium"}
+        p = heat_all.place(it, g)
+        self.assertEqual(p["cc"], "PS"); self.assertNotIn("Khan", p["place"])
+
+    def test_state_named_beats_same_name_town_elsewhere(self):
+        r = geo.locate_texts({"title": "Florida dengue and snowbird insurance"}, ["Florida's health department reported 100 new dengue cases; Hillsborough has 468."], refine=True)
+        self.assertTrue(r is None or r.get("admin1_code") in (None, "US.FL"))
+
+    def test_small_town_from_headline_only_when_unplaced(self):
+        import heat_all
+        it = {"id": "rh", "title": "'Massive explosion' prevented after suspected tampering of propane tanks in Riverhead", "loc": None, "lat": None, "lon": None, "a": 0,
+              "category": "terrorism", "links": json.dumps([{"source": "Newsday", "url": "https://www.newsday.com/long-island/x"}])}
+        p = heat_all.place(it, {"located": 0, "reason_code": "not_found"})
+        self.assertEqual(p["cc"], "US"); self.assertIn("Riverhead", p["place"])
+        self.assertIsNone(geo.small_place("Congress", {"US"}))
+
+    def test_state_of_emergency_subject(self):
+        import heat_all
+        it = {"id": "os", "title": "Ocean Shores declares a state of emergency", "loc": None, "lat": None, "lon": None, "a": 0, "category": "natural disaster",
+              "links": json.dumps([{"source": "Google News: KIRO 7 News Seattle", "url": "https://news.google.com/rss/articles/x"}])}
+        p = heat_all.place(it, {"located": 0, "reason_code": "not_found"})
+        self.assertEqual(p["cc"], "US"); self.assertIn("Ocean Shores", p["place"])
+
+    def test_oblast_is_not_its_capital(self):
+        r = geo.locate_texts({"title": "drone strike in the city of Hlukhiv"}, ["A second drone strike hit the city of Hlukhiv in Sumy Oblast on Nov. 14."])
+        self.assertIn("Hlukhiv", r["place"])
+
+    def test_source_coordinates_untouched(self):
+        import heat_all
+        self._wu("eq", self.BARR)
+        it = {"id": "eq", "title": "M 4.7 - 24 km S of Yacuiba, Bolivia", "loc": "Bolivia", "lat": -22.2, "lon": -63.6, "a": 0, "category": "natural disaster", "links": "[]"}
+        self.assertEqual(heat_all.place(it, None)["how"], "source coordinates")
+
+    def test_admin1_names(self):
+        G = geo.gaz()
+        self.assertEqual(G.admin1["FR.75"]["name"], "Paris"); self.assertEqual(G.admin1["VN.20"]["name"], "Ho Chi Minh City")
