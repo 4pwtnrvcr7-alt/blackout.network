@@ -206,6 +206,7 @@ def lead_for(cid, title="", loc="", text=""):
     return v
 
 _PH_OK = {}
+_INSTITUTION = re.compile(r"\b(universit\w*|college|museum|facility|institut\w*|school|academy|stadium|hospital|airport|library|company|corporation|foundation)\b", re.I)
 def place_photo_ok(v, title="", loc=""):
     """Nov 21 2026 (Matt pt1682u: Indianapolis on a Central Florida flood story): a file photo of a place may lead a story only when that
     place is in the story's own country, and inside one country the same state. Topic photos (no place) stay allowed."""
@@ -213,6 +214,7 @@ def place_photo_ok(v, title="", loc=""):
     if not name:
         m = re.match(r"File photo(?: of|:)\s*(.+?)(?: \(\d{4}\))?\. Not taken", v.get("caption") or "")
         name = m.group(1) if m else ""
+    if _INSTITUTION.search(name): return False      # v10: "University of Tehran", "Lima Art Museum", "Global Biodiversity Information Facility" are not places
     key = (name, title or "", loc or "")
     if key in _PH_OK: return _PH_OK[key]
     try:

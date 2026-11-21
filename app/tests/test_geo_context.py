@@ -1,4 +1,4 @@
-"""Contextual geocoder rules (geo.py v9, Nov 21 2026, Matt pt1682u: pins in the wrong place, "No location" when the story names one).
+"""Contextual geocoder rules (geo.py v9+v10, Nov 21 2026, Matt pt1682u + pt1686u: pins in the wrong place, "No location" when the story names one).
 Every case is a real item from the live Wire, Nov 13-20 2026. Offline only (Nominatim budget 0).
 Run: cd app && python3 -m unittest tests.test_geo_context -v"""
 import os, sys, tempfile, unittest
@@ -63,9 +63,65 @@ class T(unittest.TestCase):
         self.assertNotEqual(r["confidence"], "low")
 
     def test_coordinates_contradict_story_country(self):
-        # merged GDACS cluster: "in Australia" headline, point in Brazil -> kept at the point but marked low confidence (approximate on the map)
-        r = run("Green forest fire notification in Australia", "Australia", -1.3848, -55.0092)
-        self.assertEqual(r["confidence"], "low")
+        # merged GDACS cluster: "in Australia" headline, point in Brazil -> v10: the headline's country wins (country-level pin in Australia)
+        r = run("Forest fire in Australia (green alert)", "Brazil", -1.3848, -55.0092, sources=["GDACS"])
+        self.assertEqual(r["country"], "AU"); self.assertEqual(r["precision"], "country")
+        self.assertTrue(-45 < r["lat"] < -10 and 110 < r["lon"] < 155, (r["lat"], r["lon"]))
+
+    def test_coordinates_next_to_named_country(self):
+        # MeteoAlarm "Israel: ..." at a generic point just inside the West Bank: the named country, same point
+        r = run("Israel: Orange fog warning, 1 area (Izrael Valley) - MeteoAlarm", "Israel: Izrael Valley", 31.4, 35.0, sources=["MeteoAlarm (EUMETNET)"])
+        self.assertEqual(r["country"], "IL"); self.assertEqual(r["method"], "source_coords")
+
+    def test_source_coordinates_kept_when_story_agrees(self):
+        r = run("M 5.8 - 40 km N of Ruteng, Indonesia", "40 km N of Ruteng, Indonesia", -8.2501, 120.5285, sources=["USGS"])
+        self.assertEqual(r["country"], "ID"); self.assertEqual(r["method"], "source_coords")
+
+    # --- v10 (Matt pt1686u, Nov 21 2026): weak town names never beat the story's own context
+    def test_lowercase_word_is_not_a_town(self):
+        r = run("Iowa deputy witnesses house explosion, runs inside to help homeowner out", sources=["Google News: KETV", "Google News: WOWT"], category="explosion")
+        self.assertEqual(r["country"], "US"); self.assertEqual(r["admin1_code"], "US.IA")
+
+    def test_direction_word_is_not_a_town(self):
+        r = run("Some Central Florida cities declare state of emergency due to severe rain", sources=["Google News: WKMG", "Google News: Spectrum News 13"])
+        self.assertEqual(r["admin1_code"], "US.FL"); self.assertNotIn("Louisiana", r["place"])
+
+    def test_weak_town_in_unnamed_country_dropped(self):
+        r = run("Several Palestinians were injured in an Israeli attack near Abu Sharkh roundabout in the northern Gaza Strip.", sources=["Telegram @QudsNen"], category="military")
+        self.assertEqual(r["country"], "PS")
+        r = run("Iran has shot down 3 American drones today which tried to violate its airspace 1x MQ-1 'Grey Eagle' 1x MQ-9 'Reaper'", category="military")
+        self.assertEqual(r["country"], "IR")
+
+    def test_us_local_tv_prior(self):
+        self.assertEqual(geo.source_cc([{"source": "Google News: WGME"}, {"source": "Bluesky @wmur9.bsky.social"}]), "US")
+        self.assertIsNone(geo.source_cc([{"source": "Google News: WION"}]))
+        r = run("One injured after home explosion in Town of Lyons", sources=["Google News: WGME", "Bluesky @wmur9.bsky.social"], category="explosion")
+        self.assertNotEqual(r.get("country"), "FR")
+        self.assertIn("Lyons", r.get("reason_unlocated") or "")      # asked of the online geocoder inside the US instead
+
+    def test_big_city_kept_when_other_countries_named(self):
+        r = run("BREAKING: Russian strikes on Kyiv have killed at least one person and damaged the embassies of Austria and the Netherlands", category="military")
+        self.assertEqual(r["country"], "UA")
+        r = run("Fresh Israeli attack on Gaza kills three", sources=["Middle East Eye", "The Independent world"], category="military")
+        self.assertEqual(r["country"], "PS")
+
+    def test_hyphen_half_is_not_a_place(self):
+        r = run("Overnight storms cause extensive flooding in Broward, Miami-Dade; Hollywood declares state of emergency", sources=["Google News: WSVN"])
+        self.assertNotEqual(r.get("country"), "CN")
+        r = run("SEC Charges Indianapolis-Based Backward Hat Capital and Its Co-Founders", sources=["SEC press releases"], category="financial")
+        self.assertEqual(r.get("city"), "Indianapolis")
+
+    def test_county_name_not_its_city(self):
+        r = run("Explosion injures 2 at Macon County manufacturing plant, officials say", sources=["Google News: WSMV"], category="explosion")
+        self.assertNotEqual(r.get("city"), "Macon"); self.assertEqual(r["country"], "US")
+        r = run("El Paso County health authority addresses rise in measles cases", category="disease")
+        self.assertEqual(r["country"], "US")
+
+    def test_headline_countries_bound_later_texts(self):
+        r = run("Q: Pakistan was not attacked by Iran, yet other states in the Middle East were attacked",
+                brief="WHAT: Q: Pakistan was not attacked by Iran. Does that show a need for no U.S. bases in the region? Qatar's PM: Oman was attacked, and they don't have U.S. military bases.",
+                category="military")
+        self.assertNotEqual(r.get("country"), "US")
 
     # --- people and organisations are not places
     def test_people_not_places(self):
@@ -152,3 +208,14 @@ class StoryPage(unittest.TestCase):
         self.assertTrue(geo.photo_matches("Japan", "M 5.2 - 86 km NW of Ryotsu-minato, Japan", "86 km NW of Ryotsu-minato, Japan"))
         import people as PP
         self.assertFalse(PP.place_photo_ok({"kind": "place", "alt": "File photo: Indianapolis", "caption": "File photo of Indianapolis (2016). Not taken at this event."}, self.T, self.L))
+
+class HeatFallback(unittest.TestCase):
+    """v10: the classic offline fallback on the map must agree with the story (heat_all._infer_agrees)."""
+    def test_infer_must_match_sources_country(self):
+        import json, heat_all
+        it = {"id": "x", "title": "1 injured in vehicle explosion in Palo", "loc": "", "links": json.dumps([{"source": "Google News: KCRG", "url": ""}])}
+        self.assertFalse(heat_all._infer_agrees(it, {"cc": "PH", "place": "Palo", "lat": 11.1, "lon": 124.9}))
+        it = {"id": "y", "title": "Overnight storms cause extensive flooding in Broward, Miami-Dade; Hollywood declares state of emergency", "loc": "", "links": "[]"}
+        self.assertFalse(heat_all._infer_agrees(it, {"cc": "CN", "place": "Dade", "lat": 30.0, "lon": 110.0}))
+        it = {"id": "z", "title": "Tsunami threat ABOUT 94 MILES SOUTHWEST OF GUAM", "loc": "", "links": json.dumps([{"source": "NWS", "url": ""}])}
+        self.assertTrue(heat_all._infer_agrees(it, {"cc": "GU", "place": "Guam", "lat": 13.4, "lon": 144.7}))
