@@ -911,6 +911,31 @@ _AGG_TAIL = re.compile(r"\s*(?:\n\s*)?->\s*[^\n]*\|\s*More on\b.*$", re.S | re.I
 _OUTLET_TAIL = re.compile(r"^(?P<head>.+?)\s+\|\s+(?P<tail>[^|\n]{2,40})\s*$", re.S)                # "Headline | Daily Sabah"
 _VERBISH = re.compile(r"\b(?:is|are|was|were|has|have|had|will|says?|said|warns?|kills?|hits?|strikes?|launch(?:es)?|attacks?|over|after|amid|as|to|of|in|on|for)\b", re.I)
 
+_SMALL = set("a an the of and or nor but to in on at for with from by as into over near off via vs per amid after".split())
+_NUMW = set("one two three four five six seven eight nine ten several multiple many".split())
+_DEMONYM = re.compile(r"^[A-Z][a-z]+(?:ian|ean|ese|ish|i)$")
+
+def _split_glued_body(t):
+    """Alert cards that lost their line break glue the Title Case headline to the sentence-case report:
+    "Ballistic Missile Strike on Kyiv Region - Air Alert Active Ballistic missile launches detected ..." The report starts at the
+    first capitalised word followed by a lowercase content word ("Ballistic missile"), backed up over a count word ("Two Russian
+    ballistic ..."). Only when the part before it is a Title Case headline of 4+ words; otherwise the title is returned unchanged."""
+    s = re.sub(r"\s+", " ", t or "").strip()
+    toks = list(re.finditer(r"\S+", s))
+    word = lambda m: re.sub(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$", "", m.group(0))
+    for i in range(3, len(toks) - 1):
+        w, nx = word(toks[i]), word(toks[i + 1])
+        if not (w[:1].isupper() and nx[:1].islower() and nx.lower() not in _SMALL and len(nx) > 2): continue
+        j = i
+        while j > 3 and (word(toks[j - 1]).lower() in _NUMW or _DEMONYM.search(word(toks[j - 1]))): j -= 1   # "Two Russian ...", "Iranian IRGC claims ..."
+        head_toks = [word(m) for m in toks[:j]]
+        content = [x for x in head_toks if x and x.lower() not in _SMALL and not x[:1].isdigit()]
+        if len(head_toks) < 4 or not content: return s
+        if sum(1 for x in content if x[:1].isupper()) / len(content) < 0.8: return s   # sentence-case headline: leave it alone
+        head = s[:toks[j].start()].rstrip(" -\u2013\u2014,;:")
+        return head if len(head) >= 20 else s
+    return s
+
 def headline_text(t):
     """The story's own headline out of a structured scanner title, never a bare label or a fragment of it (Nov 21 2026):
     - alert card "Label | 9/10 Headline\nBody" -> "Headline" (the label and the score are metadata, the body is the report);
@@ -921,8 +946,11 @@ def headline_text(t):
     m = _ALERT_CARD.match(raw)
     if m:
         rest = m.group("rest")
-        first = rest.split("\n", 1)[0].strip()
+        # the first line with real words is the headline (a line of only flag emoji, "<flags>\n\nHouthis Strike ...", is skipped)
+        lines = [ln for ln in rest.split("\n") if len(re.findall(r"[A-Za-z0-9]+", clean_title(ln))) >= 1]
+        first = lines[0] if lines else ""
         raw = first if len(re.findall(r"[A-Za-z0-9]+", clean_title(first))) >= 3 else rest
+        if len(lines) <= 1: raw = _split_glued_body(raw)
     raw = _AGG_TAIL.sub("", raw)
     m = _OUTLET_TAIL.match(raw.strip())
     if m and "|" not in m.group("head") and "\n" not in m.group("tail"):
@@ -936,17 +964,19 @@ def tighten_title(t):
     t = clean_title(headline_text(t))
     words = re.findall(r"[A-Za-z0-9.]+", t)
     if len(words) < 8: return t
-    key = " ".join(w.lower() for w in words[:3])
-    flat = re.sub(r"[^a-z0-9.]+", " ", t.lower())
-    first = flat.find(key)
-    second = flat.find(key, first + len(key) + 1) if first >= 0 else -1
-    if second < 24: return t
-    ratio = second / max(len(flat), 1)
-    cut = t.rfind(" ", 0, max(24, int(ratio * len(t)) + 1))
-    out = t[:cut].strip(" .") if cut > 24 else t
+    # Nov 21 2026: find the repeat in the title itself. The old code mapped a position in a squeezed copy back onto the title by
+    # ratio, which landed a word early on titles with "/" or "-" ("... Iskander/S-400 or" instead of "... Iskander/S-400 or S-300").
+    pat = r"(?<![A-Za-z0-9])" + r"[^A-Za-z0-9.]+".join(re.escape(w) for w in words[:3]) + r"(?![A-Za-z0-9])"
+    hits = list(re.finditer(pat, t, re.I))
+    if len(hits) < 2 or hits[1].start() < 24: return t
+    out = t[:hits[1].start()].rstrip(" .,;:-\u2013\u2014")
+    ws = out.split()
+    while len(ws) > 4 and ws[-1].lower().strip(".,;:!?-") in _DANGLING: ws.pop()   # never end the kept headline on "or" / "of"
+    out = " ".join(ws).rstrip(" .,;:-\u2013\u2014")
+    if len(out) <= 24: return t
     return re.sub(r"\s+[A-Z]$", "", out)
 
-_DANGLING = set("a an the of and or to in on for with from as at by into over after amid its their".split())
+_DANGLING = set("a an the of and or nor but to in on for with from as at by into over after amid its their".split())
 # Abbreviations that end in a full stop but never end a sentence ("Nov. 13", "U.S. forces", "Dr. Smith").
 _ABBR = re.compile(r"(?:\b(?:Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|Mr|Mrs|Ms|Dr|St|Sen|Rep|Gov|Gen|Lt|Col|Sgt|Capt|Adm|Jr|Sr|No|Vol|vs|approx|est|Inc|Corp|Ltd|Co)|\b(?:[A-Z]\.){1,3}[A-Z]?)\.$")
 
@@ -978,7 +1008,9 @@ def _fit_headline(t, n=140):
     # out the structured parts (alert-card label + score, aggregator tail, trailing outlet); what is left is the headline.
     t = t.strip(" -|")
     sents = _sentences(t)
-    if len(sents) > 1 and len(sents[0]) >= 20 and len(sents[0]) <= n:
+    # a first sentence that closes on a quote/bracket ('... yet?"') reads to the gate as a cut (its whole-sentence exemption only
+    # knows a bare . ! ?), so such titles print whole, or with a visible ellipsis when too long (Nov 21 2026)
+    if len(sents) > 1 and len(sents[0]) >= 20 and len(sents[0]) <= n and not sents[0].endswith(("\"", "'", "\u201d", "\u2019", ")")):
         t = sents[0]
     if len(t) <= n:
         return _strip_stop(t)
