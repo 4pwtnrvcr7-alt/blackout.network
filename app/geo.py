@@ -838,6 +838,16 @@ def place_label(title, loc, max_len=90):
     """A readable place for story pages: never a raw NWS zone dump ('Inland Volusia; Orange; ...')."""
     loc = (loc or "").strip()
     if not loc: return ""
+    # v10 (pt1686u): the headline names one country and the location field another (a merged GDACS cluster: "Forest fire in Australia",
+    # location "Brazil") -> the headline's country
+    if ";" not in loc and "," not in loc:
+        try:
+            tn = {a["cc"] for a in extract(title)["acc"] if a["level"] == "country" and a.get("cue")}     # "... in Australia"
+            ln = _named_countries(loc)
+            if len(tn) == 1 and ln and not (tn & ln):
+                G = gaz(); tc = next(iter(tn))
+                if not (set((G.countries.get(tc) or {}).get("neighbours") or []) & ln): return G.countries.get(tc, {}).get("name") or loc
+        except Exception: pass
     if ";" not in loc and len(loc) <= max_len: return loc
     res = nws_resolve(title, loc)
     if res and res["states"]:
