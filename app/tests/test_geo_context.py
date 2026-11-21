@@ -138,6 +138,12 @@ class StoryPage(unittest.TestCase):
         self.assertIn("Flood Watch for 9 East Central Florida counties from NWS Melbourne, through Nov 20 at 7 PM EST.", x)
         self.assertNotIn("Inland Volusia;", x)
 
+    def test_page_header_and_jsonld_use_place_label(self):
+        # the story page header line and JSON-LD contentLocation must not print the zone dump either (live check Nov 21)
+        self.assertEqual(geo.place_label(self.T, self.L), "9 counties in East Central Florida")
+        src = open(os.path.join(os.path.dirname(__file__), "..", "story.py")).read()
+        self.assertIn("_geo.place_label(title", src)
+
     def test_file_photo_must_match_place(self):
         self.assertFalse(geo.photo_matches("Indianapolis", self.T, self.L))
         self.assertTrue(geo.photo_matches("Florida", self.T, self.L))
