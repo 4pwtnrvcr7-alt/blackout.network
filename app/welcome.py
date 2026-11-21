@@ -35,7 +35,7 @@ MORE_CATS = [
 ]
 # Site tools that are not newsletter categories — stored locally only, not sent as interests.
 EXTRA_TOOLS = [
-    ("grid", "Energy Grid", "/#grid"),
+    ("grid", "The Grid", "/grid"),
     ("ai", "AI Threats", "/#ai"),
 ]
 
@@ -113,7 +113,7 @@ TOOLS = [
     ("score", "How we score", "The 0–100 score and the 0–10 rank, explained factor by factor.", "/scoring"),
     ("alerts", "Alerts", "Instant push alerts, sent only for rank 7+ stories confirmed by independent sources.", None),
     ("brief", "Free brief", "The highest-ranked events of the day, in one email. Free, double opt-in.", "/newsletter"),
-    ("grid", "Energy Grid", "U.S. power grid status, local outages and weather-driven stress.", "/#grid"),
+    ("grid", "The Grid", "U.S. power grid status, local outages and weather-driven stress.", "/grid"),
     ("ai", "AI Threats", "AI-assisted attacks, deepfake fraud and model misuse, ranked 0–10.", "/#ai"),
     ("solar", "Solar & Seismic", "Solar flares, geomagnetic storms, the Kp index and live global quakes.", "/#solar"),
     ("weather", "Weather", "Conditions, official severe-weather alerts and the forecast for any place.", "/#weather"),
