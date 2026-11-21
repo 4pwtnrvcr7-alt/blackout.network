@@ -209,6 +209,13 @@ class StoryPage(unittest.TestCase):
         import people as PP
         self.assertFalse(PP.place_photo_ok({"kind": "place", "alt": "File photo: Indianapolis", "caption": "File photo of Indianapolis (2016). Not taken at this event."}, self.T, self.L))
 
+class PlaceLabel(unittest.TestCase):
+    def test_headline_country_beats_location_field(self):
+        self.assertEqual(geo.place_label("Forest fire in Australia (green alert)", "Brazil"), "Australia")
+        self.assertEqual(geo.place_label("Forest fire in India (green alert)", "India"), "India")
+        self.assertEqual(geo.place_label("Forest fire in Sudan (green alert)", "Sudan, South Sudan"), "Sudan, South Sudan")
+        self.assertEqual(geo.place_label("M 4.7 - 24 km S of Yacuiba, Bolivia", "Argentina"), "Argentina")     # neighbours: the feed's own place stays
+
 class HeatFallback(unittest.TestCase):
     """v10: the classic offline fallback on the map must agree with the story (heat_all._infer_agrees)."""
     def test_infer_must_match_sources_country(self):
