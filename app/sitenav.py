@@ -113,6 +113,12 @@ MESH_ON = os.environ.get("BN_MESH_UI", "0") == "1"
 if not MESH_ON:
     NAV = [(g, [it for it in its if it[0] != "@mesh"]) for g, its in NAV]
     NAV = [(g, its) for g, its in NAV if its]
+# Nov 21 2026 (Matt pt1687u): hide these from menus, footer and sitemap; routes stay reachable by URL.
+# streams=Live TV & Radio, trends=Trends, bcast=Broadcast transcripts, radio=Live Radio,
+# intel=Intel Streams, ranked=Ranked by Users, @social=Videos & Posts, @stats=Public Stats.
+# netnear (Networks near me, /network/near) is MENU3-only and is omitted there.
+HIDDEN_MENU_KEYS = frozenset({"streams", "trends", "bcast", "radio", "intel", "ranked", "@social", "@stats"})
+NAV = [(g, [it if it[0] not in HIDDEN_MENU_KEYS else (tuple(it[:5]) + (True,)) for it in its]) for g, its in NAV]
 
 # Standalone pages: path -> (active nav key, title, meta description, visible one-line description).
 PAGES = {
