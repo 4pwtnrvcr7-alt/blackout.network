@@ -201,7 +201,7 @@ def render(cid, since=""):
             + f'<details class="card bnt-sacc"><summary><h2>Timeline and sources</h2></summary><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></details>'
             + '<section class="card" id="follow" data-bnt-skip><h2>Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
               'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
-              + g_follow + '<p class="meta"><a href="/wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/social">Videos</a> · <a href="/newsletter">Newsletter</a></p>')
+              + g_follow + '<p class="meta"><a href="/wire">← Back to The Wire</a> · <a href="/scoring">How we score</a> · <a href="/newsletter">Newsletter</a></p>')
     ld = {"@context": "https://schema.org", "@type": "NewsArticle", "headline": title[:110], "description": desc,
           "datePublished": r.get("first_seen"), "dateModified": r.get("updated"), "url": f"{S.SITE}/wire/{cid}",
           "publisher": {"@type": "NewsMediaOrganization", "@id": f"{S.SITE}/#org", "name": S.BRAND, "url": S.SITE,

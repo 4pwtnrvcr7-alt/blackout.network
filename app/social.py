@@ -162,7 +162,7 @@ def social_page():
             f'<section style="margin-top:8px"><h2 style="font-size:19px">▶ YouTube · @blkoutntw</h2>{vid}</section>'
             f'<section class="card" style="margin-top:18px"><h2>𝕏 Latest from @BLKOUTNTW</h2>{xs}</section>')
     desc = "BLACKOUT.NETWORK videos and posts: world threat updates and explainers from YouTube @blkoutntw and X @BLKOUTNTW, each with a full sourced story page."
-    return S.page("Videos & posts", desc, body, "/social", "@social", jsonld={"@context": "https://schema.org", "@type": "CollectionPage", "name": "BLACKOUT.NETWORK videos & posts", "url": S.SITE + "/social"}, og_type="website")
+    return S.page("Videos & posts", desc, body, "/social", "@social", noindex=True, jsonld={"@context": "https://schema.org", "@type": "CollectionPage", "name": "BLACKOUT.NETWORK videos & posts", "url": S.SITE + "/social"}, og_type="website")
 
 def story_page(s, preview=False):
     slug = s["slug"]; yid = s.get("youtube_id") if YTID.match(str(s.get("youtube_id") or "")) else None

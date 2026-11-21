@@ -337,7 +337,7 @@ def render():
         {"@type": "Dataset", "name": "BLACKOUT.NETWORK public traffic and audience stats", "description": DESC, "url": f"{SITE}/stats", "creator": {"@id": f"{SITE}/#org"},
          "isAccessibleForFree": True, "license": f"{SITE}/tos", "temporalCoverage": f"{(s.get('first_day') or '')}/..",
          "distribution": [{"@type": "DataDownload", "encodingFormat": "application/json", "contentUrl": f"{SITE}/api/stats"}]}]}
-    head = (sitenav.head_html("stats", "/stats") + '<meta name="robots" content="index,follow,max-image-preview:large">'
+    head = (sitenav.head_html("stats", "/stats") + '<meta name="robots" content="noindex,nofollow">'
             '<meta name="keywords" content="BLACKOUT.NETWORK stats, site traffic, YouTube @blkoutntw, X @BlkoutNtw, open analytics, threat monitor audience">'
             '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") + '</script>')
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
