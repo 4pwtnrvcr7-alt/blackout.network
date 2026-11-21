@@ -449,6 +449,215 @@ def page_html(data):
 </body></html>"""
     return html_out
 
+
+# ---------------------------------------------------------------------------
+# Full original Mac dashboard, served at /admin after login.
+# The public site already ships the same dashboard.html + cohesion.js as /live;
+# this path restores the Mac chrome (visible status, Manual refresh, Scans every,
+# the original tab strip) and keeps every in-page panel. Scan interval is
+# displayed read-only (no safe server-to-Mac path to change config.json).
+# Manual refresh uses the existing /api/rt/refresh (ask the Mac to push) plus
+# /api/refresh-all (bust caches) and a reload of /api/state. It does not start
+# a scan on this node and does not touch scanner.py.
+# ---------------------------------------------------------------------------
+
+# Only in-page dashboard panels (id="tab-*") that the original .tabs strip omitted.
+# Standalone pages (Energy Grid, AI Threats, Crime, Midterms, etc.) stay reachable from the menu.
+ADMIN_EXTRA_TABS = [
+    ("noise", "Background Noise"), ("trends", "Trends"), ("sources", "Sources"),
+    ("newsletter", "Newsletter"), ("politics", "Politics"), ("weather", "Weather"),
+    ("games", "Games"),
+]
+
+ADMIN_BAR = """
+<style>
+body.bn-admin>nav.tabs{display:flex!important;flex-wrap:wrap;gap:6px;padding:8px 16px;border-bottom:1px solid var(--bd,#232a33);background:var(--pn,#12161b);position:sticky;top:0;z-index:20}
+body.bn-admin nav.tabs button[data-tab="heatmap"]{display:inline-flex!important;align-items:center;gap:4px}
+body.bn-admin nav.tabs button{appearance:none;background:transparent;color:var(--tx,#e6e9ee);border:1px solid var(--bd2,#2f3742);border-radius:8px;padding:8px 10px;font:600 13px/1.2 system-ui;cursor:pointer}
+body.bn-admin nav.tabs button.on{border-color:#fff;color:#fff}
+#bn-admin-bar{background:#0b0d10;border-bottom:1px solid var(--bd,#232a33);padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+#bn-admin-bar .pri, #bn-admin-bar button, #bn-admin-bar .btn{appearance:none;background:transparent;color:var(--tx,#e6e9ee);border:1px solid var(--bd2,#2f3742);border-radius:8px;padding:8px 12px;font:700 13px/1 system-ui;cursor:pointer}
+#bn-admin-bar #status{color:var(--mu,#8a94a3);font-size:13px;flex:1 1 220px}
+#bn-admin-bar label{color:var(--mu,#8a94a3);font-size:13px}
+#bn-admin-bar select:disabled{opacity:1;color:var(--tx,#e6e9ee);background:var(--sf,#161b21);border:1px solid var(--bd2,#2f3742);border-radius:6px;padding:4px 6px}
+#bn-admin-bar .ro-note{color:var(--mu,#8a94a3);font-size:12px;font-style:normal}
+#bn-admin-extra{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+#bn-admin-extra .ex{border:1px solid var(--bd,#232a33);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--tx,#e6e9ee)}
+#bn-admin-extra .ex b{display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mu,#8a94a3);margin:0 0 4px}
+#bn-admin-extra .ex .bad{color:#fff;background:#c8102e;border-radius:4px;padding:0 6px;font-weight:700}
+</style>
+<div id="bn-admin-bar">
+  <span id="status">loading…</span>
+  <button type="button" class="pri" id="refresh">Manual refresh</button>
+  <label title="Set on the Mac scanner. This page cannot change it.">Scans every <select id="interval" disabled aria-label="Scan interval (read only)"></select> <span class="ro-note">(set on the Mac)</span></label>
+  <span id="msg"></span>
+  <form method="post" action="/admin/logout" style="margin:0"><button type="submit">Log out</button></form>
+  <div id="bn-admin-extra">
+    <div class="ex" id="bn-ex-writer"><b>Instant writer</b><span>loading…</span></div>
+    <div class="ex" id="bn-ex-news"><b>Newsletter</b><span>loading…</span></div>
+  </div>
+</div>
+"""
+
+ADMIN_JS = r"""
+<script>
+(function(){
+  document.documentElement.classList.add("bn-admin");
+  if(document.body) document.body.classList.add("bn-admin");
+  else document.addEventListener("DOMContentLoaded", function(){ document.body.classList.add("bn-admin"); });
+  var _rep = Location.prototype.replace;
+  Location.prototype.replace = function(url){
+    if(location.pathname.indexOf("/admin")===0 && String(url).indexOf("/map")===0) return;
+    return _rep.apply(this, arguments);
+  };
+  function $(id){return document.getElementById(id)}
+  function lockInterval(){
+    var sel=$("interval"); if(!sel) return;
+    var m=(window.S && S.interval_minutes) || 60;
+    sel.disabled=true; sel.onchange=null;
+    var label=m<60?(m+" min"):((m/60)+" h");
+    if(sel.options.length!==1 || sel.options[0].textContent!==label){
+      sel.innerHTML=""; var o=document.createElement("option"); o.value=m; o.textContent=label; sel.appendChild(o);
+    }
+    sel.value=m;
+  }
+  function wireRefresh(){
+    var b=$("refresh"); if(!b) return;
+    b.textContent="Manual refresh";
+    b.title="Ask the Mac for the latest data and reload this page. This does not change the scan interval.";
+    b.onclick=async function(){
+      b.disabled=true; var msg=$("msg"); if(msg) msg.textContent="refreshing…";
+      try{
+        await fetch("/api/rt/refresh",{method:"POST",credentials:"same-origin"});
+        await fetch("/api/refresh-all",{method:"POST",credentials:"same-origin"});
+        if(typeof load==="function") await load();
+        if(msg) msg.textContent="updated";
+        lockInterval();
+      }catch(e){ if(msg) msg.textContent="error"; }
+      b.disabled=false;
+    };
+  }
+  function fillExtra(d){
+    var w=d.writer||{}, n=d.newsletter||{}, s=d.scanner||{};
+    var we=document.querySelector("#bn-ex-writer span");
+    var ne=document.querySelector("#bn-ex-news span");
+    if(we){
+      var err=w.last_error||w.error||"";
+      we.innerHTML=(w.thread_alive?"thread alive":"not running")
+        +" · key "+(w.api_key_set?"set":"missing")
+        +" · queue "+((w.queue&&w.queue.length)||0)
+        +(err?(' · <span class="bad"></span>'):"");
+      if(err) we.querySelector(".bad").textContent=err;
+    }
+    if(ne){
+      var snd=(n.sender||{}).mode||"—" ;
+      ne.textContent="sender "+snd+" · live sending "+(n.live_sending_approved?"on":"off")
+        +" · scheduler "+(n.render_scheduler?"on":"off");
+    }
+  }
+  function loadExtra(){
+    fetch("/api/admin/status",{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null}).then(function(d){ if(d) fillExtra(d); }).catch(function(){});
+  }
+  function extendHashes(){
+    try{
+      if(typeof TABHASH==="object"){
+        var extra={heatmap:"heatmap",politics:"politics",weather:"weather",games:"games",noise:"noise",trends:"trends",
+          newsletter:"newsletter",sources:"sources",grid:"grid",ai:"ai",finance:"finance",spacex:"spacex",intel:"intel",
+          gunlaws:"gunlaws",midterms:"midterms",gov:"government",figures:"figures",preppers:"preppers",solar:"solar"};
+        Object.keys(extra).forEach(function(k){ if(!TABHASH[k]) TABHASH[k]=extra[k]; });
+        if(typeof HASHTAB==="object") Object.keys(TABHASH).forEach(function(k){ HASHTAB[TABHASH[k]]=k; });
+      }
+    }catch(e){}
+  }
+  function boot(){
+    if(document.body) document.body.classList.add("bn-admin");
+    extendHashes(); wireRefresh(); lockInterval(); loadExtra();
+    setInterval(function(){ lockInterval(); loadExtra(); }, 30000);
+    setTimeout(function(){ wireRefresh(); lockInterval(); }, 800);
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+  window.addEventListener("load", function(){ wireRefresh(); lockInterval(); });
+})();
+</script>
+"""
+
+
+def _admin_top():
+    """Header + drawer + title, with tab links staying on /admin. No duplicate control ids."""
+    import sitenav, sitenav_ui as UI
+    html = UI.topbar(sitenav, "threat", "") + UI.drawer(sitenav, "threat") + UI.pagehead("The Wire", sitenav.PAGES["home"][3])
+    html = html.replace('href="/live#', 'href="/admin#')
+    html = html.replace('href="/live"', 'href="/admin"', 1)
+    # Keep the wordmark pointing at the portal while logged in
+    html = html.replace('<a class="bn-logo" href="/"', '<a class="bn-logo" href="/admin"', 1)
+    return html
+
+
+def _add_missing_tabs(html):
+    """Ensure every in-page dashboard panel has a button on the original tab strip."""
+    import re
+    m = re.search(r'(<nav class="tabs">)(.*?)(</nav>)', html, re.S)
+    if not m:
+        return html
+    inner = m.group(2)
+    for key, label in ADMIN_EXTRA_TABS:
+        if f'data-tab="{key}"' in inner:
+            continue
+        inner += f'<button type="button" data-tab="{key}">{E(label)}</button>'
+    return html[:m.start()] + m.group(1) + inner + m.group(3) + html[m.end():]
+
+
+def _admin_head_bits():
+    return (
+        '<meta name="robots" content="noindex, nofollow">'
+        '<meta name="theme-color" content="#05060a">'
+    )
+
+
+def admin_app_html():
+    """The original Blackout dashboard (dashboard.html), with Mac chrome, behind /admin auth."""
+    import re, server
+    path = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "dashboard.html")
+    with open(path, "rb") as fh: b = fh.read()
+    try:
+        top = _admin_top().encode("utf-8")
+    except Exception:
+        import traceback; traceback.print_exc()
+        top = server._DASH_FALLBACK
+    b = b.replace(b"<!--BN_TOP-->", top, 1)
+    if os.environ.get("BN_TIPS", "0") != "1":
+        b = re.sub(rb"<!--BN_TIPS-->.*?<!--/BN_TIPS-->", b"", b, flags=re.S)
+        b = re.sub(rb"/\*BN_TIPS\*/.*?/\*/BN_TIPS\*/", b"", b, flags=re.S)
+    # Do not inject the cinematic homepage (apple_v1). The Mac dashboard opens on The Wire.
+    try:
+        b = b.replace(b"<!--BN_V3_WIRE-->", server._addon_mod("design_v3").wire_html().encode("utf-8"), 1)
+    except Exception:
+        pass
+    html = b.decode("utf-8", "replace")
+    html = html.replace("<head>", "<head>" + _admin_head_bits(), 1)
+    html = html.replace('<link rel="canonical" href="https://blackout.network/">',
+                        '<link rel="canonical" href="https://blackout.network/admin">', 1)
+    html = html.replace("<body>", "<body class=\"bn-admin\">", 1)
+    # Visible Mac-style status / refresh / interval bar just under the header
+    if "id=\"bn-admin-bar\"" not in html:
+        # After the injected header, before the original tabs / main
+        placed = False
+        for mark in ('<nav class="tabs">', '<main id="tab-threat">', '<!--BN_V3_WIRE-->'):
+            if mark in html:
+                html = html.replace(mark, ADMIN_BAR + mark, 1)
+                placed = True
+                break
+        if not placed:
+            html = html.replace("</header>", "</header>" + ADMIN_BAR, 1) if "</header>" in html else (ADMIN_BAR + html)
+    html = _add_missing_tabs(html)
+    if "</body>" in html:
+        html = html.replace("</body>", ADMIN_JS + "</body>", 1)
+    else:
+        html += ADMIN_JS
+    return html
+
+
 def handle(h):
     method = (h.command or "GET").upper()
     path = h.path.split("?", 1)[0]
@@ -474,13 +683,18 @@ def handle(h):
         record_fail(ip)
         return h.send(401, login_html(err=True), "text/html", _headers())
 
-    if method == "POST" and path == "/admin/logout":
+    if method in ("POST", "GET") and path == "/admin/logout":
         loc = {"Location": "/admin", "Set-Cookie": _cookie("", clear=True)}
         return h.send(302, b"", "text/html", _headers(loc))
 
     if method == "GET" and path in ("/admin", "/admin/login"):
         if path == "/admin" and session_ok(h):
-            return h.send(200, page_html(snapshot()), "text/html", _headers())
+            try:
+                body = admin_app_html()
+            except Exception:
+                import traceback; traceback.print_exc()
+                body = page_html(snapshot())
+            return h.send(200, body, "text/html", _headers())
         return h.send(200, login_html(), "text/html", _headers())
 
     if method == "GET" and path == "/api/admin/status":

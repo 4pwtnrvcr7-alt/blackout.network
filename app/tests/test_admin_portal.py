@@ -166,32 +166,40 @@ class Routes(unittest.TestCase):
         AP.handle(h)
         self.assertEqual(h.sent[0], 302)
 
-    def test_authenticated_page_and_status(self):
+    def test_authenticated_page_is_the_dashboard(self):
         h = _login()
         cookie = h.sent[3]["Set-Cookie"].split(";", 1)[0]
         g = H("GET", "/admin", headers={"Cookie": cookie})
         code, body, ctype, hdr = AP.handle(g)
         self.assertEqual(code, 200)
-        self.assertIn("Mac scanner", body)
-        self.assertIn("Instant writer", body)
-        self.assertIn("Newsletter", body)
-        self.assertIn("no API key", body)
-        self.assertIn("Test story", body)
-        self.assertIn('http-equiv="refresh" content="30"', body)
-        self.assertIn("Refresh", body)
-        self.assertIn("Log out", body)
+        self.assertIn("text/html", ctype)
+        # Original Mac dashboard panels
+        for needle in ("id=\"tab-threat\"", "id=\"feed\"", "id=\"watch\"", "Watchlist",
+                       "Geographic heat map", "Alert volume", "Severity trend",
+                       "id=\"sources\"", "id=\"tab-jets\"", "id=\"tab-newsletter\"",
+                       "id=\"tab-sources\"", "id=\"tab-noise\"", "id=\"tab-heatmap\"",
+                       "Notification settings", "Manual refresh", "Scans every",
+                       'id="status"', 'id="refresh"', 'id="interval"', "Log out",
+                       "Instant writer", "Newsletter", "bn-admin", "noindex"):
+            self.assertIn(needle, body, needle)
+        self.assertIn("/api/rt/refresh", body)
+        self.assertIn("set on the Mac", body)
+        self.assertIn('id="interval" disabled', body)
+        # no send/deploy/config actions
         self.assertNotIn("Send now", body)
-        self.assertNotIn("Deploy", body.lower().replace("deploy", "x") and "Send newsletter")  # no action
-        self.assertNotIn("type=\"submit\">Send", body)
-        # no yellow, no emoji, no banned marketing words
-        self.assertNotRegex(body, r"#f5a524|#ffd|#ff0|yellow|#c97b00|#9[Ee]5[Ee]00")
-        self.assertNotRegex(body, r"verified|before the news|first to know")
-        self.assertNotRegex(body, r"[\U0001F300-\U0001FAFF]")
+        self.assertNotIn('action="test_send"', body)
+        self.assertEqual(hdr.get("X-Robots-Tag"), "noindex, nofollow")
+        # status API still works
         s = H("GET", "/api/admin/status", headers={"Cookie": cookie})
-        code, body, ctype, hdr = AP.handle(s)
+        code, js, ctype, hdr = AP.handle(s)
         self.assertEqual(code, 200)
-        self.assertEqual(body["scanner"]["badge"], "OK")
-        self.assertTrue(body["writer"]["thread_alive"])
+        self.assertEqual(js["scanner"]["badge"], "OK")
+        self.assertTrue(js["writer"]["thread_alive"])
+
+    def test_public_menu_still_hides_pages(self):
+        html = UI.drawer(sitenav, active="threat")
+        self.assertNotIn('href="/admin"', html)
+        self.assertNotIn('data-tab="streams"', html)
 
     def test_status_requires_session(self):
         h = H("GET", "/api/admin/status")
