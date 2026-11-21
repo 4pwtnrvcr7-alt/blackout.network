@@ -465,6 +465,10 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
     """Returns (html, dek_override). rows: deduped alerts in time order."""
     R = reports(); notes = R.get("notes") or {}
     note = notes.get(cid) or notes.get((R.get("alias") or {}).get(cid) or "")
+    if not note:   # Nov 21 2026: instant API write-up (story_writer.py) when the desk has nothing; desk briefs always win
+        try:
+            import story_writer as SW; note = SW.note_for(cid) or None
+        except Exception: note = None
     desk_lead = ""
     if r.get("desk_story"):   # t1330u: desk stories ship their own sourced brief and graphic; a pushed note still wins
         try:
