@@ -76,7 +76,7 @@ function initWorld(){var el=$("#cr-world");whenVisible(el,function(){lib().then(
  Promise.all([getJ("/api/crime/static/countries-110m.json"),getJ("/api/crime/global")]).then(function(r){
   var gj=topo(r[0],"countries"),D={};r[1].forEach(function(x){D[x[0]]=x});
   gj.features.forEach(function(f){var x=D[String(f.id)];f.properties.r=x?Math.min(1,Math.sqrt(x[3]/30)):-1;f.properties.v=x?x[3]:null;f.properties.y=x?x[4]:null;f.properties.nm=x?x[2]:f.properties.name});
-  var m=mk(el,{center:[10,20],zoom:0.9,minZoom:0,renderWorldCopies:false,fit:[[-168,-56],[180,75]]});
+  var m=mk(el,{center:[-98.35,39.5],zoom:3.2,minZoom:0,renderWorldCopies:false,fit:[[-125,24.5],[-66.5,49.5]]});
   m.on("load",function(){choro(m,"w",gj);var pop=new maplibregl.Popup({closeButton:false,offset:6});
    m.on("click","w-f",function(e){var p=e.features[0].properties;pop.setLngLat(e.lngLat).setHTML('<div class="cr-pop"><b>'+esc(p.nm)+'</b><br>'+(p.v!=null&&p.v!=="null"?fmt(+p.v)+' homicides per 100k ('+p.y+')<br><a href="/crime?place='+encodeURIComponent(p.nm)+'" data-q="'+esc(p.nm)+'">Open details</a>':'No recent official figure')+'</div>').addTo(m)});
    m.on("mouseenter","w-f",function(){m.getCanvas().style.cursor="pointer"});m.on("mouseleave","w-f",function(){m.getCanvas().style.cursor=""})})}).catch(function(){fail(el,"Country data is not available right now.")})})})}

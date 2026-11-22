@@ -176,7 +176,7 @@ function covTable(D){const C=D.coverage||{},el=$$("tr_covt");if(!el)return;const
 const GM={map:null,layer:null};
 function geoRender(D){const el=$$("tr_geo");if(!el||typeof L=="undefined"){if(el)el.innerHTML='<div class=tr-err>Map library did not load.</div>';return}
  if(!vis())return;
- if(!GM.map){GM.map=L.map(el,{worldCopyJump:true,minZoom:1,maxZoom:8,zoomSnap:.5,attributionControl:true}).setView([20,10],innerWidth<600?1:2);
+ if(!GM.map){GM.map=L.map(el,{worldCopyJump:true,minZoom:1,maxZoom:8,zoomSnap:.5,attributionControl:true}).fitBounds([[24.5,-125],[49.5,-66.5]]);
   if(window.bnBaseLayer)bnBaseLayer(GM.map,{maxZoom:8})   /* t252: shared keyless basemap (OpenFreeMap); CARTO needs a key, OSM tile servers block the site */}
  else setTimeout(()=>GM.map.invalidateSize(),50);
  if(GM.layer){GM.map.removeLayer(GM.layer);GM.layer=null}
