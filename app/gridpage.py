@@ -124,7 +124,7 @@ def page(qs=None):
 <a class="skip" href="#gx_more">Skip to grid details</a>
 <div class="gx-head">{top}</div>
 <script>(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
-<main id="gx_main">
+<main id="gx_main" data-bnt-skip>
 <h1 class="gx-vh">The Grid: U.S. power grid status</h1>
 <div id="gx_map" class="gx-map" role="region" aria-label="Map of the U.S. power grid. Drag to pan, pinch or scroll to zoom, hover or tap a point for details."></div>
 {LOADER}
