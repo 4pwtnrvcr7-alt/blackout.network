@@ -625,7 +625,7 @@ def render_page(q=""):
             + panel("b", f'<div class="cr-in">{cities}{usmap}</div>', "Cities and US counties")
             + panel("c", f'<div class="cr-in">{world}</div>', "World")
             + f'<div class="cr-in">{nl}{how}</div></main>')
-    foot = ('<footer class="cr-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/#weather">Weather</a> · <a href="/#preppers">Preppers</a> · '
+    foot = ('<footer class="cr-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/weather">Weather</a> · <a href="/#preppers">Preppers</a> · '
             '<a href="/newsletter">Newsletter</a> · <a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/credits#crime">Image credits</a></footer>')
     path = "/crime" + (f"?place={urllib.parse.quote(q)}" if q else "")
     ld = {"@context": "https://schema.org", "@graph": [
