@@ -37,7 +37,7 @@ function bnPaintMapCharts(){
   const go=()=>{
     if(typeof L==="undefined")return;
     bnGuardHeat();
-    if(!map){map=L.map("map",{worldCopyJump:true}).setView([20,0],2);bnBaseLayer(map,{maxZoom:10});markers=L.layerGroup().addTo(map)}
+    if(!map){map=L.map("map",{worldCopyJump:true}).setView([39.5,-98.35],4);bnBaseLayer(map,{maxZoom:10});markers=L.layerGroup().addTo(map)}
     heatDirty=true;if($("map").offsetWidth)drawHeat();
     markers.clearLayers();S.geo.filter(g=>g.score>=35).forEach(g=>L.circleMarker([g.lat,g.lon],{radius:4+g.score/12,color:COL[g.category],weight:1,fillOpacity:.6}).bindPopup(`<b>${g.score}</b> ${esc(g.title)}`).addTo(markers));
     if(typeof Chart==="undefined")return;
@@ -379,7 +379,7 @@ function mpDraw(){if(!MP.cl||!MP.pois)return;MP.cl.clearLayers();const ms=[];
   ms.push(L.marker([p[1],p[2]],{icon:L.divIcon({className:"mp-ic",html:c.emoji,iconSize:[22,22]}),title:p[3]||c.label}).bindPopup(`<b>${esc(p[3]||c.label)}</b><br>${esc(c.label)}${p[4]?"<br>"+esc(p[4]):""}${p[5]?`<br><a href="tel:${esc(p[5].replace(/[^0-9+]/g,""))}">${esc(p[5])}</a>`:""}<br><a href="https://www.openstreetmap.org/${esc(p[6])}" target=_blank rel="noopener noreferrer">OSM ↗</a>`))});
  MP.cl.addLayers(ms);$("mp_msg").textContent=`${ms.length.toLocaleString()} emergency points shown`}
 async function mpInit(){if(MP.map){setTimeout(()=>MP.map.invalidateSize(),60);return}
- MP.map=L.map("mp_map",{maxZoom:19,minZoom:2,zoomSnap:.5,worldCopyJump:true});{const g=window.BNGeo&&BNGeo.get();g&&g.lat!=null?MP.map.setView([g.lat,g.lon],11):MP.map.setView([20,0],2)}
+ MP.map=L.map("mp_map",{maxZoom:19,minZoom:2,zoomSnap:.5,worldCopyJump:true});{const g=window.BNGeo&&BNGeo.get();g&&g.lat!=null?MP.map.setView([g.lat,g.lon],11):MP.map.setView([39.5,-98.35],4)}
  bnBaseLayer(MP.map,{maxZoom:19});
  L.control.scale({imperial:true,metric:true}).addTo(MP.map);
  MP.cl=L.markerClusterGroup?L.markerClusterGroup({disableClusteringAtZoom:16,maxClusterRadius:50,chunkedLoading:true}):L.layerGroup();MP.cl.addTo(MP.map);
