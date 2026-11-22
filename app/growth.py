@@ -153,7 +153,7 @@ and situational awareness only; it is not an official warning service. Follow of
 - [Off-grid network map]({SITE}/mesh): live map of public off-grid mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
 ## Dashboard tabs
 
-- [Network Status]({SITE}/network), [Energy Grid]({SITE}/#grid), [Solar & Seismic]({SITE}/#solar), [Weather]({SITE}/#weather)
+- [Network Status]({SITE}/network), [The Grid]({SITE}/grid), [Solar & Seismic]({SITE}/#solar), [Weather]({SITE}/#weather)
 - [Midterms 2026]({SITE}/midterms), [Government]({SITE}/#government), [Politics]({SITE}/#politics)
 - [Preppers]({SITE}/#preppers), [Bushcraft]({SITE}/#bushcraft), [Medical]({SITE}/#medical), [Maps]({SITE}/#maps)
 
