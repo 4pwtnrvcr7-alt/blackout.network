@@ -301,7 +301,7 @@
   /* ---------- map ---------- */
   function boot() {
     if (!window.maplibregl) { $("bnm_count").textContent = "The map could not start in this browser."; window.BNML && BNML.engineFail(); return; }
-    var v = VIEWS[state.view] || VIEWS.world, t0 = Date.now();
+    var v = /[?&]view=/.test(location.search) ? (VIEWS[state.view] || VIEWS.world) : VIEWS.us, t0 = Date.now();   /* Nov 21 2026 (Matt, 7:37 PM ET): every map opens on the continental U.S. */
     map = new maplibregl.Map({
       container: "bnm_map", style: style(), center: v.center || [-96, 38], zoom: v.zoom != null ? v.zoom : 3, minZoom: 0.4, maxZoom: 15,
       attributionControl: false, maplibreLogo: false, dragRotate: false, pitchWithRotate: false, touchPitch: false,

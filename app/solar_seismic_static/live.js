@@ -178,7 +178,7 @@ async function loadQ(){const f=S.feed;try{const [j,via]=await getUSGS(f);if(f!=S
 async function loadSig(){try{const [j]=await getUSGS("significant_week");S.sig=(j.features||[]).map(x=>({id:x.id,mag:x.properties.mag,place:x.properties.place,t:x.properties.time,url:x.properties.url,lat:x.geometry.coordinates[1],lon:x.geometry.coordinates[0]})).sort((a,b)=>b.t-a.t);
  const b=g("ssl_sig");if(S.sig.length){const q=S.sig[0];b.hidden=false;b.innerHTML=`⚠ USGS significant this week: <b>${S.sig.length}</b> · latest M${q.mag.toFixed(1)} ${E(q.place)} (${E(ago(q.t))})`}else{b.hidden=false;b.innerHTML="USGS significant this week: none";b.disabled=true}}catch(e){}}
 function renderQ(){const Q=S.q||[];if(typeof L=="undefined")return;
- if(!S.map){S.map=L.map("ssl_eqmap",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1});S.map.setView([18,0],g("ssl_eqmap").clientWidth>=1000?2:1);
+ if(!S.map){S.map=L.map("ssl_eqmap",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1});S.map.fitBounds([[24.5,-125],[49.5,-66.5]]);
   if(window.bnBaseLayer)bnBaseLayer(S.map,{maxZoom:10});   // shared keyless basemap from dashboard.html (no hardcoded tile URLs here)
   S.map.attributionControl.addAttribution('Quakes: <a href="https://earthquake.usgs.gov/" target=_blank rel=noopener>USGS</a>');
   S.lay=L.layerGroup().addTo(S.map);S.map.on("click",()=>S.map.scrollWheelZoom.enable());S.map.on("mouseout",()=>S.map.scrollWheelZoom.disable())}

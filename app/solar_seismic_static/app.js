@@ -302,7 +302,7 @@ function selBin(i){const b=SS.d.bins[i];if(!b)return;keepRoom();SS.sel=SS.sel===
  <div style="margin-top:6px">${Q.slice(0,12).map(q=>acc("bq_"+q.id,qHead(q),qBody(q),{cls:"qk"})).join("")||"<span class=meta>No M2.5+ quakes in this window.</span>"}${Q.length>12?`<div class=ss-hint>+${Q.length-12} smaller quakes (all are on the map)</div>`:""}</div></div>`;
  $("ss_binx").onclick=()=>selBin(i)}
 function renderMap(){if(!SS.shown||typeof L=="undefined"||!SS.d)return;
- if(!SS.map){SS.map=L.map("ss_map",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1}).setView([20,10],2);
+ if(!SS.map){SS.map=L.map("ss_map",{worldCopyJump:true,scrollWheelZoom:false,minZoom:1}).fitBounds([[24.5,-125],[49.5,-66.5]]);
   (window.bnBaseLayer?bnBaseLayer(SS.map,{maxZoom:12}):null)/* t252: shared keyless basemap (OpenFreeMap → VersaTiles → NASA GIBS); no OSM tile servers */;
   SS.lay=L.layerGroup().addTo(SS.map);SS.map.on("click",()=>SS.map.scrollWheelZoom.enable());SS.map.on("mouseout",()=>SS.map.scrollWheelZoom.disable())}
  SS.lay.clearLayers();let Q=SS.d.map.slice();if(SS.hist)Q=SS.d.map_hist.map(q=>({...q,t_et:etF(q.t),old:1})).concat(Q);if(SS.m45)Q=Q.filter(q=>q.mag>=4.5);
