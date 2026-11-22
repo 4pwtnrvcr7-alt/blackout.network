@@ -75,3 +75,76 @@ class WeatherPage(unittest.TestCase):
         for c in ("#ffcc00", "#ffeb3b", "#fde047", "#facc15", "#f5a524"): self.assertNotIn(c, js)
 
 if __name__ == "__main__": unittest.main()
+
+class OpenMeteoBudget(unittest.TestCase):
+    """pt1745u: deploys never refill the grids from Open-Meteo; 429 backs off; a stopped refresh resumes; last good grid is served."""
+    def setUp(self):
+        import tempfile, wxmap, om_budget as OMB
+        self.w, self.B = wxmap, OMB
+        self.dir = tempfile.mkdtemp(); wxmap.PDIR = self.dir
+        OMB._S.update(log=[], until=0.0, why=None, last429=0.0)
+        for k in [k for k in wxmap._C if k[0] in ("grid", "griderr", "gridb", "gfsgrid")]: wxmap._C.pop(k, None)
+        wxmap._PART.clear(); wxmap._PEER_ST["state"] = "off"; wxmap.CHUNK_GAP = 0
+        self._jget = wxmap.jget
+
+    def tearDown(self):
+        self.w.jget = self._jget; self.w.CHUNK_GAP = 40
+        self.B._S.update(log=[], until=0.0, why=None, last429=0.0)
+
+    def _fake(self, fail_at=None):
+        import io, urllib.error, urllib.parse
+        calls = []
+        def jget(u, **kw):
+            calls.append(u)
+            if fail_at is not None and len(calls) == fail_at:
+                raise urllib.error.HTTPError(u, 429, "Too Many Requests", {"Retry-After": "3600"}, io.BytesIO(b'{"error":true,"reason":"Hourly API request limit exceeded"}'))
+            n = len(urllib.parse.parse_qs(urllib.parse.urlparse(u).query)["latitude"][0].split(","))
+            h = {"time": ["2026-11-22T00:00", "2026-11-22T03:00"], "temperature_2m": [10.0, 11.0], "precipitation": [0.0, 1.2], "snowfall": [0.0, 0.0]}
+            return [{"hourly": h} for _ in range(n)]
+        self.w.jget = jget
+        return calls
+
+    def test_429_backs_off_then_resumes_without_repeating_chunks(self):
+        w = self.w
+        calls = self._fake(fail_at=2)
+        with self.assertRaises(Exception): w.grid("us")              # chunk 1 ok, chunk 2 -> 429
+        self.assertTrue(self.B.limited()[0])
+        self.assertEqual(len(calls), 2)
+        with self.assertRaises(w.Limited): w.grid("us")              # backing off: no call at all
+        self.assertEqual(len(calls), 2)
+        self.B._S["until"] = 0
+        g = w.grid("us")                                              # resumes at chunk 2, not from scratch
+        self.assertEqual(len(calls), 2 + (len(w._cells(w.GRIDS["us"])) - 1) // w.CHUNK)
+        self.assertEqual(len(g["temp"]), 2 * len(w._cells(w.GRIDS["us"])))
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "grid_us.json.gz")))
+
+    def test_last_good_grid_survives_restart_and_is_served_while_limited(self):
+        w = self.w
+        self._fake(); g = w.grid("us")
+        w._C.pop(("grid", "us"), None)
+        w._restore()                                                  # what a restarted instance does at import
+        self.assertEqual(w.grid_peek("us")["generated"], g["generated"])
+        self.B._S["until"] = __import__("time").time() + 600; self.B._S["why"] = "Daily API request limit exceeded"
+        import json
+        d = json.loads(w.grid_bytes("us"))
+        self.assertEqual(d["as_of"], g["generated"]); self.assertIn("rate-limited", d["note"])
+
+    def test_budget_caps_and_handoff_state(self):
+        B = self.B
+        B.note(B.GRID_HOUR_CAP, "grid")
+        self.assertGreater(B.wait_s(300, "grid"), 0)                 # the grids' share is used up ...
+        self.assertEqual(B.wait_s(4, "card"), 0)                      # ... place cards still fit
+        st = B.state(); B._S.update(log=[], until=0.0)
+        self.assertTrue(B.adopt(st)); self.assertEqual(B.used(3600, "grid"), B.GRID_HOUR_CAP)
+        code, body = self.w.handle_get("/api/wxmap/omstate", {})[:2]
+        self.assertEqual(code, 200); self.assertIn("summary", body)
+        self.assertNotIn("key", str(body).lower())
+
+    def test_place_card_fallback_shapes(self):
+        import weather
+        d = weather.fallback_nws({"periods": [{"startTime": "2026-11-22T14:00:00-05:00", "temperature": 72, "temperatureUnit": "F", "probabilityOfPrecipitation": 20, "windSpeed": "10 mph", "shortForecast": "Partly Sunny", "isDaytime": True}]},
+                                 {"periods": [{"startTime": "2026-11-22T12:00:00-05:00", "temperature": 74, "isDaytime": True, "shortForecast": "Sunny", "probabilityOfPrecipitation": 10},
+                                              {"startTime": "2026-11-22T18:00:00-05:00", "temperature": 60, "isDaytime": False, "shortForecast": "Clear", "probabilityOfPrecipitation": 0}]}, None)
+        self.assertEqual(d["current"]["time"], "2026-11-22T14:00"); self.assertAlmostEqual(d["current"]["temperature_2m"], 22.2, 1)
+        self.assertEqual(d["daily"]["time"], ["2026-11-22"]); self.assertEqual(d["daily"]["weather_code"], [0])
+        self.assertEqual(weather._wmo_text("Chance Light Snow"), 71)

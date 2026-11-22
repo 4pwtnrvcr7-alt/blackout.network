@@ -123,7 +123,119 @@ def open_meteo(lat, lon):
          "hourly": "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m,uv_index",
          "daily": "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset"}
     url = OM_FC + "?" + urllib.parse.urlencode(q)
-    return src("Open-Meteo forecast (ECMWF / GFS / national models)", url, lambda: fetch(url))
+    label = "Open-Meteo forecast (ECMWF / GFS / national models)"
+    # Nov 22 2026 (pt1745u): shared Open-Meteo budget with the map grids; never call while backing off after a 429
+    try: import om_budget as OMB
+    except Exception: OMB = None
+    if OMB:
+        n = OMB.weight(33, 7)   # 12 current + 9 hourly + 12 daily variables
+        lim, why_, until = OMB.limited()
+        if lim or OMB.wait_s(n, "card") > 0:
+            return {"label": label, "url": url, "fetched": iso(), "ok": False, "limited": True,
+                    "error": "skipped: Open-Meteo is rate-limited right now" if lim else "skipped: the Open-Meteo budget for this hour is used up"}
+        OMB.note(n, "card")
+    def go():
+        try: return fetch(url)
+        except urllib.error.HTTPError as ex:
+            if ex.code == 429 and OMB: OMB.on_429(ex)
+            raise
+    return src(label, url, go)
+
+# ---------------- fallback forecast when Open-Meteo is limited (Nov 22 2026, pt1745u): NWS in the US, NOAA GFS elsewhere ----------------
+def _wmo_text(t):
+    t = (t or "").lower()
+    if t.startswith("slight chance") or t.startswith("isolated"):   # a 10-20% chance is not a showery day: describe the sky instead
+        t = t.split(" then ")[-1] if " then " in t else ("partly cloudy" if "thunder" not in t else "chance thunder")
+    if "thunder" in t: return 95
+    if "freezing" in t or "sleet" in t or "ice" in t: return 66
+    if "snow" in t or "flurr" in t or "blizzard" in t: return 73 if "heavy" in t else 71
+    if "drizzle" in t: return 51
+    if "shower" in t: return 80
+    if "rain" in t: return 63 if "heavy" in t else 61
+    if "fog" in t or "haze" in t or "smoke" in t: return 45
+    if "mostly cloudy" in t or "considerable cloud" in t: return 3
+    if "partly" in t: return 2
+    if "cloudy" in t or "overcast" in t: return 3
+    if "mostly sunny" in t or "mostly clear" in t: return 1
+    if "sunny" in t or "clear" in t or "fair" in t: return 0
+    return 2
+
+def _mph_kmh(v):
+    try:
+        if isinstance(v, (int, float)): return v * 1.609344
+        nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", str(v or ""))]
+        return max(nums) * 1.609344 if nums else None
+    except Exception: return None
+
+def _f2c(f): return None if f is None else round((f - 32) * 5 / 9, 1)
+
+def _blank(n): return [None] * n
+
+def fallback_nws(hourly, daily, obs):
+    """Open-Meteo-shaped forecast (the fields the map card reads) from the NWS hourly and 12-hour forecasts."""
+    H = (hourly or {}).get("periods") or []
+    if not H: return None
+    tl = [p["startTime"][:16] for p in H]
+    tc = [_f2c(p.get("temperature")) if (p.get("temperatureUnit") or "F") == "F" else p.get("temperature") for p in H]
+    pop = [p.get("probabilityOfPrecipitation") for p in H]
+    wind = [_mph_kmh(p.get("windSpeed")) for p in H]
+    cur = {"time": tl[0], "temperature_2m": tc[0], "apparent_temperature": None, "weather_code": _wmo_text(H[0].get("shortForecast")),
+           "wind_speed_10m": wind[0], "wind_gusts_10m": None, "relative_humidity_2m": None, "is_day": 1 if H[0].get("isDaytime") else 0}
+    if obs:
+        if obs.get("temp_c") is not None: cur["temperature_2m"] = round(obs["temp_c"], 1)
+        cur["relative_humidity_2m"] = obs.get("rh"); cur["wind_speed_10m"] = obs.get("wind_kmh") if obs.get("wind_kmh") is not None else cur["wind_speed_10m"]
+        cur["wind_gusts_10m"] = obs.get("gust_kmh")
+        hc, hk = obs.get("heat_c"), obs.get("chill_c")
+        cur["apparent_temperature"] = hc if hc is not None else hk
+    days = {}
+    for p in (daily or {}).get("periods") or []:
+        d = (p.get("startTime") or "")[:10]
+        if not d: continue
+        e = days.setdefault(d, {"max": None, "min": None, "pop": 0, "code": None})
+        t = _f2c(p.get("temperature"))
+        if p.get("isDaytime"): e["max"] = t; e["code"] = _wmo_text(p.get("shortForecast"))
+        else:
+            e["min"] = t
+            if e["code"] is None: e["code"] = _wmo_text(p.get("shortForecast"))
+        e["pop"] = max(e["pop"], p.get("probabilityOfPrecipitation") or 0)
+    dk = sorted(days)[:7]
+    return {"current": cur,
+            "hourly": {"time": tl, "temperature_2m": tc, "precipitation_probability": pop, "wind_speed_10m": wind},
+            "daily": {"time": dk, "weather_code": [days[d]["code"] for d in dk], "precipitation_probability_max": [days[d]["pop"] for d in dk],
+                      "temperature_2m_max": [days[d]["max"] for d in dk], "temperature_2m_min": [days[d]["min"] for d in dk]}}
+
+def _gfs_code(p, s, c):
+    if p >= 0.3: return (73 if p >= 3 else 71) if s else (63 if p >= 3 else 61)
+    return 3 if c >= 85 else 2 if c >= 50 else 1 if c >= 20 else 0
+
+def fallback_gfs(lat, lon):
+    """Open-Meteo-shaped forecast from the nearest 1-degree NOAA GFS point (3-hourly; local time approximated from the longitude)."""
+    try: import wxgfs; ser = wxgfs.point_series(lat, lon)
+    except Exception: ser = None
+    if not ser: return None
+    off = timedelta(hours=round(lon / 15))
+    rows = []
+    for t, f, p, sflag, c in ser:
+        u = datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        rows.append((u, (u + off).strftime("%Y-%m-%dT%H:%M"), _f2c(f), p, sflag, c))
+    nowu = now()
+    fut = [r for r in rows if r[0] >= nowu - timedelta(hours=1, minutes=30)] or rows
+    cur = fut[0]
+    hrs = fut[:17]
+    days = {}
+    for u, lt, tc, p, sflag, c in rows:
+        d = lt[:10]
+        if (u + off).date() < (nowu + off).date(): continue
+        e = days.setdefault(d, {"max": None, "min": None, "p": 0.0, "s": 0, "c": 0})
+        if tc is not None:
+            e["max"] = tc if e["max"] is None else max(e["max"], tc); e["min"] = tc if e["min"] is None else min(e["min"], tc)
+        e["p"] = max(e["p"], p); e["s"] = max(e["s"], sflag if p >= 0.3 else 0); e["c"] = max(e["c"], c)
+    dk = sorted(days)[:7]
+    return {"current": {"time": cur[1], "temperature_2m": cur[2], "apparent_temperature": None, "weather_code": _gfs_code(cur[3], cur[4], cur[5]),
+                        "wind_speed_10m": None, "wind_gusts_10m": None, "relative_humidity_2m": None},
+            "hourly": {"time": [r[1] for r in hrs], "temperature_2m": [r[2] for r in hrs], "precipitation_probability": _blank(len(hrs))},
+            "daily": {"time": dk, "weather_code": [_gfs_code(days[d]["p"], days[d]["s"], days[d]["c"]) for d in dk], "precipitation_probability_max": _blank(len(dk)),
+                      "temperature_2m_max": [days[d]["max"] for d in dk], "temperature_2m_min": [days[d]["min"] for d in dk]}}
 
 def nws(lat, lon):
     """Returns (points_src, forecast_src, hourly_src, obs_src, alerts_src)."""
@@ -268,6 +380,15 @@ def report(lat, lon, cc, names, force=False):
             for k, v in zip(("nws_points", "nws_forecast", "nws_hourly", "nws_obs", "nws_alerts"), nw): srcs[k] = v
             if not nw[0].get("ok") and not cc: us = False      # outside NWS coverage after all
         if ma: srcs["meteoalarm"] = ma
+        if not om.get("ok"):   # Open-Meteo limited or down: the card still gets a forecast
+            fbd, lab = None, None
+            if nw and nw[2].get("ok"):
+                try: fbd = fallback_nws(nw[2].get("data"), (nw[1] or {}).get("data") if nw[1].get("ok") else None, nw[3].get("data") if nw[3].get("ok") else None); lab = "National Weather Service forecast (Open-Meteo is unavailable right now)"
+                except Exception: fbd = None
+            if not fbd:
+                try: fbd = fallback_gfs(lat, lon); lab = "NOAA GFS 1° model (Open-Meteo is unavailable right now)"
+                except Exception: fbd = None
+            srcs["fallback"] = {"ok": bool(fbd), "label": lab or "Fallback forecast", "fetched": iso(), "data": fbd} if fbd else {"ok": False, "label": "Fallback forecast", "error": "no fallback forecast yet"}
         if not nw and not ma:
             alerts_note = ("No free official weather-warning feed is wired up for this country yet. Official alerts here cover the US (National Weather Service) "
                            "and the 38 MeteoAlarm countries in Europe; elsewhere only GDACS major-disaster events and the forecast are shown. Check the national weather service.")
