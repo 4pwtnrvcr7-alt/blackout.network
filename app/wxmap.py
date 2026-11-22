@@ -271,6 +271,60 @@ GRIDS = {
 }
 CHUNK, CHUNK_GAP = 300, 40
 _OM_LOCK = threading.Lock()   # one Open-Meteo pull at a time, so the two grids never burst together
+# Nov 22 2026 (pt1745u): deploys used to refill both grids from scratch and ran Open-Meteo's daily quota out (HTTP 429, Temp/Rain/Snow greyed).
+# Now: the grids are refreshed less often (US 12 h, world 18 h) and only within om_budget's share; a 429 backs off (Retry-After, else the
+# reason's hour/day); a half-done refresh resumes where it stopped; the last good grid is saved to disk and handed to the next deploy
+# (a new instance asks the still-running old one over the public URL before it calls Open-Meteo at all); and while there is no
+# Open-Meteo grid, Temp/Rain/Snow are drawn from the NOAA GFS run the map already downloads.
+import gzip, tempfile, om_budget as OMB
+GRIDS["us"]["ttl"], GRIDS["world"]["ttl"] = 12 * 3600, 18 * 3600
+MAX_AGE = 40 * 3600          # older than this, a GFS-based grid (if there is one) is better than the old Open-Meteo one
+PEER_WAIT = 480              # seconds a fresh instance waits for the old one's grids before it would call Open-Meteo itself
+BOOT = time.time()
+PEER = (os.environ.get("BN_HANDOFF_URL") or os.environ.get("RENDER_EXTERNAL_URL") or "").rstrip("/")
+if os.environ.get("BN_WX_PEER", "1") == "0": PEER = ""
+def _pdir():
+    for d in (os.environ.get("BN_PERSIST_DIR"), "/var/data"):
+        if d and os.path.isdir(d) and os.access(d, os.W_OK): return os.path.join(d, "bn_wxcache")
+    return os.path.join(tempfile.gettempdir(), "bn_wxcache")
+PDIR = _pdir()
+_PEER_ST = {"state": "off" if not PEER else "pending", "got": []}
+_PART = {}                   # region -> {"day": UTC date, "res": [...]} of a refresh that stopped early
+_GERR = {}
+
+def _gts(g):
+    try: return datetime.strptime(g["generated"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+    except Exception: return 0.0
+
+def _save(name, obj):
+    try:
+        os.makedirs(PDIR, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=PDIR, prefix=".w_")
+        with os.fdopen(fd, "wb") as f: f.write(gzip.compress(json.dumps(obj, separators=(",", ":")).encode(), 5))
+        os.replace(tmp, os.path.join(PDIR, name))
+    except Exception: pass
+
+def _load(name):
+    try:
+        with open(os.path.join(PDIR, name), "rb") as f: return json.loads(gzip.decompress(f.read()))
+    except Exception: return None
+
+def _put_grid(region, g, persist=True):
+    with _L:
+        cur = _C.get(("grid", region))
+        if cur and _gts(cur[1]) >= _gts(g) and not cur[1].get("fallback"): return False
+        _C[("grid", region)] = (_gts(g) or time.time(), g)
+    if persist: _save(f"grid_{region}.json.gz", g); _save("om_state.json.gz", OMB.state())
+    return True
+
+def _restore():
+    """At import: the grids and the Open-Meteo budget this disk already has (same instance restarting, or a persistent disk)."""
+    st = _load("om_state.json.gz")
+    if st: OMB.adopt(st)
+    for r in GRIDS:
+        g = _load(f"grid_{r}.json.gz")
+        if g and g.get("temp") and not g.get("fallback"): _put_grid(r, g, persist=False)
+_restore()
 
 def _cells(g):
     n = g["nx"] * g["ny"]
@@ -283,46 +337,111 @@ def _pull(pts):
     q = {"latitude": ",".join(str(a) for a, _ in pts), "longitude": ",".join(str(b) for _, b in pts),
          "hourly": "temperature_2m,precipitation,snowfall", "past_days": 1, "forecast_days": 7, "timezone": "GMT", "temporal_resolution": "hourly_3"}
     u = OM + "?" + urllib.parse.urlencode(q, safe=",")
+    OMB.note(len(pts), "grid")
     try: d = jget(u, timeout=60)
-    except urllib.error.HTTPError: raise
+    except urllib.error.HTTPError as ex:
+        if ex.code == 429: OMB.on_429(ex)
+        raise
     except Exception:
         time.sleep(3); d = jget(u, timeout=60)   # one retry: the upstream occasionally drops a TLS handshake
     return d if isinstance(d, list) else [d]
 
-def grid(region="us"):
-    g = GRIDS.get(region) or GRIDS["us"]
-    def go():
-        cells = _cells(g)
-        pts = [(round(g["lat0"] + g["step"] * (k // g["nx"]), 2), round(((g["lon0"] + g["step"] * (k % g["nx"]) + 180) % 360) - 180, 2)) for k in cells]
-        res = []
-        with _OM_LOCK:
-            for c in range(0, len(pts), CHUNK):
-                if c: time.sleep(CHUNK_GAP)
-                res += _pull(pts[c:c + CHUNK])
-        if len(res) != len(pts): raise ValueError("grid size mismatch")
-        times = res[0]["hourly"]["time"]
-        T, P, S = [], [], []
-        for k in range(len(times)):
-            for r in res:
-                h = r["hourly"]
-                t, p, s_ = h["temperature_2m"][k], h["precipitation"][k], h["snowfall"][k]
-                T.append(None if t is None else round(t * 9 / 5 + 32))
-                P.append(None if p is None else round(p * 10))
-                S.append(None if s_ is None else round(s_ * 10))
-        return {"generated": iso(now()), "region": region, "lat0": g["lat0"], "lon0": g["lon0"], "step": g["step"], "ny": g["ny"], "nx": g["nx"], "wrap": g["wrap"],
-                "cells": cells if g["mask"] else None, "times": [x + ":00Z" for x in times], "step_h": 3, "temp": T, "precip": P, "snow": S,
-                "units": {"temp": "F", "precip": "0.1 mm per 3 h", "snow": "0.1 cm per 3 h"},
-                "source": f"Open-Meteo forecast API (national weather models), {g['step']:g}-degree grid"}
-    return cached(("grid", region), g["ttl"], go)
+class Limited(Exception): pass
 
-def grid_bytes(region):
-    """Compact JSON, built once per refresh (the world grid is ~1.7k points x 64 times x 3 fields)."""
-    g = grid(region)
-    key = ("gridb", region, g["generated"])
+def _refresh(region):
+    g = GRIDS[region]
+    wait = BOOT + PEER_WAIT - time.time()
+    if PEER and _PEER_ST["state"] == "pending" and wait > 0: time.sleep(wait)   # the old instance may still hand its grid over
+    cur = grid_peek(region)
+    if cur and not cur.get("fallback") and time.time() - _gts(cur) < g["ttl"]: return cur
+    cells = _cells(g)
+    pts = [(round(g["lat0"] + g["step"] * (k // g["nx"]), 2), round(((g["lon0"] + g["step"] * (k % g["nx"]) + 180) % 360) - 180, 2)) for k in cells]
+    day = now().strftime("%Y-%m-%d")
+    part = _PART.get(region)
+    res = list(part["res"]) if part and part["day"] == day else []
+    with _OM_LOCK:
+        c = len(res)
+        while c < len(pts):
+            chunk = pts[c:c + CHUNK]
+            w = OMB.wait_s(len(chunk), "grid")
+            if w > 600:
+                _PART[region] = {"day": day, "res": res}
+                lim, why_, until = OMB.limited()
+                raise Limited(("Open-Meteo is rate-limited" if lim else "the Open-Meteo share for the map is used up") + ", next try " + _et(time.time() + w))
+            if w > 0: time.sleep(w)
+            try: res += _pull(chunk)
+            except Exception:
+                _PART[region] = {"day": day, "res": res}; raise
+            c += len(chunk)
+            if c < len(pts): time.sleep(CHUNK_GAP)
+    _PART.pop(region, None)
+    if len(res) != len(pts): raise ValueError("grid size mismatch")
+    times = res[0]["hourly"]["time"]
+    if any(r_["hourly"]["time"] != times for r_ in res): raise ValueError("grid chunks disagree on times")
+    T, P, S = [], [], []
+    for k in range(len(times)):
+        for r in res:
+            h = r["hourly"]
+            t, p, s_ = h["temperature_2m"][k], h["precipitation"][k], h["snowfall"][k]
+            T.append(None if t is None else round(t * 9 / 5 + 32))
+            P.append(None if p is None else round(p * 10))
+            S.append(None if s_ is None else round(s_ * 10))
+    out = {"generated": iso(now()), "region": region, "lat0": g["lat0"], "lon0": g["lon0"], "step": g["step"], "ny": g["ny"], "nx": g["nx"], "wrap": g["wrap"],
+           "cells": cells if g["mask"] else None, "times": [x + ":00Z" for x in times], "step_h": 3, "temp": T, "precip": P, "snow": S,
+           "units": {"temp": "F", "precip": "0.1 mm per 3 h", "snow": "0.1 cm per 3 h"},
+           "source": f"Open-Meteo forecast API (national weather models), {g['step']:g}-degree grid"}
+    _put_grid(region, out)
+    return out
+
+def _et(ts):
+    d = datetime.fromtimestamp(ts, timezone.utc) - timedelta(hours=5)   # the page and the owner use Eastern time (UTC-5 in winter)
+    return d.strftime("%-I:%M %p ET")
+
+def grid(region="us"):
+    """Refresh now if stale (blocking; background threads only). Returns the grid."""
+    g = GRIDS.get(region) or GRIDS["us"]
+    try:
+        out = _refresh(region if region in GRIDS else "us")
+        _GERR.pop(region, None); return out
+    except Exception as ex:
+        _GERR[region] = (time.time(), str(ex) if isinstance(ex, Limited) else why(ex))
+        with _L: _C[("griderr", region)] = _GERR[region]
+        raise
+
+def _gfs_grid(region):
+    """Temp/Rain/Snow from NOAA GFS in the grid format, cached per GFS run (fallback while there is no Open-Meteo grid)."""
+    g = GRIDS[region]; m, _ = wxgfs.meta()
+    if not m: return None
+    key = ("gfsgrid", region, m.get("run"))
     with _L:
         hit = _C.get(key)
     if hit: return hit[1]
-    b = json.dumps(g, separators=(",", ":")).encode()
+    cells = _cells(g)
+    d = wxgfs.grid_like(g, cells, region)
+    if not d: return None
+    out = {"generated": m.get("generated") or iso(now()), "region": region, "lat0": g["lat0"], "lon0": g["lon0"], "step": g["step"], "ny": g["ny"], "nx": g["nx"], "wrap": g["wrap"],
+           "cells": cells if g["mask"] else None, "times": d["times"], "step_h": 3, "temp": d["temp"], "precip": d["precip"], "snow": d["snow"],
+           "units": {"temp": "F", "precip": "0.1 mm per 3 h", "snow": "0.1 cm per 3 h"}, "fallback": "gfs",
+           "source": "NOAA GFS 1-degree forecast (used while Open-Meteo is unavailable)"}
+    with _L:
+        for k in [k for k in _C if k[0] == "gfsgrid" and k[1] == region]: _C.pop(k, None)
+        _C[key] = (time.time(), out)
+    return out
+
+def grid_bytes(region):
+    """Compact JSON for the page: the best grid there is, with an 'as of' note when it is old or a fallback."""
+    g = grid_nowait(region)
+    if g is None: return None
+    lim, why_, until = OMB.limited()
+    age = time.time() - _gts(g)
+    note = None
+    if g.get("fallback"): note = "From NOAA GFS while Open-Meteo is " + ("rate-limited" if lim else "unavailable") + "; next 7 days, every 3 hours"
+    elif age > GRIDS[region]["ttl"] or lim: note = "Last good grid, as of " + _et(_gts(g)) + ("; Open-Meteo is rate-limited" if lim else "")
+    key = ("gridb", region, g["generated"], g.get("fallback"), note)
+    with _L:
+        hit = _C.get(key)
+    if hit: return hit[1]
+    b = json.dumps(dict(g, as_of=g["generated"], note=note, label=("NOAA GFS 1°" if g.get("fallback") else f"Open-Meteo {g['step']:g}°")), separators=(",", ":")).encode()
     with _L:
         for k in [k for k in _C if k[0] == "gridb" and k[1] == region]: _C.pop(k, None)
         _C[key] = (time.time(), b)
@@ -330,28 +449,59 @@ def grid_bytes(region):
 
 _GRID_BG = {}
 def grid_nowait(region):
-    """Never blocks a request on Open-Meteo: returns the cached grid (possibly stale) and refreshes it in the background."""
+    """Never blocks a request on Open-Meteo: returns the best grid on hand (Open-Meteo, possibly old; else GFS) and refreshes in the background."""
     g = GRIDS.get(region) or GRIDS["us"]
     with _L:
         hit = _C.get(("grid", region))
         fresh = hit and time.time() - hit[0] < g["ttl"]
         th = _GRID_BG.get(region)
-        start = not fresh and not (th and th.is_alive())
+        err = _GERR.get(region)
+        retry_ok = not err or time.time() - err[0] > 300
+        start = not fresh and not (th and th.is_alive()) and retry_ok
         if start:
             th = threading.Thread(target=lambda: _quiet(grid, region), name=f"wxmap-grid-{region}", daemon=True); _GRID_BG[region] = th
     if start: th.start()
-    return hit[1] if hit else None
+    if hit and time.time() - hit[0] < MAX_AGE: return hit[1]
+    fb = _gfs_grid(region) if region in GRIDS else None
+    return fb or (hit[1] if hit else None)
 
 def _quiet(fn, *a):
     try: fn(*a)
     except Exception as ex:
-        with _L: _C[("griderr", a[0] if a else "")] = (time.time(), why(ex))
+        with _L: _C[("griderr", a[0] if a else "")] = (time.time(), str(ex) if isinstance(ex, Limited) else why(ex))
 
 def grid_peek(region):
-    """The cached grid if there is one (never starts a pull)."""
+    """The cached Open-Meteo grid if there is one (never starts a pull)."""
     with _L:
         hit = _C.get(("grid", region))
     return hit[1] if hit else None
+
+def _peer_seed():
+    """A fresh deploy asks the still-running old instance (public URL) for its grids and Open-Meteo budget before calling Open-Meteo."""
+    if not PEER: return
+    t0 = time.time(); got_state = False; old_peer = False; asked = {}
+    try:
+        while time.time() - t0 < PEER_WAIT - 20:
+            if not got_state:
+                try: got_state = OMB.adopt(json.loads(get(PEER + "/api/wxmap/omstate", timeout=15).decode("utf-8", "replace")))
+                except urllib.error.HTTPError as ex: old_peer = ex.code == 404   # an instance from before this change
+                except Exception: pass
+            # an older instance starts an Open-Meteo pull whenever its grid is asked for and missing: ask it at most twice per grid
+            need = [r for r in GRIDS if not ((grid_peek(r) or {}).get("generated") and time.time() - _gts(grid_peek(r)) < GRIDS[r]["ttl"]) and not (old_peer and asked.get(r, 0) >= 2)]
+            if old_peer and not need: break
+            for r in need:
+                asked[r] = asked.get(r, 0) + 1
+                try:
+                    b = get(PEER + "/api/wxmap/grid?r=" + r + "&peer=1", timeout=20)
+                    g = json.loads(b.decode("utf-8", "replace"))
+                    if g.get("temp") and not g.get("fallback") and g.get("region") == r:
+                        for k in ("as_of", "note", "label"): g.pop(k, None)
+                        if _put_grid(r, g): _PEER_ST["got"].append(r)
+                except Exception: pass
+            if got_state and all((grid_peek(r) or {}).get("generated") for r in GRIDS): break
+            time.sleep(15)
+    finally:
+        _PEER_ST["state"] = "done"
 
 # ---------------------------------------------------------------- NWS warnings and watches
 NWS = "https://api.weather.gov"
@@ -608,8 +758,9 @@ def warm():
         for fn in (frames, alerts, storms, tropical, gdacs):
             try: fn()
             except Exception: pass
-        for r in ("us", "world"):   # one after the other (Open-Meteo per-minute limit)
-            _quiet(grid, r)
+        _peer_seed()                # take the old instance's grids before anything else (deploys never refill from Open-Meteo)
+        for r in ("us", "world"):   # one after the other (Open-Meteo per-minute limit), only if still needed
+            if not (grid_peek(r) and time.time() - _gts(grid_peek(r)) < GRIDS[r]["ttl"]): _quiet(grid, r)
     threading.Thread(target=run, name="wxmap-warm", daemon=True).start()
 
 # ---------------------------------------------------------------- page
@@ -721,11 +872,14 @@ def handle_get(path, qs):
         r = (qs or {}).get("r", "us")
         r = (r[0] if isinstance(r, list) else r) if r else "us"
         if r not in GRIDS: return 404, {"error": "unknown region"}
-        if grid_nowait(r) is None:
+        b = grid_bytes(r)
+        if b is None:
             with _L: err = _C.get(("griderr", r))
             reason = ("the forecast source did not answer (" + err[1] + "); retrying") if err else "the forecast grid is loading; it takes a few minutes after a restart"
             return 503, {"error": "model grid unavailable", "reason": reason, "retry": 30}
-        return 200, grid_bytes(r), "application/json"
+        return 200, b, "application/json"
+    if path == "/api/wxmap/omstate":   # deploy handoff of the Open-Meteo budget (counts and back-off time only)
+        return 200, dict(OMB.state(), summary=OMB.summary(), peer=_PEER_ST["state"])
     if path == "/api/wxmap/gfs":
         k = (qs or {}).get("f", "p"); k = (k[0] if isinstance(k, list) else k) or "p"
         if k not in ("p", "c"): return 404, {"error": "unknown field"}

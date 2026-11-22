@@ -89,7 +89,7 @@ def _decode(msg):
             out.append(next(it) if bm[k >> 3] >> (7 - (k & 7)) & 1 else None)
         vals = out
     if len(vals) != NX * NY: raise ValueError("unexpected GFS grid size")
-    return {"cat": s4[9], "num": s4[10], "tmpl": struct.unpack(">H", s4[7:9])[0], "vals": vals}
+    return {"cat": s4[9], "num": s4[10], "tmpl": struct.unpack(">H", s4[7:9])[0], "lev": s4[22], "vals": vals}
 
 def _messages(b):
     i = 0
@@ -103,17 +103,19 @@ def _get(url, timeout=40):
 
 def _url(day, cyc, fh):
     return (f"{NOMADS}?dir=%2Fgfs.{day}%2F{cyc:02d}%2Fatmos&file=gfs.t{cyc:02d}z.pgrb2.1p00.f{fh:03d}"
-            "&var_PRATE=on&var_TCDC=on&lev_surface=on&lev_entire_atmosphere=on")
+            "&var_PRATE=on&var_TCDC=on&var_TMP=on&var_CSNOW=on&lev_surface=on&lev_entire_atmosphere=on&lev_2_m_above_ground=on")
 
 def _fields(day, cyc, fh):
     b = _get(_url(day, cyc, fh))
     if b[:4] != b"GRIB": raise ValueError("NOMADS returned no GRIB data")
-    pr = cl = None
+    pr = cl = t2 = sn = None
     for m in _messages(b):
         f = _decode(m)
         if f["cat"] == 1 and f["num"] == 7 and (pr is None or f["tmpl"] == 0): pr = f["vals"]       # precipitation rate, kg m-2 s-1
         if f["cat"] == 6 and f["num"] == 1 and (cl is None or f["tmpl"] == 0): cl = f["vals"]       # total cloud cover, %
-    return pr, cl
+        if f["cat"] == 0 and f["num"] == 0 and f["lev"] == 103: t2 = f["vals"]                       # temperature 2 m above ground, K
+        if f["cat"] == 1 and f["num"] == 195 and (sn is None or f["tmpl"] == 0): sn = f["vals"]     # categorical snow, 0/1
+    return pr, cl, t2, sn
 
 def _enc_rate(v):
     if v is None: return 0
@@ -144,21 +146,27 @@ def build(pause=0.4):
     hours = list(range(STEP_H, MAX_H + 1, STEP_H))   # f000 has no precipitation rate, so start at +3 h
     cmin = 1 + 254 * math.log(P_MIN / R_LO) / _LR
     times, prow, crow, bad = [], [], [], 0
+    pt = {"T": [], "P": [], "S": []}   # per-point fields for the Temp/Rain/Snow fallback and place cards (west to east from 180 W, north to south)
     for fh in hours:
         time.sleep(pause)   # stay far below NOMADS' request limit
         try:
-            pr, cl = _fields(day, cyc, fh)
+            pr, cl, t2, sn = _fields(day, cyc, fh)
         except Exception:
-            try: time.sleep(2); pr, cl = _fields(day, cyc, fh)
+            try: time.sleep(2); pr, cl, t2, sn = _fields(day, cyc, fh)
             except Exception: bad += 1; continue
         if cl is None or pr is None: bad += 1; continue
-        P = bytearray(NX * NY); C = bytearray(NX * NY)
+        P = bytearray(NX * NY); C = bytearray(NX * NY); TT = bytearray(NX * NY); PP = bytearray(NX * NY); SS = bytearray(NX * NY)
         for k in range(NX * NY):
             # GFS grid: north to south, 0..359 E. The page wants west to east starting at 180 W.
             y, x = divmod(k, NX); src = y * NX + ((x + 180) % NX)
-            c = _enc_rate(pr[src]); P[k] = 0 if c < cmin else c // P_Q * P_Q + P_Q // 2
+            r = pr[src]; c = _enc_rate(r); P[k] = 0 if c < cmin else c // P_Q * P_Q + P_Q // 2
             v = cl[src]; C[k] = 0 if v is None else max(0, min(255, int(round(v * 2.55))))
+            if t2 is not None: tv = t2[src]; TT[k] = 0 if tv is None else max(1, min(255, int(round((tv - 273.15) * 1.8 + 32)) + 100))   # deg F + 100 (0 = missing)
+            PP[k] = 0 if r is None else max(0, min(255, int(round(r * 3600 * 3 * 10))))   # 0.1 mm per 3 h
+            SS[k] = 1 if sn is not None and sn[src] and sn[src] >= 0.5 else 0
         prow.append(bytes(P)); crow.append(bytes(C))
+        pt["T"].append(bytes(TT) if t2 is not None else None); pt["P"].append(bytes(PP)); pt["S"].append(bytes(SS))
+        time.sleep(0)   # let request threads run between frames
         times.append((run + timedelta(hours=fh)).strftime("%Y-%m-%dT%H:%M:%SZ"))
     if not times: raise ValueError("GFS returned no usable forecast hours")
     n = len(times)
@@ -174,17 +182,18 @@ def build(pause=0.4):
             "p": {"nx": NX, "ny": NY, "lat0": 90, "lon0": -180, "step": 1, "bytes": len(pp)},
             "c": {"nx": NX // 2, "ny": NY // 2 + 1, "lat0": 90, "lon0": -180, "step": 2, "bytes": len(cp)},
             "rate": {"lo": R_LO, "hi": R_HI}, "missing": bad, "source": "NOAA GFS 1-degree forecast (NOMADS)"}
-    return meta, {"p": pp, "c": cp}
+    pt["C"] = crow; pt["times"] = times
+    return meta, {"p": pp, "c": cp}, pt
 
 # ------------------------------------------------------------------ cache (refresh in the background, never block a page)
 _LOCK = threading.Lock()
-_STATE = {"meta": None, "png": None, "at": 0.0, "err": None, "busy": False, "tried": 0.0}
+_STATE = {"meta": None, "png": None, "pt": None, "at": 0.0, "err": None, "busy": False, "tried": 0.0}
 TTL = 3 * 3600
 
 def _refresh():
     try:
-        meta, png = build()
-        with _LOCK: _STATE.update(meta=meta, png=png, at=time.time(), err=None)
+        meta, png, pt = build()
+        with _LOCK: _STATE.update(meta=meta, png=png, pt=pt, at=time.time(), err=None)
     except Exception as ex:
         msg = f"the source answered HTTP {ex.code}" if isinstance(ex, urllib.error.HTTPError) else ("the source did not answer in time" if "timed out" in str(ex) else "the source could not be reached just now")
         with _LOCK: _STATE["err"] = msg
@@ -205,3 +214,35 @@ def meta():
 def png(kind):
     kick()
     with _LOCK: return (_STATE["png"] or {}).get(kind)
+
+# ------------------------------------------------------------------ point fields (Nov 22 2026, pt1745u: fallback when Open-Meteo is rate-limited)
+def _ix(lat, lon):
+    y = int(round(90 - max(-90.0, min(90.0, lat)))); x = int(round(((lon + 180) % 360))) % NX
+    return y * NX + x
+
+def point_series(lat, lon):
+    """[(time, temp_F or None, precip_mm_3h, snow 0/1, cloud_pct)] for the nearest 1-degree GFS point, or None while GFS loads."""
+    kick()
+    with _LOCK: pt = _STATE.get("pt")
+    if not pt: return None
+    k = _ix(lat, lon); out = []
+    for i, t in enumerate(pt["times"]):
+        T = pt["T"][i]
+        out.append((t, (T[k] - 100) if T and T[k] else None, pt["P"][i][k] / 10.0, pt["S"][i][k], round(pt["C"][i][k] / 2.55)))
+    return out
+
+def grid_like(g, cells, region):
+    """A Temp/Rain/Snow grid in wxmap's format sampled from GFS (nearest 1-degree point), or None while GFS loads."""
+    kick()
+    with _LOCK: pt = _STATE.get("pt"); m = _STATE.get("meta")
+    if not pt or not m or not pt["T"] or pt["T"][0] is None: return None
+    idx = []
+    for k in cells:
+        lat = g["lat0"] + g["step"] * (k // g["nx"]); lon = ((g["lon0"] + g["step"] * (k % g["nx"]) + 180) % 360) - 180
+        idx.append(_ix(lat, lon))
+    T, P, S = [], [], []
+    for i in range(len(pt["times"])):
+        Ti, Pi, Si = pt["T"][i], pt["P"][i], pt["S"][i]
+        for j in idx:
+            T.append((Ti[j] - 100) if Ti and Ti[j] else None); p = Pi[j]; P.append(p); S.append(p if Si[j] else 0)   # snow: ~1 cm per mm of water
+    return {"times": list(pt["times"]), "temp": T, "precip": P, "snow": S, "run": m.get("run")}
