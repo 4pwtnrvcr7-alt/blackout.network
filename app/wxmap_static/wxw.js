@@ -38,13 +38,13 @@ function irT(r, g, b) {
   }
   if (IRC.size > 60000) IRC.clear(); IRC.set(key, v); return v;
 }
-/* cloud look from temperature: clear warm ground is transparent, colder tops get whiter and more opaque */
+/* cloud look from temperature: clear warm ground is transparent, colder tops get lighter grey and more opaque */
 var CL = new Uint8ClampedArray(161 * 4);   /* -100..+60 deg C */
 (function () {
   for (var i = 0; i <= 160; i++) {
     var T = i - 100, a = Math.min(1, Math.max(0, (-6 - T) / 52)); a = a * a * (3 - 2 * a);   /* pt1745u: thin or warm cloud (above about -6 C) stays clear, so the map shows through */
     var w = Math.min(1, Math.max(0, (-10 - T) / 50));
-    CL[i * 4] = 150 + 92 * w; CL[i * 4 + 1] = 160 + 86 * w; CL[i * 4 + 2] = 178 + 74 * w; CL[i * 4 + 3] = Math.round(a * 0.42 * 255);
+    CL[i * 4] = 128 + 52 * w; CL[i * 4 + 1] = 134 + 52 * w; CL[i * 4 + 2] = 146 + 50 * w; CL[i * 4 + 3] = Math.round(a * 255);   /* t1746u: soft grey, full shape here; the page sets the strength (cloud opacity slider) */
   }
 })();
 function clT(T, o, d, wt) { var i = Math.round(Math.min(160, Math.max(0, T + 100))) * 4; d[o] = CL[i]; d[o + 1] = CL[i + 1]; d[o + 2] = CL[i + 2]; d[o + 3] = CL[i + 3] * wt; }
@@ -238,7 +238,7 @@ function gfsTile(m) {   /* one 256 px Web-Mercator tile of GFS rain (kind "p", m
         var c = Math.min(1, Math.max(0, (v / 255 - 0.55) / 0.45)); c = c * c * (3 - 2 * c);   /* model total cloud: a lighter veil than the satellite view */
         if (c <= 0.01) continue;
         var w = Math.min(1, Math.max(0, (v / 255 - 0.6) / 0.4));
-        D[o] = 150 + 80 * w; D[o + 1] = 160 + 74 * w; D[o + 2] = 178 + 64 * w; D[o + 3] = Math.round(c * 0.26 * 255); any = true;
+        D[o] = 128 + 48 * w; D[o + 1] = 134 + 48 * w; D[o + 2] = 146 + 46 * w; D[o + 3] = Math.round(c * 0.62 * 255); any = true;
       }
     }
   }

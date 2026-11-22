@@ -186,6 +186,8 @@
   var MODE = "radar", FRAMES = [], IDX = 0, NOWI = 0, playing = false, live = true;
   var FR = null, AL = null, ST = null, TR = null, GL = null;
   var ERR = { radar: null, grid: null };
+  /* t1746u: cloud opacity (satellite infrared and GFS cloud cover), 5 to 60 %, default 15 %, kept in localStorage */
+  var CLOP = (function () { var v = +store("bn_wx_clop"); return v >= 0.05 && v <= 0.6 ? v : 0.15; })();
   var LAYS = Object.assign({ clouds: true, global: true, warn: true, reports: true, tracks: true, trop: false, outlook: false, labels: true }, store("bn_wx_lays") || {});
   function PAD() { return innerWidth < 768 ? { top: 150, bottom: 150, left: 2, right: 2 } : { top: 140, bottom: 140, left: 70, right: 80 }; }
   var US0 = innerWidth < 768 ? [[-124.6, 24.6], [-67.2, 49.2]] : US;
@@ -395,7 +397,7 @@
     var f = FRAMES[i]; if (!f) return true; var id = rEnsure(f);
     return RLIVE[id].every(function (s) { try { return map.isSourceLoaded(s); } catch (e) { return false; } });
   }
-  function rOp(id, v, ms) { (RLIVE[id] || []).forEach(function (s) { if (!map.getLayer(s)) return; var o = OPF[s] === "cl" ? (LAYS.clouds ? (v ? 1 : 0) : 0) : v; map.setPaintProperty(s, "raster-opacity-transition", { duration: ms, delay: 0 }); map.setPaintProperty(s, "raster-opacity", o); }); }
+  function rOp(id, v, ms) { (RLIVE[id] || []).forEach(function (s) { if (!map.getLayer(s)) return; var o = OPF[s] === "cl" ? (LAYS.clouds && v ? CLOP : 0) : v; map.setPaintProperty(s, "raster-opacity-transition", { duration: ms, delay: 0 }); map.setPaintProperty(s, "raster-opacity", o); }); }
   var rTok = 0;
   function rShow(i, instant) {
     var f = FRAMES[i]; if (!f) return; var id = rEnsure(f), tok = ++rTok, t0 = Date.now();
@@ -836,6 +838,16 @@
   function closeLays() { document.body.classList.remove("wx-lays-on"); $("wx_lay_btn").setAttribute("aria-expanded", "false"); setTimeout(function () { if (!document.body.classList.contains("wx-lays-on")) $("wx_lays").hidden = true; }, 250); }
   $("wx_lay_btn").addEventListener("click", function () { if (document.body.classList.contains("wx-lays-on")) closeLays(); else openLays(); });
   $("wx_lays_x").addEventListener("click", closeLays);
+  (function clop() {
+    var r = $("wx_clop"), out = $("wx_clop_v"); if (!r) return;
+    function paint() { var p = Math.round(CLOP * 100); r.value = p; out.textContent = p + "%"; r.style.setProperty("--p", ((p - 5) / 55 * 100).toFixed(1) + "%"); r.disabled = !LAYS.clouds; r.parentNode.classList.toggle("off", !LAYS.clouds); }
+    paint();
+    r.addEventListener("input", function () {
+      CLOP = Math.min(0.6, Math.max(0.05, r.value / 100)); paint(); store("bn_wx_clop", CLOP);
+      Object.keys(RLIVE).forEach(function (id) { (RLIVE[id] || []).forEach(function (s) { if (OPF[s] === "cl" && map.getLayer(s) && map.getPaintProperty(s, "raster-opacity") > 0) { map.setPaintProperty(s, "raster-opacity-transition", { duration: 0, delay: 0 }); map.setPaintProperty(s, "raster-opacity", CLOP); } }); });
+    });
+    $("wx_lays").addEventListener("change", function (e) { if (e.target.dataset.lay === "clouds") paint(); });
+  })();
   $("wx_lays").addEventListener("change", function (e) {
     var k = e.target.dataset.lay; if (!k) return; LAYS[k] = e.target.checked; store("bn_wx_lays", LAYS); setLayerVis();
     if (k === "labels" && MODE !== "radar") gShow(IDX);

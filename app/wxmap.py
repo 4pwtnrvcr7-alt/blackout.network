@@ -831,6 +831,7 @@ def page(qs=None):
 <section class="wx-lays" id="wx_lays" aria-label="Overlays" hidden>
 <div class="wx-lh"><p class="wx-k">Overlays</p><button type="button" class="wx-x" id="wx_lays_x" aria-label="Close">{_ico('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
 {lay("clouds", "Satellite clouds", "Infrared worldwide; model cloud cover ahead")}
+<div class="wx-clop"><label for="wx_clop">Cloud opacity</label><input id="wx_clop" type="range" min="5" max="60" step="1" value="15" aria-describedby="wx_clop_v"><output id="wx_clop_v" for="wx_clop">15%</output></div>
 {lay("global", "Global alerts", "Cyclones, floods and droughts worldwide")}
 {lay("warn", "U.S. warnings and watches", "NWS")}
 {lay("reports", "U.S. storm reports", "Last 72 hours")}
