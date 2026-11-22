@@ -118,6 +118,8 @@ ROUTES = {
     "/api/gridstatus": "gridstatus", # #grid status map, local outages, weather-triggered checks (t234)
     "/grid": "gridpage",             # Nov 21 2026 (pt1737u): The Grid, full-screen grid map page (menu link; replaces /live#grid)
     "/api/gridpage": "gridpage",     # /api/gridpage/data + grid.js / grid.css
+    "/weather": "wxmap",             # Nov 22 2026 (pt1742u): full-screen Weather map page (menu link; replaces /live#weather)
+    "/api/wxmap": "wxmap",           # /api/wxmap/frames|grid|alerts|storms|tropical + wx.js / wx.css
     "/mesh": "meshnet",             # Meshtastic (Nov 12): /mesh live public-node map + drop-off watch, /mesh/chat (own radio), /mesh/guide
     "/api/mesh": "meshnet",         # /api/mesh/{nodes,summary,signal,chat} + static JS/CSS (data/mesh_nodes.json from tools/meshtastic on the box)
     "/api/government": "government",   # Government tab #government (t247): index + org chart, government.db from government_collect.py
