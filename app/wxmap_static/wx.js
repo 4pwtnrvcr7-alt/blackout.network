@@ -97,7 +97,7 @@
     return p[p.length - 1].slice(1);
   }
   function grad(p, lo, hi) { return "linear-gradient(90deg," + p.filter(function (s) { return s[0] >= lo && s[0] <= hi; }).map(function (s) { return "rgba(" + s[1] + "," + s[2] + "," + s[3] + "," + Math.max(s[4], .55) + ")"; }).join(",") + ")"; }
-  /* radar palette: the worker repaints NOAA and RainViewer tiles with these stops (dBZ, r, g, b, alpha) */
+  /* radar palette: the worker repaints NOAA radar, NASA IMERG and GFS rain with these stops (dBZ, r, g, b, alpha) */
   var RADAR_GRAD = "linear-gradient(90deg,rgba(50,118,205,.6),#3e9cee,#38c4e2,#2ed496,#24ba60,#ff9a3d,#ff6a2a,#ff3b3b,#d62678,#e040fb,#f6ecff)";
   var WMO = { 0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Freezing fog", 51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle",
     61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Showers", 81: "Showers", 82: "Violent showers",
@@ -186,7 +186,7 @@
   var MODE = "radar", FRAMES = [], IDX = 0, NOWI = 0, playing = false, live = true;
   var FR = null, AL = null, ST = null, TR = null, GL = null;
   var ERR = { radar: null, grid: null };
-  var LAYS = Object.assign({ global: true, warn: true, reports: true, tracks: true, trop: false, outlook: false, labels: true }, store("bn_wx_lays") || {});
+  var LAYS = Object.assign({ clouds: true, global: true, warn: true, reports: true, tracks: true, trop: false, outlook: false, labels: true }, store("bn_wx_lays") || {});
   function PAD() { return innerWidth < 768 ? { top: 150, bottom: 150, left: 2, right: 2 } : { top: 140, bottom: 140, left: 70, right: 80 }; }
   var US0 = innerWidth < 768 ? [[-124.6, 24.6], [-67.2, 49.2]] : US;
 
@@ -194,10 +194,16 @@
   function buildFrames(keepT) {
     var out = [];
     if (MODE === "radar" && FR) {
-      var gp = (FR.global && FR.global.past || []).map(function (g) { return { t: tms(g.t), path: g.path }; });
-      FR.past.forEach(function (f) { var t = tms(f.t), g = null; gp.forEach(function (x) { if (Math.abs(x.t - t) <= 300000 && (!g || Math.abs(x.t - t) < Math.abs(g.t - t))) g = x; }); out.push({ t: t, layer: f.layer, g: g ? g.path : null, kind: "past" }); });
-      if (!FR.past.length) gp.forEach(function (g) { out.push({ t: g.t, layer: null, g: g.path, kind: "past" }); });
+      FR.past.forEach(function (f) { out.push({ t: tms(f.t), layer: f.layer, sat: f.sat || {}, im: f.im || null, kind: "past" }); });
       FR.forecast.forEach(function (f) { var t = tms(f.t); if (!out.length || t > out[out.length - 1].t) out.push({ t: t, layer: f.layer, kind: "fc", run: f.run }); });
+      var gt = gfsTimes();   /* past the U.S. forecast: worldwide GFS every 3 hours out to 7 days */
+      gt.forEach(function (t) { if (!out.length || t > out[out.length - 1].t + 1800000) out.push({ t: t, layer: null, kind: "fc" }); });
+      out.forEach(function (f) {   /* worldwide rain: IMERG where it has arrived, else the nearest GFS hour; clouds: satellite (past) or GFS (forecast) */
+        var b = -1, bd = Infinity; gt.forEach(function (t, k) { var d = Math.abs(t - f.t); if (d < bd) { bd = d; b = k; } });
+        var tol = f.kind === "fc" ? 5400000 : 10800000;
+        f.gp = !f.im && b >= 0 && bd <= tol ? b : -1;
+        f.gc = f.kind === "fc" && b >= 0 && bd <= 5400000 ? b : -1;
+      });
     } else if (MODE !== "radar" && (GD.us || GD.world)) {
       var ts = {}; ["world", "us"].forEach(function (gk) { if (GD[gk]) GD[gk].times.forEach(function (t) { ts[t] = 1; }); });
       Object.keys(ts).map(Number).sort(function (a, b) { return a - b; }).forEach(function (t) { out.push({ t: t, kind: t <= Date.now() ? "past" : "fc" }); });
@@ -217,12 +223,12 @@
   function ticks() {
     var h = "", last = null, n = FRAMES.length;
     if (n > 1 && NOWI < n - 1) h += '<span class="fc-zone" style="left:' + pos(NOWI) + '%;right:0"></span>';
-    var nowP = pos(NOWI);
+    var nowP = pos(NOWI), tw = ($("wx_ticks").clientWidth || 300), gap = Math.max(7, 34 / tw * 100), lastP = -99;   // day labels never closer than ~34px
     FRAMES.forEach(function (f, i) {
       var d = FDAY.format(new Date(f.t));
       if (last !== null && d !== last) {
         var p = pos(i); h += '<i style="left:' + p + '%"></i>';
-        if (Math.abs(p - nowP) > 7) h += '<b style="left:' + p + '%">' + esc(FD.format(new Date(f.t))) + '</b>';
+        if (Math.abs(p - nowP) > gap && p - lastP >= gap) { h += '<b style="left:' + p + '%">' + esc(FD.format(new Date(f.t))) + '</b>'; lastP = p; }
       }
       last = d;
     });
@@ -234,7 +240,7 @@
   function label() {
     var f = FRAMES[IDX]; if (!f) { $("wx_when").textContent = MODE === "radar" ? (ERR.radar || "Radar unavailable") : (ERR.grid || "Loading the forecast grid…"); $("wx_rel").textContent = ""; return; }
     var r = $("wx_rel"), isNow = IDX === NOWI;
-    var what = MODE === "radar" ? (f.kind === "fc" ? "Forecast radar" : "Radar") : MODE === "temp" ? "Temperature" : MODE === "rain" ? "Rain, 3 h to" : "Snow, 24 h to";
+    var what = MODE === "radar" ? (f.kind === "fc" ? "Forecast" : "Radar") : MODE === "temp" ? "Temperature" : MODE === "rain" ? "Rain, 3 h to" : "Snow, 24 h to";
     $("wx_when").textContent = what + " · " + when(f.t);
     r.textContent = isNow ? (MODE === "radar" ? "Live" : "Now") : rel(f.t);
     r.classList.toggle("fc", f.kind === "fc");
@@ -245,32 +251,63 @@
   function go(i, instant) {
     if (!FRAMES.length) { label(); return; }
     IDX = clamp(i, 0, FRAMES.length - 1); live = IDX === NOWI;
-    var isFc = MODE === "radar" && FRAMES[IDX].kind === "fc"; if (isFc !== legFc) { legFc = isFc; legend(); }
+    var isFc = MODE === "radar" ? FRAMES[IDX].kind + (FRAMES[IDX].layer ? "u" : "w") : MODE; if (isFc !== legFc) { legFc = isFc; legend(); }
     if (map && ready) { if (MODE === "radar") rShow(IDX, instant); else gShow(IDX, instant); timeFilters(); }
     label();
   }
 
   /* ---------- radar: one map raster layer per frame. Tiles come through a local "wxr://" protocol: the bytes are prefetched for every
-     frame in view, and a worker repaints them (one palette, soft edges, RainViewer masked inside the NOAA domain). ---------- */
-  var RLIVE = {}, RCUR = null, ROP = 0.92, RMZ = 7, WK = null, wkId = 0, wkCb = {}, BYTES = new Map(), PROTO = false, NOAA_B = [-130, 20, -60, 55];
+     frame in view, and a worker repaints them (one palette, soft edges). Outside the NOAA domain each frame also has worldwide layers:
+     past = geostationary infrared clouds (NASA GIBS, EUMETSAT) + NASA IMERG rain (else GFS), forecast = GFS rain + cloud cover. ---------- */
+  var RLIVE = {}, RCUR = null, ROP = 0.92, RMZ = 7, SMZ = 5, IMZ = 4, OPF = {}, WK = null, wkId = 0, wkCb = {}, BYTES = new Map(), PROTO = false, NOAA_B = [-130, 20, -60, 55];
   function wk() {
     if (WK !== null) return WK;
     try {
       if (typeof OffscreenCanvas === "undefined" || !window.Worker || !window.createImageBitmap) throw 0;
       var oc = new OffscreenCanvas(1, 1); if (!oc.getContext("2d") || !oc.transferToImageBitmap) throw 0;
-      WK = new Worker("/api/wxmap/wxw.js?v=" + ($("wx_main").dataset.wxw || "1"));
-      WK.onmessage = function (e) { var m = e.data, cb = wkCb[m.id]; delete wkCb[m.id]; if (cb) cb(m); };
-    } catch (e) { WK = false; }
+      var n = clamp((navigator.hardwareConcurrency || 4) - 1, 2, 4);   /* a small pool: tiles decode in parallel, the map thread stays free */
+      for (var i = 0; i < n; i++) {
+        var w = new Worker("/api/wxmap/wxw.js?v=" + ($("wx_main").dataset.wxw || "1"));
+        w.onmessage = function (e) { var m = e.data, cb = wkCb[m.id]; delete wkCb[m.id]; if (cb) cb(m); this.busy--; tPump(); };
+        w.busy = 0; POOL.push(w);
+      }
+      WK = POOL[0];
+    } catch (e) { WK = false; POOL = []; }
     return WK;
   }
-  function wkCall(msg, tr) { return new Promise(function (res, rej) { var id = ++wkId; msg.id = id; wkCb[id] = function (m) { if (m.err) rej(new Error(m.err)); else res(m); }; WK.postMessage(msg, tr || []); }); }
+  /* tile jobs: queued on this side so a frame the map has already dropped (aborted request) never costs a decode */
+  var POOL = [], TQ = [];
+  function tileCall(msg, tr, ac) {
+    return new Promise(function (res, rej) { TQ.push({ msg: msg, tr: tr || [], ac: ac, res: res, rej: rej }); tPump(); });
+  }
+  function tPump() {
+    while (TQ.length) {
+      var w = null; for (var i = 0; i < POOL.length; i++) if (POOL[i].busy < 2 && (!w || POOL[i].busy < w.busy)) w = POOL[i];
+      if (!w) return;
+      var j = TQ.shift();
+      if (j.ac && j.ac.signal && j.ac.signal.aborted) { j.res({ bmp: null }); continue; }
+      (function (j, w) { var id = ++wkId; j.msg.id = id; wkCb[id] = function (m) { if (m.err) j.rej(new Error(m.err)); else j.res(m); }; w.busy++; w.postMessage(j.msg, j.tr); })(j, w);
+    }
+  }
+  function poolAll(mk) {   /* the same message to every worker (GFS data); resolves when all have it */
+    return Promise.all(POOL.map(function (w) { return new Promise(function (res, rej) { var o = mk(), id = ++wkId; o.msg.id = id; wkCb[id] = function (m) { if (m.err) rej(new Error(m.err)); else res(m); }; w.busy++; w.postMessage(o.msg, o.tr); }); }));
+  }
+  function wkCall(msg, tr) { return new Promise(function (res, rej) { var id = ++wkId; msg.id = id; wkCb[id] = function (m) { if (m.err) rej(new Error(m.err)); else res(m); }; WK.busy++; WK.postMessage(msg, tr || []); }); }
   function blank() { var c = new OffscreenCanvas(1, 1); c.getContext("2d"); return c.transferToImageBitmap(); }
+  var GIBS = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/", GL_ = { ge: "GOES-East_ABI_Band13_Clean_Infrared", gw: "GOES-West_ABI_Band13_Clean_Infrared", hi: "Himawari_AHI_Band13_Clean_Infrared" };
+  var EUMW = "https://view.eumetsat.int/geoserver/wms?service=WMS&version=1.3.0&request=GetMap&styles=&format=image/png&crs=EPSG:3857&width=256&height=256", EL = { ms: "msg_fes:ir108", io: "msg_iodc:ir108" };
+  var SECB = { gw: [-180, -75, -103.5, 75], ge: [-108.5, -75, -35, 75], ms: [-40, -75, 32.5, 75], io: [27.5, -75, 92.5, 75], hi: [87.5, -75, 180, 75] };
   function upURL(kind, id, z, x, y) {
-    if (kind === "g") return FR.global.host + id.replace(/~/g, "/") + "/512/" + z + "/" + x + "/" + y + "/2/1_0.png";
+    if (kind === "s") { var p = id.split("|"); return GIBS + GL_[p[0]] + "/default/" + p[1] + "/GoogleMapsCompatible_Level6/" + z + "/" + y + "/" + x + ".png"; }
+    if (kind === "i") return GIBS + "IMERG_Precipitation_Rate_30min/default/" + id + "/GoogleMapsCompatible_Level6/" + z + "/" + y + "/" + x + ".png";
+    if (kind === "e") {
+      var q = id.split("|"), n = Math.pow(2, z), R = 20037508.342789244, sz = 2 * R / n;
+      return EUMW + "&layers=" + EL[q[0]] + "&time=" + q[1] + "&bbox=" + (-R + x * sz).toFixed(1) + "," + (R - (y + 1) * sz).toFixed(1) + "," + (-R + (x + 1) * sz).toFixed(1) + "," + (R - y * sz).toFixed(1);
+    }
     return FR.tile.replace("{layer}", id).replace("{z}", z).replace("{x}", x).replace("{y}", y);
   }
   /* fetch queue: 6 at a time per host is what browsers allow over HTTP/1.1 anyway; highest priority first */
-  var Q = [], QN = 0, QMAX = 10;
+  var Q = [], QN = 0, QMAX = 16;
   function bytes(u, prio) {
     var h = BYTES.get(u);
     if (h) { if (!h.done && prio < h.prio) { h.prio = prio; if (h.q) h.q.prio = prio; } return h.p; }
@@ -292,34 +329,47 @@
     if (BYTES.size < 6000) return;
     var n = BYTES.size - 5000; BYTES.forEach(function (h, u) { if (n > 0 && h.done) { BYTES.delete(u); n--; } });
   }
-  function proto(params) {
-    var m = /^wxr:\/\/([mgh])\/([^/]+)\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+  function proto(params, ac) {
+    var m = /^wxr:\/\/([mhseig])\/([^/]+)\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
     if (!m || !FR) return Promise.resolve({ data: blank() });
     var kind = m[1], id = decodeURIComponent(m[2]), z = +m[3], x = +m[4], y = +m[5];
+    if (kind === "g") {   /* worldwide GFS: drawn in the worker from the model grid, no download */
+      var gp = id.split("|");
+      if (!GFSR || gp[2] !== GTAG) return Promise.resolve({ data: blank() });
+      return tileCall({ op: "gfstile", run: GFSR, kind: gp[0], k: +gp[1], z: z, x: x, y: y }, [], ac).then(function (r) { return { data: r.bmp || blank() }; }, function () { return { data: blank() }; });
+    }
     return bytes(upURL(kind, id, z, x, y), -1).then(function (buf) {
       if (!buf || !buf.byteLength) return { data: blank() };
       var cp = buf.slice(0);
-      return wkCall({ op: "tile", kind: kind, buf: cp, z: z, x: x, y: y }, [cp]).then(function (r) { return { data: r.bmp }; }, function () { return { data: blank() }; });
+      return tileCall({ op: "tile", kind: kind, buf: cp, z: z, x: x, y: y, sec: id.split("|")[0] }, [cp], ac).then(function (r) { return { data: r.bmp || blank() }; }, function () { return { data: blank() }; });
     });
   }
   function rSrcs(f) {
-    var a = f.layer ? [{ k: f.kind === "fc" ? "h" : "m", id: f.layer, b: NOAA_B }] : [];
-    if (f.g && PROTO) a.push({ k: "g", id: f.g.replace(/\//g, "~"), b: null });
+    var a = [];
+    if (PROTO) {
+      if (f.kind === "past") {   /* clouds: one geostationary satellite per sector (tiles are 512 px on screen: soft, and a quarter of the requests) */
+        ["gw", "ge", "ms", "io", "hi"].forEach(function (k) { var t = f.sat && f.sat[k]; if (t) a.push({ k: k === "ms" || k === "io" ? "e" : "s", id: k + "|" + t, b: SECB[k], mz: SMZ, ts: 512, cl: 1 }); });
+      } else if (f.gc >= 0 && GFSR) a.push({ k: "g", id: "c|" + f.gc + "|" + GTAG, mz: 6, ts: 256, cl: 1 });
+      if (f.im) a.push({ k: "i", id: f.im, b: [-180, -60, 180, 60], mz: IMZ, ts: 256, ex: 1 });
+      else if (f.gp >= 0 && GFSR) a.push({ k: "g", id: "p" + (f.layer ? "m" : "") + "|" + f.gp + "|" + GTAG, mz: 6, ts: 256 });
+    }
+    if (f.layer) a.push({ k: f.kind === "fc" ? "h" : "m", id: f.layer, b: NOAA_B, mz: RMZ, ts: 256 });
     return a;
   }
-  function rId(f) { return "r-" + (f.layer || f.g || "").replace(/[^A-Za-z0-9]/g, ""); }
+  function rId(f) { return "r-" + f.t + (GFSR ? "g" : "") + (f.layer ? "" : "n"); }
   function rEnsure(f) {
     var id = rId(f);
     if (!RLIVE[id]) {
       RLIVE[id] = [];
       rSrcs(f).forEach(function (s) {
-        var sid = id + s.k;
+        var sid = id + s.k + s.id.replace(/[^A-Za-z0-9]/g, "");
         if (!map.getSource(sid)) {
           var t = PROTO ? "wxr://" + s.k + "/" + encodeURIComponent(s.id) + "/{z}/{x}/{y}" : upURL(s.k, s.id, "{z}", "{x}", "{y}");
-          var src = { type: "raster", tiles: [t], tileSize: s.k === "g" ? 512 : 256, maxzoom: s.k === "g" ? RMZ - 1 : RMZ, attribution: "" };   /* RainViewer at 512 px: same detail, a quarter of the requests */ if (s.b) src.bounds = s.b;
+          var src = { type: "raster", tiles: [t], tileSize: s.ts, maxzoom: s.mz, attribution: "" }; if (s.b) src.bounds = s.b;
           map.addSource(sid, src);
           map.addLayer({ id: sid, type: "raster", source: sid, paint: { "raster-opacity": 0, "raster-opacity-transition": { duration: 0, delay: 0 }, "raster-fade-duration": 0, "raster-resampling": "linear" } }, BEFORE);
         }
+        OPF[sid] = s.cl ? "cl" : "";
         RLIVE[id].push(sid);
       });
     }
@@ -329,11 +379,11 @@
     var f = FRAMES[i]; if (!f) return true; var id = rEnsure(f);
     return RLIVE[id].every(function (s) { try { return map.isSourceLoaded(s); } catch (e) { return false; } });
   }
-  function rOp(id, v, ms) { (RLIVE[id] || []).forEach(function (s) { if (!map.getLayer(s)) return; map.setPaintProperty(s, "raster-opacity-transition", { duration: ms, delay: 0 }); map.setPaintProperty(s, "raster-opacity", v); }); }
+  function rOp(id, v, ms) { (RLIVE[id] || []).forEach(function (s) { if (!map.getLayer(s)) return; var o = OPF[s] === "cl" ? (LAYS.clouds ? (v ? 1 : 0) : 0) : v; map.setPaintProperty(s, "raster-opacity-transition", { duration: ms, delay: 0 }); map.setPaintProperty(s, "raster-opacity", o); }); }
   var rTok = 0;
   function rShow(i, instant) {
     var f = FRAMES[i]; if (!f) return; var id = rEnsure(f), tok = ++rTok, t0 = Date.now();
-    for (var k = -2; k <= 7; k++) if (FRAMES[i + k] && FRAMES[i + k].layer) rEnsure(FRAMES[i + k]);
+    for (var k = -1; k <= 4; k++) if (FRAMES[i + k]) rEnsure(FRAMES[i + k]);
     (function swap() {
       if (tok !== rTok || MODE !== "radar") return;
       if (!rLoaded(i) && RCUR && Date.now() - t0 < 2500) { setTimeout(swap, 40); return; }   /* keep the last frame up until the next is decoded: no blank flash */
@@ -343,8 +393,8 @@
     })();
   }
   function rPrune(i) {
-    var keep = {}; for (var k = -6; k <= 10; k++) if (FRAMES[i + k]) keep[rId(FRAMES[i + k])] = 1;
-    Object.keys(RLIVE).forEach(function (x) { if (!keep[x] && x !== RCUR) { RLIVE[x].forEach(function (s) { if (map.getLayer(s)) map.removeLayer(s); if (map.getSource(s)) map.removeSource(s); }); delete RLIVE[x]; } });
+    var keep = {};   /* (layer ids carry the frame time) */ for (var k = -3; k <= 6; k++) if (FRAMES[i + k]) keep[rId(FRAMES[i + k])] = 1;
+    Object.keys(RLIVE).forEach(function (x) { if (!keep[x] && x !== RCUR) { RLIVE[x].forEach(function (s) { if (map.getLayer(s)) map.removeLayer(s); if (map.getSource(s)) map.removeSource(s); delete OPF[s]; }); delete RLIVE[x]; } });
   }
   function rHideAll() { rTok++; Object.keys(RLIVE).forEach(function (x) { rOp(x, 0, 250); }); RCUR = null; }
   function rClear() { rTok++; Object.keys(RLIVE).forEach(function (x) { RLIVE[x].forEach(function (s) { if (map.getLayer(s)) map.removeLayer(s); if (map.getSource(s)) map.removeSource(s); }); }); RLIVE = {}; RCUR = null; }
@@ -367,17 +417,18 @@
   function frameURLs(f, T) {
     var out = [];
     rSrcs(f).forEach(function (s) {
-      (s.k === "g" ? T.g : T.n).forEach(function (t) { var bx = tileBox(t);
-        if (s.k !== "g" && !hits4(bx, NOAA_B)) return;
-        if (s.k === "g" && inside4(bx, NOAA_B)) return;
+      if (s.k === "g") return;   /* worldwide model tiles are drawn locally from the GFS grid (ready as soon as it has loaded) */
+      (s.ts === 512 ? T.s : s.k === "i" ? T.i : T.n).forEach(function (t) { var bx = tileBox(t);
+        if (s.b && !hits4(bx, s.b)) return;
+        if (s.ex && inside4(bx, NOAA_B)) return;
         out.push(upURL(s.k, s.id, t[0], t[1], t[2])); });
     });
     return out;
   }
   function prefetch() {
     if (!PROTO || !map || !ready || MODE !== "radar" || !FRAMES.length || !FR) return;
-    var tiles = { n: viewTiles(1, RMZ).slice(0, 80), g: viewTiles(0, RMZ - 1).slice(0, 40) };
-    Q.forEach(function (it) { it.prio += 1000; });   /* demote whatever the old view still had queued */
+    var tiles = { n: viewTiles(1, RMZ).slice(0, 80), s: viewTiles(0, SMZ).slice(0, 40), i: viewTiles(1, IMZ).slice(0, 60) };
+    Q.forEach(function (it) { if (it.prio >= 0) it.prio += 1000; });   /* demote whatever the old view still had queued (never what the map is asking for right now) */
     var order = [], seen = {};
     function add(i) { if (i >= 0 && i < FRAMES.length && !seen[i]) { seen[i] = 1; order.push(i); } }
     for (var d = 0; d <= 6; d++) { add(IDX - d); if (d <= 2) add(IDX + d); }   /* the last hour first: that is what the loader waits for */
@@ -500,6 +551,20 @@
     mBusy = 1; mRender(it[0], it[1], it[2]).then(function () { bufTick(); mPump(); }, function () { mPump(); });
   }
   function mFree(keepMode) { MB.forEach(function (b, k) { if (k.split("|")[1] !== keepMode) { try { b.close(); } catch (e) {} MB.delete(k); } }); }
+  /* ---------- worldwide GFS forecast (rain rate + cloud cover, every 3 hours to 7 days): two small PNG atlases from /api/wxmap/gfs,
+     decoded once in the worker; map tiles are then drawn locally (bicubic, radar palette), so they are sharp at every zoom and need no download. ---------- */
+  var GFSR = null, GFSM = null, GTAG = "", gfsLoading = null;
+  function gfsTimes() { return GFSR && GFSM ? GFSM.times.map(tms) : []; }
+  function loadGfs() {
+    var g = FR && FR.gfs; if (!g || !WK || GFSR === g.run || gfsLoading === g.run) return;
+    gfsLoading = g.run;
+    function bin(f) { return fetch("/api/wxmap/gfs?f=" + f + "&r=" + encodeURIComponent(g.run), { credentials: "omit" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); }); }
+    Promise.all([bin("p"), bin("c")]).then(function (b) { return poolAll(function () { var p = b[0].slice(0), c = b[1].slice(0); return { msg: { op: "gfs", p: p, c: c, meta: g }, tr: [p, c] }; }); }).then(function () {
+      GFSR = g.run; GFSM = g; GTAG = g.run.replace(/\D/g, "").slice(0, 10); gfsLoading = null;
+      srcSet("gfs", "Worldwide forecast · NOAA GFS", true, "Rain and clouds every 3 hours to 7 days (run " + stamp(tms(g.run)) + ")");
+      if (MODE === "radar") { var t = FRAMES[IDX] ? FRAMES[IDX].t : null; buildFrames(live ? null : t); }
+    }, function (e) { gfsLoading = null; srcSet("gfs", "Worldwide forecast · NOAA GFS", false, "Unavailable: " + (e && e.message || "the model data did not load")); });
+  }
   function protoG(params) {
     var m = /^wxg:\/\/(\w+)\/(\w+)\/(\d+)/.exec(params.url);
     if (!m || !GD[m[1]]) return Promise.resolve({ data: blank() });
@@ -573,8 +638,9 @@
   /* ---------- legend ---------- */
   function legend() {
     var h;
-    var fc = FRAMES[IDX] && FRAMES[IDX].kind === "fc";
-    if (MODE === "radar" && fc) h = '<span class="u">Forecast</span><span>Rain</span><span class="bar sm" style="background:linear-gradient(90deg,#d6efd0,#73c476,#228a44,#006c2c)"></span><span>Snow</span><span class="bar sm" style="background:linear-gradient(90deg,#81c0d5,#1b8db3,#003f7f)"></span><span>Mix</span><span class="bar sm" style="background:linear-gradient(90deg,#e6e5f1,#7e79b8)"></span>';
+    var fc = FRAMES[IDX] && FRAMES[IDX].kind === "fc" && FRAMES[IDX].layer;   /* HRRR keeps its own rain / snow / mix colours; GFS uses the radar scale */
+    if (MODE === "radar" && FRAMES[IDX] && FRAMES[IDX].kind === "fc" && !fc) h = '<span class="u">Model</span><span>Light</span><span class="bar" style="background:' + RADAR_GRAD + '"></span><span>Heavy</span>';
+    else if (MODE === "radar" && fc) h = '<span class="u">Forecast</span><span>Rain</span><span class="bar sm" style="background:linear-gradient(90deg,#d6efd0,#73c476,#228a44,#006c2c)"></span><span>Snow</span><span class="bar sm" style="background:linear-gradient(90deg,#81c0d5,#1b8db3,#003f7f)"></span><span>Mix</span><span class="bar sm" style="background:linear-gradient(90deg,#e6e5f1,#7e79b8)"></span>';
     else if (MODE === "radar") h = '<span class="u">Radar</span><span>Light</span><span class="bar" style="background:' + RADAR_GRAD + '"></span><span>Heavy</span>';
     else if (MODE === "temp") h = '<span class="u">°F</span><span>0</span><span class="bar" style="background:' + grad(PAL.temp, -20, 112) + '"></span><span>100+</span>';
     else if (MODE === "rain") h = '<span class="u">Rain</span><span>.02"</span><span class="bar" style="background:' + grad(PAL.rain, 0.02, 2) + '"></span><span>2"+ / 3 h</span>';
@@ -676,6 +742,7 @@
       LGRP[k].forEach(function (id) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
     });
     [].forEach.call(document.querySelectorAll("[data-lay]"), function (i) { i.checked = !!LAYS[i.dataset.lay]; });
+    if (MODE === "radar" && RCUR) rOp(RCUR, ROP, 150);
   }
   function timeFilters() {
     if (!map || !ready || !map.getLayer("rep")) return;
@@ -771,7 +838,7 @@
     var r = document.querySelector('.wx-lay[data-k="reports"] .wx-lt');
     if (r) r.insertAdjacentHTML("beforeend", '<span class="wx-keys">' + [["tor", "Tornado"], ["hail", "Hail"], ["wind", "Wind"], ["flood", "Flash flood"], ["snow", "Snow"]].map(function (x) { return '<span><i style="border-radius:50%;background:' + RC[x[0]] + '"></i>' + x[1] + '</span>'; }).join("") + '</span>');
   })();
-  $("wx_src").innerHTML = 'U.S. radar: NOAA MRMS via <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener">Iowa Environmental Mesonet</a>; forecast radar: NOAA HRRR. Worldwide radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>. Temperature, rain and snow: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Warnings and storm reports: NWS. Tornado tracks: NWS Damage Assessment Toolkit. Cyclones: NHC, <a href="https://www.gdacs.org/" target="_blank" rel="noopener">GDACS</a> and IBTrACS (NOAA NCEI). Global alerts: GDACS (UN, European Commission). Outlooks: NOAA SPC.';
+  $("wx_src").innerHTML = 'U.S. radar: NOAA MRMS via <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener">Iowa Environmental Mesonet</a>; forecast radar: NOAA HRRR. Worldwide: satellite clouds from NASA GIBS (GOES-East, GOES-West, Himawari) and <a href="https://www.eumetsat.int/" target="_blank" rel="noopener">EUMETSAT</a> Meteosat (CC BY 4.0), satellite rain from NASA IMERG, forecast rain and clouds from NOAA GFS. Temperature, rain and snow: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0). Warnings and storm reports: NWS. Tornado tracks: NWS Damage Assessment Toolkit. Cyclones: NHC, <a href="https://www.gdacs.org/" target="_blank" rel="noopener">GDACS</a> and IBTrACS (NOAA NCEI). Global alerts: GDACS (UN, European Commission). Outlooks: NOAA SPC.';
 
   /* ---------- cards ---------- */
   var card = $("wx_card"), pinned = null, IDXF = {};
@@ -959,6 +1026,7 @@
   var ready = false;
   function boot() {
     if (!window.maplibregl) { $("wx_when").textContent = "The map could not start in this browser."; finish(); return; }
+    if (maplibregl.setMaxParallelImageRequests) maplibregl.setMaxParallelImageRequests(48);   /* frames ahead load in parallel (our own queue does the throttling) */
     if (PROTO) maplibregl.addProtocol("wxr", proto);
     if (WK) maplibregl.addProtocol("wxg", protoG);
     map = new maplibregl.Map({ container: "wx_map", style: style(), bounds: US0, fitBoundsOptions: { padding: PAD() }, minZoom: 1.2, maxZoom: 11,
@@ -971,7 +1039,7 @@
     };
     map.touchZoomRotate.disableRotation();
     map.dragPan.enable({ linearity: 0.25, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, deceleration: 2200, maxSpeed: 1600 });
-    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · Weather: NOAA/NWS, IEM, <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>, <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, GDACS' }), "bottom-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · Weather: NOAA/NWS, IEM, NASA GIBS, <a href="https://www.eumetsat.int/" target="_blank" rel="noopener">&copy; EUMETSAT</a> (CC BY 4.0), <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>, GDACS' }), "bottom-right");
     map.on("load", function () {
       var at = document.querySelector(".maplibregl-ctrl-attrib"); if (at) at.classList.remove("maplibregl-compact-show");
       addOverlayLayers(); ready = true; setLayerVis();
@@ -1008,17 +1076,21 @@
   function srcSet(k, label, ok, why) { SRC[k] = { label: label, ok: ok, why: why }; srcPaint(); }
   function srcPaint() {
     var el = $("wx_srcs"); if (!el) return;
-    el.innerHTML = ["radar_us", "radar_fc", "radar_world", "grid_us", "grid_world"].filter(function (k) { return SRC[k]; }).map(function (k) {
+    el.innerHTML = ["radar_us", "radar_fc", "sat", "imerg", "gfs", "grid_us", "grid_world"].filter(function (k) { return SRC[k]; }).map(function (k) {
       var x = SRC[k]; return '<li class="' + (x.ok ? "ok" : "off") + '"><i></i><span><b>' + esc(x.label) + "</b>" + (x.why ? "<small>" + esc(x.why) + "</small>" : "") + "</span></li>";
     }).join("");
   }
   function loadFrames(first) {
     return jget("/api/wxmap/frames").then(function (d) {
       var s = d.sources || {};
-      FR = d; ERR.radar = (!d.past.length && !d.forecast.length && !(d.global && d.global.past.length)) ? ((s.past && s.past.reason) || "Radar is unavailable right now") : null;
-      srcSet("radar_us", "U.S. radar · NOAA MRMS", !!(s.past && s.past.ok), s.past && s.past.ok ? "Past 6 hours, every 10 minutes" : s.past && s.past.reason);
+      FR = d; ERR.radar = (!d.past.length && !d.forecast.length && !d.gfs) ? ((s.past && s.past.reason) || "Radar is unavailable right now") : null;
+      srcSet("radar_us", "U.S. radar · NOAA MRMS", !!(s.past && s.past.ok), s.past && s.past.ok ? "Past 12 hours" : s.past && s.past.reason);
       srcSet("radar_fc", "U.S. radar forecast · NOAA HRRR", !!(s.forecast && s.forecast.ok), s.forecast && s.forecast.ok ? "Out to about 48 hours" : s.forecast && s.forecast.reason);
-      srcSet("radar_world", "Worldwide radar · RainViewer", !!(s.global && s.global.ok) && PROTO, !PROTO ? "Needs a newer browser (shown in the U.S. only)" : s.global && s.global.ok ? "Last 2 hours, where radars exist" : s.global && s.global.reason);
+      var sd = s.sat && s.sat.down ? Object.keys(s.sat.down) : [], SN = { ge: "GOES-East", gw: "GOES-West", hi: "Himawari", ms: "Meteosat", io: "Meteosat Indian Ocean" };
+      srcSet("sat", "Satellite clouds · NASA GIBS, EUMETSAT", !!(s.sat && s.sat.ok) && PROTO, !PROTO ? "Needs a newer browser" : s.sat && s.sat.ok ? (sd.length ? "Infrared, every 10 to 60 minutes. Missing now: " + sd.map(function (k) { return SN[k] || k; }).join(", ") : "Infrared, worldwide, every 10 to 60 minutes") : s.sat && s.sat.reason);
+      srcSet("imerg", "Satellite rain · NASA IMERG", !!(s.imerg && s.imerg.ok) && PROTO, !PROTO ? "Needs a newer browser" : s.imerg && s.imerg.ok ? "Worldwide, every 30 minutes, arrives about 4 to 6 hours late (newest " + stamp(tms(s.imerg.latest)) + ")" : s.imerg && s.imerg.reason);
+      if (!d.gfs) srcSet("gfs", "Worldwide forecast · NOAA GFS", false, (s.gfs && s.gfs.reason) || "Loading");
+      loadGfs();
       var b = document.querySelector('#wx_modes [data-m="radar"]'); b.disabled = !!ERR.radar; b.title = ERR.radar || "";
       LD.frames = 1; ldRow("radar", "Indexed", false); ldUpdate();
       if (MODE === "radar") {
