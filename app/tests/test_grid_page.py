@@ -29,3 +29,13 @@ class GridPage(unittest.TestCase):
             for c in ("#f5a524", "#ffd", "#ffcc00", "#ffeb3b", "#fde047", "#facc15"): self.assertNotIn(c, t)
 
 if __name__ == "__main__": unittest.main()
+
+class MapsOpenOnUS(unittest.TestCase):
+    """Matt (Nov 21 7:37 PM ET): every map opens on the continental U.S."""
+    def test_initial_views(self):
+        rd = lambda p: open(os.path.join(APP, p), encoding="utf-8").read()
+        self.assertIn("? (VIEWS[state.view] || VIEWS.world) : VIEWS.us", rd("signal_map_static/map2.js"))
+        for p in ("heatmap_static/app.js", "solar_seismic_static/app.js", "solar_seismic_static/live.js", "trends_static/app.js", "solar_quake_static/app.js"):
+            self.assertIn("fitBounds([[24.5,-125],[49.5,-66.5]])", rd(p), p)
+        self.assertNotIn("setView([20,0],2)", rd("static/cohesion.js").replace("MP.map&&MP.map.setView([20,0],2)", ""))
+        self.assertIn("bounds: US", rd("gridpage_static/grid.js"))
