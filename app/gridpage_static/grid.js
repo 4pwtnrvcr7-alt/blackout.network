@@ -95,6 +95,13 @@
       f.push({ type: "Feature", geometry: { type: "Point", coordinates: [x.lon, x.lat] }, properties: { k: "s:" + x.st, kind: "state", s: s, c: COL[s], n: x.outages } }); });
     D.weather.forEach(function (w) { if (w.lat == null || w.lon == null) return; var s = wxStatus(w); IDX["w:" + w.cluster_id] = w;
       f.push({ type: "Feature", geometry: { type: "Point", coordinates: [w.lon, w.lat] }, properties: { k: "w:" + w.cluster_id, kind: "weather", s: s, c: COL[s] } }); });
+    if (WD) {
+      WD.operators.forEach(function (o) { var s = regStatus(o.status); IDX["i:" + o.id] = o;
+        f.push({ type: "Feature", geometry: { type: "Point", coordinates: [o.lon, o.lat] }, properties: { k: "i:" + o.id, kind: "region", s: s, c: COL[s], label: o.id === "GRIDINDIA" ? "INDIA" : o.id === "ENTSOE" ? "ENTSO-E" : o.id } }); });
+      var seen = {}; D.weather.forEach(function (w) { seen[w.cluster_id] = 1; });
+      WD.wire.forEach(function (x) { if (seen[x.id]) return; var s = (x.rank || 0) >= 7 ? "out" : "strain"; IDX["x:" + x.id] = x;
+        f.push({ type: "Feature", geometry: { type: "Point", coordinates: [x.lon, x.lat] }, properties: { k: "x:" + x.id, kind: "weather", s: s, c: COL[s] } }); });
+    }
     return { type: "FeatureCollection", features: f };
   }
 
@@ -112,6 +119,23 @@
       if (o.reasons && o.reasons.length) h += '<ul>' + o.reasons.slice(0, 3).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + '</ul>';
       h += '<p class="age">States: ' + esc((o.states || []).join(", ")) + (o.eia_hour ? ' · EIA hour ' + esc(ago(o.eia_hour)) : '') + '</p>';
       h += '<div class="acts">' + (url(o.site) ? '<a href="' + url(o.site) + '" target="_blank" rel="noopener noreferrer">Operator dashboard</a>' : '') + '<button type="button" class="gx-fly" data-more="gx-regions">All operators</button></div>';
+    } else if (t === "i") {
+      var si = regStatus(o.status);
+      h = '<span class="st" style="color:' + COL[si] + '"><i style="background:' + COL[si] + '"></i>Grid operator · ' + esc(regLabel(o.status)) + '</span><h3>' + esc(o.name) + '</h3>';
+      if (o.status !== "nodata") {
+        h += '<dl><dt>Demand</dt><dd>' + num(o.demand_mw) + ' MW</dd>' + (o.vs_yesterday_pct != null ? '<dt>vs yesterday</dt><dd>' + pct(o.vs_yesterday_pct) + '</dd>' : '') +
+          (o.carbon_g_kwh != null ? '<dt>Carbon intensity</dt><dd>' + esc(o.carbon_g_kwh) + ' g/kWh' + (o.carbon_index ? ' (' + esc(o.carbon_index) + ')' : '') + '</dd>' : '') +
+          '<dt>Wire grid alerts, 12 h</dt><dd>' + o.alerts_12h + '</dd></dl>' + spark(o.series, COL[si]);
+      }
+      if (o.reason) h += '<ul><li>' + esc(o.reason) + '</li></ul>';
+      h += '<p class="age">' + (o.source ? esc(o.source) : 'No live feed') + (o.data_time ? ' · ' + esc(ago(o.data_time)) : '') + '</p>';
+      h += '<div class="acts">' + (url(o.site) ? '<a href="' + url(o.site) + '" target="_blank" rel="noopener noreferrer">Operator site</a>' : '') + '<button type="button" class="gx-fly" data-more="gx-world">Worldwide</button></div>';
+    } else if (t === "x") {
+      var sx = (o.rank || 0) >= 7 ? "out" : "strain", dx = /^[0-9a-f]{16}$/.test(o.id || "") ? "/wire/" + o.id : "";
+      h = '<span class="st" style="color:' + COL[sx] + '"><i style="background:' + COL[sx] + '"></i>Grid alert · rank ' + esc(o.rank) + '</span><h3>' + esc(o.title) + '</h3>' +
+        (o.place ? '<p class="age">' + esc(o.place) + (o.prec && o.prec !== "exact" && o.prec !== "city" ? ' (approximate)' : '') + '</p>' : '') +
+        '<p class="age">' + esc(ago(o.t)) + (o.src ? ' · ' + esc(String(o.src).replace(/\s*\([^)]*\)/g, "").slice(0, 40)) : '') + '</p><div class="acts">' + (dx ? '<a href="' + dx + '">Read on the Wire</a>' : '') +
+        (url(o.url) ? '<a href="' + url(o.url) + '" target="_blank" rel="noopener noreferrer">Source</a>' : '') + '</div>';
     } else if (t === "s") {
       var s2 = stStatus(o.outages);
       h = '<span class="st" style="color:' + COL[s2] + '"><i style="background:' + COL[s2] + '"></i>State · ' + (o.outages ? (o.outages >= 1500 ? "Major outages" : "Outages reported") : "No outages reported") + '</span><h3>' + esc(o.name) + '</h3>' +
@@ -152,7 +176,7 @@
     if (!window.maplibregl) { $("gx_sum").textContent = "The map could not start in this browser."; step("map"); return; }
     map = new maplibregl.Map({ container: "gx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD() }, minZoom: 1.2, maxZoom: 12,
       attributionControl: false, maplibreLogo: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0, fadeDuration: 200 });
-    window.__gxMap = map;
+    window.__gxMap = map; window.__gxIdx = IDX;   /* QA hooks (read-only) */
     map.touchZoomRotate.disableRotation();
     map.dragPan.enable({ linearity: 0.25, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, deceleration: 2200, maxSpeed: 1600 });
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }), "bottom-right");
@@ -163,7 +187,7 @@
       map.addSource("pts", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "glow", type: "circle", source: "pts", paint: { "circle-color": ["get", "c"], "circle-blur": 1, "circle-opacity": 0.35,
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, ["match", ["get", "kind"], "region", 22, "weather", 12, 8], 6, ["match", ["get", "kind"], "region", 40, "weather", 14, 16]] } });
-      map.addLayer({ id: "pulse", type: "circle", source: "pts", filter: ["any", ["==", ["get", "s"], "out"], ["all", ["==", ["get", "kind"], "region"], ["!=", ["get", "s"], "ok"]]], paint: { "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": ["get", "c"], "circle-stroke-width": 1.4, "circle-radius": 10, "circle-stroke-opacity": 0.6 } });
+      map.addLayer({ id: "pulse", type: "circle", source: "pts", filter: ["any", ["==", ["get", "s"], "out"], ["all", ["==", ["get", "kind"], "region"], ["==", ["get", "s"], "strain"]]], paint: { "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": ["get", "c"], "circle-stroke-width": 1.4, "circle-radius": 10, "circle-stroke-opacity": 0.6 } });
       map.addLayer({ id: "region", type: "circle", source: "pts", filter: ["==", ["get", "kind"], "region"], paint: { "circle-color": "#05060a", "circle-stroke-color": ["get", "c"], "circle-stroke-width": 3,
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, 7, 6, 11] } });
       map.addLayer({ id: "region-core", type: "circle", source: "pts", filter: ["==", ["get", "kind"], "region"], paint: { "circle-color": ["get", "c"], "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, 3, 6, 5] } });
@@ -196,7 +220,16 @@
       ready = true; paint();
     });
   }
-  var SECG = null, ready = false;
+  var SECG = null, ready = false, WD = null;
+  var VIEWS = { us: { b: US }, eu: { b: [[-11, 35], [32, 61]] }, apac: { b: [[66, -46], [179, 50]] }, world: { c: [12, 22], z: innerWidth < 768 ? 0.6 : 1.4 } };
+  function region(r) {
+    var v = VIEWS[r]; if (!map || !v) return;
+    [].forEach.call(document.querySelectorAll("#gx_reg button"), function (b) { b.setAttribute("aria-pressed", b.dataset.r === r ? "true" : "false"); });
+    hideCard(true);
+    if (v.b) map.fitBounds(v.b, { padding: PAD(), duration: 1400, essential: true, easing: function (t) { return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; } });
+    else map.flyTo({ center: v.c, zoom: v.z, speed: 0.9, curve: 1.4, essential: true });
+  }
+  document.getElementById("gx_reg").addEventListener("click", function (e) { var b = e.target.closest("button[data-r]"); if (b) region(b.dataset.r); });
   function paint() {
     if (!ready || !D) return;
     map.getSource("pts").setData(features());
@@ -250,6 +283,28 @@
       ["eia", "odin", "nws", "swpc", "shelters"].map(function (k) { return k.toUpperCase() + " " + (fr[k] && fr[k].age_min != null ? fr[k].age_min + " min" : "no data"); }).join(" · ") +
       '. Operator status is our own reading of these feeds, not an official operator status.</p>');
     $("gx_st").addEventListener("change", function () { loadState(this.value); });
+    renderWorld();
+  }
+  function renderWorld() {
+    if (!WD) return;
+    var ops = WD.operators.slice().sort(function (a, b) { var o = { online: 0, watch: 1, degraded: 1, offline: 1, nodata: 2 }; return (o[a.status] || 2) - (o[b.status] || 2); });
+    var h = '<p class="gx-k" style="margin-top:6px">Operators outside the U.S.</p>' + ops.map(function (o) { var s = regStatus(o.status);
+      return '<div class="gx-row"><h4><i style="background:' + COL[s] + '"></i>' + esc(o.name) + '</h4><span class="n">' + (o.status !== "nodata" && o.demand_mw != null ? num(o.demand_mw) + " MW" : "No live data") + '</span>' +
+        '<span class="m">' + (o.status !== "nodata" ? esc(regLabel(o.status)) + (o.vs_yesterday_pct != null ? ' · ' + pct(o.vs_yesterday_pct) + ' vs yesterday' : '') + (o.carbon_g_kwh != null ? ' · ' + esc(o.carbon_g_kwh) + ' g CO2/kWh' : '') + ' · ' + esc(ago(o.data_time)) : esc(o.reason || "No live feed")) +
+        ' · <button type="button" class="gx-fly" data-fly="i:' + esc(o.id) + '">Show on map</button>' + (url(o.site) ? ' · <a href="' + url(o.site) + '" target="_blank" rel="noopener noreferrer">Operator site</a>' : '') + '</span>' +
+        (o.series && o.series.length > 1 && o.status !== "nodata" ? '<span class="spk">' + spark(o.series, COL[s]) + '</span>' : '') + '</div>'; }).join("");
+    var wx = WD.wire.slice(0, 25);
+    h += '<p class="gx-k" style="margin-top:16px">Grid and blackout alerts on the Wire, last 7 days</p>' + (wx.length ? wx.map(function (x) { var d = /^[0-9a-f]{16}$/.test(x.id || "") ? "/wire/" + x.id : "";
+      return '<div class="gx-row"><h4><span class="gx-rk' + ((x.rank || 0) >= 7 ? " hi" : "") + '">' + esc(x.rank) + '</span>' + esc(x.title) + '</h4><span class="n"></span><span class="m">' + esc(x.place || x.cc || "") + ' · ' + esc(ago(x.t)) +
+        ' · <button type="button" class="gx-fly" data-fly="x:' + esc(x.id) + '">Show on map</button>' + (d ? ' · <a href="' + d + '">Story</a>' : '') + '</span></div>'; }).join("")
+      : '<p class="gx-empty">No grid or blackout alerts with a place on the Wire in the last 7 days.</p>');
+    h += '<p class="gx-empty" style="margin-top:10px">Live operator feeds refresh every ' + Math.round((WD.ttl_s || 300) / 60) + ' minutes. Operators without a free public feed show as no live data; nothing is estimated.</p>';
+    sec("gx-world", h);
+  }
+  function loadWorld() {
+    return fetch("/api/gridpage/world").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (w) {
+      WD = w; WD.operators = WD.operators || []; WD.wire = WD.wire || []; renderWorld(); if (D) paint();
+    }).catch(function () { sec("gx-world", '<p class="gx-empty">Worldwide grid data could not be loaded right now.</p>'); });
   }
   function loadThreats() {
     fetch("/api/grid?limit=60").then(function (r) { return r.json(); }).then(function (g) {
@@ -309,6 +364,6 @@
       step("data"); render(); paint(); if (!ready) setTimeout(function () { step("pts"); }, 6000);
     }).catch(function () { $("gx_sum").textContent = "Grid status is unavailable right now"; step("data"); step("pts"); });
   }
-  boot(); load(); loadThreats();
-  setInterval(function () { if (!document.hidden) load(); }, 120000);
+  boot(); load(); loadThreats(); loadWorld();
+  setInterval(function () { if (!document.hidden) { load(); loadWorld(); } }, 120000);
 })();
