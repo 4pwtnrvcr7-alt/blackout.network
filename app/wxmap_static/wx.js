@@ -272,8 +272,24 @@
         w.busy = 0; POOL.push(w);
       }
       WK = POOL[0];
+      if (pmBug()) poolAll(function () { return { msg: { op: "cfg", pm: true }, tr: [] }; });
     } catch (e) { WK = false; POOL = []; }
     return WK;
+  }
+  /* Safari/WebKit: does WebGL take an ImageBitmap without premultiplying it? (then the workers premultiply; see wxw.js put()) */
+  function pmBug() {
+    try {
+      var c = new OffscreenCanvas(2, 2), x = c.getContext("2d"), im = x.createImageData(2, 2);
+      for (var i = 0; i < 16; i += 4) { im.data[i] = im.data[i + 1] = im.data[i + 2] = 240; im.data[i + 3] = 107; }
+      x.putImageData(im, 0, 0); var bm = c.transferToImageBitmap();
+      var cv = document.createElement("canvas"); cv.width = cv.height = 2; var gl = cv.getContext("webgl"); if (!gl) return false;
+      var t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, bm);
+      var fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      var px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      var lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
+      return px[3] > 0 && px[0] > 160;   /* premultiplied would read about 100 */
+    } catch (e) { return false; }
   }
   /* tile jobs: queued on this side so a frame the map has already dropped (aborted request) never costs a decode */
   var POOL = [], TQ = [];
@@ -926,13 +942,16 @@
     showCard('<span class="st" style="color:#5AB4FF"><i style="background:#5AB4FF"></i>Forecast</span><h3>' + esc(loc.name || "This spot") + '</h3><p class="age">Loading the forecast…</p>', null, true);
     var q = "lat=" + loc.lat.toFixed(4) + "&lon=" + loc.lon.toFixed(4) + (loc.cc ? "&cc=" + encodeURIComponent(loc.cc) : "") + (loc.name ? "&name=" + encodeURIComponent(loc.name) : "") + (loc.admin1 ? "&admin1=" + encodeURIComponent(loc.admin1) : "");
     jget("/api/weather?" + q).then(function (d) {
-      var s = d.sources || {}, om = s.open_meteo && s.open_meteo.ok ? s.open_meteo.data : null, h = "";
+      var s = d.sources || {}, fb = !(s.open_meteo && s.open_meteo.ok) && s.fallback && s.fallback.ok ? s.fallback : null, om = s.open_meteo && s.open_meteo.ok ? s.open_meteo.data : fb ? fb.data : null, h = "";
       var nm = [loc.name, loc.admin1 && loc.admin1 !== loc.name ? loc.admin1 : ""].filter(Boolean).join(", ");
       h += '<span class="st" style="color:#5AB4FF"><i style="background:#5AB4FF"></i>Forecast</span><h3>' + esc(nm || "This spot") + "</h3>";
       if (om && om.current) {
         var c = om.current;
         h += '<div class="wx-now-big"><b>' + fF(c.temperature_2m) + '</b><span>' + esc(WMO[c.weather_code] || "") + "<br>Feels like " + fF(c.apparent_temperature) + "</span></div>";
-        h += '<p class="age">Wind ' + MPH(c.wind_speed_10m) + (c.wind_gusts_10m ? ", gusts " + MPH(c.wind_gusts_10m) : "") + " · Humidity " + esc(c.relative_humidity_2m) + "%</p>";
+        var kv = [];
+        if (c.wind_speed_10m != null) kv.push("Wind " + MPH(c.wind_speed_10m) + (c.wind_gusts_10m ? ", gusts " + MPH(c.wind_gusts_10m) : ""));
+        if (c.relative_humidity_2m != null) kv.push("Humidity " + esc(Math.round(c.relative_humidity_2m)) + "%");
+        if (kv.length) h += '<p class="age">' + kv.join(" · ") + "</p>";
         var hr = om.hourly || {}, out = "";
         for (var i = 0, n = 0; hr.time && i < hr.time.length && n < 12; i++) {
           var hh = hr.time[i]; if (hh < (c.time || "")) continue;
@@ -954,7 +973,7 @@
       al.slice(0, 3).forEach(function (a) { h += '<div class="wx-al' + (/Tornado/.test(a.event || "") ? " tor" : "") + '"><b>' + esc(a.event) + "</b>" + (a.expires ? '<span class="age">Until ' + esc(stamp(tms(a.expires))) + "</span>" : "") + "</div>"; });
       var nf = s.nws_forecast && s.nws_forecast.ok && s.nws_forecast.data.periods && s.nws_forecast.data.periods[0];
       if (nf) h += "<p><b>" + esc(nf.name) + ":</b> " + esc(nf.detailedForecast || nf.shortForecast) + "</p>";
-      h += '<p class="age">' + (nf ? "National Weather Service · " : "") + "Open-Meteo</p>";
+      h += '<p class="age">' + (fb ? esc(fb.label) : (nf ? "National Weather Service · " : "") + "Open-Meteo") + "</p>";
       showCard(h, null, true);
     }).catch(function () { showCard('<h3>' + esc(loc.name || "This spot") + '</h3><p class="age">The forecast is unavailable right now.</p>', null, true); });
   }
@@ -1114,7 +1133,7 @@
       return post.then(function () {
         GD[gk] = g; GERR[gk] = null; FC = {};
         MB.forEach(function (b, k) { if (k.indexOf(gk + "|") === 0) { try { b.close(); } catch (e) {} MB.delete(k); } });
-        srcSet("grid_" + gk, gk === "us" ? "U.S. temperature, rain, snow · Open-Meteo 1.5°" : "Worldwide temperature, rain, snow · Open-Meteo 4°", true, "Past day and next 7 days, every 3 hours");
+        srcSet("grid_" + gk, (gk === "us" ? "U.S. temperature, rain, snow · " : "Worldwide temperature, rain, snow · ") + (d.label || "Open-Meteo"), true, d.note || ("Past day and next 7 days, every 3 hours · as of " + stamp(tms(d.as_of || d.generated))));
         if (WK) ["temp", "rain", "snow"].forEach(function (m) { var b = document.querySelector('#wx_modes [data-m="' + m + '"]'); b.disabled = false; b.title = ""; });
         ERR.grid = null;
         if (MODE !== "radar") { if (map && ready) gHide(); buildFrames(FRAMES[IDX] ? FRAMES[IDX].t : null); }

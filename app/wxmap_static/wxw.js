@@ -87,11 +87,20 @@ function domMask(z, x, y, W, H, feather) {
     if (r) for (var q = 0; q < W; q++) m[py * W + q] = r * cols[q]; }
   return m;
 }
+/* WebKit (Safari, every iOS browser) uploads an ImageBitmap to WebGL without premultiplying it, so MapLibre's premultiplied blending turned
+   every semi-transparent pixel into solid white (Nov 22 2026, pt1747u: the white blocks and stripe on iPhone). The page tests for that
+   once and tells the workers; then the pixels are premultiplied here, which is what the GPU gets on every browser. */
+var PMFIX = false;
+function put(cx, im) {
+  if (PMFIX) { var d = im.data; for (var i = 0; i < d.length; i += 4) { var a = d[i + 3]; if (a === 255) continue; if (a === 0) { d[i] = d[i + 1] = d[i + 2] = 0; continue; } d[i] = d[i] * a / 255; d[i + 1] = d[i + 1] * a / 255; d[i + 2] = d[i + 2] * a / 255; } }
+  cx.putImageData(im, 0, 0);
+}
 function done(cx) { var b; if (CV.transferToImageBitmap) { b = CV.transferToImageBitmap(); CV = null; return b; } return createImageBitmap(CV); }
 function radarTile(kind, buf, z, x, y, sec) {
   return createImageBitmap(new Blob([buf], { type: "image/png" })).then(function (bmp) {
     var W = bmp.width, H = bmp.height;
-    if (kind === "h") return bmp;   /* HRRR forecast tiles keep their own rain / snow / mix colours */
+    if (kind === "h" && !PMFIX) return bmp;   /* HRRR forecast tiles keep their own rain / snow / mix colours */
+    if (kind === "h") { var hc = canvas(W, H); hc.clearRect(0, 0, W, H); hc.drawImage(bmp, 0, 0); bmp.close(); put(hc, hc.getImageData(0, 0, W, H)); return done(hc); }
     if (kind === "i") {   /* fully inside the NOAA domain: the U.S. radar covers it */
       var lw = tileLon(x, z), le = tileLon(x + 1, z), ln = tileLat(y, z), ls = tileLat(y + 1, z);
       if (lw >= DOM.w && le <= DOM.e && ls >= DOM.s && ln <= DOM.n) { bmp.close(); return blank1(); }
@@ -120,7 +129,7 @@ function radarTile(kind, buf, z, x, y, sec) {
         for (var a1 = 1; a1 < 9; a1++) { var key = nb[a1], b1 = a1 - 1; while (b1 >= 0 && nb[b1] > key) { nb[b1 + 1] = nb[b1]; b1--; } nb[b1 + 1] = key; }
         clT(nb[4], o, d, wt);
       }
-      cx.putImageData(im, 0, 0); return done(cx);
+      put(cx, im); return done(cx);
     }
     var mask = kind === "i" ? domMask(z, x, y, W, H, 0) : null, D = new Float32Array(N), any = false;
     for (i = 0; i < N; i++) {
@@ -145,7 +154,7 @@ function radarTile(kind, buf, z, x, y, sec) {
       var q = j * 4, val = Math.max(S[j], D[j] * 0.85), li = Math.min(200, Math.round(val * 2)) * 4;
       d[q] = DLUT[li]; d[q + 1] = DLUT[li + 1]; d[q + 2] = DLUT[li + 2]; d[q + 3] = DLUT[li + 3];
     }
-    cx.putImageData(im, 0, 0);
+    put(cx, im);
     return done(cx);
   });
 }
@@ -234,7 +243,7 @@ function gfsTile(m) {   /* one 256 px Web-Mercator tile of GFS rain (kind "p", m
     }
   }
   if (!any) return blank1();
-  cx.putImageData(im, 0, 0);
+  put(cx, im);
   var b = CV.transferToImageBitmap(); CV = null; return b;
 }
 
@@ -305,7 +314,7 @@ function fieldImage(m) {
       D[o] = c[0]; D[o + 1] = c[1]; D[o + 2] = c[2]; D[o + 3] = Math.round(c[3] * 255 * fade);
     }
   }
-  cx.putImageData(im, 0, 0);
+  put(cx, im);
   var b = CV.transferToImageBitmap(); CV = null; return b;
 }
 
@@ -317,6 +326,8 @@ self.onmessage = function (e) {
     gfsLoad(m).then(function () { self.postMessage({ id: m.id, ok: 1 }); }, function (err) { self.postMessage({ id: m.id, err: String(err && err.message || err) }); });
   } else if (m.op === "gfstile") {
     try { var g = gfsTile(m); self.postMessage({ id: m.id, bmp: g }, g ? [g] : []); } catch (err) { self.postMessage({ id: m.id, err: String(err && err.message || err) }); }
+  } else if (m.op === "cfg") {
+    PMFIX = !!m.pm; self.postMessage({ id: m.id, ok: 1 });
   } else if (m.op === "grid") {
     GR[m.key] = m.grid; self.postMessage({ id: m.id, ok: 1 });
   } else if (m.op === "field") {

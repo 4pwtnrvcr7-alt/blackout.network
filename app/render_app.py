@@ -677,6 +677,9 @@ if __name__ == "__main__":
         import story_writer
         story_writer.start(ready=lambda: has_data() and HANDOFF["state"] != "pending", paused=lambda: FREEZE["until"] > time.time())
     except Exception: traceback.print_exc()
+    try:   # Nov 22 2026 (pt1745u): during the handoff (before we bind) the weather map takes the old instance's Open-Meteo grids, so a deploy never refills them
+        threading.Thread(target=lambda: server._addon_mod("wxmap").warm_once(), name="wxmap-boot", daemon=True).start()
+    except Exception: traceback.print_exc()
     wait_before_bind()
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True
