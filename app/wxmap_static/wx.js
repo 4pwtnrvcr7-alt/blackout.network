@@ -131,7 +131,7 @@
     }
     FRAMES = out;
     var now = Date.now(); NOWI = 0;
-    for (var i = 0; i < out.length; i++) if (out[i].t <= now + 60000) NOWI = i;
+    for (var i = 0; i < out.length; i++) if (out[i].t <= now + 60000 && (MODE !== "radar" || out[i].kind === "past")) NOWI = i;   /* radar "now" is always the latest observed scan */
     var r = $("wx_range"); r.max = Math.max(0, out.length - 1);
     var target = (keepT == null || live) ? NOWI : nearest(keepT);
     ticks();
