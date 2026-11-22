@@ -19,7 +19,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "wxmap_static")
-FILES = {"wx.js": "application/javascript", "wx.css": "text/css"}
+FILES = {"wx.js": "application/javascript", "wx.css": "text/css", "wxw.js": "application/javascript"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "Mozilla/5.0 (compatible; blackout.network weather map; +https://blackout.network/weather)"
 IEM_TILE = "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/{layer}/{z}/{x}/{y}.png"
@@ -111,51 +111,120 @@ def frames():
             while d <= max(end1, end2):
                 run = ini if d <= end1 else ext
                 fm = int((d - run).total_seconds() // 60)
-                if fm >= 0:
+                if fm >= 0 and (d <= start + timedelta(hours=18) or d.hour % 3 == 0):   # hourly for 18 h, then every 3 h (fewer frames to preload)
                     out["forecast"].append({"t": iso(d), "layer": f"hrrr::REFP-F{fm:04d}-{run.strftime('%Y%m%d%H%M')}", "run": iso(run)})
                 d += timedelta(hours=1)
             out["sources"]["forecast"] = {"ok": bool(out["forecast"]), "label": "NOAA HRRR model radar forecast (IEM)", "run": iso(ini), "long_run": iso(ext) if ext else None,
                                           "reason": None if out["forecast"] else "No HRRR forecast frames are published right now"}
         except Exception as ex:
             out["sources"]["forecast"] = {"ok": False, "label": "NOAA HRRR model radar forecast (IEM)", "reason": "Radar forecast is unavailable: " + why(ex)}
+        # global past radar (outside the NOAA domain): RainViewer, last 2 hours at 10-minute steps
+        try:
+            rv = jget("https://api.rainviewer.com/public/weather-maps.json", timeout=10)
+            host = rv.get("host") or "https://tilecache.rainviewer.com"
+            past = [{"t": iso(datetime.fromtimestamp(int(f["time"]), timezone.utc)), "path": f["path"]} for f in (rv.get("radar") or {}).get("past") or [] if f.get("path")]
+            out["global"] = {"host": host, "past": past}
+            out["sources"]["global"] = {"ok": bool(past), "label": "RainViewer global radar", "reason": None if past else "RainViewer published no frames just now"}
+        except Exception as ex:
+            out["global"] = None
+            out["sources"]["global"] = {"ok": False, "label": "RainViewer global radar", "reason": "Global radar is unavailable: " + why(ex)}
         out["tile"] = IEM_TILE
         return out
     return cached(("frames",), 180, go)
 
 # ---------------------------------------------------------------- model grid (temperature / rain / snow)
-G_LAT0, G_LON0, G_STEP, G_NY, G_NX = 23.0, -126.0, 1.5, 19, 41
-GRID_TTL = 6 * 3600
 OM = "https://api.open-meteo.com/v1/forecast"
+# Two grids. "us": 1.5 degrees over the lower 48 (779 points, every 8 h). "world": 4 degrees worldwide, only points that touch land
+# (1,732 points, every 12 h; oceans are masked on the map anyway). Open-Meteo free tier: 10,000 location-calls a day, 600 a minute,
+# so the pulls go out in chunks of <= 300 points spaced 40 s apart, US first. A restart costs about 2,500 calls.
+GRIDS = {
+    "us":    {"lat0": 23.0, "lon0": -126.0, "step": 1.5, "ny": 19, "nx": 41, "ttl": 8 * 3600, "wrap": False, "mask": None},
+    "world": {"lat0": -56.0, "lon0": -180.0, "step": 4.0, "ny": 34, "nx": 90, "ttl": 12 * 3600, "wrap": True,
+              "mask": "AAAAPx8AAAGAAAAAAAAPxwAAAOAAAMwAAAPwAAAAMAAAOwAAAPgAAAAAAAPPwAAAPwAAAAAAAfHgAAA/8AAfAAAf/jAAAA/8AA/gAAf/jAAAAH+AA/8AAf/gBhgAH/AA//gAf/+x/gAP/gZ//gAf/f8eAAf/gZ/+AAP/P8DAAf/wZ/+AA//9ADAA//wB//AD//8AAAD//wB/7AH//wBgAD//gD/8AP//jBgAD/8B//+Dv/wDAAAB/8D//+Hv/wAAAAP/wH///Hv/AABwB//gP///n//AABwB//gP/////+AABwD/+AD//////gAAAH/8AD//////gAAAP/8AD//////8AAAf/8Af//////8AAAf//Ac//////+AAAf//4A///////AwA///4A///////x/h///4A////////v/////A/////////////vHf/////////////////////////////x///////3//////w///////AAf////B/H////AA="},
+}
+CHUNK, CHUNK_GAP = 300, 40
+_OM_LOCK = threading.Lock()   # one Open-Meteo pull at a time, so the two grids never burst together
 
-def grid():
+def _cells(g):
+    n = g["nx"] * g["ny"]
+    if not g["mask"]: return list(range(n))
+    import base64
+    bits = base64.b64decode(g["mask"])
+    return [k for k in range(n) if bits[k >> 3] >> (7 - (k & 7)) & 1]
+
+def _pull(pts):
+    q = {"latitude": ",".join(str(a) for a, _ in pts), "longitude": ",".join(str(b) for _, b in pts),
+         "hourly": "temperature_2m,precipitation,snowfall", "past_days": 1, "forecast_days": 7, "timezone": "GMT", "temporal_resolution": "hourly_3"}
+    u = OM + "?" + urllib.parse.urlencode(q, safe=",")
+    try: d = jget(u, timeout=60)
+    except urllib.error.HTTPError: raise
+    except Exception:
+        time.sleep(3); d = jget(u, timeout=60)   # one retry: the upstream occasionally drops a TLS handshake
+    return d if isinstance(d, list) else [d]
+
+def grid(region="us"):
+    g = GRIDS.get(region) or GRIDS["us"]
     def go():
-        pts = [(round(G_LAT0 + G_STEP * j, 2), round(G_LON0 + G_STEP * i, 2)) for j in range(G_NY) for i in range(G_NX)]
-        def pull(chunk):
-            q = {"latitude": ",".join(str(a) for a, _ in chunk), "longitude": ",".join(str(b) for _, b in chunk),
-                 "hourly": "temperature_2m,precipitation,snowfall", "past_days": 1, "forecast_days": 7, "timezone": "GMT", "temporal_resolution": "hourly_3"}
-            u = OM + "?" + urllib.parse.urlencode(q, safe=",")
-            try: d = jget(u, timeout=40)
-            except Exception:
-                time.sleep(2); d = jget(u, timeout=40)   # one retry: the upstream occasionally drops a TLS handshake
-            return d if isinstance(d, list) else [d]
-        chunks = [pts[k:k + 400] for k in range(0, len(pts), 400)]
-        with ThreadPoolExecutor(2) as ex: res = [r for part in ex.map(pull, chunks) for r in part]
+        cells = _cells(g)
+        pts = [(round(g["lat0"] + g["step"] * (k // g["nx"]), 2), round(((g["lon0"] + g["step"] * (k % g["nx"]) + 180) % 360) - 180, 2)) for k in cells]
+        res = []
+        with _OM_LOCK:
+            for c in range(0, len(pts), CHUNK):
+                if c: time.sleep(CHUNK_GAP)
+                res += _pull(pts[c:c + CHUNK])
         if len(res) != len(pts): raise ValueError("grid size mismatch")
         times = res[0]["hourly"]["time"]
-        nt = len(times)
         T, P, S = [], [], []
-        for k in range(nt):
+        for k in range(len(times)):
             for r in res:
                 h = r["hourly"]
-                t, p, s = h["temperature_2m"][k], h["precipitation"][k], h["snowfall"][k]
+                t, p, s_ = h["temperature_2m"][k], h["precipitation"][k], h["snowfall"][k]
                 T.append(None if t is None else round(t * 9 / 5 + 32))
                 P.append(None if p is None else round(p * 10))
-                S.append(None if s is None else round(s * 10))
-        return {"generated": iso(now()), "lat0": G_LAT0, "lon0": G_LON0, "step": G_STEP, "ny": G_NY, "nx": G_NX,
-                "times": [x + ":00Z" for x in times], "step_h": 3, "temp": T, "precip": P, "snow": S,
+                S.append(None if s_ is None else round(s_ * 10))
+        return {"generated": iso(now()), "region": region, "lat0": g["lat0"], "lon0": g["lon0"], "step": g["step"], "ny": g["ny"], "nx": g["nx"], "wrap": g["wrap"],
+                "cells": cells if g["mask"] else None, "times": [x + ":00Z" for x in times], "step_h": 3, "temp": T, "precip": P, "snow": S,
                 "units": {"temp": "F", "precip": "0.1 mm per 3 h", "snow": "0.1 cm per 3 h"},
-                "source": "Open-Meteo forecast API (NOAA GFS / HRRR and other national models), 1.5-degree grid"}
-    return cached(("grid",), GRID_TTL, go)
+                "source": f"Open-Meteo forecast API (national weather models), {g['step']:g}-degree grid"}
+    return cached(("grid", region), g["ttl"], go)
+
+def grid_bytes(region):
+    """Compact JSON, built once per refresh (the world grid is ~1.7k points x 64 times x 3 fields)."""
+    g = grid(region)
+    key = ("gridb", region, g["generated"])
+    with _L:
+        hit = _C.get(key)
+    if hit: return hit[1]
+    b = json.dumps(g, separators=(",", ":")).encode()
+    with _L:
+        for k in [k for k in _C if k[0] == "gridb" and k[1] == region]: _C.pop(k, None)
+        _C[key] = (time.time(), b)
+    return b
+
+_GRID_BG = {}
+def grid_nowait(region):
+    """Never blocks a request on Open-Meteo: returns the cached grid (possibly stale) and refreshes it in the background."""
+    g = GRIDS.get(region) or GRIDS["us"]
+    with _L:
+        hit = _C.get(("grid", region))
+        fresh = hit and time.time() - hit[0] < g["ttl"]
+        th = _GRID_BG.get(region)
+        start = not fresh and not (th and th.is_alive())
+        if start:
+            th = threading.Thread(target=lambda: _quiet(grid, region), name=f"wxmap-grid-{region}", daemon=True); _GRID_BG[region] = th
+    if start: th.start()
+    return hit[1] if hit else None
+
+def _quiet(fn, *a):
+    try: fn(*a)
+    except Exception as ex:
+        with _L: _C[("griderr", a[0] if a else "")] = (time.time(), why(ex))
+
+def grid_peek(region):
+    """The cached grid if there is one (never starts a pull)."""
+    with _L:
+        hit = _C.get(("grid", region))
+    return hit[1] if hit else None
 
 # ---------------------------------------------------------------- NWS warnings and watches
 NWS = "https://api.weather.gov"
@@ -353,6 +422,50 @@ def _season():
     feats.sort(key=lambda f: f["properties"]["max_kt"])
     return {"type": "FeatureCollection", "features": feats, "season": yr}
 
+# ---------------------------------------------------------------- worldwide: GDACS (UN / European Commission) cyclones, floods, droughts
+GDACS = "https://www.gdacs.org/gdacsapi/api"
+GD_LBL = {"TC": "Tropical cyclone", "FL": "Flood", "DR": "Drought"}
+
+def _gd_tc(ev):
+    """Track (lines), forecast cone and current position for one GDACS cyclone."""
+    p = ev["properties"]
+    g = jget(f"{GDACS}/polygons/getgeometry?eventtype=TC&eventid={p['eventid']}&episodeid={p['episodeid']}", timeout=20)
+    name = (p.get("eventname") or p.get("name") or "").title()
+    out, segs = [], []
+    for f in g.get("features") or []:
+        c = (f.get("properties") or {}).get("Class") or ""; geo = f.get("geometry") or {}
+        if c.startswith("Line_") and geo.get("type") == "LineString": segs.append(geo["coordinates"])
+        elif c == "Poly_Cones": out.append({"type": "Feature", "geometry": _round_geom(geo, 2), "properties": {"kind": "cone", "name": name, "src": "gdacs"}})
+        elif c == "Point_Centroid": out.append({"type": "Feature", "geometry": geo, "properties": {"kind": "point", "name": name, "src": "gdacs"}})
+    if segs: out.append({"type": "Feature", "geometry": {"type": "MultiLineString", "coordinates": [[[round(x, 2), round(y, 2)] for x, y in s_] for s_ in segs]}, "properties": {"kind": "track", "name": name, "src": "gdacs"}})
+    for f in out:
+        f["properties"].update({"cls": (p.get("severitydata") or {}).get("severitytext"), "alert": p.get("alertlevel"), "country": p.get("country"),
+                                "url": (p.get("url") or {}).get("report"), "source": p.get("source")})
+    return out
+
+def gdacs():
+    def go():
+        frm = (now() - timedelta(days=14)).strftime("%Y-%m-%d")
+        d = jget(f"{GDACS}/events/geteventlist/SEARCH?eventlist=TC;FL;DR&alertlevel=green;orange;red&fromDate={frm}&toDate={now().strftime('%Y-%m-%d')}", timeout=25)
+        pts, tcs = [], []
+        for f in d.get("features") or []:
+            p = f.get("properties") or {}
+            if str(p.get("iscurrent")).lower() != "true": continue
+            et = p.get("eventtype")
+            g = f.get("geometry") or {}
+            if g.get("type") != "Point": continue
+            pts.append({"type": "Feature", "geometry": g, "properties": {"et": et, "kind": GD_LBL.get(et, et), "name": p.get("name"), "alert": (p.get("alertlevel") or "").lower(),
+                        "country": p.get("country"), "from": p.get("fromdate"), "to": p.get("todate"), "sev": (p.get("severitydata") or {}).get("severitytext"),
+                        "url": (p.get("url") or {}).get("report")}})
+            if et == "TC": tcs.append(f)
+        tracks = []
+        for f in tcs[:8]:
+            try: tracks += _gd_tc(f)
+            except Exception: continue
+        return {"generated": iso(now()), "events": {"type": "FeatureCollection", "features": pts}, "cyclones": {"type": "FeatureCollection", "features": tracks},
+                "source": "GDACS (Global Disaster Alert and Coordination System, UN / European Commission)"}
+    return cached(("gdacs",), 1800, go)
+
 def tropical():
     out = {"generated": iso(now())}
     try: out["active"] = cached(("nhc",), 900, _nhc); out["active_status"] = {"ok": True}
@@ -364,23 +477,24 @@ def tropical():
 def warm():
     """Fill the slow caches in the background so the first visitor doesn't wait (season tracks: ~12 MB CSV)."""
     def run():
-        for fn in (frames, alerts, storms, tropical, grid):
+        for fn in (frames, alerts, storms, tropical, gdacs):
             try: fn()
             except Exception: pass
+        for r in ("us", "world"):   # one after the other (Open-Meteo per-minute limit)
+            _quiet(grid, r)
     threading.Thread(target=run, name="wxmap-warm", daemon=True).start()
 
 # ---------------------------------------------------------------- page
-LOADER = ('<div class="wx-ld" id="wx_ld" role="status" aria-label="Loading the weather map">'
-  '<div class="wx-flash" aria-hidden="true"></div>'
-  '<svg class="wx-ldsvg" viewBox="0 0 240 200" aria-hidden="true" focusable="false">'
-  '<path class="wx-cloud" d="M62 104a30 30 0 0 1 6-59 42 42 0 0 1 80-8 34 34 0 0 1 32 67z"/>'
-  '<g class="wx-rain"><path d="M70 120l-8 22"/><path d="M96 120l-8 22"/><path d="M150 120l-8 22"/><path d="M176 120l-8 22"/><path d="M83 150l-8 22"/><path d="M163 150l-8 22"/></g>'
-  '<path class="wx-bolt" d="M128 92l-26 46h20l-12 44 36-56h-21l15-34z"/>'
-  '<path class="wx-bolt2" d="M178 98l-10 18h8l-5 16 14-22h-8l6-12z"/>'
-  '</svg>'
-  '<p class="wx-ldk"><span>Charging the radar</span><b id="wx_ldn">00%</b></p>'
-  '<ol class="wx-lds" aria-hidden="true"><li data-s="map">Map</li><li data-s="radar">Radar</li><li data-s="storms">Storms</li></ol>'
-  '<p class="wx-ldmsg" id="wx_ldmsg" hidden></p></div>')
+LOADER = ('<div class="wx-ld" id="wx_ld" role="status" aria-label="Loading the weather map"><div class="wx-ldc">'
+  '<canvas class="wx-ldg" id="wx_ldg" width="260" height="260" aria-hidden="true"></canvas>'
+  '<p class="wx-ldt">BLACKOUT.NETWORK<i></i>WEATHER</p>'
+  '<ul class="wx-ldl" aria-hidden="true">'
+  '<li data-s="map"><span>Map engine</span><b>Standby</b></li>'
+  '<li data-s="radar"><span>Radar frames</span><b>Standby</b></li>'
+  '<li data-s="alerts"><span>Warnings and storms</span><b>Standby</b></li></ul>'
+  '<div class="wx-ldbar"><i id="wx_ldfill"></i></div>'
+  '<p class="wx-ldp"><span id="wx_ldphase">Initializing</span><b><span id="wx_ldn">000</span>%</b></p>'
+  '<p class="wx-ldmsg" id="wx_ldmsg" hidden></p></div></div>')
 
 def _ico(p): return f'<svg viewBox="0 0 24 24" aria-hidden="true">{p}</svg>'
 
@@ -397,8 +511,8 @@ def page(qs=None):
         mlv = mlc = "0"
     warm_once()
     title = "Weather: live radar, forecast and storms | BLACKOUT.NETWORK"
-    desc = ("Full-screen live weather map: radar you can scrub back six hours and forward up to two days, temperature, rain and snow outlooks, "
-            "NWS warnings, tornado tracks, storm reports and hurricane paths.")
+    desc = ("Full-screen live weather map, worldwide: radar you can scrub back and forward, temperature, rain and snow for the next 7 days, "
+            "NWS warnings, tornado tracks, storm reports, cyclone paths and global disaster alerts.")
     lay = lambda k, name, sub: (f'<label class="wx-lay" data-k="{k}"><input type="checkbox" data-lay="{k}"><span class="wx-sw" aria-hidden="true"></span>'
                                 f'<span class="wx-lt"><b>{E(name)}</b><small data-st="{k}">{E(sub)}</small></span></label>')
     return f'''<!doctype html><html lang="en" class="wx-root"><head><meta charset="utf-8">
@@ -409,7 +523,7 @@ def page(qs=None):
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
 <meta property="og:url" content="https://blackout.network/weather"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/weather.png">
 <meta name="theme-color" content="#05060a">
-<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preconnect" href="https://mesonet.agron.iastate.edu" crossorigin>
+<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preconnect" href="https://mesonet.agron.iastate.edu" crossorigin><link rel="preconnect" href="https://tilecache.rainviewer.com" crossorigin>
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/wxmap/wx.css?v={_v("wx.css")}">
 <script src="/sitenav.js" defer></script>
@@ -417,7 +531,7 @@ def page(qs=None):
 <a class="skip" href="#wx_tl">Skip to the timeline</a>
 <div class="wx-head">{top}</div>
 <script>(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
-<main id="wx_main" data-bnt-skip>
+<main id="wx_main" data-bnt-skip data-wxw="{_v("wxw.js")}">
 <h1 class="wx-vh">Weather: live radar, forecast and storms</h1>
 <div id="wx_map" class="wx-map" role="region" aria-label="Weather map. Drag to pan, pinch or scroll to zoom, tap for details."></div>
 {LOADER}
@@ -425,6 +539,7 @@ def page(qs=None):
 <form class="wx-search" id="wx_search" role="search" autocomplete="off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
 <input id="wx_q" type="search" inputmode="search" placeholder="City or ZIP code" aria-label="Search a city or ZIP code" enterkeyhint="search"><ul id="wx_hits" role="listbox" hidden></ul></form>
 <div class="wx-modes" id="wx_modes" role="group" aria-label="Map layer"><button type="button" data-m="radar" aria-pressed="true">Radar</button><button type="button" data-m="temp" aria-pressed="false">Temp</button><button type="button" data-m="rain" aria-pressed="false">Rain</button><button type="button" data-m="snow" aria-pressed="false">Snow</button></div>
+<div class="wx-reg" id="wx_reg" role="group" aria-label="Region"><button type="button" data-r="us" aria-pressed="true">U.S.</button><button type="button" data-r="eu" aria-pressed="false">Europe</button><button type="button" data-r="apac" aria-pressed="false">Asia-Pacific</button><button type="button" data-r="world" aria-pressed="false">World</button></div>
 <button type="button" class="wx-pill" id="wx_pill" hidden></button>
 </div>
 <div class="wx-ctl">
@@ -436,12 +551,14 @@ def page(qs=None):
 </div>
 <section class="wx-lays" id="wx_lays" aria-label="Overlays" hidden>
 <div class="wx-lh"><p class="wx-k">Overlays</p><button type="button" class="wx-x" id="wx_lays_x" aria-label="Close">{_ico('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
-{lay("warn", "Warnings and watches", "NWS")}
-{lay("reports", "Storm reports", "Last 72 hours")}
-{lay("tracks", "Tornado tracks", "Last 90 days")}
+{lay("global", "Global alerts", "Cyclones, floods and droughts worldwide")}
+{lay("warn", "U.S. warnings and watches", "NWS")}
+{lay("reports", "U.S. storm reports", "Last 72 hours")}
+{lay("tracks", "U.S. tornado tracks", "Last 90 days")}
 {lay("trop", "Hurricane season tracks", "This year, worldwide")}
-{lay("outlook", "Severe outlook", "SPC, follows the timeline")}
+{lay("outlook", "U.S. severe outlook", "SPC, follows the timeline")}
 {lay("labels", "City values", "Temperature, rain and snow")}
+<p class="wx-k wx-k2">Data sources</p><ul class="wx-srcs" id="wx_srcs"></ul>
 <p class="wx-src" id="wx_src"></p>
 </section>
 <aside class="wx-card" id="wx_card" hidden aria-live="polite"></aside>
@@ -450,7 +567,7 @@ def page(qs=None):
 <div class="wx-tl" id="wx_tl">
 <button type="button" class="wx-play" id="wx_play" aria-label="Play">{_ico('<path class="i-play" d="M8 5.5v13l10.5-6.5z"/><path class="i-pause" d="M8 5h3v14H8zM13 5h3v14h-3z"/>')}</button>
 <div class="wx-tbody"><div class="wx-trow"><span class="wx-when" id="wx_when">Loading…</span><span class="wx-rel" id="wx_rel"></span></div>
-<div class="wx-track" id="wx_track"><div class="wx-fill" id="wx_fill"></div><div class="wx-ticks" id="wx_ticks"></div><i class="wx-now" id="wx_nowm"></i>
+<div class="wx-track" id="wx_track"><div class="wx-buf" id="wx_buf"></div><div class="wx-fill" id="wx_fill"></div><div class="wx-ticks" id="wx_ticks"></div><i class="wx-now" id="wx_nowm"></i>
 <input type="range" id="wx_range" min="0" max="0" value="0" step="1" aria-label="Time"></div></div>
 </div></div>
 <noscript><p class="wx-nojs">The weather map needs JavaScript. <a href="/live#weather">Text forecast</a></p></noscript>
@@ -472,8 +589,15 @@ def handle_get(path, qs):
         return 200, page(qs or {}), "text/html"
     if path == "/api/wxmap/frames": return _j(frames, "radar frames")
     if path == "/api/wxmap/grid":
-        c, b = _j(grid, "model grid")
-        return (c, json.dumps(b, separators=(",", ":")).encode(), "application/json") if c == 200 else (c, b)
+        r = (qs or {}).get("r", "us")
+        r = (r[0] if isinstance(r, list) else r) if r else "us"
+        if r not in GRIDS: return 404, {"error": "unknown region"}
+        if grid_nowait(r) is None:
+            with _L: err = _C.get(("griderr", r))
+            reason = ("the forecast source did not answer (" + err[1] + "); retrying") if err else "the forecast grid is loading; it takes a few minutes after a restart"
+            return 503, {"error": "model grid unavailable", "reason": reason, "retry": 30}
+        return 200, grid_bytes(r), "application/json"
+    if path == "/api/wxmap/global": return _j(gdacs, "GDACS alerts")
     if path == "/api/wxmap/alerts": return _j(alerts, "NWS alerts")
     if path == "/api/wxmap/storms": return _j(storms, "storm data")
     if path == "/api/wxmap/tropical": return _j(tropical, "tropical data")
