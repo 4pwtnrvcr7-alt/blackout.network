@@ -188,4 +188,4 @@ body.wx-lays-on .wx-lays{opacity:1;visibility:visible}
 .wx-srcs small{display:block;color:var(--wx-mu);font-size:11px}
 .wx-ld{overflow:hidden;-webkit-text-size-adjust:100%;text-size-adjust:100%}.wx-ldt{flex-wrap:wrap;justify-content:center;row-gap:8px;max-width:100%;text-align:center}
 #wx_ldphase{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:12px}
-@media (max-width:480px){.wx-ldt{font-size:9px;letter-spacing:.24em;gap:8px}.wx-ldt i{display:none}.wx-ldl li,.wx-ldp{font-size:9px;letter-spacing:.1em}}
+@media (max-width:480px){.wx-ldt{display:block;font-size:9px;letter-spacing:.24em;line-height:1.9}.wx-ldt span{display:block}.wx-ldt i{display:none}.wx-ldl li,.wx-ldp{font-size:9px;letter-spacing:.1em}}

@@ -487,7 +487,7 @@ def warm():
 # ---------------------------------------------------------------- page
 LOADER = ('<div class="wx-ld" id="wx_ld" role="status" aria-label="Loading the weather map"><div class="wx-ldc">'
   '<canvas class="wx-ldg" id="wx_ldg" width="260" height="260" aria-hidden="true"></canvas>'
-  '<p class="wx-ldt">BLACKOUT.NETWORK<i></i>WEATHER</p>'
+  '<p class="wx-ldt"><span>BLACKOUT.NETWORK</span><i></i><span>WEATHER</span></p>'
   '<ul class="wx-ldl" aria-hidden="true">'
   '<li data-s="map"><span>Map engine</span><b>Standby</b></li>'
   '<li data-s="radar"><span>Radar frames</span><b>Standby</b></li>'
