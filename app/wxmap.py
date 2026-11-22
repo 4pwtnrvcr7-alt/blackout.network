@@ -4,18 +4,22 @@ the location card on this page reuses /api/weather and /api/weather/geocode).
 
 Free, keyless public sources only. Radar and model tiles load straight from the providers in the browser as map-native raster layers;
 this module only builds frame lists and re-serves small, cached JSON so visitors never each hit an upstream:
-  - Past radar: Iowa Environmental Mesonet (IEM) archive of the NWS NEXRAD composite (ridge::USCOMP-N0Q), 5-minute stamps.
-  - Forecast radar: NOAA HRRR simulated reflectivity with precip type, via IEM tiles (hrrr::REFP), latest run + latest 48-hour run.
+  - Past radar (U.S.): NOAA MRMS mosaic via the Iowa Environmental Mesonet (IEM) archive (NEXRAD composite as the fallback).
+  - Forecast radar (U.S.): NOAA HRRR simulated reflectivity with precip type, via IEM tiles (hrrr::REFP), latest run + latest 48-hour run.
+  - Worldwide, past (Nov 22 pt1744u): geostationary infrared clouds (NASA GIBS: GOES-East, GOES-West, Himawari; EUMETSAT EUMETView:
+    Meteosat 0 degrees and Indian Ocean, hourly "Core" images, CC BY 4.0) and NASA IMERG satellite rainfall (GIBS, public domain).
+  - Worldwide, forecast: NOAA GFS 1-degree rain rate and cloud cover from NOMADS, every 3 hours to 7 days (wxgfs.py).
   - Temperature / rain / snow: Open-Meteo forecast API on a 1.5-degree grid over the lower 48 (past 24 h + 7 days, 3-hourly), one
     pull every 6 hours, drawn in the browser.
   - Warnings and watches: NWS api.weather.gov active alerts (storm-based polygons, plus forecast-zone / county shapes, cached).
   - Storm reports (72 h): NWS Local Storm Reports via IEM. Tornado tracks (90 days): NWS Damage Assessment Toolkit.
   - Severe outlook: NOAA SPC Day 1-3 categorical outlooks. Hurricanes: NHC active storms (cone, track) + IBTrACS season tracks (NOAA NCEI).
 Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py, config.json, blackout.db, the newsletter or geo code.
-Routes: /weather (page), /api/wxmap/frames|grid|alerts|storms|tropical|status, /api/wxmap/<static file>."""
+Routes: /weather (page), /api/wxmap/frames|grid|gfs|alerts|storms|tropical|global, /api/wxmap/<static file>."""
 import os, io, csv, json, re, time, threading, urllib.parse, urllib.request, html as _html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
+import wxgfs
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "wxmap_static")
@@ -64,40 +68,165 @@ def why(ex):
     return "the source could not be reached just now"
 
 # ---------------------------------------------------------------- radar frames
-PAST_H, PAST_STEP = 6, 10          # past radar: 6 hours at 10-minute steps
+# Timeline: the last 12 hours (every 30 minutes, then every 10 minutes for the last 6 hours), then the forecast out to 7 days.
+PAST_H, PAST_STEP = 6, 10          # recent past: 6 hours at 10-minute steps
+OLD_H, OLD_STEP = 6, 30            # before that: 6 more hours at 30-minute steps (NASA IMERG rain arrives ~4-6 h late)
 
 def _floor5(d): return d.replace(minute=d.minute - d.minute % 5, second=0, microsecond=0)
+def _pt(s): return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
 
 def _hrrr_init(fname):
     d = jget(f"https://mesonet.agron.iastate.edu/data/gis/images/4326/hrrr/{fname}", timeout=10)
     return datetime.strptime(d["model_init_utc"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
 
+# Worldwide past layers (free, no key, fine for a public site):
+#  - NASA GIBS (public domain): geostationary infrared clouds every 10 minutes (GOES-East, GOES-West, Himawari) and
+#    NASA IMERG satellite rainfall every 30 minutes;
+#  - EUMETSAT EUMETView (Meteosat hourly images are EUMETSAT "Core" data, CC BY 4.0): Meteosat 0 degrees and Indian Ocean.
+GIBS_DOM = "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/{layer}/default/GoogleMapsCompatible_Level6/all/{a}--{b}.xml"
+SATS = {"ge": "GOES-East_ABI_Band13_Clean_Infrared", "gw": "GOES-West_ABI_Band13_Clean_Infrared", "hi": "Himawari_AHI_Band13_Clean_Infrared"}
+IMERG = "IMERG_Precipitation_Rate_30min"
+EUM = {"ms": "msg_fes/ir108", "io": "msg_iodc/ir108"}
+
+def _gibs_times(layer, a, b):
+    """Available times for one GIBS layer between a and b (DescribeDomains), as a sorted list of datetimes."""
+    x = get(GIBS_DOM.format(layer=layer, a=iso(a), b=iso(b)), accept="text/xml", timeout=12).decode("utf-8", "replace")
+    m = re.search(r"<Domain>([^<]*)</Domain>", x)
+    out = set()
+    for part in (m.group(1).split(",") if m else []):
+        bits = part.split("/")
+        if len(bits) == 3:
+            s_, e_, per = bits
+            if len(s_) == 10: s_ += "T00:00:00Z"
+            mm = re.match(r"PT(\d+)M", per); step = timedelta(minutes=int(mm.group(1)) if mm else 10)
+            t, e2 = _pt(s_), _pt(e_)
+            if t < a: t = t + ((a - t) // step) * step
+            while t <= e2 and len(out) < 2000:
+                if t >= a: out.add(t)
+                t += step
+        elif len(bits) == 1 and len(part) >= 19: out.add(_pt(part))
+    return sorted(out)
+
+def _eum_latest(layer):
+    x = get(f"https://view.eumetsat.int/geoserver/{layer}/ows?service=WMS&version=1.3.0&request=GetCapabilities", accept="text/xml", timeout=12).decode("utf-8", "replace")
+    m = re.search(r'<Dimension name="time"[^>]*>[^<]*?/([0-9T:\-.]+Z)/PT', x)
+    if not m: raise ValueError("no time dimension")
+    return _pt(m.group(1))
+
+_SAT_OK = set()  # (sector, time) infrared images whose tiles have answered once
+SATP = {"ge": "0/0", "gw": "0/0", "hi": "0/1"}   # one zoom-1 tile (row/col) inside each satellite disc
+_IM_OK = set()   # IMERG half-hours whose tiles have answered once (probed only once each)
+
+def satellite(a, b):
+    """{"ge": [times], ..., "im": [times], "ms": latest, "io": latest, "status": {key: reason or None}} for the window a..b."""
+    def go():
+        out, st = {}, {}
+        for k, layer in list(SATS.items()) + [("im", IMERG)]:
+            try: out[k] = _gibs_times(layer, a - timedelta(hours=1), b); st[k] = None if out[k] else "no images in this window"
+            except Exception as ex: out[k] = []; st[k] = why(ex)
+        # GIBS sometimes lists an IMERG half-hour whose tiles are not there (yet): keep only times whose tiles answer
+        def ok(t):
+            if t in _IM_OK: return t
+            try: get(f"https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/{IMERG}/default/{iso(t)}/GoogleMapsCompatible_Level6/3/4/3.png", accept="image/png", timeout=8)
+            except Exception: return None
+            if len(_IM_OK) > 500: _IM_OK.clear()
+            _IM_OK.add(t); return t
+        if out.get("im"):
+            with ThreadPoolExecutor(max_workers=6) as ex: out["im"] = [t for t in ex.map(ok, out["im"]) if t]
+        # the newest infrared images can be listed 30-60 minutes before their tiles exist (Himawari most of all): probe the last 2 hours once each
+        def sok(kt):
+            k, t = kt
+            if (k, t) in _SAT_OK: return True
+            try: get(f"https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/{SATS[k]}/default/{iso(t)}/GoogleMapsCompatible_Level6/1/{SATP[k]}.png", accept="image/png", timeout=8)
+            except Exception: return False
+            if len(_SAT_OK) > 1500: _SAT_OK.clear()
+            _SAT_OK.add((k, t)); return True
+        edge = now() - timedelta(hours=2)
+        todo = [(k, t) for k in SATS for t in (out.get(k) or []) if t >= edge]
+        if todo:
+            with ThreadPoolExecutor(max_workers=8) as ex: bad = {kt for kt, good in zip(todo, ex.map(sok, todo)) if not good}
+            for k in SATS: out[k] = [t for t in (out.get(k) or []) if (k, t) not in bad]
+        for k, layer in EUM.items():
+            try: out[k] = _eum_latest(layer); st[k] = None
+            except Exception as ex: out[k] = None; st[k] = why(ex)
+        out["status"] = st
+        return out
+    return cached(("sat", a.strftime("%Y%m%d%H"), b.strftime("%Y%m%d%H%M")[:11]), 240, go)
+
+def _pick(ts, t, max_age):
+    """Newest time in sorted list ts that is <= t and no older than max_age."""
+    best = None
+    for x in ts:
+        if x <= t: best = x
+        else: break
+    return best if best is not None and t - best <= max_age else None
+
 def frames():
     def go():
         out = {"generated": iso(now()), "past": [], "forecast": [], "sources": {}}
         # past: MRMS SeamlessHSR (NOAA's quality-controlled radar mosaic; 2-minute archive at IEM), else the raw NEXRAD composite
-        n = PAST_H * 60 // PAST_STEP
+        def times_back(latest):
+            ts = []
+            n = PAST_H * 60 // PAST_STEP
+            old0 = latest - timedelta(hours=PAST_H)
+            old0 = old0.replace(minute=old0.minute - old0.minute % OLD_STEP, second=0, microsecond=0)
+            recent0 = latest - timedelta(minutes=PAST_STEP * n); recent0 = recent0.replace(minute=recent0.minute - recent0.minute % PAST_STEP)
+            for k in range(OLD_H * 60 // OLD_STEP, -1, -1):
+                d = old0 - timedelta(minutes=OLD_STEP * k)
+                if d < recent0: ts.append(d)
+            for i in range(n, -1, -1):
+                d = latest - timedelta(minutes=PAST_STEP * i)
+                if i: d = d.replace(minute=d.minute - d.minute % PAST_STEP)
+                ts.append(d)
+            return sorted(set(ts))
+        latest = None
         try:
             m = jget("https://mesonet.agron.iastate.edu/data/gis/images/4326/mrms/lcref.json", timeout=10)
             latest = datetime.strptime(m["meta"]["end_valid"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
             latest = latest.replace(minute=latest.minute - latest.minute % 2, second=0, microsecond=0)
-            for i in range(n, -1, -1):
-                d = latest - timedelta(minutes=PAST_STEP * i)
-                if i: d = d.replace(minute=d.minute - d.minute % PAST_STEP)
-                out["past"].append({"t": iso(d), "layer": "mrms::lcref-" + d.strftime("%Y%m%d%H%M")})
+            for d in times_back(latest): out["past"].append({"t": iso(d), "layer": "mrms::lcref-" + d.strftime("%Y%m%d%H%M")})
             out["sources"]["past"] = {"ok": True, "label": "NOAA MRMS radar mosaic (IEM archive)", "latest": iso(latest)}
         except Exception as ex1:
             try:
                 t = jget("https://mesonet.agron.iastate.edu/json/tms.json", timeout=10)
                 lay = next((s for s in t.get("services", []) if s.get("id") == "ridge_uscomp_n0q"), None)
                 latest = _floor5(datetime.strptime(lay["utc_valid"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc))
-                for i in range(n, -1, -1):
-                    d = latest - timedelta(minutes=PAST_STEP * i)
-                    if i: d = d.replace(minute=d.minute - d.minute % PAST_STEP)
-                    out["past"].append({"t": iso(d), "layer": "ridge::USCOMP-N0Q-" + d.strftime("%Y%m%d%H%M")})
+                for d in times_back(latest): out["past"].append({"t": iso(d), "layer": "ridge::USCOMP-N0Q-" + d.strftime("%Y%m%d%H%M")})
                 out["sources"]["past"] = {"ok": True, "label": "NWS NEXRAD composite (IEM archive)", "latest": iso(latest)}
             except Exception as ex:
-                out["sources"]["past"] = {"ok": False, "label": "NOAA MRMS / NWS NEXRAD radar (IEM archive)", "reason": "Past radar is unavailable: " + why(ex)}
+                out["sources"]["past"] = {"ok": False, "label": "NOAA MRMS / NWS NEXRAD radar (IEM archive)", "reason": "Past U.S. radar is unavailable: " + why(ex)}
+        if not out["past"]:   # the U.S. radar is down: keep the worldwide satellite timeline anyway
+            latest = now() - timedelta(minutes=20); latest = latest.replace(minute=latest.minute - latest.minute % 10, second=0, microsecond=0)
+            for d in times_back(latest): out["past"].append({"t": iso(d), "layer": None})
+        # worldwide past: infrared clouds + IMERG rain, matched to each past frame
+        a, b = _pt(out["past"][0]["t"]), _pt(out["past"][-1]["t"])
+        try:
+            sat = satellite(a, b)
+        except Exception as ex:
+            sat = {"status": {k: why(ex) for k in ("ge", "gw", "hi", "im", "ms", "io")}}
+        ripe = now() - timedelta(minutes=35)   # GIBS lists a new image before all of its tiles exist: skip the last ~35 minutes
+        for k in SATS: sat[k] = [x for x in (sat.get(k) or []) if x <= ripe]
+        for f in out["past"]:
+            t = _pt(f["t"]); s_ = {}
+            t30 = t if f is out["past"][-1] else t.replace(minute=t.minute - t.minute % 30, second=0, microsecond=0)   # infrared every 30 minutes: clouds move slowly, and it is a third of the downloads
+            for k in SATS:
+                x = _pick(sat.get(k) or [], t30, timedelta(minutes=40)) or _pick(sat.get(k) or [], t, timedelta(minutes=60))
+                if x: s_[k] = iso(x)
+            for k in EUM:
+                L = sat.get(k)
+                if L:
+                    h = min(t, L).replace(minute=0, second=0, microsecond=0)   # hourly images only (the CC BY 4.0 "Core" set)
+                    if t - h <= timedelta(minutes=90): s_[k] = iso(h)
+            f["sat"] = s_
+            x = _pick(sat.get("im") or [], t, timedelta(minutes=30))
+            if x: f["im"] = iso(x)
+        st = sat.get("status", {})
+        im_ts = sat.get("im") or []
+        out["sources"]["sat"] = {"ok": any(st.get(k) is None for k in ("ge", "gw", "hi", "ms", "io")), "label": "Satellite clouds (NASA GIBS, EUMETSAT)",
+                                 "down": {k: v for k, v in st.items() if v and k != "im"},
+                                 "reason": None if any(st.get(k) is None for k in ("ge", "gw", "hi", "ms", "io")) else "Satellite images are unavailable: " + (st.get("ge") or "no images")}
+        out["sources"]["imerg"] = {"ok": bool(im_ts), "label": "NASA IMERG satellite rainfall", "latest": iso(im_ts[-1]) if im_ts else None,
+                                   "reason": None if im_ts else "NASA IMERG is unavailable: " + (st.get("im") or "no images in the last 12 hours")}
         # forecast: HRRR reflectivity with precip type. Latest hourly run (18 h), then the latest synoptic run out to 48 h.
         try:
             t0 = now()
@@ -117,17 +246,15 @@ def frames():
             out["sources"]["forecast"] = {"ok": bool(out["forecast"]), "label": "NOAA HRRR model radar forecast (IEM)", "run": iso(ini), "long_run": iso(ext) if ext else None,
                                           "reason": None if out["forecast"] else "No HRRR forecast frames are published right now"}
         except Exception as ex:
-            out["sources"]["forecast"] = {"ok": False, "label": "NOAA HRRR model radar forecast (IEM)", "reason": "Radar forecast is unavailable: " + why(ex)}
-        # global past radar (outside the NOAA domain): RainViewer, last 2 hours at 10-minute steps
-        try:
-            rv = jget("https://api.rainviewer.com/public/weather-maps.json", timeout=10)
-            host = rv.get("host") or "https://tilecache.rainviewer.com"
-            past = [{"t": iso(datetime.fromtimestamp(int(f["time"]), timezone.utc)), "path": f["path"]} for f in (rv.get("radar") or {}).get("past") or [] if f.get("path")]
-            out["global"] = {"host": host, "past": past}
-            out["sources"]["global"] = {"ok": bool(past), "label": "RainViewer global radar", "reason": None if past else "RainViewer published no frames just now"}
-        except Exception as ex:
-            out["global"] = None
-            out["sources"]["global"] = {"ok": False, "label": "RainViewer global radar", "reason": "Global radar is unavailable: " + why(ex)}
+            out["sources"]["forecast"] = {"ok": False, "label": "NOAA HRRR model radar forecast (IEM)", "reason": "U.S. radar forecast is unavailable: " + why(ex)}
+        # worldwide forecast: GFS rain and cloud cover every 3 hours to 7 days (built in the background, see wxgfs.py)
+        gm, gerr = wxgfs.meta()
+        if gm:
+            out["gfs"] = {k: gm[k] for k in ("run", "times", "p", "c", "rate", "generated")}
+            out["sources"]["gfs"] = {"ok": True, "label": "NOAA GFS model (rain and clouds)", "run": gm["run"]}
+        else:
+            out["gfs"] = None
+            out["sources"]["gfs"] = {"ok": False, "label": "NOAA GFS model (rain and clouds)", "reason": ("Worldwide forecast is unavailable: " + gerr) if gerr else "The worldwide forecast is still loading"}
         out["tile"] = IEM_TILE
         return out
     return cached(("frames",), 180, go)
@@ -477,6 +604,7 @@ def tropical():
 def warm():
     """Fill the slow caches in the background so the first visitor doesn't wait (season tracks: ~12 MB CSV)."""
     def run():
+        wxgfs.kick()   # worldwide model rain + clouds (~1 minute, NOMADS)
         for fn in (frames, alerts, storms, tropical, gdacs):
             try: fn()
             except Exception: pass
@@ -523,7 +651,7 @@ def page(qs=None):
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
 <meta property="og:url" content="https://blackout.network/weather"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/weather.png">
 <meta name="theme-color" content="#05060a">
-<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preconnect" href="https://mesonet.agron.iastate.edu" crossorigin><link rel="preconnect" href="https://tilecache.rainviewer.com" crossorigin>
+<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preconnect" href="https://mesonet.agron.iastate.edu" crossorigin><link rel="preconnect" href="https://gibs.earthdata.nasa.gov" crossorigin><link rel="preconnect" href="https://view.eumetsat.int" crossorigin>
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/wxmap/wx.css?v={_v("wx.css")}">
 <script src="/sitenav.js" defer></script>
@@ -551,6 +679,7 @@ def page(qs=None):
 </div>
 <section class="wx-lays" id="wx_lays" aria-label="Overlays" hidden>
 <div class="wx-lh"><p class="wx-k">Overlays</p><button type="button" class="wx-x" id="wx_lays_x" aria-label="Close">{_ico('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
+{lay("clouds", "Satellite clouds", "Infrared worldwide; model cloud cover ahead")}
 {lay("global", "Global alerts", "Cyclones, floods and droughts worldwide")}
 {lay("warn", "U.S. warnings and watches", "NWS")}
 {lay("reports", "U.S. storm reports", "Last 72 hours")}
@@ -597,6 +726,14 @@ def handle_get(path, qs):
             reason = ("the forecast source did not answer (" + err[1] + "); retrying") if err else "the forecast grid is loading; it takes a few minutes after a restart"
             return 503, {"error": "model grid unavailable", "reason": reason, "retry": 30}
         return 200, grid_bytes(r), "application/json"
+    if path == "/api/wxmap/gfs":
+        k = (qs or {}).get("f", "p"); k = (k[0] if isinstance(k, list) else k) or "p"
+        if k not in ("p", "c"): return 404, {"error": "unknown field"}
+        b = wxgfs.png(k)
+        if not b:
+            m, err = wxgfs.meta()
+            return 503, {"error": "worldwide forecast unavailable", "reason": err or "the worldwide forecast is still loading", "retry": 60}
+        return 200, b, "image/png"
     if path == "/api/wxmap/global": return _j(gdacs, "GDACS alerts")
     if path == "/api/wxmap/alerts": return _j(alerts, "NWS alerts")
     if path == "/api/wxmap/storms": return _j(storms, "storm data")
