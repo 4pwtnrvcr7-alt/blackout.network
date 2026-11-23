@@ -1,15 +1,15 @@
 {
-  "as_of": "2026-11-23T17:31:00Z",
-  "as_of_et": "2026-11-23 12:31 PM ET",
+  "as_of": "2026-11-23T18:12:56Z",
+  "as_of_et": "2026-11-23 1:12 PM ET",
   "source": "https://blackout.network/api/signal/heat",
   "window_days": 7,
-  "total": 4134,
-  "located": 1933,
-  "no_location": 2201,
-  "no_location_share_pct": 53.24,
-  "located_share_pct": 46.8,
-  "points_shown": 943,
-  "points_unverified": 1071,
+  "total": 4139,
+  "located": 2856,
+  "no_location": 1283,
+  "no_location_share_pct": 31.0,
+  "located_share_pct": 69.0,
+  "points_shown": 1687,
+  "points_unverified": 408,
   "tolerance_points": 2.0,
-  "notes": "Baseline taken after PR #103 went live (boot 5f80c6d3882db04a), last 7 days, from the live /api/signal/heat coverage and the No location chip (unverified_pins). That chip is an honest count and must stay. The no-location total includes stories hidden by the #100/#103 pin filters, not only stories that name no place. Stage 2 is supposed to lower this share by geocoding those stories correctly. The guard fails if the 7-day no-location share rises more than 2.0 points above this baseline."
+  "notes": "Baseline ratcheted down after PR #107 went live (boot b42d61a0e01819a5), last 7 days, from the live /api/signal/heat rows (located = rows with coordinates; no_location = unverified_pins / the No location chip). That chip is an honest count and must stay. Share fell from 53.24% (2,201 of 4,134 after #103) to 31.00% (1,283 of 4,139). The remaining no-location total still includes stories that name several countries, cyber/source-HQ items, stories that truly name no place, and a smaller set of named-place misses (for example a Kyiv bridges headline that stayed unlocated). The 7-day window drifts by tens of items; the chip read 1,282 at 1:17 PM ET and 1,301 at 1:19 PM ET. The guard fails if the 7-day no-location share rises more than 2.0 points above this baseline (33.00%)."
 }
