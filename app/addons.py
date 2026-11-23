@@ -20,6 +20,7 @@ ROUTES = {
     "/api/netstatus": "netstatus",
     "/api/netstatus/alerts": "netstatus",
     "/network": "netpages",         # t398: /network hub + /network/<slug> provider pages (aws, azure, m365, gcp, workspace, cloudflare, akamai)
+    "/api/netmap": "netmap",        # Nov 23 2026 (pt1755u): /api/netmap/data|dc + net.js/net.css for the /network map page
     "/api/network": "netpages",     # t398: /api/network/<slug>/brief (accordion data) + /api/network/accordion.js
     "/api/vote": "votes",
     "/api/votes": "votes",

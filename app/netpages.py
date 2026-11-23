@@ -863,6 +863,10 @@ def _pc_refresh(k):
     threading.Thread(target=job, daemon=True, name="np-swr").start()
 def handle_get(path, qs, headers=None):
     p = path.rstrip("/") or "/"
+    if p == "/network" and os.environ.get("BN_NETMAP", "1") != "0":   # Nov 23 2026 (pt1755u): full-screen Network Status map (netmap.py); BN_NETMAP=0 = old hub
+        import netmap
+        return netmap.handle_get(p, qs)
+    if p == "/network/providers": p = "/network"   # the previous provider hub stays reachable here
     if p in ("/network/starlink", "/network/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
         r = sl().handle_get(p, qs or {}, _sys_mod(), headers)
         if r is not None: return r
