@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"net.js": "application/javascript", "net.css": "text/css"}
+FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -407,7 +407,8 @@ def dc(): return swr("dc", 6 * 3600, _dc_build)
 # ---------------------------------------------------------------- page
 LOADER = ('<div class="nx-ld" id="nx_ld" role="status" aria-label="Loading network status">'
   '<canvas id="nx_ldcv" aria-hidden="true"></canvas>'
-  '<div class="nx-ldc"><p class="nx-ldk"><span>Building the network</span><b id="nx_ldn">00%</b></p>'
+  '<div class="nx-ldp" id="nx_ldp"><div class="nx-ldh"><div><p class="nx-ldk">System boot</p><p class="nx-ldst" id="nx_ldst">Power on</p></div>'
+  '<b class="nx-ldn" id="nx_ldn">00%</b></div><div class="nx-ldtr"><i id="nx_ldbar"></i></div>'
   '<ol class="nx-lds" aria-hidden="true"><li data-s="map">Map</li><li data-s="nets">Networks</li><li data-s="out">Outages</li><li data-s="dc">Data centers</li></ol>'
   '<p class="nx-ldmsg" id="nx_ldmsg" hidden></p></div></div>')
 
@@ -470,7 +471,7 @@ def page(qs=None):
 <div class="nx-scroll" id="nx_scroll"><div id="nx_list"><p class="nx-empty">Loading…</p></div></div></section>
 <noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/network/providers">Cloud provider pages</a></p></noscript>
 </main>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
+<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/boot.js?v={_v("boot.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
 </body></html>'''
 
 def handle_get(path, qs=None, headers=None):
