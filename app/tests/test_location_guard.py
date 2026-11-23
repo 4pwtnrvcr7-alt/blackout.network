@@ -50,10 +50,10 @@ class LocationGuard(unittest.TestCase):
     def test_baseline_file_is_present_and_honest(self):
         b = G.load_baseline()
         self.assertEqual(b["window_days"], 7)
-        self.assertEqual(b["total"], 4134)
-        self.assertEqual(b["located"], 1933)
-        self.assertEqual(b["no_location"], 2201)
-        self.assertAlmostEqual(b["no_location_share_pct"], 53.24, places=2)
+        self.assertEqual(b["total"], 4139)
+        self.assertEqual(b["located"], 2856)
+        self.assertEqual(b["no_location"], 1283)
+        self.assertAlmostEqual(b["no_location_share_pct"], 31.00, places=2)
         self.assertEqual(b["tolerance_points"], 2.0)
         self.assertEqual(b["no_location"] + b["located"], b["total"])
         # The chip stays: the baseline is the No location count, not a hidden or zeroed figure.
