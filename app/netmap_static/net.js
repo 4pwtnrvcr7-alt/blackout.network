@@ -106,19 +106,20 @@
   setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, map = null, ready = false;
-  var ON = { internet: true, power: true, cloud: true, dc: false, mobile: false, sat: false, pay: false, apps: false, sea: false };
+  var ON = { internet: true, power: true, cloud: true, dc: false, mobile: false, sat: false, pay: false, apps: false, sea: false, towers: false, grid: false, fiber: false };
   try { var sv = JSON.parse(localStorage.getItem("bn_net_layers") || "null"); if (sv && typeof sv === "object") for (var k0 in ON) if (k0 in sv) ON[k0] = !!sv[k0]; } catch (e) {}
+  for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
   function boot() {
     if (!window.maplibregl) { setTimeout(boot, 60); return; }
     map = new maplibregl.Map({ container: "nx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD() }, minZoom: 1, maxZoom: 13,
       attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: reduce ? 0 : 300, renderWorldCopies: true });
     map.touchZoomRotate.disableRotation();
-    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a>' }), "bottom-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a> · Towers: <a href="https://www.fcc.gov/antenna-structure-registration" target="_blank" rel="noopener">FCC ASR</a> · Power grid, fiber: OpenStreetMap (ODbL)' }), "bottom-right");
     setTimeout(function () { var a = document.querySelector(".nx-map .maplibregl-ctrl-attrib"); if (a) a.classList.remove("maplibregl-compact-show"); }, 1500);
     map.on("dataloading", function () { if (!ready) step("map", Math.min(0.8, P.map + 0.04)); });
     map.on("load", function () {
-      step("map", 0.5); addLayers(); seaLayers(); bindLayers();
+      step("map", 0.5); addLayers(); seaLayers(); infLayers(); bindLayers();
       Promise.allSettled([pData, pWorld]).then(function (r) {
         if (r[0].status === "fulfilled") { D = r[0].value; applyData(); }
         else { $("nx_sum").textContent = "Network data is unavailable right now"; }
@@ -168,6 +169,12 @@
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
         if (sf.length) satCard(sf[0].properties.i, e.point); else { hideCard(true); SKY.sel = null; if (map.getSource("trk")) map.getSource("trk").setData(EMPTY); } return; }
       var f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["pt", "dc"].filter(function (l) { return map.getLayoutProperty(l, "visibility") !== "none"; }) })[0];
+      if (!f && (ON.towers || ON.grid || ON.fiber)) {
+        var il = []; INF_K.forEach(function (k) { if (ON[k]) il = il.concat(INF[k].Q); });
+        f = map.queryRenderedFeatures([[e.point.x - 9, e.point.y - 9], [e.point.x + 9, e.point.y + 9]], { layers: il.filter(function (l) { return map.getLayer(l); }) })[0];
+        if (f && f.properties.cluster) { var cid = f.properties.cluster_id, cc0 = f.geometry.coordinates; hideCard(true);
+          map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
+      }
       if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["sea-ls", "sea-line"] })[0] || map.queryRenderedFeatures(e.point, { layers: ["seaz-fill"] })[0];
       if (f) showCard(f, e.point, true); else hideCard(true);
     });
@@ -218,6 +225,7 @@
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
     SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.sea ? "visible" : "none"); });
     if (ON.sea) seaLoad(); seaPanel();
+    INF_K.forEach(function (k) { INF[k].L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON[k] ? "visible" : "none"); }); if (ON[k]) infLoad(k); }); infPanel();
     document.querySelectorAll("#nx_f button").forEach(function (b) { b.setAttribute("aria-pressed", ON[b.dataset.k] ? "true" : "false"); });
   }
 
@@ -255,6 +263,7 @@
         ((s.top || []).length ? '<ul>' + s.top.map(function (u) { return '<li>' + (url(u.web) ? '<a href="' + url(u.web) + '" target="_blank" rel="noopener noreferrer">' + esc(u.name) + '</a>' : esc(u.name)) + ' · ' + num(u.outages) + '</li>'; }).join("") + '</ul>' : '') +
         '<div class="acts"><a href="/grid">Open The Grid</a></div>';
     } else if (p.kind === "cable" || p.kind === "ls" || p.kind === "zone") { h = seaCard(p);
+    } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss" || p.kind === "fb") { h = infCard(p);
     } else if (p.kind === "cloud") {
       var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = lvCol(cl.level);
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p]) + ' · ' + esc(lvName(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(n.status || "") + '</p>' +
@@ -310,7 +319,7 @@
       return '<button type="button" data-z="' + i + '"><i style="background:' + zCol(z) + '"></i><b>' + esc(z.name.split(" and ")[0]) + '</b><em>' + z.score + '</em></button>'; }).join("") + '</div>' +
       (SEA.st ? "" : '<p class="nx-swm">Status is unavailable right now; routes only.</p>');
     el.querySelectorAll("[data-z]").forEach(function (b) { b.onclick = function () { var z = zs[+b.dataset.z], xs = z.poly.map(function (p) { return p[0]; }), ys = z.poly.map(function (p) { return p[1]; });
-      map.fitBounds([[Math.min.apply(null, xs), Math.min.apply(null, ys)], [Math.max.apply(null, xs), Math.max.apply(null, ys)]], { padding: PAD(), duration: reduce ? 0 : 900, maxZoom: 5.5 });
+      map.fitBounds([[Math.min.apply(null, xs), Math.min.apply(null, ys)], [Math.max.apply(null, xs), Math.max.apply(null, ys)]], { padding: innerWidth < 768 ? { top: 250, bottom: Math.round(innerHeight * 0.42), left: 24, right: 24 } : PAD(), duration: reduce ? 0 : 900, maxZoom: 5.5 });
       showCard({ properties: { kind: "zone", i: +b.dataset.z } }, { x: innerWidth / 2, y: 140 }, true); }; });
   }
   function seaWhen(ts) { var d = new Date(ts); return isFinite(d) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""; }
@@ -322,9 +331,9 @@
         '<p><b style="color:' + zCol(z) + '">Risk ' + z.score + '/100</b> <span class="age">our model, not a forecast</span></p><dl>' + z.parts.map(function (q) { return '<dt>' + esc(q[0]) + '</dt><dd>+' + q[1] + '</dd>'; }).join("") + '</dl>' +
         (z.ioda.length ? '<p>IODA internet outage signal now: ' + z.ioda.map(function (o) { return linkA(o.url, o.name); }).join(", ") + '</p>' : "") +
         (z.news.length ? '<p class="nx-k">Cable damage in the news</p><ul>' + z.news.map(function (n) { return '<li>' + linkA(n.url, n.t) + ' · ' + esc(n.src) + ', ' + esc(seaWhen(n.at)) + '</li>'; }).join("") + '</ul>' : "") +
-        '<p class="nx-k">Documented cuts</p><ul>' + z.cuts.map(function (k) { return '<li>' + esc(seaWhen(k.d + "T12:00:00Z")) + ': ' + esc(k.t) + ' · ' + linkA(k.url, k.src) + '</li>'; }).join("") + '</ul>' +
+        (innerWidth < 768 ? '<details class="nx-det"><summary>Cuts, headlines and method</summary>' : '') + '<p class="nx-k">Documented cuts</p><ul>' + z.cuts.map(function (k) { return '<li>' + esc(seaWhen(k.d + "T12:00:00Z")) + ': ' + esc(k.t) + ' · ' + linkA(k.url, k.src) + '</li>'; }).join("") + '</ul>' +
         (z.conflict.length ? '<p class="nx-k">Security headlines, last 7 days</p><ul>' + z.conflict.slice(0, 3).map(function (n) { return '<li>' + linkA(n.url, n.t) + ' · ' + esc(n.src) + '</li>'; }).join("") + '</ul>' : "") +
-        (z.note ? '<p class="age">' + linkA(z.note_url, z.note) + '</p>' : "") + '<p class="age">' + esc(SEA.st.basis) + ' ' + esc(SEA.st.model) + '</p>';
+        (z.note ? '<p class="age">' + linkA(z.note_url, z.note) + '</p>' : "") + '<p class="age">' + esc(SEA.st.basis) + ' ' + esc(SEA.st.model) + '</p>' + (innerWidth < 768 ? '</details>' : '');
     } else {
       var f = SEA.geo.features[p.i].properties, dm = p.kind === "cable" ? seaDmg(f.n) : null; c = dm ? COL.deg : "#6FB7E8";
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ls" ? "Cable landing station" : dm ? "Damage reported in the news (inferred)" : "Undersea cable · no damage reported (inferred)") + '</span>' +
@@ -333,6 +342,78 @@
         (dm ? '<p>' + linkA(dm.url, dm.t) + ' · ' + esc(dm.src) + ', ' + esc(seaWhen(dm.at)) + '</p>' : "") +
         '<p class="age">' + (f.s === "noaa" ? "General location of the cable area, from NOAA Office for Coastal Management." : "Route as mapped by OpenStreetMap contributors; coverage is incomplete.") +
         ' Operators publish no live status, so this is inferred from news and IODA signals.</p>';
+    }
+    return h;
+  }
+
+  /* ---------- U.S. infrastructure (pt1785u Stage 3): FCC ASR towers, OSM power grid and publicly mapped long-haul fiber. All off by default, loaded on first use ---------- */
+  var INF = {
+    towers: { url: "/api/netmap/towers.json", L: ["tw-cl", "tw-cnt", "tw-pt"], Q: ["tw-cl", "tw-pt"], d: null, busy: false, err: false },
+    grid: { url: "/api/netmap/grid.json", L: ["gl-lo", "gl-hi", "gss"], Q: ["gss", "gl-hi", "gl-lo"], d: null, busy: false, err: false },
+    fiber: { url: "/api/netmap/fiber.json", L: ["fb-line"], Q: ["fb-line"], d: null, busy: false, err: false }
+  }, INF_K = ["towers", "grid", "fiber"], INF_L = [];
+  INF_K.forEach(function (k) { INF_L = INF_L.concat(INF[k].L); });
+  var TWC = "#9FB4FF", FBC = "#E58FD0";
+  function kvCol() { return ["step", ["get", "v"], "#6E6A9A", 300, "#9C8CE0", 450, "#C9B8FF", 700, "#F0F0FA"]; }
+  function infLayers() {
+    map.addSource("tw", { type: "geojson", data: EMPTY, cluster: true, clusterRadius: 46, clusterMaxZoom: 10, maxzoom: 12 });
+    map.addSource("grid", { type: "geojson", data: EMPTY, tolerance: 0.5 });
+    map.addSource("fib", { type: "geojson", data: EMPTY, tolerance: 0.5 });
+    function L(o) { o.layout = o.layout || {}; o.layout.visibility = "none"; map.addLayer(o, "glow"); }
+    L({ id: "gl-lo", type: "line", source: "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": kvCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
+    L({ id: "gl-hi", type: "line", source: "grid", filter: ["all", ["==", ["geometry-type"], "LineString"], [">=", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": kvCol(), "line-opacity": 0.8, "line-width": ["interpolate", ["linear"], ["zoom"], 2, ["case", [">=", ["get", "v"], 450], 0.9, 0.5], 6, ["case", [">=", ["get", "v"], 450], 1.8, 1.1], 10, 2.6] } });
+    L({ id: "gss", type: "circle", source: "grid", minzoom: 5.5, filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-color": "#05060a", "circle-stroke-color": kvCol(), "circle-stroke-width": 1.4, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.5, 2, 10, 4.5] } });
+    L({ id: "fb-line", type: "line", source: "fib", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": FBC, "line-opacity": 0.85, "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1, 8, 2, 12, 3] } });
+    L({ id: "tw-cl", type: "circle", source: "tw", filter: ["has", "point_count"],
+      paint: { "circle-color": "rgba(159,180,255,.16)", "circle-stroke-color": TWC, "circle-stroke-width": 1, "circle-stroke-opacity": 0.6,
+        "circle-radius": ["step", ["get", "point_count"], 9, 100, 13, 1000, 17, 5000, 22] } });
+    L({ id: "tw-cnt", type: "symbol", source: "tw", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": FB, "text-size": 10, "text-allow-overlap": true },
+      paint: { "text-color": "rgba(240,240,250,.9)" } });
+    L({ id: "tw-pt", type: "circle", source: "tw", filter: ["!", ["has", "point_count"]],
+      paint: { "circle-color": TWC, "circle-stroke-color": "#05060a", "circle-stroke-width": 1, "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 2.5, 12, 5] } });
+  }
+  function infLoad(k) {
+    var o = INF[k]; if (o.d || o.busy || !map) return; o.busy = true; o.err = false; infPanel();
+    getJSON(o.url).then(function (j) {
+      o.d = j; o.busy = false;
+      if (k === "towers") map.getSource("tw").setData({ type: "FeatureCollection", features: j.p.map(function (r, i) { return { type: "Feature", geometry: { type: "Point", coordinates: [r[0], r[1]] }, properties: { kind: "tw", i: i } }; }) });
+      else { j.features.forEach(function (f, i) { f.properties.i = i; f.properties.kind = k === "fiber" ? "fb" : f.geometry.type === "Point" ? "ss" : "gl"; }); map.getSource(k === "fiber" ? "fib" : "grid").setData(j); }
+      infPanel();
+    }, function () { o.busy = false; o.err = true; infPanel(); });
+  }
+  function infPanel() {
+    var el = $("nx_inf"); if (!el) return; var on = INF_K.filter(function (k) { return ON[k]; });
+    el.hidden = !on.length || SKY.on; if (el.hidden) return;
+    var row = function (k, key, txt) { var o = INF[k]; return '<li>' + key + '<span>' + (o.err ? "Unavailable right now" : o.busy || !o.d ? "Loading…" : txt(o.d)) + '</span></li>'; };
+    el.innerHTML = '<ul>' + on.map(function (k) {
+      if (k === "towers") return row(k, '<i style="background:' + TWC + '"></i><b>Cell towers</b>', function (d) { return num(d.p.length) + " FCC-registered towers · not every cell site"; });
+      if (k === "grid") return row(k, '<i class="ln" style="background:#C9B8FF"></i><b>Power grid</b>', function (d) { return "230 kV and up · brighter = higher voltage"; });
+      return row(k, '<i class="ln" style="background:' + FBC + '"></i><b>Long-haul fiber</b>', function (d) { return "Publicly mapped routes only (" + num(d.km) + " km). Street-level fiber isn't public."; });
+    }).join("") + '</ul>';
+  }
+  function kvTxt(v) { return v ? v + " kV" : "Unknown"; }
+  function infCard(p) {
+    var h = "", c;
+    if (p.kind === "tw") {
+      var d = INF.towers.d, r = d.p[p.i];
+      h = '<span class="st" style="color:' + TWC + '"><i style="background:' + TWC + '"></i>Registered antenna structure</span><h3>' + esc(d.owners[r[2]]) + '</h3><dl>' +
+        '<dt>Type</dt><dd>' + esc(d.tnames[d.types[r[4]]] || d.types[r[4]]) + '</dd><dt>Height</dt><dd>' + (r[3] ? num(r[3]) + " m (" + num(r[3] * 3.281) + " ft)" : "–") + '</dd></dl>' +
+        '<div class="acts">' + linkA("https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistration.jsp?regKey=" + r[5], "FCC registration record") + '</div>' +
+        '<p class="age">FCC Antenna Structure Registration, data as of ' + esc(d.asof) + '. The owner registered the structure; the FCC file does not list which carriers use it. Shorter sites and rooftop or small cells are usually not registered.</p>';
+    } else if (p.kind === "gl" || p.kind === "ss") {
+      var f = INF.grid.d.features[p.i].properties; c = "#C9B8FF";
+      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
+        '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") + '</dl>' +
+        '<p class="age">Mapped by OpenStreetMap contributors (ODbL). Shows lines and substations of 230 kV and up; coverage is good but not complete. Not a live status.</p>';
+    } else if (p.kind === "fb") {
+      var g = INF.fiber.d.features[p.i].properties;
+      h = '<span class="st" style="color:' + FBC + '"><i style="background:' + FBC + '"></i>Long-haul fiber route</span><h3>' + esc(g.n || g.op || "Fiber route") + '</h3><dl>' +
+        (g.op ? '<dt>Operator</dt><dd>' + esc(g.op) + '</dd>' : "") + '<dt>Length</dt><dd>' + num(g.km) + ' km</dd></dl>' +
+        '<p class="age">Route as publicly mapped in OpenStreetMap (ODbL). Most U.S. fiber, including all street-level fiber, is not public, so this is a small part of the real network. Not a live status.</p>';
     }
     return h;
   }
@@ -487,7 +568,7 @@
     SKY.on = sky; document.body.classList.toggle("nx-sky", sky);
     document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"); });
     $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = !sky; $("nx_leg").hidden = sky; hideCard(true);
-    if (sky) SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
+    if (sky) SEA_L.concat(INF_L).forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
     try { history.replaceState(null, "", sky ? "#sky" : "#map"); } catch (e) {}
     ["cty-fill", "cty-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
     if (!sky) {
