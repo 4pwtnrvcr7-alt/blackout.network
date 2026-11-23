@@ -440,13 +440,22 @@ def _build_points(limit=None):
             "approximate": approximate, "cc": cc, "watchlist": int(r.get("watchlist") or 0),
             "links": [{"url": (l or {}).get("url"), "source": (l or {}).get("source")} for l in links[:5] if isinstance(l, dict)],
         }
-        # Nov 23 2026 (pt1762u): only a verified, specific location is a pin. Country centroids,
+        # Nov 23 2026 (pt1762u): only a specific, named location is a pin. Country centroids,
         # scattered stand-in cities, low-confidence / ambiguous matches, water, and headline
-        # contradictions stay in the lists, not on the map.
-        if not map_pins.eligible(title=entry["title"], place=entry["place"], precision=entry["precision"],
-                                 lat=entry["lat"], lon=entry["lon"], cc=entry["cc"]):
+        # contradictions stay in the lists, not on the map. A city pin whose city is not in the
+        # headline is dropped, or moved to a county or state the headline names.
+        pin = map_pins.resolve_pin(title=entry["title"], place=entry["place"], precision=entry["precision"],
+                                   lat=entry["lat"], lon=entry["lon"], cc=entry["cc"])
+        if not pin:
             unverified += 1
             continue
+        entry["lat"], entry["lon"] = pin["lat"], pin["lon"]
+        if pin.get("place") is not None:
+            entry["place"] = pin["place"]
+        if pin.get("precision"):
+            entry["precision"] = pin["precision"]
+        if pin.get("cc"):
+            entry["cc"] = pin["cc"]
         drafted.append(entry)
     points = drafted
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
