@@ -162,6 +162,23 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     }
     return s + (Math.max.apply(null, r.concat([0])) ? '<polyline points="' + pts.join(" ") + '" class="nb-sp-rp"/>' : '<line x1="0" y1="' + (H - 1) + '" x2="' + W + '" y2="' + (H - 1) + '" class="nb-sp-na"/>');
   }
+  function chart24(n) {   /* back face (pt1793 item 3): hourly 24 h history, bigger than the front sparkline, with axis and legend */
+    var W = 120, H = 34, bw = W / 24, r = rep(n.id).hrs || [], w = n.watch ? (n.web24 || []) : (n.h24 || []), mx = Math.max.apply(null, r.concat([2])), pts = [], have = 0;
+    var s = '<svg class="nb-c24" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="Last 24 hours">' +
+      '<line x1="0" y1="' + (H - 0.5) + '" x2="' + W + '" y2="' + (H - 0.5) + '" class="nb-c24a"/>';
+    for (var i = 0; i < 24; i++) {
+      var l = w[i];
+      if (l != null && l >= 0) { have++; var bh = l >= 3 ? H - 2 : l === 2 ? H * 0.75 : l === 1 ? H * 0.5 : H * 0.3;
+        s += '<rect x="' + (i * bw + 0.7).toFixed(1) + '" y="' + (H - 1 - bh).toFixed(1) + '" width="' + (bw - 1.4).toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="0.8" class="' + (n.watch ? (l >= 2 ? "b-deg" : "b-wk") : "b-" + LV(l)) + '"/>'; }
+      else s += '<rect x="' + (i * bw + 0.7).toFixed(1) + '" y="' + (H - 2.5) + '" width="' + (bw - 1.4).toFixed(1) + '" height="1.5" class="b-na"/>';
+      pts.push((i * bw + bw / 2).toFixed(1) + "," + (H - 1.5 - (H - 5) * (r[i] || 0) / mx).toFixed(1));
+    }
+    if (Math.max.apply(null, r.concat([0]))) s += '<polyline points="' + pts.join(" ") + '" class="nb-sp-rp"/>';
+    var t24 = rep(n.id).h24 || 0;
+    return { svg: s + '</svg><span class="nb-c24x"><span>24 h ago</span><span>now</span></span>',
+      lbl: (n.watch ? "Site ok " + w.filter(function (v) { return v === 0; }).length + "/" + have + " h ok" : have ? "Status, 24 h" : "No status history yet"),
+      tail: t24 + " report" + (t24 === 1 ? "" : "s") };
+  }
   function mini(n) {   /* back-face chart: the provider's 30-day history when published, else our 24 h reports */
     var W = 120, H = 24, s = '<svg class="nb-sp" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">', d = n.days, r = rep(n.id).hrs;
     if (n.watch) { var ok = (n.web24 || []).filter(function (v) { return v === 0; }).length, ck = (n.web24 || []).filter(function (v) { return v != null && v >= 0; }).length;
@@ -176,7 +193,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
       '<span class="nb-tn">' + esc(nm) + '</span>' + (sub(n.name) ? '<span class="nb-ts">' + esc(sub(n.name)) + '</span>' : '<span class="nb-ts">&nbsp;</span>') +
       '<span class="nb-tw"><i></i>' + esc(n.link_only ? "Link to status" : r.surge && n.level < 2 ? "People report problems" : word(n)) + (ch.length && n.level < 2 ? '<em>Likely affected</em>' : "") + '</span>' + strip(n) +
       '<span class="nb-tf"><span>24 h</span>' + (r.h1 ? '<span class="nb-tr">' + r.h1 + ' report' + (r.h1 > 1 ? "s" : "") + ' / h</span>' : (n.uptime != null ? '<span>' + n.uptime.toFixed(2) + '% · 30 d</span>' : "")) + '</span></button>';
-    var m = mini(n), txt = n.link_only ? "Official status page only" : (n.status || word(n));
+    var m = chart24(n), txt = n.link_only ? "Official status page only" : (n.status || word(n));
     var back = '<div class="nb-fb ' + st + '"' + (f ? "" : ' aria-hidden="true"') + '><button type="button" class="nb-fx" data-flip="' + esc(n.id) + '" aria-label="Back to the front of ' + esc(nm) + '"' + (f ? "" : ' tabindex="-1"') + '>' +
       '<span class="nb-fw"><i></i>' + esc(nm) + '</span><span class="nb-fs">' + esc(txt) + '</span>' + m.svg + '<span class="nb-tf"><span>' + esc(m.lbl) + '</span><span>' + esc(m.tail || (r.h24 ? r.h24 + " reports today" : n.kind === "asn" ? "IODA signal" : "Status page")) + '</span></span></button>' +
       '<div class="nb-fa"><a class="nb-fe" href="/network/status/' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>Expand</a>' +
