@@ -15,7 +15,7 @@ LOGO = os.path.join(BASE, "static", "social", "brand_tile_v2_dark_168.png")
 BG = (11, 13, 16)
 LAND = (22, 28, 36)
 COAST = (255, 194, 26)
-GOLD = (255, 194, 26)
+GOLD = (229, 229, 234)   # pt1754u: no yellow anywhere (name kept for callers)
 INK = (245, 245, 247)
 MUTED = (120, 126, 136)
 RED = (200, 16, 46)
@@ -255,7 +255,7 @@ def section_plate(title):
         prev = None
         for x in range(8, w - 8):
             y = int(y0 + math.sin(x / 18.0 + phase) * amp)
-            if prev: _line(pix, prev[0], prev[1], x, y, (90, 74, 28) if i != 1 else GOLD)
+            if prev: _line(pix, prev[0], prev[1], x, y, (72, 72, 76) if i != 1 else GOLD)
             prev = (x, y)
     _hline(pix, 2, GOLD); _hline(pix, h - 3, GOLD)
     label = title.upper()[:28]
@@ -279,7 +279,7 @@ def _stroke_circle(pix, cx, cy, r, color):
 # 144px tile so a 72px header slot stays full. No scene, halo, or baked-in words.
 TILE = (27, 41, 51)
 MARK = {
-    "missile": ((255, 194, 26), "#FFC21A"),
+    "missile": ((229, 229, 234), "#E5E5EA"),
     "conflict": ((224, 138, 74), "#E08A4A"),
     "politics": ((126, 164, 204), "#7EA4CC"),
     "outbreak": ((94, 174, 156), "#5EAE9C"),
@@ -287,17 +287,17 @@ MARK = {
     "storm": ((126, 164, 204), "#7EA4CC"),
     "flood": ((96, 170, 184), "#60AAB8"),
     "fire": ((214, 146, 78), "#D6924E"),
-    "grid": ((240, 196, 96), "#F0C460"),
+    "grid": ((200, 200, 206), "#C8C8CE"),
     "cyber": ((156, 146, 196), "#9C92C4"),
     "space": ((186, 196, 214), "#BAC4D6"),
-    "financial": ((214, 166, 86), "#D6A656"),
-    "rights": ((214, 198, 156), "#D6C69C"),
+    "financial": ((174, 174, 178), "#AEAEB2"),
+    "rights": ((214, 214, 220), "#D6D6DC"),
     "surveillance": ((168, 184, 196), "#A8B8C4"),
     "protest": ((204, 166, 122), "#CCA67A"),
     "border": ((186, 176, 146), "#BAB092"),
     "place": ((244, 241, 232), "#F4F1E8"),
-    "other": ((255, 194, 26), "#FFC21A"),
-    "nuclear": ((214, 176, 96), "#D6B060"),
+    "other": ((229, 229, 234), "#E5E5EA"),
+    "nuclear": ((190, 190, 196), "#BEBEC4"),
     "terror": ((196, 122, 96), "#C47A60"),
 }
 
@@ -614,7 +614,7 @@ def trend_badge_html(trajectory, detail):
     """Full-width arrow badge. Colours are inline so a dark-mode client does not wash them out."""
     word = trend_word(trajectory)
     if word == "UPTREND":
-        bg, arrow, ac = "#C8102E", "▲", "#FFC21A"
+        bg, arrow, ac = "#C8102E", "▲", "#FFFFFF"
     elif word == "DOWNTREND":
         bg, arrow, ac = "#146C43", "▼", "#D1FAE5"
     else:

@@ -57,6 +57,6 @@ document.querySelectorAll("form[data-nl-addcat]").forEach(f=>{if(f.dataset.nlRea
  const msg=f.querySelector(".nl-msg"),btn=f.querySelector("button[type=submit]");
  f.addEventListener("submit",async e=>{e.preventDefault();const fd=new FormData(f);btn.disabled=true;
   try{const r=await post("add_category",{token:fd.get("token"),category:fd.get("category")});
-   say(msg,(r.j&&r.j.message)||("Error "+r.status),r.ok);if(r.ok){btn.textContent="Added ✓"}else{btn.disabled=false}}
+   say(msg,(r.j&&r.j.message)||("Error "+r.status),r.ok);if(r.ok){btn.textContent="Added"}else{btn.disabled=false}}
   catch(err){say(msg,"Network error. Please try again.");btn.disabled=false}})});
 })();
