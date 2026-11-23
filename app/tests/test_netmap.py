@@ -114,3 +114,20 @@ class NetSkyStarlinkFallback(unittest.TestCase):
         with mock.patch.object(netstarlink, "celestrak_file", lambda *a: (None, None, "HTTP 403")), mock.patch.object(netsky, "_fetch", fetch):
             self.assertEqual(netsky._file("starlink", "starlink"), ("/x", 1.0, None))
         self.assertEqual(seen[0][0], "starlink_sup"); self.assertIn("sup-gp.php?FILE=starlink", seen[0][1])
+
+class NetRails(unittest.TestCase):
+    def test_rails_group_and_component_filter(self):
+        import netmap
+        from unittest import mock
+        self.assertIn("rails", [g for g, _ in netmap.GROUPS])
+        ids = {n[0]: n for n in netmap.NETS if n[2] == "rails"}
+        for k in ("fedres", "column", "logingov", "bandwidth"): self.assertIn(k, ids)
+        self.assertEqual(ids["fedres"][3], "link")   # Fed's status app disallows robots: link only, never fetched
+        summ = {"status": {"indicator": "major"}, "components": [{"name": "FedWire", "status": "operational"}, {"name": "Production", "status": "major_outage"}],
+                "incidents": [{"name": "API down", "status": "investigating", "components": [{"name": "Production"}]}]}
+        def jg(u, **k): return summ if u.endswith("summary.json") else {"incidents": []}
+        with mock.patch.object(netmap, "jget", jg):
+            netmap._C.clear() if hasattr(netmap, "_C") else None
+            r = netmap.spc_one(("https://x.example", r"^(FedWire|FedACH)$"))
+        self.assertEqual(r["level"], 0); self.assertEqual(r["incidents"], [])
+        self.assertEqual(netmap.link_one("see page")["level"], -1)

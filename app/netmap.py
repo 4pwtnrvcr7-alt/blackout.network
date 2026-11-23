@@ -6,7 +6,7 @@ one refresh at a time, never per request) and re-served as one compact JSON:
   DOE/ORNL ODIN power outages via gridpage.py (gridstatus.db).
 Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py, config.json, the newsletter or the QA gate.
 Routes: /network (page, via netpages.py), /api/netmap/data, /api/netmap/dc, /api/netmap/<static file>."""
-import os, json, time, math, threading, urllib.request, html as _html
+import os, re, json, time, math, threading, urllib.request, html as _html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
@@ -102,6 +102,17 @@ NETS = [
  ("cashapp", "Cash App", "pay", "sp", "https://status.cash.app", "https://status.cash.app", "https://cash.app/help"),
  ("shopify", "Shopify", "pay", "sp", "https://www.shopifystatus.com", "https://www.shopifystatus.com", "https://help.shopify.com/"),
  ("authorizenet", "Authorize.net", "pay", "sp", "https://status.authorize.net", "https://status.authorize.net", "https://support.authorize.net/"),
+ # banking rails and public services (stage 2 piece 3; free public status feeds only)
+ ("fedres", "Federal Reserve (FedNow, Fedwire, FedACH)", "rails", "link", "Official status is published on the Federal Reserve page, which does not allow automated reads. Open it to check",
+  "https://www.frbservices.org/service-status/", "https://www.frbservices.org/contact-us/"),
+ ("column", "Fedwire and FedACH via Column Bank", "rails", "spc", ("https://status.column.com", r"^(FedWire|FedACH)$"), "https://status.column.com", "https://column.com/contact"),
+ ("increase", "ACH, wires and RTP via Increase", "rails", "sp", "https://status.increase.com", "https://status.increase.com", "https://increase.com/contact"),
+ ("mx", "MX (bank account connections)", "rails", "sp", "https://status.mx.com", "https://status.mx.com", "https://www.mx.com/contact/"),
+ ("clover", "Clover (card terminals)", "rails", "sp", "https://status.clover.com", "https://status.clover.com", "https://www.clover.com/help"),
+ ("toast", "Toast (restaurant payments)", "rails", "sp", "https://status.toasttab.com", "https://status.toasttab.com", "https://central.toasttab.com/s/support"),
+ ("gusto", "Gusto (payroll)", "rails", "sp", "https://status.gusto.com", "https://status.gusto.com", "https://support.gusto.com/"),
+ ("logingov", "Login.gov (federal sign-in: SSA, IRS and more)", "rails", "sp", "https://status.login.gov", "https://status.login.gov", "https://login.gov/help/"),
+ ("bandwidth", "Bandwidth US voice (carrier behind many calling apps)", "rails", "spc", ("https://status.bandwidth.com", r"United States"), "https://status.bandwidth.com", "https://support.bandwidth.com/"),
  ("plaid", "Plaid (bank links)", "pay", "sp", "https://status.plaid.com", "https://status.plaid.com", "https://support.plaid.com/"),
  ("chime", "Chime", "pay", "sp", "https://status.chime.com", "https://status.chime.com", "https://help.chime.com/"),
  ("affirm", "Affirm", "pay", "sp", "https://status.affirm.com", "https://status.affirm.com", "https://helpcenter.affirm.com/"),
@@ -124,7 +135,7 @@ NETS = [
  ("1password", "1Password", "apps", "sp", "https://status.1password.com", "https://status.1password.com", "https://support.1password.com/"),
 ]
 GROUPS = [("isp", "Internet providers"), ("mobile", "Mobile carriers"), ("sat", "Satellite internet"), ("cloud", "Cloud and web"),
-          ("pay", "Payments and money"), ("apps", "Apps and messaging")]
+          ("pay", "Payments and money"), ("rails", "Banking rails and public services"), ("apps", "Apps and messaging")]
 NP_PAGES = {"aws", "azure", "m365", "gcp", "workspace", "cloudflare", "akamai", "starlink"}
 
 def _day_index(t, n0):
@@ -164,6 +175,26 @@ def sp_one(base):
     days, up = _bars([x for x in spans if x[2] > 0])
     return dict(level=lvl, status=desc or "Status published", incidents=[dict(t=i.get("name", "")[:160], since=i.get("started_at") or i.get("created_at"),
                 impact=i.get("impact")) for i in act[:4]], days=days, uptime=up, basis="provider incident reports")
+
+def spc_one(feed):
+    """Statuspage, only the components that matter here (feed = (base, regex on component names))."""
+    base, rx = feed; rx = re.compile(rx)
+    s = jget(base + "/api/v2/summary.json", timeout=9)
+    comps = [c for c in s.get("components") or [] if rx.search(c.get("name") or "")]
+    worst = max([CST.get(c.get("status"), 0) for c in comps] or [0])
+    hit = lambda i: any(rx.search(c.get("name") or "") for c in i.get("components") or [])
+    act = [i for i in s.get("incidents") or [] if i.get("status") not in ("resolved", "postmortem") and hit(i)]
+    lvl = max(worst, 1 if act else 0)
+    inc = swr("spi:" + base, 3600, lambda: jget(base + "/api/v2/incidents.json", timeout=9).get("incidents") or [], wait=True) or []
+    spans = [(pts(i.get("started_at") or i.get("created_at")), pts(i.get("resolved_at")), IMP.get(i.get("impact") or "minor", 1)) for i in inc if hit(i)]
+    days, up = _bars([x for x in spans if x[2] > 0])
+    st = {0: "All tracked services operational", 1: "Minor issues reported", 2: "Partial outage reported", 3: "Major outage reported"}[lvl]
+    return dict(level=lvl, status=st, incidents=[dict(t=i.get("name", "")[:160], since=i.get("started_at") or i.get("created_at"), impact=i.get("impact")) for i in act[:4]],
+                days=days, uptime=up, basis="provider incident reports for the tracked services")
+CST = {"operational": 0, "under_maintenance": 0, "degraded_performance": 1, "partial_outage": 2, "major_outage": 3}
+
+def link_one(note):
+    return dict(level=-1, status=note, incidents=[], days=None, uptime=None, basis="", link_only=True)
 
 def stripe_one(url):
     d = jget(url, timeout=9); big = d.get("largestatus", "up")
@@ -312,6 +343,8 @@ def build():
             if kind == "sp": r = sp_one(feed)
             elif kind == "np": r = np_one(feed)
             elif kind == "stripe": r = stripe_one(feed)
+            elif kind == "spc": r = spc_one(feed)
+            elif kind == "link": r = link_one(feed)
             else: r = asn_one(feed, asn_ev)
         except Exception:
             r = dict(level=-1, status="Status feed unreachable right now", incidents=[], days=None, uptime=None, basis="")
@@ -322,9 +355,9 @@ def build():
     lvl = {n["id"]: n["level"] for n in nets}
     out = outages(); pw = power()
     cloud = [dict(p=p, name=nm, lon=lo, lat=la, level=lvl.get(p, -1)) for p, nm, lo, la in CLOUD_PTS]
-    issues = [n for n in nets if n["level"] >= 2]
+    issues = [n for n in nets if n["level"] >= 2]; tracked = [n for n in nets if not n.get("link_only")]
     return dict(generated=iso(now()), groups=[dict(id=g, name=t) for g, t in GROUPS], nets=nets, cloud=cloud, outages=out, power=pw,
-                summary=dict(networks=len(nets), ok=sum(1 for n in nets if n["level"] in (0, 1)), issues=len(issues), unknown=sum(1 for n in nets if n["level"] < 0),
+                summary=dict(networks=len(tracked), ok=sum(1 for n in tracked if n["level"] in (0, 1)), issues=len(issues), unknown=sum(1 for n in tracked if n["level"] < 0),
                              countries_now=sum(1 for c in out["countries"] if c["cur"]), countries_24h=len(out["countries"]),
                              power_customers=sum(s["outages"] for s in (pw.get("states") or []))),
                 sources=SOURCES, ttl_s=300)

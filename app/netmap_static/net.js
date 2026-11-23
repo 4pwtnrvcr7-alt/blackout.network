@@ -286,7 +286,7 @@
     var chip = $("nx_chip"), txt;
     if (maj.length) { txt = maj.length + " major outage" + (maj.length > 1 ? "s" : "") + " · " + maj[0].name; chip.className = "nx-chip live s-out"; }
     else if (iss.length) { txt = iss.length + " network" + (iss.length > 1 ? "s" : "") + " disrupted · " + iss[0].name; chip.className = "nx-chip live s-deg"; }
-    else { txt = "No major U.S. network outages · " + (s.ok || 0) + " of " + (s.networks || 0) + " normal"; chip.className = "nx-chip live s-ok"; }
+    else { txt = innerWidth < 768 ? (s.ok || 0) + " of " + (s.networks || 0) + " networks normal" : "No major U.S. network outages · " + (s.ok || 0) + " of " + (s.networks || 0) + " normal"; chip.className = "nx-chip live s-ok"; }
     $("nx_sum").textContent = txt;
     $("nx_more_lbl").textContent = "All " + (s.networks || "") + " networks";
   }
@@ -362,14 +362,14 @@
       daily.map(function (v, i) { var hh = Math.max(1.5, 60 * v / mx); return '<rect x="' + (i * bw + 1).toFixed(1) + '" y="' + (64 - hh).toFixed(1) + '" width="' + (bw - 2).toFixed(1) + '" height="' + hh.toFixed(1) + '"' + (v >= mx * 0.6 && v > 40 ? ' class="hi"' : '') + '><title>' + v + ' events</title></rect>'; }).join("") +
       '</svg><div class="ax"><span>30 days ago</span><span>Today</span></div></div>';
     var h = '<div class="nx-kpis"><div class="nx-kpi"><b>' + num(s.ok) + '/' + num(s.networks) + '</b><span>Networks normal</span></div><div class="nx-kpi"><b>' + num(s.countries_now) + '</b><span>Countries with an outage now</span></div><div class="nx-kpi"><b>' + num(s.power_customers) + '</b><span>U.S. power customers out</span></div></div>' + chart;
-    var shownGroups = (D.groups || []).filter(function (g) { return g.id === "isp" ? ON.internet : g.id === "mobile" ? ON.mobile : g.id === "sat" ? ON.sat : g.id === "cloud" ? ON.cloud : g.id === "pay" ? ON.pay : g.id === "apps" ? ON.apps : true; });
+    var shownGroups = (D.groups || []).filter(function (g) { return g.id === "isp" ? ON.internet : g.id === "mobile" ? ON.mobile : g.id === "sat" ? ON.sat : g.id === "cloud" ? ON.cloud : (g.id === "pay" || g.id === "rails") ? ON.pay : g.id === "apps" ? ON.apps : true; });
     if (!shownGroups.length) shownGroups = D.groups || [];
     shownGroups.forEach(function (g) {
       var ns = nets.filter(function (n) { return n.group === g.id; }).sort(function (a, b) { return (b.level - a.level) || a.name.localeCompare(b.name); });
       var bad = ns.filter(function (n) { return n.level >= 2; }).length;
       h += '<div class="nx-gh" id="nxg-' + g.id + '"><h3>' + esc(g.name) + '</h3><span>' + (bad ? bad + " disrupted" : "All normal") + '</span></div>';
       ns.forEach(function (n) {
-        h += '<details class="nx-net"><summary><i style="background:' + lvCol(n.level) + '"></i><b>' + esc(n.name) + '</b><em>' + (n.uptime != null ? n.uptime.toFixed(2) + "%" : "") + '</em><small>' + esc(lvName(n.level)) + ' · ' + esc(n.status) + '</small>' + bars(n.days) + '</summary>' +
+        h += '<details class="nx-net"><summary><i style="background:' + lvCol(n.level) + '"></i><b>' + esc(n.name) + '</b><em>' + (n.uptime != null ? n.uptime.toFixed(2) + "%" : "") + '</em><small>' + esc(n.link_only ? "Official page" : lvName(n.level)) + ' · ' + esc(n.status) + '</small>' + bars(n.days) + '</summary>' +
           '<div class="nx-nb">' + ((n.incidents || []).length ? '<ul>' + n.incidents.map(function (i) { return '<li>' + esc(i.t) + (i.since ? ' · ' + esc(ago(i.since)) : '') + '</li>'; }).join("") + '</ul>' : '<p style="margin:0">No active incidents.</p>') +
           (n.uptime != null ? '<p style="margin:6px 0 0">30-day availability ' + n.uptime.toFixed(2) + '% (from ' + esc(n.basis || "public data") + ').</p>' : '') +
           '<div class="nx-acts">' + linkA(n.status_url, "Official status") + linkA(n.support, "Contact support") + linkA(n.page, "Full analysis") + linkA(n.ioda, "IODA signal") + '</div></div></details>';
