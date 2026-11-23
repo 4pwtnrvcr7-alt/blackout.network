@@ -127,14 +127,6 @@ body.nx-more-on .nx-more{transform:none;visibility:visible}
 .nx-ld{position:fixed;inset:0;z-index:40;background:#03040a;transition:opacity .7s var(--nx-ease),visibility .7s}
 body.nx-ready .nx-ld{opacity:0;visibility:hidden;pointer-events:none}
 .nx-ld canvas{position:absolute;inset:0;width:100%;height:100%}
-.nx-ldc{position:absolute;left:0;right:0;bottom:calc(14vh + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:14px;pointer-events:none}
-.nx-ldk{display:flex;gap:14px;align-items:baseline;margin:0;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:rgba(240,240,250,.62)}
-.nx-ldk b{font:600 15px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;color:#F0F0FA;min-width:4ch;text-align:right}
-.nx-lds{display:flex;gap:16px;list-style:none;margin:0;padding:0;font:500 10px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(240,240,250,.3)}
-.nx-lds li{display:flex;align-items:center;gap:6px;transition:color .3s}
-.nx-lds li::before{content:"";width:6px;height:6px;border-radius:50%;border:1px solid currentColor;transition:background .3s}
-.nx-lds li.on{color:#F0F0FA}.nx-lds li.on::before{background:var(--nx-dc);border-color:var(--nx-dc);box-shadow:0 0 8px var(--nx-dc)}
-.nx-ldmsg{margin:0;font-size:12.5px;color:rgba(240,240,250,.6)}
 /* ---------- filter chips ---------- */
 .nx-f{position:fixed;z-index:20;top:calc(108px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:flex;gap:6px;max-width:calc(100vw - 24px);overflow-x:auto;scrollbar-width:none;padding:2px 2px 4px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 12px),transparent);mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 12px),transparent)}
 .nx-f::-webkit-scrollbar{display:none}
@@ -175,8 +167,7 @@ body.nx-ready .nx-ld{opacity:0;visibility:hidden;pointer-events:none}
 .nx-src{font-size:12px;color:var(--nx-mu);margin-top:26px}.nx-src a{color:var(--nx-tx)}
 @media (max-width:767px){
  .nx-leg{top:calc(146px + env(safe-area-inset-top));bottom:auto;left:50%;transform:translateX(-50%)}
- .nx-lds{gap:11px;font-size:9.5px;letter-spacing:.12em}
- .nx-ldk{letter-spacing:.2em}
+
 }
 @media (max-width:767px){.nx-leg{font-size:10px;padding:6px 11px}.nx-leg ul{gap:10px}}
 /* stage 2: an opaque layer under the map so the site footer never shows through while the map fades in; theme-proof pill button */
@@ -213,3 +204,17 @@ body.nx-sky .nx-more-btn{display:none}
  body.nx-sky .nx-ctl{bottom:calc(236px + env(safe-area-inset-bottom))}
  body.nx-sky .maplibregl-ctrl-bottom-right{bottom:196px}
 }
+/* ---------- boot loader (pt1759u): text in its own opaque panel, nothing drawn behind it ---------- */
+.nx-ldp{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom));width:min(460px,calc(100% - 28px));box-sizing:border-box;padding:20px 22px 18px;border-radius:18px;background:#07080f;border:1px solid rgba(160,170,255,.16);box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:2}
+.nx-ldh{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.nx-ldk{margin:0 0 8px;font:600 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#A9AEC2}
+.nx-ldst{margin:0;font:600 16px/1.3 Inter,system-ui,sans-serif;color:#F4F5FA;min-height:1.3em}
+.nx-ldn{font:600 34px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.01em;color:#FFFFFF;font-variant-numeric:tabular-nums;min-width:4ch;text-align:right}
+.nx-ldtr{margin:16px 0 14px;height:4px;border-radius:4px;background:#161827;overflow:hidden}
+.nx-ldtr i{display:block;height:100%;width:100%;transform:scaleX(0);transform-origin:left;border-radius:4px;background:linear-gradient(90deg,#36FFB0,#22E5FF 30%,#4D8DFF 55%,#9D7BFF 75%,#FF4FD8)}
+.nx-lds{display:flex;gap:16px;flex-wrap:wrap;list-style:none;margin:0;padding:0;font:600 10.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6E7390}
+.nx-lds li{display:flex;align-items:center;gap:7px;transition:color .3s}
+.nx-lds li::before{content:"";width:7px;height:7px;border-radius:50%;border:1px solid currentColor;transition:background .3s,box-shadow .3s}
+.nx-lds li.on{color:#E9ECF8}.nx-lds li.on::before{background:#22E5FF;border-color:#22E5FF;box-shadow:0 0 8px #22E5FF}
+.nx-ldmsg{margin:12px 0 0;font-size:12.5px;line-height:1.4;color:#B8BCD0}
+@media (max-width:767px){.nx-ldp{padding:16px 16px 15px;bottom:calc(16px + env(safe-area-inset-bottom))}.nx-ldn{font-size:28px}.nx-ldst{font-size:15px}.nx-lds{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;font-size:10px;letter-spacing:.1em}.nx-lds li{white-space:nowrap}}
