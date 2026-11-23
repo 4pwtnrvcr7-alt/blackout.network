@@ -357,6 +357,19 @@ def _build_points(limit=None):
             c.close()
     import geo, map_pins
 
+    # Same headline+state resolver as the Wire map (v12, pt1761u), including sibling counties.
+    ha_places = {}
+    try:
+        import heat_all as HA
+        items = [{"id": r.get("cluster_id"), "title": r.get("title") or "", "loc": r.get("location") or "",
+                  "lat": r.get("lat"), "lon": r.get("lon"), "a": 0, "category": r.get("category") or "",
+                  "brief": r.get("brief") or "", "links": r.get("links") or "[]"} for r in rows]
+        grew = HA._geo_rows(it["id"] for it in items if it["id"])
+        places = HA._sibling_hints(items, [HA.place(it, grew.get(it["id"])) for it in items])
+        ha_places = {it["id"]: p for it, p in zip(items, places)}
+    except Exception:
+        ha_places = {}
+
     # Pass 1: resolve each story. Country-only and other unverified pins stay off the map (pt1762u).
     drafted, stored, inferred, unmapped, unverified = [], 0, 0, 0, 0
     for r in rows:
@@ -369,6 +382,13 @@ def _build_points(limit=None):
         prefer = named[0] if len(named) == 1 else None
         hit = signal_place.infer(story, prefer_cc=prefer)
         coord = _stored_coord(r.get("lat"), r.get("lon"))
+        hp = ha_places.get(r.get("cluster_id"))
+        if hp and hp.get("prec") in map_pins.SPECIFIC and hp.get("lat") is not None and hp.get("lon") is not None:
+            hit = {"lat": hp["lat"], "lon": hp["lon"], "place": hp.get("place") or "",
+                   "precision": hp.get("prec") or "city", "cc": hp.get("cc") or "", "approximate": False}
+            # A stored cluster coordinate that contradicts the headline place is ignored.
+            if coord and geo.hav(coord[0], coord[1], hp["lat"], hp["lon"]) > 50:
+                coord = None
         specific = hit and hit.get("precision") in ("city", "facility", "state", "region")
         # Stored coord must sit inside the story's country when we know one.
         expected_cc = (hit or {}).get("cc") or prefer
