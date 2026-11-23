@@ -37,6 +37,14 @@ E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 LEGEND = ('<p class="bn-sig-leg"><i class="lo"></i>Low<i class="md"></i>Elevated<i class="hi"></i>High</p>'
           '<p class="bn-sig-sr">Low is rank 0 to 3, elevated is rank 4 to 6, and high is rank 7 to 10. Red is only rank 7 and above.</p>')
 
+def _display_cat(title, category):
+    try:
+        import story_display as SD
+        return SD.display_category(title, category)
+    except Exception:
+        return category or ""
+
+
 def views_html(active="us", counts=None):
     counts = counts or {}
     def btn(name, label):
@@ -348,6 +356,7 @@ def _build_points(limit=None):
         finally:
             c.close()
     import geo, map_pins
+
     # Pass 1: resolve each story. Country-only and other unverified pins stay off the map (pt1762u).
     drafted, stored, inferred, unmapped, unverified = [], 0, 0, 0, 0
     for r in rows:
@@ -406,7 +415,7 @@ def _build_points(limit=None):
             continue
         entry = {
             "cluster_id": r.get("cluster_id"), "title": r.get("title") or "", "rank": int(r.get("rank") or 0),
-            "category": r.get("category") or "", "event_time": r.get("event_time") or r.get("first_seen") or r.get("updated") or "",
+            "category": _display_cat(r.get("title") or "", r.get("category") or ""), "event_time": r.get("event_time") or r.get("first_seen") or r.get("updated") or "",
             "lat": lat, "lon": lon, "exact": exact, "place": place, "precision": precision,
             "approximate": approximate, "cc": cc, "watchlist": int(r.get("watchlist") or 0),
             "links": [{"url": (l or {}).get("url"), "source": (l or {}).get("source")} for l in links[:5] if isinstance(l, dict)],

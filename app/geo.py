@@ -18,7 +18,7 @@ UA = "blackout.network-heatmap/1.0 (+https://blackout.network; research dashboar
 NOM_URL = "https://nominatim.openstreetmap.org/search"
 NOM_BUDGET = 150            # max Nominatim requests per worker pass (cached forever, so each query is asked once)
 WINDOW_DAYS = 7
-VERSION = 10                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u)
+VERSION = 11                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u; 11: headline place + state, reject mayor surnames such as Depew, pt1761u)
 _lock = threading.RLock()
 _nom_lock = threading.Lock()
 _last_nom = [0.0]
@@ -264,6 +264,7 @@ def extract(text, ctx_cc=None, trust=False):
     """Find place mentions in free text. Returns dict with accepted matches, context countries, rejected/ambiguous info, unmatched locative spans.
     trust=True for a location field (every capitalised span there is meant to be a place)."""
     G = gaz(); raw = text or ""
+    people = honorific_surnames(raw) if not trust else set()
     flags = []
     for f in FLAG_RE.findall(raw):
         cc = "".join(chr(ord(ch) - 0x1F1E6 + 65) for ch in f)
@@ -301,6 +302,7 @@ def extract(text, ctx_cc=None, trust=False):
                 if n == 1 and k in CAPS_ONLY and not (words[i].replace(".", "").isupper() and not shouting): continue
                 if (k in CAPS_ONLY or k.replace(" ", "") in CAPS_ONLY) and not words[i][0].isupper(): continue
                 if n == 1 and k in ORG_WORDS and not trust: continue
+                if n == 1 and not trust and k in people: continue   # v11: "Mayor Diezel Depew" is not Depew, NY
                 hit = (i, n, k, list(G.idx.get(k, [])))
                 break
         if hit: found.append(hit); i += hit[1]
@@ -343,8 +345,12 @@ def extract(text, ctx_cc=None, trust=False):
         before_cap = i > 0 and caps[i - 1] and prev not in CONNECT and not cue and not _sent_start(t, toks, i) and not (prev in ("a", "an") and _sent_start(t, toks, i - 1))   # v11: "A Krasnoyarsk apartment"
         after_cap = i + n < len(words) and caps[i + n] and nw(words[i + n]) not in CONNECT and not _sent_start(t, toks, i + n)
         person_like = (before_cap or after_cap) and not title_case and not trust
-        if i > 0 and not trust and (nw(words[i - 1]) in GIVEN_NAMES or nw(words[i - 1]) in HONORIFICS) and caps[i - 1] and nw(words[i - 1]) not in STRONG_CUES:
-            rejected_people.append(" ".join(words[i - 1:i + n])); continue
+        prev2 = nw(words[i - 2]) if i > 1 else ""
+        if i > 0 and not trust and caps[i - 1] and nw(words[i - 1]) not in STRONG_CUES and (
+                nw(words[i - 1]) in GIVEN_NAMES or nw(words[i - 1]) in HONORIFICS or prev2 in HONORIFICS):
+            rejected_people.append(" ".join(words[max(0, i - 2):i + n])); continue
+        if not trust and k in people:
+            rejected_people.append(words[i]); continue
         common = k in G.common
         pair = pairs.get(k)
         cands = []
@@ -575,6 +581,24 @@ emmanuel keir rishi justin narendra recep xi kim shinzo fumio jair javier claudi
 HONORIFICS = {"mr", "mrs", "ms", "dr", "sen", "senator", "rep", "representative", "gov", "governor", "president", "minister", "gen", "general", "judge",
               "justice", "secretary", "mayor", "sir", "lord", "lady", "prince", "princess", "king", "queen", "pope", "rev", "father", "officer", "sheriff",
               "commissioner", "chairman", "speaker", "professor", "prof", "coach", "captain", "capt", "sgt", "lt", "col", "councilman", "councilwoman", "councillor"}
+
+# "Mayor Diezel Depew" / "Gov. Katie Hobbs": the last name is a person, not a town (Depew, NY).
+_HONOR_RE = re.compile(
+    r"\b(?:Mayor|Governor|Gov\.|Senator|Sen\.|Representative|Rep\.|President|Minister|Judge|"
+    r"Dr\.|Mr\.|Mrs\.|Ms\.|Gen\.|General|Col\.|Capt\.|Commissioner|Chairman|Chairwoman|"
+    r"Sheriff|Secretary|Councilman|Councilwoman|Councillor)\s+"
+    r"([A-Z][a-zA-Z.'\-]+)(?:\s+([A-Z][a-zA-Z.'\-]+))?"
+)
+def honorific_surnames(text):
+    """Normalized last (and first) names introduced by a title in the text."""
+    out = set()
+    for m in _HONOR_RE.finditer(text or ""):
+        for g in m.groups():
+            if g:
+                k = key_of(g)
+                if k and k not in GENERIC:
+                    out.add(k)
+    return out
 
 # Where a source is published is a prior, not proof: it only breaks ties between same-named places and limits online lookups.
 SOURCE_CC = [
@@ -1000,6 +1024,22 @@ def geocode(cl, members, budget):
                     "high" if nres["matched"] >= max(1, nres["total"] // 2) else "medium", place,
                     evidence="zones: " + "; ".join(nres["zones"][:8]) + (f" (+{nres['n'] - 8})" if nres["n"] > 8 else ""))
     locs = [l for l in locs if not BROAD_RE.fullmatch(fold(l).strip())]
+    # v11 (pt1761u): the headline's city, disambiguated by a state or county the story names, beats a
+    # location field that picked up a person's surname (Depew, NY for Edgewater, Florida).
+    early_texts = [title] + [m["title"] for m in sorted(members, key=lambda m: -(m.get("official") or 0)) if m.get("title") and m["title"] != title][:5]
+    for tx in supplemental_texts(cl, members):
+        if tx and tx not in early_texts: early_texts.append(tx)
+    if cl.get("brief") and cl.get("brief") not in early_texts: early_texts.append(cl.get("brief"))
+    early_prior = source_cc(members, cl.get("source_hint") or "")
+    hit = resolve_headline_city(title, early_texts + locs, early_prior)
+    if hit:
+        a1 = hit["a1"] if hit.get("a1") in G.admin1 else None
+        stn = (G.admin1.get(a1) or {}).get("name", "")
+        cn = (G.countries.get(hit["cc"]) or {}).get("name", hit["cc"])
+        place = ", ".join(p for p in (hit["name"], stn, cn) if p)
+        return fill(hit["lat"], hit["lon"], hit["cc"], a1, "city", "gazetteer",
+                    "headline place + state or county", "high" if a1 else "medium", place, city=hit["name"],
+                    evidence=f"headline place \"{hit['name']}\"" + (f" in {stn}" if stn else ""))
     for loc in locs:
         nws = re.search(r"\bby NWS ([A-Za-z./ -]+?) ([A-Z]{2})\b", title)
         zones = [z.strip() for z in loc.split(";") if z.strip()]
@@ -1026,7 +1066,16 @@ def geocode(cl, members, budget):
                             f"{', '.join(zones[:3])} ({stn})", evidence=nws.group(0))
         ex = extract(loc, trust=True)
         ch, rc, rt, cands = choose(ex)
-        if ch: return place_from(ch, out, fill, "location_field", f"location field \"{loc[:80]}\"", loc)
+        if ch:
+            a1 = ((ch.get("city") or {}).get("a1") if ch.get("level") == "city" else ch.get("a1"))
+            pl = ((ch.get("city") or {}).get("name") if ch.get("level") == "city" else None) or ch.get("text") or loc
+            if place_contradicts_headline(title, pl, ch.get("level"), a1, early_texts + locs):
+                ch = None
+            else:
+                return place_from(ch, out, fill, "location_field", f"location field \"{loc[:80]}\"", loc)
+        subj = headline_subject(title)
+        if subj and key_of(subj) != key_of((loc or "").split(",")[0]):
+            continue     # do not Nominatim a location field that is a different city than the headline
         st, res = nominatim(loc[:120], None, budget)
         if st == "skipped": return dict(out, reason_code="pending", reason_unlocated=f"Location field \"{loc[:60]}\" queued for the online geocoder")
         r = nom_pick(res, None, 0.3)
@@ -1064,6 +1113,12 @@ def geocode(cl, members, budget):
             ex = alt; ch, rc, rt, cands = choose(ex)
         if ch and n > 0 and tnamed0 and ch["cc"] not in tnamed0:
             ch = None     # v10: the headline names its countries; a later text may not move the story to a country the headline never names
+        if ch and ch.get("level") == "city":
+            same = {x for x in named_admin1_codes(texts + locs) if x.split(".")[0] == ch["cc"]}
+            a1 = (ch.get("city") or {}).get("a1")
+            if same and a1 not in same: ch = None
+            pl = (ch.get("city") or {}).get("name") if ch else None
+            if ch and place_contradicts_headline(title, pl, "city", a1, texts + locs): ch = None
         if ch:
             if ch: return place_from(ch, out, fill, "gazetteer", ("title" if n == 0 else "the story's summary" if bw and tx == bw else "another source's title in this story")
                                      + (f" (source country prior {prior})" if prior else ""), tx)
@@ -1156,6 +1211,15 @@ def locate_texts(cl, texts, members=(), method="writeup", what="the story's writ
         for a in extract(tx)["acc"]:
             if a["level"] == "state" and a.get("a1"): nstates.add(a["a1"])
     spans_all = []; multi = False
+    hit = resolve_headline_city(title, list(texts) + [t for t in span_texts if isinstance(t, str)], prior)
+    if hit and not refine:
+        a1 = hit["a1"] if hit.get("a1") in G.admin1 else None
+        stn = (G.admin1.get(a1) or {}).get("name", "")
+        cn = (G.countries.get(hit["cc"]) or {}).get("name", hit["cc"])
+        place = ", ".join(p for p in (hit["name"], stn, cn) if p)
+        return fill(hit["lat"], hit["lon"], hit["cc"], a1, "city", method,
+                    what + " (headline place + state or county)", "high" if a1 else "medium", place, city=hit["name"],
+                    evidence=f"headline place \"{hit['name']}\"" + (f" in {stn}" if stn else ""))
     for i, tx in enumerate(texts):
         if refine and i > 0 and not cue_only: break     # refining a country pin: the lede only ("Two days earlier ... in Khan Younis" is not this strike)
         cp = county_place(tx, prior)
@@ -1284,10 +1348,157 @@ def small_place(name, ccs):
         L = [x for x in L if x["cc"] in ccs]
         if not L: return None
     elif len({x["cc"] for x in L}) > 1 and not (L[0]["pop"] >= 5000 and L[1]["pop"] * 3 <= L[0]["pop"]): return None
+
     if len(L) > 1 and L[1]["pop"] * 3 > L[0]["pop"]: return None       # two similar-sized towns of that name: not guessed
     return L[0]
 
+# v11 (Matt pt1761u, Nov 23 2026): prefer the headline's place plus a state or county the story
+# actually names; reject a match whose state contradicts the text; leave the story unlocated
+# rather than guess. "Edgewater declares ... amid flooding" + "Volusia County, Fla." is
+# Edgewater, Florida, not Depew, NY (the mayor's last name).
+
+# Compact AP / dateline abbreviations the extract() pass does not always treat as a state.
+_AP_ADMIN = {"fla": "FL", "calif": "CA", "colo": "CO", "conn": "CT", "del": "DE", "ga": "GA",
+             "ill": "IL", "ind": "IN", "kan": "KS", "ky": "KY", "la": "LA", "mass": "MA",
+             "md": "MD", "mich": "MI", "minn": "MN", "miss": "MS", "mo": "MO", "mont": "MT",
+             "neb": "NE", "nev": "NV", "okla": "OK", "ore": "OR", "pa": "PA", "tenn": "TN",
+             "tex": "TX", "vt": "VT", "va": "VA", "wash": "WA", "wis": "WI", "wyo": "WY",
+             "ariz": "AZ", "ark": "AR", "ala": "AL"}
+
+def headline_subject(title):
+    """The place a 'declares a state of emergency' headline is about, or None if that subject looks like a person."""
+    m = _SOE.match((title or "").strip())
+    if not m:
+        return None
+    s = m.group(1).strip()
+    s = re.sub(
+        r"^(?:Mayor|Governor|Gov\.|Senator|Sen\.|Representative|Rep\.|President|Minister|Judge|"
+        r"Dr\.|Mr\.|Mrs\.|Ms\.)\s+",
+        "",
+        s,
+    ).strip()
+    if not s:
+        return None
+    parts = s.split()
+    if parts and key_of(parts[0]) in GIVEN_NAMES:
+        return None
+    if parts and key_of(parts[0]) in HONORIFICS:
+        return None
+    return s
+
+def named_admin1_codes(texts):
+    """Admin1 codes (US.FL, …) actually written in the texts, including 'Fla.' datelines and unique US counties."""
+    found = set()
+    for tx in texts or []:
+        if not tx:
+            continue
+        try:
+            for a in extract(tx)["acc"]:
+                if a.get("level") == "state" and a.get("a1"):
+                    found.add(a["a1"])
+        except Exception:
+            pass
+        for m in re.finditer(r"\b([A-Za-z]{2,5})\.\s", tx):
+            st = _AP_ADMIN.get(m.group(1).lower())
+            if st and st in US_POSTAL:
+                found.add(US_POSTAL[st])
+        cp = county_place(tx)
+        if cp and cp.get("st") in US_POSTAL:
+            found.add(US_POSTAL[cp["st"]])
+        for st in POSTAL_RE.findall(tx):
+            if st in US_POSTAL:
+                found.add(US_POSTAL[st])
+    return found
+
+def cities_named(name, ccs=None, a1s=None):
+    """Unique gazetteer or small-places city for this name, filtered by country and/or admin1. None if ambiguous."""
+    k = key_of(re.sub(r"^(?:the|in|near|at)\s+", "", (name or "").strip(), flags=re.I))
+    if not k or len(k) < 4 or k in SMALL_STOP or k in GENERIC or k in GIVEN_NAMES:
+        return None
+    G = gaz()
+    L = []
+    seen = set()
+    for kind, idx in (G.idx.get(k) or []):
+        if kind != "city":
+            continue
+        c = G.city(idx)
+        key = (round(c["lat"], 4), round(c["lon"], 4), c.get("a1") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        L.append({"name": c["name"], "lat": c["lat"], "lon": c["lon"], "cc": c["cc"], "a1": c["a1"], "pop": c.get("pop") or 0})
+    # towns the 34k list lacks
+    sp = small_place(name, ccs or set())
+    if not sp and not ccs:
+        # small_place with no country filter may already have refused; try unfiltered rows through _small_db
+        sp = None
+    if sp:
+        key = (round(sp["lat"], 4), round(sp["lon"], 4), sp.get("a1") or "")
+        if key not in seen:
+            L.append(sp)
+    if ccs:
+        L = [x for x in L if x.get("cc") in ccs]
+    if a1s:
+        L = [x for x in L if x.get("a1") in a1s]
+    if not L:
+        return None
+    L.sort(key=lambda x: -int(x.get("pop") or 0))
+    if len(L) > 1 and L[1]["pop"] * 3 > L[0]["pop"]:
+        return None
+    return L[0]
+
+def resolve_headline_city(title, texts=(), prior=None):
+    """Headline place + a state or county the story names. None when that would be a guess."""
+    subj = headline_subject(title)
+    if not subj:
+        return None
+    texts = [t for t in ([title] + list(texts or [])) if t]
+    a1s = named_admin1_codes(texts)
+    ccs = set()
+    if prior:
+        ccs.add(prior)
+    for tx in texts:
+        ccs |= {c for c in _named_countries(tx) if c}
+    # A unique US county mentioned in the body pins the city to that state.
+    for tx in texts:
+        cp = county_place(tx, prior)
+        if cp and cp.get("st") in US_POSTAL:
+            a1s.add(US_POSTAL[cp["st"]])
+    hit = cities_named(subj, ccs or None, a1s or None)
+    if hit:
+        return hit
+    # State named, no country named: still try the state filter alone.
+    if a1s:
+        hit = cities_named(subj, None, a1s)
+        if hit:
+            return hit
+    # Unique town of that name (Ocean Shores): only when no conflicting state was named.
+    if not a1s:
+        hit = cities_named(subj, ccs or None, None)
+        if hit:
+            return hit
+        hit = small_place(subj, ccs or set())
+        if hit:
+            return hit
+    return None
+
+def place_contradicts_headline(title, place, precision=None, a1=None, texts=()):
+    """True when a stored or location-field pin is a different city, or its state contradicts the text."""
+    subj = headline_subject(title)
+    city = (place or "").split(",")[0].strip()
+    prec = (precision or "").lower()
+    if subj and city and key_of(city) != key_of(subj):
+        if prec not in ("county", "state", "country", "region"):
+            return True
+    named = named_admin1_codes([title] + list(texts or []))
+    if a1 and named:
+        same = {x for x in named if x.split(".")[0] == str(a1).split(".")[0]}
+        if same and a1 not in same:
+            return True
+    return False
+
 def place_from(ch, out, fill, method, detail, text):
+
     G = gaz(); cc, a1 = ch["cc"], ch.get("a1")
     if ch["level"] == "city":
         c = ch["city"]
