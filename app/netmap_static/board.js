@@ -8,16 +8,22 @@
   function url(u) { return /^https?:\/\//i.test(u || "") || /^\/[a-z]/.test(u || "") ? esc(u) : ""; }
   var root = $("nb"); if (!root) return;
   var D = null, B = null, OPEN = null, MAPD = null;
-  var GB = [{ id: "internet", name: "Internet and ISPs", g: ["isp", "sat"] }, { id: "mobile", name: "Mobile", g: ["mobile"] }, { id: "cloud", name: "Cloud", g: ["cloud"] },
-            { id: "money", name: "Payments and banking", g: ["pay", "rails"] }, { id: "apps", name: "Apps and messaging", g: ["apps"] }, { id: "gov", name: "Government and public", g: ["gov"] }];
+  var GB = [{ id: "bank", name: "Banks and brokerages", g: ["bank"] }, { id: "cards", name: "Card networks", g: ["cards"] }, { id: "internet", name: "Internet and ISPs", g: ["isp", "sat"] }, { id: "mobile", name: "Mobile", g: ["mobile"] }, { id: "cloud", name: "Cloud", g: ["cloud"] },
+            { id: "money", name: "Payment apps and fintech", g: ["pay"] }, { id: "rails", name: "Banking rails", g: ["rails"] }, { id: "apps", name: "Apps and messaging", g: ["apps"] }, { id: "gov", name: "Government and public", g: ["gov"] }];
   var ALIAS = { gmail: "workspace", google: "workspace", meet: "workspace", "google meet": "workspace", "google drive": "workspace", drive: "workspace", outlook: "m365", teams: "m365", office: "m365",
     "office 365": "m365", microsoft: "m365", hotmail: "m365", chatgpt: "openai", "chat gpt": "openai", sora: "openai", comcast: "xfinity", centurylink: "lumen", "spectrum internet": "spectrum",
     "time warner": "spectrum", charter: "spectrum", "at&t": "att", att: "att", verizon: "verizonwireless", fios: "verizonfios", tmobile: "tmobile", "t mobile": "tmobile", "amazon web services": "aws",
     amazon: "aws", "google cloud": "gcp", "microsoft azure": "azure", fednow: "fedres", fedwire: "fedres", ach: "increase", "social security": "ssa", irs: "logingov", "cash app": "cashapp",
-    venmo: "~Venmo", snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter: "~X", slack: "~Slack", roblox: "~Roblox", fortnite: "~Fortnite", alexa: "~Alexa", signal: "~Signal",
-    robinhood: "~Robinhood", canva: "~Canva", uber: "~Uber", claude: "~Claude", xbox: "~Xbox", minecraft: "~Minecraft", "prime video": "~Prime Video", etsy: "~Etsy", duolingo: "~Duolingo" };
+    wells: "wellsfargo", "wells fargo": "wellsfargo", wf: "wellsfargo", "chase bank": "chase", jpmorgan: "chase", "jp morgan": "chase", "jpmorgan chase": "chase", boa: "bofa", bofa: "bofa", "bank of america": "bofa", "b of a": "bofa",
+    citibank: "citi", citigroup: "citi", "capital one": "capitalone", capone: "capitalone", "us bank": "usbank", "u.s. bank": "usbank", usbank: "usbank", "td bank": "td", "navy federal": "navyfederal", nfcu: "navyfederal",
+    "charles schwab": "schwab", "td ameritrade": "schwab", "thinkorswim": "schwab", "fidelity investments": "fidelity", "american express": "amex", "discover card": "discover", "apple pay": "applepay", "apple wallet": "applepay",
+    "google pay": "googlepay", gpay: "googlepay", "google wallet": "googlepay", braintree: "paypal", "pay pal": "paypal", "fifth third": "fifththird", "53 bank": "fifththird", "ally bank": "ally", "regions bank": "regions", "citizens bank": "citizens",
+snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter: "~X", slack: "~Slack", roblox: "~Roblox", fortnite: "~Fortnite", alexa: "~Alexa", signal: "~Signal",
+    canva: "~Canva", uber: "~Uber", claude: "~Claude", xbox: "~Xbox", minecraft: "~Minecraft", "prime video": "~Prime Video", etsy: "~Etsy", duolingo: "~Duolingo" };
   var LV = function (l) { return l >= 3 ? "out" : l === 2 ? "deg" : l === 1 ? "minor" : l === 0 ? "ok" : "na"; };
   var WORD = function (l) { return l >= 3 ? "Major outage" : l === 2 ? "Disruption" : l === 1 ? "Minor issue" : l === 0 ? "Normal" : "No live feed"; };
+  function word(n) { return n && n.watch && n.level === 0 ? "No outage reported" : WORD(n ? n.level : -1); }
+  var FLIP = {};
   function short(n) { return String(n || "").replace(/\s*\((.*)\)\s*$/, ""); }
   function sub(n) { var m = /\((.*)\)\s*$/.exec(n || ""); return m ? m[1] : ""; }
   var TZ = (function () { try { return new Intl.DateTimeFormat("en-US", { timeZoneName: "short" }).formatToParts(new Date()).filter(function (p) { return p.type === "timeZoneName"; })[0].value; } catch (e) { return ""; } })();
@@ -59,8 +65,9 @@
     else if (lv >= 3) head = "Yes. " + nm + " is down.";
     else if (lv === 2) head = "Partly. " + nm + " has a disruption.";
     else if (lv === 1) head = "Mostly up. " + nm + " reports a minor issue.";
-    else if (lv === 0 && r.surge) { head = "Maybe. " + nm + " says it is up, but " + r.h1 + " people reported it down in the last hour."; cls = "rep"; }
+    else if (lv <= 1 && r.surge) { head = "Maybe. " + nm + " says it is up, but " + r.h1 + " people reported it down in the last hour."; cls = "rep"; }
     else if (lv === 0 && ch.length) { head = "Probably up, but at risk."; cls = "minor"; }
+    else if (lv === 0 && n.watch) head = "No outage reported. " + nm + " has no public status page, and the news, our Wire and reports here show no problem right now.";
     else if (lv === 0) head = "No. " + nm + " looks up.";
     else { head = "Unknown. " + nm + "'s live status is unavailable right now."; }
     var isAsn = n.kind === "asn", off = isAsn ? null : lv, ioda = isAsn ? lv : null;
@@ -77,8 +84,9 @@
     var sts = Object.keys(r.states || {}).sort(function (a, b) { return r.states[b] - r.states[a]; });
     if (sts.length) where.push("reports from " + sts.slice(0, 4).join(", "));
     var sig = '<ul class="nb-sig">' +
-      '<li><span>Status page</span><b class="c-' + (off == null ? "na" : LV(off)) + '">' + (off == null ? (isAsn ? "None published" : "–") : WORD(off)) + '</b></li>' +
-      '<li><span>IODA internet signal</span><b class="c-' + (ioda == null ? "na" : ioda >= 2 ? "deg" : "ok") + '">' + (ioda == null ? "Not measured" : ioda >= 2 ? "Drop detected" : "Normal") + '</b></li>' +
+      '<li><span>Status page</span><b class="c-' + (off == null || n.watch ? "na" : LV(off)) + '">' + (off == null || n.watch ? (isAsn || n.watch ? "None published" : "–") : WORD(off)) + '</b></li>' +
+      (n.watch ? '<li><span>News, last 6 h</span><b class="c-' + ((n.sig || {}).news ? "deg" : "ok") + '">' + ((n.sig || {}).news || 0) + ' report' + ((n.sig || {}).news === 1 ? "" : "s") + '</b></li><li><span>Website check</span><b class="c-' + ((n.sig || {}).web === "answers" ? "ok" : "na") + '">' + esc((n.sig || {}).web === "answers" ? "Answers" : (n.sig || {}).web || "Unknown") + '</b></li>' : "") +
+      (n.watch ? "" : '<li><span>IODA internet signal</span><b class="c-' + (ioda == null ? "na" : ioda >= 2 ? "deg" : "ok") + '">' + (ioda == null ? "Not measured" : ioda >= 2 ? "Drop detected" : "Normal") + '</b></li>') +
       '<li><span>Reports here, last hour</span><b class="c-' + (r.surge ? "rep" : "na") + '">' + r.h1 + (r.surge ? " · spiking" : "") + '</b></li></ul>';
     var chain = ch.map(function (d) { var u = byId(d.up); return '<p class="nb-vchain"><i></i>Likely affected: ' + esc(short(u.name)) + ' has a ' + esc(WORD(u.level).toLowerCase()) + ' and ' + esc(nm) + ' relies on it. ' + esc(d.why) + '.</p>'; }).join("");
     if (n.incidents && n.incidents.length) why = n.incidents.slice(0, 2).map(function (i) { return '<li>' + esc(i.t) + '</li>'; });
@@ -92,7 +100,7 @@
     a += (url(n.status_url) ? '<a class="nb-lnk" href="' + url(n.status_url) + '" target="_blank" rel="noopener">Official status</a>' : "") +
       (url(n.support) ? '<a class="nb-lnk" href="' + url(n.support) + '" target="_blank" rel="noopener">Contact</a>' : "") +
       (url(n.ioda) ? '<a class="nb-lnk" href="' + url(n.ioda) + '" target="_blank" rel="noopener">IODA</a>' : "") +
-      (url(n.page) ? '<a class="nb-lnk" href="' + url(n.page) + '">Details</a>' : "") + '</div><div class="nb-zip" data-zipfor="' + esc(n.id) + '" hidden></div>';
+      '<a class="nb-lnk" href="/network/status/' + esc(n.id) + '">History and details</a>' + (url(n.page) ? '<a class="nb-lnk" href="' + url(n.page) + '">Provider analysis</a>' : "") + '</div><div class="nb-zip" data-zipfor="' + esc(n.id) + '" hidden></div>';
     return a;
   }
   function untracked(app) {
@@ -140,21 +148,31 @@
   document.addEventListener("click", function (e) { if (!e.target.closest(".nb-hero")) sug.hidden = true; });
 
   /* ---------- tiles ---------- */
-  function tile(n) {
-    var r = rep(n.id), cls = "nb-t s-" + LV(n.level) + (r.surge && n.level < 2 ? " s-rep" : "") + (OPEN === n.id ? " on" : ""), ch = chainHits(n.id);
-    return '<button type="button" class="' + cls + '" data-t="' + esc(n.id) + '" aria-expanded="' + (OPEN === n.id) + '">' +
-      '<span class="nb-tn">' + esc(short(n.name)) + '</span>' + (sub(n.name) ? '<span class="nb-ts">' + esc(sub(n.name)) + '</span>' : "") +
-      '<span class="nb-tw"><i></i>' + esc(n.link_only ? "Link to status" : r.surge && n.level < 2 ? "People report problems" : WORD(n.level)) + (ch.length && n.level < 2 ? '<em>Likely affected</em>' : "") + '</span>' + strip(n) +
-      '<span class="nb-tf"><span>24 h</span>' + (r.h1 ? '<span class="nb-tr">' + r.h1 + ' report' + (r.h1 > 1 ? "s" : "") + ' / h</span>' : (n.uptime != null ? '<span>' + n.uptime.toFixed(2) + '% · 30 d</span>' : "")) + '</span></button>';
+  /* ---------- flip cards (pt1785u): front = live state + 24 h sparkline, back = status, a small chart and Expand ---------- */
+  function mini(n) {   /* back-face chart: the provider's 30-day history when published, else our 24 h reports */
+    var W = 120, H = 24, s = '<svg class="nb-sp" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">', d = n.days, r = rep(n.id).hrs;
+    if (d && d.length) { var bw = W / d.length; d.forEach(function (l, i) { var bh = l >= 3 ? H : l === 2 ? H * 0.78 : l === 1 ? H * 0.5 : H * 0.28; s += '<rect x="' + (i * bw + 0.4).toFixed(1) + '" y="' + (H - bh).toFixed(1) + '" width="' + Math.max(0.6, bw - 0.8).toFixed(1) + '" height="' + bh.toFixed(1) + '" class="b-' + LV(l) + '"/>'; }); return { svg: s + '</svg>', lbl: "30 days" }; }
+    if (r) { var mx = Math.max.apply(null, r.concat([1])), bw2 = W / 24; r.forEach(function (v, i) { var bh = v ? 3 + (H - 3) * v / mx : 1; s += '<rect x="' + (i * bw2 + 0.6).toFixed(1) + '" y="' + (H - bh).toFixed(1) + '" width="' + (bw2 - 1.2).toFixed(1) + '" height="' + bh.toFixed(1) + '" class="b-rp"/>'; }); return { svg: s + '</svg>', lbl: "Reports, 24 h" }; }
+    return { svg: strip(n), lbl: "24 h" };
   }
-  function detail(n) {
-    var tl = ((B && B.timeline) || []).filter(function (t) { return t.svc === n.id; }).slice(0, 4);
-    var ups = upsOf(n.id), downs = deps().filter(function (d) { return d.up === n.id; });
-    return '<div class="nb-d" id="nb_d" role="region" aria-label="' + esc(short(n.name)) + ' details"><button type="button" class="nb-dx" aria-label="Close details">×</button>' +
-      '<p class="nb-vk">' + esc(short(n.name)) + (sub(n.name) ? ' <span>' + esc(sub(n.name)) + '</span>' : "") + '</p>' + verdict(n) +
-      (tl.length ? '<p class="nb-k2">Recent log</p><ul class="nb-dl">' + tl.map(tlRow).join("") + '</ul>' : "") +
-      (downs.length ? '<p class="nb-k2">If ' + esc(short(n.name)) + ' fails, these often fail too</p>' + downs.map(chainBody).join("") : "") +
-      (ups.length ? '<p class="nb-k2">Depends on</p><p class="nb-vs">' + ups.map(function (d) { var u = byId(d.up); return u ? esc(short(u.name)) + " (" + esc(WORD(u.level).toLowerCase()) + ")" : ""; }).join(", ") + '. Documented in past outages.</p>' : "") + '</div>';
+  function tile(n) {
+    var r = rep(n.id), st = "s-" + LV(n.level) + (r.surge && n.level < 2 ? " s-rep" : ""), ch = chainHits(n.id), f = !!FLIP[n.id], nm = short(n.name);
+    var front = '<button type="button" class="nb-t nb-ff ' + st + '" data-flip="' + esc(n.id) + '" aria-pressed="' + f + '" aria-expanded="' + f + '" aria-label="' + esc(nm + ": " + word(n) + ". Show details") + '">' +
+      '<span class="nb-tn">' + esc(nm) + '</span>' + (sub(n.name) ? '<span class="nb-ts">' + esc(sub(n.name)) + '</span>' : '<span class="nb-ts">&nbsp;</span>') +
+      '<span class="nb-tw"><i></i>' + esc(n.link_only ? "Link to status" : r.surge && n.level < 2 ? "People report problems" : word(n)) + (ch.length && n.level < 2 ? '<em>Likely affected</em>' : "") + '</span>' + strip(n) +
+      '<span class="nb-tf"><span>24 h</span>' + (r.h1 ? '<span class="nb-tr">' + r.h1 + ' report' + (r.h1 > 1 ? "s" : "") + ' / h</span>' : (n.uptime != null ? '<span>' + n.uptime.toFixed(2) + '% · 30 d</span>' : "")) + '</span></button>';
+    var m = mini(n), txt = n.link_only ? "Official status page only" : (n.status || word(n));
+    var back = '<div class="nb-fb ' + st + '"' + (f ? "" : ' aria-hidden="true"') + '><button type="button" class="nb-fx" data-flip="' + esc(n.id) + '" aria-label="Back to the front of ' + esc(nm) + '"' + (f ? "" : ' tabindex="-1"') + '>' +
+      '<span class="nb-fw"><i></i>' + esc(nm) + '</span><span class="nb-fs">' + esc(txt) + '</span>' + m.svg + '<span class="nb-tf"><span>' + esc(m.lbl) + '</span><span>' + (r.h24 ? r.h24 + " reports today" : esc(n.watch ? "No status page" : n.kind === "asn" ? "IODA signal" : "Status page")) + '</span></span></button>' +
+      '<div class="nb-fa"><a class="nb-fe" href="/network/status/' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>Expand</a>' +
+      (n.link_only ? "" : '<button type="button" class="nb-fd" data-down="' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>' + (mine(n.id) ? "Reported" : "Down for me") + '</button>') + '</div></div>';
+    return '<div class="nb-fc' + (f ? " flip" : "") + '" data-fc="' + esc(n.id) + '"><div class="nb-fi">' + front + back + '</div></div>';
+  }
+  function flip(id, on) {
+    var cards = root.querySelectorAll('[data-fc="' + id + '"]'); FLIP[id] = on == null ? !FLIP[id] : on; if (!FLIP[id]) delete FLIP[id];
+    cards.forEach(function (c) { c.classList.toggle("flip", !!FLIP[id]); var b = c.querySelector(".nb-fb"), ff = c.querySelector(".nb-ff");
+      if (b) { b.setAttribute("aria-hidden", FLIP[id] ? "false" : "true"); b.querySelectorAll("a,button").forEach(function (x) { if (FLIP[id]) x.removeAttribute("tabindex"); else x.setAttribute("tabindex", "-1"); }); }
+      if (ff) { ff.setAttribute("aria-pressed", !!FLIP[id]); ff.setAttribute("aria-expanded", !!FLIP[id]); if (FLIP[id]) ff.setAttribute("tabindex", "-1"); else ff.removeAttribute("tabindex"); } });
   }
   function groups() {
     var all = nets(), h = "";
@@ -163,8 +181,8 @@
     gs.sort(function (a, b) { return (b.worst >= 20 ? b.worst : 0) - (a.worst >= 20 ? a.worst : 0); });   /* groups with a real problem move up; otherwise the fixed order */
     gs.forEach(function (x) {
       var bad = x.ns.filter(function (n) { return n.level >= 2; }).length, ok = x.ns.filter(function (n) { return n.level === 0 || n.level === 1; }).length, mi = x.ns.filter(function (n) { return n.level === 1; }).length;
-      h += '<section class="nb-g" aria-label="' + esc(x.g.name) + '"><div class="nb-gh"><h2>' + esc(x.g.name) + '</h2><span class="' + (bad ? "c-deg" : "") + '">' + (bad ? bad + " with problems" : (mi ? (ok - mi) + " normal · " + mi + " minor" : ok + " of " + x.ns.length + " normal")) + '</span></div><div class="nb-grid">';
-      x.ns.forEach(function (n) { h += tile(n); if (OPEN === n.id && !(hot(n) && !n.link_only)) h += detail(n); });   /* a problem tile opens up in Problems now */
+      h += '<section class="nb-g" aria-label="' + esc(x.g.name) + '"><div class="nb-gh"><h2>' + esc(x.g.name) + '</h2><span class="' + (bad ? "c-deg" : "") + '">' + (bad ? bad + " with problems" : (mi ? (ok - mi) + " normal · " + mi + " minor" : ok + " of " + x.ns.length + " normal")) + '</span></div><div class="nb-tl">';
+      x.ns.forEach(function (n) { h += tile(n); });
       h += '</div></section>';
     });
     $("nb_groups").innerHTML = h;
@@ -191,8 +209,8 @@
     var chains = deps().filter(function (d) { var u = byId(d.up); return u && u.level >= 2; });
     if (!bad.length) { sec.hidden = true; sec.innerHTML = ""; }
     else {
-      var h = '<div class="nb-gh"><h2>Problems now</h2><span>Worst first</span></div><div class="nb-grid">';
-      bad.forEach(function (n) { h += tile(n); if (OPEN === n.id) h += detail(n); });
+      var h = '<div class="nb-gh"><h2>Problems now</h2><span>Worst first</span></div><div class="nb-tl">';
+      bad.forEach(function (n) { h += tile(n); });
       h += '</div>';
       if (chains.length) h += '<div class="nb-gh"><h2>Chain reactions</h2><span>Documented dependencies</span></div><div class="nb-chg">' + chains.map(chainBody).join("") + '</div>';
       var st = {}; bad.forEach(function (n) { var s = rep(n.id).states || {}; for (var k in s) st[k] = (st[k] || 0) + s[k]; });
@@ -240,10 +258,10 @@
     if (dn) {
       var id = dn.dataset.down; if (mine(id) || dn.disabled) return; dn.disabled = true; dn.textContent = "Sending…";
       post({ svc: id }).then(function (j) {
-        var z = dn.closest(".nb-v,.nb-d").querySelector('[data-zipfor="' + id + '"]');
+        var zh = dn.closest(".nb-v,.nb-d"), z = zh ? zh.querySelector('[data-zipfor="' + id + '"]') : null;
         if (!j._ok && j._st === 429) { setMine(id); dn.textContent = "Already counted. Thanks"; dn.classList.add("done"); return; }
         if (!j._ok) { dn.textContent = j.error || "Could not send"; dn.disabled = false; return; }
-        setMine(id); dn.textContent = "Reported. Thanks"; dn.classList.add("done");
+        setMine(id); dn.textContent = dn.classList.contains("nb-fd") ? "Reported" : "Reported. Thanks"; dn.classList.add("done");
         if (z) { z.hidden = false; z.innerHTML = '<form class="nb-zf"><label for="nbz_' + esc(id) + '">Add your ZIP to put it on the outage map (optional, nothing else is stored)</label><div><input id="nbz_' + esc(id) + '" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="ZIP" autocomplete="postal-code"><button type="submit">Add</button></div></form>';
           z.querySelector("form").onsubmit = function (ev) { ev.preventDefault(); var v = z.querySelector("input").value.trim(); if (!/^\d{5}$/.test(v)) { z.querySelector("label").textContent = "Enter 5 digits"; return; }
             post({ tok: j.tok, zip: v }).then(function (k) { z.innerHTML = '<p class="nb-vs">' + (k._ok ? "Added to the map (" + esc(k.st) + ")." : esc(k.error || "Could not add the ZIP")) + '</p>'; setTimeout(loadBoard, 1500); }, function () {}); }; }
@@ -251,8 +269,10 @@
       }, function () { dn.textContent = "Could not send. Try again"; dn.disabled = false; });
       return;
     }
+    var fl = e.target.closest("[data-flip]"); if (fl) { flip(fl.dataset.flip); return; }
     var x = e.target.closest(".nb-dx"); if (x) { OPEN = null; render(); return; }
     var t = e.target.closest("[data-t]");
+    if (t) { var c0 = root.querySelector('.nb-g [data-fc="' + t.dataset.t + '"]') || root.querySelector('[data-fc="' + t.dataset.t + '"]'); if (c0) { flip(t.dataset.t, true); var rr = c0.getBoundingClientRect(); root.scrollTo({ top: root.scrollTop + rr.top - 140, behavior: "smooth" }); } return; }
     if (t) { var nid = t.dataset.t; OPEN = OPEN === nid ? null : nid; render(); var d = $("nb_d"); if (d && OPEN) { var r = d.getBoundingClientRect(); if (r.top < 110 || r.bottom > innerHeight) root.scrollTo({ top: root.scrollTop + r.top - 120, behavior: "smooth" }); } }
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && OPEN) { OPEN = null; render(); } });

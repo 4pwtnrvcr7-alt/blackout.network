@@ -866,6 +866,9 @@ def handle_get(path, qs, headers=None):
     if p == "/network" and os.environ.get("BN_NETMAP", "1") != "0":   # Nov 23 2026 (pt1755u): full-screen Network Status map (netmap.py); BN_NETMAP=0 = old hub
         import netmap
         return netmap.handle_get(p, qs)
+    if re.fullmatch(r"/network/status/[a-z0-9]+", p):   # pt1785u: per-service detail pages behind the board's tiles
+        import netmap
+        return netmap.handle_get(p, qs)
     if p == "/network/providers": p = "/network"   # the previous provider hub stays reachable here
     if p in ("/network/starlink", "/network/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
         r = sl().handle_get(p, qs or {}, _sys_mod(), headers)

@@ -66,7 +66,7 @@ class NetMap(unittest.TestCase):
         ids = set()
         for n in netmap.NETS:
             self.assertNotIn(n[0], ids); ids.add(n[0])
-            self.assertTrue(n[5].startswith("https://") and n[6].startswith("https://"), n[0])
+            self.assertTrue((n[5] is None and n[3] == "watch" or n[5].startswith("https://")) and n[6].startswith("https://"), n[0])   # feedless banks have no status page
             self.assertIn(n[2], {g for g, _ in netmap.GROUPS})
 
 if __name__ == "__main__":
