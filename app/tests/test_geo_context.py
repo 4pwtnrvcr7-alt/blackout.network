@@ -321,3 +321,74 @@ class WriteupPlace(unittest.TestCase):
     def test_admin1_names(self):
         G = geo.gaz()
         self.assertEqual(G.admin1["FR.75"]["name"], "Paris"); self.assertEqual(G.admin1["VN.20"]["name"], "Ho Chi Minh City")
+
+    # --- v11 (Matt pt1761u, Nov 23 2026): Edgewater flooding is Edgewater, FL, not Depew, NY
+    def test_edgewater_is_florida_not_depew(self):
+        brief = ("VOLUSIA COUNTY, Fla. – Edgewater mayor Diezel Depew called a special City Council meeting. "
+                 "Depew said homes are taking on floodwaters. The city declared a local state of emergency.")
+        r = run("Edgewater declares state of emergency amid flooding", brief=brief, category="political")
+        self.assertEqual(r["country"], "US")
+        self.assertEqual(r["admin1_code"], "US.FL")
+        self.assertEqual(r["precision"], "city")
+        self.assertIn("Edgewater", r["place"])
+        self.assertIn("Florida", r["place"])
+        self.assertNotIn("Depew", r["place"] or "")
+        self.assertNotEqual(r.get("admin1_code"), "US.NY")
+
+    def test_depew_location_field_yields_to_florida_headline(self):
+        brief = "Volusia County, Fla. officials said flooding closed roads in Edgewater."
+        r = run("Edgewater declares a state of emergency as flooding hits the city",
+                location="Depew, New York, United States", brief=brief, category="political")
+        self.assertIn("Edgewater", r["place"])
+        self.assertEqual(r["admin1_code"], "US.FL")
+        self.assertNotIn("Depew", r["place"] or "")
+
+    def test_edgewater_without_a_state_is_unlocated(self):
+        r = run("Edgewater declares state of emergency amid flooding",
+                location="Depew, New York, United States", category="political")
+        # Several Edgewaters exist; do not guess Illinois or keep the mayor's hometown.
+        self.assertTrue(not r.get("located") or r.get("precision") in ("country", "global") or r.get("city") is None)
+        self.assertNotIn("Depew", r.get("place") or "")
+        self.assertNotEqual(r.get("admin1_code"), "US.NY")
+        self.assertNotEqual(r.get("admin1_code"), "US.IL")
+
+    def test_heat_all_overrides_stored_depew_pin(self):
+        import heat_all
+        it = {"id": "1c6c54ca300b4c17", "title": "Edgewater declares state of emergency amid flooding",
+              "loc": "Depew, New York, United States", "lat": None, "lon": None, "a": 0,
+              "category": "political", "brief": "VOLUSIA COUNTY, Fla. – flooding hit Edgewater.",
+              "links": "[]"}
+        g = {"located": 1, "lat": 42.904, "lon": -78.6923, "precision": "city", "country": "US",
+             "admin1_code": "US.NY", "place": "Depew, New York, United States", "method": "location_field",
+             "confidence": "high"}
+        p = heat_all.place(it, g)
+        self.assertIn("Edgewater", p["place"])
+        self.assertEqual(p["cc"], "US")
+        self.assertNotIn("Depew", p["place"])
+        self.assertTrue(28.5 < p["lat"] < 29.5 and -81.5 < p["lon"] < -80.5, (p["lat"], p["lon"]))
+
+    def test_sibling_county_disambiguates_edgewater(self):
+        import heat_all
+        a = {"id": "a", "title": "Edgewater declares a state of emergency as flooding hits the city",
+             "loc": None, "lat": None, "lon": None, "a": 0, "category": "natural disaster",
+             "brief": "", "links": "[]", "t": "", "rank": 7, "watchlist": 0, "n_families": 5, "eff_families": 5, "fs": ""}
+        b = {"id": "b", "title": "Edgewater declares state of emergency amid flooding",
+             "loc": "Depew, New York, United States", "lat": None, "lon": None, "a": 0, "category": "political",
+             "brief": "", "links": "[]", "t": "", "rank": 7, "watchlist": 0, "n_families": 7, "eff_families": 7, "fs": ""}
+        geo_rows = {
+            "a": {"located": 1, "lat": 29.06, "lon": -81.191, "precision": "county", "country": "US",
+                  "admin1_code": "US.FL", "place": "Volusia County, Florida", "method": "gazetteer", "confidence": "high"},
+            "b": {"located": 1, "lat": 42.904, "lon": -78.6923, "precision": "city", "country": "US",
+                  "admin1_code": "US.NY", "place": "Depew, New York, United States", "method": "location_field", "confidence": "high"},
+        }
+        rows, tiers, reasons = heat_all._rows([a, b], geo_rows)
+        ix = {c: i for i, c in enumerate(heat_all.COLS)}
+        by_id = {r[ix["id"]]: r for r in rows}
+        for rid in ("a", "b"):
+            r = by_id[rid]
+            self.assertIn("Edgewater", r[ix["place"]], r)
+            self.assertIn("Florida", r[ix["place"]], r)
+            self.assertNotIn("Depew", r[ix["place"]])
+            self.assertEqual(r[ix["cat"]], "natural disaster")
+            self.assertEqual(r[ix["prec"]], "city")
+            self.assertTrue(28.5 < r[ix["lat"]] < 29.5)

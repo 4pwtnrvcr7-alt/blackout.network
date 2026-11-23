@@ -17,6 +17,15 @@ class Category(unittest.TestCase):
         self.assertEqual(SD.display_category(t, "war/conflict"), "war/conflict")
     def test_hits_alone_with_outbreak(self):
         self.assertEqual(SD.display_category("Outbreak hits boarding schools in Kenya", "war/conflict"), "disease")
+    def test_flood_emergency_is_disaster(self):
+        self.assertEqual(SD.display_category("Edgewater declares state of emergency amid flooding", "political"), "natural disaster")
+        self.assertEqual(SD.display_category("Edgewater declares a state of emergency as flooding hits the city", "political"), "natural disaster")
+        self.assertEqual(SD.display_category("Storms batter the Arizona coast as the governor declares an emergency", "political"), "natural disaster")
+    def test_coup_emergency_stays_political(self):
+        self.assertEqual(SD.display_category("President declares state of emergency after coup attempt", "political"), "political")
+        self.assertEqual(SD.display_category("Mass protests as parliament is dissolved", "political"), "political")
+    def test_conflict_with_weather_word_kept(self):
+        self.assertEqual(SD.display_category("Missile strikes hospital as storms delay the evacuation", "war/conflict"), "war/conflict")
 
 class Entertainment(unittest.TestCase):
     def test_movie_review(self):
