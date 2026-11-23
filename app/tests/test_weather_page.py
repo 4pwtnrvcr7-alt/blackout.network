@@ -24,7 +24,7 @@ class WeatherPage(unittest.TestCase):
         self.assertEqual(wxmap.handle_get("/api/wxmap/nope", {})[0], 404)
         self.assertEqual(wxmap.handle_get("/api/wxmap/wx.js", {})[0], 200)
         self.assertEqual(wxmap.handle_get("/api/wxmap/wxw.js", {})[0], 200)   # decode worker
-        for s in ('id="wx_reg"', 'data-r="world"', 'id="wx_srcs"', 'id="wx_ldg"', 'id="wx_ldfill"'):
+        for s in ('id="wx_reg"', 'data-r="world"', 'id="wx_srcs"', 'id="wx_ldcv"', 'id="wx_ldn"', 'id="wx_ldphase"'):
             self.assertIn(s, body)
 
     def test_grid_regions_and_global_alerts(self):

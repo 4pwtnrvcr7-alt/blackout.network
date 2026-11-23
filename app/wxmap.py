@@ -764,15 +764,11 @@ def warm():
     threading.Thread(target=run, name="wxmap-warm", daemon=True).start()
 
 # ---------------------------------------------------------------- page
-LOADER = ('<div class="wx-ld" id="wx_ld" role="status" aria-label="Loading the weather map"><div class="wx-ldc">'
-  '<canvas class="wx-ldg" id="wx_ldg" width="260" height="260" aria-hidden="true"></canvas>'
-  '<p class="wx-ldt"><span>BLACKOUT.NETWORK</span><i></i><span>WEATHER</span></p>'
-  '<ul class="wx-ldl" aria-hidden="true">'
-  '<li data-s="map"><span>Map engine</span><b>Standby</b></li>'
-  '<li data-s="radar"><span>Radar frames</span><b>Standby</b></li>'
-  '<li data-s="alerts"><span>Warnings and storms</span><b>Standby</b></li></ul>'
-  '<div class="wx-ldbar"><i id="wx_ldfill"></i></div>'
-  '<p class="wx-ldp"><span id="wx_ldphase">Initializing</span><b><span id="wx_ldn">000</span>%</b></p>'
+LOADER = ('<div class="wx-ld" id="wx_ld" role="status" aria-label="Loading the weather map">'
+  '<canvas class="wx-ldcv" id="wx_ldcv" aria-hidden="true"></canvas><div class="wx-ldc">'
+  '<p class="wx-ldt">BLACKOUT.NETWORK</p>'
+  '<p class="wx-ldn"><span id="wx_ldn">0</span><small>%</small></p>'
+  '<p class="wx-ldp" id="wx_ldphase">Starting the map engine</p>'
   '<p class="wx-ldmsg" id="wx_ldmsg" hidden></p></div></div>')
 
 def _ico(p): return f'<svg viewBox="0 0 24 24" aria-hidden="true">{p}</svg>'
