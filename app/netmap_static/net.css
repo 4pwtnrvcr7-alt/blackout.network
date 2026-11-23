@@ -179,3 +179,6 @@ body.nx-ready .nx-ld{opacity:0;visibility:hidden;pointer-events:none}
  .nx-ldk{letter-spacing:.2em}
 }
 @media (max-width:767px){.nx-leg{font-size:10px;padding:6px 11px}.nx-leg ul{gap:10px}}
+/* stage 2: an opaque layer under the map so the site footer never shows through while the map fades in; theme-proof pill button */
+body.nx::before{content:"";position:fixed;inset:0;background:#232a3a;pointer-events:none}
+html body.nx button#nx_more_btn.nx-more-btn{border-radius:99px!important}
