@@ -761,6 +761,9 @@ def text_part(issue, links, c, subj, why, groups=None, sx=None, refs=None):
     try:
         import newsletter_wx as _WX; T += _WX.text_lines(issue.get("weather"))   # pt1754u: weather forecast + major alerts
     except Exception: pass
+    try:
+        import newsletter_net as _NET; T += _NET.text_lines(issue.get("network"))   # pt1755u: network outage report (opt-in)
+    except Exception: pass
     for s_ in issue.get("videos") or []: T.extend(N._video_text(s_, c, issue["slot"]))
     if sx:
         T += [GROUPS["space"][0].upper(), "=" * len(GROUPS["space"][0])]

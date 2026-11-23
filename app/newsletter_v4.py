@@ -192,6 +192,18 @@ def _head(title):
 def _wx_link(label, url):
     return f'<a href="{E(url)}" class="bnm" style="font:500 13px/20px {FACE};color:{MU};text-decoration:underline">{E(label)}</a>'
 
+def _network(issue):
+    """Network outage report (pt1755u, opt-in). Nothing at all when the reader did not opt in or the data was unavailable."""
+    n = issue.get("network")
+    if not n or not n.get("head"): return []
+    R = [_section("Network status"), _row(_summary(n["head"]), "0 24px")]
+    if n.get("rows"):
+        R.append('<tr><td style="font-size:0;line-height:10px;height:10px">&nbsp;</td></tr>')
+        for r in n["rows"]:
+            R.append(_line(r["name"], r["url"], E(r["what"] + (" · " + r["note"] if r.get("note") else ""))))
+    R.append(_row("".join(_summary(x) for x in n.get("lines") or []) + button("Open the outage map", n["url"]), "4px 24px 0 24px"))
+    return R
+
 def _weather(issue):
     """Weather forecast + major weather alerts (pt1754u). Rows only for the parts that have data; never an empty section."""
     try:
@@ -274,6 +286,8 @@ def render(issue, links, c):
             else: B.append(story(it, c, refs, first=k == 0, big=gi == 0 and k == 0))
     try: B.extend(_weather(issue))
     except Exception as ex: N.log(f"weather section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
+    try: B.extend(_network(issue))
+    except Exception as ex: N.log(f"network section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
     if issue.get("crime"):
         cr = issue["crime"]
         B.append(_section(f"Crime near you · {cr['label']}"))

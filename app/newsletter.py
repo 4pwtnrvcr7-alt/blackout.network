@@ -243,6 +243,7 @@ MIGRATE = [("sent_items", "rank", "INTEGER"), ("sent_items", "n_items", "INTEGER
            ("subscribers", "loc_label", "TEXT"), ("subscribers", "loc_lat", "REAL"), ("subscribers", "loc_lon", "REAL"), ("subscribers", "loc_cc", "TEXT"),
            ("subscribers", "loc_kind", "TEXT"),
            ("subscribers", "crime_brief", "INTEGER NOT NULL DEFAULT 0"), ("subscribers", "crime_alerts", "INTEGER NOT NULL DEFAULT 0"),
+           ("subscribers", "net_brief", "INTEGER NOT NULL DEFAULT 0"),                # pt1755u: network outage report in the brief (opt-in, default off)
            ("subscribers", "signup_cc", "TEXT"),                                   # 2-letter CF-IPCountry at signup only (consent region)
            ("subscribers", "tracking_consent", "INTEGER"),                         # NULL = no choice made, 0 = no, 1 = yes (open/click measurement)
            ("subscribers", "tracking_consent_at", "TEXT"), ("subscribers", "tracking_consent_version", "TEXT")]   # consent record (when, which wording)
@@ -1292,6 +1293,9 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     try:   # pt1754u: weather forecast + major weather alerts (local with a saved area, else US overview); None on any failure
         import newsletter_wx as _WX; issue["weather"] = _WX.for_sub(sub, c)
     except Exception: issue["weather"] = None
+    try:   # pt1755u: network outage report (only for readers who opted in); None on any failure = no section
+        import newsletter_net as _NET; issue["network"] = _NET.for_sub(sub, c)
+    except Exception: issue["network"] = None
     issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries the matters lead (no separate "nothing confirmed" email)
     _include_noted(issue)
     _uniquify_why(issue)
@@ -2600,6 +2604,7 @@ def subscribe(d, ip="", headers=None):
         if kind == "confirm" and loc: k.execute("UPDATE subscribers SET loc_label=?, loc_lat=?, loc_lon=?, loc_cc=?, loc_kind=? WHERE email=?", (loc["label"], loc["lat"], loc["lon"], loc["cc"], loc["kind"], email))
         if kind == "confirm":   # t392: crime opt-ins (default off; only meaningful with an area)
             k.execute("UPDATE subscribers SET crime_brief=?, crime_alerts=? WHERE email=?", (_flag(d.get("crime_brief")), _flag(d.get("crime_alerts")), email))
+            k.execute("UPDATE subscribers SET net_brief=? WHERE email=?", (_flag(d.get("net_brief")), email))   # pt1755u: network outage report opt-in
         if kind == "confirm":   # open/click measurement: store only the 2-letter signup country; unticked box = no (EEA/UK/CH/unknown need a yes)
             k.execute("UPDATE subscribers SET signup_cc=? WHERE email=?", (_cc((headers or {}).get("cf-ipcountry")) or None, email))
             rr = k.execute("SELECT * FROM subscribers WHERE email=?", (email,)).fetchone(); yes = bool(_flag(d.get("track_consent")))
@@ -2661,6 +2666,9 @@ def manage(tok, d):
     cb, ca = _row_get(r, "crime_brief", 0) or 0, _row_get(r, "crime_alerts", 0) or 0
     if "crime_present" in d or "crime_brief" in d or "crime_alerts" in d:   # t392 checkboxes (absent = off when the form rendered them)
         cb, ca = _flag(d.get("crime_brief")), _flag(d.get("crime_alerts"))
+    nb = _row_get(r, "net_brief", 0) or 0
+    if "net_present" in d or "net_brief" in d:   # pt1755u: network outage report checkbox (absent = off when the form rendered it)
+        nb = _flag(d.get("net_brief"))
     loc = "keep"
     if "location" in d:
         if str(d.get("location") or "").strip():
@@ -2669,8 +2677,8 @@ def manage(tok, d):
         else: loc = None
     k = db()
     if loc != "keep": _set_loc(k, r["id"], loc)
-    k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, crime_brief=?, crime_alerts=?, updated=? WHERE id=?",
-              (freq, json.dumps(ints), int(brk if brk is not None else 1), cb, ca, iso(now()), r["id"]))
+    k.execute("UPDATE subscribers SET frequency=?, interests=?, breaking=?, crime_brief=?, crime_alerts=?, net_brief=?, updated=? WHERE id=?",
+              (freq, json.dumps(ints), int(brk if brk is not None else 1), cb, ca, int(nb), iso(now()), r["id"]))
     if "trk_present" in d:   # "Count my opens and clicks" (absent checkbox = off); only a real change is logged
         on = bool(_flag(d.get("track_consent"))); cur = tracking_effective(r)
         if on != cur or _row_get(r, "tracking_consent") is None: set_tracking(k, r["id"], on, "preferences")
@@ -3373,7 +3381,7 @@ def form_html(mode="page"):
             f'<fieldset class="nlx-segs"><legend class="nlx-vh">When (Eastern Time)</legend>{seg}</fieldset>'
             f'<label for="{uid}_loc" class="nl-loc-l nlx-vh">Your area (optional)</label>'
             f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="ZIP or city (optional)">'
-            '<div class="nl-crime nlx-togs">' + tog("crime_brief", "Local crime report") + tog("crime_alerts", "Crime alerts near me") + '</div>'
+            '<div class="nl-crime nlx-togs">' + tog("crime_brief", "Local crime report") + tog("crime_alerts", "Crime alerts near me") + tog("net_brief", "Network outage report") + '</div>'
             f'<details class="nl-cats-d"><summary>Topics: all</summary><div class="nl-cats">{cats}</div></details>'
             f'<div class="nl-trk" hidden><label class="nl-chk"><input type="checkbox" name="track_consent" value="1"> {E(TRACK_CONSENT_LABEL)}</label></div>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
@@ -3474,6 +3482,10 @@ def prefs_form(tok, r):
             '<p class="nl-sm">Uses your area above. The summary uses official FBI rates and, in 16 US cities, recent police reports. Alerts cover serious violent reports '
             '(homicide, shooting, robbery, aggravated assault, kidnapping) within about 5 km in cities with near-real-time police data, and count toward the same 3-a-day limit as breaking alerts. '
             '<a href="/crime">See the Crime page</a>.</p></fieldset>'
+            '<fieldset><legend>Network outages</legend><input type="hidden" name="net_present" value="1">'
+            f'<label class="nl-chk"><input type="checkbox" name="net_brief" value="1"{" checked" if _row_get(r, "net_brief", 0) else ""}> Include the network outage report in my briefs</label>'
+            '<p class="nl-sm">Internet, mobile, cloud, payments and power outages from official status pages, IODA and ODIN. '
+            '<a href="/network">See the live outage map</a>.</p></fieldset>'
             + tracking_fieldset(r) +
             '<button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')
