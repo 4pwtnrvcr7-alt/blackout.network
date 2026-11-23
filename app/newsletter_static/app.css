@@ -61,3 +61,70 @@
 @media(max-width:700px){.nl-page>header{padding:10px 12px}.nl-wrap{padding:12px}.nl-card{padding:12px}.nla-frame{height:560px}}
 /* t392: crime opt-ins on the signup form */
 .nl-crime{display:flex;flex-direction:column;gap:6px;margin:2px 0 10px}.nl-crime .nl-chk{align-items:flex-start;line-height:1.35}.nl-crime input{margin-top:2px;flex:none}
+/* t1754u: newsletter signup redesign. Dark, monochrome, graphic. No yellow; red only for rank 7+. */
+.nl-wrap:has(.nlx-hero){max-width:1180px;padding-top:12px}
+.nlx-vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.nlx-kick{font:600 11px/1 system-ui,-apple-system,sans-serif;letter-spacing:.32em;text-transform:uppercase;color:#9aa3ad;margin:0 0 14px}
+.nlx-hero{position:relative;border-radius:18px;overflow:hidden;background:#000 center 30%/cover no-repeat;border:1px solid #1c2026;min-height:560px;display:flex;align-items:flex-end}
+.nlx-hero-in{width:100%;max-width:620px;padding:120px 40px 28px}
+.nlx-hero h1{margin:0 0 12px;font:700 clamp(38px,6vw,64px)/1.02 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.02em;color:#fff;text-transform:none}
+.nlx-lede{margin:0 0 22px;color:#c9ced5;font-size:17px;line-height:1.45;max-width:30em}
+.nlx-card{background:rgba(8,9,11,.78);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px}
+.nlx-credit{margin:12px 0 0;font-size:11px;color:#6f7782}
+.nlx-form{gap:12px;margin:0}
+.nlx-form .nl-row{gap:8px;flex-wrap:nowrap}
+.nlx-form .nl-row input[type=email]{flex:1 1 auto;min-width:0;height:48px;background:#0d0f12;border:1px solid #2a2f37;border-radius:10px;font-size:16px;padding:0 14px;color:#fff}
+.nlx-form input[type=email]:focus,.nlx-form .nl-loc:focus{border-color:#fff;outline:none}
+.nlx-form button.pri{flex:none;height:48px;padding:0 22px;border-radius:10px;background:#fff;color:#000;font-weight:700;font-size:15px;letter-spacing:.02em;border:1px solid #fff;transition:background .15s,color .15s}
+.nlx-form button.pri:hover{background:transparent;color:#fff}
+.nlx-segs{display:grid!important;grid-template-columns:1.4fr 1fr 1fr;gap:0!important;border:1px solid #2a2f37!important;border-radius:10px!important;padding:3px!important;background:#0d0f12}
+.nlx-seg{position:relative;cursor:pointer;display:block}
+.nlx-seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.nlx-seg span{display:block;text-align:center;padding:9px 6px;border-radius:8px;font-size:13.5px;color:#9aa3ad;transition:background .15s,color .15s;white-space:nowrap}
+.nlx-seg input:checked+span{background:#fff;color:#000;font-weight:600}
+.nlx-seg input:focus-visible+span{outline:2px solid #fff;outline-offset:1px}
+.nlx-form .nl-loc{height:44px;background:#0d0f12;border:1px solid #2a2f37;border-radius:10px;color:#fff;padding:0 14px;font-size:16px}
+.nlx-togs{flex-direction:row!important;flex-wrap:wrap;gap:8px 18px!important;margin:0!important}
+.nlx-tog{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:#d6dae0;position:relative;user-select:none}
+.nlx-tog input{position:absolute;opacity:0;width:1px;height:1px}
+.nlx-sw{width:36px;height:20px;border-radius:20px;background:#22262c;border:1px solid #343a43;position:relative;flex:none;transition:background .15s}
+.nlx-sw:after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8b95a3;transition:transform .18s,background .18s}
+.nlx-tog input:checked+.nlx-sw{background:#fff;border-color:#fff}
+.nlx-tog input:checked+.nlx-sw:after{transform:translateX(16px);background:#000}
+.nlx-tog input:focus-visible+.nlx-sw{outline:2px solid #fff;outline-offset:2px}
+.nlx-form .nl-cats-d summary{font-size:12.5px;color:#7d8590}
+.nlx-form .nl-msg{min-height:0}.nlx-form .nl-msg:empty{display:none}
+.nlx-form .nl-msg.ok{color:#e6e9ee}.nlx-form .nl-msg.err{color:#c9ced5}
+.nlx-form .nl-priv{font-size:11px;line-height:1.5;color:#6f7782;margin:2px 0 0}.nlx-form .nl-priv a{color:#9aa3ad}.nlx-form .nl-trk .nl-chk{font-size:12.5px;color:#9aa3ad}
+.nlx-show{display:grid;grid-template-columns:1fr 380px;gap:40px;align-items:start;margin:44px 4px 20px}
+.nlx-list{list-style:none;margin:0 0 22px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#1c2026;border:1px solid #1c2026;border-radius:14px;overflow:hidden}
+.nlx-list li{background:#0b0c0e;padding:18px}
+.nlx-list b{display:block;color:#fff;font-size:16px;margin:0 0 4px}.nlx-list span{color:#8b95a3;font-size:13.5px}
+.nlx-fig{margin:0;border-radius:14px;overflow:hidden;border:1px solid #1c2026;background:#000}
+.nlx-fig img{display:block;width:100%;height:auto;aspect-ratio:21/9;object-fit:cover;filter:grayscale(.15) contrast(1.05)}
+.nlx-fig figcaption{font-size:11px;color:#6f7782;padding:8px 12px}
+.nlx-more{margin:16px 0 0}.nlx-more a{color:#fff;text-decoration:none;border-bottom:1px solid #444;padding-bottom:2px;font-size:14px}
+.nlx-phone{background:#08090b;border:1px solid #23282f;border-radius:28px;padding:22px 18px 18px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.nlx-ex-top{display:flex;justify-content:space-between;align-items:center;font:700 11px/1 system-ui,sans-serif;letter-spacing:.22em;color:#fff}
+.nlx-ex-tag{font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:10px;color:#9aa3ad;border:1px solid #3a4049;border-radius:20px;padding:4px 8px}
+.nlx-ex-title{color:#fff;font-size:22px;font-weight:700;margin:16px 0 2px}.nlx-ex-sub{color:#7d8590;font-size:12.5px}
+.nlx-ex-sec{margin:18px 0 8px;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:#7d8590;border-top:1px solid #1c2026;padding-top:12px}
+.nlx-ex-wx{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.nlx-d{background:#0f1114;border:1px solid #1c2026;border-radius:10px;padding:8px 4px;text-align:center;display:flex;flex-direction:column;gap:2px}
+.nlx-d b{font-size:11px;color:#9aa3ad;font-weight:600}.nlx-d span{color:#fff;font-size:17px;font-weight:700}.nlx-d i{font-style:normal;color:#7d8590;font-size:12px}.nlx-d em{font-style:normal;color:#9fc3e6;font-size:11px}
+.nlx-ex-it{padding:10px 0;border-bottom:1px solid #15181c}.nlx-ex-it:last-child{border-bottom:0}
+.nlx-ex-k{font-size:11px;color:#8b95a3;margin:0 0 3px}.nlx-ex-h{color:#fff;font-size:14.5px;font-weight:600;line-height:1.3}.nlx-ex-t{color:#7d8590;font-size:12.5px;margin-top:2px}
+.nlx-fine{margin:30px 4px 0;padding:18px 0 0;border-top:1px solid #1c2026;color:#6f7782;font-size:12px;line-height:1.55}
+.nlx-fine p{margin:6px 0}.nlx-fine a{color:#9aa3ad}
+.nlx-fine summary{cursor:pointer;color:#9aa3ad;font-size:12.5px;margin:0 0 6px}.nlx-fine ul{margin:4px 0 10px;padding-left:18px}
+@media(max-width:860px){.nlx-show{grid-template-columns:1fr;gap:28px;margin-top:32px}}
+@media(max-width:600px){
+ .nl-wrap:has(.nlx-hero){padding:8px 10px 30px}
+ .nlx-hero{min-height:0;border-radius:14px;background-position:center 20%}
+ .nlx-hero-in{padding:84px 16px 18px}
+ .nlx-hero h1{font-size:40px}.nlx-lede{font-size:15.5px;margin-bottom:16px}
+ .nlx-card{padding:12px}
+ .nlx-form .nl-row{flex-wrap:wrap}.nlx-form .nl-row input[type=email]{flex-basis:100%}.nlx-form button.pri{width:100%}
+ .nlx-seg span{font-size:12.5px;padding:9px 2px}
+ .nlx-list{grid-template-columns:1fr}
+}
