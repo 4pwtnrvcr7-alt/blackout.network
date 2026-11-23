@@ -365,7 +365,7 @@ def _build_points(limit=None):
                   "lat": r.get("lat"), "lon": r.get("lon"), "a": 0, "category": r.get("category") or "",
                   "brief": r.get("brief") or "", "links": r.get("links") or "[]"} for r in rows]
         grew = HA._geo_rows(it["id"] for it in items if it["id"])
-        places = HA._sibling_hints(items, [HA.place(it, grew.get(it["id"])) for it in items])
+        places = HA._stored_places(items, grew)   # stored once (story_places.db), never re-geocoded per request
         ha_places = {it["id"]: p for it, p in zip(items, places)}
     except Exception:
         ha_places = {}
@@ -570,13 +570,49 @@ def _rt_v():
 
 _HEAT = {"t": 0.0, "v": None}
 _HLOCK = _th.Lock()
+_HBUILD = _th.Lock()     # single flight: one heat build at a time
+
+def _drop_unplaced(body):
+    """Nov 23 2026 (Matt pt1781u): a story with no map position is not sent to the map at all (no tray, no chip).
+    coverage keeps the server-side counts for the location guard; the map never shows them."""
+    if not body or not body.get("rows"): return body
+    cols = body.get("cols") or []
+    try: i_lat, i_lon = cols.index("lat"), cols.index("lon")
+    except ValueError: return body
+    body = dict(body)
+    body["rows"] = [r for r in body["rows"] if r[i_lat] is not None and r[i_lon] is not None]
+    return body
+
 def heat_payload():
+    """Stale-while-revalidate: a cached body is returned at once and a stale one is rebuilt in the background (one build at a time).
+    Only the very first request after boot waits for a build."""
+    import time
+    with _HLOCK:
+        v, fresh = _HEAT["v"], time.time() - _HEAT["t"] < 60
+    if v is not None:
+        if not fresh and not _HBUILD.locked():
+            _th.Thread(target=_heat_rebuild, name="heat_rebuild", daemon=True).start()
+        return v
+    _heat_rebuild()
+    with _HLOCK:
+        return _HEAT["v"]
+
+def _heat_rebuild():
+    if not _HBUILD.acquire(blocking=False):
+        _HBUILD.acquire(); _HBUILD.release(); return      # someone else is building: wait for it
+    try:
+        body = _heat_build()
+        with _HLOCK:
+            _HEAT["v"] = body
+    finally:
+        _HBUILD.release()
+
+def _heat_build():
     """Slim, read-only rows for the heat map: every Wire item of the last 7 days with its best position (heat_all.build); if that fails,
     the Heat Map tab's located alerts (heatmap.data, 7 days, geo.db), else /map's points.
     Cached 60 s in one slot. Never writes, never geocodes, never scores."""
     import time, sys
     with _HLOCK:
-        if _HEAT["v"] is not None and time.time() - _HEAT["t"] < 60: return _HEAT["v"]
         g0 = _HEAT.get("g", 0)   # Nov 21 2026: realtime.bust() bumps "g"; a build that started before a bust must not cache its older rows
     body = None
     # Nov 20 2026 (Matt pt1672u): every Wire item, placed at its best honest precision (heat_all.py). BN_MAP_ALL=0 restores the located-only feed.
@@ -589,8 +625,9 @@ def heat_payload():
     except Exception as ex:
         print("signal_map heat: every-Wire-item feed failed, using located-only:", ex, flush=True); body = None
     if body is not None:
+        body = _drop_unplaced(body)
         with _HLOCK:
-            if _HEAT.get("g", 0) == g0: _HEAT.update(t=time.time(), v=body)
+            _HEAT["t"] = time.time() if _HEAT.get("g", 0) == g0 else 0.0     # a bust during the build: serve it, rebuild next request
         return body
     try:
         hm = sys.modules.get("heatmap")
@@ -622,9 +659,9 @@ def heat_payload():
                 "coverage": {"located": len(rows), "total": len(rows) + int(p.get("unmapped") or 0), "pct": None}, "rows": rows}
     body["cols"] = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam"]
     import map_pins
-    body = map_pins.filter_heat_body(body)
+    body = _drop_unplaced(map_pins.filter_heat_body(body))
     with _HLOCK:
-        if _HEAT.get("g", 0) == g0: _HEAT.update(t=time.time(), v=body)
+        _HEAT["t"] = time.time() if _HEAT.get("g", 0) == g0 else 0.0
     return body
 
 def handle_get(path, qs):
@@ -636,6 +673,9 @@ def handle_get(path, qs):
         return 200, heat_payload()
     if path == "/api/signal/points":
         return 200, points_payload()
+    if path == "/api/signal/places-status":
+        import story_places
+        return 200, story_places.status()
     if path in ("/api/signal/location-guard", "/api/location-guard"):
         import location_guard
         return 200, location_guard.latest_report()

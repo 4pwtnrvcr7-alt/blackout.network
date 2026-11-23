@@ -678,6 +678,11 @@ if __name__ == "__main__":
     t = threading.Thread(target=_render_bg, daemon=True); t.start()
     start_handoff()
     print(f"deploy handoff: {HANDOFF['state']} (peer url set: {bool(HANDOFF_URL)})", flush=True)
+    try:   # Nov 23 2026: new stories' map place read once by the xAI API and stored (story_places.py; BN_PLACES=0 = off)
+        import story_places
+        story_places.start(ready=lambda: has_data() and HANDOFF["state"] != "pending", paused=lambda: FREEZE["until"] > time.time())
+    except Exception as ex:
+        print("story_places start:", ex, flush=True)
     try:   # Nov 21 2026: instant rank 5+ write-ups via the xAI API (story_writer.py; idle without XAI_API_KEY; BN_WRITER=0 = off)
         import story_writer
         story_writer.start(ready=lambda: has_data() and HANDOFF["state"] != "pending", paused=lambda: FREEZE["until"] > time.time())
