@@ -103,3 +103,14 @@ class NetSky(unittest.TestCase):
         import netpages
         b = netpages.handle_get("/network", {})[1]
         for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
+
+class NetSkyStarlinkFallback(unittest.TestCase):
+    def test_supgp_when_group_refused(self):
+        import netsky, netstarlink, tempfile
+        from unittest import mock
+        os.environ["BN_STARLINK_CACHE_DIR"] = tempfile.mkdtemp(); netsky._BO.clear()
+        seen = []
+        def fetch(gid, url): seen.append((gid, url)); return ("/x", 1.0, None)
+        with mock.patch.object(netstarlink, "celestrak_file", lambda *a: (None, None, "HTTP 403")), mock.patch.object(netsky, "_fetch", fetch):
+            self.assertEqual(netsky._file("starlink", "starlink"), ("/x", 1.0, None))
+        self.assertEqual(seen[0][0], "starlink_sup"); self.assertIn("sup-gp.php?FILE=starlink", seen[0][1])
