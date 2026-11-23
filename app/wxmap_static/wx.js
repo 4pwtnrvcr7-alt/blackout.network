@@ -104,82 +104,126 @@
     61: "Light rain", 63: "Rain", 65: "Heavy rain", 66: "Freezing rain", 67: "Freezing rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 77: "Snow grains", 80: "Showers", 81: "Showers", 82: "Violent showers",
     85: "Snow showers", 86: "Heavy snow showers", 95: "Thunderstorms", 96: "Thunderstorms, hail", 99: "Severe thunderstorms" };
 
-  /* ---------- loader: thin-line globe with a radar sweep; progress is the real preload (map, frames, radar tiles, storms) ---------- */
-  var LD = { map: 0, frames: 0, storms: 0, need: 0, have: 0 }, ldT0 = Date.now(), ldDone = false;
-  function ldRow(k, txt, ok) { var li = document.querySelector('.wx-ldl li[data-s="' + k + '"]'); if (!li) return; li.querySelector("b").textContent = txt; li.classList.toggle("on", !!ok); }
-  function ldPct() { return Math.min(1, 0.2 * LD.map + 0.1 * LD.frames + 0.15 * LD.storms + 0.55 * (LD.need ? Math.min(1, LD.have / LD.need) : (LD.frames ? 1 : 0))); }
+  /* ---------- loader (pt1751u): full-screen rain, water rises with the real preload (every scrubbable frame fetched and decoded,
+     model grids, GFS, warnings), rare soft lightning. 100% = screen full of water, then it fades to the map. ---------- */
+  var LD = { map: 0, frames: 0, storms: 0, grids: 0, gfs: 0, bN: 0, bH: 0, dN: 0, dH: 0, fN: 0, fB: 0, fD: 0 }, ldT0 = Date.now(), ldDone = false, ldShown = 0;
+  function ldRow() {}
+  function ldPct() {
+    var rad = !ERR.radar && MODE === "radar" && PROTO;
+    var b = rad ? (LD.bN ? LD.bH / LD.bN : 0) : 1, d = rad ? (LD.dN ? LD.dH / LD.dN : (LD.bN ? 1 : 0)) : 1;
+    return Math.min(1, 0.07 * LD.map + 0.04 * LD.frames + 0.07 * LD.storms + 0.07 * LD.grids + 0.05 * LD.gfs + 0.48 * b + 0.22 * d);
+  }
   function ldUpdate() {
     if (ldDone) return;
-    var p = ldPct(), n = $("wx_ldn"), f = $("wx_ldfill");
-    if (n) n.textContent = ("00" + Math.round(p * 100)).slice(-3);
-    if (f) f.style.transform = "scaleX(" + p.toFixed(3) + ")";
-    var ph = !LD.map ? "Starting the map engine" : !LD.frames ? "Reading the radar index" : LD.need && LD.have < LD.need ? "Buffering radar frames" : !LD.storms ? "Loading warnings and storms" : "Ready";
+    var p = Math.max(ldShown, ldPct()); ldShown = p;
+    var n = $("wx_ldn"); if (n) n.textContent = Math.round(p * 100);
+    var ph = !LD.frames ? "Reading the radar index"
+      : LD.fN && LD.fB < LD.fN ? "Loading radar frames " + LD.fB + "/" + LD.fN
+      : LD.fN && LD.fD < LD.fN ? "Decoding frames " + LD.fD + "/" + LD.fN
+      : !LD.gfs ? "Loading the worldwide forecast" : !LD.grids ? "Loading temperature, rain and snow" : !LD.storms ? "Loading warnings and storms" : !LD.map ? "Drawing the map" : "Ready";
     var e = $("wx_ldphase"); if (e) e.textContent = ph;
+    RAIN.level = p;
     if (p >= 0.999) finish();
   }
-  function step(k) {
-    if (LD[k]) return; LD[k] = 1;
-    if (k === "map") ldRow("map", "Online", true);
-    if (k === "storms") ldRow("alerts", "Synced", true);
-    ldUpdate();
-  }
+  function step(k) { if (LD[k]) return; LD[k] = 1; ldUpdate(); }
   function finish() {
-    if (ldDone) return; ldDone = true; ldUpdate.done = 1;
-    var n = $("wx_ldn"), f = $("wx_ldfill"); if (n) n.textContent = "100"; if (f) f.style.transform = "scaleX(1)";
-    setTimeout(function () { document.body.classList.add("wx-ready"); setTimeout(function () { globeStop = true; }, 900); }, Math.max(250, 1400 - (Date.now() - ldT0)));
+    if (ldDone) return; ldDone = true;
+    var n = $("wx_ldn"); if (n) n.textContent = "100"; RAIN.level = 1; RAIN.full = true; var e = $("wx_ldphase"); if (e) e.textContent = "Opening the map";
+    setTimeout(function () { document.body.classList.add("wx-ready"); setTimeout(function () { RAIN.stop = true; }, 1300); }, Math.max(700, 2200 - (Date.now() - ldT0)));
   }
-  setTimeout(function () { if (!ldDone) { var m = $("wx_ldmsg"); if (m) { m.hidden = false; m.textContent = "Still buffering. The rest loads in the background."; } setTimeout(finish, 1200); } }, 11000);
-  var globeStop = false;
-  (function globe() {
-    var cv = $("wx_ldg"); if (!cv || !cv.getContext) return;
-    var dpr = Math.min(2, window.devicePixelRatio || 1), S = 260; cv.width = S * dpr; cv.height = S * dpr; cv.style.width = S + "px"; cv.style.height = S + "px";
-    var c = cv.getContext("2d"), R = 78, C = S / 2, tilt = -0.36, t0 = performance.now();
-    var blips = []; for (var i = 0; i < 26; i++) blips.push([Math.random() * 360 - 180, Math.random() * 110 - 50, Math.random()]);
-    function proj(lon, lat, rot) {
-      var l = (lon + rot) * Math.PI / 180, p = lat * Math.PI / 180, x = Math.cos(p) * Math.sin(l), y = Math.sin(p), z = Math.cos(p) * Math.cos(l);
-      var y2 = y * Math.cos(tilt) - z * Math.sin(tilt), z2 = y * Math.sin(tilt) + z * Math.cos(tilt);
-      return [C + R * x, C - R * y2, z2];
+  setTimeout(function () { if (!ldDone) { var m = $("wx_ldmsg"); if (m) { m.hidden = false; m.textContent = "Some layers are still loading. They finish in the background."; } setTimeout(finish, 900); } }, 25000);
+  var RAIN = { level: 0, stop: false, full: false };
+  (function rain() {
+    var cv = $("wx_ldcv"); if (!cv || !cv.getContext) return;
+    var c = cv.getContext("2d"), dpr = Math.min(2, window.devicePixelRatio || 1), W = 0, H = 0, drops = [], rip = [], L = 0, last = performance.now(), t0 = last;
+    var bolt = null, nextBolt = last + 2200 + Math.random() * 1800;
+    function size() {
+      W = innerWidth; H = innerHeight;
+      dpr = W < 760 ? Math.min(2, window.devicePixelRatio || 1) : Math.min(window.devicePixelRatio || 1, Math.sqrt(520000 / (W * H)));   /* big screens: a lighter canvas (rain and water are soft anyway) */
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px";
+      var n = Math.min(170, Math.round(W * H / 5200)); drops = [];
+      for (var i = 0; i < n; i++) drops.push(newDrop(true));
     }
-    function line(pts, rot, front) {
-      c.beginPath(); var pen = false;
-      for (var i = 0; i < pts.length; i++) { var q = proj(pts[i][0], pts[i][1], rot); if ((q[2] >= 0) === front) { if (!pen) c.moveTo(q[0], q[1]); else c.lineTo(q[0], q[1]); pen = true; } else pen = false; }
-      c.stroke();
+    function newDrop(any) { var z = Math.random(); return { x: Math.random() * (W + 80) - 40, y: any ? Math.random() * H : -30 - Math.random() * 80, v: 760 + 620 * z, l: 9 + 16 * z, a: 0.12 + 0.34 * z, w: 0.6 + 0.6 * z }; }
+    function surf(x, t) { return Math.sin(x * 0.012 + t * 1.25) * 5.5 + Math.sin(x * 0.027 - t * 1.9 + 1.3) * 2.6; }
+    function mkBolt() {
+      var x = W * (0.15 + Math.random() * 0.7), y0 = -10, y1 = Math.max(H * 0.18, (H * (1 - L)) * (0.55 + Math.random() * 0.35)), segs = [];
+      function branch(x, y, ang, len, w, depth) {
+        var pts = [[x, y]], n = Math.max(4, Math.round(len / 18));
+        for (var i = 0; i < n; i++) { ang += (Math.random() - 0.5) * 0.9; x += Math.sin(ang) * len / n; y += Math.cos(ang) * len / n; pts.push([x, y]);
+          if (depth < 2 && Math.random() < 0.13 && i > 1) branch(x, y, ang + (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.6), len * (0.25 + Math.random() * 0.25), w * 0.5, depth + 1); }
+        segs.push({ p: pts, w: w });
+      }
+      branch(x, y0, (Math.random() - 0.5) * 0.3, y1 - y0, 1.6, 0);
+      return { segs: segs, t: performance.now(), x: x };
     }
-    function frame(now) {
-      if (globeStop) return;
-      var t = (now - t0) / 1000, rot = t * 14, sw = (t * 1.35) % (Math.PI * 2);
-      c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, S, S);
-      /* bezel ticks */
-      c.save(); c.translate(C, C); c.rotate(-t * 0.08);
-      for (var k = 0; k < 120; k++) { var a = k / 120 * Math.PI * 2, long = k % 10 === 0, r0 = long ? 112 : 116, r1 = 121;
-        c.strokeStyle = long ? "rgba(240,240,250,.55)" : "rgba(240,240,250,.16)"; c.lineWidth = 1; c.beginPath(); c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); c.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); c.stroke(); }
-      c.restore();
-      c.strokeStyle = "rgba(240,240,250,.10)"; c.lineWidth = 1; c.beginPath(); c.arc(C, C, 104, 0, Math.PI * 2); c.stroke();
-      /* sweep wedge */
-      var N = 28; for (var j = 0; j < N; j++) { var a0 = sw - j * 0.035, al = 0.22 * (1 - j / N);
-        c.fillStyle = "rgba(90,180,255," + al.toFixed(3) + ")"; c.beginPath(); c.moveTo(C, C); c.arc(C, C, 104, a0 - 0.036, a0); c.closePath(); c.fill(); }
-      c.strokeStyle = "rgba(150,205,255,.85)"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(C, C); c.lineTo(C + Math.cos(sw) * 104, C + Math.sin(sw) * 104); c.stroke();
-      /* globe: back graticule faint, front brighter */
-      var lon, lat, pts;
-      [false, true].forEach(function (front) {
-        c.strokeStyle = front ? "rgba(240,240,250,.30)" : "rgba(240,240,250,.06)"; c.lineWidth = front ? 0.8 : 0.6;
-        for (lon = -180; lon < 180; lon += 20) { pts = []; for (lat = -90; lat <= 90; lat += 5) pts.push([lon, lat]); line(pts, rot, front); }
-        for (lat = -60; lat <= 60; lat += 20) { pts = []; for (lon = -180; lon <= 180; lon += 5) pts.push([lon, lat]); line(pts, rot, front); }
+    /* flicker envelope (ms from strike): two soft pulses inside 420 ms, so never more than 2 flashes in a second */
+    function env(ms) { if (ms < 0 || ms > 420) return 0; if (ms < 70) return 1; if (ms < 140) return 0.22; if (ms < 200) return 0.75; return 0.75 * Math.pow(1 - (ms - 200) / 220, 2); }
+    function strokeBolt(I, flip, sy) {
+      c.lineCap = "round"; c.lineJoin = "round";
+      [[7, 0.10], [3, 0.28], [1.1, 0.95]].forEach(function (L2) {
+        c.strokeStyle = L2[1] < 0.9 ? "rgba(150,190,255," + (L2[1] * I).toFixed(3) + ")" : "rgba(235,243,255," + (L2[1] * I).toFixed(3) + ")";
+        bolt.segs.forEach(function (sg) { c.lineWidth = L2[0] * sg.w; c.beginPath(); sg.p.forEach(function (q, k) { var y = flip ? 2 * sy - q[1] : q[1]; if (k) c.lineTo(q[0], y); else c.moveTo(q[0], y); }); c.stroke(); });
       });
-      c.strokeStyle = "rgba(240,240,250,.6)"; c.lineWidth = 1; c.beginPath(); c.arc(C, C, R, 0, Math.PI * 2); c.stroke();
-      /* echoes: light up as the sweep passes them */
-      blips.forEach(function (b) {
-        var q = proj(b[0], b[1], rot); if (q[2] < 0.05) return;
-        var ang = Math.atan2(q[1] - C, q[0] - C); ang = (ang + Math.PI * 2) % (Math.PI * 2);
-        var d = (sw - ang + Math.PI * 2) % (Math.PI * 2), glow = Math.max(0, 1 - d / 2.2);
-        if (glow <= 0.02) return;
-        c.fillStyle = "rgba(150,205,255," + (glow * 0.9 * q[2]).toFixed(3) + ")"; c.beginPath(); c.arc(q[0], q[1], 1.2 + 1.6 * glow * b[2], 0, Math.PI * 2); c.fill();
-      });
-      /* crosshair */
-      c.strokeStyle = "rgba(240,240,250,.22)"; c.lineWidth = 1; c.beginPath(); c.moveTo(C - 128, C); c.lineTo(C - 108, C); c.moveTo(C + 108, C); c.lineTo(C + 128, C); c.moveTo(C, C - 128); c.lineTo(C, C - 108); c.moveTo(C, C + 108); c.lineTo(C, C + 128); c.stroke();
-      requestAnimationFrame(frame);
     }
-    if (reduce) { frame(t0 + 4000); globeStop = true; } else requestAnimationFrame(frame);
+    var skip = 0;
+    function draw(now) {
+      if (RAIN.stop) return;
+      if (W >= 760 && !reduce && (skip ^= 1)) { requestAnimationFrame(draw); return; }   /* 30 fps on big screens: half the paint work, same look */
+      if (!ldDone && Date.now() - ldT0 > 26000) finish();   /* the 25 s promise holds even when timers run late */
+      var dt = Math.min(0.05, (now - last) / 1000), t = (now - t0) / 1000; last = now;
+      var target = RAIN.full ? 1.06 : RAIN.level; L += (target - L) * Math.min(1, dt * 3.2);
+      var sy = H * (1 - L);   /* mean water surface */
+      c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+      /* lightning sky flash */
+      var I = 0;
+      if (!reduce && !RAIN.full) {
+        if (!bolt && now > nextBolt && sy > H * 0.2) bolt = mkBolt();
+        if (bolt) { I = env(now - bolt.t); if (now - bolt.t > 420) { bolt = null; nextBolt = now + 3000 + Math.random() * 2000; } }
+      }
+      if (I > 0) { var gx = c.createRadialGradient(bolt.x, 0, 0, bolt.x, 0, Math.max(W, H)); gx.addColorStop(0, "rgba(140,175,235," + (0.16 * I).toFixed(3) + ")"); gx.addColorStop(1, "rgba(140,175,235," + (0.03 * I).toFixed(3) + ")"); c.fillStyle = gx; c.fillRect(0, 0, W, sy + 10); strokeBolt(I, false, sy); }
+      /* rain: one batched path */
+      if (!reduce) {
+        c.strokeStyle = "rgba(205,225,255,.38)"; c.lineWidth = 1; c.beginPath();
+        for (var i = 0; i < drops.length; i++) {
+          var d = drops[i]; d.y += d.v * dt; d.x += d.v * dt * 0.09;
+          var wy = sy + surf(d.x, t);
+          if (d.y > wy) { if (rip.length < 40 && Math.random() < 0.55) rip.push({ x: d.x, y: wy, t: now, s: d.w }); drops[i] = newDrop(false); continue; }
+          c.moveTo(d.x, d.y); c.lineTo(d.x - d.l * 0.09, d.y - d.l);
+        }
+        c.stroke();
+      }
+      /* water: back wave, front wave, gradient body */
+      if (sy < H + 12) {
+        c.fillStyle = "rgba(38,74,122,.45)"; c.beginPath(); c.moveTo(0, H);
+        for (var x = 0; x <= W + 12; x += 12) c.lineTo(x, sy - 4 + Math.sin(x * 0.009 - t * 0.9 + 2) * 6);
+        c.lineTo(W, H); c.closePath(); c.fill();
+        var g = c.createLinearGradient(0, Math.max(0, sy - 8), 0, H);
+        g.addColorStop(0, "rgba(46,88,140,.92)"); g.addColorStop(0.25, "rgba(22,48,86,.96)"); g.addColorStop(1, "#071226");
+        c.fillStyle = g; c.beginPath(); c.moveTo(0, H);
+        for (x = 0; x <= W + 8; x += 8) c.lineTo(x, sy + surf(x, t));
+        c.lineTo(W, H); c.closePath(); c.fill();
+        /* caustic light bands (soft refraction) */
+        c.save(); c.clip();
+        for (var k = 0; k < 3; k++) { var cx = (W * (0.2 + 0.3 * k) + Math.sin(t * 0.4 + k * 2) * W * 0.12), cg = c.createLinearGradient(cx - 60, 0, cx + 60, 0);
+          cg.addColorStop(0, "rgba(120,170,230,0)"); cg.addColorStop(0.5, "rgba(120,170,230,.06)"); cg.addColorStop(1, "rgba(120,170,230,0)"); c.fillStyle = cg; c.fillRect(cx - 60, sy - 10, 120, H - sy + 10); }
+        if (I > 0) { c.globalAlpha = 0.32; strokeBolt(I, true, sy); c.globalAlpha = 1; c.fillStyle = "rgba(150,190,255," + (0.08 * I).toFixed(3) + ")"; c.fillRect(0, sy - 10, W, 60); }
+        c.restore();
+        /* surface highlight */
+        c.strokeStyle = "rgba(170,210,255," + (0.30 + 0.4 * (I || 0)).toFixed(3) + ")"; c.lineWidth = 1.2; c.beginPath();
+        for (x = 0; x <= W + 8; x += 8) { var yy = sy + surf(x, t); if (x) c.lineTo(x, yy); else c.moveTo(x, yy); }
+        c.stroke();
+        /* ripples where drops land */
+        c.lineWidth = 0.9;
+        rip = rip.filter(function (r) { var a = (now - r.t) / 650; if (a >= 1) return false;
+          c.strokeStyle = "rgba(190,220,255," + ((1 - a) * 0.45).toFixed(3) + ")"; c.beginPath(); c.ellipse(r.x, r.y + 1, 2 + 13 * a * r.s, 0.8 + 3 * a * r.s, 0, 0, Math.PI * 2); c.stroke(); return true; });
+      }
+      if (reduce) return;
+      requestAnimationFrame(draw);
+    }
+    size(); addEventListener("resize", size);
+    if (reduce) { RAIN.redraw = function () { L = RAIN.full ? 1.06 : RAIN.level; draw(performance.now()); }; setInterval(function () { if (!RAIN.stop) RAIN.redraw(); }, 250); RAIN.redraw(); }
+    else requestAnimationFrame(draw);
   })();
 
   /* ---------- state ---------- */
@@ -326,29 +370,53 @@
     return FR.tile.replace("{layer}", id).replace("{z}", z).replace("{x}", x).replace("{y}", y);
   }
   /* fetch queue: 6 at a time per host is what browsers allow over HTTP/1.1 anyway; highest priority first */
-  var Q = [], QN = 0, QMAX = 16;
+  var Q = [], QN = 0, QMAX = 16, QD = false;
   function bytes(u, prio) {
     var h = BYTES.get(u);
-    if (h) { if (!h.done && prio < h.prio) { h.prio = prio; if (h.q) h.q.prio = prio; } return h.p; }
+    if (h && h.fail && Date.now() - h.fail > 300000) { BYTES.delete(u); h = null; }   /* failed tiles are remembered for 5 minutes, so a scrub never re-asks */
+    if (h) { if (!h.done && prio < h.prio) { h.prio = prio; if (h.q) { h.q.prio = prio; QD = true; } } return h.p; }
     h = { prio: prio, done: false }; BYTES.set(u, h);
-    h.p = new Promise(function (res) { h.q = { u: u, prio: prio, res: res, h: h }; Q.push(h.q); });
+    h.p = new Promise(function (res) { h.q = { u: u, prio: prio, res: res, h: h }; Q.push(h.q); QD = true; });
     pump(); return h.p;
   }
   function pump() {
     while (QN < QMAX && Q.length) {
-      var bi = 0; for (var i = 1; i < Q.length; i++) if (Q[i].prio < Q[bi].prio) bi = i;
-      var it = Q.splice(bi, 1)[0]; it.h.q = null; QN++;
+      if (QD) { Q.sort(function (a, b) { return a.prio - b.prio; }); QD = false; }   /* sort once per burst, not a scan per fetch */
+      var it = Q.shift(); it.h.q = null; QN++;
       (function (it) {
         fetch(it.u, { mode: "cors", credentials: "omit" }).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).catch(function () { return null; })
-          .then(function (b) { it.h.done = true; it.h.ok = !!b; if (!b) BYTES.delete(it.u); QN--; it.res(b); pump(); bufTick(); });
+          .then(function (b) { it.h.done = true; it.h.ok = !!b; if (!b) it.h.fail = Date.now(); QN--; it.res(b); pump(); bufTick(); });
       })(it);
     }
   }
-  function trim() {   /* keep memory bounded: drop the oldest finished downloads beyond 6,000 tiles */
-    if (BYTES.size < 6000) return;
-    var n = BYTES.size - 5000; BYTES.forEach(function (h, u) { if (n > 0 && h.done) { BYTES.delete(u); n--; } });
+  function trim() {   /* keep memory bounded: drop the oldest finished downloads beyond 12,000 tiles (a full desktop view of every frame fits) */
+    if (BYTES.size < 12000) return;
+    var n = BYTES.size - 10000; BYTES.forEach(function (h, u) { if (n > 0 && h.done) { BYTES.delete(u); n--; } });
   }
+  /* decoded-ahead tiles (pt1751u): every scrubbable frame in view is fetched and decoded while the loader runs, so scrubbing
+     never waits on the network or the decoder. Bounded memory (about 96 MB on phones, 256 MB on desktop). */
+  var DEC = new Map(), DECB = 0, DECMAX = (matchMedia("(max-width: 760px)").matches ? 96 : 256) * 1048576, DQ = [], DQN = 0, DGEN = 0;
   function proto(params, ac) {
+    var hit = DEC.get(params.url);
+    if (hit) return createImageBitmap(hit).then(function (cpy) { return { data: cpy }; }, function () { return protoRaw(params, ac, -1); });
+    return protoRaw(params, ac, -1);
+  }
+  function decPump() {
+    while (DQN < 3 && DQ.length) {
+      var it = DQ.shift(); if (it.g !== DGEN || DEC.has(it.u)) { decTick(); continue; }
+      if (DECB > DECMAX) { DQ = []; decTick(); return; }
+      DQN++;
+      (function (it) {
+        protoRaw({ url: it.u }, null, it.prio).then(function (r) {
+          DQN--; var bm = r && r.data;
+          if (it.g === DGEN && bm && bm.width > 1) { DEC.set(it.u, bm); DECB += bm.width * bm.height * 4; }
+          it.done = true; decTick(); decPump();
+        }, function () { DQN--; it.done = true; decTick(); decPump(); });
+      })(it);
+    }
+  }
+  var decT = 0; function decTick() { if (!decT) decT = setTimeout(function () { decT = 0; bufPaint(); }, 120); }
+  function protoRaw(params, ac, prio) {
     var m = /^wxr:\/\/([mhseig])\/([^/]+)\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
     if (!m || !FR) return Promise.resolve({ data: blank() });
     var kind = m[1], id = decodeURIComponent(m[2]), z = +m[3], x = +m[4], y = +m[5];
@@ -357,7 +425,7 @@
       if (!GFSR || gp[2] !== GTAG) return Promise.resolve({ data: blank() });
       return tileCall({ op: "gfstile", run: GFSR, kind: gp[0], k: +gp[1], z: z, x: x, y: y }, [], ac).then(function (r) { return { data: r.bmp || blank() }; }, function () { return { data: blank() }; });
     }
-    return bytes(upURL(kind, id, z, x, y), -1).then(function (buf) {
+    return bytes(upURL(kind, id, z, x, y), prio == null ? -1 : prio).then(function (buf) {
       if (!buf || !buf.byteLength) return { data: blank() };
       var cp = buf.slice(0);
       return tileCall({ op: "tile", kind: kind, buf: cp, z: z, x: x, y: y, sec: id.split("|")[0] }, [cp], ac).then(function (r) { return { data: r.bmp || blank() }; }, function () { return { data: blank() }; });
@@ -418,14 +486,16 @@
   function rHideAll() { rTok++; Object.keys(RLIVE).forEach(function (x) { rOp(x, 0, 250); }); RCUR = null; }
   function rClear() { rTok++; Object.keys(RLIVE).forEach(function (x) { RLIVE[x].forEach(function (s) { if (map.getLayer(s)) map.removeLayer(s); if (map.getSource(s)) map.removeSource(s); }); }); RLIVE = {}; RCUR = null; }
   /* tiles in view at the zoom MapLibre will request: 256 px sources ask for round(zoom) + 1, 512 px sources for round(zoom) */
-  function viewTiles(off, zmax) {
+  function viewTiles(off, zmax, pad) {
     var z = clamp(Math.round(map.getZoom()) + off, 0, zmax), n = Math.pow(2, z), b = map.getBounds();
     var w = b.getWest(), e = b.getEast(), no = clamp(b.getNorth(), -85, 85), so = clamp(b.getSouth(), -85, 85);
     function tx(lon) { return Math.floor((lon + 180) / 360 * n); }
     function ty(lat) { var r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); }
-    var x0 = tx(w), x1 = tx(e), y0 = clamp(ty(no), 0, n - 1), y1 = clamp(ty(so), 0, n - 1), out = [], seen = {};
+    var p_ = pad || 0, x0 = tx(w) - p_, x1 = tx(e) + p_, y0 = clamp(ty(no) - p_, 0, n - 1), y1 = clamp(ty(so) + p_, 0, n - 1), out = [], seen = {};   /* pad: MapLibre also asks for the ring just outside the view at low zoom */
     if (x1 - x0 > n) { x0 = 0; x1 = n - 1; }
-    for (var x = x0; x <= x1; x++) for (var y = y0; y <= y1; y++) { var xx = ((x % n) + n) % n, k = xx + "/" + y; if (seen[k]) continue; seen[k] = 1; out.push([z, xx, y]); }
+    var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    for (var x = x0; x <= x1; x++) for (var y = y0; y <= y1; y++) { var xx = ((x % n) + n) % n, k = xx + "/" + y; if (seen[k]) continue; seen[k] = 1; out.push([z, xx, y, Math.abs(x - cx) + Math.abs(y - cy)]); }
+    out.sort(function (a, b) { return a[3] - b[3]; });   /* centre first, so a cap drops the edges */
     return out;
   }
   function tileBox(t) { var n = Math.pow(2, t[0]); function lat(y) { var a = Math.PI - 2 * Math.PI * y / n; return 180 / Math.PI * Math.atan(0.5 * (Math.exp(a) - Math.exp(-a))); }
@@ -446,17 +516,32 @@
   }
   function prefetch() {
     if (!PROTO || !map || !ready || MODE !== "radar" || !FRAMES.length || !FR) return;
-    var tiles = { n: viewTiles(1, RMZ).slice(0, 80), s: viewTiles(0, SMZ).slice(0, 40), i: viewTiles(1, IMZ).slice(0, 60) };
-    Q.forEach(function (it) { if (it.prio >= 0) it.prio += 1000; });   /* demote whatever the old view still had queued (never what the map is asking for right now) */
+    var tiles = { n: viewTiles(1, RMZ).slice(0, 80), s: viewTiles(0, SMZ, 1).slice(0, 64), i: viewTiles(1, IMZ, 1).slice(0, 96) };
+    Q.forEach(function (it) { if (it.prio >= 0) it.prio += 1000; }); QD = true;   /* demote whatever the old view still had queued (never what the map is asking for right now) */
     var order = [], seen = {};
     function add(i) { if (i >= 0 && i < FRAMES.length && !seen[i]) { seen[i] = 1; order.push(i); } }
     for (var d = 0; d <= 6; d++) { add(IDX - d); if (d <= 2) add(IDX + d); }   /* the last hour first: that is what the loader waits for */
     for (var i = 0; i < FRAMES.length; i++) add(i);   /* then oldest first, so Play from the start never waits */
-    PF = { frames: [] };
+    PF = { frames: [], dec: [] };
     order.forEach(function (i, n) {
       var us = frameURLs(FRAMES[i], tiles); PF.frames[i] = us;
       us.forEach(function (u) { bytes(u, n); });
     });
+    /* decode ahead: the exact wxr:// tiles MapLibre will ask for, frame by frame in the same order */
+    var gen = ++DGEN, want = {}, vt = {}; DQ = [];
+    function tilesFor(s) { var k = (s.ts === 512 ? 0 : 1) + "/" + s.mz; return vt[k] || (vt[k] = s.ts === 512 ? tiles.s : s.k === "i" ? tiles.i : viewTiles(1, s.mz).slice(0, 80)); }
+    order.forEach(function (i, n) {
+      var list = []; PF.dec[i] = list;
+      rSrcs(FRAMES[i]).forEach(function (s) {
+        if (s.k === "m" || s.k === "h") { if (!PROTO) return; }
+        tilesFor(s).forEach(function (t) { var bx = tileBox(t);
+          if (s.b && !hits4(bx, s.b)) return; if (s.ex && inside4(bx, NOAA_B)) return;
+          var u = "wxr://" + s.k + "/" + encodeURIComponent(s.id) + "/" + t[0] + "/" + t[1] + "/" + t[2]; want[u] = 1;
+          var it = { u: u, prio: n, g: gen, done: DEC.has(u) }; list.push(it); if (!it.done) DQ.push(it); });
+      });
+    });
+    DEC.forEach(function (bm, u) { if (!want[u]) { DECB -= bm.width * bm.height * 4; try { bm.close(); } catch (e) {} DEC.delete(u); } });
+    decPump();
     trim(); bufTick();
   }
   function frameBuffered(i) { var us = PF.frames && PF.frames[i]; if (!us) return !PROTO; for (var k = 0; k < us.length; k++) { var h = BYTES.get(us[k]); if (!h || !h.done) return false; } return true; }
@@ -472,8 +557,13 @@
     for (var j = 0; j < n; j++) { var c = ready_[j] ? "rgba(240,240,250,.28)" : "rgba(240,240,250,0)"; stops.push(c + " " + (j * w).toFixed(2) + "%", c + " " + ((j + 1) * w).toFixed(2) + "%"); }
     el.style.background = "linear-gradient(90deg," + stops.join(",") + ")";
     BUF = cnt / n; $("wx_play").style.setProperty("--buf", (BUF * 100).toFixed(1) + "%"); $("wx_play").classList.toggle("buf", BUF < 0.999);
-    if (MODE === "radar" && !ldDone) {
-      LD.need = Math.max(1, past); LD.have = pastOk; ldRow("radar", cnt + " / " + n, pastOk >= past);
+    if (MODE === "radar" && !ldDone && PF.dec) {
+      var bN = 0, bH = 0, dN = 0, dH = 0, fD = 0;
+      for (var q = 0; q < n; q++) {
+        var us = PF.frames[q] || []; bN += us.length; us.forEach(function (u) { var h = BYTES.get(u); if (h && h.done) bH++; });
+        var dl = PF.dec[q] || [], all = true; dN += dl.length; dl.forEach(function (it) { if (it.done || DEC.has(it.u) || DECB > DECMAX) dH++; else all = false; }); if (all) fD++;
+      }
+      LD.bN = bN; LD.bH = bH; LD.dN = dN; LD.dH = dH; LD.fN = n; LD.fB = cnt; LD.fD = fD;
       ldUpdate();
     }
   }
@@ -579,10 +669,10 @@
     gfsLoading = g.run;
     function bin(f) { return fetch("/api/wxmap/gfs?f=" + f + "&r=" + encodeURIComponent(g.run), { credentials: "omit" }).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); }); }
     Promise.all([bin("p"), bin("c")]).then(function (b) { return poolAll(function () { var p = b[0].slice(0), c = b[1].slice(0); return { msg: { op: "gfs", p: p, c: c, meta: g }, tr: [p, c] }; }); }).then(function () {
-      GFSR = g.run; GFSM = g; GTAG = g.run.replace(/\D/g, "").slice(0, 10); gfsLoading = null;
+      GFSR = g.run; GFSM = g; GTAG = g.run.replace(/\D/g, "").slice(0, 10); gfsLoading = null; step("gfs");
       srcSet("gfs", "Worldwide forecast · NOAA GFS", true, "Rain and clouds every 3 hours to 7 days (run " + stamp(tms(g.run)) + ")");
       if (MODE === "radar") { var t = FRAMES[IDX] ? FRAMES[IDX].t : null; buildFrames(live ? null : t); }
-    }, function (e) { gfsLoading = null; srcSet("gfs", "Worldwide forecast · NOAA GFS", false, "Unavailable: " + (e && e.message || "the model data did not load")); });
+    }, function (e) { gfsLoading = null; step("gfs"); srcSet("gfs", "Worldwide forecast · NOAA GFS", false, "Unavailable: " + (e && e.message || "the model data did not load")); });
   }
   function protoG(params) {
     var m = /^wxg:\/\/(\w+)\/(\w+)\/(\d+)/.exec(params.url);
@@ -1121,7 +1211,7 @@
       var sd = s.sat && s.sat.down ? Object.keys(s.sat.down) : [], SN = { ge: "GOES-East", gw: "GOES-West", hi: "Himawari", ms: "Meteosat", io: "Meteosat Indian Ocean" };
       srcSet("sat", "Satellite clouds · NASA GIBS, EUMETSAT", !!(s.sat && s.sat.ok) && PROTO, !PROTO ? "Needs a newer browser" : s.sat && s.sat.ok ? (sd.length ? "Infrared, every 10 to 60 minutes. Missing now: " + sd.map(function (k) { return SN[k] || k; }).join(", ") : "Infrared, worldwide, every 10 to 60 minutes") : s.sat && s.sat.reason);
       srcSet("imerg", "Satellite rain · NASA IMERG", !!(s.imerg && s.imerg.ok) && PROTO, !PROTO ? "Needs a newer browser" : s.imerg && s.imerg.ok ? "Worldwide, every 30 minutes, arrives about 4 to 6 hours late (newest " + stamp(tms(s.imerg.latest)) + ")" : s.imerg && s.imerg.reason);
-      if (!d.gfs) srcSet("gfs", "Worldwide forecast · NOAA GFS", false, (s.gfs && s.gfs.reason) || "Loading");
+      if (!d.gfs) { srcSet("gfs", "Worldwide forecast · NOAA GFS", false, (s.gfs && s.gfs.reason) || "Loading"); step("gfs"); }
       loadGfs();
       var b = document.querySelector('#wx_modes [data-m="radar"]'); b.disabled = !!ERR.radar; b.title = ERR.radar || "";
       LD.frames = 1; ldRow("radar", "Indexed", false); ldUpdate();
@@ -1165,7 +1255,8 @@
   function loadGrids() { return loadGrid("us").then(function () { return loadGrid("world"); }); }
   PROTO = !!wk();
   if (!WK) ["temp", "rain", "snow"].forEach(function (m) { var b = document.querySelector('#wx_modes [data-m="' + m + '"]'); b.disabled = true; b.title = "Needs a newer browser"; });
-  legend(); label(); boot(); loadFrames(true); loadGrids();
+  legend(); label(); boot(); loadFrames(true); loadGrids().then(function () { step("grids"); }, function () { step("grids"); });
+  setTimeout(function () { step("grids"); step("gfs"); }, 20000);
   setInterval(function () { if (document.hidden) return; loadFrames(false); loadAlerts(); }, 180000);
   setInterval(function () { if (!document.hidden) { loadStorms(); loadTropical(); loadGlobal(); } }, 600000);
   setInterval(function () { if (!document.hidden) loadGrids(); }, 1800000);
