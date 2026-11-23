@@ -162,8 +162,8 @@
       return { g: g, ns: ns, worst: ns.reduce(function (m, n) { return Math.max(m, score(n)); }, 0) }; }).filter(function (x) { return x.ns.length; });
     gs.sort(function (a, b) { return (b.worst >= 20 ? b.worst : 0) - (a.worst >= 20 ? a.worst : 0); });   /* groups with a real problem move up; otherwise the fixed order */
     gs.forEach(function (x) {
-      var bad = x.ns.filter(function (n) { return n.level >= 2; }).length, ok = x.ns.filter(function (n) { return n.level === 0 || n.level === 1; }).length;
-      h += '<section class="nb-g" aria-label="' + esc(x.g.name) + '"><div class="nb-gh"><h2>' + esc(x.g.name) + '</h2><span class="' + (bad ? "c-deg" : "") + '">' + (bad ? bad + " with problems" : ok + " of " + x.ns.length + " normal") + '</span></div><div class="nb-grid">';
+      var bad = x.ns.filter(function (n) { return n.level >= 2; }).length, ok = x.ns.filter(function (n) { return n.level === 0 || n.level === 1; }).length, mi = x.ns.filter(function (n) { return n.level === 1; }).length;
+      h += '<section class="nb-g" aria-label="' + esc(x.g.name) + '"><div class="nb-gh"><h2>' + esc(x.g.name) + '</h2><span class="' + (bad ? "c-deg" : "") + '">' + (bad ? bad + " with problems" : (mi ? (ok - mi) + " normal · " + mi + " minor" : ok + " of " + x.ns.length + " normal")) + '</span></div><div class="nb-grid">';
       x.ns.forEach(function (n) { h += tile(n); if (OPEN === n.id && !(hot(n) && !n.link_only)) h += detail(n); });   /* a problem tile opens up in Problems now */
       h += '</div></section>';
     });

@@ -224,7 +224,7 @@
     var chip = $("nx_chip"), txt;
     if (maj.length) { txt = maj.length + " major outage" + (maj.length > 1 ? "s" : "") + " · " + maj[0].name; chip.className = "nx-chip live s-out"; }
     else if (iss.length) { txt = iss.length + " network" + (iss.length > 1 ? "s" : "") + " disrupted · " + iss[0].name; chip.className = "nx-chip live s-deg"; }
-    else { txt = innerWidth < 768 ? (s.ok || 0) + " of " + (s.networks || 0) + " networks normal" : "No major U.S. network outages · " + (s.ok || 0) + " of " + (s.networks || 0) + " normal"; chip.className = "nx-chip live s-ok"; }
+    else { txt = innerWidth < 768 ? "No major U.S. outages · " + (s.networks || 0) + " tracked" : "No major U.S. network outages · " + (s.networks || 0) + " tracked"; chip.className = "nx-chip live s-ok"; }
     $("nx_sum").textContent = txt;
     $("nx_more_lbl").textContent = "All " + (s.networks || "") + " networks";
   }
