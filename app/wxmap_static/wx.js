@@ -139,7 +139,7 @@
     var bolt = null, nextBolt = last + 2200 + Math.random() * 1800;
     function size() {
       W = innerWidth; H = innerHeight;
-      dpr = W < 760 ? Math.min(2, window.devicePixelRatio || 1) : Math.min(window.devicePixelRatio || 1, Math.sqrt(520000 / (W * H)));   /* big screens: a lighter canvas (rain and water are soft anyway) */
+      dpr = W < 760 ? Math.min(2, window.devicePixelRatio || 1) : Math.min(window.devicePixelRatio || 1, Math.sqrt(300000 / (W * H)));   /* big screens: a lighter canvas (rain and water are soft anyway) */
       cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + "px"; cv.style.height = H + "px";
       var n = Math.min(170, Math.round(W * H / 5200)); drops = [];
       for (var i = 0; i < n; i++) drops.push(newDrop(true));
@@ -169,7 +169,7 @@
     var skip = 0;
     function draw(now) {
       if (RAIN.stop) return;
-      if (W >= 760 && !reduce && (skip ^= 1)) { requestAnimationFrame(draw); return; }   /* 30 fps on big screens: half the paint work, same look */
+      if (W >= 760 && !reduce && (skip = (skip + 1) % 3)) { requestAnimationFrame(draw); return; }   /* 20 fps on big screens, so the paint never competes with the preload */
       if (!ldDone && Date.now() - ldT0 > 26000) finish();   /* the 25 s promise holds even when timers run late */
       var dt = Math.min(0.05, (now - last) / 1000), t = (now - t0) / 1000; last = now;
       var target = RAIN.full ? 1.06 : RAIN.level; L += (target - L) * Math.min(1, dt * 3.2);
@@ -425,6 +425,9 @@
       if (!GFSR || gp[2] !== GTAG) return Promise.resolve({ data: blank() });
       return tileCall({ op: "gfstile", run: GFSR, kind: gp[0], k: +gp[1], z: z, x: x, y: y }, [], ac).then(function (r) { return { data: r.bmp || blank() }; }, function () { return { data: blank() }; });
     }
+    /* IMERG tiles fully inside the NOAA radar domain are blank by design (the U.S. radar covers them; the worker drops them too).
+       The preloader skips them, so answer them here without a download: that was the desktop scrub gap (z4 tiles over the U.S.). */
+    if (kind === "i" && inside4(tileBox([z, x, y]), NOAA_B)) return Promise.resolve({ data: blank() });
     return bytes(upURL(kind, id, z, x, y), prio == null ? -1 : prio).then(function (buf) {
       if (!buf || !buf.byteLength) return { data: blank() };
       var cp = buf.slice(0);
@@ -486,12 +489,12 @@
   function rHideAll() { rTok++; Object.keys(RLIVE).forEach(function (x) { rOp(x, 0, 250); }); RCUR = null; }
   function rClear() { rTok++; Object.keys(RLIVE).forEach(function (x) { RLIVE[x].forEach(function (s) { if (map.getLayer(s)) map.removeLayer(s); if (map.getSource(s)) map.removeSource(s); }); }); RLIVE = {}; RCUR = null; }
   /* tiles in view at the zoom MapLibre will request: 256 px sources ask for round(zoom) + 1, 512 px sources for round(zoom) */
-  function viewTiles(off, zmax, pad) {
+  function viewTiles(off, zmax) {
     var z = clamp(Math.round(map.getZoom()) + off, 0, zmax), n = Math.pow(2, z), b = map.getBounds();
     var w = b.getWest(), e = b.getEast(), no = clamp(b.getNorth(), -85, 85), so = clamp(b.getSouth(), -85, 85);
     function tx(lon) { return Math.floor((lon + 180) / 360 * n); }
     function ty(lat) { var r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); }
-    var p_ = pad || 0, x0 = tx(w) - p_, x1 = tx(e) + p_, y0 = clamp(ty(no) - p_, 0, n - 1), y1 = clamp(ty(so) + p_, 0, n - 1), out = [], seen = {};   /* pad: MapLibre also asks for the ring just outside the view at low zoom */
+    var x0 = tx(w), x1 = tx(e), y0 = clamp(ty(no), 0, n - 1), y1 = clamp(ty(so), 0, n - 1), out = [], seen = {};
     if (x1 - x0 > n) { x0 = 0; x1 = n - 1; }
     var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     for (var x = x0; x <= x1; x++) for (var y = y0; y <= y1; y++) { var xx = ((x % n) + n) % n, k = xx + "/" + y; if (seen[k]) continue; seen[k] = 1; out.push([z, xx, y, Math.abs(x - cx) + Math.abs(y - cy)]); }
@@ -516,7 +519,7 @@
   }
   function prefetch() {
     if (!PROTO || !map || !ready || MODE !== "radar" || !FRAMES.length || !FR) return;
-    var tiles = { n: viewTiles(1, RMZ).slice(0, 80), s: viewTiles(0, SMZ, 1).slice(0, 64), i: viewTiles(1, IMZ, 1).slice(0, 96) };
+    var tiles = { n: viewTiles(1, RMZ).slice(0, 160), s: viewTiles(0, SMZ).slice(0, 64), i: viewTiles(1, IMZ).slice(0, 128) };
     Q.forEach(function (it) { if (it.prio >= 0) it.prio += 1000; }); QD = true;   /* demote whatever the old view still had queued (never what the map is asking for right now) */
     var order = [], seen = {};
     function add(i) { if (i >= 0 && i < FRAMES.length && !seen[i]) { seen[i] = 1; order.push(i); } }
@@ -529,7 +532,7 @@
     });
     /* decode ahead: the exact wxr:// tiles MapLibre will ask for, frame by frame in the same order */
     var gen = ++DGEN, want = {}, vt = {}; DQ = [];
-    function tilesFor(s) { var k = (s.ts === 512 ? 0 : 1) + "/" + s.mz; return vt[k] || (vt[k] = s.ts === 512 ? tiles.s : s.k === "i" ? tiles.i : viewTiles(1, s.mz).slice(0, 80)); }
+    function tilesFor(s) { var k = (s.ts === 512 ? 0 : 1) + "/" + s.mz; return vt[k] || (vt[k] = s.ts === 512 ? tiles.s : s.k === "i" ? tiles.i : viewTiles(1, s.mz).slice(0, 160)); }
     order.forEach(function (i, n) {
       var list = []; PF.dec[i] = list;
       rSrcs(FRAMES[i]).forEach(function (s) {
