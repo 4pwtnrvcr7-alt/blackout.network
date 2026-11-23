@@ -5,43 +5,44 @@
   "use strict";
   var F = ["Noto Sans Regular"], FB = ["Noto Sans Bold"];
   function style() {
-    var lbl = "rgba(240,240,250,", halo = "rgba(5,6,10,.9)";
+    var lbl = "rgba(240,240,250,", halo = "rgba(5,6,10,.85)";   /* pt1748u: brighter base map, still dark */
     return {
       version: 8, glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
       sources: { omt: { type: "vector", url: "https://tiles.openfreemap.org/planet", attribution: "" } },
       layers: [
-        { id: "bg", type: "background", paint: { "background-color": "#12151e" } },
-        { id: "water", type: "fill", source: "omt", "source-layer": "water", paint: { "fill-color": "#080a11", "fill-antialias": true } },
-        { id: "ice", type: "fill", source: "omt", "source-layer": "landcover", filter: ["==", ["get", "subclass"], "glacier"], paint: { "fill-color": "#171b25", "fill-opacity": 0.6 } },
-        { id: "park", type: "fill", source: "omt", "source-layer": "park", minzoom: 8, paint: { "fill-color": "#0f131a", "fill-opacity": 0.6 } },
-        { id: "waterway", type: "line", source: "omt", "source-layer": "waterway", minzoom: 7, paint: { "line-color": "#070910", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.5, 14, 2] } },
-        { id: "building", type: "fill", source: "omt", "source-layer": "building", minzoom: 14, paint: { "fill-color": "#141822", "fill-opacity": 0.7 } },
+        { id: "bg", type: "background", paint: { "background-color": "#232a3a" } },
+        { id: "water", type: "fill", source: "omt", "source-layer": "water", paint: { "fill-color": "#0f1828", "fill-antialias": true } },
+        { id: "ice", type: "fill", source: "omt", "source-layer": "landcover", filter: ["==", ["get", "subclass"], "glacier"], paint: { "fill-color": "#2c3344", "fill-opacity": 0.6 } },
+        { id: "park", type: "fill", source: "omt", "source-layer": "park", minzoom: 8, paint: { "fill-color": "#1f2635", "fill-opacity": 0.6 } },
+        { id: "waterway", type: "line", source: "omt", "source-layer": "waterway", minzoom: 7, paint: { "line-color": "#0f1828", "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.5, 14, 2] } },
+        { id: "coast", type: "line", source: "omt", "source-layer": "water", filter: ["!=", ["get", "class"], "swimming_pool"], paint: { "line-color": "rgba(150,185,230,.30)", "line-width": ["interpolate", ["linear"], ["zoom"], 1, 0.5, 5, 0.8, 10, 1.2] } },
+        { id: "building", type: "fill", source: "omt", "source-layer": "building", minzoom: 14, paint: { "fill-color": "#2a3142", "fill-opacity": 0.7 } },
         { id: "road-minor", type: "line", source: "omt", "source-layer": "transportation", minzoom: 10, filter: ["match", ["get", "class"], ["minor", "service", "tertiary", "secondary"], true, false],
-          paint: { "line-color": "rgba(240,240,250,.06)", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.4, 16, 3] } },
+          paint: { "line-color": "rgba(240,240,250,.10)", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.4, 16, 3] } },
         { id: "road-major", type: "line", source: "omt", "source-layer": "transportation", minzoom: 5, filter: ["match", ["get", "class"], ["motorway", "trunk", "primary"], true, false],
-          paint: { "line-color": "rgba(240,240,250,.09)", "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.3, 10, 1, 16, 4] } },
+          paint: { "line-color": "rgba(240,240,250,.15)", "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.3, 10, 1, 16, 4] } },
         { id: "admin-state", type: "line", source: "omt", "source-layer": "boundary", minzoom: 1.8, filter: ["all", ["==", ["get", "admin_level"], 4], ["!=", ["get", "maritime"], 1]],
-          paint: { "line-color": "rgba(240,240,250,.17)", "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.5, 3, 0.6, 8, 1.3], "line-dasharray": [3, 2] } },
+          paint: { "line-color": "rgba(240,240,250,.34)", "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.6, 3, 0.75, 8, 1.4], "line-dasharray": [3, 2] } },
         { id: "admin-country", type: "line", source: "omt", "source-layer": "boundary", filter: ["all", ["==", ["get", "admin_level"], 2], ["!=", ["get", "maritime"], 1], ["!=", ["get", "disputed"], 1]],
-          paint: { "line-color": "rgba(240,240,250,.32)", "line-width": ["interpolate", ["linear"], ["zoom"], 0, 0.5, 5, 1.15, 10, 1.9] } },
+          paint: { "line-color": "rgba(240,240,250,.56)", "line-width": ["interpolate", ["linear"], ["zoom"], 0, 0.6, 5, 1.3, 10, 2] } },
         { id: "lbl-country", type: "symbol", source: "omt", "source-layer": "place", minzoom: 1.5, maxzoom: 7, filter: ["==", ["get", "class"], "country"],
           layout: { "text-field": ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]], "text-font": FB, "text-transform": "uppercase", "text-letter-spacing": 0.22,
             "text-size": ["interpolate", ["linear"], ["zoom"], 1.5, 8.5, 4, 11, 6, 13], "text-max-width": 7, "symbol-sort-key": ["coalesce", ["get", "rank"], 9] },
-          paint: { "text-color": lbl + ".38)", "text-halo-color": halo, "text-halo-width": 1.2 } },
+          paint: { "text-color": lbl + ".66)", "text-halo-color": halo, "text-halo-width": 1.3 } },
         { id: "lbl-state", type: "symbol", source: "omt", "source-layer": "place", minzoom: 4, maxzoom: 8, filter: ["==", ["get", "class"], "state"],
           layout: { "text-field": ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]], "text-font": F, "text-transform": "uppercase", "text-letter-spacing": 0.24, "text-size": 9.5, "text-max-width": 8 },
-          paint: { "text-color": lbl + ".24)", "text-halo-color": halo, "text-halo-width": 1 } },
+          paint: { "text-color": lbl + ".48)", "text-halo-color": halo, "text-halo-width": 1.1 } },
         { id: "lbl-city", type: "symbol", source: "omt", "source-layer": "place", minzoom: 3, filter: ["match", ["get", "class"], ["city"], true, false],
           layout: { "text-field": ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]], "text-font": F, "text-size": ["interpolate", ["linear"], ["zoom"], 3, 10, 8, 13, 12, 15],
             "text-letter-spacing": 0.04, "text-max-width": 8, "symbol-sort-key": ["coalesce", ["get", "rank"], 20],
             "text-variable-anchor": ["top", "bottom", "left", "right"], "text-radial-offset": 0.6 },
-          paint: { "text-color": lbl + ".58)", "text-halo-color": halo, "text-halo-width": 1.2, "text-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 5, 1] } },
+          paint: { "text-color": lbl + ".88)", "text-halo-color": halo, "text-halo-width": 1.4, "text-opacity": ["interpolate", ["linear"], ["zoom"], 3, 0.85, 5, 1] } },
         { id: "lbl-town", type: "symbol", source: "omt", "source-layer": "place", minzoom: 8, filter: ["match", ["get", "class"], ["town"], true, false],
           layout: { "text-field": ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]], "text-font": F, "text-size": 11.5, "text-max-width": 8 },
-          paint: { "text-color": lbl + ".45)", "text-halo-color": halo, "text-halo-width": 1 } },
+          paint: { "text-color": lbl + ".74)", "text-halo-color": halo, "text-halo-width": 1.2 } },
         { id: "lbl-village", type: "symbol", source: "omt", "source-layer": "place", minzoom: 11, filter: ["match", ["get", "class"], ["village", "suburb"], true, false],
           layout: { "text-field": ["coalesce", ["get", "name:en"], ["get", "name_en"], ["get", "name"]], "text-font": F, "text-size": 10.5, "text-max-width": 8 },
-          paint: { "text-color": lbl + ".34)", "text-halo-color": halo, "text-halo-width": 1 } }
+          paint: { "text-color": lbl + ".56)", "text-halo-color": halo, "text-halo-width": 1.1 } }
       ]
     };
   }
