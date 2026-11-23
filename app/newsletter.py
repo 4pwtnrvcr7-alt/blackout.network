@@ -1289,6 +1289,9 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     issue["videos"] = videos_for(issue, c)
     issue["empty"] = issue["empty"] and not issue["videos"]
     issue["crime"] = _subscriber_crime(sub)   # only when they opted in AND saved an area; never invents a default place
+    try:   # pt1754u: weather forecast + major weather alerts (local with a saved area, else US overview); None on any failure
+        import newsletter_wx as _WX; issue["weather"] = _WX.for_sub(sub, c)
+    except Exception: issue["weather"] = None
     issue["empty"] = False   # CoS Nov 1: the brief always goes out on schedule; a quiet one carries the matters lead (no separate "nothing confirmed" email)
     _include_noted(issue)
     _uniquify_why(issue)
@@ -1550,11 +1553,11 @@ def _short(t, n=90): return _cut(re.sub(r"^[^\w(\"'“]+", "", t or "").strip() 
 # web-safe fallback stack. All text is left-aligned. Masthead = BN tile + small domain + tagline (t333u).
 # apple_v1 (Nov 3 2026): the email mirrors the minimal site (review/design/apple_style_v1/STYLE_GUIDE.md): text wordmark only, big clean
 # headline, quiet rounded cards with no borders, yellow pill buttons, red only for rank 7+. Dark stays the inline default; light via @media.
-PAL = {"bg": "#0B0C0F", "surf": "#16181C", "surf2": "#121418", "line": "#2A2D33", "tx": "#F5F5F7", "mu": "#A1A1A6", "ac": "#FFC21A", "ink": "#0B0C0F",
+PAL = {"bg": "#0B0C0F", "surf": "#16181C", "surf2": "#121418", "line": "#2A2D33", "tx": "#F5F5F7", "mu": "#A1A1A6", "ac": "#F5F5F7", "ink": "#0B0C0F",
        "band": "#1B2933", "meta": "#C4CDD2",
-       "sev": ("#F5F5F7", "#FFC21A", "#C8102E"), "empty": "#2A2D33", "body": "#D2D2D7", "fill": "#FFC21A", "red": "#C8102E", "onred": "#FFFFFF"}
-PAL_LIGHT = {"bg": "#F5F5F7", "surf": "#FFFFFF", "surf2": "#FBFBFD", "line": "#D2D2D7", "tx": "#1D1D1F", "mu": "#6E6E73", "ac": "#8A6100", "ink": "#0B0D10",
-             "sev": ("#1D1D1F", "#8A6100", "#C8102E"), "empty": "#D2D2D7", "body": "#424245", "fill": "#FFC21A", "red": "#C8102E", "onred": "#FFFFFF"}
+       "sev": ("#F5F5F7", "#AEAEB2", "#C8102E"), "empty": "#2A2D33", "body": "#D2D2D7", "fill": "#AEAEB2", "red": "#C8102E", "onred": "#FFFFFF"}
+PAL_LIGHT = {"bg": "#F5F5F7", "surf": "#FFFFFF", "surf2": "#FBFBFD", "line": "#D2D2D7", "tx": "#1D1D1F", "mu": "#6E6E73", "ac": "#1D1D1F", "ink": "#0B0D10",
+             "sev": ("#1D1D1F", "#6E6E73", "#C8102E"), "empty": "#D2D2D7", "body": "#424245", "fill": "#8E8E93", "red": "#C8102E", "onred": "#FFFFFF"}
 FB = "Inter,Arial,Helvetica,sans-serif"
 FH = "Inter,Arial,Helvetica,sans-serif"
 FACE = FB
@@ -1602,7 +1605,7 @@ def _head(title):
 def sev_band(r):
     r = max(0, min(10, int(r or 0)))
     return 0 if r <= 3 else (1 if r <= 6 else 2)
-RANK_COLORS = [PAL["red"] if i >= 7 else PAL["fill"] for i in range(11)]   # kept for callers: yellow below rank 7, red for rank 7+ (site rule)
+RANK_COLORS = [PAL["red"] if i >= 7 else PAL["fill"] for i in range(11)]   # kept for callers: grey below rank 7, red for rank 7+ (site rule; no yellow, pt1754u)
 _SEVCLS = ("sg", "sa", "sr"); _SEVTXT = ("tg", "ta", "tr")
 def rank_color(r): return RANK_COLORS[max(0, min(10, int(r or 0)))]
 def slot_label(slot): return {"morning": "Morning", "evening": "Evening", "breaking": "Breaking"}.get(slot, "Special")
@@ -2382,22 +2385,33 @@ def _video_text(s, c, camp):
     T.append(f"  Watch on X: {s.get('x_url') or 'https://x.com/BLKOUTNTW'}")
     return T + [""]
 def render_simple(title, paras, button=None, c=None, extra_links=None):
-    """Transactional email (confirm / already-subscribed). paras: plain strings. button: (label, url). extra_links: [(label, url)]."""
+    """Transactional email (confirm / already-subscribed / crime alert). paras: plain strings. button: (label, url). extra_links: [(label, url)].
+    pt1754u: same look as the 7 AM / 7 PM issue (layout v4): black, white/grey type, text wordmark only (no logo image), outlined white button, no yellow."""
     c = c or cfg(); addr = (c.get("mailing_address") or "").strip()
-    btn = (f'<p style="margin:18px 0 0 0">{_btn(E(button[0]), button[1])}</p>'
-           f'<p class="bnm" style="font:400 12px/1.5 {FB};color:{PAL["mu"]};word-break:break-all;margin:14px 0 0 0">Or paste this link into your browser: {E(button[1])}</p>') if button else ""
-    xl = "".join(f'<p style="font:400 13px/1.5 {FB};margin:0 0 6px 0"><a href="{E(u)}" class="bnt" style="{_L}">{E(l)}</a></p>' for l, u in (extra_links or []))
-    foot = (f'<tr><td class="bnl" style="padding:22px 20px 8px 20px;border-top:1px solid {PAL["line"]}">{_logo_html(c, 32)}</td></tr>'
-            f'<tr><td class="bnm" style="padding:8px 20px 22px 20px;font:400 12px/1.6 {FB};color:{PAL["mu"]};text-align:left">{E(DISCLAIMER)}<br>{E(END_LINE)}<br>{BRAND} · '
-            + (E(addr) if addr else 'https://BLACKOUT.NETWORK') + "</td></tr>")
-    body = "".join(f'<p {_P}>{E(p)}</p>' for p in paras)
-    html_ = (_head(title) + f'<body class="bnb" style="margin:0;padding:0;background:{PAL["bg"]};-webkit-text-size-adjust:100%">'
-             f'<table role="presentation" class="bnb" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{PAL["bg"]}"><tr><td align="center" style="padding:0">'
-             f'<table role="presentation" class="bnb" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:{PAL["bg"]};font-family:{FB};text-align:left">'
-             + _sevbar() + f'<tr><td class="bnpad" style="padding:26px 20px 0 20px">{_logo_html(c, 48)}</td></tr>'
-             f'<tr><td class="bnpad" style="padding:40px 20px 40px 20px;text-align:left">'
-             f'<h1 class="bnt bnh1" style="font:600 34px/1.12 {FH};letter-spacing:-0.8px;color:{PAL["tx"]};margin:0 0 16px 0">{E(title)}</h1>'
-             + body + btn + xl + '</td></tr>' + foot + '</table></td></tr></table></body></html>')
+    import newsletter_v4 as V
+    F = V.FACE
+    row = lambda inner, pad: f'<tr><td class="bnpad" bgcolor="{V.BG}" style="padding:{pad};background:{V.BG};text-align:left">{inner}</td></tr>'
+    rule = row(f'<div style="height:1px;line-height:1px;font-size:0;background:{V.LINE}">&nbsp;</div>', "0 24px")
+    body = "".join(f'<p class="bnx" style="margin:0 0 14px 0;font:400 16px/25px {F};color:{V.BODY}">{E(p)}</p>' for p in paras)
+    btn = (V.button(button[0], button[1])
+           + f'<p class="bnm" style="margin:18px 0 0 0;font:400 12px/18px {F};color:{V.DIM};word-break:break-all">Or paste this link into your browser: {E(button[1])}</p>') if button else ""
+    xl = "".join(f'<a href="{E(u)}" class="bnm" style="display:inline-block;padding:10px 18px 0 0;font:500 13px/20px {F};color:{V.MU};text-decoration:underline">{E(l)}</a>'
+                 for l, u in (extra_links or []))
+    base = (c.get("base_url") or "https://blackout.network").rstrip("/")
+    FT = f"font:400 12px/19px {F};color:{V.DIM}"
+    html_ = (V._head(title) + f'<body bgcolor="{V.BG}" class="bnb body" style="margin:0;padding:0;background:{V.BG};color:{V.TX};-webkit-text-size-adjust:100%">'
+             f'<table role="presentation" class="bnb" bgcolor="{V.BG}" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{V.BG}"><tr><td bgcolor="{V.BG}" align="center" style="padding:0;background:{V.BG}">'
+             f'<table role="presentation" class="bnb" bgcolor="{V.BG}" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:{V.W}px;background:{V.BG};font-family:{F};color:{V.TX};text-align:left">'
+             + row(f'<a href="{E(base)}/" class="bnt" style="font:600 22px/26px {F};letter-spacing:-0.2px;color:{V.TX};text-decoration:none">{V.WORDMARK}</a>'
+                   f'<div class="bnm" style="font:400 13px/18px {F};letter-spacing:1.8px;color:{V.MU};margin:6px 0 0 0">{V.TAGLINE.upper()}</div>', "36px 24px 28px 24px")
+             + rule
+             + row(f'<div class="bnt bnh1" style="font:600 30px/36px {F};letter-spacing:-0.3px;color:{V.TX};margin:0 0 18px 0">{E(title)}</div>' + body + btn + xl, "36px 24px 8px 24px")
+             + row(f'<div style="height:1px;line-height:1px;font-size:0;background:{V.LINE}">&nbsp;</div>', "48px 24px 0 24px")
+             + row(f'<div class="bnt" style="font:600 18px/22px {F};color:{V.TX}">{V.WORDMARK}</div>'
+                   f'<div class="bnm" style="font:400 12px/18px {F};letter-spacing:1.6px;color:{V.MU};margin:4px 0 14px 0">{V.TAGLINE.upper()}</div>'
+                   f'<p class="bnm" style="margin:0 0 8px 0;{FT}">{E(DISCLAIMER)}</p><p class="bnm" style="margin:0 0 8px 0;{FT}">{E(END_LINE)}</p>'
+                   f'<p class="bnm" style="margin:0;{FT}">{BRAND} &middot; {E(addr) if addr else "https://BLACKOUT.NETWORK"}</p>', "26px 24px 40px 24px")
+             + '</table></td></tr></table></body></html>')
     text = "\n\n".join([f"{BRAND} — {title}", TAGLINE, *paras] + ([f"{button[0]}: {button[1]}"] if button else [])
                        + [f"{l}: {u}" for l, u in (extra_links or [])] + ["--", DISCLAIMER, END_LINE, f"{BRAND} · {TAGLINE} · {addr or 'https://BLACKOUT.NETWORK'}"])
     return html_, text
@@ -2523,8 +2537,8 @@ def send_transactional(row, kind):
     c = cfg(); L = links_for(row, c)
     if kind == "confirm":
         title = f"Confirm your {BRAND} newsletter subscription"
-        paras = [f"Someone (hopefully you) asked to subscribe {row['email']} to the {BRAND} newsletter: {FREQS.get(row['frequency'], 'twice daily').lower()} briefs of the highest-severity threats, each confirmed by independent sources.",
-                 f"Click the button to confirm. The link expires in {c['confirm_ttl_hours']} hours. If you didn't ask for this, ignore this email and nothing will be sent."]
+        paras = [f"Tap the button to start the {BRAND} brief for {row['email']}: {FREQS.get(row['frequency'], 'twice daily').lower()}, ranked and sourced, with your local weather.",
+                 f"The link expires in {c['confirm_ttl_hours']} hours. Didn't ask for this? Ignore this email and nothing will be sent."]
         hb, tx = render_simple(title, paras, ("Confirm subscription", L["confirm"]), c=c); unsub = None
     else:
         title = f"You're already subscribed to {BRAND}"
@@ -3422,8 +3436,10 @@ def signup_page():
     return page("Newsletter", body, robots="index")
 
 def result_page(title, msg, ok=True, extra=""):
-    return page(title, f'<section class="nl-card nl-result {"ok" if ok else "warn"}"><h2>{"✓" if ok else "ⓘ"} {E(title)}</h2><p>{E(msg)}</p>{extra}'
-                '<p class="nl-sm"><a href="/#wire">Go to the dashboard</a> · <a href="/newsletter">Newsletter home</a></p></section>')
+    """Confirm / unsubscribe / follow / preferences result pages (pt1754u): same look as the signup page, no symbols."""
+    return page(title, f'<section class="nl-result nlx-res {"ok" if ok else "warn"}" style="background-image:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.82) 60%,#000),url({NL_IMG_HERO})">'
+                f'<div class="nlx-res-in"><div class="nlx-kick">The Brief</div><h1>{E(title)}</h1><p class="nlx-lede">{E(msg)}</p>{extra}'
+                '<p class="nlx-res-l"><a href="/">Live site</a><a href="/newsletter">Newsletter</a></p></div></section>')
 
 def tracking_effective(r):
     """What the preferences toggle shows: the subscriber's measurement setting, independent of whether the tracked domain is live yet."""
@@ -3511,8 +3527,8 @@ def _confirm_result(tok):
     """Activate a pending subscription (POST only, see handle_get) and return the result page."""
     st, r = confirm(tok)
     if st == "ok":
-        return 200, result_page("Subscription confirmed", f"You're in. {r['email']} will get the {FREQS[r['frequency']].lower()} brief from the next scheduled send. "
-                                "Every email has a one-click unsubscribe link.", True,
+        return 200, result_page("You're in", f"{r['email']} gets the {FREQS[r['frequency']].lower()} brief, starting with the next scheduled send. "
+                                "One-click unsubscribe in every email.", True,
                                 f'<p><a class="nl-btn" href="/newsletter/manage?token={E(sub_token("manage", r))}">Manage preferences</a></p>'), "text/html"
     if st == "already": return 200, result_page("Already confirmed", "This subscription was already confirmed. Nothing changed.", True), "text/html"
     if st == "expired":
@@ -3549,7 +3565,7 @@ def handle_get(path, qs):
     if path == "/newsletter/confirm":   # scanner-safe double opt-in: GET only shows a button; the POST below activates
         tok = q1("token"); st, r = token_sub(tok, "confirm")
         if st == "ok" and r is not None and r["status"] == "pending":
-            return 200, result_page("One more tap", f"Confirm that {r['email']} should get the {BRAND} brief.", False,
+            return 200, result_page("One more tap", f"Start the {BRAND} brief for {r['email']}.", False,
                                     f'<form method="post" action="/newsletter/confirm"><input type="hidden" name="token" value="{E(tok)}">'
                                     '<button type="submit" class="nl-btn">Yes, start my brief</button></form>'), "text/html"
         return _confirm_result(tok)
@@ -3741,7 +3757,7 @@ def render_preview_html(notes, out, at=None, clean=False):
     print("QA gate:", "PASS" if qa["ok"] else f"BLOCK ({len(qa['blockers'])})", file=sys.stderr)
     for b in qa["blockers"] + ["warning: " + w for w in qa["warnings"]]: print("  -", b, file=sys.stderr)
     if live and not clean:
-        banner = ('<div style="background:#FFC21A;color:#0B0C0F;font:600 14px/1.45 Inter,system-ui,sans-serif;padding:12px 16px">'
+        banner = ('<div style="background:#E5E5EA;color:#0B0C0F;font:600 14px/1.45 Inter,system-ui,sans-serif;padding:12px 16px">'
                   'Preview only. Live cluster snapshot from blackout.network/api/state. Nothing was emailed.</div>')
         html = html.replace("<body ", banner + "<body ", 1)
     os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)

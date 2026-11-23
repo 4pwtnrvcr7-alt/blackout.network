@@ -36,7 +36,7 @@ WINDOWS = (("24h", 24), ("7d", 24 * 7), ("30d", 24 * 30))
 
 # Email palette, same hexes as newsletter.PAL, so this module does not import newsletter (cycle).
 TX, MU, BODY = "#F5F5F7", "#A1A1A6", "#D2D2D7"
-SURF, LINE, AC, FILL, INK = "#16181C", "#2A2D33", "#FFC21A", "#FFC21A", "#0B0C0F"
+SURF, LINE, AC, FILL, INK = "#16181C", "#2A2D33", "#F5F5F7", "#AEAEB2", "#0B0C0F"   # pt1754u: no yellow
 FB = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 FH = FB
 

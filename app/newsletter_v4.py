@@ -189,6 +189,61 @@ def _head(title):
             '<meta name="x-apple-disable-message-reformatting"><meta name="color-scheme" content="dark only"><meta name="supported-color-schemes" content="dark only">'
             f'<title>{E(title)}</title><style>{CSS}</style></head>')
 
+def _wx_link(label, url):
+    return f'<a href="{E(url)}" class="bnm" style="font:500 13px/20px {FACE};color:{MU};text-decoration:underline">{E(label)}</a>'
+
+def _weather(issue):
+    """Weather forecast + major weather alerts (pt1754u). Rows only for the parts that have data; never an empty section."""
+    try:
+        import newsletter_wx as X
+    except Exception:
+        return []
+    w = issue.get("weather")
+    if not w: return []
+    R = []
+    if X.has_forecast(w):
+        if w.get("fc"):
+            fc = w["fc"]; days = fc["days"][:4]
+            R.append(_section(f"Weather · {w['label']}"))
+            cw = int(100 / max(1, len(days)))
+            cells = "".join(
+                f'<td valign="top" width="{cw}%" style="padding:14px 6px 14px 0;border-top:1px solid {LINE};text-align:left">'
+                f'<div class="bnm" style="font:600 11px/16px {FACE};letter-spacing:1.6px;color:{MU}">{E(d["name"].upper())}</div>'
+                + (f'<div class="bnt" style="font:600 24px/30px {FACE};color:{TX};margin-top:4px">{E(X.deg(d.get("hi")))}</div>'
+                   f'<div class="bnm" style="font:400 13px/18px {FACE};color:{MU}">{E(X.deg(d.get("lo")))}</div>' if d.get("hi") is not None else
+                   f'<div class="bnt" style="font:600 24px/30px {FACE};color:{TX};margin-top:4px">{E(X.deg(d.get("lo")))}</div>'
+                   f'<div class="bnm" style="font:400 13px/18px {FACE};color:{MU}">low</div>')
+                + (f'<div class="bnx" style="font:400 13px/18px {FACE};color:{BODY};margin-top:4px">{int(d["pop"])}% rain</div>' if d.get("pop") else "")
+                + f'<div class="bnm" style="font:400 12px/17px {FACE};color:{DIM};margin-top:4px">{E(d.get("text") or "")}</div></td>' for d in days)
+            R.append(_row(f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0 0;table-layout:fixed"><tr>{cells}</tr></table>', "0 24px"))
+            det = (_summary(f"{fc.get('detail_name') or 'Now'}: {fc['detail']}") if fc.get("detail") else "")
+            R.append(_row(det + f'<div style="margin:12px 0 0 0">{_wx_link("Full forecast from " + fc["src"], fc["url"])}</div>', "0 24px"))
+        else:
+            R.append(_section("Weather · across the US"))
+            R.append('<tr><td style="font-size:0;line-height:10px;height:10px">&nbsp;</td></tr>')
+            for x in w["cities"]:
+                R.append(_line(f"{x['name']} · {X.temps(x)}", x["url"], E(x.get("text") or "")))
+            R.append(_row(f'<div style="margin:12px 0 0 0">{_wx_link("Forecasts from the National Weather Service", "https://www.weather.gov/")}</div>', "0 24px"))
+    if X.has_alerts(w):
+        R.append(_section("Major weather alerts"))
+        R.append('<tr><td style="font-size:0;line-height:10px;height:10px">&nbsp;</td></tr>')
+        for a in w["alerts"]:
+            ev = f'<span style="color:{RED}">{E(a["event"])}</span>' if a.get("red") else E(a["event"])
+            R.append(_row(f'<a href="{E(a["url"])}" class="bnt" style="display:block;padding:14px 0;border-top:1px solid {LINE};text-decoration:none">'
+                          f'<span style="display:block;font:500 16px/23px {FACE};color:{TX}">{ev} &middot; your area</span>'
+                          f'<span class="bnm" style="display:block;font:400 13px/19px {FACE};color:{MU};margin-top:4px">{E(X.alert_meta(a) or "Active now")} &middot; National Weather Service</span></a>', "0 24px"))
+        for g in w["nat_alerts"]:
+            ev = f'<span style="color:{RED}">{E(g["event"])}</span>' if g.get("red") else E(g["event"])
+            R.append(_row(f'<a href="{E(X.NWS_ALERTS_PAGE)}" class="bnt" style="display:block;padding:14px 0;border-top:1px solid {LINE};text-decoration:none">'
+                          f'<span style="display:block;font:500 16px/23px {FACE};color:{TX}">{ev}</span>'
+                          f'<span class="bnm" style="display:block;font:400 13px/19px {FACE};color:{MU};margin-top:4px">{E(X.nat_line(g))} &middot; National Weather Service</span></a>', "0 24px"))
+        for st in w["storms"]:
+            R.append(_line(st["name"], st["url"], E((f"{st['mph']} mph winds &middot; " if st.get("mph") else "")) + "National Hurricane Center"))
+    elif X.alerts_quiet(w):
+        R.append(_section("Major weather alerts"))
+        R.append(_row(_summary(X.quiet_text(w)) + f'<div style="margin:10px 0 0 0">{_wx_link("All active alerts", X.NWS_ALERTS_PAGE)}</div>', "6px 24px 0 24px"))
+    return R
+
 def render(issue, links, c):
     """-> (subject, html, text), same contract as newsletter.render."""
     N = _N(); subj = N.subject_for(issue); camp = f"{issue.get('slot') or 'brief'}-{issue['end'].astimezone(N.ET).strftime('%Y-%m-%d')}"
@@ -217,6 +272,8 @@ def render(issue, links, c):
             seen.add(it.get("cluster_id")); f_ = it.get("_feat")
             if f_: B.append(story(it, c, refs, url=f_["url"], head=f_["title"], text=f_.get("text") or "", first=k == 0, big=gi == 0 and k == 0))
             else: B.append(story(it, c, refs, first=k == 0, big=gi == 0 and k == 0))
+    try: B.extend(_weather(issue))
+    except Exception as ex: N.log(f"weather section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
     if issue.get("crime"):
         cr = issue["crime"]
         B.append(_section(f"Crime near you · {cr['label']}"))
