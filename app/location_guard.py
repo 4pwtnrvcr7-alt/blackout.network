@@ -298,6 +298,36 @@ def _eval_expect(got, expect):
     return problems
 
 
+def _visible_pin_problems(case, got):
+    """The user-visible path: heat_all.place then map_pins.resolve_pin must keep coordinates."""
+    problems = []
+    expect = case.get("expect") or {}
+    try:
+        import heat_all, map_pins, json as _json
+        links = _json.dumps([{"source": s, "url": "https://example.invalid"} for s in (case.get("sources") or [])])
+        it = {"id": case.get("id") or "t", "title": case.get("title") or "", "loc": case.get("location"),
+              "lat": case.get("lat"), "lon": case.get("lon"), "a": 0,
+              "category": case.get("category") or "", "brief": case.get("brief") or "", "links": links}
+        p = heat_all.place(it, {"located": 0, "reason_code": "not_found"})
+        pin = None
+        if p and p.get("lat") is not None:
+            pin = map_pins.resolve_pin(title=it["title"], place=p.get("place") or "",
+                                       precision=p.get("prec") or "", tier=p.get("tier") or "",
+                                       lat=p.get("lat"), lon=p.get("lon"), cc=p.get("cc") or "",
+                                       how=p.get("how") or "")
+        if not pin:
+            problems.append("map filter cleared the coordinates or the server geocoder left it unpinned")
+        elif expect.get("cc") and (pin.get("cc") or "").upper() != expect["cc"].upper():
+            problems.append("visible pin cc %s != %s" % (pin.get("cc"), expect["cc"]))
+        for s in expect.get("place_contains") or []:
+            blob = (pin or {}).get("place") or (p or {}).get("place") or ""
+            if s.lower() not in blob.lower():
+                problems.append("visible place %r missing %r" % (blob, s))
+    except Exception as ex:
+        problems.append("visible-pin check error: %s" % str(ex)[:200])
+    return problems
+
+
 def check_golden():
     data = load_golden()
     cases = data.get("cases") or []
@@ -314,6 +344,8 @@ def check_golden():
                                                            got.get("cc") or "", got.get("admin1_code") or "",
                                                            got.get("precision") or ""):
             problems.append("resolved pin contradicts the headline")
+        if (case.get("expect") or {}).get("located") is True:
+            problems.extend(_visible_pin_problems(case, got))
         if problems:
             failures.append({"id": case.get("id"), "title": case.get("title"), "got": got, "problems": problems})
     return {"ok": not failures, "checked": len(cases), "failures": failures}

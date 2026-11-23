@@ -1,24 +1,33 @@
 """Which stories may appear as pins on the homepage map, /map, and any other story map.
 
-Nov 23 2026 (pt1761u, pt1762u): only a specific, named location is a pin. Stories with no
-location, a country-centroid-only location, a low-confidence or ambiguous match, a pin on
-water, or a location that contradicts the headline stay in the lists, not on the map.
+Nov 23 2026 (pt1761u, pt1762u, corrected pt1767u): a story that clearly states a location
+must never show as no location. Pins stay at the most specific verified level (city, then
+county, then state). A truly national story may use a country capital or centroid. Stories
+with no location, a low-confidence or ambiguous match, a pin on open water with no named
+place, or a location that contradicts the headline stay in the lists, not on the map.
 
 A city, point, or facility pin stays at that level only when the headline names the city
 (including offset forms like "38 km NE of Calama" and close spelling or transliteration).
 If the city is not named but the headline names a consistent containing county or state
-(or equivalent admin-1 place), the pin is moved to that level. A country name alone is
-not enough: country centroids stay off the map.
+(or equivalent admin-1 place), the pin is moved to that level. Country pins are kept only
+when the headline is clearly about that country.
 
 Does not geocode, write a database, or touch scanner scoring.
 """
 import re, unicodedata
 from difflib import SequenceMatcher
 
-SPECIFIC = {"point", "city", "county", "facility", "state"}
+def _title_without_nws_office(title):
+    try:
+        import geo
+        return geo.strip_nws_office(title or "")
+    except Exception:
+        return title or ""
+
+SPECIFIC = {"point", "city", "county", "facility", "state", "country"}
 CITY_PREC = {"point", "city", "facility"}
-DROP_PREC = {"country", "region"}
-DROP_TIER = {"global", "region", "approx"}
+DROP_PREC = {"region"}
+DROP_TIER = {"global", "region"}
 LOW_CONF = {"low", "weak", "ambiguous"}
 HOW_BAD = ("several", "ambiguous", "nationality", "pending", "fallback", "country centre",
            "country center", "country-level", "spread", "place_in_country")
@@ -474,6 +483,7 @@ def _prefix_country(text):
 
 def _admin_conflict(title, place, cc=""):
     """True when the pin's state/province is not the one the headline names."""
+    title = _title_without_nws_office(title)
     place_codes = set()
     cc = (cc or "").upper()
     for group in _groups(place):
@@ -556,23 +566,51 @@ def headline_pin(title, place, precision="", cc="", lat=None, lon=None):
         if not coord:
             return None
         return {"place": place, "precision": prec or "city", "lat": coord[0], "lon": coord[1], "cc": cc or ""}
+    # Source coordinates for a quake, volcano, or named island/offset: the point is the event.
+    if prec == "point" and coord and named_offshore(title, place):
+        if not _admin_conflict(title, place, cc):
+            return {"place": place, "precision": "point", "lat": coord[0], "lon": coord[1], "cc": cc or ""}
     # State / county / admin-labelled pins: keep when that admin is named (Bayelsa, Jazan, FL).
     head = (place or "").split(",")[0].strip()
     if prec in ("state", "county") or _looks_like_admin(head):
         if _admin_mentioned(head, title, cc):
             if not coord:
+                try:
+                    import geo
+                    rec = geo.admin_centroid(name=head, cc=cc or None)
+                    if rec:
+                        coord = (rec["lat"], rec["lon"])
+                        cc = cc or rec.get("cc") or ""
+                except Exception:
+                    rec = None
+            if not coord:
                 return None
             return {"place": place, "precision": prec or "state", "lat": coord[0], "lon": coord[1], "cc": cc or ""}
     cont = container_named_in_headline(title, place, cc)
-    if not cont:
-        return None
-    if cont.get("reuse_coords"):
-        if not coord:
-            return None
-        cont = dict(cont, lat=coord[0], lon=coord[1])
-        cont.pop("reuse_coords", None)
-        cont.pop("label", None)
-    return cont
+    if cont:
+        if cont.get("reuse_coords"):
+            if not coord:
+                return None
+            cont = dict(cont, lat=coord[0], lon=coord[1])
+            cont.pop("reuse_coords", None)
+            cont.pop("label", None)
+        return cont
+    # Truly national story: keep a country capital/centroid, never a city the headline does not name.
+    if national_country_pin(title, place, cc):
+        rec = None
+        try:
+            import geo
+            rec = geo.admin_centroid(cc=cc or None) if cc else None
+            if not rec and place:
+                rec = geo.admin_centroid(name=place.split(",")[-1].strip())
+        except Exception:
+            rec = None
+        if rec:
+            return {"place": rec["name"], "precision": "country", "lat": rec["lat"], "lon": rec["lon"], "cc": rec["cc"]}
+        if coord:
+            label = place.split(",")[-1].strip() if place else (cc or "")
+            return {"place": label or place, "precision": "country", "lat": coord[0], "lon": coord[1], "cc": cc or ""}
+    return None
 
 
 def headline_agrees(title, place, precision=""):
@@ -587,6 +625,13 @@ def headline_agrees(title, place, precision=""):
     return headline_pin(title, place, prec, lat=1, lon=1) is not None
 
 
+_OFFSHORE = re.compile(
+    r"\b(earthquake|quake|tremor|aftershock|tsunami|volcano|eruption|epicent(?:er|re)|"
+    r"offshore|islands?|aleutian|andaman|tonga|fiji|kermadec|mariana|south of|west of|"
+    r"east of|north of|km (?:n|s|e|w|ne|nw|se|sw)\b|miles (?:n|s|e|w|off))\b",
+    re.I,
+)
+
 def on_water(lat, lon):
     """True when Natural Earth admin-0 has no country at this point (open water). False if PIP is unavailable."""
     if lat is None or lon is None:
@@ -597,6 +642,39 @@ def on_water(lat, lon):
         return not cc
     except Exception:
         return False
+
+def named_offshore(title, place=""):
+    """Offshore quakes and named island points should stay on the map even when PIP is water."""
+    return bool(_OFFSHORE.search((title or "") + " " + (place or "")))
+
+def national_country_pin(title, place="", cc=""):
+    """True when the headline is a story about this country (capital or centroid is allowed)."""
+    title = title or ""
+    place = place or ""
+    cc = (cc or "").upper()
+    if not title.strip():
+        return False
+    named = set()
+    try:
+        import geo
+        named = {c.upper() for c in geo._named_countries(title) if c}
+        if not cc:
+            # infer cc from the place label when the row left it blank
+            rec = geo.admin_centroid(name=place.split(",")[-1] if place else "")
+            if rec:
+                cc = rec["cc"]
+    except Exception:
+        named = set()
+    head = (place.split(",")[0] if place else "").strip()
+    if cc and named and cc not in named:
+        # "Sudan's capital" / "America Braces" may set named via aliases; if not, require the place name in the title
+        if not phrase_in_text(head, title) and not phrase_in_text(place, title):
+            return False
+    if not named and not phrase_in_text(head, title) and not (cc and phrase_in_text(cc, title)):
+        return False
+    if cc and named and cc not in named and not phrase_in_text(head, title):
+        return False
+    return bool(cc or head)
 
 
 def _coord(lat, lon):
@@ -614,27 +692,65 @@ def _coord(lat, lon):
 def resolve_pin(*, title="", place="", precision="", tier="", lat=None, lon=None, cc="", how="", confidence=""):
     """Pin fields if this story should be drawn, else None. May demote city pins to county/state."""
     coord = _coord(lat, lon)
+    prec0 = (precision or "").lower().strip()
+    if not coord and (prec0 in ("state", "county", "country") or (place or "").strip()):
+        try:
+            import geo
+            head = (place or "").split(",")[0].strip()
+            rec = geo.admin_centroid(name=head, cc=cc or None) if head else (geo.admin_centroid(cc=cc) if cc else None)
+            if rec:
+                coord = (rec["lat"], rec["lon"])
+                cc = cc or rec.get("cc") or ""
+                if not prec0:
+                    prec0 = rec.get("precision") or prec0
+        except Exception:
+            pass
     if not coord:
         return None
     prec = (precision or "").lower().strip()
     tier = (tier or "").lower().strip()
     how = (how or "").lower()
     conf = (confidence or "").lower().strip()
-    if tier in DROP_TIER:
+    if tier in DROP_TIER and prec not in SPECIFIC and not (place or "").strip():
         return None
     if prec in DROP_PREC:
         return None
-    if prec and prec not in SPECIFIC:
-        return None
+    if prec == "country" or (prec and prec not in SPECIFIC):
+        if prec == "country" and national_country_pin(title, place, cc):
+            pass
+        elif prec and prec not in SPECIFIC:
+            return None
+        elif prec == "country":
+            return None
     if conf in LOW_CONF:
         return None
     if any(s in how for s in HOW_BAD):
         return None
     pin = headline_pin(title, place, prec, cc, coord[0], coord[1])
+    if not pin and prec == "country" and national_country_pin(title, place, cc):
+        pin = {"place": place, "precision": "country", "lat": coord[0], "lon": coord[1], "cc": cc or ""}
+    how_l = how or ""
+    if not pin and coord and any(s in how_l for s in ("write-up", "server re-read", "headline town", "offline place match", "gazetteer")):
+        if not _admin_conflict(title, place, cc) and not (_prefix_country(place) and _prefix_country(title) and _prefix_country(place) != _prefix_country(title)):
+            pin = {"place": place, "precision": prec or "city", "lat": coord[0], "lon": coord[1], "cc": cc or ""}
     if not pin:
         return None
-    if on_water(pin["lat"], pin["lon"]):
+    # PIP is approximate: a named city, county or state on the coast must not be dropped as "water".
+    # A mid-ocean point ("Atlantic Ocean") with no populated place still is.
+    prec_pin = (pin.get("precision") or prec or "").lower()
+    if on_water(pin["lat"], pin["lon"]) and not named_offshore(title, pin.get("place") or place)             and prec_pin not in ("city", "county", "state", "facility", "country"):
         return None
+    if not pin.get("cc"):
+        try:
+            import geo
+            rec = geo.admin_centroid(name=(pin.get("place") or place or "").split(",")[-1].strip())
+            if rec and rec.get("cc"):
+                pin["cc"] = rec["cc"]
+            elif cc:
+                pin["cc"] = cc
+        except Exception:
+            if cc:
+                pin["cc"] = cc
     return pin
 
 

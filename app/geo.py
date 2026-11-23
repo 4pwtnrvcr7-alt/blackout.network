@@ -18,7 +18,7 @@ UA = "blackout.network-heatmap/1.0 (+https://blackout.network; research dashboar
 NOM_URL = "https://nominatim.openstreetmap.org/search"
 NOM_BUDGET = 150            # max Nominatim requests per worker pass (cached forever, so each query is asked once)
 WINDOW_DAYS = 7
-VERSION = 11                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u; 11: headline place + state, reject mayor surnames such as Depew, pt1761u)
+VERSION = 12                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u; 11: headline place + state, reject mayor surnames such as Depew, pt1761u; 12: corpus-common must not drop Iowa/Alaska/Kyiv, Census places/counties, Nov 23 pt1767u)
 _lock = threading.RLock()
 _nom_lock = threading.Lock()
 _last_nom = [0.0]
@@ -117,7 +117,13 @@ BROAD_REGIONS = ["Middle East", "Europe", "European Union", "Africa", "Asia", "L
                  "North Africa", "Pacific", "Indo-Pacific", "Arctic", "Antarctica", "Midwest", "Midwestern", "West Coast", "East Coast", "Gulf Coast", "Red Sea", "Black Sea"]
 BROAD_RE = re.compile(r"\b(" + "|".join(re.escape(x) for x in sorted(BROAD_REGIONS, key=len, reverse=True)) + r")\b")
 NONGEO_CATS = {"cyber", "financial", "ufo/uap", "spiritual/religious", "other"}
+INSTITUTION_PLACES = {"white house", "the white house", "pentagon", "the pentagon", "kremlin", "the kremlin",
+                     "downing street", "elysee", "elysée", "capitol", "capitol hill", "langley", "foggy bottom"}
 FLAG_RE = re.compile("[\U0001F1E6-\U0001F1FF]{2}")
+_STRIP_NWS_OFFICE = re.compile(r"\s+by\s+NWS\s+[A-Za-z./' -]+?\s+[A-Z]{2}\b", re.I)
+def strip_nws_office(text):
+    """Drop the issuing office ('by NWS Seattle WA') so it is never treated as the event place."""
+    return _STRIP_NWS_OFFICE.sub("", text or "").strip()
 US_POSTAL = {}
 US_POSTAL_KEYS = set()
 METHOD_LABEL = {"source_coords": "Coordinates in the source data", "location_field": "Alert's location field", "gazetteer": "Place name in the text (offline gazetteer)",
@@ -133,7 +139,13 @@ class Gaz:
         self.countries = json.load(open(os.path.join(DATA, "countries.json")))
         self.admin1 = json.load(open(os.path.join(DATA, "admin1.json")))
         self.cities = json.load(open(os.path.join(DATA, "cities.json")))     # [name, ascii, lat, lon, cc, a1code, pop, fcode, alts]
-        self.common = set(COMMON_HARD) | self._corpus_common()
+        # v12: lowercase words that appear often in the live alert corpus ("in alaska", "from iowa")
+        # must not drop real states, countries, capitals, or special cities from the gazetteer or
+        # from extract(). That is what made the Aleutian pin lose cc=US, hid "Iowa deputy…", and
+        # treated "strikes on Kyiv … embassies of Austria and the Netherlands" as no location.
+        self.protected = self._protected_keys()
+        self.common = (set(COMMON_HARD) | self._corpus_common()) - self.protected
+        self.common |= set(COMMON_HARD)  # Mobile, Nice, Reading, Bath and other COMMON_HARD names still need context
         self.idx = {}
         def add(k, ref):
             if not k or k in MONTHS: return
@@ -148,7 +160,8 @@ class Gaz:
             if cc == "US" and a.get("postal"): US_POSTAL[a["postal"]] = code
             for n in names:
                 k = key_of(n)
-                if len(k) < 4 or k in GENERIC or k in self.common: continue
+                if len(k) < 4 or k in GENERIC: continue
+                if k in self.common and k not in self.protected: continue
                 if cc != "US" and len(n) <= 3: continue
                 add(k, ("admin1", code))
         self.by_name_cc = {}
@@ -168,6 +181,33 @@ class Gaz:
             for n in {a["name"], a["ascii"], *a.get("alts", [])}: self.a1_by_name.setdefault((code.split(".")[0], key_of(n)), code)
         self.load_s = round(time.time() - t, 2)
         self.polys = None
+
+    def _protected_keys(self):
+        """Place names that a busy lowercase news corpus must never knock out of the gazetteer."""
+        keys = set()
+        for iso2, c in self.countries.items():
+            for n in {c.get("name") or "", *c.get("ne_names", []), *COUNTRY_ALIASES.get(iso2, [])}:
+                k = key_of(n)
+                if k:
+                    keys.add(k)
+        for code, a in self.admin1.items():
+            for n in {a.get("name") or "", a.get("ascii") or "", *a.get("alts", [])}:
+                k = key_of(n)
+                if len(k) >= 3:
+                    keys.add(k)
+        for c in self.cities:
+            if (c[6] or 0) >= 250000 or (c[7] or "") in ("PPLC", "PPLA", "PPLA2"):
+                keys.add(key_of(c[0]))
+                if c[1]:
+                    keys.add(key_of(c[1]))
+        for k, rec in SPECIAL_CITY.items():
+            if rec:
+                keys.add(k)
+                keys.add(key_of(rec[0]))
+        # Short AP abbreviations and other COMMON_HARD words ("Mass Protests", "Nice")
+        # must stay out of the gazetteer index; "Massachusetts" and "Mass." still work.
+        keys -= set(COMMON_HARD)
+        return keys
 
     def _corpus_common(self):
         """Words the alert corpus itself uses in lower case (e.g. 'police', 'deal'): such place names need extra context."""
@@ -256,6 +296,38 @@ def gaz():
     return _GAZ[0]
 
 # ------------------------------------------------------------------ text extraction
+_INCIDENTAL_COUNTRY = re.compile(
+    r"\b(?:embass(?:y|ies)|consulate[s]?|ambassador[s]?)\s+(?:of|to|in)\b", re.I)
+
+def _incidental_country_mention(raw, start, end):
+    """True when a country is mentioned only as an embassy, consulate, or ambassador, not as the event place."""
+    window = (raw or "")[max(0, start - 48):min(len(raw or ""), end + 16)]
+    return bool(_INCIDENTAL_COUNTRY.search(window))
+
+def admin_centroid(a1=None, name=None, cc=None):
+    """State/province or country label coordinates from the offline gazetteer, or None."""
+    G = gaz()
+    if a1 and a1 in G.admin1 and G.admin1[a1].get("label"):
+        rec = G.admin1[a1]
+        return {"lat": rec["label"][0], "lon": rec["label"][1], "cc": a1.split(".")[0], "a1": a1,
+                "name": rec.get("name") or a1, "precision": "state"}
+    if name:
+        k = key_of(name)
+        for kind, ref in (G.idx.get(k) or []):
+            if kind == "admin1" and (not cc or ref.split(".")[0] == cc) and G.admin1.get(ref, {}).get("label"):
+                rec = G.admin1[ref]
+                return {"lat": rec["label"][0], "lon": rec["label"][1], "cc": ref.split(".")[0], "a1": ref,
+                        "name": rec.get("name") or name, "precision": "state"}
+            if kind == "country" and G.countries.get(ref, {}).get("label"):
+                rec = G.countries[ref]
+                return {"lat": rec["label"][0], "lon": rec["label"][1], "cc": ref, "a1": None,
+                        "name": rec.get("name") or name, "precision": "country"}
+    if cc and cc in G.countries and G.countries[cc].get("label"):
+        rec = G.countries[cc]
+        return {"lat": rec["label"][0], "lon": rec["label"][1], "cc": cc, "a1": None,
+                "name": rec.get("name") or cc, "precision": "country"}
+    return None
+
 def _hyph(t, toks, i, n):
     """v11: the name is one half of a hyphenated name ("Loire-Atlantique")."""
     return (i > 0 and t[toks[i - 1][2]:toks[i][1]] == "-") or (i + n < len(toks) and t[toks[i + n - 1][2]:toks[i + n][1]] == "-")
@@ -263,7 +335,7 @@ def _hyph(t, toks, i, n):
 def extract(text, ctx_cc=None, trust=False):
     """Find place mentions in free text. Returns dict with accepted matches, context countries, rejected/ambiguous info, unmatched locative spans.
     trust=True for a location field (every capitalised span there is meant to be a place)."""
-    G = gaz(); raw = text or ""
+    G = gaz(); raw = strip_nws_office(text or "") if not trust else (text or "")
     people = honorific_surnames(raw) if not trust else set()
     flags = []
     for f in FLAG_RE.findall(raw):
@@ -327,6 +399,8 @@ def extract(text, ctx_cc=None, trust=False):
         keys = [key_of(" ".join(aw[-n:])) for n in (1, 2, 3) if len(aw) >= n]
         val = None
         if len(b) == 2 and b in US_POSTAL: val = ("US", US_POSTAL[b]); bump("US", 1)
+        elif _AP_ADMIN.get(b.lower().rstrip(".")) and _AP_ADMIN[b.lower().rstrip(".")] in US_POSTAL:
+            val = ("US", US_POSTAL[_AP_ADMIN[b.lower().rstrip(".")]]); bump("US", 1)
         elif key_of(b) in G.idx:
             for r in G.idx[key_of(b)]:
                 if r[0] == "country": val = (r[1], None); break
@@ -351,7 +425,9 @@ def extract(text, ctx_cc=None, trust=False):
             rejected_people.append(" ".join(words[max(0, i - 2):i + n])); continue
         if not trust and k in people:
             rejected_people.append(words[i]); continue
-        common = k in G.common
+        if not trust and k in INSTITUTION_PLACES:
+            continue  # "White House says…" is the speaker, not White House, Morocco
+        common = k in G.common and k not in getattr(G, "protected", set())
         pair = pairs.get(k)
         cands = []
         if k in SPECIAL_CITY and SPECIAL_CITY[k]:
@@ -369,6 +445,8 @@ def extract(text, ctx_cc=None, trust=False):
             cc = countries[0]
             if k == "georgia" or (a1s and k in NEEDS_CTX_COUNTRY):
                 pass
+            elif (not trust) and _incidental_country_mention(raw, toks[i][1], toks[i + n - 1][2]):
+                pass  # "embassies of Austria and the Netherlands" is not the event country
             else:
                 acc.append({"level": "country", "cc": cc, "a1": None, "i": i, "k": k, "text": " ".join(words[i:i + n]), "conf": "high" if trust else "medium", "cue": strong_cue}); continue
         if a1s:
@@ -1130,7 +1208,33 @@ def geocode(cl, members, budget):
         if cty and lab:   # v10: "Santa Cruz County", "El Paso County": a US county name found in several states -> the US, approximate
             return fill(lab[0], lab[1], "US", None, "country", "gazetteer", f"US county name in several states ({cty})", "medium", f"{cty}, United States",
                         evidence=f"matched \"{cty}\" (NWS county table, more than one state)")
+    # v12: a clearly named state or country in the title must never show as no location
+    # (Matt Nov 20). "Explosion in Ward, Ala." pins Alabama when Ward is not in the AL gazetteer;
+    # "Iowa deputy…" pins Iowa. Only when nothing finer was resolved.
+    named_a1 = named_admin1_codes([title] + texts[:1] + locs)
+    if len(named_a1) == 1:
+        rec = admin_centroid(a1=next(iter(named_a1)))
+        if rec:
+            cn = (G.countries.get(rec["cc"]) or {}).get("name", rec["cc"])
+            return fill(rec["lat"], rec["lon"], rec["cc"], rec["a1"], "state", "gazetteer",
+                        "headline names this state", "high", f"{rec['name']}, {cn}",
+                        evidence="named admin1 " + rec["a1"])
+    tnamed = {c for c in _named_countries(title) if c}
+    if len(tnamed) == 1 and not first_fail:
+        rec = admin_centroid(cc=next(iter(tnamed)))
+        if rec:
+            return fill(rec["lat"], rec["lon"], rec["cc"], None, "country", "gazetteer",
+                        "headline names this country", "medium", rec["name"],
+                        evidence="named country " + rec["cc"])
     if first_fail and not quals:
+        # Same rule: a named state still wins over an equal-weight country conflict.
+        if len(named_a1) == 1:
+            rec = admin_centroid(a1=next(iter(named_a1)))
+            if rec:
+                cn = (G.countries.get(rec["cc"]) or {}).get("name", rec["cc"])
+                return fill(rec["lat"], rec["lon"], rec["cc"], rec["a1"], "state", "gazetteer",
+                            "headline names this state", "high", f"{rec['name']}, {cn}",
+                            evidence="named admin1 " + rec["a1"])
         return dict(out, reason_code=first_fail[0], reason_unlocated=first_fail[1], candidates=json.dumps(first_fail[2]))
     if rejected and not quals:
         r = rejected[0]
@@ -1296,6 +1400,8 @@ def _small_db():
     temp dir, built once per process (about a second). Never written next to the app's databases; read-only after it is built."""
     import glob
     srcs = sorted(glob.glob(os.path.join(DATA, "small_places_*.tsv")))     # sharded (each file under 1 MB)
+    srcs += sorted(glob.glob(os.path.join(DATA, "us_census_places_*.tsv")))
+    srcs += sorted(glob.glob(os.path.join(DATA, "us_counties.tsv")))
     if not srcs: return None
     if _SP["db"] and os.path.exists(_SP["db"]): return _SP["db"]
     with _SP_LOCK:
@@ -1349,7 +1455,10 @@ def small_place(name, ccs):
         if not L: return None
     elif len({x["cc"] for x in L}) > 1 and not (L[0]["pop"] >= 5000 and L[1]["pop"] * 3 <= L[0]["pop"]): return None
 
-    if len(L) > 1 and L[1]["pop"] * 3 > L[0]["pop"]: return None       # two similar-sized towns of that name: not guessed
+    if len(L) > 1:
+        a, b = int(L[0].get("pop") or 0), int(L[1].get("pop") or 0)
+        if a <= 0 or b <= 0 or b * 3 > a:
+            return None       # two towns of that name: not guessed (unknown census pop counts as ambiguous)
     return L[0]
 
 # v11 (Matt pt1761u, Nov 23 2026): prefer the headline's place plus a state or county the story
@@ -1398,7 +1507,7 @@ def named_admin1_codes(texts):
                     found.add(a["a1"])
         except Exception:
             pass
-        for m in re.finditer(r"\b([A-Za-z]{2,5})\.\s", tx):
+        for m in re.finditer(r"\b([A-Za-z]{2,5})\.(?:\s|$)", tx):
             st = _AP_ADMIN.get(m.group(1).lower())
             if st and st in US_POSTAL:
                 found.add(US_POSTAL[st])
@@ -1443,8 +1552,10 @@ def cities_named(name, ccs=None, a1s=None):
     if not L:
         return None
     L.sort(key=lambda x: -int(x.get("pop") or 0))
-    if len(L) > 1 and L[1]["pop"] * 3 > L[0]["pop"]:
-        return None
+    if len(L) > 1:
+        a, b = int(L[0].get("pop") or 0), int(L[1].get("pop") or 0)
+        if a <= 0 or b <= 0 or b * 3 > a:
+            return None
     return L[0]
 
 def resolve_headline_city(title, texts=(), prior=None):
