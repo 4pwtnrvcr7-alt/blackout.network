@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css"}
+FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -557,7 +557,7 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
 
 SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
              ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
-CHIPS = [("internet", "Internet"), ("power", "Power"), ("cloud", "Cloud"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
+CHIPS = [("internet", "Internet"), ("power", "Power"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
 
 def page(qs=None):
     try:
@@ -603,6 +603,7 @@ def page(qs=None):
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
+<aside class="nx-sea" id="nx_sea" hidden aria-label="Undersea cable chokepoints"></aside>
 <div class="nx-ctl"><button type="button" class="nx-b" id="nx_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>
@@ -663,6 +664,12 @@ def handle_get(path, qs=None, headers=None):
             except Exception: stp = {}
             return 200, dict(generated=iso(now()), reports=NB.reports(), timeline=NB.timeline(72, 50), deps=NB.DEPS, st_pt=stp)
         except Exception as ex: return 503, {"error": "board data unavailable", "detail": type(ex).__name__}
+    if p == "/api/netmap/cables":   # pt1785u Stage 2: undersea cable chokepoints, inferred status and risk (light, 10 min cache)
+        import netcables
+        try:
+            r = swr("cables", 600, lambda: netcables.api(swr, lambda: ((_C.get("data") or (0, {}))[1] or {}).get("outages")), wait=True)
+            return (200, r) if r else (503, {"error": "cable data is still loading"})
+        except Exception as ex: return 503, {"error": "cable data unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":
         import netsky
         return 200, netsky.space()

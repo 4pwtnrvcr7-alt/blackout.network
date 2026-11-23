@@ -154,7 +154,7 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 .nb .bng-btn:hover,.nb .bng-btn:focus-visible,.nb .bng-btn.bng-p:hover,.nb .bng-btn.bng-p:focus-visible{background:#F2F2F4!important;color:#05060a!important}
 
 /* pt1785u flip cards: tap a tile to flip it; the back has the status, a small chart and Expand (the on-site detail page) */
-.nb-fc{position:relative;height:150px;perspective:900px;-webkit-perspective:900px;min-width:0}
+.nb-fc{position:relative;height:170px;perspective:900px;-webkit-perspective:900px;min-width:0}
 .nb-fi{position:relative;width:100%;height:100%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.7,.2,1)}
 .nb-fc.flip .nb-fi{transform:rotateY(180deg)}
 .nb-ff,.nb-fb{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden;justify-content:space-between}
@@ -170,7 +170,7 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 .nb-fa{display:flex;gap:6px}
 .nb-fe,.nb-fd{all:unset;box-sizing:border-box;cursor:pointer;flex:1;text-align:center;padding:6px 4px;border-radius:99px;border:1px solid rgba(240,240,250,.35);font:600 10.5px/1.2 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#fff;white-space:nowrap}
 .nb-fe:hover,.nb-fd:hover{border-color:#fff}.nb-fd.done,.nb-fd[disabled]{opacity:.6}
-@media (max-width:767px){.nb-fc{height:158px}.nb-fb{padding:10px 10px 9px}.nb-fe,.nb-fd{font-size:10px;letter-spacing:.05em}}
+@media (max-width:767px){.nb-fc{height:180px}.nb-fb{padding:10px 10px 9px}.nb-fe,.nb-fd{font-size:10px;letter-spacing:.05em}}
 @media (prefers-reduced-motion:reduce){.nb-fi{transition:none}}
 /* pt1785u color-coded grid: green up, amber minor, orange disruption, red major only */
 .nb-ff.s-ok,.nb-fb.s-ok{border-color:rgba(47,214,123,.30);box-shadow:inset 0 3px 0 rgba(47,214,123,.75)}
@@ -188,3 +188,7 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 /* preserve rectangular, color-coded tiles under the global rounded-button theme */
 html body main .nb .nb-ff{border-radius:14px!important}
 .s-na .nb-tw i,.nb-fb.s-na .nb-fw i{background:var(--na)}.nb-sp rect.b-wk{fill:rgba(124,129,144,.55)}.nb-sp .nb-sp-rp{fill:none;stroke:var(--cy);stroke-width:1.2;vector-effect:non-scaling-stroke}
+.nb-fb .nb-c24{display:block;width:100%;height:34px;margin-top:2px}.nb-c24 .nb-c24a{stroke:rgba(240,240,250,.18);stroke-width:1;vector-effect:non-scaling-stroke}
+.nb-c24 rect.b-ok{fill:rgba(47,214,123,.55)}.nb-c24 rect.b-minor{fill:#FFA040}.nb-c24 rect.b-deg{fill:#FF7A1A}.nb-c24 rect.b-out{fill:#FF3B3B}.nb-c24 rect.b-na{fill:rgba(124,129,144,.35)}.nb-c24 rect.b-wk{fill:rgba(124,129,144,.6)}
+.nb-c24 .nb-sp-rp{fill:none;stroke:var(--cy);stroke-width:1.3;vector-effect:non-scaling-stroke}
+.nb-c24x{display:flex;justify-content:space-between;font-size:9.5px;line-height:1;color:var(--mu);margin:2px 0 0}
