@@ -176,7 +176,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     if (Math.max.apply(null, r.concat([0]))) s += '<polyline points="' + pts.join(" ") + '" class="nb-sp-rp"/>';
     var t24 = rep(n.id).h24 || 0;
     return { svg: s + '</svg><span class="nb-c24x"><span>24 h ago</span><span>now</span></span>',
-      lbl: (n.watch ? "Site ok " + w.filter(function (v) { return v === 0; }).length + "/" + have + " h ok" : have ? "Status, 24 h" : "No status history yet"),
+      lbl: (n.watch ? "Site ok " + w.filter(function (v) { return v === 0; }).length + " of " + have + " h" : have ? "Status, 24 h" : "No status history yet"),
       tail: t24 + " report" + (t24 === 1 ? "" : "s") };
   }
   function mini(n) {   /* back-face chart: the provider's 30-day history when published, else our 24 h reports */

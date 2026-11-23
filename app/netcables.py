@@ -4,7 +4,7 @@ Geometry: netmap_static/cables.json, built by tools/build_cables.py from OpenStr
 Management (U.S. waters, public domain). TeleGeography's free map data is CC BY-NC-SA (non-commercial), so it is not used.
 
 Status is INFERRED, never official: no cable operator publishes a live status feed. We combine
-  - news headlines that name a cable or a chokepoint together with damage words (Google News RSS, 2 queries / 30 min),
+  - news headlines that name a cable or a chokepoint together with damage words (Google News RSS, 4 spaced queries an hour; a failed query keeps its last good result),
   - IODA internet outage signals (Georgia Tech) in the countries around each chokepoint, from the map's own data build.
 Risk score per chokepoint (0-100, our model, shown with its parts): chokepoint base 20 + documented cuts in the last
 36 months (15 each, max 30) + conflict/security headlines in the last 7 days (5 each, max 25) + cable-damage news in the
@@ -73,13 +73,16 @@ def _rss(q, days):
 
 def news():
     """Raises if every query failed, so the cache keeps the last good copy instead of saying 'no news'."""
+    # four requests an hour in all, spaced out, so Google News does not throttle us
     res = dict(cable=None, conflict={}); ok = 0
-    try: res["cable"] = _rss(CABLE_Q, NEWS_DAYS); ok += 1
-    except Exception: pass
-    for z in ZONES:
+    for t in (0, 3):
+        try: time.sleep(t); res["cable"] = _LAST["cable"] = _rss(CABLE_Q, NEWS_DAYS); ok += 1; break
+        except Exception: res["cable"] = _LAST.get("cable")
+    for z in ZONES:   # one query per chokepoint, spaced out, hourly; a failed query keeps its last good list
+        time.sleep(2)
         try: res["conflict"][z["id"]] = _LAST[z["id"]] = [it for it in _rss(z["q"], CONFLICT_DAYS) if CONFLICT.search(it["t"])]; ok += 1
-        except Exception: res["conflict"][z["id"]] = _LAST.get(z["id"])   # keep the last good list rather than dropping the score
-    if not ok: raise RuntimeError("news search unavailable")
+        except Exception: res["conflict"][z["id"]] = _LAST.get(z["id"])
+    if not ok and not _LAST: raise RuntimeError("news search unavailable")
     res["ok"] = ok == 1 + len(ZONES); res["at"] = _iso(_now())
     return res
 
@@ -125,7 +128,7 @@ def status(nw, outages=None):
         hist = [c for c in z["cuts"] if datetime.fromisoformat(c["d"]).replace(tzinfo=timezone.utc) >= n0 - timedelta(days=HIST_MONTHS * 30.4)]
         parts = [("Chokepoint", 20), (f"Documented cuts, last {HIST_MONTHS} months ({len(hist)})", min(30, 15 * len(hist))),
                  (f"Conflict and security headlines, last {CONFLICT_DAYS} days ({len(cf)})" if cf_raw is not None else "Conflict headlines (search unavailable)", min(25, 5 * len(cf))),
-                 (f"Cable damage in the news, last {NEWS_DAYS} days", 25 if zn else 0)]
+                 (f"Cable damage in the news, last {NEWS_DAYS} days" if (nw or {}).get("cable") is not None else "Cable damage news (search unavailable)", 25 if zn else 0)]
         score = min(100, sum(p[1] for p in parts))
         io = [dict(cc=c, name=ioda[c]["name"], url=ioda[c].get("ioda")) for c in z["cc"] if c in ioda]
         if zn and io: st, lv = "Likely damage (inferred)", 2
@@ -140,7 +143,7 @@ def status(nw, outages=None):
                 model="Risk score (our model): chokepoint 20 + documented cuts 15 each (max 30) + conflict headlines 5 each (max 25) + cable damage news 25.")
 
 def api(swr, outages_fn):
-    nw = swr("cables:news", 1800, news, wait=True)
+    nw = swr("cables:news", 3600, news, wait=True)
     try: out = outages_fn()
     except Exception: out = None
     return status(nw, out)
