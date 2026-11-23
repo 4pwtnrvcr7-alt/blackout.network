@@ -22,7 +22,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     canva: "~Canva", uber: "~Uber", claude: "~Claude", xbox: "~Xbox", minecraft: "~Minecraft", "prime video": "~Prime Video", etsy: "~Etsy", duolingo: "~Duolingo" };
   var LV = function (l) { return l >= 3 ? "out" : l === 2 ? "deg" : l === 1 ? "minor" : l === 0 ? "ok" : "na"; };
   var WORD = function (l) { return l >= 3 ? "Major outage" : l === 2 ? "Disruption" : l === 1 ? "Minor issue" : l === 0 ? "Normal" : "No live feed"; };
-  function word(n) { return n && n.watch && n.level === 0 ? "No outage reported" : WORD(n ? n.level : -1); }
+  function word(n) { return n && n.watch && n.level < 0 ? "No live signal" : WORD(n ? n.level : -1); }
   var FLIP = {};
   function short(n) { return String(n || "").replace(/\s*\((.*)\)\s*$/, ""); }
   function sub(n) { var m = /\((.*)\)\s*$/.exec(n || ""); return m ? m[1] : ""; }
@@ -48,6 +48,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
   /* ---------- 24 h strip: one bar per hour (status level), cyan line = our user reports ---------- */
   function strip(n) {
     var h = n.h24, r = rep(n.id).hrs, W = 120, H = 26, bw = W / 24, s = '<svg class="nb-sp" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">';
+    if (n.watch && n.level < 0) return checks(n, s, W, H) + '</svg>';
     if (!h) return s + '<line x1="0" y1="' + (H - 2) + '" x2="' + W + '" y2="' + (H - 2) + '" class="nb-sp-na"/></svg>';
     for (var i = 0; i < 24; i++) {
       var l = h[i], bh = l >= 3 ? H : l === 2 ? H * 0.78 : l === 1 ? H * 0.5 : l === 0 ? H * 0.28 : H * 0.1;
@@ -62,16 +63,19 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     var r = rep(n.id), nm = short(n.name), lv = n.level, ch = chainHits(n.id), inc = (n.incidents || [])[0], rec = (n.recent || [])[0];
     var head, cls = LV(lv), conf, why = [];
     if (n.link_only) { head = "Check " + nm + "'s own status page."; cls = "na"; }
+    else if (n.watch && lv >= 1) head = (lv >= 3 ? "Likely down. " : lv === 2 ? "Possibly down. " : "Maybe. ") + (n.status || "") + ".";
     else if (lv >= 3) head = "Yes. " + nm + " is down.";
     else if (lv === 2) head = "Partly. " + nm + " has a disruption.";
     else if (lv === 1) head = "Mostly up. " + nm + " reports a minor issue.";
     else if (lv <= 1 && r.surge) { head = "Maybe. " + nm + " says it is up, but " + r.h1 + " people reported it down in the last hour."; cls = "rep"; }
     else if (lv === 0 && ch.length) { head = "Probably up, but at risk."; cls = "minor"; }
-    else if (lv === 0 && n.watch) head = "No outage reported. " + nm + " has no public status page, and the news, our Wire and reports here show no problem right now.";
+    else if (lv < 0 && n.watch && r.h1) { head = "Unclear. " + r.h1 + " " + (r.h1 > 1 ? "people" : "person") + " reported " + nm + " down here in the last hour, below our spike threshold. " + nm + " publishes no status feed."; cls = "rep"; }
+    else if (lv < 0 && n.watch) head = "No live signal. " + nm + " publishes no status feed, so we cannot say it is up. No reports here and no outage news right now.";
     else if (lv === 0) head = "No. " + nm + " looks up.";
     else { head = "Unknown. " + nm + "'s live status is unavailable right now."; }
     var isAsn = n.kind === "asn", off = isAsn ? null : lv, ioda = isAsn ? lv : null;
-    if (lv >= 2 && !isAsn) conf = "High"; else if (lv >= 2 && isAsn) conf = r.h1 >= 3 ? "High" : "Medium";
+    if (n.watch) conf = lv >= 3 ? "Medium" : lv >= 0 ? "Low to medium" : "Low";   /* feedless: news, a site check and our own reports, never an official word */
+    else if (lv >= 2 && !isAsn) conf = "High"; else if (lv >= 2 && isAsn) conf = r.h1 >= 3 ? "High" : "Medium";
     else if (r.surge || ch.length) conf = "Medium"; else if (lv === 0 && r.h1 === 0) conf = "High"; else if (lv >= 0) conf = "Medium"; else conf = "Low";
     var since = "";
     var old = function (ts) { return Date.now() - Date.parse(ts) > 3 * 864e5; };
@@ -79,13 +83,14 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     else if (lv >= 1 && (inc && inc.since)) since = "Since " + when(inc.since) + " (" + ago(inc.since) + ")";
     else if (lv >= 1 && rec && !rec.e) since = "Since " + when(rec.s) + " (" + ago(rec.s) + ")";
     else if (rec && rec.e) since = "Last problem: " + when(rec.s) + ", recovered after " + dur((Date.parse(rec.e) - Date.parse(rec.s)) / 60000);
-    else if (!n.link_only && lv >= 0) since = "No problems logged in the last 7 days";
+    else if (!n.link_only && !n.watch && lv >= 0) since = "No problems logged in the last 7 days";
+    else if (n.watch && lv < 0) since = "Grey means unknown, not up. If it is down for you, tap Down for me.";
     var where = []; if (isAsn && n.incidents && n.incidents.length) n.incidents.forEach(function (i) { where.push(String(i.t || "").split(":")[0]); });
     var sts = Object.keys(r.states || {}).sort(function (a, b) { return r.states[b] - r.states[a]; });
     if (sts.length) where.push("reports from " + sts.slice(0, 4).join(", "));
     var sig = '<ul class="nb-sig">' +
       '<li><span>Status page</span><b class="c-' + (off == null || n.watch ? "na" : LV(off)) + '">' + (off == null || n.watch ? (isAsn || n.watch ? "None published" : "–") : WORD(off)) + '</b></li>' +
-      (n.watch ? '<li><span>News, last 6 h</span><b class="c-' + ((n.sig || {}).news ? "deg" : "ok") + '">' + ((n.sig || {}).news || 0) + ' report' + ((n.sig || {}).news === 1 ? "" : "s") + '</b></li><li><span>Website check</span><b class="c-' + ((n.sig || {}).web === "answers" ? "ok" : "na") + '">' + esc((n.sig || {}).web === "answers" ? "Answers" : (n.sig || {}).web || "Unknown") + '</b></li>' : "") +
+      (n.watch ? '<li><span>News, last 6 h</span><b class="c-' + ((n.sig || {}).news ? "deg" : "na") + '">' + ((n.sig || {}).news_ok === false ? "Search unavailable" : ((n.sig || {}).news || 0) + ' report' + ((n.sig || {}).news === 1 ? "" : "s")) + '</b></li><li><span>Website reachable</span><b class="c-' + (/unreach|server/.test((n.sig || {}).web || "") ? "deg" : "na") + '">' + esc(({ reachable: "Yes", "connection only": "Connects", "server error": "Server errors", unreachable: "No" })[(n.sig || {}).web] || "Unknown") + ((n.sig || {}).web_code ? " · HTTP " + (n.sig || {}).web_code : "") + '</b></li>' : "") +
       (n.watch ? "" : '<li><span>IODA internet signal</span><b class="c-' + (ioda == null ? "na" : ioda >= 2 ? "deg" : "ok") + '">' + (ioda == null ? "Not measured" : ioda >= 2 ? "Drop detected" : "Normal") + '</b></li>') +
       '<li><span>Reports here, last hour</span><b class="c-' + (r.surge ? "rep" : "na") + '">' + r.h1 + (r.surge ? " · spiking" : "") + '</b></li></ul>';
     var chain = ch.map(function (d) { var u = byId(d.up); return '<p class="nb-vchain"><i></i>Likely affected: ' + esc(short(u.name)) + ' has a ' + esc(WORD(u.level).toLowerCase()) + ' and ' + esc(nm) + ' relies on it. ' + esc(d.why) + '.</p>'; }).join("");
@@ -149,8 +154,18 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
 
   /* ---------- tiles ---------- */
   /* ---------- flip cards (pt1785u): front = live state + 24 h sparkline, back = status, a small chart and Expand ---------- */
+  function checks(n, s, W, H) {   /* feedless services: one bar per hour of our sign-in site check (grey = reachable, orange = failing, gap = not checked) + a line of Down for me reports */
+    var w = n.web24 || [], r = rep(n.id).hrs || [], bw = W / 24, mx = Math.max.apply(null, r.concat([2])), pts = [];
+    for (var i = 0; i < 24; i++) {
+      var l = w[i]; if (l != null && l >= 0) { var bh = l >= 2 ? H * 0.8 : H * 0.3; s += '<rect x="' + (i * bw + 0.6).toFixed(1) + '" y="' + (H - bh).toFixed(1) + '" width="' + (bw - 1.2).toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="1" class="' + (l >= 2 ? "b-deg" : "b-wk") + '"/>'; }
+      pts.push((i * bw + bw / 2).toFixed(1) + "," + (H - 1 - (H - 3) * (r[i] || 0) / mx).toFixed(1));
+    }
+    return s + (Math.max.apply(null, r.concat([0])) ? '<polyline points="' + pts.join(" ") + '" class="nb-sp-rp"/>' : '<line x1="0" y1="' + (H - 1) + '" x2="' + W + '" y2="' + (H - 1) + '" class="nb-sp-na"/>');
+  }
   function mini(n) {   /* back-face chart: the provider's 30-day history when published, else our 24 h reports */
     var W = 120, H = 24, s = '<svg class="nb-sp" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">', d = n.days, r = rep(n.id).hrs;
+    if (n.watch) { var ok = (n.web24 || []).filter(function (v) { return v === 0; }).length, ck = (n.web24 || []).filter(function (v) { return v != null && v >= 0; }).length;
+      return { svg: checks(n, s, W, H) + '</svg>', lbl: ck ? "Site ok " + ok + "/" + ck + " h" : "24 h", tail: (rep(n.id).h24 || 0) + " reports" }; }
     if (d && d.length) { var bw = W / d.length; d.forEach(function (l, i) { var bh = l >= 3 ? H : l === 2 ? H * 0.78 : l === 1 ? H * 0.5 : H * 0.28; s += '<rect x="' + (i * bw + 0.4).toFixed(1) + '" y="' + (H - bh).toFixed(1) + '" width="' + Math.max(0.6, bw - 0.8).toFixed(1) + '" height="' + bh.toFixed(1) + '" class="b-' + LV(l) + '"/>'; }); return { svg: s + '</svg>', lbl: "30 days" }; }
     if (r) { var mx = Math.max.apply(null, r.concat([1])), bw2 = W / 24; r.forEach(function (v, i) { var bh = v ? 3 + (H - 3) * v / mx : 1; s += '<rect x="' + (i * bw2 + 0.6).toFixed(1) + '" y="' + (H - bh).toFixed(1) + '" width="' + (bw2 - 1.2).toFixed(1) + '" height="' + bh.toFixed(1) + '" class="b-rp"/>'; }); return { svg: s + '</svg>', lbl: "Reports, 24 h" }; }
     return { svg: strip(n), lbl: "24 h" };
@@ -163,7 +178,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
       '<span class="nb-tf"><span>24 h</span>' + (r.h1 ? '<span class="nb-tr">' + r.h1 + ' report' + (r.h1 > 1 ? "s" : "") + ' / h</span>' : (n.uptime != null ? '<span>' + n.uptime.toFixed(2) + '% · 30 d</span>' : "")) + '</span></button>';
     var m = mini(n), txt = n.link_only ? "Official status page only" : (n.status || word(n));
     var back = '<div class="nb-fb ' + st + '"' + (f ? "" : ' aria-hidden="true"') + '><button type="button" class="nb-fx" data-flip="' + esc(n.id) + '" aria-label="Back to the front of ' + esc(nm) + '"' + (f ? "" : ' tabindex="-1"') + '>' +
-      '<span class="nb-fw"><i></i>' + esc(nm) + '</span><span class="nb-fs">' + esc(txt) + '</span>' + m.svg + '<span class="nb-tf"><span>' + esc(m.lbl) + '</span><span>' + (r.h24 ? r.h24 + " reports today" : esc(n.watch ? "No status page" : n.kind === "asn" ? "IODA signal" : "Status page")) + '</span></span></button>' +
+      '<span class="nb-fw"><i></i>' + esc(nm) + '</span><span class="nb-fs">' + esc(txt) + '</span>' + m.svg + '<span class="nb-tf"><span>' + esc(m.lbl) + '</span><span>' + esc(m.tail || (r.h24 ? r.h24 + " reports today" : n.kind === "asn" ? "IODA signal" : "Status page")) + '</span></span></button>' +
       '<div class="nb-fa"><a class="nb-fe" href="/network/status/' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>Expand</a>' +
       (n.link_only ? "" : '<button type="button" class="nb-fd" data-down="' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>' + (mine(n.id) ? "Reported" : "Down for me") + '</button>') + '</div></div>';
     return '<div class="nb-fc' + (f ? " flip" : "") + '" data-fc="' + esc(n.id) + '"><div class="nb-fi">' + front + back + '</div></div>';
@@ -205,7 +220,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     var worst = bad.length ? Math.max.apply(null, bad.map(function (n) { return n.level; })) : 0;
     pulse.className = "nb-pulse c-" + (bad.length ? (worst >= 3 ? "out" : worst === 2 ? "deg" : "rep") : "ok");
     pulse.innerHTML = '<i></i><div><p class="nb-pt">' + (bad.length ? bad.length + (bad.length > 1 ? " services have problems right now" : " service has a problem right now") : "No major U.S. outages right now") + '</p>' +
-      '<p class="nb-ps">' + (ok - minor) + " normal" + (minor ? " · " + minor + " minor issue" + (minor > 1 ? "s" : "") : "") + " · " + all.length + " tracked" + (D && D.generated ? " · checked " + ago(D.generated) : "") + '</p></div>';
+      '<p class="nb-ps">' + (ok - minor) + " normal" + (minor ? " · " + minor + " minor issue" + (minor > 1 ? "s" : "") : "") + (D && D.summary && D.summary.no_signal ? " · " + D.summary.no_signal + " no live signal" : "") + " · " + all.length + " tracked" + (D && D.generated ? " · checked " + ago(D.generated) : "") + '</p></div>';
     var chains = deps().filter(function (d) { var u = byId(d.up); return u && u.level >= 2; });
     if (!bad.length) { sec.hidden = true; sec.innerHTML = ""; }
     else {
