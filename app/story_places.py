@@ -217,7 +217,7 @@ def start(ready=lambda: True, paused=lambda: False):
     if _env("BN_PLACES", "1") == "0": ST["state"] = "off"; return
     hours = float(_env("BN_PLACES_BACKLOG_H", "2"))
     ST["since"] = _iso(datetime.now(timezone.utc) - timedelta(hours=hours)); ST["state"] = "running"
-    def loop():
+    def _places_run():     # name must not contain 'loop' (render_app blocks threads whose target is named *loop*)
         warmed = False
         while True:
             if not warmed and ready():
@@ -234,7 +234,7 @@ def start(ready=lambda: True, paused=lambda: False):
             except Exception as ex:
                 ST["errors"] += 1; ST["last_error"] = str(ex)[:160]
             time.sleep(30)
-    threading.Thread(target=loop, name="story_places", daemon=True).start()
+    threading.Thread(target=_places_run, name="story_places", daemon=True).start()
 
 def status():
     _load()
