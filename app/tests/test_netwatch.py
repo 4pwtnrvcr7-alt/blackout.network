@@ -24,25 +24,33 @@ class Watch(unittest.TestCase):
         for s, t in no: self.assertFalse(W.match(s, t), t)
 
     def test_watch_levels_never_invent(self):
-        fake = lambda news, tls: (lambda key, ttl, fn, wait=True: news if key == "watch:news" else [] if key == "watch:wire" else tls)
+        fake = lambda news, web: (lambda key, ttl, fn, wait=True: news if key == "watch:news" else [] if key == "watch:wire" else web)
         from datetime import datetime, timezone, timedelta
-        now = datetime.now(timezone.utc)
-        r = W.watch_one("wellsfargo", fake([], (True, 50)))
-        self.assertEqual(r["level"], 0); self.assertNotIn("affected", r); self.assertTrue(r["watch"])
+        now = datetime.now(timezone.utc); W._FAILS.clear()
+        r = W.watch_one("wellsfargo", fake([], ("reachable", 200, 50)))
+        self.assertEqual(r["level"], -1); self.assertIn("No live signal", r["status"]); self.assertNotIn("affected", r); self.assertTrue(r["watch"])   # never green without a real signal
         hot = [dict(t="Wells Fargo outage: customers can't log in", src="X", url="https://e.com", at=(now - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ"))]
-        self.assertEqual(W.watch_one("wellsfargo", fake(hot, (True, 50)))["level"], 2)
+        self.assertEqual(W.watch_one("wellsfargo", fake(hot, ("reachable", 200, 50)))["level"], 2)
         old = [dict(hot[0], at=(now - timedelta(hours=20)).strftime("%Y-%m-%dT%H:%M:%SZ"))]
-        r = W.watch_one("wellsfargo", fake(old, (True, 50))); self.assertEqual(r["level"], 0); self.assertEqual(r["sig"]["news48"], 1)
+        r = W.watch_one("wellsfargo", fake(old, ("reachable", 200, 50))); self.assertEqual(r["level"], -1); self.assertEqual(r["sig"]["news48"], 1)
+        W._FAILS.clear(); W.watch_one("wellsfargo", fake([], ("unreachable", None, None)))
+        self.assertEqual(W.watch_one("wellsfargo", fake([], ("unreachable", None, None)))["level"], 2)   # two failed sign-in checks in a row
+        self.assertEqual(W.watch_one("wellsfargo", fake(hot, ("unreachable", None, None)))["level"], 3)
+        W._FAILS.clear()
+
+    def test_snapshot_round_trip(self):
+        NB.save_snapshot("t", '{"a":1}'); self.assertEqual(NB.load_snapshot("t"), '{"a":1}')
 
     def test_detail_page_and_route(self):
         orig = netmap.data
         try:
-            netmap.data = lambda: dict(generated="2026-11-23T20:00:00Z", nets=[dict(id="wellsfargo", name="Wells Fargo", group="bank", kind="watch", level=0, watch=True,
-                                       status="No outage reported in the news or on this site", sig=dict(news=0, news48=0, web="answers"), news=[], h24=[0] * 24,
+            netmap.data = lambda: dict(generated="2026-11-23T20:00:00Z", nets=[dict(id="wellsfargo", name="Wells Fargo", group="bank", kind="watch", level=-1, watch=True,
+                                       status="No live signal", sig=dict(news=0, news48=0, web="reachable"), news=[], h24=[0] * 24,
                                        status_url=None, support="https://www.wellsfargo.com/help/", basis="no public status page")])
             code, html, ct = netmap.handle_get("/network/status/wellsfargo")
             self.assertEqual(code, 200); h = html.decode() if isinstance(html, bytes) else html
-            for s in ("Wells Fargo", "Uptime, last 90 days", "Incident history", "Not published", "sd_down", "None published"): self.assertIn(s, h)
+            for s in ("Wells Fargo", "Uptime, last 90 days", "Incident history", "Not published", "sd_down", "None published", "No live signal", "Website reachable"): self.assertIn(s, h)
+            self.assertNotIn("No outage reported", h)
             self.assertNotIn("#F5A524", h)
             self.assertEqual(netmap.handle_get("/network/status/nope")[0], 404)
             import netpages

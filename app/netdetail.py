@@ -2,6 +2,7 @@
 Matt: each item needs a scrollable history of uptime and downtime and how many users were affected, hosted on our own site,
 with the original sources kept but secondary. History is ours (netboard tables in votes.db); user counts are only ever our own
 "Down for me" reports or a number the provider itself publishes, labeled as such. Nothing is estimated or invented."""
+from urllib.parse import urlparse
 import html, json
 from datetime import datetime, timezone, timedelta
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -23,7 +24,7 @@ def _p(s):
 def short(n): return n.split(" (")[0]
 def sub(n): return n[n.index("(") + 1: n.rindex(")")] if "(" in n and n.endswith(")") else ""
 def word(n, lv):
-    if n.get("watch") and lv == 0: return "No outage reported"
+    if n.get("watch") and lv < 0: return "No live signal"
     return WORD.get(lv, WORD[-1])
 
 CSS = """
@@ -63,7 +64,7 @@ b.onclick=function(){if(b.disabled)return;b.disabled=true;b.textContent="Sending
 .then(function(r){return r.json().then(function(j){if(r.ok||r.status===429){try{var m=JSON.parse(localStorage.getItem(k)||"{}");m[id]=Date.now();localStorage.setItem(k,JSON.stringify(m))}catch(e){}b.textContent=r.ok?"Reported. Thanks":"Already counted. Thanks"}else{b.textContent=j.error||"Could not send";b.disabled=false}})},function(){b.textContent="Could not send. Try again";b.disabled=false})}})();</script>"""
 
 def render(n, hist, rep, generated=None, prov_inc=()):
-    nm = short(n["name"]); lv = n.get("level", -1); c = LVC.get(lv, LVC[-1]); sg = n.get("sig") or {}; r = rep or {}
+    nm = short(n["name"]); lv = n.get("level", -1); c = LVC.get(lv, "#7C8190") if lv >= 0 else "#7C8190"; sg = n.get("sig") or {}; r = rep or {}
     days = hist.get("days") or []; prov = n.get("days_full") or n.get("days") or []
     # merge the provider's own 30-day incident history (when it publishes one) into our stored daily levels
     if prov:
@@ -86,9 +87,11 @@ def render(n, hist, rep, generated=None, prov_inc=()):
     if n.get("watch"):
         cards.append(("Official status page", "None published", f"{nm} does not publish a public status page we can read."))
         cards.append(("News reports, last 6 h", str(sg.get("news", 0)) if sg.get("news_ok") is not False else "Search unavailable",
-                      f'{sg.get("news48", 0)} in the last 48 h that name {nm} and an outage' if sg.get("news_ok") is not False else "The news search did not answer on the last check; showing the last good result."))
-        cards.append(("Website check", "Answers" if sg.get("web") == "answers" else "Not answering" if sg.get("web") == "not answering" else "Unknown",
-                      "A secure connection to the public website, every 5 min. It does not test logins, the app or card payments."))
+                      f'{sg.get("news48", 0)} in the last 48 h that name {nm} and an outage' + (" (one of our two news searches failed on the last check)" if sg.get("news_ok") == "partial" else "") if sg.get("news_ok") is not False else "The news search did not answer on the last check; showing the last good result."))
+        w = sg.get("web"); code = sg.get("web_code"); ms = sg.get("web_ms")
+        cards.append(("Website reachable", {"reachable": "Yes", "connection only": "Connects", "server error": "Server errors", "unreachable": "No"}.get(w, "Unknown"),
+                      (f"HTTP {code} in {ms} ms. " if code else "Secure connection made; the site refused a plain page request. " if w == "connection only" else "")
+                      + f'We load {E(urlparse(sg.get("web_url") or "").netloc or "the sign-in site")} every 4 min. It shows the site answers, not that logins, the app or card payments work.'))
     elif n.get("kind") == "asn":
         cards.append(("Official status page", "None published", "Measured with IODA internet signals (Georgia Tech) for this provider's networks."))
     else:

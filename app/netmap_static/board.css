@@ -187,3 +187,4 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 @media (prefers-reduced-motion:reduce){.nb-ff,.nb-fb{transition:none}}
 /* preserve rectangular, color-coded tiles under the global rounded-button theme */
 html body main .nb .nb-ff{border-radius:14px!important}
+.s-na .nb-tw i,.nb-fb.s-na .nb-fw i{background:var(--na)}.nb-sp rect.b-wk{fill:rgba(124,129,144,.55)}.nb-sp .nb-sp-rp{fill:none;stroke:var(--cy);stroke-width:1.2;vector-effect:non-scaling-stroke}
