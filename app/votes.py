@@ -32,6 +32,9 @@ def agg(c, typ, ids, voter=None):
     return out
 def handle_post(path, d, ip=None):
     if path == "/api/vote/source": return source_vote(d, ip)
+    if path == "/api/vote/netdown":   # pt1758u: /network "Down for me" reports (netboard.py, tables in this same Render-owned votes.db)
+        import netboard, netmap
+        return netboard.post(d, ip, {n[0] for n in netmap.NETS if n[3] != "link"})
     if path != "/api/vote": return 404, {"error": "not found"}
     typ = d.get("item_type"); iid = str(d.get("item_id") or ""); voter = str(d.get("voter") or "")
     try: rating = int(d.get("rating"))

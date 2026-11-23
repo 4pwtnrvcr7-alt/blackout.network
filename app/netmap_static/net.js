@@ -68,7 +68,7 @@
   function PAD() { var m = innerWidth < 768; return m ? { top: 150, bottom: 120, left: 18, right: 18 } : { top: 160, bottom: 90, left: 60, right: 80 }; }
 
   /* ---------- loader: glowing network built in front of you, progress tracks the real preload ---------- */
-  var P = { map: 0, nets: 0, out: 0, dc: 0 }, W8 = { map: 0.35, nets: 0.3, out: 0.15, dc: 0.2 }, shown = 0, ldDone = false, t0 = performance.now();
+  var P = { map: 0, nets: 0, out: 0, dc: 0, rep: 0 }, W8 = { map: 0.3, nets: 0.3, out: 0.1, dc: 0.15, rep: 0.15 }, shown = 0, ldDone = false, t0 = performance.now();
   function prog() { var p = 0; for (var k in P) p += W8[k] * P[k]; return Math.min(1, p); }
   function step(k, v) { P[k] = Math.max(P[k], v); if (v >= 1) { var li = document.querySelector('.nx-lds li[data-s="' + k + '"]'); if (li) li.classList.add("on"); } if (prog() >= 0.999) setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0))); }   /* never a flash: the build shows for at least ~2.6 s */
   function finish() {
@@ -100,8 +100,11 @@
         if (n > 0) { step(k, 0.4); return new Promise(function (res) { setTimeout(res, 2500); }).then(function () { return retry(u, k, n - 1); }); }
         step(k, 1); throw e; });
   }
+  window.__nxStep = step;   /* board.js reports its own preload (reports + timeline) */
   var pData = retry("/api/netmap/data", "nets", 3), pDc = retry("/api/netmap/dc", "dc", 2), pWorld = getJSON("/api/signal/world.geojson");
   pData.then(function () { step("out", 0.5); }, function () {});
+  setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
+  window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, map = null, ready = false;
   var ON = { internet: true, power: true, cloud: true, dc: false, mobile: false, sat: false, pay: false, apps: false };
   try { var sv = JSON.parse(localStorage.getItem("bn_net_layers") || "null"); if (sv && typeof sv === "object") for (var k0 in ON) if (k0 in sv) ON[k0] = !!sv[k0]; } catch (e) {}
@@ -124,7 +127,7 @@
       });
       pDc.then(function (j) { DC = j; applyDc(); }, function () {});
       var tk = setInterval(function () {   /* the first view's tiles are all in (the pulse animation would keep "idle" from ever firing) */
-        if (map.areTilesLoaded() && map.isStyleLoaded()) { clearInterval(tk); ready = true; step("map", 1); startPulse(); if (location.hash === "#sky") setTimeout(function () { setMode("sky"); }, 400); }
+        if (map.areTilesLoaded() && map.isStyleLoaded()) { clearInterval(tk); ready = true; step("map", 1); startPulse(); if (location.hash === "#sky") setTimeout(function () { view("sky"); }, 400); }
       }, 150);
     });
     map.on("error", function () { });
@@ -413,7 +416,7 @@
     SKY.on = sky; document.body.classList.toggle("nx-sky", sky);
     document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"); });
     $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = !sky; $("nx_leg").hidden = sky; hideCard(true);
-    try { history.replaceState(null, "", sky ? "#sky" : location.pathname); } catch (e) {}
+    try { history.replaceState(null, "", sky ? "#sky" : "#map"); } catch (e) {}
     ["cty-fill", "cty-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
     if (!sky) {
       clearInterval(SKY.timer); SKY.timer = null; SKY.sel = null;
@@ -428,11 +431,21 @@
     skyLoad().then(function () { if (!SKY.on) return; swPanel(); prop(); clearInterval(SKY.timer); SKY.timer = setInterval(function () { if (!document.hidden) prop(); }, reduce ? 10000 : (mob ? 2000 : 1200)); },
       function () { $("nx_sum").textContent = "Orbital data is unavailable right now"; });
   }
-  document.querySelectorAll("#nx_mode button").forEach(function (b) { b.addEventListener("click", function () { setMode(b.dataset.m); }); });
+  /* pt1758u: three views. Status (the board, default) sits over the map; Map and Sky are the map views */
+  function view(v) {
+    var board = v === "status";
+    if (board && SKY.on) setMode("map");   /* leave the globe first, so its own button state does not win */
+    document.body.classList.toggle("nx-board", board);
+    document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === v ? "true" : "false"); });
+    if (board) { hideCard(true); document.body.classList.remove("nx-more-on"); try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} return; }
+    if (map) { map.resize(); if (v === "map" && !SKY.on) { try { history.replaceState(null, "", "#map"); } catch (e) {} } setMode(v); }
+  }
+  document.querySelectorAll("#nx_mode button").forEach(function (b) { b.addEventListener("click", function () { view(b.dataset.m); }); });
+  if (!document.body.classList.contains("nx-board")) document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === (location.hash === "#sky" ? "sky" : "map") ? "true" : "false"); });
   document.querySelectorAll("#nx_sf button").forEach(function (b) {
     b.addEventListener("click", function () { var g = b.dataset.g; SKY.show[g] = !(SKY.show[g] !== false); b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false"); prop(); });
   });
 
   /* ---------- live refresh every 5 minutes ---------- */
-  setInterval(function () { if (document.hidden) return; getJSON("/api/netmap/data").then(function (j) { D = j; applyData(); }, function () {}); }, 300000);
+  setInterval(function () { if (document.hidden) return; getJSON("/api/netmap/data").then(function (j) { D = j; applyData(); try { document.dispatchEvent(new CustomEvent("nx:data", { detail: j })); } catch (e) {} }, function () {}); }, 300000);
 })();

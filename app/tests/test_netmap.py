@@ -138,7 +138,9 @@ class NetRails(unittest.TestCase):
         from unittest import mock
         self.assertIn("rails", [g for g, _ in netmap.GROUPS])
         ids = {n[0]: n for n in netmap.NETS if n[2] == "rails"}
-        for k in ("fedres", "column", "logingov", "bandwidth"): self.assertIn(k, ids)
+        for k in ("fedres", "column"): self.assertIn(k, ids)
+        grp = {n[0]: n[2] for n in netmap.NETS}   # pt1758u board groups: Login.gov under Government, Bandwidth voice under Apps
+        self.assertEqual((grp["logingov"], grp["ssa"], grp["cloudgov"], grp["bandwidth"]), ("gov", "gov", "gov", "apps"))
         self.assertEqual(ids["fedres"][3], "link")   # Fed's status app disallows robots: link only, never fetched
         summ = {"status": {"indicator": "major"}, "components": [{"name": "FedWire", "status": "operational"}, {"name": "Production", "status": "major_outage"}],
                 "incidents": [{"name": "API down", "status": "investigating", "components": [{"name": "Production"}]}]}

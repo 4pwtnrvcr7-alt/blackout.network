@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript"}
+FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -111,8 +111,11 @@ NETS = [
  ("clover", "Clover (card terminals)", "rails", "sp", "https://status.clover.com", "https://status.clover.com", "https://www.clover.com/help"),
  ("toast", "Toast (restaurant payments)", "rails", "sp", "https://status.toasttab.com", "https://status.toasttab.com", "https://central.toasttab.com/s/support"),
  ("gusto", "Gusto (payroll)", "rails", "sp", "https://status.gusto.com", "https://status.gusto.com", "https://support.gusto.com/"),
- ("logingov", "Login.gov (federal sign-in: SSA, IRS and more)", "rails", "sp", "https://status.login.gov", "https://status.login.gov", "https://login.gov/help/"),
- ("bandwidth", "Bandwidth US voice (carrier behind many calling apps)", "rails", "spc", ("https://status.bandwidth.com", r"United States"), "https://status.bandwidth.com", "https://support.bandwidth.com/"),
+ ("logingov", "Login.gov (federal sign-in: SSA, IRS and more)", "gov", "sp", "https://status.login.gov", "https://status.login.gov", "https://login.gov/help/"),
+ ("bandwidth", "Bandwidth US voice (carrier behind many calling apps)", "apps", "spc", ("https://status.bandwidth.com", r"United States"), "https://status.bandwidth.com", "https://support.bandwidth.com/"),
+ # government and public services (pt1758u board): free public Statuspage feeds only
+ ("ssa", "Social Security (SSA.gov, my Social Security)", "gov", "sp", "https://status.ssa.gov", "https://status.ssa.gov", "https://www.ssa.gov/agency/contact/"),
+ ("cloudgov", "cloud.gov (hosting for many federal sites)", "gov", "sp", "https://cloudgov.statuspage.io", "https://cloudgov.statuspage.io", "https://cloud.gov/docs/help/"),
  ("plaid", "Plaid (bank links)", "pay", "sp", "https://status.plaid.com", "https://status.plaid.com", "https://support.plaid.com/"),
  ("chime", "Chime", "pay", "sp", "https://status.chime.com", "https://status.chime.com", "https://help.chime.com/"),
  ("affirm", "Affirm", "pay", "sp", "https://status.affirm.com", "https://status.affirm.com", "https://helpcenter.affirm.com/"),
@@ -135,7 +138,7 @@ NETS = [
  ("1password", "1Password", "apps", "sp", "https://status.1password.com", "https://status.1password.com", "https://support.1password.com/"),
 ]
 GROUPS = [("isp", "Internet providers"), ("mobile", "Mobile carriers"), ("sat", "Satellite internet"), ("cloud", "Cloud and web"),
-          ("pay", "Payments and money"), ("rails", "Banking rails and public services"), ("apps", "Apps and messaging")]
+          ("pay", "Payments and money"), ("rails", "Banking rails"), ("apps", "Apps and messaging"), ("gov", "Government and public")]
 NP_PAGES = {"aws", "azure", "m365", "gcp", "workspace", "cloudflare", "akamai", "starlink"}
 
 def _day_index(t, n0):
@@ -163,6 +166,25 @@ def _bars(spans, n0=None):
     tot = (n - win0).total_seconds()
     return days, round(100 - 100 * bad / tot, 2) if tot > 0 else None
 
+def _hrs(spans):
+    """spans -> 24 hourly worst levels for the last 24 h, oldest first (the tile sparkline)."""
+    n = now(); h0 = n.replace(minute=0, second=0, microsecond=0); out = [0] * 24
+    for s, e, lv in spans:
+        if not s: continue
+        e = e or n
+        for k in range(24):
+            a = h0 - timedelta(hours=23 - k); b = a + timedelta(hours=1)
+            if s < b and e >= a: out[k] = max(out[k], lv)
+    return out
+
+def _recent(items, days=7):
+    """[(title, start, end, level)] -> newest-first incident list for the last `days` days (the timeline and the verdict)."""
+    lim = now() - timedelta(days=days); out = []
+    for t, s, e, lv in items:
+        if not s or (e or now()) < lim: continue
+        out.append(dict(t=(t or "")[:160], s=iso(s), e=iso(e) if e else None, lv=lv))
+    out.sort(key=lambda x: x["s"], reverse=True); return out[:8]
+
 IMP = {"none": 1, "minor": 1, "maintenance": 0, "major": 2, "critical": 3}
 def sp_one(base):
     s = jget(base + "/api/v2/summary.json", timeout=9)
@@ -173,8 +195,9 @@ def sp_one(base):
     inc = swr("spi:" + base, 3600, lambda: jget(base + "/api/v2/incidents.json", timeout=9).get("incidents") or [], wait=True) or []
     spans = [(pts(i.get("started_at") or i.get("created_at")), pts(i.get("resolved_at")), IMP.get(i.get("impact") or "minor", 1)) for i in inc]
     days, up = _bars([x for x in spans if x[2] > 0])
+    rec = _recent([(i.get("name"), pts(i.get("started_at") or i.get("created_at")), pts(i.get("resolved_at")), IMP.get(i.get("impact") or "minor", 1)) for i in inc if IMP.get(i.get("impact") or "minor", 1) > 0])
     return dict(level=lvl, status=desc or "Status published", incidents=[dict(t=i.get("name", "")[:160], since=i.get("started_at") or i.get("created_at"),
-                impact=i.get("impact")) for i in act[:4]], days=days, uptime=up, basis="provider incident reports")
+                impact=i.get("impact")) for i in act[:4]], days=days, uptime=up, basis="provider incident reports", h24=_hrs([x for x in spans if x[2] > 0]), recent=rec, recent_ok=True)
 
 def spc_one(feed):
     """Statuspage, only the components that matter here (feed = (base, regex on component names))."""
@@ -188,9 +211,10 @@ def spc_one(feed):
     inc = swr("spi:" + base, 3600, lambda: jget(base + "/api/v2/incidents.json", timeout=9).get("incidents") or [], wait=True) or []
     spans = [(pts(i.get("started_at") or i.get("created_at")), pts(i.get("resolved_at")), IMP.get(i.get("impact") or "minor", 1)) for i in inc if hit(i)]
     days, up = _bars([x for x in spans if x[2] > 0])
+    rec = _recent([(i.get("name"), pts(i.get("started_at") or i.get("created_at")), pts(i.get("resolved_at")), IMP.get(i.get("impact") or "minor", 1)) for i in inc if hit(i) and IMP.get(i.get("impact") or "minor", 1) > 0])
     st = {0: "All tracked services operational", 1: "Minor issues reported", 2: "Partial outage reported", 3: "Major outage reported"}[lvl]
     return dict(level=lvl, status=st, incidents=[dict(t=i.get("name", "")[:160], since=i.get("started_at") or i.get("created_at"), impact=i.get("impact")) for i in act[:4]],
-                days=days, uptime=up, basis="provider incident reports for the tracked services")
+                days=days, uptime=up, basis="provider incident reports for the tracked services", h24=_hrs([x for x in spans if x[2] > 0]), recent=rec, recent_ok=True)
 CST = {"operational": 0, "under_maintenance": 0, "degraded_performance": 1, "partial_outage": 2, "major_outage": 3}
 
 def link_one(note):
@@ -210,8 +234,10 @@ def np_one(slug):
     spans += [(i.get("start"), i.get("end") or (i["start"] + timedelta(hours=1) if i.get("start") else None), min(3, int(i.get("sev") or 1))) for i in d.get("history") or []]
     days, up = _bars(spans)
     act = d.get("active") or []
+    rec = _recent([(i.get("title"), i.get("start"), i.get("end"), 1 if i.get("longrun") else min(3, int(i.get("sev") or 1))) for i in act if not i.get("longrun")] +
+                  [(i.get("title"), i.get("start"), i.get("end") or (i["start"] + timedelta(hours=1) if i.get("start") else None), min(3, int(i.get("sev") or 1))) for i in d.get("history") or []])
     return dict(level=b.get("level", -1), status=b.get("status") or "", incidents=[dict(t=(i.get("title") or "")[:160], since=iso(i.get("start"))) for i in act[:4]],
-                days=days, uptime=up, basis="provider incident reports")
+                days=days, uptime=up, basis="provider incident reports", h24=_hrs([x for x in spans if x[2] > 0]), recent=rec, recent_ok=True)
 
 # ---------------------------------------------------------------- IODA
 def ioda_asn_events():
@@ -235,12 +261,18 @@ def asn_one(asns, evs):
         if en >= n - timedelta(minutes=75): cur.append(e)
     days, up = _bars(spans)
     if evs is None: return dict(level=-1, status="Measurements unavailable right now", days=None, uptime=None, incidents=[], basis="")
+    grp = []   # IODA reports many short events: merge ones less than an hour apart into one timeline entry
+    for e in sorted((e for e in evs if e.get("location") in want and e.get("datasource") in STRONG and int(e.get("duration") or 0) <= MAX_EVENT_S), key=lambda e: int(e["start"])):
+        s, en, _ = _ev(e); nm = e.get("location_name") or e.get("location")
+        if grp and s <= grp[-1][2] + timedelta(hours=1): grp[-1][2] = max(grp[-1][2], en); grp[-1][3].add(nm)
+        else: grp.append([None, s, en, {nm}])
+    rec = _recent([("Outage signal on " + ", ".join(sorted(g[3])[:2]) + (" (IODA routing and probing data)"), g[1], None if g[2] >= n - timedelta(minutes=75) else g[2], 2) for g in grp])
     lvl = 2 if cur else 0
     last = max((s for s, _, _ in spans), default=None)
     st = (f"Outage signal on {len({e['location'] for e in cur})} of {len(asns)} network{'s' if len(asns) > 1 else ''}" if cur else
           "No outage signal" + (f" · last one {last.strftime('%b %-d')}" if last else " in 30 days"))
     return dict(level=lvl, status=st, incidents=[dict(t=f"{e.get('location_name')}: {'routing (BGP)' if e['datasource'] == 'bgp' else 'active probing'} drop", since=iso(_ev(e)[0])) for e in cur[:3]],
-                days=days, uptime=up, basis="IODA measurements", ioda=f"{IODA_UI}/asn/{asns[0]}")
+                days=days, uptime=up, basis="IODA measurements", ioda=f"{IODA_UI}/asn/{asns[0]}", h24=_hrs(spans), recent=rec, recent_ok=True)
 
 # ---------------------------------------------------------------- geography
 _GEO = {"v": None}
@@ -348,15 +380,28 @@ def build():
             else: r = asn_one(feed, asn_ev)
         except Exception:
             r = dict(level=-1, status="Status feed unreachable right now", incidents=[], days=None, uptime=None, basis="")
-        r.update(id=nid, name=name, group=grp, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES else None)
+        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES else None)
         return r
     with ThreadPoolExecutor(12) as ex:
         nets = list(ex.map(one, NETS))
+    tl = []
+    try:   # pt1758u board: hourly history, the incident timeline and "Down for me" reports live in netboard.py
+        import netboard as NB
+        NB.record(nets); hist = NB.hours({n["id"] for n in nets})
+        for n in nets:
+            h = list(n.get("h24") or [-1] * 24); st = hist.get(n["id"])
+            if st: h = [max(a, b) for a, b in zip(h, st)]
+            if n["level"] >= 0: h[-1] = max(h[-1], n["level"])
+            n["h24"] = h if n.get("level", -1) >= 0 or st else None
+        tl = NB.timeline(72, 50)
+    except Exception: pass
+    for n in nets:
+        n["recent"] = (n.get("recent") or [])[:3]; n.pop("recent_ok", None)
     lvl = {n["id"]: n["level"] for n in nets}
     out = outages(); pw = power()
     cloud = [dict(p=p, name=nm, lon=lo, lat=la, level=lvl.get(p, -1)) for p, nm, lo, la in CLOUD_PTS]
     issues = [n for n in nets if n["level"] >= 2]; tracked = [n for n in nets if not n.get("link_only")]
-    return dict(generated=iso(now()), groups=[dict(id=g, name=t) for g, t in GROUPS], nets=nets, cloud=cloud, outages=out, power=pw,
+    return dict(generated=iso(now()), groups=[dict(id=g, name=t) for g, t in GROUPS], nets=nets, cloud=cloud, outages=out, power=pw, timeline=tl,
                 summary=dict(networks=len(tracked), ok=sum(1 for n in tracked if n["level"] in (0, 1)), issues=len(issues), unknown=sum(1 for n in tracked if n["level"] < 0),
                              countries_now=sum(1 for c in out["countries"] if c["cur"]), countries_24h=len(out["countries"]),
                              power_customers=sum(s["outages"] for s in (pw.get("states") or []))),
@@ -409,8 +454,25 @@ LOADER = ('<div class="nx-ld" id="nx_ld" role="status" aria-label="Loading netwo
   '<canvas id="nx_ldcv" aria-hidden="true"></canvas>'
   '<div class="nx-ldp" id="nx_ldp"><div class="nx-ldh"><div><p class="nx-ldk">System boot</p><p class="nx-ldst" id="nx_ldst">Power on</p></div>'
   '<b class="nx-ldn" id="nx_ldn">00%</b></div><div class="nx-ldtr"><i id="nx_ldbar"></i></div>'
-  '<ol class="nx-lds" aria-hidden="true"><li data-s="map">Map</li><li data-s="nets">Networks</li><li data-s="out">Outages</li><li data-s="dc">Data centers</li></ol>'
+  '<ol class="nx-lds" aria-hidden="true"><li data-s="nets">Networks</li><li data-s="out">Outages</li><li data-s="rep">Reports</li><li data-s="map">Map</li></ol>'
   '<p class="nx-ldmsg" id="nx_ldmsg" hidden></p></div></div>')
+
+BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div class="nb-in">'
+  '<header class="nb-hero"><p class="nb-k">Is it down?</p>'
+  '<form class="nb-q" id="nb_qf" role="search" autocomplete="off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>'
+  '<input id="nb_q" type="search" enterkeyhint="search" placeholder="AWS, Verizon, Gmail, ChatGPT, Venmo" aria-label="Is it down? Type a service name" spellcheck="false">'
+  '<button type="submit">Check</button></form><ul class="nb-sug" id="nb_sug" hidden></ul>'
+  '<div class="nb-v" id="nb_v" aria-live="polite" hidden></div></header>'
+  '<div class="nb-pulse" id="nb_pulse"><i></i><div><p class="nb-pt">Checking services</p><p class="nb-ps">Official status pages, IODA and reports</p></div></div>'
+  '<section class="nb-now" id="nb_now" hidden aria-label="Problems now"></section>'
+  '<div id="nb_groups"></div>'
+  '<section class="nb-sec" aria-label="Incident timeline"><div class="nb-gh"><h2>Incident timeline</h2><span>Last 3 days</span></div><div id="nb_tl"><p class="nb-empty">Loading</p></div></section>'
+  '<section class="nb-sec" aria-label="Chain reactions"><div class="nb-gh"><h2>How outages spread</h2><span>Documented dependencies</span></div>'
+  '<p class="nb-note">When one of these fails, the services under it usually fail too. Each link is from a past outage, and anything we infer is marked likely.</p><div class="nb-chg" id="nb_chains"></div></section>'
+  '<footer class="nb-foot"><p>Verdicts combine official status pages, IODA internet measurements (Georgia Tech) and reports from people on this page. '
+  '"Down for me" stores the service, the time and an optional ZIP, nothing else. Open <b>Map</b> for data centers, power and internet outages, or <b>Sky</b> for satellites.</p>'
+  '<p><a href="/network/providers">Cloud provider pages</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a></p></footer>'
+  '</div></section>')
 
 SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
              ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
@@ -427,9 +489,9 @@ def page(qs=None):
         mlv = signal_map._v("maplibre-gl.js"); mlc = signal_map._v("maplibre-gl.css")
     except Exception:
         mlv = mlc = "0"
-    title = "Network Status: internet, mobile, cloud and payment outages | BLACKOUT.NETWORK"
-    desc = ("Live full-screen map of network outages worldwide: internet outages by country and state, internet providers, mobile carriers, Starlink, "
-            "cloud, payments, apps, power outages and data centers, with 30-day uptime and official status links.")
+    title = "Is it down? Live status of internet, mobile, cloud, banking and apps | BLACKOUT.NETWORK"
+    desc = ("Is it down right now? Plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, banking, apps and government "
+            "services, from official status pages, IODA internet measurements and user reports, plus chain reactions, an incident log, a data center map and a live satellite globe.")
     skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="true"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="{"true" if k in ("internet", "power", "cloud") else "false"}"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
@@ -445,15 +507,18 @@ def page(qs=None):
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/netmap/net.css?v={_v("net.css")}">
 <script src="/sitenav.js" defer></script>
-</head><body class="nx">
-<a class="skip" href="#nx_more">Skip to the network list</a>
+<link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}">
+</head><body class="nx nx-board">
+<script>(function(){{var h=location.hash;if(h==="#map"||h==="#sky"){{document.body.classList.remove("nx-board");}}}})()</script>
+<a class="skip" href="#nb_q">Skip to the outage search</a>
 <div class="nx-head">{top}</div>
 <script>(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
 <main id="nx_main" data-bnt-skip>
-<h1 class="nx-vh">Network Status: live outages for internet, mobile, cloud, payments and power</h1>
+<h1 class="nx-vh">Is it down? Live status of internet, mobile, cloud, payments, apps and government services</h1>
 <div id="nx_map" class="nx-map" role="region" aria-label="Map of network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
-<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
+{BOARD}
+<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="true">Status</button><button type="button" data-m="map" aria-pressed="false">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
@@ -471,7 +536,7 @@ def page(qs=None):
 <div class="nx-scroll" id="nx_scroll"><div id="nx_list"><p class="nx-empty">Loading…</p></div></div></section>
 <noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/network/providers">Cloud provider pages</a></p></noscript>
 </main>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/boot.js?v={_v("boot.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
+<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/boot.js?v={_v("boot.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
 </body></html>'''
 
 def handle_get(path, qs=None, headers=None):
@@ -493,6 +558,14 @@ def handle_get(path, qs=None, headers=None):
             lite = str(((qs or {}).get("lite") or [""])[0] if isinstance((qs or {}).get("lite"), list) else (qs or {}).get("lite") or "") == "1"
             return 200, netsky.sky_cached(lite), "application/json"
         except Exception as ex: return 503, {"error": "orbital data unavailable right now", "detail": type(ex).__name__}
+    if p == "/api/netmap/board":   # pt1758u: reports, timeline and chain reactions for the status board (light, 20 s cache)
+        import netboard as NB
+        try:
+            try:
+                import gridpage as GP; stp = {k: list(v) for k, v in GP.ST_PT.items()}
+            except Exception: stp = {}
+            return 200, dict(generated=iso(now()), reports=NB.reports(), timeline=NB.timeline(72, 50), deps=NB.DEPS, st_pt=stp)
+        except Exception as ex: return 503, {"error": "board data unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":
         import netsky
         return 200, netsky.space()

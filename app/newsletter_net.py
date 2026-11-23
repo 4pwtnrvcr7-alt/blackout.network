@@ -66,9 +66,27 @@ def build(d, c=None):
         if minor and not bad: lines.append(f"{len(minor)} with minor issues reported by the provider.")
         if cs: lines.append("Internet outage signals now in " + ", ".join(x["name"] for x in cs[:4]) + (f" and {len(cs) - 4} more" if len(cs) > 4 else "") + " (IODA).")
         if pw >= 10000: lines.append(f"{pw:,} U.S. power customers out (ODIN).")
+        lines = _log_lines(d) + lines   # pt1758u: the /network incident timeline, recovered problems first
         return dict(head=head, rows=rows, lines=lines[:3], url=_base(c) + "/network", generated=d.get("generated"), issues=len(bad))
     except Exception:
         return None
+
+def _log_lines(d, hours=12):
+    """Up to 2 plain-English lines from the /network incident timeline: real problems (level 2+) that recovered in the last `hours` hours."""
+    try:
+        from datetime import datetime, timezone, timedelta
+        from zoneinfo import ZoneInfo
+        et = ZoneInfo("America/New_York"); lim = datetime.now(timezone.utc) - timedelta(hours=hours); out = []
+        for t in d.get("timeline") or []:
+            if int(t.get("level") or 0) < 2 or not t.get("end"): continue
+            s = datetime.fromisoformat(str(t["start"]).replace("Z", "+00:00")); e = datetime.fromisoformat(str(t["end"]).replace("Z", "+00:00"))
+            if e < lim: continue
+            f = lambda x: x.astimezone(et).strftime("%-I:%M %p")
+            out.append(f"Recovered: {str(t.get('name') or '')[:60]}, {str(t.get('title') or '')[:90]} ({f(s)} to {f(e)} ET).")
+            if len(out) >= 2: break
+        return out
+    except Exception:
+        return []
 
 def for_sub(sub, c=None):
     if not _on(c) or not _opted(sub): return None
