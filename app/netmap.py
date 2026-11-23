@@ -17,6 +17,7 @@ E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
 DAYS = 30
+SATJS = ("https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js", "sha384-ks/q8WwP74/nmNCaw/3Kj9Iv2xK5DsfHUJx18wEND2nHyRN7wjPfXjJF1Ejyj1lH")   # same pinned build as /network/starlink
 STRONG = {"bgp", "ping-slash24"}
 MAX_EVENT_S = 72 * 3600    # IODA events longer than 3 days are baseline shifts, not outages
 
@@ -377,6 +378,8 @@ LOADER = ('<div class="nx-ld" id="nx_ld" role="status" aria-label="Loading netwo
   '<ol class="nx-lds" aria-hidden="true"><li data-s="map">Map</li><li data-s="nets">Networks</li><li data-s="out">Outages</li><li data-s="dc">Data centers</li></ol>'
   '<p class="nx-ldmsg" id="nx_ldmsg" hidden></p></div></div>')
 
+SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
+             ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
 CHIPS = [("internet", "Internet"), ("power", "Power"), ("cloud", "Cloud"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
 
 def page(qs=None):
@@ -393,6 +396,7 @@ def page(qs=None):
     title = "Network Status: internet, mobile, cloud and payment outages | BLACKOUT.NETWORK"
     desc = ("Live full-screen map of network outages worldwide: internet outages by country and state, internet providers, mobile carriers, Starlink, "
             "cloud, payments, apps, power outages and data centers, with 30-day uptime and official status links.")
+    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="true"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="{"true" if k in ("internet", "power", "cloud") else "false"}"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
@@ -415,8 +419,10 @@ def page(qs=None):
 <h1 class="nx-vh">Network Status: live outages for internet, mobile, cloud, payments and power</h1>
 <div id="nx_map" class="nx-map" role="region" aria-label="Map of network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
-<div class="nx-top"><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
+<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
+<div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
+<aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
 <div class="nx-ctl"><button type="button" class="nx-b" id="nx_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>
@@ -431,7 +437,7 @@ def page(qs=None):
 <div class="nx-scroll" id="nx_scroll"><div id="nx_list"><p class="nx-empty">Loading…</p></div></div></section>
 <noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/network/providers">Cloud provider pages</a></p></noscript>
 </main>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script>
+<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
 </body></html>'''
 
 def handle_get(path, qs=None, headers=None):
@@ -447,6 +453,15 @@ def handle_get(path, qs=None, headers=None):
             b = dc()
             return (200, b, "application/json") if b else (503, {"error": "data centers are still loading"})
         except Exception as ex: return 503, {"error": "data centers unavailable", "detail": type(ex).__name__}
+    if p == "/api/netmap/sky":
+        import netsky
+        try:
+            lite = str(((qs or {}).get("lite") or [""])[0] if isinstance((qs or {}).get("lite"), list) else (qs or {}).get("lite") or "") == "1"
+            return 200, netsky.sky_cached(lite), "application/json"
+        except Exception as ex: return 503, {"error": "orbital data unavailable right now", "detail": type(ex).__name__}
+    if p == "/api/netmap/space":
+        import netsky
+        return 200, netsky.space()
     if p.startswith("/api/netmap/"):
         n = p[len("/api/netmap/"):]
         if n not in FILES: return 404, {"error": "not found"}
