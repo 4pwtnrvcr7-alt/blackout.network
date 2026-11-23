@@ -328,7 +328,6 @@ def _build_points(limit=None):
     """Rebuild verified points. limit=N builds only the top N by rank (cold seed path); None = full Wire window."""
     import json, sqlite3, time
     from datetime import datetime, timezone, timedelta
-    from collections import defaultdict
     now = time.time()
     import signal_place
     path = os.path.join(BASE, "blackout.db")
@@ -348,10 +347,9 @@ def _build_points(limit=None):
                 rows = [dict(r) for r in c.execute(q, (cut,))]
         finally:
             c.close()
-    import geo
-    # Pass 1: resolve each story. Country-only rows are held so we can spread them across real cities.
+    import geo, map_pins
+    # Pass 1: resolve each story. Country-only and other unverified pins stay off the map (pt1762u).
     drafted, stored, inferred, unmapped, unverified = [], 0, 0, 0, 0
-    country_only = defaultdict(list)   # cc -> [index into drafted]
     for r in rows:
         if int(r.get("watchlist") or 0) not in (0, 1): continue
         try: links = json.loads(r.get("links") or "[]")
@@ -413,25 +411,14 @@ def _build_points(limit=None):
             "approximate": approximate, "cc": cc, "watchlist": int(r.get("watchlist") or 0),
             "links": [{"url": (l or {}).get("url"), "source": (l or {}).get("source")} for l in links[:5] if isinstance(l, dict)],
         }
-        ix = len(drafted)
+        # Nov 23 2026 (pt1762u): only a verified, specific location is a pin. Country centroids,
+        # scattered stand-in cities, low-confidence / ambiguous matches, water, and headline
+        # contradictions stay in the lists, not on the map.
+        if not map_pins.eligible(title=entry["title"], place=entry["place"], precision=entry["precision"],
+                                 lat=entry["lat"], lon=entry["lon"], cc=entry["cc"]):
+            unverified += 1
+            continue
         drafted.append(entry)
-        if precision == "country" and cc:
-            country_only[cc].append(ix)
-    # Pass 2: country-only stories sharing a country → distinct real cities (no ring / no shared centroid).
-    for cc, indexes in country_only.items():
-        total = len(indexes)
-        for n, ix in enumerate(indexes):
-            row = drafted[ix]
-            placed = signal_place.place_in_country(cc, story_id=str(row.get("cluster_id") or ix), index=n, total=total)
-            if not placed: continue
-            if not signal_place.in_country(placed["lat"], placed["lon"], cc):
-                continue
-            row["lat"], row["lon"] = placed["lat"], placed["lon"]
-            row["place"] = placed.get("place") or row["place"]
-            row["approximate"] = True
-            row["exact"] = False
-            row["precision"] = "country"
-            row["cc"] = cc
     points = drafted
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     body = {"points": points, "stored": stored, "inferred": inferred, "shown": len(points),
@@ -558,6 +545,9 @@ def heat_payload():
     try:
         import heat_all
         if heat_all.on(): body = heat_all.build()
+        if body is not None:
+            import map_pins
+            body = map_pins.filter_heat_body(body)
     except Exception as ex:
         print("signal_map heat: every-Wire-item feed failed, using located-only:", ex, flush=True); body = None
     if body is not None:
@@ -593,6 +583,8 @@ def heat_payload():
         body = {"generated": p.get("generated"), "source": "points", "window_days": 7,
                 "coverage": {"located": len(rows), "total": len(rows) + int(p.get("unmapped") or 0), "pct": None}, "rows": rows}
     body["cols"] = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam"]
+    import map_pins
+    body = map_pins.filter_heat_body(body)
     with _HLOCK:
         if _HEAT.get("g", 0) == g0: _HEAT.update(t=time.time(), v=body)
     return body
