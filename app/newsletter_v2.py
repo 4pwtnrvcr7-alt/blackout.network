@@ -24,8 +24,8 @@ import html, os, re, urllib.parse
 E = lambda s: html.escape("" if s is None else str(s), quote=True)
 FACE = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
 BG, SURF, SURF2, LINE = "#0B0C0F", "#16181C", "#1C1F24", "#2A2D33"
-TX, BODY, MU, AC, INK = "#F5F5F7", "#D2D2D7", "#A1A1A6", "#FFC21A", "#0B0C0F"
-RED, AMBER, GREEN = "#C8102E", "#FFC21A", "#3FA66A"
+TX, BODY, MU, AC, INK = "#F5F5F7", "#D2D2D7", "#A1A1A6", "#F5F5F7", "#0B0C0F"   # pt1754u: no yellow
+RED, AMBER, GREEN = "#C8102E", "#AEAEB2", "#3FA66A"
 RED_TX = "#FF6B6B"   # rank 7+ text on the dark card (band red, lifted for contrast)
 BODY_PX, FOOT_PX = 16, 13   # Matt, Nov 13: no body text below 16px (12pt); footer >= 12px
 IMG_W = 568   # card inner width at 600px
@@ -758,6 +758,9 @@ def text_part(issue, links, c, subj, why, groups=None, sx=None, refs=None):
         T += cr["lines"][:3] + [f"Map and full numbers: {cr['url']}", ""]
     tsec("Stories you follow", issue.get("follow"))
     for g, items in groups: tsec(GROUPS[g][0], items)
+    try:
+        import newsletter_wx as _WX; T += _WX.text_lines(issue.get("weather"))   # pt1754u: weather forecast + major alerts
+    except Exception: pass
     for s_ in issue.get("videos") or []: T.extend(N._video_text(s_, c, issue["slot"]))
     if sx:
         T += [GROUPS["space"][0].upper(), "=" * len(GROUPS["space"][0])]
