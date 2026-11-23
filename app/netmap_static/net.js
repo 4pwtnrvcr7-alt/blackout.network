@@ -72,86 +72,21 @@
   function prog() { var p = 0; for (var k in P) p += W8[k] * P[k]; return Math.min(1, p); }
   function step(k, v) { P[k] = Math.max(P[k], v); if (v >= 1) { var li = document.querySelector('.nx-lds li[data-s="' + k + '"]'); if (li) li.classList.add("on"); } if (prog() >= 0.999) setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0))); }   /* never a flash: the build shows for at least ~2.6 s */
   function finish() {
-    if (ldDone) return; ldDone = true; shown = 1; $("nx_ldn").textContent = "100%";
-    document.body.classList.add("nx-ready");
-    try { window.__nxLoad = Math.round(performance.now() - t0); } catch (e) {}
-    setTimeout(function () { var l = $("nx_ld"); if (l) l.remove(); }, 900);
+    if (ldDone) return; ldDone = true; shown = 1; if (!BOOT) $("nx_ldn").textContent = "100%";
+    var gone = false;
+    function reveal() {   /* the last parts power on, the board flashes, then it fades into the page */
+      if (gone) return; gone = true;
+      document.body.classList.add("nx-ready");
+      try { window.__nxLoad = Math.round(performance.now() - t0); } catch (e) {}
+      setTimeout(function () { if (BOOT) BOOT.stop(); var l = $("nx_ld"); if (l) l.remove(); }, 900);
+    }
+    if (BOOT) { BOOT.done(reveal); setTimeout(reveal, 3200); } else setTimeout(reveal, reduce ? 0 : 520);
   }
   setTimeout(function () { if (!ldDone) { var m = $("nx_ldmsg"); if (m) { m.hidden = false; m.textContent = "Some layers are still loading. They finish in the background."; } setTimeout(finish, 900); } }, 25000);
-  (function loader() {
-    var cv = $("nx_ldcv"); if (!cv) return; var cx = cv.getContext("2d"), Wd, Ht, dpr, nodes = [], links = [], pulses = [], last = 0, flash = 0;
-    function build() {
-      dpr = Math.min(2, devicePixelRatio || 1); Wd = cv.clientWidth; Ht = cv.clientHeight; cv.width = Wd * dpr; cv.height = Ht * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      nodes = []; links = [];
-      var s = Wd < 600 ? 34 : 46, cols = Math.ceil(Wd / s) + 1, rows = Math.ceil(Ht / s) + 1, ox = (Wd - (cols - 1) * s) / 2, oy = (Ht - (rows - 1) * s) / 2, mx = Wd / 2, my = Ht * 0.42;
-      var seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-      var idx = {};
-      for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
-        if (rnd() < 0.18) continue;
-        var x = ox + c * s + (rnd() - 0.5) * s * 0.36, y = oy + r * s + (rnd() - 0.5) * s * 0.36;
-        var d = Math.hypot((x - mx) / Wd, (y - my) / Ht) + rnd() * 0.06;
-        var hub = rnd() < 0.07; idx[r + "," + c] = nodes.length;
-        nodes.push({ x: x, y: y, d: d, hub: hub, on: 0, t: 0, r: c, q: r });
-      }
-      nodes.forEach(function (n, i) {
-        [[0, 1], [1, 0], [1, 1], [1, -1]].forEach(function (o, k) {
-          if (k >= 2 && rnd() < 0.72) return;
-          var j = idx[(n.q + o[0]) + "," + (n.r + o[1])]; if (j == null) return;
-          links.push({ a: i, b: j, d: Math.max(n.d, nodes[j].d), t: 0 });
-        });
-      });
-      var ord = nodes.map(function (n, i) { return i; }).sort(function (a, b) { return nodes[a].d - nodes[b].d; });
-      ord.forEach(function (i, k) { nodes[i].rank = k / ord.length; });
-      links.forEach(function (l) { l.rank = Math.max(nodes[l.a].rank, nodes[l.b].rank); });
-    }
-    build(); addEventListener("resize", function () { if (!ldDone) build(); });
-    function draw(ts) {
-      if (ldDone && document.body.classList.contains("nx-ready") && !$("nx_ld")) return;
-      var dt = Math.min(64, ts - (last || ts)); last = ts;
-      var target = prog(); shown += (target - shown) * Math.min(1, dt / 260); if (ldDone) shown = 1;
-      var pctEl = $("nx_ldn"); if (pctEl) pctEl.textContent = (shown >= 0.995 ? 100 : Math.floor(shown * 100)).toString().padStart(2, "0") + "%";
-      var lit = 0.04 + shown * 0.96;
-      cx.clearRect(0, 0, Wd, Ht);
-      var g = cx.createRadialGradient(Wd / 2, Ht * 0.42, 0, Wd / 2, Ht * 0.42, Math.max(Wd, Ht) * 0.75);
-      g.addColorStop(0, "rgba(127,212,255," + (0.06 + 0.06 * shown) + ")"); g.addColorStop(1, "rgba(3,4,10,0)"); cx.fillStyle = g; cx.fillRect(0, 0, Wd, Ht);
-      cx.lineCap = "round";
-      for (var i = 0; i < links.length; i++) {
-        var l = links[i], A = nodes[l.a], B = nodes[l.b];
-        cx.strokeStyle = "rgba(240,240,250,.05)"; cx.lineWidth = 1; cx.beginPath(); cx.moveTo(A.x, A.y); cx.lineTo(B.x, B.y); cx.stroke();
-        if (l.rank <= lit) {
-          l.t = Math.min(1, l.t + dt / (reduce ? 1 : 420));
-          var x2 = A.x + (B.x - A.x) * l.t, y2 = A.y + (B.y - A.y) * l.t;
-          cx.strokeStyle = "rgba(127,212,255," + (0.18 + 0.22 * l.t) + ")"; cx.lineWidth = 1.1; cx.beginPath(); cx.moveTo(A.x, A.y); cx.lineTo(x2, y2); cx.stroke();
-          if (!reduce && l.t >= 1 && Math.random() < 0.0016 * (dt / 16)) pulses.push({ l: l, p: 0, rev: Math.random() < 0.5 });
-        }
-      }
-      if (!reduce) {
-        cx.shadowColor = "rgba(127,212,255,.9)"; cx.shadowBlur = 10;
-        for (var k = pulses.length - 1; k >= 0; k--) {
-          var q = pulses[k]; q.p += dt / 700; if (q.p >= 1) { pulses.splice(k, 1); continue; }
-          var a = nodes[q.l.a], b = nodes[q.l.b], pp = q.rev ? 1 - q.p : q.p, px = a.x + (b.x - a.x) * pp, py = a.y + (b.y - a.y) * pp;
-          cx.fillStyle = "rgba(240,248,255,.95)"; cx.beginPath(); cx.arc(px, py, 1.7, 0, 6.283); cx.fill();
-        }
-        cx.shadowBlur = 0;
-      }
-      for (var j = 0; j < nodes.length; j++) {
-        var n = nodes[j];
-        if (n.rank <= lit) n.t = Math.min(1, n.t + dt / (reduce ? 1 : 360));
-        if (n.t > 0) {
-          var rr = (n.hub ? 3.2 : 1.7) * (0.6 + 0.4 * n.t);
-          if (n.hub) { cx.fillStyle = "rgba(127,212,255," + (0.12 * n.t) + ")"; cx.beginPath(); cx.arc(n.x, n.y, rr * 4, 0, 6.283); cx.fill(); }
-          cx.fillStyle = n.hub ? "rgba(240,248,255," + n.t + ")" : "rgba(127,212,255," + (0.5 + 0.5 * n.t) + ")";
-          cx.beginPath(); cx.arc(n.x, n.y, rr, 0, 6.283); cx.fill();
-          if (n.t < 1 && !reduce) { cx.strokeStyle = "rgba(127,212,255," + (1 - n.t) + ")"; cx.lineWidth = 1; cx.beginPath(); cx.arc(n.x, n.y, rr + 10 * n.t, 0, 6.283); cx.stroke(); }
-        } else { cx.fillStyle = "rgba(240,240,250,.10)"; cx.fillRect(n.x - 0.7, n.y - 0.7, 1.4, 1.4); }
-      }
-      if (!reduce && !ldDone) {   /* scan line sweeping down */
-        var sy = ((ts / 2600) % 1) * Ht, sg = cx.createLinearGradient(0, sy - 60, 0, sy);
-        sg.addColorStop(0, "rgba(127,212,255,0)"); sg.addColorStop(1, "rgba(127,212,255,.07)"); cx.fillStyle = sg; cx.fillRect(0, sy - 60, Wd, 60);
-      }
-      requestAnimationFrame(draw);
-    }
-    requestAnimationFrame(draw);
+  var BOOT = null;
+  (function loader() {   /* pt1759u: boot sequence in boot.js; the percentage and every stage follow prog() */
+    var cv = $("nx_ldcv"); if (!cv || !window.BNBoot) return;
+    BOOT = window.BNBoot({ canvas: cv, panel: $("nx_ldp"), progress: prog, pct: $("nx_ldn"), bar: $("nx_ldbar"), status: $("nx_ldst") });
   })();
 
   /* ---------- preload: every dataset in parallel ---------- */
