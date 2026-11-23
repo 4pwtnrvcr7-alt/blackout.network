@@ -178,7 +178,9 @@ def announce(new_ids, geo_ids=(), src="push"):
     except Exception as ex: ST["last_error"] = "items: " + str(ex)[:160]
     heat, heat_reload = [], len(new_ids) + len(geo_ids) > EV_HEAT
     try:
-        if ha and not heat_reload: heat = ha.rows_for(new_ids + geo_ids)
+        if ha and not heat_reload:
+            import map_pins
+            heat, _ = map_pins.filter_heat_rows(ha.rows_for(new_ids + geo_ids), ha.COLS)
     except Exception as ex: ST["last_error"] = "heat: " + str(ex)[:160]; heat_reload = True
     wc = None
     try: wc = ha.wire_counts() if ha else None

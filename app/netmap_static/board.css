@@ -148,3 +148,7 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
  .nb-pulse{margin-bottom:26px}
 }
 @media (prefers-reduced-motion:reduce){.nb,.nb-t{transition:none}.nb-pulse > i::after{animation:none}}
+
+/* Nov 23 2026 (pt1763ua0): Follow-block brief button must match the bright X and YouTube buttons. */
+.nb .bng-btn,.nb .bng-btn span,.nb .bng-btn.bng-p,.nb .bng-btn.bng-p span{color:#F2F2F4!important;border-color:#F2F2F4!important;background:none!important}
+.nb .bng-btn:hover,.nb .bng-btn:focus-visible,.nb .bng-btn.bng-p:hover,.nb .bng-btn.bng-p:focus-visible{background:#F2F2F4!important;color:#05060a!important}
