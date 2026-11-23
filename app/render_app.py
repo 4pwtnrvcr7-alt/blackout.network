@@ -644,6 +644,11 @@ def _writer_admin_ok(h):
 def _render_bg():
     while True:
         _refresh_state()
+        try:
+            import feed_health
+            feed_health.tick()
+        except Exception:
+            traceback.print_exc()
         try: _trim()
         except Exception: pass
         time.sleep(60)

@@ -460,7 +460,7 @@ def page_html():
 <video class="tl-vid" muted loop playsinline preload="none" disablepictureinpicture tabindex="-1" data-webm="/bnt/media/wtvid-d.webm?v=1" data-mp4="/bnt/media/wtvid-d.mp4?v=1"></video><i class="tl-veil"></i></div>
 <main id="tl_main">
 <section class="tl-hero" aria-label="The Wire"><div class="tl-hc"><p class="w2-eb">The Wire &middot; Timeline</p><h1 class="w2-ht">Every signal</h1>
-<p class="w2-hl" id="tl_line">{E(line)}</p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
+<p class="w2-hl" id="tl_line">{E(line)}</p><p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
 <a class="tl-cue" href="#tl_start" aria-label="Scroll to the timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></a></section>
 <div id="tl_start"></div>
 <div class="tl-ctl" id="tl_ctl">

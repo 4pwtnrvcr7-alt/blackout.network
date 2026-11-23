@@ -31,6 +31,7 @@ ROUTES = {
     "/api/rt": "realtime",           # Nov 21 2026 (pt1688u): live Wire + map stream: /api/rt/stream (SSE), /since, /status, /client.js
     "/og": "og",                     # per-page Open Graph / Twitter share images (1200x630)
     "/map": "signal_map",             # Global signal map (Control panel v2 look): /map page. Not /maps (printable maps tab).
+    "/api/signal/feed-health": "feed_health",  # Nov 23 2026: Wire/home staleness; must sit above /api/signal
     "/api/signal": "signal_map",      # /api/signal/app.js, leaflet, world.geojson. Dots come from /api/state, not a new feed.
     "/api/weather": "weather",
     "/api/refresh-all": "refresh_all",   # Nov 13: top-bar "Refresh data" (one shared refresh per 60 s; BN_REFRESH_ALL=0 = off)

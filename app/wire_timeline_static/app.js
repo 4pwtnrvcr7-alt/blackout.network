@@ -473,8 +473,15 @@ var rzT=0;W.addEventListener("resize",function(){clearTimeout(rzT);rzT=setTimeou
     v.muted=true;v.autoplay=true;v.preload="auto";v.addEventListener("playing",function(){v.classList.add("on")},{once:true});v.load();var p=v.play();if(p&&p.catch)p.catch(function(){})},300)})();
 /* keep the controls under the site bar (the bar stays put on this page) */
 function syncBar(){d.documentElement.style.setProperty("--tl-bar",barH()+"px");d.documentElement.style.setProperty("--tl-ctl",ctl.offsetHeight+"px")}
+/* ---------- feed freshness notice (clears on its own when scans resume) */
+function feedHealth(){var el=$("tl_stale");if(!el)return;
+  fetch("/api/signal/feed-health",{cache:"no-store"}).then(function(r){return r.json()}).then(function(H){
+    if(H&&H.stale&&H.notice){el.hidden=false;el.textContent=H.notice;el.classList.toggle("is-severe",!!H.severe)}
+    else{el.hidden=true;el.textContent="";el.classList.remove("is-severe")}
+  }).catch(function(){})}
+setInterval(feedHealth,30000);
 /* ---------- boot */
-function boot(){syncBar();lastW=list.clientWidth;cw=lastW;measureTop();
+function boot(){syncBar();lastW=list.clientWidth;cw=lastW;measureTop();feedHealth();
   fetch("/api/wire_tl/meta").then(function(r){return r.json()}).then(function(m){meta=m;total=m.total||0;buildJump();status();var ln=$("tl_line");if(ln&&total&&m.earliest)ln.textContent=total.toLocaleString()+" signals since "+(/T00:00:00Z$/.test(m.earliest)?fUs:fL).format(dt(m.earliest)).replace(/^\w+, /,"")+". Newest at the top."}).catch(function(){buildJump()});
   var hs=(location.hash||"").match(/^#d=(\d{4}-\d{2}-\d{2})$/);
   if(hs)jumpTo(endOfDayET(hs[1]));else loadOlder();

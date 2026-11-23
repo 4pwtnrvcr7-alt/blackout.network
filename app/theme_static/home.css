@@ -65,6 +65,10 @@ h2.h-h{font-size:clamp(32px,4.6vw,64px)}
 .h-stats span{font-size:12.5px;color:var(--bnt-ink-60);margin-top:6px}
 .h-stats .h-asof{flex-basis:100%;font-size:12px;color:var(--bnt-ink-60);display:flex;align-items:center;gap:8px;margin:0}
 .h-stats .h-asof i{width:7px;height:7px;border-radius:50%;background:#fff;animation:hpulse 2s infinite}
+.h-stats .h-asof.is-stale{color:#C8CCD2}
+.h-stats .h-asof.is-stale i{background:#C8CCD2;animation:none;box-shadow:none}
+.h-stats .h-asof.is-severe{color:#E5484D}
+.h-stats .h-asof.is-severe i{background:#E5484D;animation:none;box-shadow:none}
 @keyframes hpulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}70%{box-shadow:0 0 0 8px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
 /* rank scale */
 .h-scale{margin:-4px 0 30px;max-width:460px}

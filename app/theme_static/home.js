@@ -24,9 +24,16 @@ if("IntersectionObserver" in window){
 var bar=$("h_bar");if(bar){var h="";for(var i=0;i<=10;i++)h+='<i style="background:'+(i>=7?"#E5484D":"#fff")+';opacity:'+(i>=7?1:.18+i*.1)+'"></i>';bar.innerHTML=h}
 /* live numbers */
 function fmtAgo(iso){try{var m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?"just now":m<60?m+" min ago":Math.round(m/60)+" h ago"}catch(e){return""}}
+var liveSum=null,liveHealth=null;
+function paintAsOf(){var el=$("h_asof");if(!el)return;
+ el.classList.remove("is-stale","is-severe");
+ if(liveHealth&&liveHealth.stale&&liveHealth.notice){el.classList.add("is-stale");if(liveHealth.severe)el.classList.add("is-severe");el.innerHTML="<i></i>"+liveHealth.notice;return}
+ if(!liveSum)return;
+ el.innerHTML="<i></i>Live: last scan "+liveSum.last_scan_et+(liveSum.last_scan?" ("+fmtAgo(liveSum.last_scan)+")":"")}
 fetch("/api/live/summary",{cache:"no-store"}).then(function(r){return r.json()}).then(function(S){if(!S||!S.wire)return;
- $("h_n_wire").textContent=S.wire;$("h_n_src").textContent=S.sources_ok+"/"+S.sources_total;$("h_n_high").textContent=S.bands.high;
- $("h_asof").innerHTML="<i></i>Live: last scan "+S.last_scan_et+(S.last_scan?" ("+fmtAgo(S.last_scan)+")":"")}).catch(function(){});
+ liveSum=S;$("h_n_wire").textContent=S.wire;$("h_n_src").textContent=S.sources_ok+"/"+S.sources_total;$("h_n_high").textContent=S.bands.high;paintAsOf()}).catch(function(){});
+function loadHealth(){fetch("/api/signal/feed-health",{cache:"no-store"}).then(function(r){return r.json()}).then(function(H){liveHealth=H;paintAsOf()}).catch(function(){})}
+loadHealth();setInterval(loadHealth,30000);
 /* language rotator */
 var L=[["English","Free for everyone<br>on the planet","ltr"],["Español","Gratis para todos<br>en el planeta","ltr"],["Français","Gratuit pour tous<br>sur la planète","ltr"],["Português","Grátis para todos<br>no planeta","ltr"],["Deutsch","Kostenlos für alle<br>auf der Welt","ltr"],["Українська","Безкоштовно<br>для всіх","ltr"],["हिन्दी","सबके लिए<br>मुफ़्त","ltr"],["العربية","مجاني للجميع<br>في كل مكان","rtl"]];
 var rot=$("h_rot"),langs=$("h_langs"),li=0;
