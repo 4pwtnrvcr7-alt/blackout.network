@@ -26,7 +26,8 @@ def db():
         CREATE TABLE IF NOT EXISTS net_hours(svc TEXT, hr INTEGER, lv INTEGER, PRIMARY KEY(svc, hr));
         CREATE TABLE IF NOT EXISTS net_timeline(key TEXT PRIMARY KEY, svc TEXT, name TEXT, title TEXT, start TEXT, end TEXT, level INTEGER, src TEXT, upd TEXT);
         CREATE INDEX IF NOT EXISTS ix_nt_start ON net_timeline(start);
-        CREATE TABLE IF NOT EXISTS net_open(svc TEXT PRIMARY KEY, start TEXT, level INTEGER, title TEXT);""")
+        CREATE TABLE IF NOT EXISTS net_open(svc TEXT PRIMARY KEY, start TEXT, level INTEGER, title TEXT);
+        CREATE TABLE IF NOT EXISTS net_snapshot(k TEXT PRIMARY KEY, ts INTEGER, body TEXT);""")
         _INIT.add(key)
     return c
 
@@ -187,6 +188,19 @@ def record(nets):
     except Exception:
         pass
 
+def record_levels(lv):
+    """{svc: level} for this hour (worst wins). Used for the sign-in check history of feedless services ('web:<id>')."""
+    if not writable() or not lv: return
+    hr = int(time.time()) // 3600
+    try:
+        c = db()
+        try:
+            for k, v in lv.items():
+                c.execute("INSERT INTO net_hours(svc, hr, lv) VALUES(?,?,?) ON CONFLICT(svc, hr) DO UPDATE SET lv=MAX(lv, excluded.lv)", (k, hr, int(v)))
+            c.commit()
+        finally: c.close()
+    except Exception: pass
+
 def hours(ids):
     """{svc: [24 worst levels, oldest first]} from the stored per-hour history (-1 = no reading that hour)."""
     hr = int(time.time()) // 3600; out = {}
@@ -242,3 +256,14 @@ def service_history(svc, days=90):
         s, e = pts(r["start"]), pts(r["end"])
         r["mins"] = int(((e or now()) - s).total_seconds() // 60) if s else None
     return dict(days=out, incidents=inc, hours_total=tot, hours_bad=bad, uptime=round(100 - 100 * bad / tot, 2) if tot else None, since=iso(datetime.fromtimestamp(first * 3600, timezone.utc)) if first else None)
+
+def save_snapshot(k, body):
+    if not writable(): return
+    c = db()
+    try: c.execute("INSERT INTO net_snapshot VALUES(?,?,?) ON CONFLICT(k) DO UPDATE SET ts=excluded.ts, body=excluded.body", (k, int(time.time()), body)); c.commit()
+    finally: c.close()
+def load_snapshot(k, max_age=6 * 3600):
+    c = db()
+    try: r = c.execute("SELECT ts, body FROM net_snapshot WHERE k=?", (k,)).fetchone()
+    finally: c.close()
+    return r["body"] if r and time.time() - r["ts"] < max_age else None

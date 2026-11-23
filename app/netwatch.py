@@ -9,7 +9,7 @@ legitimately collect, and the page says which ones were used:
   4. "Down for me" reports from people on this page (netboard.py), applied in netmap.build.
 Nothing here guesses a user count. Also: PayPal (its own public RSS incident feed) and Apple Pay (Apple's public system status JSON).
 Never touches the scanner, scoring, push or the QA gate."""
-import email.utils, json, os, re, socket, ssl, sqlite3, time, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+import email.utils, json, os, re, socket, ssl, sqlite3, time, urllib.error, urllib.parse, urllib.request, xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +45,13 @@ W = {
  "venmo": ("Venmo", "venmo.com", r"\bVenmo\b", None),
  "googlepay": ("Google Pay", "pay.google.com", r"\b(?:Google Pay|Google Wallet|GPay)\b", None),
 }
+LOGIN = {"wellsfargo": "https://connect.secure.wellsfargo.com/auth/login/present", "chase": "https://secure.chase.com/", "bofa": "https://secure.bankofamerica.com/",
+ "citi": "https://online.citi.com/", "capitalone": "https://verified.capitalone.com/", "usbank": "https://onlinebanking.usbank.com/", "pnc": "https://www.pnc.com/en/personal-banking/banking/online-and-mobile-banking.html",
+ "truist": "https://dias.bank.truist.com/", "td": "https://onlinebanking.tdbank.com/", "navyfederal": "https://digitalomni.navyfederal.org/", "usaa": "https://www.usaa.com/",
+ "ally": "https://secure.ally.com/", "regions": "https://onlinebanking.regions.com/", "citizens": "https://www.citizensbank.com/", "fifththird": "https://onlinebanking.53.com/",
+ "schwab": "https://client.schwab.com/", "fidelity": "https://digital.fidelity.com/", "vanguard": "https://investor.vanguard.com/", "amex": "https://global.americanexpress.com/",
+ "discover": "https://portal.discover.com/", "visa": "https://www.visa.com/", "mastercard": "https://www.mastercard.com/", "zelle": "https://www.zellepay.com/",
+ "venmo": "https://venmo.com/", "googlepay": "https://pay.google.com/"}
 OUT = re.compile(r"\b(?:outages?|is down|are down|was down|went down|goes down|down for (?:some|many|thousands|users|customers)|not working|stopped working|service (?:disruption|interruption|issues?)|"
                  r"technical (?:issues?|difficulties|glitch)|glitch(?:es)?|app (?:issues?|problems?|down|crash)|login (?:issues?|problems?)|can(?:'|no)t (?:log ?in|access|sign in|pay|use)|"
                  r"report(?:s|ing)? (?:problems?|issues?)|unable to (?:log ?in|access|sign in|pay|use)|declined (?:cards?|transactions?)|payments? (?:failing|failed|delayed)|deposits? (?:delayed|missing|not showing))\b", re.I)
@@ -71,8 +78,11 @@ def news_fetch():
     names = [v[0] for v in W.values()]; half = (len(names) + 1) // 2; items = []; ok = 0
     for part in (names[:half], names[half:]):
         u = "https://news.google.com/rss/search?" + urllib.parse.urlencode({"q": _q(part), "hl": "en-US", "gl": "US", "ceid": "US:en"})
-        try: root = ET.fromstring(_get(u, timeout=12)); ok += 1
-        except Exception: continue
+        root = None
+        for t in (0, 2):   # one retry: Google News sometimes drops the second query of a pair
+            try: time.sleep(t); root = ET.fromstring(_get(u, timeout=12)); ok += 1; break
+            except Exception: root = None
+        if root is None: continue
         for it in root.iter("item"):
             t = (it.findtext("title") or "").strip(); src = (it.findtext("source") or "").strip()
             if src and t.endswith(" - " + src): t = t[: -len(src) - 3]
@@ -80,7 +90,7 @@ def news_fetch():
             except Exception: pd = None
             if pd and pd.tzinfo is None: pd = pd.replace(tzinfo=timezone.utc)
             items.append(dict(t=t[:200], src=src[:60], url=(it.findtext("link") or "")[:600], at=iso(pd) if pd else None))
-    NEWS_STATE["ok"] = ok == 2
+    NEWS_STATE["ok"] = True if ok == 2 else "partial" if ok else False
     if ok == 0: raise RuntimeError("news search unavailable")   # keep the last good copy (swr) instead of reporting "no news"
     return items
 
@@ -108,9 +118,25 @@ def tls_ok(host, timeout=6):
     except Exception:
         return False, None
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k): return None   # a redirect is an answer; we never follow into the sign-in flow
+_OPEN = urllib.request.build_opener(_NoRedirect)
+def http_check(url, timeout=8):
+    """'reachable' (any HTTP answer below 500, incl. 3xx/403), 'server error' (5xx), 'connection only' (TLS works, HTTP refused) or 'unreachable'."""
+    t0 = time.time(); host = urllib.parse.urlparse(url).hostname
+    try:
+        rq = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/html"})
+        with _OPEN.open(rq, timeout=timeout) as r: r.read(2048); code = r.status
+    except urllib.error.HTTPError as e: code = e.code
+    except Exception:
+        ok, _ms = tls_ok(host, timeout=6)
+        return ("connection only" if ok else "unreachable"), None, None
+    ms = int((time.time() - t0) * 1000)
+    return ("server error" if code >= 500 else "reachable"), code, ms
+
 _FAILS = {}
 def watch_one(sid, swr):
-    """Status for one feedless service. level 0 = no outage found, 2 = news or our Wire reports one, or the site stopped answering."""
+    """Status for one feedless service. level -1 = no live signal (grey, never green), 2 = news or our Wire reports one, or the sign-in site failed twice."""
     nm, host, _rx, _neg = W[sid]
     allnews = (swr("watch:news", 900, news_fetch, wait=True) or []) + (swr("watch:wire", 900, wire_fetch, wait=True) or [])
     n0 = _now(); seen = set(); hits = []
@@ -123,16 +149,20 @@ def watch_one(sid, swr):
         except Exception: at = None
         if at and n0 - at <= timedelta(hours=NEWS_KEEP_H): hits.append(dict(it, age_h=round((n0 - at).total_seconds() / 3600, 1)))
     hits.sort(key=lambda x: x.get("at") or "", reverse=True)
-    ok, ms = swr("watch:tls:" + host, 240, lambda: tls_ok(host), wait=True) or (None, None)
-    f = _FAILS.get(sid, 0) + 1 if ok is False else 0; _FAILS[sid] = f
+    url = LOGIN.get(sid) or f"https://{host}/"
+    web, code, ms = swr("watch:http:" + sid, 240, lambda: http_check(url), wait=True) or ("unknown", None, None)
+    bad = web in ("unreachable", "server error")
+    f = _FAILS.get(sid, 0) + 1 if bad else 0; _FAILS[sid] = f
     hot = [h for h in hits if h["age_h"] <= NEWS_HOT_H]
-    lvl = 0; status = "No outage reported in the news or on this site"
+    # No status feed: grey "No live signal" unless a real problem signal shows up. Never green (pt1793: Matt saw Wells Fargo green while he had trouble).
+    lvl = -1; status = "No live signal. No status feed, no reports here and no outage news right now" + ("; the sign-in website is reachable" if web in ("reachable", "connection only") else "")
     if hot: lvl = 2; status = "News reports a problem: " + hot[0]["t"][:120]
-    if f >= 2: lvl = max(lvl, 2); status = f"{nm}'s website is not answering" + (" and the news reports a problem" if hot else "")
-    sig = dict(news=len(hot), news48=len(hits), news_ok=NEWS_STATE.get("ok"), web=("answers" if ok else "not answering" if ok is False else "unknown"), web_ms=ms)
+    if f >= 2:
+        lvl = 3 if hot else 2; status = f"{nm}'s sign-in site " + ("returns server errors" if web == "server error" else "is not answering") + (" and the news reports a problem" if hot else "")
+    sig = dict(news=len(hot), news48=len(hits), news_ok=NEWS_STATE.get("ok"), web=web, web_code=code, web_ms=ms, web_url=url, web_fails=f)
     inc = [dict(t=h["t"][:160], since=h["at"]) for h in hot[:3]]
-    return dict(level=lvl, status=status, incidents=inc, days=None, uptime=None, watch=True, sig=sig, news=hits[:8],
-                basis="no public status page; news reports, our Wire, a website check and reports on this page")
+    return dict(level=lvl, status=status, incidents=inc, days=None, uptime=None, watch=True, sig=sig, news=hits[:8], web_lv=2 if bad else 0 if web in ("reachable", "connection only") else -1,
+                basis="no public status page; news headlines, our Wire, a sign-in site check and reports on this page")
 
 # ---------------------------------------------------------------- PayPal (public RSS incident feed)
 PP_RSS = "https://www.paypal-status.com/feed/rss"

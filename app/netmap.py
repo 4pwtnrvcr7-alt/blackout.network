@@ -405,7 +405,17 @@ CLOUD_PTS = [
 ]
 
 def build():
-    asn_ev = swr("ioda:asn", 1800, ioda_asn_events, wait=True)
+    # pt1793 (5): the IODA download (~17 s), the outage summaries (~18 s) and the provider feeds (~14 s) run side by side, not one after another
+    pre = ThreadPoolExecutor(3, thread_name_prefix="nm-pre")
+    f_asn = pre.submit(swr, "ioda:asn", 1800, ioda_asn_events, True); f_out = pre.submit(outages); f_pw = pre.submit(power); pre.shutdown(wait=False)
+    class _Lazy:
+        v = None
+        def get(self):
+            if self.v is None:
+                try: self.v = f_asn.result(timeout=60) or []
+                except Exception: self.v = []
+            return self.v
+    asn = _Lazy()
     def one(n):
         nid, name, grp, kind, feed, page, support = n
         try:
@@ -421,7 +431,7 @@ def build():
                 r = dict(r)
             elif kind == "apple":
                 import netwatch; r = dict(swr("apple:" + feed, 300, lambda: netwatch.apple_one(feed, _bars, _hrs, _recent), wait=True))
-            else: r = asn_one(feed, asn_ev)
+            else: r = asn_one(feed, asn.get())
         except Exception:
             r = dict(level=-1, status="Status feed unreachable right now", incidents=[], days=None, uptime=None, basis="")
         r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES else None,
@@ -433,15 +443,24 @@ def build():
     try:   # pt1758u board: hourly history, the incident timeline and "Down for me" reports live in netboard.py
         import netboard as NB
         rp = NB.reports()
-        for n in nets:   # feedless services (banks, card networks): a spike in our own reports is the strongest live signal we have
-            if n.get("watch") and n.get("level") == 0 and (rp.get(n["id"]) or {}).get("surge"):
-                n["level"] = 1; n["status"] = f"{rp[n['id']]['h1']} people reported problems on this page in the last hour"
+        for n in nets:   # feedless services (banks, card networks): weigh our own Down for me reports in with the news and the sign-in check
+            if not n.get("watch"): continue
+            r = rp.get(n["id"]) or {}; h1 = int(r.get("h1") or 0); lv = n.get("level", -1)
+            if r.get("surge"):
+                n["level"] = 3 if lv >= 2 else 2
+                n["status"] = f"{h1} people reported problems on this page in the last hour" + ("; " + n["status"][0].lower() + n["status"][1:] if lv >= 2 else "")
+            elif h1 >= 2 and lv < 1:
+                n["level"] = 1; n["status"] = f"{h1} people reported problems on this page in the last hour (below our spike threshold)"
         NB.record(nets); hist = NB.hours({n["id"] for n in nets})
         for n in nets:
             h = list(n.get("h24") or [-1] * 24); st = hist.get(n["id"])
             if st: h = [max(a, b) for a, b in zip(h, st)]
             if n["level"] >= 0: h[-1] = max(h[-1], n["level"])
             n["h24"] = h if n.get("level", -1) >= 0 or st else None
+        NB.record_levels({"web:" + n["id"]: n["web_lv"] for n in nets if n.get("watch") and n.get("web_lv", -1) >= 0})   # sign-in check history, per hour
+        wh = NB.hours({"web:" + n["id"] for n in nets if n.get("watch")})
+        for n in nets:
+            if n.get("watch"): n["web24"] = wh.get("web:" + n["id"]); n.pop("web_lv", None)
         tl = NB.timeline(72, 50)
     except Exception: pass
     for n in nets:
@@ -449,11 +468,11 @@ def build():
         if full is not None: HIST[n["id"]] = full
         n["recent"] = list(n.get("recent") or [])[:3]; n.pop("recent_ok", None)
     lvl = {n["id"]: n["level"] for n in nets}
-    out = outages(); pw = power()
+    out = f_out.result(); pw = f_pw.result()
     cloud = [dict(p=p, name=nm, lon=lo, lat=la, level=lvl.get(p, -1)) for p, nm, lo, la in CLOUD_PTS]
     issues = [n for n in nets if n["level"] >= 2]; tracked = [n for n in nets if not n.get("link_only")]
     return dict(generated=iso(now()), groups=[dict(id=g, name=t) for g, t in GROUPS], nets=nets, cloud=cloud, outages=out, power=pw, timeline=tl,
-                summary=dict(networks=len(tracked), ok=sum(1 for n in tracked if n["level"] in (0, 1)), issues=len(issues), unknown=sum(1 for n in tracked if n["level"] < 0),
+                summary=dict(networks=len(tracked), ok=sum(1 for n in tracked if n["level"] in (0, 1)), issues=len(issues), unknown=sum(1 for n in tracked if n["level"] < 0), no_signal=sum(1 for n in tracked if n.get("watch") and n["level"] < 0),
                              countries_now=sum(1 for c in out["countries"] if c["cur"]), countries_24h=len(out["countries"]),
                              power_customers=sum(s["outages"] for s in (pw.get("states") or []))),
                 sources=SOURCES, ttl_s=300)
@@ -466,8 +485,19 @@ SOURCES = [
  dict(name="Map tiles: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors", url="https://openfreemap.org/"),
 ]
 
+def _build_and_keep():
+    d = build()
+    try:   # pt1793 (5): keep the last good snapshot in votes.db, so a fresh deploy (votes.db is handed over) serves it at once while it rebuilds
+        import netboard as NB; NB.save_snapshot("netmap:data", json.dumps(d, separators=(",", ":")))
+    except Exception: pass
+    return d
 def data():
-    return swr("data", 300, build)
+    if "data" not in _C:
+        try:
+            import netboard as NB; snap = NB.load_snapshot("netmap:data")
+            if snap and "data" not in _C: _C["data"] = (0.0, json.loads(snap))   # stale on purpose: served now, rebuilt in the background (single flight)
+        except Exception: pass
+    return swr("data", 300, _build_and_keep)
 
 # ---------------------------------------------------------------- data centers (PeeringDB, daily, disk cache)
 def _dc_path():
