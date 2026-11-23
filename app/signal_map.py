@@ -636,9 +636,18 @@ def handle_get(path, qs):
         return 200, heat_payload()
     if path == "/api/signal/points":
         return 200, points_payload()
+    if path in ("/api/signal/location-guard", "/api/location-guard"):
+        import location_guard
+        return 200, location_guard.latest_report()
     if path.startswith("/api/signal/"):
         name = path[len("/api/signal/"):]
         if name not in FILES: return 404, {"error": "not found"}
         with open(os.path.join(STATIC, name), "rb") as fh:
             return 200, fh.read(), FILES[name]
     return 404, {"error": "not found"}
+
+try:
+    import location_guard as _location_guard
+    _location_guard.start_hourly()
+except Exception as _lg_ex:
+    print("location_guard start:", _lg_ex, flush=True)
