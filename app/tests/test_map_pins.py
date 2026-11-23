@@ -18,10 +18,16 @@ class MapPins(unittest.TestCase):
             place="Edgewater, Florida, United States",
             precision="city", tier="exact", lat=28.988, lon=-80.902, cc="US"))
 
-    def test_country_centroid_is_dropped(self):
-        self.assertFalse(map_pins.eligible(
+    def test_national_country_pin_is_kept(self):
+        self.assertTrue(map_pins.eligible(
             title="Earthquake in Japan", place="Japan",
             precision="country", tier="approx", lat=36.0, lon=138.0, cc="JP"))
+
+    def test_unrelated_country_label_is_dropped(self):
+        # Source-HQ / typo: the headline never names Hong Kong.
+        self.assertFalse(map_pins.eligible(
+            title="Mozilla Firefox Multiple Vulnerabilities", place="Hong Kong",
+            precision="country", tier="approx", lat=22.3, lon=114.2, cc="HK"))
 
     def test_no_location_is_dropped(self):
         self.assertFalse(map_pins.eligible(
@@ -62,11 +68,11 @@ class MapPins(unittest.TestCase):
         ]
         out, dropped = map_pins.filter_heat_rows(rows, cols)
         self.assertEqual(len(out), 3)
-        self.assertEqual(dropped, 2)
+        self.assertEqual(dropped, 1)
         self.assertEqual(out[0][1], 28.988)
         self.assertIsNone(out[1][1])
         self.assertEqual(out[1][9], "global")
-        self.assertIsNone(out[2][1])
+        self.assertEqual(out[2][1], 36.0)
 
     def test_filter_points_drops_country_and_contradiction(self):
         pts = [
@@ -78,19 +84,28 @@ class MapPins(unittest.TestCase):
              "precision": "country", "exact": False, "approximate": True, "lat": 36.0, "lon": 138.0, "cc": "JP"},
         ]
         kept, dropped = map_pins.filter_points(pts)
-        self.assertEqual(dropped, 2)
-        self.assertEqual(len(kept), 1)
+        self.assertEqual(dropped, 1)
+        self.assertEqual(len(kept), 2)
         self.assertIn("Edgewater", kept[0]["place"])
+        self.assertEqual(kept[1]["cc"], "JP")
 
-    def test_city_not_in_headline_is_dropped_even_if_country_is(self):
-        self.assertFalse(map_pins.eligible(
+    def test_city_not_in_headline_is_demoted_to_named_country(self):
+        iran = map_pins.resolve_pin(
             title="Iran says it will use 'all means' to fight US sanctions",
             place="Tehran, Tehran, Iran",
-            precision="city", tier="exact", lat=35.69, lon=51.39, cc="IR"))
-        self.assertFalse(map_pins.eligible(
+            precision="city", tier="exact", lat=35.69, lon=51.39, cc="IR")
+        self.assertIsNotNone(iran)
+        self.assertEqual(iran["precision"], "country")
+        self.assertEqual(iran["cc"], "IR")
+        self.assertNotIn("Tehran", iran["place"])
+        libya = map_pins.resolve_pin(
             title="Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel.",
             place="Benghazi, Banghazi, Libya",
-            precision="city", tier="exact", lat=32.12, lon=20.07, cc="LY"))
+            precision="city", tier="exact", lat=32.12, lon=20.07, cc="LY")
+        self.assertIsNotNone(libya)
+        self.assertEqual(libya["precision"], "country")
+        self.assertEqual(libya["cc"], "LY")
+        # Izium is the event city; a stored Kyiv pin is the wrong place and has no named country to demote to.
         self.assertFalse(map_pins.eligible(
             title="This is what a Russian strike leaves behind. Izium, 19 Nov: the site after the strike",
             place="Kyiv, Kyiv City, Ukraine",
@@ -134,12 +149,18 @@ class MapPins(unittest.TestCase):
             place="Fort Lauderdale, Florida, United States",
             precision="city", tier="exact", lat=26.12, lon=-80.14, cc="US"))
 
-    def test_quake_city_not_in_headline_is_dropped(self):
-        # "Central Peru" names only the country, not Carhuamayo — no country-centroid pin.
-        self.assertFalse(map_pins.eligible(
+    def test_quake_city_not_in_headline_is_kept_as_named_country_or_offset(self):
+        # "Central Peru" does not name Carhuamayo. A Peru country pin (or the source
+        # point, because this is an earthquake) is the honest location, not "no location".
+        pin = map_pins.resolve_pin(
             title="EMSC: M5.4 earthquake Central Peru",
             place="9 km NNE of Carhuamayo, Peru",
-            precision="point", tier="exact", lat=-10.9, lon=-76.0, cc="PE"))
+            precision="point", tier="exact", lat=-10.9, lon=-76.0, cc="PE")
+        self.assertIsNotNone(pin)
+        self.assertEqual(pin["cc"], "PE")
+        if pin["precision"] != "point":
+            self.assertEqual(pin["precision"], "country")
+            self.assertNotIn("Carhuamayo", pin["place"])
 
     def test_city_demoted_to_named_state(self):
         title = "A cruise liner reports a gastrointestinal illness off the Florida coast"
@@ -179,10 +200,13 @@ class MapPins(unittest.TestCase):
              "precision": "city", "lat": 35.69, "lon": 51.39, "cc": "IR"},
         ]
         kept, dropped = map_pins.filter_points(pts)
-        self.assertEqual(dropped, 1)
-        self.assertEqual(len(kept), 1)
+        self.assertEqual(dropped, 0)
+        self.assertEqual(len(kept), 2)
         self.assertEqual(kept[0]["precision"], "state")
         self.assertIn("Florida", kept[0]["place"])
+        self.assertEqual(kept[1]["precision"], "country")
+        self.assertEqual(kept[1]["cc"], "IR")
+        self.assertNotIn("Tehran", kept[1]["place"])
 
     def test_gaza_container_when_camp_unlisted(self):
         # City spelling that does not match, but Gaza is named → pin at Gaza Strip, not the camp.
@@ -277,11 +301,51 @@ class MapPins(unittest.TestCase):
             place="Italy: Calabria, Abruzzo, Toscana +1 more",
             precision="point", lat=45.1, lon=15.6, cc="HR"))
 
-    def test_generic_costa_does_not_demote_to_wrong_coast(self):
-        self.assertFalse(map_pins.eligible(
+    def test_generic_costa_does_not_keep_a_wrong_coast_point(self):
+        pin = map_pins.resolve_pin(
             title="Spain: Orange coastalevent warning, 1 area (Costa - Litoral cántabro) - MeteoAlarm",
             place="Spain: Costa - Bizkaia litoral, Costa - Gipuzkoa litoral",
-            precision="point", lat=40.2, lon=-3.6, cc="ES"))
+            precision="point", lat=40.2, lon=-3.6, cc="ES")
+        # Do not keep the generic "Costa" point. A Spain-level pin is allowed.
+        if pin:
+            self.assertEqual(pin["precision"], "country")
+            self.assertEqual(pin["cc"], "ES")
+            self.assertNotIn("Costa", pin["place"])
+
+
+    def test_iowa_state_pin_survives_approx_tier(self):
+        pin = map_pins.resolve_pin(
+            title="Iowa deputy witnesses house explosion, runs inside to help homeowner out",
+            place="Iowa", precision="state", tier="approx",
+            lat=42.0423, lon=-93.3891, cc="US", how="offline place match")
+        self.assertIsNotNone(pin)
+        self.assertEqual(pin["precision"], "state")
+        self.assertAlmostEqual(pin["lat"], 42.0423, places=3)
+
+    def test_iowa_state_pin_fills_null_coordinates(self):
+        pin = map_pins.resolve_pin(
+            title="Iowa deputy witnesses house explosion, runs inside to help homeowner out",
+            place="Iowa", precision="state", tier="global",
+            lat=None, lon=None, cc="US", how="no verified location")
+        self.assertIsNotNone(pin)
+        self.assertIsNotNone(pin["lat"])
+        self.assertEqual(pin["cc"], "US")
+
+    def test_aleutian_offshore_quake_is_kept(self):
+        pin = map_pins.resolve_pin(
+            title="GEOFON: M5.0 earthquake Andreanof Islands, Aleutian Islands",
+            place="65 km SSW of Atka, Alaska", precision="point", tier="exact",
+            lat=51.49, lon=-174.6, cc="US", how="source coordinates")
+        self.assertIsNotNone(pin)
+        self.assertAlmostEqual(pin["lat"], 51.49, places=2)
+
+    def test_kyiv_embassy_headline_keeps_kyiv(self):
+        pin = map_pins.resolve_pin(
+            title="BREAKING: Russian strikes on Kyiv have killed at least one person and damaged the embassies of Austria and the Netherlands",
+            place="Kyiv, Kyiv City, Ukraine", precision="city", tier="exact",
+            lat=50.4547, lon=30.5238, cc="UA", how="geo")
+        self.assertIsNotNone(pin)
+        self.assertIn("Kyiv", pin["place"])
 
 
 

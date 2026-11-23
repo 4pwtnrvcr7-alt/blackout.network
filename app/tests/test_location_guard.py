@@ -14,9 +14,38 @@ import location_guard as G
 class LocationGuard(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        import tempfile, geo
-        geo.GDB = os.path.join(tempfile.mkdtemp(), "geo.db")
-        geo.gaz()
+        """Use a writable geo.db and a production-like alerts corpus.
+
+        The live web node builds geo.gaz().common from lowercase words in blackout.db.
+        Words like "iowa", "alaska", and "kyiv" appear often enough to hit that list; the
+        guard must still pass, or Docker would ship the regression that made the hourly
+        run fail those three golden cases.
+        """
+        import tempfile, sqlite3, geo
+        cls._orig_gdb = geo.GDB
+        cls._orig_bdb = geo.BDB
+        d = tempfile.mkdtemp(prefix="locguard_")
+        geo.GDB = os.path.join(d, "geo.db")
+        bdb = os.path.join(d, "blackout.db")
+        c = sqlite3.connect(bdb)
+        c.execute("CREATE TABLE alerts (title TEXT, first_seen TEXT)")
+        titles = []
+        for w in ("iowa", "alaska", "kyiv", "kiev", "ukraine", "florida", "alabama", "japan"):
+            titles.extend(["update from %s officials on the situation" % w] * 6)
+        c.executemany("INSERT INTO alerts VALUES (?, '2026-11-01')", [(x,) for x in titles])
+        c.commit(); c.close()
+        geo.BDB = "file:%s?mode=ro" % bdb
+        geo._GAZ[0] = None
+        gaz = geo.gaz()
+        # Sanity: the fixture did enter the corpus, and the protected-name fix kept them in the index.
+        cls._gaz = gaz
+
+    @classmethod
+    def tearDownClass(cls):
+        import geo
+        geo.GDB = cls._orig_gdb
+        geo.BDB = cls._orig_bdb
+        geo._GAZ[0] = None
 
     def test_baseline_file_is_present_and_honest(self):
         b = G.load_baseline()
@@ -54,6 +83,11 @@ class LocationGuard(unittest.TestCase):
                      "paraguay-senate-impeaches-not-colombia", "joe-wilson-is-not-a-city",
                      "kyiv-not-pulled-to-actor-country"):
             self.assertIn(need, ids)
+
+    def test_corpus_fixture_is_production_like(self):
+        gaz = self._gaz
+        for w in ("iowa", "alaska", "kyiv", "ukraine"):
+            self.assertIn(w, gaz.idx, "%s must stay in the gazetteer even when the live corpus uses it in lowercase" % w)
 
     def test_golden_pins_are_correct(self):
         """A story that clearly states a location must never show as no location, and must not land in the wrong place."""
