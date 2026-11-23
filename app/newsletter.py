@@ -3335,29 +3335,36 @@ def page(title, body, robots="noindex"):
             f'<footer>Research-only data · {BRAND} · <a href="/#wire">Dashboard</a> · <a href="/scoring">How we score</a> · <a href="/newsletter">Newsletter</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a><br>{BRAND} · PO Box 1228, Lake Mary, FL 32746</footer>'
             '<script src="/api/translate/app.js"></script><script src="/api/search/app.js"></script></body></html>')
 
+NL_IMG_HERO = "https://images-assets.nasa.gov/image/iss073e0982450/iss073e0982450~medium.jpg"   # NASA, public domain (ISS, Oct 25 2025)
+NL_IMG_STORM = "https://images-assets.nasa.gov/image/iss042e237320/iss042e237320~medium.jpg"  # NASA, public domain (ISS, Feb 9 2015)
+
+def _hm(v):
+    try:
+        h, m = (int(x) for x in str(v).split(":")[:2]); return f'{(h % 12) or 12}{":%02d" % m if m else ""} {"AM" if h < 12 else "PM"}'
+    except Exception: return str(v)
+
 def form_html(mode="page"):
-    """Server-rendered signup form (works without JavaScript; app.js enhances it in place)."""
+    """Server-rendered signup form (works without JavaScript; app.js enhances it in place). Same field names as before (t1754u redesign)."""
     c = cfg(); sl = c["slots"]; uid = "nlp" if mode == "page" else "nlc"
+    am, pm = _hm(sl["morning"]), _hm(sl["evening"])
     cats = "".join(f'<label class="nl-chk"><input type="checkbox" name="interests" value="{E(x)}" checked> {E(x)}</label>' for x in CATEGORIES)
-    return (f'<form method="post" action="/api/newsletter/subscribe" class="nl-form" data-nl-form novalidate>'
+    seg = "".join(f'<label class="nlx-seg"><input type="radio" name="frequency" value="{k}"{" checked" if k == "twice" else ""}><span>{E(v)}</span></label>'
+                  for k, v in (("twice", f"{am} + {pm}"), ("morning", am), ("evening", pm)))
+    tog = lambda n, t: (f'<label class="nlx-tog"><input type="checkbox" name="{n}" value="1"><span class="nlx-sw" aria-hidden="true"></span><span>{E(t)}</span></label>')
+    return (f'<form method="post" action="/api/newsletter/subscribe" class="nl-form nlx-form" data-nl-form novalidate>'
             f'<input type="hidden" name="csrf" value="{E(csrf_token())}"><input type="hidden" name="source" value="{E(mode)}">'
-            f'<label for="{uid}_email">Email address</label>'
-            f'<div class="nl-row"><input id="{uid}_email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" placeholder="you@example.org" aria-describedby="{uid}_msg">'
+            f'<label for="{uid}_email" class="nlx-vh">Email address</label>'
+            f'<div class="nl-row"><input id="{uid}_email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" placeholder="Your email" aria-describedby="{uid}_msg">'
             '<button class="pri" type="submit">Get the brief</button></div>'
-            f'<fieldset class="nl-freq"><legend>How often</legend>'
-            + "".join(f'<label class="nl-radio"><input type="radio" name="frequency" value="{k}"{" checked" if k == "twice" else ""}> {E(v)}'
-                      f'<span class="nl-sm"> ({E(sl["morning"] + " & " + sl["evening"] if k == "twice" else sl[k])} ET)</span></label>' for k, v in FREQS.items())
-            + '</fieldset>'
-            f'<label for="{uid}_loc" class="nl-loc-l">Your area (optional): US ZIP, city or country</label>'
-            f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="e.g. 80202, Denver, CO or Germany">'
-            '<p class="nl-sm">Adds a "Near you" section first. We store only the place name and a rough location (about 10 km), never your address.</p>'
-            '<div class="nl-crime"><label class="nl-chk"><input type="checkbox" name="crime_brief" value="1"> Include local crime summary in my briefs</label>'
-            '<label class="nl-chk"><input type="checkbox" name="crime_alerts" value="1"> Real-time crime alerts for my area (cities with live police data)</label></div>'
-            f'<details class="nl-cats-d"><summary>Categories: all (optional: pick only some)</summary><div class="nl-cats">{cats}</div></details>'
+            f'<fieldset class="nlx-segs"><legend class="nlx-vh">When (Eastern Time)</legend>{seg}</fieldset>'
+            f'<label for="{uid}_loc" class="nl-loc-l nlx-vh">Your area (optional)</label>'
+            f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="ZIP or city (optional)">'
+            '<div class="nl-crime nlx-togs">' + tog("crime_brief", "Local crime report") + tog("crime_alerts", "Crime alerts near me") + '</div>'
+            f'<details class="nl-cats-d"><summary>Topics: all</summary><div class="nl-cats">{cats}</div></details>'
             f'<div class="nl-trk" hidden><label class="nl-chk"><input type="checkbox" name="track_consent" value="1"> {E(TRACK_CONSENT_LABEL)}</label></div>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
-            f'<p class="nl-sm nl-priv"><svg class="nl-lock" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" style="vertical-align:-2px;margin-right:3px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>{consent_line()} {E(DISCLAIMER)}</p></form>')
+            f'<p class="nl-sm nl-priv">{consent_line()}</p></form>')
 
 def consent_line():
     """Signup consent wording (Compliance global-legal-gap K, CASL-grade): names the sender and its contact details and says consent can be withdrawn.
@@ -3368,28 +3375,49 @@ def consent_line():
             'unsubscribe at any time with the link in every email. We count opens and clicks to improve the newsletter; in the EEA, UK and Switzerland '
             'only if you tick the box. See our <a href="/privacy#email-tracking">Privacy Policy</a> and <a href="/tos">Terms</a>.')
 
+def _nlx_example():
+    """Example issue preview: generic, labeled example data only (no real events, no specific places)."""
+    row = lambda k, h, t: f'<div class="nlx-ex-it"><div class="nlx-ex-k">{k}</div><div class="nlx-ex-h">{h}</div><div class="nlx-ex-t">{t}</div></div>'
+    days = "".join(f'<div class="nlx-d"><b>{d}</b><span>{hi}&deg;</span><i>{lo}&deg;</i><em>{r}</em></div>'
+                   for d, hi, lo, r in (("Today", 78, 64, "40%"), ("Tue", 81, 66, "20%"), ("Wed", 74, 60, "60%"), ("Thu", 72, 58, "10%")))
+    return ('<div class="nlx-phone" aria-label="Example issue"><div class="nlx-ex-top"><span>BLACKOUT.NETWORK</span><span class="nlx-ex-tag">Example</span></div>'
+            '<div class="nlx-ex-title">Evening brief</div><div class="nlx-ex-sub">The last 12 hours, ranked and sourced.</div>'
+            '<div class="nlx-ex-sec">Weather in your area</div>'
+            f'<div class="nlx-ex-wx">{days}</div>'
+            + row("Weather alert", "Flood watch until 8 PM", "Heavy rain expected after sunset. Example data.")
+            + '<div class="nlx-ex-sec">Crime report in your area</div>'
+            + row("Last 24 h within 5 km", "3 reports, down from 5 last week", "Theft and burglary, no violent reports. Example data.")
+            + '<div class="nlx-ex-sec">Top threats</div>'
+            + row("Rank 6 &middot; 3 sources", "Major storm system moving inland", "What happened, where, and the source links. Example data.")
+            + row("Rank 5 &middot; 2 sources", "Regional power outages after high winds", "Example data.")
+            + '</div>')
+
 def signup_page():
     rmin, smin = main_rule()
-    body = ('<section class="nl-card"><h2>✉ The BLACKOUT.NETWORK brief, in your inbox</h2>'
-            '<p class="nl-lede">Once or twice a day: the highest-severity threats that cleared the main-feed bar, each as a one-paragraph brief '
-            '(what happened, where, when, how well it\'s confirmed, and the raw source link so you can verify it yourself)'
-            + (', plus a short watchlist of unconfirmed single-source reports' if watchlist_enabled() else '') + '. Every story opens with a bottom line up front and links to its own page on BLACKOUT.NETWORK, '
-            'where you can open every original source. A story you already got is never repeated: when it develops, you get only what is new, '
-            'marked UPDATE. Tap <b>Follow this story</b> on any item to get its updates. Quiet windows get a short "nothing qualified" note, never filler.</p>'
-            '<div id="nl_app" data-mode="page">' + form_html("page") + '</div>'
-            '<p class="nl-sm"><a href="/newsletter/sample" target="_blank" rel="noopener">See a sample issue built from live data →</a></p></section>'
-            '<section class="nl-card nl-faq"><h3>How it works</h3><ul>'
-            '<li><b>Double opt-in.</b> You get a confirmation email first. Nothing else is sent until you click it.</li>'
-            f'<li><b>What makes the main feed.</b> Rank {rmin}+ items confirmed by {smin}+ independent sources (the same bar as instant alerts). '
-            'If fewer than 3 qualify, up to 3 "Also notable" items (confirmed rank 5–6, or a high rank from one official source) are added and labeled. '
-            'See <a href="/scoring">How we score</a>.</li>'
-            + ('<li><b>Watchlist.</b> Up to 5 low-confidence, single-source reports, each clearly labeled UNCONFIRMED.</li>' if watchlist_enabled() else '') +
-            '<li><b>Breaking alerts.</b> Rare emergency emails for truly major events only, such as the outbreak of a war, a novel pathogen or a rank 9–10 event, '
-            f'at most one every {(cfg().get("breaking") or {}).get("min_gap_hours", 3)} hours. You can turn them off on the manage page.</li>'
-            '<li><b>Follow this story.</b> One click in any email, no login. Updates on that story then lead your next brief until you unfollow.</li>'
-            '<li><b>Times.</b> Morning and evening briefs go out at the times shown on the form, Eastern Time.</li>'
-            '<li><b>Leaving.</b> Every email has a one-click unsubscribe link and a manage-preferences link. No account or login.</li>'
-            f'<li><b>Privacy.</b> {E(PRIVACY)} Your address is never sold, shared or shown publicly.</li></ul></section>'
+    body = ('<section class="nlx-hero" style="background-image:linear-gradient(180deg,rgba(0,0,0,.25),rgba(0,0,0,.72) 55%,#000),url(' + NL_IMG_HERO + ')">'
+            '<div class="nlx-hero-in"><div class="nlx-kick">The Brief</div>'
+            '<h1>Global threats.<br>Your inbox.</h1>'
+            '<p class="nlx-lede">Ranked and sourced, with your local weather. 7 AM and 7 PM ET. Free.</p>'
+            '<div id="nl_app" data-mode="page" class="nlx-card">' + form_html("page") + '</div>'
+            '<p class="nlx-credit">Photo: NASA, ISS, Oct 2025</p></div></section>'
+            '<section class="nlx-show"><div class="nlx-show-tx"><div class="nlx-kick">Inside every issue</div>'
+            '<ul class="nlx-list"><li><b>Top threats</b><span>Ranked 0 to 10, with every source linked.</span></li>'
+            '<li><b>Your weather</b><span>Forecast and major alerts for your area.</span></li>'
+            '<li><b>Local crime</b><span>Optional report for your area.</span></li>'
+            '<li><b>Two minutes</b><span>Nothing repeated. Quiet days stay short.</span></li></ul>'
+            '<figure class="nlx-fig"><img src="' + NL_IMG_STORM + '" alt="Thunderstorm tops seen from the International Space Station" width="640" height="427">'
+            '<figcaption>Thunderstorm from orbit. Photo: NASA, ISS, Feb 2015</figcaption></figure>'
+            '<p class="nlx-more"><a href="/newsletter/sample" target="_blank" rel="noopener">See a full sample issue</a></p></div>'
+            + _nlx_example() + '</section>'
+            '<section class="nlx-fine"><details><summary>How it works</summary><ul>'
+            '<li>Double opt-in: we email you a confirmation link. Nothing else is sent until you tap it.</li>'
+            f'<li>Top threats are rank {rmin}+ items confirmed by {smin}+ independent sources. <a href="/scoring">How we score</a>.</li>'
+            + ('<li>A short watchlist of single-source reports, each labeled UNCONFIRMED.</li>' if watchlist_enabled() else '') +
+            '<li>Rare breaking alerts for truly major events only. Turn them off any time from Manage.</li>'
+            '<li>Your area is stored as a place name and rough location (about 10 km), never your address.</li>'
+            '<li>Every email has one-click unsubscribe and a manage link. No account or login.</li></ul></details>'
+            f'<p>{E(PRIVACY)} Your address is never sold, shared or shown publicly.</p><p>{E(DISCLAIMER)}</p>'
+            '<p>Photos: NASA (public domain). Example issue shows sample data, not real reports.</p></section>'
             '<script src="/api/newsletter/app.js"></script>')
     return page("Newsletter", body, robots="index")
 
