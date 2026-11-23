@@ -218,3 +218,13 @@ body.nx-sky .nx-more-btn{display:none}
 .nx-lds li.on{color:#E9ECF8}.nx-lds li.on::before{background:#22E5FF;border-color:#22E5FF;box-shadow:0 0 8px #22E5FF}
 .nx-ldmsg{margin:12px 0 0;font-size:12.5px;line-height:1.4;color:#B8BCD0}
 @media (max-width:767px){.nx-ldp{padding:16px 16px 15px;bottom:calc(16px + env(safe-area-inset-bottom))}.nx-ldn{font-size:28px}.nx-ldst{font-size:15px}.nx-lds{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;font-size:10px;letter-spacing:.1em}.nx-lds li{white-space:nowrap}}
+
+/* pt1785u Stage 2: undersea cable chokepoints */
+.nx-sea{position:fixed;z-index:20;left:calc(14px + env(safe-area-inset-left));top:calc(128px + env(safe-area-inset-top));width:268px;padding:11px 12px;border-radius:14px;background:rgba(5,6,10,.8);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);font-size:12px;color:var(--nx-mu)}
+.nx-sea[hidden],body.nx-board .nx-sea,body.nx-sky .nx-sea{display:none!important}
+.nx-sea .nx-k{display:flex;justify-content:space-between;gap:8px;margin:0 0 8px}.nx-sea .nx-k span{text-transform:none;letter-spacing:0;font-weight:400;color:rgba(240,240,250,.45)}
+.nx-zb{display:grid;gap:6px}
+.nx-zb button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;border:1px solid var(--nx-bd);color:var(--nx-tx);font-size:12px}
+.nx-zb button:hover{border-color:rgba(240,240,250,.4)}.nx-zb i{width:8px;height:8px;border-radius:50%;flex:none}.nx-zb b{font-weight:600;flex:1}.nx-zb em{font-style:normal;font-variant-numeric:tabular-nums;color:var(--nx-mu)}
+.nx-card .nx-k{margin:10px 0 2px}
+@media (max-width:767px){.nx-sea{left:12px;right:12px;width:auto;top:calc(190px + env(safe-area-inset-top));bottom:auto;padding:8px 9px}.nx-zb{grid-template-columns:repeat(3,1fr);gap:5px}.nx-zb button{padding:6px 7px;font-size:11px;gap:5px}.nx-sea .nx-k{margin-bottom:6px;font-size:10px}}
