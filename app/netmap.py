@@ -342,16 +342,25 @@ def data():
 # ---------------------------------------------------------------- data centers (PeeringDB, daily, disk cache)
 def _dc_path():
     d = os.environ.get("BN_STATE_DIR") or "/tmp"; os.makedirs(d, exist_ok=True); return os.path.join(d, "bn_peeringdb_fac.json")
+_DCB = {"until": 0.0}
+def _dc_fallback(p):
+    try:
+        with open(p, "rb") as fh: return fh.read()
+    except OSError:
+        with open(os.path.join(STATIC, "peeringdb_fac.json"), "rb") as fh: return fh.read()   # bundled snapshot (PeeringDB, Nov 23 2026, 5,304 sites)
 def _dc_build():
     p = _dc_path()
     try:
         if time.time() - os.path.getmtime(p) < 86400:
             with open(p, "rb") as fh: return fh.read()
     except OSError: pass
+    if time.time() < _DCB["until"]: return _dc_fallback(p)
     try:
         d = jget("https://www.peeringdb.com/api/fac?fields=id,name,city,country,latitude,longitude,org_name,net_count,ix_count,website", timeout=60, cap=20_000_000)["data"]
+        if len(d) < 1000: raise RuntimeError("short PeeringDB answer")
     except Exception:
-        with open(p, "rb") as fh: return fh.read()   # serve the old copy if PeeringDB is unreachable (raises if none)
+        _DCB["until"] = time.time() + 3600   # PeeringDB throttles anonymous readers: back off an hour, serve the last copy or the bundled snapshot
+        return _dc_fallback(p)
     rows = [[round(x["longitude"], 4), round(x["latitude"], 4), x.get("name") or "", x.get("city") or "", x.get("country") or "", x.get("org_name") or "",
              int(x.get("net_count") or 0), int(x.get("ix_count") or 0), x.get("id")] for x in d if x.get("latitude") is not None and x.get("longitude") is not None]
     b = json.dumps({"generated": iso(now()), "cols": ["lon", "lat", "name", "city", "cc", "org", "nets", "ixs", "id"], "rows": rows,
