@@ -1,0 +1,532 @@
+{
+  "version": 1,
+  "rule": "Matt Nov 20 2026 (pt1672u): a story that clearly states a location must never show as no location. These ~40 tricky cases (Edgewater/Depew, Barr/Milan, Paraguay/Colombia, surname-places, NWS office vs zone, offset quakes, ambiguous counties) must resolve to the correct pin.",
+  "cases": [
+    {
+      "id": "edgewater-fl-not-depew",
+      "title": "Edgewater declares state of emergency amid flooding",
+      "brief": "VOLUSIA COUNTY, Fla. – Edgewater mayor Diezel Depew called a special City Council meeting. Depew said homes are taking on floodwaters. The city declared a local state of emergency.",
+      "category": "political",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.FL",
+        "place_contains": [
+          "Edgewater"
+        ],
+        "place_excludes": [
+          "Depew"
+        ]
+      }
+    },
+    {
+      "id": "depew-field-yields-to-edgewater-fl",
+      "title": "Edgewater declares a state of emergency as flooding hits the city",
+      "location": "Depew, New York, United States",
+      "brief": "Volusia County, Fla. officials said flooding closed roads in Edgewater.",
+      "category": "political",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.FL",
+        "place_contains": [
+          "Edgewater"
+        ],
+        "place_excludes": [
+          "Depew"
+        ]
+      }
+    },
+    {
+      "id": "barr-remarks-in-milan",
+      "title": "Fed’s Barr flags bank run and debt risks from rapid AI adoption",
+      "brief": "In remarks prepared for the Association for Computing Machinery's conference on AI in finance in Milan on Monday, November 16, Federal Reserve Governor Michael S. Barr said AI agents acting for customers could move funds at high speed.",
+      "category": "financial",
+      "expect": {
+        "located": true,
+        "cc": "IT",
+        "place_contains": [
+          "Milan"
+        ],
+        "place_excludes": [
+          "Barr"
+        ]
+      }
+    },
+    {
+      "id": "nws-melbourne-flood-watch-florida",
+      "title": "Flood Watch issued November 16 at 3:18PM EST until November 20 at 7:00PM EST by NWS Melbourne FL",
+      "location": "Inland Volusia; Orange; Seminole; Osceola; Okeechobee; Coastal Volusia; Coastal Indian River; Coastal St. Lucie; Coastal Martin; Inland Northern Brevard; Inland Indian River; Inland St. Lucie; Inland ",
+      "sources": [
+        "NWS (api.weather.gov)"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.FL",
+        "precision_in": [
+          "county"
+        ],
+        "lat_range": [
+          27.0,
+          29.5
+        ],
+        "lon_range": [
+          -81.6,
+          -80.0
+        ],
+        "place_excludes": [
+          ";"
+        ]
+      }
+    },
+    {
+      "id": "nws-las-vegas-office-inyo-california",
+      "title": "Winter Storm Watch issued November 11 at 12:15AM PST until November 14 at 4:00PM PST by NWS Las Vegas NV",
+      "location": "Eastern Sierra Slopes of Inyo County; Owens Valley; White Mountains of Inyo County",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.CA"
+      }
+    },
+    {
+      "id": "nws-flood-warning-lake-volusia-fl",
+      "title": "Flood Warning issued November 19 at 8:38AM EST by NWS Melbourne FL",
+      "location": "Lake, FL; Volusia, FL",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.FL",
+        "precision_in": [
+          "county"
+        ]
+      }
+    },
+    {
+      "id": "offshore-quake-tokomaru-not-turkey",
+      "title": "GeoNet: M3.4 quake 30 km east of Tokomaru Bay (MMI 3)",
+      "location": "30 km east of Tokomaru Bay, New Zealand",
+      "lat": -38.0213,
+      "lon": 178.6554,
+      "sources": [
+        "GeoNet NZ"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "NZ"
+      }
+    },
+    {
+      "id": "illapel-chile-quake",
+      "title": "M 4.7 - 94 km W of Illapel, Chile",
+      "location": "94 km W of Illapel, Chile",
+      "lat": -31.7842,
+      "lon": -72.1485,
+      "sources": [
+        "USGS"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "CL"
+      }
+    },
+    {
+      "id": "ruteng-indonesia-source-coords",
+      "title": "M 5.8 - 40 km N of Ruteng, Indonesia",
+      "location": "40 km N of Ruteng, Indonesia",
+      "lat": -8.2501,
+      "lon": 120.5285,
+      "sources": [
+        "USGS"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "ID"
+      }
+    },
+    {
+      "id": "australia-fire-not-brazil-coords",
+      "title": "Forest fire in Australia (green alert)",
+      "location": "Brazil",
+      "lat": -1.3848,
+      "lon": -55.0092,
+      "sources": [
+        "GDACS"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "AU",
+        "precision_in": [
+          "country"
+        ],
+        "lat_range": [
+          -45,
+          -10
+        ],
+        "lon_range": [
+          110,
+          155
+        ]
+      }
+    },
+    {
+      "id": "aleutian-alaska-not-wrong-country",
+      "title": "GEOFON: M5.0 earthquake Andreanof Islands, Aleutian Islands",
+      "location": "65 km SSW of Atka, Alaska",
+      "lat": 51.49,
+      "lon": -174.6,
+      "expect": {
+        "located": true,
+        "cc": "US"
+      }
+    },
+    {
+      "id": "iowa-explosion-not-random-town",
+      "title": "Iowa deputy witnesses house explosion, runs inside to help homeowner out",
+      "sources": [
+        "Google News: KETV",
+        "Google News: WOWT"
+      ],
+      "category": "explosion",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.IA"
+      }
+    },
+    {
+      "id": "central-florida-emergency-not-louisiana",
+      "title": "Some Central Florida cities declare state of emergency due to severe rain",
+      "sources": [
+        "Google News: WKMG",
+        "Google News: Spectrum News 13"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.FL",
+        "place_excludes": [
+          "Louisiana"
+        ]
+      }
+    },
+    {
+      "id": "gaza-strip-named",
+      "title": "Several Palestinians were injured in an Israeli attack near Abu Sharkh roundabout in the northern Gaza Strip.",
+      "sources": [
+        "Telegram @QudsNen"
+      ],
+      "category": "military",
+      "expect": {
+        "located": true,
+        "cc": "PS"
+      }
+    },
+    {
+      "id": "iran-drones-national",
+      "title": "Iran has shot down 3 American drones today which tried to violate its airspace 1x MQ-1 'Grey Eagle' 1x MQ-9 'Reaper'",
+      "category": "military",
+      "expect": {
+        "located": true,
+        "cc": "IR"
+      }
+    },
+    {
+      "id": "kyiv-strikes-not-austria",
+      "title": "BREAKING: Russian strikes on Kyiv have killed at least one person and damaged the embassies of Austria and the Netherlands",
+      "category": "military",
+      "expect": {
+        "located": true,
+        "cc": "UA",
+        "place_contains": [
+          "Kyiv"
+        ]
+      }
+    },
+    {
+      "id": "fresh-israeli-attack-on-gaza",
+      "title": "Fresh Israeli attack on Gaza kills three",
+      "sources": [
+        "Middle East Eye",
+        "The Independent world"
+      ],
+      "category": "military",
+      "expect": {
+        "located": true,
+        "cc": "PS"
+      }
+    },
+    {
+      "id": "broward-miami-dade-not-china",
+      "title": "Overnight storms cause extensive flooding in Broward, Miami-Dade; Hollywood declares state of emergency",
+      "sources": [
+        "Google News: WSVN"
+      ],
+      "expect": {
+        "cc_not": "CN"
+      }
+    },
+    {
+      "id": "indianapolis-not-hyphen-place",
+      "title": "SEC Charges Indianapolis-Based Backward Hat Capital and Its Co-Founders",
+      "sources": [
+        "SEC press releases"
+      ],
+      "category": "financial",
+      "expect": {
+        "located": true,
+        "city": "Indianapolis"
+      }
+    },
+    {
+      "id": "macon-county-not-macon-city",
+      "title": "Explosion injures 2 at Macon County manufacturing plant, officials say",
+      "sources": [
+        "Google News: WSMV"
+      ],
+      "category": "explosion",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "city_not": "Macon"
+      }
+    },
+    {
+      "id": "joe-wilson-is-not-a-city",
+      "title": "Republican Representative, Joe Wilson, says he supports the war with Iran",
+      "category": "political",
+      "expect": {
+        "city_not": "Wilson"
+      }
+    },
+    {
+      "id": "ben-norton-is-not-a-city",
+      "title": "***LIVESTREAM ALERT*** Danny Haiphong is LIVE today w/ Ben Norton",
+      "category": "political",
+      "expect": {
+        "city_not": "Norton"
+      }
+    },
+    {
+      "id": "ohio-university-not-university-florida",
+      "title": "Ohio University E. Coli Cases Nearly Triple to 11, Health Officials Brace for More",
+      "category": "disease",
+      "expect": {
+        "place_excludes": [
+          "University, Florida"
+        ]
+      }
+    },
+    {
+      "id": "paris-protests-france",
+      "title": "Paris Fortified Ahead Of Mass Protests Police Flood Streets, Metro Stations Shut",
+      "sources": [
+        "Google News: The Times of India"
+      ],
+      "category": "political",
+      "expect": {
+        "located": true,
+        "cc": "FR",
+        "place_contains": [
+          "Paris"
+        ]
+      }
+    },
+    {
+      "id": "britain-sanctions-not-new-britain-ct",
+      "title": "NEW: Britain has sanctioned eight Israeli companies involved in expanding illegal settlements",
+      "category": "political",
+      "expect": {
+        "city_not": "New Britain"
+      }
+    },
+    {
+      "id": "el-salvador-soldiers-in-haiti-not-brazil",
+      "title": "Two Soldiers From El Salvador Die in Haiti Explosion While Working With Explosive Materials",
+      "category": "war/conflict",
+      "expect": {
+        "cc_not": "BR"
+      }
+    },
+    {
+      "id": "gulf-of-finland-not-papua",
+      "title": "Russian missile ship damaged in suspected Ukrainian drone attack in Gulf of Finland",
+      "category": "war/conflict",
+      "expect": {
+        "cc_not": "PG"
+      }
+    },
+    {
+      "id": "viljoen-not-new-zealand-town",
+      "title": "Nelson Mandela privately revealed that General Constand Viljoen prevented a military coup",
+      "category": "political",
+      "expect": {
+        "cc_not": "NZ"
+      }
+    },
+    {
+      "id": "baltimore-county-dundalk-maryland",
+      "title": "Baltimore County fire crews respond to boat explosion in Dundalk",
+      "category": "war/conflict",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.MD",
+        "precision_in": [
+          "county"
+        ]
+      }
+    },
+    {
+      "id": "bernalillo-county-new-mexico",
+      "title": "Bernalillo County Shigellosis Outbreak Tops 102 Cases",
+      "category": "disease",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "admin1_code": "US.NM"
+      }
+    },
+    {
+      "id": "orange-county-ambiguous-no-guess",
+      "title": "Orange County deputies investigate",
+      "category": "war/conflict",
+      "expect": {
+        "precision_not": "county"
+      }
+    },
+    {
+      "id": "ocean-shores-washington",
+      "title": "Ocean Shores declares a state of emergency",
+      "sources": [
+        "Google News: KIRO 7 News Seattle"
+      ],
+      "engine": "heat_all",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "place_contains": [
+          "Ocean Shores"
+        ]
+      }
+    },
+    {
+      "id": "hlukhiv-sumy-oblast-not-capital",
+      "title": "drone strike in the city of Hlukhiv",
+      "texts": [
+        "A second drone strike hit the city of Hlukhiv in Sumy Oblast on Nov. 14."
+      ],
+      "engine": "locate_texts",
+      "expect": {
+        "located": true,
+        "place_contains": [
+          "Hlukhiv"
+        ]
+      }
+    },
+    {
+      "id": "riverhead-long-island",
+      "title": "'Massive explosion' prevented after suspected tampering of propane tanks in Riverhead",
+      "sources": [
+        "Newsday"
+      ],
+      "engine": "heat_all",
+      "category": "terrorism",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "place_contains": [
+          "Riverhead"
+        ]
+      }
+    },
+    {
+      "id": "paraguay-senate-impeaches-not-colombia",
+      "title": "JUST IN - Paraguay's Senate impeaches President Santiago Peña, convicting him of corruption",
+      "engine": "signal_place",
+      "expect": {
+        "located": true,
+        "cc": "PY",
+        "place_excludes": [
+          "Santiago",
+          "Bogota",
+          "Bogotá",
+          "Colombia"
+        ]
+      }
+    },
+    {
+      "id": "paraguay-bank-failure-inside-paraguay",
+      "title": "Mass protests over Ueno Bank collapse topple Paraguay's president",
+      "engine": "signal_place",
+      "expect": {
+        "located": true,
+        "cc": "PY",
+        "place_excludes": [
+          "Bogota",
+          "Bogotá"
+        ]
+      }
+    },
+    {
+      "id": "kyiv-not-pulled-to-actor-country",
+      "title": "White House says Russia struck Kyiv",
+      "engine": "signal_place",
+      "expect": {
+        "located": true,
+        "cc": "UA",
+        "place_contains": [
+          "Kyiv"
+        ]
+      }
+    },
+    {
+      "id": "calama-offset-chile",
+      "title": "CSN: M5.0 earthquake 33 km al NE de Calama, Chile (depth 116 km)",
+      "location": "38 km NE of Calama, Chile",
+      "lat": -22.3,
+      "lon": -68.7,
+      "sources": [
+        "CSN"
+      ],
+      "expect": {
+        "located": true,
+        "cc": "CL",
+        "place_contains": [
+          "Calama"
+        ]
+      }
+    },
+    {
+      "id": "kryvyi-rih-spelling",
+      "title": "Russian ballistic missile strike on Ukraine’s Kryvyi Rih injures 20, including three children",
+      "location": "Kryvyy Rih, Dnipropetrovsk, Ukraine",
+      "lat": 47.91,
+      "lon": 33.39,
+      "category": "military",
+      "expect": {
+        "located": true,
+        "cc": "UA",
+        "place_contains": [
+          "Rih"
+        ]
+      }
+    },
+    {
+      "id": "arizona-state-of-emergency",
+      "title": "Gov. Katie Hobbs declares a state of emergency as storms batter Arizona",
+      "location": "Arizona, United States",
+      "lat": 34.2,
+      "lon": -111.6,
+      "engine": "map_pins_keep",
+      "expect": {
+        "located": true,
+        "cc": "US",
+        "place_contains": [
+          "Arizona"
+        ]
+      }
+    }
+  ]
+}

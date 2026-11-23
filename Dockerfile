@@ -11,6 +11,8 @@ COPY app/ /workspace/blackout/
 # Global Sources directory: build the SQLite/FTS index from the committed gzipped NDJSON shards (no network needed at build time)
 RUN cd /workspace/blackout && python3 sources_directory.py --build
 RUN mkdir -p logs snapshots static/vsubs video_subs newsletter_outbox && chown -R bn:bn /workspace
+# Location-accuracy guard (Matt, Nov 23 2026): fail the image build so a bad pin change never deploys.
+RUN cd /workspace/blackout && python3 -m unittest tests.test_location_guard
 USER bn
 EXPOSE 10000
 CMD ["python3", "render_app.py"]

@@ -1,0 +1,15 @@
+{
+  "as_of": "2026-11-23T17:31:00Z",
+  "as_of_et": "2026-11-23 12:31 PM ET",
+  "source": "https://blackout.network/api/signal/heat",
+  "window_days": 7,
+  "total": 4134,
+  "located": 1933,
+  "no_location": 2201,
+  "no_location_share_pct": 53.24,
+  "located_share_pct": 46.8,
+  "points_shown": 943,
+  "points_unverified": 1071,
+  "tolerance_points": 2.0,
+  "notes": "Baseline taken after PR #103 went live (boot 5f80c6d3882db04a), last 7 days, from the live /api/signal/heat coverage and the No location chip (unverified_pins). That chip is an honest count and must stay. The no-location total includes stories hidden by the #100/#103 pin filters, not only stories that name no place. Stage 2 is supposed to lower this share by geocoding those stories correctly. The guard fails if the 7-day no-location share rises more than 2.0 points above this baseline."
+}

@@ -1,0 +1,24 @@
+# Location-accuracy guard (Matt, Nov 23 2026). Runs on every pull request and on
+# pushes to main. A failure must block the deploy.
+name: Location accuracy guard
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  location-guard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Golden set, contradiction fixtures, baseline
+        run: python3 -m unittest tests.test_location_guard -v
+      - name: Live 7-day no-location share
+        env:
+          LOCATION_GUARD_LIVE: https://blackout.network
+        run: python3 -m location_guard --live
