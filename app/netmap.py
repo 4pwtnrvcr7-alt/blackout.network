@@ -124,6 +124,38 @@ NETS = [
  ("coinbase", "Coinbase", "pay", "sp", "https://status.coinbase.com", "https://status.coinbase.com", "https://help.coinbase.com/"),
  ("kraken", "Kraken", "pay", "sp", "https://status.kraken.com", "https://status.kraken.com", "https://support.kraken.com/"),
  ("gemini", "Gemini", "pay", "sp", "https://status.gemini.com", "https://status.gemini.com", "https://support.gemini.com/"),
+ # banks, card networks, brokerages and payment apps (pt1785u): most publish no status feed, so these use netwatch.py signals
+ ("wellsfargo", "Wells Fargo", "bank", "watch", "wellsfargo", None, "https://www.wellsfargo.com/help/"),
+ ("chase", "Chase (JPMorgan Chase)", "bank", "watch", "chase", None, "https://www.chase.com/digital/customer-service"),
+ ("bofa", "Bank of America", "bank", "watch", "bofa", None, "https://www.bankofamerica.com/customer-service/contact-us/"),
+ ("citi", "Citi", "bank", "watch", "citi", None, "https://online.citi.com/US/ag/contactus"),
+ ("capitalone", "Capital One", "bank", "watch", "capitalone", None, "https://www.capitalone.com/contact/"),
+ ("usbank", "U.S. Bank", "bank", "watch", "usbank", None, "https://www.usbank.com/customer-service.html"),
+ ("pnc", "PNC", "bank", "watch", "pnc", None, "https://www.pnc.com/en/customer-service.html"),
+ ("truist", "Truist", "bank", "watch", "truist", None, "https://www.truist.com/contact-us"),
+ ("td", "TD Bank", "bank", "watch", "td", None, "https://www.td.com/us/en/personal-banking/contact-us"),
+ ("navyfederal", "Navy Federal Credit Union", "bank", "watch", "navyfederal", None, "https://www.navyfederal.org/contact-us.html"),
+ ("usaa", "USAA", "bank", "watch", "usaa", None, "https://www.usaa.com/support/contact/"),
+ ("ally", "Ally Bank", "bank", "watch", "ally", None, "https://www.ally.com/help/"),
+ ("regions", "Regions Bank", "bank", "watch", "regions", None, "https://www.regions.com/help/contact-us"),
+ ("citizens", "Citizens Bank", "bank", "watch", "citizens", None, "https://www.citizensbank.com/customer-service/contact-us.aspx"),
+ ("fifththird", "Fifth Third Bank", "bank", "watch", "fifththird", None, "https://www.53.com/content/fifth-third/en/customer-service.html"),
+ ("schwab", "Charles Schwab", "bank", "watch", "schwab", None, "https://www.schwab.com/contact-us"),
+ ("fidelity", "Fidelity", "bank", "watch", "fidelity", None, "https://www.fidelity.com/customer-service/overview"),
+ ("vanguard", "Vanguard", "bank", "watch", "vanguard", None, "https://investor.vanguard.com/contact-us"),
+ ("robinhood", "Robinhood", "bank", "sp", "https://status.robinhood.com", "https://status.robinhood.com", "https://robinhood.com/us/en/support/"),
+ ("visa", "Visa (card network)", "cards", "watch", "visa", None, "https://usa.visa.com/support.html"),
+ ("mastercard", "Mastercard (card network)", "cards", "watch", "mastercard", None, "https://www.mastercard.us/en-us/personal/get-support.html"),
+ ("amex", "American Express", "cards", "watch", "amex", None, "https://www.americanexpress.com/en-us/customer-service/"),
+ ("discover", "Discover", "cards", "watch", "discover", None, "https://www.discover.com/contact-us/"),
+ ("marqeta", "Marqeta (card issuing behind many fintech cards)", "cards", "sp", "https://status.marqeta.com", "https://status.marqeta.com", "https://www.marqeta.com/contact"),
+ ("paypal", "PayPal (and Braintree)", "pay", "paypal", None, "https://www.paypal-status.com", "https://www.paypal.com/us/cshelp/personal"),
+ ("venmo", "Venmo", "pay", "watch", "venmo", None, "https://help.venmo.com/"),
+ ("zelle", "Zelle", "pay", "watch", "zelle", None, "https://www.zellepay.com/support"),
+ ("applepay", "Apple Pay and Wallet", "pay", "apple", "Apple Pay", "https://www.apple.com/support/systemstatus/", "https://support.apple.com/apple-pay"),
+ ("googlepay", "Google Pay and Wallet", "pay", "watch", "googlepay", None, "https://support.google.com/wallet/"),
+ ("mercury", "Mercury (business banking)", "pay", "sp", "https://status.mercury.com", "https://status.mercury.com", "https://mercury.com/contact"),
+ ("brex", "Brex (business cards)", "pay", "sp", "https://status.brex.com", "https://status.brex.com", "https://www.brex.com/support"),
  # apps, messaging and work
  ("m365", "Microsoft 365 / Outlook / Teams", "apps", "np", "m365", "https://status.cloud.microsoft", "https://support.microsoft.com/contactus"),
  ("workspace", "Google Workspace (Gmail, Meet)", "apps", "np", "workspace", "https://www.google.com/appsstatus/dashboard/", "https://support.google.com/"),
@@ -137,7 +169,7 @@ NETS = [
  ("tailscale", "Tailscale (VPN)", "apps", "sp", "https://status.tailscale.com", "https://status.tailscale.com", "https://tailscale.com/contact/support"),
  ("1password", "1Password", "apps", "sp", "https://status.1password.com", "https://status.1password.com", "https://support.1password.com/"),
 ]
-GROUPS = [("isp", "Internet providers"), ("mobile", "Mobile carriers"), ("sat", "Satellite internet"), ("cloud", "Cloud and web"),
+GROUPS = [("bank", "Banks and brokerages"), ("cards", "Card networks"), ("isp", "Internet providers"), ("mobile", "Mobile carriers"), ("sat", "Satellite internet"), ("cloud", "Cloud and web"),
           ("pay", "Payments and money"), ("rails", "Banking rails"), ("apps", "Apps and messaging"), ("gov", "Government and public")]
 NP_PAGES = {"aws", "azure", "m365", "gcp", "workspace", "cloudflare", "akamai", "starlink"}
 
@@ -177,13 +209,18 @@ def _hrs(spans):
             if s < b and e >= a: out[k] = max(out[k], lv)
     return out
 
+class _RL(list):
+    full = None   # pt1785u: the provider's whole published list (90 days), kept off the payload for the detail pages
 def _recent(items, days=7):
     """[(title, start, end, level)] -> newest-first incident list for the last `days` days (the timeline and the verdict)."""
-    lim = now() - timedelta(days=days); out = []
+    lim = now() - timedelta(days=days); lim90 = now() - timedelta(days=90); out = []; full = []
     for t, s, e, lv in items:
-        if not s or (e or now()) < lim: continue
-        out.append(dict(t=(t or "")[:160], s=iso(s), e=iso(e) if e else None, lv=lv))
-    out.sort(key=lambda x: x["s"], reverse=True); return out[:8]
+        if not s or (e or now()) < lim90: continue
+        x = dict(t=(t or "")[:160], s=iso(s), e=iso(e) if e else None, lv=lv); full.append(x)
+        if (e or now()) >= lim: out.append(x)
+    out.sort(key=lambda x: x["s"], reverse=True); full.sort(key=lambda x: x["s"], reverse=True)
+    r = _RL(out[:8]); r.full = full[:120]; return r
+HIST = {}
 
 IMP = {"none": 1, "minor": 1, "maintenance": 0, "major": 2, "critical": 3}
 def sp_one(base):
@@ -377,16 +414,28 @@ def build():
             elif kind == "stripe": r = stripe_one(feed)
             elif kind == "spc": r = spc_one(feed)
             elif kind == "link": r = link_one(feed)
+            elif kind == "watch":
+                import netwatch; r = netwatch.watch_one(feed, swr)
+            elif kind == "paypal":
+                import netwatch; r = swr("pp", 300, lambda: netwatch.paypal_one(feed, _bars, _hrs, _recent), wait=True)
+                r = dict(r)
+            elif kind == "apple":
+                import netwatch; r = dict(swr("apple:" + feed, 300, lambda: netwatch.apple_one(feed, _bars, _hrs, _recent), wait=True))
             else: r = asn_one(feed, asn_ev)
         except Exception:
             r = dict(level=-1, status="Status feed unreachable right now", incidents=[], days=None, uptime=None, basis="")
-        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES else None)
+        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES else None,
+                 detail=f"/network/status/{nid}")
         return r
     with ThreadPoolExecutor(12) as ex:
         nets = list(ex.map(one, NETS))
     tl = []
     try:   # pt1758u board: hourly history, the incident timeline and "Down for me" reports live in netboard.py
         import netboard as NB
+        rp = NB.reports()
+        for n in nets:   # feedless services (banks, card networks): a spike in our own reports is the strongest live signal we have
+            if n.get("watch") and n.get("level") == 0 and (rp.get(n["id"]) or {}).get("surge"):
+                n["level"] = 1; n["status"] = f"{rp[n['id']]['h1']} people reported problems on this page in the last hour"
         NB.record(nets); hist = NB.hours({n["id"] for n in nets})
         for n in nets:
             h = list(n.get("h24") or [-1] * 24); st = hist.get(n["id"])
@@ -396,7 +445,9 @@ def build():
         tl = NB.timeline(72, 50)
     except Exception: pass
     for n in nets:
-        n["recent"] = (n.get("recent") or [])[:3]; n.pop("recent_ok", None)
+        full = getattr(n.get("recent"), "full", None)
+        if full is not None: HIST[n["id"]] = full
+        n["recent"] = list(n.get("recent") or [])[:3]; n.pop("recent_ok", None)
     lvl = {n["id"]: n["level"] for n in nets}
     out = outages(); pw = power()
     cloud = [dict(p=p, name=nm, lon=lo, lat=la, level=lvl.get(p, -1)) for p, nm, lo, la in CLOUD_PTS]
@@ -539,9 +590,25 @@ def page(qs=None):
 <script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/boot.js?v={_v("boot.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
 </body></html>'''
 
+def detail_page(sid):
+    """pt1785u: the on-site detail page behind every tile's Expand control (opens at the top, like every site page)."""
+    if sid not in {x[0] for x in NETS}: return 404, {"error": "not found"}
+    import netboard as NB, netdetail as ND, site_page
+    d = data() or {}; n = next((x for x in d.get("nets") or [] if x["id"] == sid), None)
+    if n is None:
+        x = next(x for x in NETS if x[0] == sid)
+        n = dict(id=sid, name=x[1], group=x[2], kind=x[3], level=-1, status="Live status is loading. Try again in a minute.", status_url=x[5], support=x[6], watch=x[3] == "watch")
+    body = ND.render(n, NB.service_history(sid, 90), (NB.reports() or {}).get(sid), d.get("generated"), HIST.get(sid) or [])
+    nm = ND.short(n["name"])
+    title = f"Is {nm} down? Live status, outage history and reports"
+    desc = f"{nm} status now, 90-day uptime, incident history and Down for me reports, from " + (n.get("basis") or "official status feeds") + "."
+    return 200, site_page.page(title, desc, body, f"/network/status/{sid}", active="net", og_type="website"), "text/html"
+
 def handle_get(path, qs=None, headers=None):
     p = path.rstrip("/") or "/"
     if p == "/network": return 200, page(qs or {}), "text/html"
+    m = re.fullmatch(r"/network/status/([a-z0-9]+)", p)
+    if m: return detail_page(m.group(1))
     if p == "/api/netmap/data":
         try:
             d = data()
