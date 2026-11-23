@@ -72,13 +72,25 @@ _PLACES = {
 _WHERE_NONE = re.compile(r"(WHERE:\s*)location not specified by source", re.I)
 
 
+# Flood, storm and similar emergencies the scanner first-matched as political
+# ("state of emergency") should still show as a natural disaster (Matt pt1761u).
+_WX_DISASTER = re.compile(
+    r"\b(flood(?:ing|s|ed|waters?)?|storms?|hurricanes?|typhoons?|cyclones?|tornado(?:es|s)?|"
+    r"wildfires?|earthquakes?|tsunamis?|landslides?|mudslides?|droughts?|blizzard|"
+    r"heat ?wave|tropical storm|nor'?easter)\b",
+    re.I)
+
 def display_category(title, category=""):
     """If disease/outbreak words are present and the only conflict cue is a verb like
-    'strikes' or 'hits', show disease — even when the stored category is war/conflict."""
+    'strikes' or 'hits', show disease — even when the stored category is war/conflict.
+    Flood, storm and emergency-with-weather stories show as natural disaster, even when
+    the stored category is political."""
     cat = (category or "").strip() or "other"
     t = title or ""
     if _DISEASE.search(t) and not _STRONG_CONFLICT.search(t):
         return "disease"
+    if _WX_DISASTER.search(t) and not _STRONG_CONFLICT.search(t):
+        return "natural disaster"
     return cat
 
 

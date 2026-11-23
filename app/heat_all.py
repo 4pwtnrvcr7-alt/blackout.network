@@ -184,16 +184,67 @@ def _ok(lat, lon):
 
 PREC_EXACT = {"point", "city", "county", "state", "facility"}
 
+def _story_texts(item):
+    texts = [item.get("title") or "", item.get("loc") or "", item.get("brief") or ""]
+    try:
+        import geo_text
+        w, body = geo_text.factual_text(item.get("id") or item.get("cluster_id"))
+        texts += [w or "", body or ""]
+    except Exception:
+        pass
+    return [x for x in texts if x]
+
+def _drop_bad_stored(item, g, base):
+    """Clear a stored geo.db pin that is a different city than the headline, or the wrong state."""
+    if not g or not g.get("located") or base.get("how") != "geo":
+        return g, base
+    try:
+        import geo
+        if geo.place_contradicts_headline(item.get("title") or "", base.get("place") or g.get("place") or "",
+                                          base.get("prec") or g.get("precision") or "",
+                                          g.get("admin1_code") or None, _story_texts(item)):
+            g = dict(g, located=0, reason_code=g.get("reason_code") or "ambiguous",
+                     reason_unlocated="stored pin contradicts the headline or a state the story names")
+            return g, _place_base(item, g)
+    except Exception:
+        pass
+    return g, base
+
+def _headline_pin(item, extra_texts=()):
+    """Headline city + a state or county the story (or a sibling row) names."""
+    try:
+        import geo
+        hit = geo.resolve_headline_city(item.get("title") or "", list(_story_texts(item)) + list(extra_texts or []), None)
+        if not hit or not _ok(hit.get("lat"), hit.get("lon")):
+            return None
+        G = geo.gaz()
+        a1 = hit["a1"] if hit.get("a1") in G.admin1 else None
+        stn = (G.admin1.get(a1) or {}).get("name", "")
+        cn = (G.countries.get(hit["cc"]) or {}).get("name", hit["cc"])
+        place = ", ".join(p for p in (hit["name"], stn, cn) if p)
+        return {"lat": round(float(hit["lat"]), 4), "lon": round(float(hit["lon"]), 4),
+                "prec": "city", "tier": "exact", "place": place, "cc": hit.get("cc") or "",
+                "how": "headline place + state", "rid": ""}
+    except Exception:
+        return None
+
 def place(item, g):
+
     """-> dict(lat, lon, prec, tier, place, cc, how, rid). lat/lon None only for tier 'global'.
     v11 (Matt pt1718u, Nov 21 2026): the story's published write-up (desk brief, Story v3 or the instant writer; the same text the
     story page prints under "What happened") is read here, on the server, so a place it names reaches the map without a Mac install:
       - tray / region-only items: the lede, then places later sentences mark with "in / near / at"; with no write-up, a small town the
         headline marks the same way (offline GeoNames table)
       - a country-only pin or an approximate fallback: refined only by the lede, only inside the same country, only to one single place
-    Never touches source coordinates or a geo.db point / city / county / state pin."""
+    Never touches source coordinates. A geo.db city pin that contradicts the headline (or a
+    state the story names) is dropped and the place is resolved again on the server
+    (v12, Matt pt1761u, Nov 23 2026: Edgewater flooding was stored as Depew, NY)."""
     base = _place_base(item, g)
     if base.get("how") == "source coordinates": return base
+    g, base = _drop_bad_stored(item, g, base)
+    pin = _headline_pin(item)
+    if pin:
+        return pin
     try:
         import geo_text
         if base["tier"] in ("global", "region"):
@@ -347,12 +398,53 @@ def build(days=7, now=None):
 
 COLS = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam", "tier", "how", "rid", "arch", "fs"]
 
+def _sibling_hints(items, places):
+    """When several stories share a headline subject, a county or state one of them has can disambiguate the others."""
+    groups = {}
+    try:
+        import geo
+        for i, it in enumerate(items):
+            sub = geo.headline_subject(it.get("title") or "")
+            if sub:
+                groups.setdefault(geo.key_of(sub), []).append(i)
+    except Exception:
+        return places
+    out = list(places)
+    for idxs in groups.values():
+        if len(idxs) < 2:
+            continue
+        hints = []
+        for i in idxs:
+            hints.append((out[i] or {}).get("place") or "")
+            hints.append(items[i].get("brief") or "")
+            hints.append(items[i].get("loc") or "")
+        hints = [h for h in hints if h]
+        for i in idxs:
+            it, p = items[i], out[i]
+            # Already a headline-agreeing city pin: leave it.
+            if p and p.get("prec") == "city" and p.get("tier") == "exact":
+                city = (p.get("place") or "").split(",")[0].strip()
+                try:
+                    import geo
+                    if geo.key_of(city) == geo.key_of(geo.headline_subject(it.get("title") or "") or city):
+                        continue
+                except Exception:
+                    pass
+            pin = _headline_pin(it, hints)
+            if pin:
+                out[i] = pin
+    return out
+
 def _rows(items, geo_rows):
     """One map row per Wire item (column order = COLS). Shared by build() and rows_for() so the live stream and the full feed match."""
     rows, tiers, reasons = [], {"exact": 0, "approx": 0, "region": 0, "global": 0}, {}
-    for it in items:
-        g = geo_rows.get(it["id"])
-        p = place(it, g)
+    places = [place(it, geo_rows.get(it["id"])) for it in items]
+    places = _sibling_hints(items, places)
+    try:
+        import story_display as SD
+    except Exception:
+        SD = None
+    for it, p in zip(items, places):
         tiers[p["tier"]] += 1
         if p["how"] != "geo": reasons[p["how"].split(" (")[0]] = reasons.get(p["how"].split(" (")[0], 0) + 1
         try: links = json.loads(it["links"] or "[]")
@@ -361,7 +453,11 @@ def _rows(items, geo_rows):
         rk = it["rank"]
         try: rk = int(rk or 0)
         except (TypeError, ValueError): rk = 0
-        rows.append([it["id"], p["lat"], p["lon"], rk, it["category"] or "", it["t"] or "", _title(it["title"]),
+        cat = it["category"] or ""
+        if SD:
+            try: cat = SD.display_category(it.get("title") or "", cat)
+            except Exception: pass
+        rows.append([it["id"], p["lat"], p["lon"], rk, cat, it["t"] or "", _title(it["title"]),
                      p.get("place") or "", p["prec"], int(it["watchlist"] or 0), (ln.get("source") or "")[:60], (ln.get("url") or "")[:500],
                      p.get("cc") or "", int(it["eff_families"] or it["n_families"] or 0), p["tier"], p["how"], p.get("rid") or "", int(it["a"] or 0),
                      it.get("fs") or ""])
