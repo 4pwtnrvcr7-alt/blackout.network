@@ -99,7 +99,7 @@
   function nowRef() { var g = Date.parse(meta.generated || ""); return isFinite(g) ? g : Date.now(); }
   var shown = [];
   var shownReg = [], shownTray = [];
-  function onMap(r) { return r.tier === "exact" || r.tier === "approx" || !r.tier; }
+  function onMap(r) { if (r.tier === "global" || r.tier === "region" || r.tier === "approx" || r.prec === "country") return false; var p = (r.prec || "").toLowerCase(); if (p && ["point","city","county","facility","state"].indexOf(p) < 0) return false; return r.lat != null && r.lon != null && !(r.lat === 0 && r.lon === 0); }
   function apply(fit) {
     var now = nowRef(), all = rows.filter(function (r) { return pass(r, state, now, true); }), base = all.filter(onMap);
     var vis = all.filter(function (r) { return pass(r, state, now, false); });
@@ -117,7 +117,7 @@
     var gb = $("bnm_gbtn"); if (gb) { gb.hidden = !shownTray.length; $("bnm_gn").textContent = shownTray.length.toLocaleString(); }
     var wc = ((meta.coverage || {}).wire_counts || {})[state.window], ex = shown.filter(function (r) { return r.tier !== "approx"; }).length;
     if ($("bnm_cov") && meta.coverage && meta.coverage.tiers) $("bnm_cov").innerHTML = (state.view === "us" ? "U.S. view: " + tot.toLocaleString() + " alerts with a U.S. position." :
-      "Every Wire alert from the last " + esc(WL) + " is on this map: <b>" + ex.toLocaleString() + "</b> at their exact place, <b>" + (shown.length - ex).toLocaleString() + "</b> approximate (hollow rings, usually a country centre), <b>" +
+      "Alerts from the last " + esc(WL) + " with a specific place: <b>" + ex.toLocaleString() + "</b> on the map, <b>" + (shown.length - ex).toLocaleString() + "</b> approximate, <b>" +
       shownReg.length.toLocaleString() + "</b> region only (labeled rings) and <b>" + shownTray.length.toLocaleString() + "</b> with no place (the No location list).") +
       (wc != null && !state.rank && !state.topic && state.view === "world" ? " The Wire shows " + (+wc).toLocaleString() + " for this window" + (+wc === tot ? ", the same set." : ".") : "");
     if (wc != null && +wc === tot) resyncN = 0;

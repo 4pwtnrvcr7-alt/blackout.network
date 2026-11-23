@@ -12,7 +12,7 @@ function xIntent(text,url,camp){return "https://x.com/intent/post?text="+encodeU
 var IX='<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-7.6 8.7L23 22h-6.8l-5.3-6.9L4.8 22H1.7l8.1-9.3L1 2h7l4.8 6.3L18.9 2zm-1.2 18h1.7L7.1 3.9H5.3L17.7 20z"/></svg>';
 var IY='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M23 7.2a3 3 0 0 0-2.1-2.1C19 4.6 12 4.6 12 4.6s-7 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .5 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.9.5 8.9.5 8.9.5s7 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .5-4.8 31 31 0 0 0-.5-4.8zM9.7 15.1V8.9l5.8 3.1-5.8 3.1z"/></svg>';
 var IM='<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 2.3V17h16V7.3l-8 5.3-8-5.3zM5.6 7l6.4 4.2L18.4 7H5.6z"/></svg>';
-function btns(camp){return '<a class="bng-btn bng-p" href="/newsletter?utm_source=site&utm_medium=cta&utm_campaign='+camp+'">'+IM+'<span>Get the free brief</span></a>'+
+function btns(camp){return '<a class="bng-btn" href="/newsletter?utm_source=site&utm_medium=cta&utm_campaign='+camp+'">'+IM+'<span>Get the free brief</span></a>'+
  '<a class="bng-btn" href="'+XU+'" target="_blank" rel="noopener">'+IX+'<span>Follow @BlkoutNtw</span></a>'+
  '<a class="bng-btn" href="'+YTS+'" target="_blank" rel="noopener">'+IY+'<span>Subscribe on YouTube</span></a>'}
 function people(text){var t=text||"",out=[];D.figures.forEach(function(f){var i=t.indexOf(f.name);if(i<0&&f.alias){var m=new RegExp("\\b"+f.alias.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b").exec(t);if(m)i=m.index}if(i>=0)out.push([i,f])});

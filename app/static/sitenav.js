@@ -11,8 +11,10 @@
 if(window.bnSitenav)return;window.bnSitenav=1;
 var D=/*BN_SITENAV_DATA*/null;var R=document.documentElement;R.classList.add("bn-js");
 /* Matt 5:25 PM: /live#heatmap and /#heatmap always go to the full-screen /map, never the old regional panel. */
+/* Nov 23 2026 (pt1763u): /live#network, /#network and /#net always go to the /network status board. */
 var _hm=(location.hash||"").replace(/^#/,"").split(/[/?]/)[0];
 if((_hm==="heatmap"||_hm==="map")&&/^\/(live\/?)?$/.test(location.pathname)){location.replace("/map"+location.search);}
+if((_hm==="network"||_hm==="net")&&/^\/(live\/?)?$/.test(location.pathname)){location.replace("/network"+location.search);}
 var LS={get:function(k){try{return localStorage.getItem(k)}catch(e){return null}},set:function(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 if(!window.bnMeter)window.bnMeter=function(r,sz){r=Math.max(0,Math.min(10,Math.round(+r||0)));return '<span class="bn-meter bn-r'+r+(sz?" bn-meter-"+sz:"")+'" role="img" aria-label="Rank '+r+' of 10" title="Rank '+r+' of 10"><span class="bn-segs" aria-hidden="true">'+new Array(11).join("<i></i>")+'</span><b class="bn-num" aria-hidden="true">'+r+'<small>/10</small></b></span>'};
 function $(s,r){return (r||document).querySelector(s)}function $$(s,r){return [].slice.call((r||document).querySelectorAll(s))}
@@ -194,6 +196,7 @@ function init(){
  document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("#bn-menu a[data-tab],.bn-primary a[data-tab]");if(!a||e.ctrlKey||e.metaKey||e.shiftKey||e.button)return;
   var k=a.dataset.tab,href=(a.getAttribute("href")||"").split("?")[0];if(k.charAt(0)==="@"||k==="heatmap"||href==="/map")return;
   if(k==="threat")return; // The Wire is the standalone /wire page; do not trap the click as a dashboard tab
+  if(k==="net"||href==="/network")return; // Network Status is the standalone /network board (pt1763u)
   var b=btn(k);if(!b)return;e.preventDefault();
   var dest=a.hash&&a.hash!==location.hash?a.hash:"";if(!(window.bnMenuClose&&bnMenuClose(true,dest?{replace:dest}:{}))&&dest)try{history.pushState(null,"",dest)}catch(_){}
   if(!b.classList.contains("on"))b.click();window.scrollTo(0,0);var h=document.getElementById("bn_ptitle");if(h){h.setAttribute("tabindex","-1");try{h.focus({preventScroll:true})}catch(_){}}});
