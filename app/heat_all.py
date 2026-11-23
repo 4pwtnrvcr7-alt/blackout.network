@@ -128,8 +128,9 @@ def _infer(item):
     if key in _INF: return _INF[key]
     hit = None
     try:
-        import signal_place as SP
-        hit = SP.infer(SP.story_text(item["title"], item.get("loc") or "", item.get("brief") or ""))
+        import signal_place as SP, geo as _geo
+        title = _geo.strip_nws_office(item["title"] or "")
+        hit = SP.infer(SP.story_text(title, item.get("loc") or "", item.get("brief") or ""))
     except Exception:
         hit = None
     if len(_INF) > 20000: _INF.clear()
@@ -228,6 +229,38 @@ def _headline_pin(item, extra_texts=()):
     except Exception:
         return None
 
+def _server_geocode(item):
+    """Re-read the title, brief, and published write-up with the current offline gazetteer (no Nominatim)."""
+    try:
+        import geo, json as _json
+        links = item.get("links") or []
+        try:
+            links = _json.loads(links) if isinstance(links, str) else links
+        except Exception:
+            links = []
+        mem = [{"source": (x or {}).get("source") or (x or {}).get("s"), "source_url": (x or {}).get("url") or (x or {}).get("u"),
+                "title": None, "lat": None, "lon": None, "location": None, "official": 0}
+               for x in links if isinstance(x, dict)]
+        brief = item.get("brief") or ""
+        try:
+            import geo_text
+            w, body = geo_text.factual_text(item.get("id") or item.get("cluster_id"))
+            extra = " ".join(x for x in (w, body) if x)
+            if extra:
+                brief = (brief + "\n" + extra).strip()
+        except Exception:
+            pass
+        cl = {"cluster_id": item.get("id") or item.get("cluster_id") or "t",
+              "title": item.get("title") or "", "category": item.get("category") or "",
+              "location": item.get("loc") or item.get("location"),
+              "lat": item.get("lat"), "lon": item.get("lon"), "n_items": 1, "brief": brief}
+        r = geo.geocode(cl, mem, geo.NomBudget(0))
+        if r and r.get("located") and _ok(r.get("lat"), r.get("lon")):
+            return _from_geo(r, "headline (server re-read)")
+    except Exception as ex:
+        print("heat_all: server geocode failed:", str(ex)[:160], flush=True)
+    return None
+
 def place(item, g):
 
     """-> dict(lat, lon, prec, tier, place, cc, how, rid). lat/lon None only for tier 'global'.
@@ -240,11 +273,43 @@ def place(item, g):
     state the story names) is dropped and the place is resolved again on the server
     (v12, Matt pt1761u, Nov 23 2026: Edgewater flooding was stored as Depew, NY)."""
     base = _place_base(item, g)
-    if base.get("how") == "source coordinates": return base
+    if base.get("how") == "source coordinates":
+        # Source coordinates that contradict a country the headline names must not win
+        # (GDACS "Forest fire in Australia" at a point in Brazil).
+        try:
+            import geo
+            title_named = {c.upper() for c in geo._named_countries(item.get("title") or "") if c}
+            loc_named = {c.upper() for c in geo._named_countries(item.get("loc") or item.get("location") or "") if c}
+            cc = (base.get("cc") or "").upper()
+            # Border PIP can flip a Bolivian epicentre to Argentina; if the title or location
+            # field names that country, or a town of that country is nearby, keep the point.
+            near = False
+            try:
+                if title_named and base.get("lat") is not None:
+                    near = any(geo.gaz().nearest_city_cc(float(base["lat"]), float(base["lon"]), c, 300) for c in title_named)
+            except Exception:
+                near = False
+            if title_named and cc and cc not in title_named and not (loc_named & title_named) and not near:
+                sg = _server_geocode(item)
+                if sg:
+                    return sg
+                rec = geo.admin_centroid(cc=next(iter(title_named))) if len(title_named) == 1 else None
+                if rec:
+                    return {"lat": rec["lat"], "lon": rec["lon"], "prec": "country", "tier": "approx",
+                            "place": rec["name"], "cc": rec["cc"], "how": "headline country overrides source coordinates"}
+            else:
+                return base
+        except Exception:
+            return base
+        return base
     g, base = _drop_bad_stored(item, g, base)
     pin = _headline_pin(item)
     if pin:
         return pin
+    if not _ok(base.get("lat"), base.get("lon")) or base.get("tier") in ("global", "region") or base.get("prec") == "country":
+        sg = _server_geocode(item)
+        if sg and (not _ok(base.get("lat"), base.get("lon")) or (sg.get("prec") in PREC_EXACT and base.get("prec") in ("country", "region", "global", ""))):
+            return sg
     try:
         import geo_text
         if base["tier"] in ("global", "region"):
@@ -270,7 +335,7 @@ def _from_geo(g, how):
     prec = g.get("precision") or "point"
     exact = prec in PREC_EXACT and (g.get("confidence") or "") != "low"
     return {"lat": round(float(g["lat"]), 4), "lon": round(float(g["lon"]), 4), "prec": prec, "tier": "exact" if exact else "approx",
-            "place": g.get("place") or g.get("country_name") or "", "cc": g.get("country") or "", "how": "geo"}
+            "place": g.get("place") or g.get("country_name") or "", "cc": g.get("country") or "", "how": how or "geo"}
 
 def _place_base(item, g):
     if g and g.get("located") and _ok(g.get("lat"), g.get("lon")):
@@ -280,8 +345,25 @@ def _place_base(item, g):
         return {"lat": round(float(g["lat"]), 4), "lon": round(float(g["lon"]), 4), "prec": prec, "tier": "exact" if exact else "approx",
                 "place": g.get("place") or g.get("country_name") or "", "cc": g.get("country") or "", "how": "geo"}
     if _ok(item.get("lat"), item.get("lon")):
+        cc = ""
+        try:
+            import geo
+            loc = item.get("loc") or item.get("location") or ""
+            title = item.get("title") or ""
+            named = geo._named_countries(loc) or geo._named_countries(title)
+            pip_cc, _a1 = geo.gaz().pip(float(item["lat"]), float(item["lon"]))
+            if pip_cc:
+                cc = pip_cc
+            elif len(named) == 1:
+                cc = next(iter(named))
+            else:
+                rec = geo.admin_centroid(name=(loc.split(",")[-1].strip() if loc else ""))
+                if rec:
+                    cc = rec.get("cc") or ""
+        except Exception:
+            cc = ""
         return {"lat": round(float(item["lat"]), 4), "lon": round(float(item["lon"]), 4), "prec": "point", "tier": "exact",
-                "place": item.get("loc") or "", "cc": "", "how": "source coordinates"}
+                "place": item.get("loc") or "", "cc": cc, "how": "source coordinates"}
     rc = (g or {}).get("reason_code") or ("archive" if item.get("a") else "pending")
     reason = (g or {}).get("reason_unlocated") or ""
     cands = []
@@ -326,7 +408,8 @@ def _place_base(item, g):
             if prec == "region":
                 return dict(_region("p:" + _k(hit.get("place") or ""), hit.get("place") or "Region", round(float(hit["lat"]), 4), round(float(hit["lon"]), 4)),
                             cc=hit.get("cc") or "", how="offline place match")
-            return {"lat": round(float(hit["lat"]), 4), "lon": round(float(hit["lon"]), 4), "prec": prec, "tier": "approx",
+            exact = prec in PREC_EXACT
+            return {"lat": round(float(hit["lat"]), 4), "lon": round(float(hit["lon"]), 4), "prec": prec, "tier": "exact" if exact else "approx",
                     "place": hit.get("place") or "", "cc": hit.get("cc") or "", "how": "offline place match" + (" (exact geocode pending)" if rc == "pending" else "")}
     # ambiguous across countries, not found, no place: the Wire's own region (both Rafahs are Middle East), else the tray
     wr = _wire_region(item)
