@@ -182,3 +182,34 @@ body.nx-ready .nx-ld{opacity:0;visibility:hidden;pointer-events:none}
 /* stage 2: an opaque layer under the map so the site footer never shows through while the map fades in; theme-proof pill button */
 body.nx::before{content:"";position:fixed;inset:0;background:#232a3a;pointer-events:none}
 html body.nx button#nx_more_btn.nx-more-btn{border-radius:99px!important}
+/* ---------- Sky view ---------- */
+.nx-top{display:flex;align-items:center;gap:8px}
+.nx-mode{flex:none;display:flex;gap:2px;padding:3px;border-radius:99px;background:rgba(5,6,10,.7);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html body.nx .nx-mode button{all:unset;cursor:pointer;padding:6px 12px;border-radius:99px!important;font:600 10.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--nx-mu);transition:background .25s,color .25s}
+html body.nx .nx-mode button[aria-pressed="true"]{background:rgba(240,240,250,.16);color:var(--nx-tx)}
+.nx-mode button:focus-visible{outline:2px solid #F2F2F4;outline-offset:1px}
+.nx-top .nx-chip{min-width:0}
+.nx-f[hidden],.nx-sw[hidden],.nx-leg[hidden]{display:none!important}
+.nx-sf button i{border-width:1px}
+.nx-sf button[aria-pressed="false"] i{background:transparent!important}
+body.nx-sky .nx-map{background:#03040a}
+.nx-sw{position:fixed;z-index:20;left:calc(14px + env(safe-area-inset-left));bottom:calc(18px + env(safe-area-inset-bottom));width:250px;padding:12px 14px;border-radius:14px;background:rgba(5,6,10,.78);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);font-size:12px;color:var(--nx-mu)}
+.nx-cnt{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.nx-cnt li{display:flex;align-items:center;gap:6px}.nx-cnt li i{width:7px;height:7px;border-radius:50%;flex:none}.nx-cnt li b{margin-left:auto;color:var(--nx-tx);font-weight:600;font-variant-numeric:tabular-nums}
+.nx-swl{display:flex;align-items:center;gap:7px;margin:0 0 4px;color:var(--nx-tx)}.nx-swl i{width:8px;height:8px;border-radius:50%}
+.nx-swm{margin:2px 0 0;font-size:11.5px;line-height:1.4}.nx-swm a{color:var(--nx-tx)}
+body.nx-sky .nx-more-btn{display:none}
+@media (max-width:767px){
+ .nx-top{left:12px;right:12px;transform:none;max-width:none}
+ html body.nx .nx-mode button{padding:6px 10px;font-size:10px;letter-spacing:.1em}
+ .nx-top .nx-chip{flex:1;padding:8px 11px}
+ .nx-sw{left:12px;right:12px;width:auto;bottom:calc(14px + env(safe-area-inset-bottom));padding:10px 10px}
+ .nx-cnt{grid-template-columns:1fr 1fr 1fr 1fr;gap:3px 8px;font-size:10.5px}.nx-cnt li b{margin-left:3px}
+}
+@media (max-width:767px){
+ .nx-cnt{grid-template-columns:repeat(4,auto);justify-content:space-between;gap:3px 4px;font-size:9.5px;letter-spacing:0}
+ .nx-cnt li{gap:3px;white-space:nowrap}.nx-cnt li i{width:6px;height:6px}.nx-cnt li b{margin-left:2px}
+ .nx-swl{font-size:11.5px}.nx-swm{font-size:10.5px}.nx-sw .nx-swm.nx-imp{display:none}
+ body.nx-sky .nx-ctl{bottom:calc(236px + env(safe-area-inset-bottom))}
+ body.nx-sky .maplibregl-ctrl-bottom-right{bottom:196px}
+}
