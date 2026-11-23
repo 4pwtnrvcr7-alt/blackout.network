@@ -18,6 +18,9 @@ body.tl{background:#000}
 .tl-hero{position:relative;min-height:100svh;display:flex;align-items:flex-end;padding:0 var(--w2-gut) 14vh;box-sizing:border-box}
 .tl-hc{max-width:780px}
 .tl-hero .w2-eb{color:#D6D8DC}.tl-hero .w2-btn{margin-top:30px}
+.tl-stale{margin:14px 0 0;font-size:clamp(13px,1.15vw,16px);line-height:1.45;color:#A8ADB4;max-width:58ch}
+.tl-stale.is-severe{color:#E5484D}
+.tl-stale[hidden]{display:none}
 .tl-cue{position:absolute;left:50%;bottom:22px;width:32px;height:32px;margin-left:-16px;color:#fff;opacity:.7;animation:tlcue 2.4s ease-in-out infinite}
 .tl-cue svg{width:32px;height:32px}
 @keyframes tlcue{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
