@@ -54,3 +54,52 @@ class NetMap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+CSV = ("OBJECT_NAME,OBJECT_ID,EPOCH,MEAN_MOTION,ECCENTRICITY,INCLINATION,RA_OF_ASC_NODE,ARG_OF_PERICENTER,MEAN_ANOMALY,EPHEMERIS_TYPE,CLASSIFICATION_TYPE,NORAD_CAT_ID,ELEMENT_SET_NO,REV_AT_EPOCH,BSTAR,MEAN_MOTION_DOT,MEAN_MOTION_DDOT\n"
+       + "".join(f"SAT {i},2020-001A,2026-11-22T12:00:00.123456,15.06,0.0001,53.0,10.0,90.0,270.0,0,U,{40000+i},999,100,0.0001,0,0\n" for i in range(9)))
+
+class NetSky(unittest.TestCase):
+    def setUp(self):
+        import tempfile, netsky
+        self.d = tempfile.mkdtemp(); os.environ["BN_STARLINK_CACHE_DIR"] = self.d; netsky._MEM.clear()
+        p = os.path.join(self.d, "g.csv"); open(p, "w").write(CSV); self.p = p
+
+    def test_sky_payload_lite_and_missing(self):
+        import netsky, json, time
+        from unittest import mock
+        def fake(gid, grp): return (self.p, time.time(), None) if gid in ("starlink", "gps") else (None, None, "HTTPError")
+        with mock.patch.object(netsky, "_file", fake):
+            full = json.loads(netsky.sky(False)); lite = json.loads(netsky.sky(True))
+        g = {x["id"]: x for x in full["groups"]}
+        self.assertEqual(len(full["groups"]), 8)
+        self.assertEqual((g["starlink"]["total"], g["gps"]["shown"]), (9, 9))
+        self.assertEqual(g["goes"]["shown"], 0); self.assertTrue(g["goes"]["error"])
+        self.assertEqual(len(full["sats"]), 18); self.assertEqual(len(lite["sats"]), 3 + 9)
+        self.assertEqual(len(full["sats"][0]), len(full["fields"]))
+        self.assertAlmostEqual(full["sats"][0][2] % 1, 0.123, places=2)
+
+    def test_routes_and_space_fallback(self):
+        import netmap, netsky
+        from unittest import mock
+        with mock.patch.object(netsky, "sky_cached", lambda lite: b'{"lite":%d}' % lite):
+            self.assertEqual(netmap.handle_get("/api/netmap/sky", {"lite": ["1"]})[1], b'{"lite":1}')
+            self.assertEqual(netmap.handle_get("/api/netmap/sky", {})[1], b'{"lite":0}')
+        def boom(u): raise OSError("down")
+        with mock.patch.object(netsky, "_j", boom):
+            code, body = netmap.handle_get("/api/netmap/space", {})[:2]
+        self.assertEqual(code, 200); self.assertFalse(body["ok"])
+
+    def test_space_levels(self):
+        import netsky
+        from unittest import mock
+        def fake(u):
+            if "scales" in u: return {"0": {"DateStamp": "2026-11-23", "TimeStamp": "06:00:00", "R": {"Scale": "0"}, "S": {"Scale": "0"}, "G": {"Scale": "3"}}}
+            return [{"time_tag": "2026-11-23T03:00:00", "Kp": 7.0}]
+        with mock.patch.object(netsky, "_j", fake): w = netsky.space()
+        self.assertTrue(w["ok"]); self.assertEqual(w["scales"]["G"], 3); self.assertEqual(w["gnss"], "Watch")
+        self.assertIn("gpsjam.org", w["jamming"]["url"])
+
+    def test_page_has_sky(self):
+        import netpages
+        b = netpages.handle_get("/network", {})[1]
+        for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
