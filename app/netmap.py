@@ -668,6 +668,7 @@ def handle_get(path, qs=None, headers=None):
         import netcables
         try:
             r = swr("cables", 600, lambda: netcables.api(swr, lambda: ((_C.get("data") or (0, {}))[1] or {}).get("outages")), wait=True)
+            if r and not r.get("news_ok") and "cables" in _C and time.time() - _C["cables"][0] > 120: _C["cables"] = (time.time() - 600, r)   # news failed: try again soon (served stale meanwhile)
             return (200, r) if r else (503, {"error": "cable data is still loading"})
         except Exception as ex: return 503, {"error": "cable data unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":
