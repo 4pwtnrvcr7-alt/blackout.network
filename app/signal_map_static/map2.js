@@ -104,21 +104,19 @@
     var now = nowRef(), all = rows.filter(function (r) { return pass(r, state, now, true); }), base = all.filter(onMap);
     var vis = all.filter(function (r) { return pass(r, state, now, false); });
     shown = vis.filter(onMap);
-    shownReg = vis.filter(function (r) { return r.tier === "region"; });
-    shownTray = vis.filter(function (r) { return r.tier === "global"; });
+    shownReg = []; shownTray = [];   // Nov 23 2026 (Matt pt1781u): only stories with a map position are on the map; no No-location tray
     if (state.view === "us") { shown = shown.filter(inUS); shownReg = []; shownTray = []; }
     var usN = base.filter(inUS).length;
-    var n = { world: all.length, us: usN, conflicts: all.filter(function (r) { return r.cat === "war/conflict"; }).length };
+    var n = { world: base.length, us: usN, conflicts: all.filter(function (r) { return r.cat === "war/conflict"; }).length };
     [].forEach.call(d.querySelectorAll("[data-n]"), function (e) { e.textContent = n[e.getAttribute("data-n")] || 0; });
     var hi = shown.filter(function (r) { return r.rank >= 7; }).length;
     var tot = shown.length + shownReg.length + shownTray.length, WL = { "24": "24 hours", "72": "3 days", "168": "7 days" }[state.window] || "";
     hi = shown.concat(shownReg, shownTray).filter(function (r) { return r.rank >= 7; }).length;
     if (loadedAt) $("bnm_count").textContent = tot.toLocaleString() + (state.view === "us" ? " U.S. alerts" : " alerts") + (hi ? " · " + hi + " high" : "") + " · " + WL;
-    var gb = $("bnm_gbtn"); if (gb) { gb.hidden = !shownTray.length; $("bnm_gn").textContent = shownTray.length.toLocaleString(); }
-    var wc = ((meta.coverage || {}).wire_counts || {})[state.window], ex = shown.filter(function (r) { return r.tier !== "approx"; }).length;
+    var gb = $("bnm_gbtn"); if (gb) gb.hidden = true;
+    var wc = null /* the map holds only placed stories, so it no longer matches the Wire's total */, ex = shown.filter(function (r) { return r.tier !== "approx"; }).length;
     if ($("bnm_cov") && meta.coverage && meta.coverage.tiers) $("bnm_cov").innerHTML = (state.view === "us" ? "U.S. view: " + tot.toLocaleString() + " alerts with a U.S. position." :
-      "Alerts from the last " + esc(WL) + " with a specific place: <b>" + ex.toLocaleString() + "</b> on the map, <b>" + (shown.length - ex).toLocaleString() + "</b> approximate, <b>" +
-      shownReg.length.toLocaleString() + "</b> region only (labeled rings) and <b>" + shownTray.length.toLocaleString() + "</b> with no place (the No location list).") +
+      "Alerts from the last " + esc(WL) + " on the map: <b>" + shown.length.toLocaleString() + "</b>.") +
       (wc != null && !state.rank && !state.topic && state.view === "world" ? " The Wire shows " + (+wc).toLocaleString() + " for this window" + (+wc === tot ? ", the same set." : ".") : "");
     if (wc != null && +wc === tot) resyncN = 0;
     if (wc != null && +wc !== tot && !state.rank && !state.topic && state.view === "world" && rtMode === "live" && resyncN < 3 && Date.now() - resyncAt > 30000) {

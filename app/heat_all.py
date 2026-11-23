@@ -481,8 +481,9 @@ def build(days=7, now=None):
 
 COLS = ["id", "lat", "lon", "rank", "cat", "t", "title", "place", "prec", "watch", "src", "url", "cc", "fam", "tier", "how", "rid", "arch", "fs"]
 
-def _sibling_hints(items, places):
-    """When several stories share a headline subject, a county or state one of them has can disambiguate the others."""
+def _sibling_hints(items, places, fresh=None):
+    """When several stories share a headline subject, a county or state one of them has can disambiguate the others.
+    fresh: indexes computed this build (stored positions are not re-resolved)."""
     groups = {}
     try:
         import geo
@@ -503,6 +504,8 @@ def _sibling_hints(items, places):
             hints.append(items[i].get("loc") or "")
         hints = [h for h in hints if h]
         for i in idxs:
+            if fresh is not None and i not in fresh:
+                continue
             it, p = items[i], out[i]
             # Already a headline-agreeing city pin: leave it.
             if p and p.get("prec") == "city" and p.get("tier") == "exact":
@@ -518,11 +521,41 @@ def _sibling_hints(items, places):
                 out[i] = pin
     return out
 
+def _stored_places(items, geo_rows):
+    """Nov 23 2026 (Matt pt1781u): each story is placed once and stored (story_places.db); requests never re-geocode it.
+    The position this module computes is memoised by input signature; a new story's AI-read place (story_places LLM thread) fills in
+    where that position is not an exact pin."""
+    try:
+        import story_places as SPL
+    except Exception:
+        SPL = None
+    if SPL is None:
+        return _sibling_hints(items, [place(it, geo_rows.get(it["id"])) for it in items])
+    out, fresh, sigs = [], set(), {}
+    for i, it in enumerate(items):
+        g = geo_rows.get(it["id"])
+        sig = SPL.sig_of(it, g); sigs[i] = sig
+        p = SPL.memo_get(it["id"], sig)
+        if p is None:
+            p = place(it, g); fresh.add(i)
+        out.append(p)
+    if fresh:
+        out = _sibling_hints(items, out, fresh)
+        SPL.memo_put_many([(items[i]["id"], sigs[i], out[i]) for i in fresh])
+    # A new story's AI-read place fills in only where this module has no exact pin (an exact source point or a headline city stays).
+    for i, it in enumerate(items):
+        p = out[i] or {}
+        if p.get("tier") == "exact" and p.get("lat") is not None:
+            continue
+        hit = SPL.llm_get(it["id"])
+        if hit is not None and hit.get("lat") is not None and hit.get("tier") == "exact":
+            out[i] = hit
+    return out
+
 def _rows(items, geo_rows):
     """One map row per Wire item (column order = COLS). Shared by build() and rows_for() so the live stream and the full feed match."""
     rows, tiers, reasons = [], {"exact": 0, "approx": 0, "region": 0, "global": 0}, {}
-    places = [place(it, geo_rows.get(it["id"])) for it in items]
-    places = _sibling_hints(items, places)
+    places = _stored_places(items, geo_rows)
     try:
         import story_display as SD
     except Exception:

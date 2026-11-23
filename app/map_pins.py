@@ -849,6 +849,9 @@ def filter_heat_rows(rows, cols):
     out, dropped = [], 0
     ix = _ix(cols)
     for row in rows or []:
+        if _cell(row, ix, "how") == "story place (AI read)" and _cell(row, ix, "lat", None) is not None:
+            out.append(row)      # Nov 23 2026: a new story's stored AI-read place is shown as stored
+            continue
         pin = resolve_pin(title=_cell(row, ix, "title"), place=_cell(row, ix, "place"),
                           precision=_cell(row, ix, "prec"), tier=_cell(row, ix, "tier"),
                           lat=_cell(row, ix, "lat", None), lon=_cell(row, ix, "lon", None),
