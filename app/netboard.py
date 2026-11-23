@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 BASE = os.path.dirname(os.path.abspath(__file__))
 def _path(): return os.environ.get("BN_NETBOARD_DB") or os.path.join(BASE, "votes.db")
 _SALT = secrets.token_hex(16); _RL = {}; _LK = threading.Lock(); _INIT = set()
-KEEP_S = 8 * 86400
+KEEP_S = 90 * 86400   # pt1785u: report counts feed the 90-day detail page
 
 def db():
     p = _path(); c = sqlite3.connect(p, timeout=20); c.row_factory = sqlite3.Row
@@ -158,7 +158,7 @@ def record(nets):
             for n in nets:
                 if n.get("link_only") or n.get("level", -1) < 0: continue
                 c.execute("INSERT INTO net_hours(svc, hr, lv) VALUES(?,?,?) ON CONFLICT(svc, hr) DO UPDATE SET lv=MAX(lv, excluded.lv)", (n["id"], hr, int(n["level"])))
-                for i in n.get("recent") or []:   # provider incident list (Statuspage, AWS, Azure, Google) and IODA events
+                for i in (getattr(n.get("recent"), "full", None) or n.get("recent") or []):   # provider incident list (Statuspage, AWS, Azure, Google) and IODA events
                     if not i.get("s") or int(i.get("lv") or 0) < 1: continue
                     key = f"{n['id']}:{i['s']}:{hashlib.sha1(str(i.get('t')).encode()).hexdigest()[:6]}"
                     c.execute("""INSERT INTO net_timeline(key, svc, name, title, start, end, level, src, upd) VALUES(?,?,?,?,?,?,?,?,?)
@@ -180,8 +180,8 @@ def record(nets):
                     c.execute("""INSERT INTO net_timeline VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET title=excluded.title, upd=excluded.upd""",
                               (f"rep:{n['id']}:{hr}", n["id"], n["name"], f"{r['h1']} people reported it down in an hour", iso(h), iso(h + timedelta(hours=1)), 1, "BLACKOUT.NETWORK user reports", s_now))
             if secrets.randbelow(30) == 0:
-                c.execute("DELETE FROM net_hours WHERE hr<?", (hr - 8 * 24,))
-                c.execute("DELETE FROM net_timeline WHERE start<?", (iso(n0 - timedelta(days=30)),))
+                c.execute("DELETE FROM net_hours WHERE hr<?", (hr - 90 * 24,))   # pt1785u: 90 days of history per service
+                c.execute("DELETE FROM net_timeline WHERE start<?", (iso(n0 - timedelta(days=365)),))
             c.commit()
         finally: c.close()
     except Exception:
@@ -217,3 +217,28 @@ def timeline(hours_back=72, limit=60):
         if k in seen: continue
         seen.add(k); r["mins"] = int(((e or now()) - s).total_seconds() // 60); out.append(r)
     return out[:limit]
+
+# ---------------------------------------------------------------- per-service history (pt1785u detail page /network/status/<id>)
+def service_history(svc, days=90):
+    """Stored on our side: daily worst level and hours with data (oldest first), daily report counts, and every logged incident."""
+    t = int(time.time()); hr = t // 3600; d0 = t // 86400; lv = {}; hrs_seen = {}; reps = {}; inc = []; bad = 0; tot = 0
+    try:
+        c = db()
+        try:
+            for r in c.execute("SELECT hr, lv FROM net_hours WHERE svc=? AND hr>?", (svc, hr - days * 24)):
+                d = r["hr"] // 24; lv[d] = max(lv.get(d, -1), r["lv"]); hrs_seen[d] = hrs_seen.get(d, 0) + 1; tot += 1; bad += r["lv"] >= 2
+            for r in c.execute("SELECT ts FROM net_reports WHERE svc=? AND ts>?", (svc, t - days * 86400)):
+                d = r["ts"] // 86400; reps[d] = reps.get(d, 0) + 1
+            inc = [dict(r) for r in c.execute("SELECT title, start, end, level, src FROM net_timeline WHERE svc=? ORDER BY start DESC LIMIT 300", (svc,))]
+            first = c.execute("SELECT MIN(hr) FROM net_hours WHERE svc=?", (svc,)).fetchone()[0]
+        finally: c.close()
+    except Exception:
+        first = None
+    out = []
+    for k in range(days - 1, -1, -1):
+        d = d0 - k
+        out.append(dict(day=datetime.fromtimestamp(d * 86400, timezone.utc).strftime("%Y-%m-%d"), lv=lv.get(d, -1), hours=hrs_seen.get(d, 0), reports=reps.get(d, 0)))
+    for r in inc:
+        s, e = pts(r["start"]), pts(r["end"])
+        r["mins"] = int(((e or now()) - s).total_seconds() // 60) if s else None
+    return dict(days=out, incidents=inc, hours_total=tot, hours_bad=bad, uptime=round(100 - 100 * bad / tot, 2) if tot else None, since=iso(datetime.fromtimestamp(first * 3600, timezone.utc)) if first else None)

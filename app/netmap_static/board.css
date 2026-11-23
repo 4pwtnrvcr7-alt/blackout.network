@@ -1,5 +1,5 @@
 /* Network status board (/network main view, Nov 23 2026, pt1758u). Dark only, no yellow; red only for a major outage. */
-.nb{--g:#2FD67B;--mi:#C9CCD6;--dg:#FF7A1A;--rd:#FF3B3B;--rp:#A98BFF;--cy:#22E5FF;--na:#7C8190;--tx:#F0F0FA;--mu:rgba(240,240,250,.64);--bd:rgba(240,240,250,.11);--card:#0a0c14;
+.nb{--g:#2FD67B;--mi:#FFA040;--dg:#FF7A1A;--rd:#FF3B3B;--rp:#A98BFF;--cy:#22E5FF;--na:#7C8190;--tx:#F0F0FA;--mu:rgba(240,240,250,.64);--bd:rgba(240,240,250,.11);--card:#0a0c14;
  position:fixed;inset:0;z-index:15;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
  background:radial-gradient(900px 420px at 50% -120px,rgba(77,141,255,.10),transparent 70%),#05060a;color:var(--tx);font-family:Inter,system-ui,sans-serif;
  padding-top:calc(116px + env(safe-area-inset-top));opacity:0;transition:opacity .6s cubic-bezier(.2,.7,.2,1)}
@@ -71,7 +71,7 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 .nb-gh h2{margin:0;font:700 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase}
 .nb-gh span{font-size:12.5px;color:var(--mu)}
 .nb-now .nb-gh{margin-top:22px}.nb-now .nb-gh:first-child{margin-top:0}
-.nb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.nb-tl{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
 .nb-t{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-width:0;padding:13px 13px 11px;border-radius:14px;background:var(--card);border:1px solid var(--bd);transition:border-color .2s,transform .2s,background .2s}
 .nb-t:hover{border-color:rgba(240,240,250,.28)}
 .nb-t.on{border-color:rgba(240,240,250,.5)}
@@ -83,10 +83,10 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 .nb-tw{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mu)}
 .nb-tw i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--na)}
 .s-ok .nb-tw i{background:var(--g)}.s-minor .nb-tw i{background:var(--mi)}.s-deg .nb-tw i{background:var(--dg)}.s-out .nb-tw i{background:var(--rd)}
-.s-rep .nb-tw{color:var(--rp)}.s-rep .nb-tw i{background:var(--rp)}.s-deg .nb-tw{color:#FFB27A}.s-out .nb-tw{color:#FF8A8A}.s-minor .nb-tw{color:var(--tx)}
+.s-rep .nb-tw{color:var(--rp)}.s-rep .nb-tw i{background:var(--rp)}.s-deg .nb-tw{color:#FFB27A}.s-out .nb-tw{color:#FF8A8A}.s-minor .nb-tw{color:#FFC08A}
 .nb-tw em{margin-left:auto;padding:2px 7px;border-radius:99px;font:600 10px/1.4 Inter,system-ui,sans-serif;font-style:normal;letter-spacing:.06em;text-transform:uppercase;color:var(--rp);border:1px solid rgba(169,139,255,.45)}
 .nb-sp{display:block;width:100%;height:26px}
-.nb-sp rect.b-ok{fill:rgba(47,214,123,.42)}.nb-sp rect.b-minor{fill:rgba(201,204,214,.75)}.nb-sp rect.b-deg{fill:#FF7A1A}.nb-sp rect.b-out{fill:#FF3B3B}.nb-sp rect.b-na{fill:rgba(124,129,144,.3)}
+.nb-sp rect.b-ok{fill:rgba(47,214,123,.42)}.nb-sp rect.b-minor{fill:#FFA040}.nb-sp rect.b-deg{fill:#FF7A1A}.nb-sp rect.b-out{fill:#FF3B3B}.nb-sp rect.b-na{fill:rgba(124,129,144,.3)}
 .nb-sp-r{fill:none;stroke:var(--cy);stroke-width:1.4;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 .nb-sp-na{stroke:rgba(124,129,144,.4);stroke-width:1;stroke-dasharray:3 3}
 .nb-tf{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--mu);font-variant-numeric:tabular-nums}
@@ -140,7 +140,7 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
  .nb-vt{font-size:18px}
  .nb-sig{grid-template-columns:1fr}
  .nb-sig li{flex-direction:row;justify-content:space-between;align-items:center}
- .nb-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .nb-tl{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
  .nb-t{padding:11px 11px 10px}
  .nb-tn{font-size:13.5px}
  .nb-tw em{display:none}
@@ -152,3 +152,38 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 /* Nov 23 2026 (pt1763ua0): Follow-block brief button must match the bright X and YouTube buttons. */
 .nb .bng-btn,.nb .bng-btn span,.nb .bng-btn.bng-p,.nb .bng-btn.bng-p span{color:#F2F2F4!important;border-color:#F2F2F4!important;background:none!important}
 .nb .bng-btn:hover,.nb .bng-btn:focus-visible,.nb .bng-btn.bng-p:hover,.nb .bng-btn.bng-p:focus-visible{background:#F2F2F4!important;color:#05060a!important}
+
+/* pt1785u flip cards: tap a tile to flip it; the back has the status, a small chart and Expand (the on-site detail page) */
+.nb-fc{position:relative;height:150px;perspective:900px;-webkit-perspective:900px;min-width:0}
+.nb-fi{position:relative;width:100%;height:100%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+.nb-fc.flip .nb-fi{transform:rotateY(180deg)}
+.nb-ff,.nb-fb{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden;justify-content:space-between}
+.nb-ff{transform:rotateY(0deg)}
+.nb-fb{transform:rotateY(180deg);box-sizing:border-box;display:flex;flex-direction:column;gap:6px;padding:11px 12px 10px;border-radius:14px;background:#0b0d18;border:1px solid rgba(240,240,250,.28)}
+.nb-fb.s-deg{border-color:rgba(255,122,26,.6)}.nb-fb.s-out{border-color:rgba(255,59,59,.7)}.nb-fb.s-rep{border-color:rgba(169,139,255,.6)}
+.nb-fx{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+.nb-fw{display:flex;align-items:center;gap:7px;font:650 13.5px/1.25 Inter,system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nb-fw i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--na)}
+.nb-fb.s-ok .nb-fw i{background:var(--g)}.nb-fb.s-minor .nb-fw i{background:var(--mi)}.nb-fb.s-deg .nb-fw i{background:var(--dg)}.nb-fb.s-out .nb-fw i{background:var(--rd)}.nb-fb.s-rep .nb-fw i{background:var(--rp)}
+.nb-fs{font-size:11.5px;line-height:1.3;color:var(--mu);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:30px}
+.nb-fb .nb-sp{height:22px}.nb-sp rect.b-rp{fill:var(--cy)}
+.nb-fa{display:flex;gap:6px}
+.nb-fe,.nb-fd{all:unset;box-sizing:border-box;cursor:pointer;flex:1;text-align:center;padding:6px 4px;border-radius:99px;border:1px solid rgba(240,240,250,.35);font:600 10.5px/1.2 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#fff;white-space:nowrap}
+.nb-fe:hover,.nb-fd:hover{border-color:#fff}.nb-fd.done,.nb-fd[disabled]{opacity:.6}
+@media (max-width:767px){.nb-fc{height:158px}.nb-fb{padding:10px 10px 9px}.nb-fe,.nb-fd{font-size:10px;letter-spacing:.05em}}
+@media (prefers-reduced-motion:reduce){.nb-fi{transition:none}}
+/* pt1785u color-coded grid: green up, amber minor, orange disruption, red major only */
+.nb-ff.s-ok,.nb-fb.s-ok{border-color:rgba(47,214,123,.30);box-shadow:inset 0 3px 0 rgba(47,214,123,.75)}
+.nb-ff.s-minor,.nb-fb.s-minor{border-color:rgba(255,160,64,.5);box-shadow:inset 0 3px 0 #FFA040;background:linear-gradient(180deg,rgba(255,160,64,.08),var(--card) 60%)}
+.nb-ff.s-deg,.nb-fb.s-deg{box-shadow:inset 0 3px 0 #FF7A1A}
+.nb-ff.s-out,.nb-fb.s-out{box-shadow:inset 0 3px 0 var(--rd)}
+.nb-ff.s-na,.nb-fb.s-na{box-shadow:inset 0 3px 0 rgba(124,129,144,.4)}
+.nb-ff.s-rep,.nb-fb.s-rep{box-shadow:inset 0 3px 0 var(--rp)}
+/* the inactive face is hidden at the half-way point of the flip, so the card never shows a mirrored face even where backface-visibility is not honored */
+.nb-ff{visibility:visible;transition:visibility 0s linear .22s}
+.nb-fb{visibility:hidden;transition:visibility 0s linear .22s}
+.nb-fc.flip .nb-ff{visibility:hidden}.nb-fc.flip .nb-fb{visibility:visible}
+@media (max-width:767px){.nb-fe,.nb-fd{letter-spacing:.02em;padding:6px 2px}}
+@media (prefers-reduced-motion:reduce){.nb-ff,.nb-fb{transition:none}}
+/* preserve rectangular, color-coded tiles under the global rounded-button theme */
+html body main .nb .nb-ff{border-radius:14px!important}
