@@ -191,7 +191,8 @@ M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets"),   #
            "newsletter": ("newsletter", "/newsletter"), "sources": ("sources", "/sources"),
            "midterms": ("midterms", "/midterms"),
            "grid": ("grid", "/grid"),
-           "weather": ("weather", "/weather")}   # Nov 22 2026 (pt1742u): Weather opens the full-screen /weather map, not the old /live#weather tab
+           "weather": ("weather", "/weather"),
+           "net": ("net", "/network")}   # Nov 23 2026 (pt1763u): Network Status opens the /network board, not /live#network
              # Nov 21 2026 (pt1737u): The Grid opens the full-screen /grid page, not the old /live#grid dashboard tab   # Nov 21: menu opens the standalone pages, same as the top bar
 
 def menu3_sections(sn):
@@ -254,7 +255,7 @@ def drawer(sn, active=""):
                 out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
             else:
                 cur = ' aria-current="page"' if key == active else ""
-                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms", "/grid", "/weather") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
+                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms", "/grid", "/weather", "/network") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
                 out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
     out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'

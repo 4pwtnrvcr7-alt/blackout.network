@@ -362,8 +362,8 @@ html[data-theme="light"] .fin-st.fin-ok{border-left-color:#248A3D!important}html
 html[data-theme="light"] .fin-card{background:#fff!important;border-color:rgba(0,0,0,.1)!important;color:#1D1D1F!important}
 html[data-theme="light"] .fin-card .fin-nm b{color:#1D1D1F!important}html[data-theme="light"] .fin-card .fin-sym{color:#515154!important}
 /* Promo buttons in dark mode: ink text leaked onto dark/yellow buttons */
-html:not([data-theme="light"]) .bng-btn,html:not([data-theme="light"]) .bng-btn span{color:#E6E9EE!important}
-html:not([data-theme="light"]) .bng-btn.bng-p,html:not([data-theme="light"]) .bng-btn.bng-p span{color:#1D1D1F!important}
+html:not([data-theme="light"]) .bng-btn,html:not([data-theme="light"]) .bng-btn span,html:not([data-theme="light"]) .bng-btn svg,
+html:not([data-theme="light"]) .bng-btn.bng-p,html:not([data-theme="light"]) .bng-btn.bng-p span,html:not([data-theme="light"]) .bng-btn.bng-p svg{color:#F2F2F4!important;fill:currentColor;border-color:#F2F2F4!important}
 /* ---------- Phase 3b+: folded panels and long lists (Apple-style accordions and "Show all") ---------- */
 html.bna-pg .bna-fold>h2{cursor:pointer;display:flex!important;align-items:center;gap:12px;min-height:44px;margin:0!important;-webkit-user-select:none;user-select:none}
 html.bna-pg .bna-fold>h2:focus-visible{outline:2px solid var(--a-lk);outline-offset:4px;border-radius:8px}
