@@ -19,6 +19,8 @@ GROUPS = [("starlink", "Starlink", "starlink", "SpaceX broadband, low Earth orbi
           ("goes", "GOES", "goes", "NOAA weather satellites, geostationary")]
 _L = threading.Lock(); _KL = {}; _BO = {}; _ERR = {}; _MEM = {}
 
+SUP_STARLINK = "https://celestrak.org/NORAD/elements/supplemental/sup-gp.php?FILE=starlink&FORMAT=csv"
+
 def _dir():
     d = os.environ.get("BN_STARLINK_CACHE_DIR") or os.path.join(os.environ.get("BN_STATE_DIR") or "/tmp", "bn_starlink")
     os.makedirs(d, mode=0o700, exist_ok=True); return d
@@ -28,9 +30,15 @@ def _file(gid, group):
         try:
             import netstarlink as SL
             p, mt, err = SL.celestrak_file("gp.csv", SL.GP_URL, SL.GP_MAX_AGE)
-            return p, mt, err
+            if p: return p, mt, err
         except Exception as e:
-            return None, None, type(e).__name__
+            err = type(e).__name__
+        # GROUP=starlink refused (CelesTrak 403s repeat/shared-IP downloads): use CelesTrak's supplemental
+        # SpaceX-ephemeris GP file instead (same CSV columns), on the same polite 6 h / 2 h schedule.
+        return _fetch("starlink_sup", SUP_STARLINK)
+    return _fetch(gid, CT.format(g=group))
+
+def _fetch(gid, url):
     p = os.path.join(_dir(), f"sky_{gid}.csv")
     have = lambda: (p, os.path.getmtime(p)) if os.path.exists(p) else (None, None)
     fp, mt = have()
@@ -41,7 +49,7 @@ def _file(gid, group):
         fp, mt = have()
         if mt and time.time() - mt < MAX_AGE: return fp, mt, None
         try:
-            with urllib.request.urlopen(urllib.request.Request(CT.format(g=group), headers={"User-Agent": UA, "Accept": "text/csv"}), timeout=30) as r:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "text/csv"}), timeout=30) as r:
                 b = r.read(8_000_000)
             if not b.startswith(b"OBJECT_NAME") or b.count(b"\n") < 3: raise RuntimeError("unexpected response")
             with open(p + ".tmp", "wb") as f: f.write(b)
