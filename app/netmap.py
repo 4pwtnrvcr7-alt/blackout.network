@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json", "inet_ents.json": "application/json"}
+FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json", "hydro.json": "application/json", "inet_ents.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -624,7 +624,7 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
 SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
              ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
 # Nov 24 2026 (Matt): one "Power grid" chip (outages + operators + 230 kV+ lines); chips with no map items (Mobile, Satellite, Payments, Apps) live on Status only
-CHIPS = [("internet", "Internet"), ("grid", "Power grid"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers")]
+CHIPS = [("internet", "Internet"), ("grid", "Power grid"), ("hydro", "Hydro dams"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers")]
 
 def page(qs=None):
     try:
@@ -677,7 +677,7 @@ def page(qs=None):
 <button type="button" class="nx-b" id="nx_home" aria-label="Show the whole U.S."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
 <div class="nx-leg" id="nx_leg" aria-label="Legend"><ul>
 <li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li style="display:none"><i class="s-na" style="background:#7C8190"></i>No data</li><li><i class="s-dc"></i>Data center</li></ul>
-<ul class="nx-shapes" id="gx_leg"><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul><ul class="nx-lnk" aria-label="Power lines, coloured by their grid operator&#39;s live status"><li><i class="ln" style="background:#2FD67B"></i>Lines normal</li><li><i class="ln" style="background:#F5D547"></i>Strained</li><li><i class="ln" style="background:#FF3B3B"></i>Outage</li><li><i class="ln" style="background:#7C8190"></i>No live feed</li></ul><p class="nx-live" id="gx_live">Live line status: U.S. grid operators</p></div>
+<ul class="nx-shapes" id="gx_leg"><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul><ul class="nx-lnk" aria-label="Power lines, coloured by their grid operator&#39;s live status"><li><i class="ln" style="background:#2FD67B"></i>Lines normal</li><li><i class="ln" style="background:#F5D547"></i>Strained</li><li><i class="ln" style="background:#FF3B3B"></i>Outage</li><li><i class="ln" style="background:#7C8190"></i>No live feed</li></ul><p class="nx-live" id="gx_live">Live line status: U.S. grid operators</p><ul class="nx-lnk" aria-label="Hydro dams by reservoir level"><li><i style="width:8px;height:8px;border-radius:50%;background:#2FD67B"></i>Dam level OK</li><li><i style="width:8px;height:8px;border-radius:50%;background:#FF7A1A"></i>Low water</li><li><i style="width:8px;height:8px;border-radius:50%;background:#FF3B3B"></i>Near min. pool</li><li><i style="width:8px;height:8px;border-radius:50%;background:rgba(124,129,144,.6)"></i>No level data</li></ul></div>
 <button type="button" class="nx-more-btn" id="nx_more_btn" aria-controls="nx_more" aria-expanded="false"><span id="nx_more_lbl">All networks</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <button type="button" class="gx-more-btn" id="gx_more_btn" aria-controls="gx_more" aria-expanded="false"><span class="gx-ml">More about the grid</span><span class="gx-ms">Grid details</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <aside class="nx-card" id="nx_card" hidden aria-live="polite"></aside>
@@ -759,6 +759,12 @@ def handle_get(path, qs=None, headers=None):
             r = swr("gridfreq", 300, lambda: gridfreq.build(jget, STATIC), wait=True)
             return (200, r) if r else (503, {"error": "grid frequency is still loading"})
         except Exception as ex: return 503, {"error": "grid frequency unavailable", "detail": type(ex).__name__}
+    if p == "/api/netmap/reservoirs":   # pt1815u stage 2: reservoir level vs. minimum power pool (USBR, 30 min cache)
+        import reservoirs
+        try:
+            r = swr("reservoirs", 1800, lambda: reservoirs.build(jget), wait=True)
+            return (200, r) if r else (503, {"error": "reservoir levels are still loading"})
+        except Exception as ex: return 503, {"error": "reservoir levels unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":
         import netsky
         return 200, netsky.space()

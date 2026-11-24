@@ -155,7 +155,7 @@
   }
   window.__bnPlace = function (c, pt) { dragCard(c); placeCard(c, pt); };
   addEventListener("resize", function () { ["nx_card", "gx_card"].forEach(function (id) { var c = document.getElementById(id); if (c && !c.hidden) { var r = c.getBoundingClientRect(); clampCard(c, r.left, r.top); } }); });
-  var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
+  var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, hydro: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
   function boot() {
@@ -232,9 +232,10 @@
       var inetHit = ON.internet && INET && map.getLayer("inet-fill") && map.getLayoutProperty("inet-fill", "visibility") !== "none" ? map.queryRenderedFeatures(e.point, { layers: ["inet-fill"] })[0] : null,
         T = inetHit ? 3 : 8, T9 = inetHit ? 3 : 9;
       var f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["pt", "dc"].filter(function (l) { return map.getLayoutProperty(l, "visibility") !== "none"; }) })[0];
-      if (!f && (ON.towers || ON.grid)) {
+      if (!f && (ON.towers || ON.grid || ON.hydro)) {
         var il = []; INF_K.forEach(function (k) { if (ON[k]) il = il.concat(INF[k].Q); });
-        f = map.queryRenderedFeatures([[e.point.x - T9, e.point.y - T9], [e.point.x + T9, e.point.y + T9]], { layers: il.filter(function (l) { return map.getLayer(l); }) })[0];
+        var fl = map.queryRenderedFeatures([[e.point.x - T9, e.point.y - T9], [e.point.x + T9, e.point.y + T9]], { layers: il.filter(function (l) { return map.getLayer(l); }) });
+        f = fl.filter(function (x) { return x.source === "hy"; })[0] || fl[0];   /* a dam wins over the substation at its foot */
         if (f && f.source === "grid") f.properties.kind = f.geometry.type === "Point" ? "ss" : "gl";
         if (f && f.properties.cluster) { var cid = f.properties.cluster_id, cc0 = f.geometry.coordinates; hideCard(true);
           map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
@@ -358,7 +359,7 @@
         ((s.top || []).length ? '<ul>' + s.top.map(function (u) { return '<li>' + (url(u.web) ? '<a href="' + url(u.web) + '" target="_blank" rel="noopener noreferrer">' + esc(u.name) + '</a>' : esc(u.name)) + ' · ' + num(u.outages) + '</li>'; }).join("") + '</ul>' : '') +
         '<div class="acts">' + (s.st ? '<button type="button" class="gx-fly" data-state="' + esc(s.st) + '">Utilities and outage maps</button>' : '') + '<button type="button" class="gx-fly" data-more="gx-outages">Outages by state</button></div>';
     } else if (p.kind === "cable" || p.kind === "ls") { h = seaCard(p);
-    } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss") { h = infCard(p);
+    } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss" || p.kind === "hy") { h = infCard(p);
     } else if (p.kind === "inet") { h = inetCard(p);
     } else if (p.kind === "cloud") {
       var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = lvCol(cl.level);
@@ -444,7 +445,15 @@
   var INF = {
     towers: { url: "/api/netmap/towers.json", L: ["tw-cl", "tw-cnt", "tw-pt"], Q: ["tw-cl", "tw-pt"], d: null, busy: false, err: false },
     grid: { url: "/api/netmap/grid.json", L: ["gl-lo", "gl-hi", "gss"], Q: ["gss", "gl-hi", "gl-lo"], d: null, busy: false, err: false }
-  }, INF_K = ["towers", "grid"], INF_L = [];
+,
+    hydro: { url: "/api/netmap/hydro.json", L: ["hy-pt"], Q: ["hy-pt"], d: null, busy: false, err: false }   /* pt1815u stage 2: hydro dams + reservoir level risk */
+  }, INF_K = ["towers", "grid", "hydro"], INF_L = [];
+  var HCOL = { ok: "#2FD67B", low: "#FF7A1A", out: "#FF3B3B", na: "#7C8190" }, HWORD = { ok: "Water level normal", low: "Low water: output reduced", out: "Near or below minimum power pool", na: "No water level data" }, HLV = {};
+  function hydroData() {
+    var d = INF.hydro.d; if (!d || !map || !map.getSource("hy")) return;
+    map.getSource("hy").setData({ type: "FeatureCollection", features: d.p.map(function (r, i) { var lv = HLV[r[7]]; return { type: "Feature", geometry: { type: "Point", coordinates: [r[0], r[1]] }, properties: { kind: "hy", i: i, mw: r[3], st: lv ? lv.status : "na" } }; }) });
+  }
+  function hydroLevels() { getJSON("/api/netmap/reservoirs").then(function (j) { HLV = j.levels || {}; hydroData(); }, function () {}); }
   INF_K.forEach(function (k) { INF_L = INF_L.concat(INF[k].L); });
   var TWC = "#9FB4FF";
   /* Nov 24 2026 (Matt): 230 kV+ lines coloured by the live status of the U.S. operator/BA area they sit in (no public per-line status exists).
@@ -478,6 +487,10 @@
         "circle-radius": ["step", ["get", "point_count"], 9, 100, 13, 1000, 17, 5000, 22] } });
     L({ id: "tw-cnt", type: "symbol", source: "tw", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": FB, "text-size": 10, "text-allow-overlap": true },
       paint: { "text-color": "rgba(240,240,250,.9)" } });
+    map.addSource("hy", { type: "geojson", data: EMPTY });
+    L({ id: "hy-pt", type: "circle", source: "hy", layout: { "circle-sort-key": ["case", ["==", ["get", "st"], "na"], 0, 1] },
+      paint: { "circle-color": ["match", ["get", "st"], "ok", HCOL.ok, "low", HCOL.low, "out", HCOL.out, "rgba(124,129,144,.35)"], "circle-stroke-color": ["match", ["get", "st"], "na", "#A9AEBB", "#05060a"], "circle-stroke-width": 1,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["case", ["!=", ["get", "st"], "na"], 6, [">=", ["get", "mw"], 2000], 3, 1.6], 6, ["interpolate", ["linear"], ["sqrt", ["get", "mw"]], 5, 3, 150, 11]] } });
     L({ id: "tw-pt", type: "circle", source: "tw", filter: ["!", ["has", "point_count"]],
       paint: { "circle-color": TWC, "circle-stroke-color": "#05060a", "circle-stroke-width": 1, "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 2.5, 12, 5] } });
   }
@@ -503,6 +516,7 @@
     getJSON(o.url).then(function (j) {
       o.d = j; o.busy = false;
       if (k === "towers") map.getSource("tw").setData({ type: "FeatureCollection", features: j.p.map(function (r, i) { return { type: "Feature", geometry: { type: "Point", coordinates: [r[0], r[1]] }, properties: { kind: "tw", i: i } }; }) });
+      if (k === "hydro") { hydroData(); hydroLevels(); setInterval(function () { if (!document.hidden) hydroLevels(); }, 1800000); }
       // Grid geometry is fetched as vector tiles for the visible viewport, never a national GeoJSON download.
       infPanel();
     }, function () { o.busy = false; o.err = true; infPanel(); });
@@ -519,7 +533,16 @@
   function kvTxt(v) { return v ? v + " kV" : "Unknown"; }
   function infCard(p) {
     var h = "", c;
-    if (p.kind === "tw") {
+    if (p.kind === "hy") {
+      var hd = INF.hydro.d, hr = hd.p[p.i], lv = HLV[hr[7]], hs = lv ? lv.status : "na"; c = HCOL[hs];
+      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Hydroelectric dam · ' + esc(HWORD[hs]) + '</span><h3>' + esc(lv ? lv.dam : hr[2]) + '</h3><dl>' +
+        '<dt>Capacity</dt><dd>' + num(hr[3]) + ' MW</dd>' + (hr[4] ? '<dt>Operator</dt><dd>' + esc(hr[4]) + '</dd>' : "") + (hr[5] ? '<dt>In service</dt><dd>' + hr[5] + '</dd>' : "") + '<dt>Country</dt><dd>' + esc(hr[6]) + '</dd>' +
+        (lv && lv.ft != null ? '<dt>' + esc(lv.lake) + '</dt><dd>' + num(Math.round(lv.ft)) + ' ft, ' + num(Math.round(lv.above_min)) + ' ft above minimum power pool (' + num(lv.min_pool) + ' ft)</dd>' +
+          '<dt>7-day trend</dt><dd>' + (lv.chg7 == null ? "–" : (lv.chg7 >= 0 ? "+" : "") + lv.chg7.toFixed(1) + " ft") + '</dd><dt>Reading</dt><dd>' + esc(lv.date) + '</dd>' : "") + '</dl>' +
+        (lv ? '<div class="acts">' + linkA(lv.url, "Reclamation lake levels") + '</div><p class="age">Amber at or below ' + num(lv.amber) + ' ft, red at or below ' + num(lv.red) + ' ft. Source: ' + esc(lv.src) + '.</p>'
+          : '<p class="age">No free live water-level feed with a published minimum power pool for this reservoir, so no risk colour is shown.</p>') +
+        '<p class="age">Plant data: WRI Global Power Plant Database (2021), CC BY 4.0. Plants of 25 MW and up.</p>';
+    } else if (p.kind === "tw") {
       var d = INF.towers.d, r = d.p[p.i];
       h = '<span class="st" style="color:' + TWC + '"><i style="background:' + TWC + '"></i>Registered antenna structure</span><h3>' + esc(d.owners[r[2]]) + '</h3><dl>' +
         '<dt>Type</dt><dd>' + esc(d.tnames[d.types[r[4]]] || d.types[r[4]]) + '</dd><dt>Height</dt><dd>' + (r[3] ? num(r[3]) + " m (" + num(r[3] * 3.281) + " ft)" : "–") + '</dd></dl>' +
