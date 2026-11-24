@@ -22,6 +22,21 @@ class T(unittest.TestCase):
         r = netinet.build(jget)
         self.assertEqual(set(r["places"]), {"C:PR", "S:Florida"})
         self.assertTrue(all(p["level"] == -1 for p in r["places"].values()))
+    def test_recovered_by_current_value(self):
+        self.assertEqual(netinet.judge([A("bgp", "critical", 1, 20, 100)], {"bgp": 97})[0], 0)
+    def test_current_value_still_down(self):
+        l, d, _, _ = netinet.judge([A("bgp", "critical", 1, 20, 100)], {"bgp": 50})
+        self.assertEqual((l, d[0]["pct"], d[0]["live"]), (3, 50, True))
+    def test_build_rechecks_down_signals(self):
+        def jget(url, **k):
+            if "entities" in url and "region" in url: return {"data": []}
+            if "entities" in url: return {"data": [{"code": "IQ", "name": "Iraq"}]}
+            if "alerts" in url and "country" in url: return {"data": [dict(A("bgp", "critical", 1, 10, 100), entity={"code": "IQ"})]}
+            if "alerts" in url: return {"data": []}
+            if "signals/raw/country/IQ" in url: return {"data": [[{"values": [None, 40, 99, None]}]]}
+            raise OSError(url)
+        r = netinet.build(jget)
+        self.assertEqual(r["places"]["C:IQ"]["level"], 0)
     def test_static_geo_served(self):
         st, body, ct = netmap.handle_get("/api/netmap/inet.json")
         self.assertEqual((st, ct), (200, "application/json")); self.assertIn(b'"S:Florida"', body); self.assertIn(b'"C:PR"', body)
