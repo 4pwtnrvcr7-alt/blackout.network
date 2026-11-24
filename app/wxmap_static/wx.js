@@ -129,7 +129,7 @@
   function finish() {
     if (ldDone) return; ldDone = true;
     var n = $("wx_ldn"); if (n) n.textContent = "100"; RAIN.level = 1; RAIN.full = true; var e = $("wx_ldphase"); if (e) e.textContent = "Opening the map";
-    setTimeout(function () { document.body.classList.add("wx-ready"); setTimeout(function () { RAIN.stop = true; }, 1300); }, Math.max(700, 2200 - (Date.now() - ldT0)));
+    setTimeout(function () { document.body.classList.add("wx-ready"); maybeAutoplay(); setTimeout(function () { RAIN.stop = true; }, 1300); }, Math.max(700, 2200 - (Date.now() - ldT0)));
   }
   setTimeout(function () { if (!ldDone) { var m = $("wx_ldmsg"); if (m) { m.hidden = false; m.textContent = "Some layers are still loading. They finish in the background."; } setTimeout(finish, 900); } }, 25000);
   var RAIN = { level: 0, stop: false, full: false };
@@ -264,6 +264,7 @@
     go(target, true);
     if (MODE === "radar") setTimeout(prefetch, 60); else mPreload();
     bufTick();
+    maybeAutoplay();
   }
   function nearest(t) { var b = 0, bd = Infinity; FRAMES.forEach(function (f, i) { var d = Math.abs(f.t - t); if (d < bd) { bd = d; b = i; } }); return b; }
   function pos(i) { return FRAMES.length > 1 ? i / (FRAMES.length - 1) * 100 : 0; }
@@ -775,6 +776,13 @@
   /* ---------- play ---------- */
   var playT = null;
   function frameReady(i) { return MODE === "radar" ? frameBuffered(i) && rLoaded(i) : mReadyK(i) && mLoaded(i); }
+  var autoPlayed = false;
+  function maybeAutoplay() {
+    if (autoPlayed || !ldDone || !document.body.classList.contains("wx-ready")) return;
+    if (MODE !== "radar" || !FRAMES.length) return;
+    autoPlayed = true;
+    play();
+  }
   function play() {
     if (!FRAMES.length) return; playing = true; $("wx_play").classList.add("on"); $("wx_play").setAttribute("aria-label", "Pause");
     if (IDX >= FRAMES.length - 1) go(0);
@@ -798,7 +806,7 @@
   document.addEventListener("keydown", function (e) {
     if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && e.target.id !== "wx_range") return;
     if (e.key === " " && e.target.id !== "wx_range") { e.preventDefault(); if (playing) stop(); else play(); }
-    if (e.key === "Escape") { if (pinned) hideCard(true); else closeLays(); }
+    if (e.key === "Escape") { if (abarOpen()) collapseAbar(); else if (abarOn()) hideAbar(); else if (pinned) hideCard(true); else closeLays(); }
   });
 
   /* ---------- overlays ---------- */
@@ -928,7 +936,7 @@
     var row = document.querySelector('.wx-lay[data-k="' + k + '"]'); if (row) { row.classList.toggle("off", !ok); var i = row.querySelector("input"); if (i) i.disabled = !ok; }
   }
   /* overlay panel */
-  function openLays() { document.body.classList.add("wx-lays-on"); $("wx_lays").hidden = false; $("wx_lay_btn").setAttribute("aria-expanded", "true"); hideCard(true); }
+  function openLays() { document.body.classList.add("wx-lays-on"); $("wx_lays").hidden = false; $("wx_lay_btn").setAttribute("aria-expanded", "true"); hideCard(true); collapseAbar(); }
   function closeLays() { document.body.classList.remove("wx-lays-on"); $("wx_lay_btn").setAttribute("aria-expanded", "false"); setTimeout(function () { if (!document.body.classList.contains("wx-lays-on")) $("wx_lays").hidden = true; }, 250); }
   $("wx_lay_btn").addEventListener("click", function () { if (document.body.classList.contains("wx-lays-on")) closeLays(); else openLays(); });
   $("wx_lays_x").addEventListener("click", closeLays);
@@ -1011,11 +1019,22 @@
     return (v < 0.1 ? "No snow" : v.toFixed(1) + " in of snow") + " in 24 h";
   }
   function place(pt) {
-    if (touch || innerWidth < 768) { card.style.left = ""; card.style.top = ""; return; }
-    if (!pt) { card.style.left = "16px"; card.style.top = "124px"; return; }
+    if (touch || innerWidth < 768) {
+      card.classList.remove("dock");
+      card.style.left = ""; card.style.top = ""; card.style.right = ""; card.style.bottom = ""; card.style.transform = "";
+      return;
+    }
+    if (card.classList.contains("pin") || !pt) {
+      card.classList.add("dock");
+      card.style.left = ""; card.style.top = ""; card.style.right = ""; card.style.bottom = ""; card.style.transform = "";
+      return;
+    }
+    card.classList.remove("dock");
     var w = card.offsetWidth, h = card.offsetHeight, x = pt.x + 18, y = pt.y + 18;
-    if (x + w > innerWidth - 70) x = pt.x - w - 18; if (y + h > innerHeight - 150) y = Math.max(130, innerHeight - h - 150);
-    card.style.left = Math.max(12, x) + "px"; card.style.top = Math.max(120, y) + "px";
+    if (x + w > innerWidth - 70) x = pt.x - w - 18;
+    if (y + h > innerHeight - 150) y = Math.max(210, innerHeight - h - 150);
+    card.style.bottom = ""; card.style.right = ""; card.style.transform = "";
+    card.style.left = Math.max(12, x) + "px"; card.style.top = Math.max(210, y) + "px";
   }
   function showCard(html, pt, pin, tip) {
     if (!pin && pinned) return;
@@ -1025,12 +1044,98 @@
   }
   function hideCard(force) {
     if (pinned && !force) return;
-    pinned = null; card.classList.remove("in", "pin"); setTimeout(function () { if (!card.classList.contains("in")) card.hidden = true; }, 200);
+    pinned = null; card.classList.remove("in", "pin", "dock"); setTimeout(function () { if (!card.classList.contains("in")) card.hidden = true; }, 200);
   }
   card.addEventListener("click", function (e) {
     if (e.target.closest(".wx-cx")) { hideCard(true); return; }
     var b = e.target.closest("[data-fc]"); if (b) { var a = b.dataset.fc.split(","); forecast({ lat: +a[0], lon: +a[1], name: "This spot" }, false); }
   });
+  /* ---------- NWS alert bar (pt1843u): starts collapsed above the timeline ---------- */
+  var abar = $("wx_abar"), abarBar = $("wx_abar_bar"), abarPanel = $("wx_abar_panel"), abarList = [], abarAt = null;
+  function abarOn() { return abar && !abar.hidden; }
+  function abarOpen() { return abarOn() && abar.classList.contains("open"); }
+  function areaShort(a) { return a ? String(a).split(";")[0].replace(/\s+/g, " ").trim() : ""; }
+  function alertSev(p) {
+    var s = String(p.severity || "").toLowerCase();
+    if (p.watch) return "warn";
+    if (s === "extreme" || s === "severe") return "sev";
+    if (/emergency|warning$/i.test(p.event || "")) return "sev";
+    return "warn";
+  }
+  function isWarn(f) { var id = f && f.layer && f.layer.id; return id === "warn-fill" || id === "warn-line" || id === "watch-line"; }
+  function uniqAlerts(list) {
+    var out = [], seen = {};
+    list.forEach(function (f) {
+      var p = f.properties || {}, k = p.id || p.url || (p.event + "|" + p.area);
+      if (seen[k]) return; seen[k] = 1; out.push(f);
+    });
+    var rank = { tor: 0, svr: 1, flood: 2, trop: 3, wind: 4, winter: 5, heat: 6, cold: 7 };
+    out.sort(function (a, b) {
+      var pa = a.properties || {}, pb = b.properties || {};
+      if (!pa.watch !== !pb.watch) return pa.watch ? 1 : -1;
+      return (rank[pa.g] || 9) - (rank[pb.g] || 9);
+    });
+    return out;
+  }
+  function syncAbarH() {
+    var h = abarOn() ? abar.offsetHeight : 0;
+    document.body.style.setProperty("--wx-abar-h", h + "px");
+  }
+  function setAbarOpen(on) {
+    if (!abar) return;
+    abar.classList.toggle("open", !!on);
+    abarPanel.hidden = !on;
+    abarBar.setAttribute("aria-expanded", on ? "true" : "false");
+    document.body.classList.toggle("wx-abar-open", !!on);
+    if (on) paintAbarPanel();
+    requestAnimationFrame(syncAbarH);
+  }
+  function hideAbar() {
+    if (!abar) return;
+    abar.hidden = true; abar.classList.remove("open", "sev", "warn");
+    abarPanel.hidden = true; abarPanel.innerHTML = "";
+    abarBar.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("wx-abar-on", "wx-abar-open");
+    abarList = []; abarAt = null;
+    document.body.style.setProperty("--wx-abar-h", "0px");
+  }
+  function collapseAbar() { if (abarOpen()) setAbarOpen(false); }
+  function paintAbarPanel() {
+    if (!abarList.length) return;
+    var f = abarList[0], p = f.properties || {}, fc = "";
+    if (abarAt) fc = '<div class="acts"><button type="button" class="lnk" data-fc="' + abarAt.lat.toFixed(4) + "," + abarAt.lng.toFixed(4) + '">Forecast for this spot</button></div>';
+    var more = "";
+    if (abarList.length > 1) {
+      more = '<ul class="wx-abar-more">' + abarList.slice(1).map(function (x) {
+        var q = x.properties || {}, area = areaShort(q.area);
+        return "<li><b>" + esc(q.event || "Alert") + (area ? " · " + esc(area) : "") + "</b>" + (url(q.url) ? '<a href="' + url(q.url) + '" target="_blank" rel="noopener noreferrer">Full alert</a>' : "") + "</li>";
+      }).join("") + "</ul>";
+    }
+    abarPanel.innerHTML = '<div class="wx-abar-hd"><button type="button" class="wx-abar-col" data-abar-col>Collapse</button></div>' + featHTML(f) + fc + more;
+  }
+  function showAbar(list, lngLat, open) {
+    if (!abar || !list.length) { hideAbar(); return; }
+    hideCard(true);
+    abarList = list; abarAt = lngLat || null;
+    var p = list[0].properties || {}, area = areaShort(p.area), n = list.length;
+    var sev = "warn", i;
+    for (i = 0; i < list.length; i++) if (alertSev(list[i].properties || {}) === "sev") { sev = "sev"; break; }
+    abar.classList.remove("sev", "warn"); abar.classList.add(sev);
+    $("wx_abar_sum").textContent = (p.event || "Alert") + (area ? " · " + area : "");
+    var badge = $("wx_abar_n");
+    if (n > 1) { badge.hidden = false; badge.textContent = String(n); }
+    else badge.hidden = true;
+    abar.hidden = false;
+    document.body.classList.add("wx-abar-on");
+    setAbarOpen(!!open);
+    syncAbarH();
+  }
+  abarBar.addEventListener("click", function () { setAbarOpen(!abarOpen()); });
+  abar.addEventListener("click", function (e) {
+    if (e.target.closest("[data-abar-col]")) { e.preventDefault(); setAbarOpen(false); return; }
+    var b = e.target.closest("[data-fc]"); if (b) { var a = b.dataset.fc.split(","); forecast({ lat: +a[0], lon: +a[1], name: "This spot" }, false); }
+  });
+
   var HIT = ["gd", "rep", "trk-hit", "nhc-pt", "nhc-track", "nhc-cone", "season-line", "warn-fill", "ol-fill"];
   function hits(pt, pad) {
     var bb = pad ? [[pt.x - pad, pt.y - pad], [pt.x + pad, pt.y + pad]] : pt;
@@ -1180,15 +1285,18 @@
         if (touch) return;
         var f = hits(e.point, 3)[0];
         map.getCanvas().style.cursor = f ? "pointer" : "";
-        if (f) { showCard(featHTML(f), e.point, false); return; }
+        if (f) { if (isWarn(f)) { hideCard(false); return; } showCard(featHTML(f), e.point, false); return; }
         var v = valueHTML(e.lngLat.lng, e.lngLat.lat);
         if (v) showCard(esc(v), e.point, false, true); else hideCard(false);
       });
       map.on("mouseout", function () { hideCard(false); });
       map.on("click", function (e) {
         if (document.body.classList.contains("wx-lays-on")) { closeLays(); return; }
-        var f = hits(e.point, 8)[0], v = valueHTML(e.lngLat.lng, e.lngLat.lat);
+        var hs = hits(e.point, 8), warns = uniqAlerts(hs.filter(isWarn));
+        var f = hs[0], v = valueHTML(e.lngLat.lng, e.lngLat.lat);
         var fc = '<div class="acts"><button type="button" class="lnk" data-fc="' + e.lngLat.lat.toFixed(4) + "," + e.lngLat.lng.toFixed(4) + '">Forecast for this spot</button></div>';
+        if (warns.length) { showAbar(warns, e.lngLat, false); return; }
+        hideAbar();
         if (f) showCard(featHTML(f) + (v ? '<p class="age">' + esc(v) + "</p>" : "") + fc, e.point, true);
         else if (pinned) hideCard(true);
         else showCard((v ? "<h3>" + esc(v) + "</h3>" : "<h3>This spot</h3>") + '<p class="age">' + esc(FRAMES[IDX] ? when(FRAMES[IDX].t) : "") + "</p>" + fc, e.point, true);
