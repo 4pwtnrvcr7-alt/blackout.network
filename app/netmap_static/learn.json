@@ -1,0 +1,165 @@
+{
+  "starlink": {
+    "name": "Starlink",
+    "operator": "SpaceX",
+    "first": "2019-05-24",
+    "first_label": "24 May 2019 (first 60 satellites, Starlink mission 0.9)",
+    "purpose": "Low Earth orbit broadband internet.",
+    "depends": "Starlink customer terminals used by households, businesses, ships, aircraft and some government users.",
+    "failure": "Losing a few satellites is routine in a constellation this large. A constellation-wide failure would interrupt Starlink internet for its customers. It would not take down GPS or other navigation systems.",
+    "image": "/api/netmap/learn/starlink.jpg",
+    "alt": "A stack of 60 Starlink satellites on a Falcon 9, 24 May 2019",
+    "credit": "Official SpaceX Photos, 24 May 2019. Released under CC0 1.0.",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "sources": [
+      {
+        "name": "SpaceX Starlink",
+        "url": "https://www.starlink.com/"
+      },
+      {
+        "name": "SpaceX launches",
+        "url": "https://www.spacex.com/launches/"
+      }
+    ]
+  },
+  "gps": {
+    "name": "GPS",
+    "operator": "U.S. Space Force, Space Operations Command",
+    "first": "1978-02-22",
+    "first_label": "22 February 1978 (Navstar 1). Civil service declared operational 17 July 1995.",
+    "purpose": "Global positioning, navigation and timing (PNT) from medium Earth orbit, about 20,200 km up.",
+    "depends": "Aviation and maritime navigation, surveying, smartphone maps, cellular networks, power-grid timing, financial-transaction timestamps, emergency services and military PNT.",
+    "failure": "A complete GPS outage would degrade or stop many civil navigation and timing uses until other GNSS (Galileo, GLONASS, BeiDou) or backup clocks and navigation are used. The U.S. has warned about over-reliance on GPS. Losing some satellites usually leaves the service usable, with lower accuracy.",
+    "image": "/api/netmap/learn/gps.jpg",
+    "alt": "Illustration of a GPS Block IIR satellite",
+    "credit": "U.S. government illustration of a GPS IIR spacecraft. Public domain.",
+    "license": "Public domain",
+    "sources": [
+      {
+        "name": "GPS.gov",
+        "url": "https://www.gps.gov/systems/gps/"
+      },
+      {
+        "name": "U.S. Space Force",
+        "url": "https://www.spaceforce.mil/"
+      }
+    ]
+  },
+  "glonass": {
+    "name": "GLONASS",
+    "operator": "Roscosmos and the Ministry of Defence of the Russian Federation",
+    "first": "1982-10-12",
+    "first_label": "12 October 1982. A full constellation was restored around 2011.",
+    "purpose": "Russia's global navigation satellite system, in medium Earth orbit.",
+    "depends": "Russian and partner military and civil navigation, and multi-GNSS receivers worldwide.",
+    "failure": "Receivers that use only GLONASS would lose positioning and timing. Most modern phones use several GNSS systems and would still use GPS, Galileo or BeiDou.",
+    "sources": [
+      {
+        "name": "Information and Analysis Center for Positioning, Navigation and Timing",
+        "url": "https://www.glonass-iac.ru/en/"
+      }
+    ]
+  },
+  "galileo": {
+    "name": "Galileo",
+    "operator": "European Union Agency for the Space Programme (EUSPA). Satellites are developed with the European Space Agency.",
+    "first": "2011-10-21",
+    "first_label": "21 October 2011 (first In-Orbit Validation satellites). Initial services began 15 December 2016. Test satellites (GIOVE) flew from 2005.",
+    "purpose": "The European Union's global navigation satellite system, including an authenticated civil service, in medium Earth orbit.",
+    "depends": "European civil and commercial navigation, multi-GNSS smartphones, and some European infrastructure that uses Galileo timing or positioning.",
+    "failure": "Europe's independent satellite PNT would be lost; multi-GNSS devices would still use other constellations. Galileo had a multi-day service outage in July 2019, which EUSPA and ESA later documented.",
+    "image": "/api/netmap/learn/galileo.jpg",
+    "alt": "A Galileo satellite in ESA's Large European Acoustic Facility for testing",
+    "credit": "ESA, Galileo satellite in the Large European Acoustic Facility, 2013. CC BY-SA 3.0 IGO. Resized from the original.",
+    "license": "CC BY-SA 3.0 IGO",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/igo/",
+    "sources": [
+      {
+        "name": "EUSPA",
+        "url": "https://www.euspa.europa.eu/european-space/galileo/galileo-what-galileo"
+      },
+      {
+        "name": "ESA Galileo",
+        "url": "https://www.esa.int/Applications/Satellite_navigation/Galileo"
+      }
+    ]
+  },
+  "beidou": {
+    "name": "BeiDou",
+    "operator": "China Satellite Navigation Office",
+    "first": "2000-10-31",
+    "first_label": "31 October 2000 (first BeiDou-1 satellite). The global BDS-3 service was commissioned 31 July 2020.",
+    "purpose": "China's global positioning, navigation and timing system.",
+    "depends": "Chinese civil and military users, partner services, and multi-GNSS phones worldwide.",
+    "failure": "Users relying only on BeiDou would lose that positioning and timing service. Multi-GNSS devices would still use other systems.",
+    "sources": [
+      {
+        "name": "BeiDou Navigation Satellite System",
+        "url": "http://en.beidou.gov.cn/"
+      }
+    ]
+  },
+  "iridium": {
+    "name": "Iridium",
+    "operator": "Iridium Communications",
+    "first": "1997-05-05",
+    "first_label": "5 May 1997 (first launch). The Iridium NEXT replenishment was completed in 2019.",
+    "purpose": "Global satellite voice and data, including polar coverage. Aireon aircraft-tracking payloads fly on Iridium NEXT.",
+    "depends": "Maritime, aviation, military and remote-area communications, and some safety and Internet-of-things services. Aireon space-based ADS-B uses the hosted payloads.",
+    "failure": "Iridium phone and data users would lose that service. Aireon space-based aircraft surveillance would be affected if the hosted payloads failed.",
+    "image": "/api/netmap/learn/iridium.jpg",
+    "alt": "Iridium NEXT satellites on a Falcon 9, SpaceX launch photo",
+    "credit": "Official SpaceX Photos, Iridium NEXT 21-30 mission. Released under CC0 1.0.",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "sources": [
+      {
+        "name": "Iridium",
+        "url": "https://www.iridium.com/"
+      },
+      {
+        "name": "Aireon",
+        "url": "https://aireon.com/"
+      }
+    ]
+  },
+  "oneweb": {
+    "name": "OneWeb",
+    "operator": "Eutelsat Group (Eutelsat OneWeb)",
+    "first": "2019-02-27",
+    "first_label": "27 February 2019 (first six satellites).",
+    "purpose": "Low Earth orbit broadband, mainly for enterprise, government, aviation and maritime customers.",
+    "depends": "OneWeb customer terminals in those markets.",
+    "failure": "Those customers would lose OneWeb connectivity. Terrestrial networks and other satellite broadband would be unaffected.",
+    "sources": [
+      {
+        "name": "Eutelsat OneWeb",
+        "url": "https://oneweb.net/"
+      }
+    ]
+  },
+  "goes": {
+    "name": "GOES",
+    "operator": "NOAA. NASA builds and launches the satellites; NOAA operates them.",
+    "first": "1975-10-16",
+    "first_label": "16 October 1975 (GOES-1). The current GOES-R series began with GOES-16 on 19 November 2016.",
+    "purpose": "Continuous weather, lightning, space-weather and environmental monitoring for the Americas from geostationary orbit, about 35,786 km up.",
+    "depends": "U.S. National Weather Service forecasts and warnings, aviation weather, hurricane tracking and emergency management.",
+    "failure": "NOAA flies multiple GOES satellites (east, west and a backup). Losing one would reduce coverage until a spare is moved into place. Losing the whole GOES fleet would cut continuous geostationary weather imagery for the U.S.; polar-orbiting satellites and ground radar would still provide some data.",
+    "image": "/api/netmap/learn/goes.jpg",
+    "alt": "NOAA illustration of the GOES-R spacecraft",
+    "credit": "NOAA, GOES-R spacecraft illustration. Public domain.",
+    "license": "Public domain",
+    "sources": [
+      {
+        "name": "GOES-R Program",
+        "url": "https://www.goes-r.gov/"
+      },
+      {
+        "name": "NOAA Satellites",
+        "url": "https://www.nesdis.noaa.gov/"
+      }
+    ]
+  }
+}

@@ -168,6 +168,51 @@ class NetSky(unittest.TestCase):
         self.assertNotIn("#FFC21A", added)
         self.assertNotIn("yellow", added.lower())
 
+
+    def test_sky_true_scale_and_learn_panel(self):
+        # pt1814u: true-altitude 3D layer, GEO zoom, learn panel with licensed images, no Sky chip status dot
+        from pathlib import Path
+        import netmap, json
+        root = Path(__file__).resolve().parents[1] / "netmap_static"
+        js = (root / "net.js").read_text()
+        css = (root / "net.css").read_text()
+        learn = json.loads((root / "learn.json").read_text())
+        self.assertIn("function globePos", js)
+        self.assertIn("sats3d", js)
+        self.assertIn("35786", js)
+        self.assertIn("function skyPick", js)
+        self.assertIn("nx-learn-panel", js)
+        self.assertIn("setMinZoom(-2)", js)
+        self.assertIn('className = "nx-chip"', js)
+        self.assertIn("/api/netmap/learn.json", js)
+        self.assertIn("nx-learn-panel", css)
+        self.assertIn("body.nx-sky .nx-chip i", css)
+        added = css.split("pt1814u")[-1]
+        self.assertNotIn("#FFC21A", added)
+        self.assertNotIn("yellow", added.lower())
+        for gid in ("starlink", "gps", "glonass", "galileo", "beidou", "iridium", "oneweb", "goes"):
+            self.assertIn(gid, learn)
+            self.assertTrue(learn[gid]["sources"])
+            for s in learn[gid]["sources"]:
+                self.assertTrue(s["url"].startswith("http"))
+        gal = learn["galileo"]
+        self.assertIn("CC BY-SA 3.0 IGO", gal["credit"])
+        self.assertIn("Resized from the original", gal["credit"])
+        self.assertIn("creativecommons.org/licenses/by-sa/3.0/igo", gal["license_url"])
+        for rec in learn.values():
+            if rec.get("image"):
+                name = rec["image"].split("?")[0].split("/")[-1]
+                self.assertTrue((root / "learn" / name).is_file() or (root / "learn" / (name + ".b64")).is_file(), name)
+        code, body, *rest = netmap.handle_get("/api/netmap/learn.json")
+        self.assertEqual(code, 200)
+        self.assertIn(b"starlink", body if isinstance(body, (bytes, bytearray)) else json.dumps(body).encode())
+        code, img, ctype = netmap.handle_get("/api/netmap/learn/gps.jpg")
+        self.assertEqual(code, 200)
+        self.assertIn("image", ctype)
+        self.assertEqual(img[:2], b"\xff\xd8")
+        self.assertEqual(netmap.handle_get("/api/netmap/learn/../net.js")[0], 404)
+        self.assertEqual(netmap.handle_get("/api/netmap/learn/nope.jpg")[0], 404)
+
 class NetSkyStarlinkFallback(unittest.TestCase):
     def test_supgp_when_group_refused(self):
         import netsky, netstarlink, tempfile

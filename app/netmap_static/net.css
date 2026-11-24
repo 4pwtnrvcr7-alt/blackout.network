@@ -283,3 +283,34 @@ body.nx-sky .nx-lnk{display:none!important}
   body.nx-sky-focus .nx-card.open{max-height:42dvh;overflow:auto}
   body.nx-sky-focus .nx-card.open .nx-sat-extra{display:block;margin-top:8px}
 }
+
+/* pt1814u: Sky true-scale altitude + learn panel; hide the Tracking chip status dot in Sky */
+body.nx-sky .nx-chip i{display:none!important}
+body.nx-sky .nx-chip{gap:0}
+.nx-learn{margin-top:10px;padding-top:10px;border-top:1px solid var(--nx-bd)}
+.nx-learn-fig{margin:0 0 10px}
+.nx-learn-fig img{display:block;width:100%;height:auto;border-radius:10px;background:#111}
+.nx-learn-fig figcaption{margin:6px 0 0;font-size:10.5px;line-height:1.35;color:rgba(240,240,250,.45)}
+.nx-learn-dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px}
+.nx-learn-dl dt{color:var(--nx-mu);font-weight:500}
+.nx-learn-dl dd{margin:0;color:var(--nx-tx)}
+.nx-learn-src{margin:8px 0 0;font-size:11px;line-height:1.4;color:var(--nx-mu)}
+.nx-scale{margin-top:10px}
+@media (min-width:768px){
+  body.nx-sky-focus .nx-sw{display:none!important}
+  body.nx-sky .nx-card.nx-learn-panel,
+  body.nx-sky .nx-card.nx-learn-panel.pin,
+  body.nx-sky .nx-card.nx-learn-panel.dragged{
+    left:calc(14px + env(safe-area-inset-left))!important;
+    top:calc(128px + env(safe-area-inset-top))!important;
+    right:auto!important;bottom:auto!important;
+    width:min(332px,calc(100vw - 28px))!important;
+    max-height:calc(100dvh - 160px);
+    padding:14px 16px 14px;pointer-events:auto
+  }
+  body.nx-sky .nx-card.nx-learn-panel .bn-drag{display:none}
+}
+@media (max-width:767px){
+  body.nx-sky-focus .nx-card.open .nx-learn{margin-top:8px}
+  body.nx-sky-focus .nx-card.open .nx-learn-fig img{max-height:28dvh;object-fit:contain}
+}
