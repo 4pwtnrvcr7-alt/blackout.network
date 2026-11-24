@@ -1,0 +1,87 @@
+Solar explorer planet surfaces and landing-site data (pt1837u, Nov 24 2026).
+All imagery is U.S. government public domain (NASA, JPL, USGS, Goddard, ASU,
+JHUAPL) except where a generated stand-in is noted. Each file was resized and
+recompressed; metadata was stripped. No non-commercial sources.
+
+moon.jpg
+  Source: NASA SVS CGI Moon Kit, "Lroc color poles" map (LRO LROC WAC color
+  mosaic with LOLA fill at the poles). Map centered on 0° longitude.
+  https://svs.gsfc.nasa.gov/4720/
+  Author: NASA / Goddard / Arizona State University (LROC), LOLA team
+  License: Public domain (U.S. government work)
+  Obtained via the Wikimedia Commons copy of the same NASA map (File:CGI Moon
+  Kit - Lroc color poles.tif), resized to 3840×1920 JPEG.
+
+mars.jpg
+  Source: Viking Orbiter Colorized Mars Digital Image Model (MDIM) 2.1,
+  global simple-cylindrical mosaic.
+  https://astrogeology.usgs.gov/search/map/mars_viking_colorized_global_mosaic_232m
+  Author: NASA Ames / JPL / USGS Astrogeology Science Center
+  License: Public domain (U.S. government work)
+  Obtained as the Commons copy File:Mars Viking MDIM21 ClrMosaic 1km.jpg
+  (21,339×10,670), resized to 3840×1920 JPEG.
+
+earth.jpg
+  Source: NASA Blue Marble 2002 (Terra/MODIS).
+  https://visibleearth.nasa.gov/
+  Author: NASA Earth Observatory / Terra MODIS
+  License: Public domain (U.S. government work)
+  Obtained as the Commons copy File:Blue Marble 2002.png, resized to
+  2048×1024 JPEG.
+
+jupiter.jpg
+  Source: Cassini's Best Maps of Jupiter (Cylindrical Map), PIA07782.
+  Images taken 11–12 December 2000. Includes the Great Red Spot.
+  https://science.nasa.gov/resource/cassinis-best-maps-of-jupiter-cylindrical-map/
+  https://images-assets.nasa.gov/image/PIA07782/PIA07782~orig.jpg
+  Author: NASA / JPL / Space Science Institute
+  License: Public domain (U.S. government work)
+  Resized to 2048×1024 JPEG.
+
+mercury.jpg
+  Source: MESSENGER MDIS global color mosaic (enhanced-color over complete
+  basemap).
+  Author: NASA / Johns Hopkins University Applied Physics Laboratory /
+  Carnegie Institution of Washington
+  License: Public domain (U.S. government work)
+  Obtained as Commons File:Mercury map by MESSENGER global mosaic
+  enhancedcolor over completebasemap.png, resized to 2048×1024 JPEG.
+
+venus.jpg
+  Source: Magellan global cylindrical radar map of Venus.
+  Author: NASA / JPL
+  License: Public domain (U.S. government work)
+  Obtained as Commons File:Cylindrical Map of Venus.jpg, resized to
+  2048×1024 JPEG.
+
+saturn.jpg
+  No official public-domain 2k cylindrical color map of Saturn's atmosphere
+  was available to this build. This is a generated latitude-band texture
+  painted in natural-color tones sampled from Cassini portraits
+  (NASA / JPL / SSI). It is a stand-in, not a projected Cassini mosaic.
+  The north-pole hexagon is a separate overlay (see saturn_hex.webp).
+
+saturn_hex.webp
+  Source: "In Full View: Saturn Streaming Hexagon", PIA17652, Cassini.
+  A false-color polar view of the north-pole hexagon, cropped to a circular
+  overlay with a transparent edge.
+  https://images-assets.nasa.gov/image/PIA17652/PIA17652~orig.jpg
+  Author: NASA / JPL / SSI
+  License: Public domain (U.S. government work)
+
+uranus.jpg
+  A generated smooth texture in Voyager 2 true-color tones sampled from the
+  left (true-color) half of PIA00032, "Uranus in True and False Color."
+  NASA / JPL. Public domain. Not a cylindrical projection of the Voyager
+  frames; Uranus showed very few visible features at Voyager's resolution.
+
+neptune.jpg
+  A generated smooth texture in Voyager 2 true-color tones. NASA / JPL.
+  Public domain. The Great Dark Spot was a transient storm in 1989 and is
+  not drawn here as if it were still present.
+
+sites.json
+  Landing-site coordinates and mission facts from NASA NSSDC spacecraft
+  records (public U.S. government information). Links are in each record.
+  Great Red Spot position is measured on PIA07782 (Cassini, Dec 2000).
+
