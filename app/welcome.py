@@ -115,7 +115,7 @@ TOOLS = [
     ("ai", "AI Threats", "AI-assisted attacks, deepfake fraud and model misuse, ranked 0–10.", "/#ai"),
     ("solar", "Solar & Seismic", "Solar flares, geomagnetic storms, the Kp index and live global quakes.", "/#solar"),
     ("weather", "Weather", "Conditions, official severe-weather alerts and the forecast for any place.", "/weather"),
-    ("net", "The Grid", "Power grid operators, local outages and weather threats, plus internet, cloud, apps and ISPs.", "/network"),
+    ("net", "The Grid", "Power grid operators, local outages and weather threats, plus internet, cloud, apps and ISPs.", "/grid"),
     ("bush", "Bushcraft", "A grid-down guide: water, fire, shelter, food, navigation and signaling.", "/#bushcraft"),
     ("gov", "Government", "A 0–100 U.S. government health index, plus who holds office.", "/#government"),
     ("sources", "Sources", "Every source we use, with a transparent 0–10 confidence rating.", "/sources"),

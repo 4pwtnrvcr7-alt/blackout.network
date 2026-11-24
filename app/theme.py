@@ -290,12 +290,12 @@ def credits_page():
 # ---------- "/" ----------
 def _ic(p): return f'<svg viewBox="0 0 24 24" aria-hidden="true">{p}</svg>'
 CHIPS = [
- ("Energy grid", '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>', "Grid load, outages and stress across North American power regions.", "/network"),
+ ("Energy grid", '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>', "Grid load, outages and stress across North American power regions.", "/grid"),
  ("Markets & banking", '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>', "Index moves, bank stress and the money stories behind them.", "/markets"),
  ("Solar & seismic", '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>', "Solar flares, the Kp index and earthquakes worldwide.", "/live#solar"),
  ("Health & outbreaks", '<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>', "Outbreak reports from health agencies, ranked on The Wire.", "/wire"),
  ("Conflict", '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', "Strikes, attacks and escalations, each linked to its sources.", "/wire"),
- ("Internet & cloud", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>', "Country-level internet outages and cloud provider status.", "/network"),
+ ("Internet & cloud", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>', "Country-level internet outages and cloud provider status.", "/grid"),
  ("Weather", '<path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18z"/>', "Severe weather warnings, radar and storms on one map.", "/weather"),
  ("AI threats", '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>', "Deepfakes, AI-driven attacks and the policy fights around them.", "/live#ai"),
 ]

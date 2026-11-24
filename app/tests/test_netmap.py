@@ -1,4 +1,4 @@
-"""Network Status map (/network, Nov 23 2026, pt1755u): route, page skeleton, no yellow, no OSM tiles, bars math, old hub kept."""
+"""Network Status map (/grid, Nov 23 2026, pt1755u): route, page skeleton, no yellow, no OSM tiles, bars math, old hub kept."""
 import os, sys, re, unittest
 from datetime import datetime, timezone, timedelta
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,8 +9,8 @@ class NetMap(unittest.TestCase):
     def test_routes(self):
         import addons, netmap, netpages
         self.assertEqual(addons.ROUTES["/api/netmap"], "netmap")
-        self.assertEqual(addons.ROUTES["/network"], "netpages")
-        code, body, ct = netpages.handle_get("/network", {})
+        self.assertEqual(addons.ROUTES["/grid"], "netpages")
+        code, body, ct = netpages.handle_get("/grid", {})
         self.assertEqual((code, ct), (200, "text/html"))
         for s in ('id="nx_map"', 'id="nx_ld"', 'id="gx_more"', 'id="nx_more"', 'id="nx_f"', "/api/netmap/net.js", "/api/signal/maplibre-gl.js"):
             self.assertIn(s, body)
@@ -31,7 +31,7 @@ class NetMap(unittest.TestCase):
         Progress ids net.js drives are present, reduced motion is honored, no yellow or red neon."""
         import colorsys, netmap, netpages
         self.assertEqual(netmap.handle_get("/api/netmap/boot.js")[0], 200)
-        body = netpages.handle_get("/network", {})[1]
+        body = netpages.handle_get("/grid", {})[1]
         self.assertNotIn("/api/netmap/boot.js", body)
         self.assertLess(body.index('class="gx-ld" id="nx_ld"'), body.index("/api/netmap/net.js"))
         for s in ('id="nx_ldn"', 'id="nx_ldmsg"', "Energizing the grid", 'class="gx-ldsvg"', 'data-s="map"', 'data-s="nets"', 'data-s="out"', 'data-s="rep"'): self.assertIn(s, body)
@@ -121,7 +121,7 @@ class NetSky(unittest.TestCase):
 
     def test_page_has_sky(self):
         import netpages
-        b = netpages.handle_get("/network", {})[1]
+        b = netpages.handle_get("/grid", {})[1]
         for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
 
 class NetSkyStarlinkFallback(unittest.TestCase):
