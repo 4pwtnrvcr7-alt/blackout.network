@@ -297,12 +297,24 @@ def np_one(slug):
                 days=days, uptime=up, basis="provider incident reports", h24=_hrs([x for x in spans if x[2] > 0]), recent=rec, recent_ok=True)
 
 # ---------------------------------------------------------------- IODA
+# Nov 24 2026: when Render gets 403 from IODA, use the box relay snapshot (app/data/ioda_relay_data.json, pushed by
+# tools/ioda_relay every 10 min, max 2 h old). The ASN list is cut on the box to the ASNs in NETS.
+RELAY_DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "ioda_relay_data.json")
+def _relayed(key, fn):
+    try: return fn()
+    except Exception:
+        try:
+            with open(RELAY_DATA, encoding="utf-8") as fh: r = json.load(fh)
+            if time.time() - (pts(r.get("generated")) or now()).timestamp() < 7200 and isinstance(r.get(key), list): return r[key]
+        except Exception: pass
+        raise
 def ioda_asn_events():
-    n = int(time.time()); return jget(f"{IODA}/outages/events?entityType=asn&from={n - DAYS * 86400}&until={n}&limit=30000", timeout=40, cap=20_000_000).get("data") or []
+    n = int(time.time()); return _relayed("asn", lambda: jget(f"{IODA}/outages/events?entityType=asn&from={n - DAYS * 86400}&until={n}&limit=30000", timeout=40, cap=20_000_000).get("data") or [])
 def ioda_country_events():
-    n = int(time.time()); return jget(f"{IODA}/outages/events?entityType=country&from={n - DAYS * 86400}&until={n}&limit=5000", timeout=30).get("data") or []
+    n = int(time.time()); return _relayed("cev", lambda: jget(f"{IODA}/outages/events?entityType=country&from={n - DAYS * 86400}&until={n}&limit=5000", timeout=30).get("data") or [])
 def ioda_summary(et, hours=24):
-    n = int(time.time()); return jget(f"{IODA}/outages/summary?entityType={et}&from={n - hours * 3600}&until={n}&limit=3000", timeout=25).get("data") or []
+    n = int(time.time()); f = lambda: jget(f"{IODA}/outages/summary?entityType={et}&from={n - hours * 3600}&until={n}&limit=3000", timeout=25).get("data") or []
+    return _relayed("reg", f) if et == "region" and hours == 24 else f()
 
 def _ev(e):
     s = datetime.fromtimestamp(int(e["start"]), timezone.utc); d = int(e.get("duration") or 0)
