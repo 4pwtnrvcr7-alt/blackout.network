@@ -80,7 +80,7 @@
     box(g, 0.05, 0.05, 1.55, chrome, 0.32, 1.35, 0);
     /* dashboard + screen reading DON'T PANIC */
     box(g, 0.35, 0.18, 1.45, blk, 0.32, 1.03, 0);
-    var scr = new T.Mesh(new T.PlaneGeometry(0.34, 0.13), new T.MeshBasicMaterial({ map: screenTex() })); scr.position.set(0.14, 1.12, 0); scr.rotation.y = -Math.PI / 2; scr.rotateX(-0.35); g.add(scr);
+    var scr = new T.Mesh(new T.PlaneGeometry(0.5, 0.19), new T.MeshBasicMaterial({ map: screenTex() })); scr.position.set(0.12, 1.16, 0); scr.rotation.y = -Math.PI / 2; scr.rotateX(-0.35); g.add(scr);
     /* steering wheel */
     var sw = new T.Mesh(new T.TorusGeometry(0.17, 0.025, 8, 24), blk); sw.position.set(0.05, 1.18, 0.35); sw.rotation.y = Math.PI / 2; sw.rotateX(0.5); g.add(sw);
     /* wheels */
@@ -214,9 +214,9 @@
     var o = OBJ[id]; if (!o) return; SEL = o;
     LIST.forEach(function (x) { if (x.lab) x.lab.classList.toggle("sel", x === o); });
     S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.id === id ? "true" : "false"); });
-    var tgt = o.node.getWorldPosition(new T.Vector3()), dist = o.kind === "craft" ? o.size * (o.id === "roadster" ? 1.3 : 2.2) : o.kind === "sun" ? 26 : Math.max(o.size * 6, 1.5);
+    var tgt = o.node.getWorldPosition(new T.Vector3()); if (o.id === "roadster") tgt.y += 0.06; var dist = o.kind === "craft" ? o.size * (o.id === "roadster" ? (S.W < 500 ? 1.5 : 0.95) : 2.2) : o.kind === "sun" ? 26 : Math.max(o.size * 6, 1.5);
     var dir = S.cam.position.clone().sub(S.ctl.target); if (dir.lengthSq() < 1e-9) dir.set(0, 0.4, 1); dir.normalize();
-    if (o.kind === "craft") { dir.set(0.55, 0.35, 0.75); if (o.id === "roadster") { o.model.rotation.set(0, 0, 0); dir.set(-0.75, 0.6, 0.35); } dir.normalize(); }
+    if (o.kind === "craft") { dir.set(0.55, 0.35, 0.75); if (o.id === "roadster") { o.model.rotation.set(0, 0, 0); dir.set(-0.5, 0.72, -0.5); } dir.normalize(); }
     FLY = { t0: performance.now(), dur: 1300, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: tgt, toP: tgt.clone().add(dir.multiplyScalar(dist)) };
     info(o);
   }
@@ -236,6 +236,7 @@
       if (o.lab) {
         o.node.getWorldPosition(tmp); tmp.project(S.cam);
         var vis = tmp.z < 1 && Math.abs(tmp.x) < 1.1 && Math.abs(tmp.y) < 1.1;
+        if (vis && o.model && S.cam.position.distanceTo(o.node.position) < o.size * 3) vis = false;
         if (vis) { o.lab.style.display = ""; o.lab.style.transform = "translate(" + ((tmp.x + 1) / 2 * S.W).toFixed(1) + "px," + ((1 - tmp.y) / 2 * S.H).toFixed(1) + "px) translate(-50%,-150%)"; }
         else o.lab.style.display = "none";
       }
