@@ -5,7 +5,7 @@
 (function () {
   "use strict";
   var ER = 6371008.8, mob = matchMedia("(max-width: 760px)").matches, reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var LC = { on: true, reveal: false, data: null, sel: -1, anim: null, layer: null, lbl: null, bar: null, t0: 0, loadT: 0, hidden: null };
+  var LC = { on: true, reveal: false, data: null, sel: -1, follow: false, open: false, det: {}, anim: null, layer: null, lbl: null, bar: null, t0: 0, loadT: 0, hidden: null };
   var COL = { up: [0.91, 0.93, 0.96], past: [0.62, 0.66, 0.74], boost: [0.31, 0.76, 0.97], ok: [0.36, 0.88, 0.71], bad: [1, 0.35, 0.35] };
   function lcEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function lcPos(lon, lat, alt) {
@@ -48,6 +48,11 @@
     ".nx-lc-ev.dim{opacity:0}",
     ".nx-lc-ev.left{padding:0 8px 0 0}.nx-lc-ev.left:before{left:auto;right:-3px}",
     ".nx-lc-bar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:8px;max-width:min(720px,calc(100% - 16px));width:max-content;background:rgba(8,10,16,.86);border:1px solid rgba(232,236,245,.22);border-radius:10px;padding:6px 8px;color:#E8ECF5;font-size:12.5px}",
+    ".nx-lc-bar{flex-direction:column;align-items:stretch}.nx-lc-row{display:flex;align-items:center;gap:8px;min-width:0}",
+    ".nx-lc-bar .t{cursor:pointer}.nx-lc-sheet{max-height:52vh;overflow:auto;padding:4px 4px 8px;border-bottom:1px solid rgba(232,236,245,.14);margin-bottom:4px;font-size:12.5px;line-height:1.45;width:min(700px,calc(100vw - 40px))}",
+    ".nx-lc-sheet h4{margin:10px 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#AEB4C4;font-weight:600}.nx-lc-sheet h3{margin:2px 0 4px;font-size:15px}",
+    ".nx-lc-sheet dl{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:0}.nx-lc-sheet dt{color:#AEB4C4}.nx-lc-sheet dd{margin:0;min-width:0;overflow-wrap:anywhere}",
+    ".nx-lc-sheet p{margin:4px 0}.nx-lc-sheet a{color:#E8ECF5}.nx-lc-sheet .np{color:#8A94A8}.nx-lc-sheet figure{margin:6px 0}.nx-lc-sheet img{max-width:100%;max-height:220px;border-radius:6px;display:block}.nx-lc-sheet figcaption{font-size:11px;color:#AEB4C4}",
     ".nx-lc-bar button{all:unset;cursor:pointer;padding:4px 7px;border:1px solid rgba(232,236,245,.3);border-radius:6px;line-height:1;font-size:13px}",
     ".nx-lc-bar .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}",
     ".nx-lc-bar .t b{font-weight:650}.nx-lc-bar .t span{color:#AEB4C4}",
@@ -55,7 +60,7 @@
     ".nx-lc-bar .tp{font-variant-numeric:tabular-nums;color:#C9CCD6;min-width:44px}",
     ".nx-lc-note{position:absolute;left:8px;bottom:56px;z-index:6;font-size:10.5px;color:#AEB4C4;text-shadow:0 0 3px #000;pointer-events:none}",
     "body.nx-lc-focus #nx_sky_labs,body.nx-lc-focus .nx-sw,body.nx-lc-focus .nx-ss,body.nx-lc-focus .nx-chip,body.nx-lc-focus .nx-ctl,body.nx-lc-focus .nx-leg,body.nx-lc-focus .nx-card,body.nx-lc-focus .maplibregl-ctrl-bottom-right{display:none!important}",
-    "@media (max-width:760px){body.nx-lc-focus .nx-sf{display:none!important}.nx-lc-bar{bottom:8px;gap:6px;padding:5px 6px;font-size:12px}.nx-lc-bar input[type=range]{width:84px}.nx-lc-l{font-size:10.5px}.nx-lc-bar .t .v{display:none}.nx-lc-bar .t{max-width:96px}.nx-lc-note{bottom:52px;right:8px}}"
+    "@media (max-width:760px){body.nx-lc-focus .nx-sf{display:none!important}.nx-lc-bar{bottom:8px;gap:6px;padding:5px 6px;font-size:12px}.nx-lc-bar input[type=range]{width:84px}.nx-lc-l{font-size:10.5px}.nx-lc-bar .t .v{display:none}.nx-lc-bar .t{max-width:96px}.nx-lc-sheet{max-height:46dvh;width:calc(100vw - 34px)}.nx-lc-note{bottom:52px;right:8px}}"
   ].join("\n");
   document.head.appendChild(css);
 
@@ -142,7 +147,7 @@
       if (el.dataset.ev === "head") {
         var hp = LC.anim ? lcAt(L, LC.anim.t) : null;
         if (!hp) { el.style.transform = "translate(-9999px,0)"; return; }
-        el.textContent = lcVehicle(L).replace(/ Block \d+$/, "") + " " + lcTPlus(LC.anim.t) + " \u00b7 " + Math.round(hp.alt / 1000) + " km";
+        el.textContent = lcVehicle(L).replace(/ Block \d+$/, "") + " " + lcTPlus(LC.anim.t) + " \u00b7 " + lcAltTxt(hp.alt / 1000);
         lcPlace(el, m, lcPos(hp.lon, hp.lat, hp.alt), cw, ch, cen, placed); return;
       }
       var b = L.labels[+el.dataset.ev];
@@ -233,6 +238,7 @@
   }
   function lcEnsureLayer() {
     var map = window.__nxMap; if (!map || LC.layer) return;
+    if (!LC.panBound) { LC.panBound = true; map.on("dragstart", function (e) { if (e && e.originalEvent) LC.follow = false; }); }
     if (!map.isStyleLoaded || !map.isStyleLoaded()) { setTimeout(lcEnsureLayer, 250); return; }
     try {
       if (map.getLayer("launch3d")) return;
@@ -253,25 +259,29 @@
       LC.note = document.createElement("div"); LC.note.className = "nx-lc-note"; LC.note.textContent = "Modeled trajectory, not telemetry \u00b7 Launch data: The Space Devs Launch Library 2";
       map.getContainer().appendChild(LC.bar); map.getContainer().appendChild(LC.note);
       LC.bar.addEventListener("click", function (e) {
+        if (e.target.closest(".nx-lc-sheet")) { e.stopPropagation(); return; }
+        if (e.target.closest(".t")) { e.stopPropagation(); lcSheet(!LC.open); return; }
         var b = e.target.closest("button"); if (!b) return; e.stopPropagation();
+        if (b.dataset.a === "more") { lcSheet(!LC.open); return; }
         var a = b.dataset.a;
         if (a === "x") lcClose();
         else if (a === "prev" || a === "next") { var n = lcList().length; lcSelect((LC.sel + (a === "next" ? 1 : n - 1)) % n); }
-        else if (a === "play") lcPlay(LC.anim && LC.anim.playing ? "pause" : "play");
+        else if (a === "play") { LC.follow = true; lcPlay(LC.anim && LC.anim.playing ? "pause" : "play"); }
       });
       LC.bar.addEventListener("input", function (e) {
         if (e.target.type !== "range") return; var L = lcList()[LC.sel]; if (!L) return;
-        lcPlay("pause"); LC.anim = LC.anim || {}; LC.anim.t = (+e.target.value / 1000) * lcTEnd(L); LC.anim.playing = false; lcBarTime(); lcRepaint();
+        lcPlay("pause"); LC.anim = LC.anim || {}; LC.anim.t = (+e.target.value / 1000) * lcTEnd(L); LC.anim.playing = false; LC.follow = true; lcFollow(1); lcBarTime(); lcRepaint();
       });
     }
     var L = lcList()[LC.sel]; if (!L) { LC.bar.hidden = true; LC.note.hidden = true; return; }
     LC.bar.hidden = false; LC.note.hidden = false;
-    LC.bar.innerHTML = '<button type="button" data-a="prev" aria-label="Previous launch">\u2039</button>' +
+    LC.bar.innerHTML = '<div class="nx-lc-sheet" hidden></div><div class="nx-lc-row"><button type="button" data-a="prev" aria-label="Previous launch">\u2039</button>' +
       '<button type="button" data-a="play" aria-label="Replay launch">\u25B6</button>' +
       '<input type="range" min="0" max="1000" value="0" aria-label="Launch timeline">' +
       '<span class="tp">T+0:00</span>' +
       '<span class="t"><b>' + lcEsc(lcMission(L)) + '</b> <span class="v">' + lcEsc(lcVehicle(L)) + " \u00b7 " + lcEsc(L.location || L.pad || "") + " \u00b7 <span data-clk2>" + lcEsc(lcClock(L)) + "</span></span></span>" +
-      '<button type="button" data-a="next" aria-label="Next launch">\u203A</button><button type="button" data-a="x" aria-label="Close launch">\u00d7</button>';
+      '<button type="button" data-a="more" aria-expanded="false" aria-label="Launch details">Details</button><button type="button" data-a="next" aria-label="Next launch">\u203A</button><button type="button" data-a="x" aria-label="Close launch">\u00d7</button></div>';
+    if (LC.open) lcSheet(true);
   }
   function lcBarTime() {
     var L = lcList()[LC.sel]; if (!L || !LC.bar) return;
@@ -291,7 +301,7 @@
       if (!LC.anim || !LC.anim.playing || LC.sel < 0) return;
       var dt = Math.min(64, now - last); last = now;
       LC.anim.t = Math.min(end, LC.anim.t + end * dt / dur);
-      lcBarTime(); lcRepaint();
+      lcBarTime(); lcFollow(0.15); lcRepaint();
       if (LC.anim.t >= end) { LC.anim.playing = false; lcBarTime(); return; }
       requestAnimationFrame(lcStep);
     })(last);
@@ -308,23 +318,102 @@
   }
   function lcSelect(i) {
     var L = lcList()[i], map = window.__nxMap; if (!L || !map) return;
-    LC.sel = i; LC.anim = null; window.__nxSpinHold = true;
+    LC.sel = i; LC.anim = null; LC.follow = true; window.__nxSpinHold = true;
     document.body.classList.add("nx-lc-focus"); lcHideOthers(true);
     lcEvLabels(); lcBar();
     var live = (Date.now() - lcNetMs(L)) / 1000;
-    var mid = lcAt(L, Math.min(lcTEnd(L) * 0.55, 400)) || { lon: L.pad_lon, lat: L.pad_lat };
+    var mid = live >= 0 && live < lcTEnd(L) ? (lcAt(L, live) || { lon: L.pad_lon, lat: L.pad_lat }) : { lon: L.pad_lon, lat: L.pad_lat };
     try { map.easeTo({ center: [mid.lon, mid.lat], zoom: mob ? 2.3 : 3, pitch: mob ? 40 : 50, duration: reduce ? 0 : 1000 }); } catch (e) {}
     if (live >= 0 && live < lcTEnd(L) && L.status !== "Success" && L.status !== "Failure") { LC.anim = { t: live, playing: false, live: true }; }
     else setTimeout(function () { if (LC.sel === i) lcPlay("play"); }, reduce ? 0 : 1100);
     lcBarTime(); lcRepaint();
   }
   function lcClose() {
-    var map = window.__nxMap; LC.sel = -1; LC.anim = null; window.__nxSpinHold = false;
+    var map = window.__nxMap; LC.sel = -1; LC.anim = null; LC.follow = false; LC.open = false; window.__nxSpinHold = false;
     document.body.classList.remove("nx-lc-focus"); lcHideOthers(false); lcEvLabels(); lcBar();
     try { map.easeTo({ pitch: 0, zoom: mob ? -0.55 : -0.4, duration: reduce ? 0 : 900 }); } catch (e) {}
     lcRepaint();
   }
 
+
+  /* ---------- follow the rocket (pt1834u) ---------- */
+  function lcFollow(k) {
+    var map = window.__nxMap, L = lcList()[LC.sel]; if (!map || !L || !LC.follow || !LC.anim) return;
+    var h = lcAt(L, LC.anim.t); if (!h) return;
+    var c = map.getCenter(), dl = h.lon - c.lng; if (dl > 180) dl -= 360; if (dl < -180) dl += 360;
+    try { map.jumpTo({ center: [c.lng + dl * k, c.lat + (h.lat - c.lat) * k] }); } catch (e) {}
+  }
+  function lcAltTxt(km) { var U = window.BNUnits; return U && U.fmtAlt ? U.fmtAlt(km) : Math.round(km) + " km"; }
+  function lcDistTxt(km) { var U = window.BNUnits; return U && U.fmtDist ? U.fmtDist(km) : Math.round(km) + " km"; }
+  function lcLenTxt(m) { var U = window.BNUnits; return U && U.fmtLenM ? U.fmtLenM(m) : m + " m"; }
+  function lcImp() { var U = window.BNUnits; return !U || !U.isImperial || U.isImperial(); }
+  function lcMassKg(kg) {
+    if (kg == null) return null;
+    if (lcImp()) { var lb = kg * 2.20462; return lb >= 20000 ? Math.round(lb / 2000).toLocaleString("en-US") + " tons" : Math.round(lb).toLocaleString("en-US") + " lb"; }
+    return kg >= 10000 ? Math.round(kg / 1000).toLocaleString("en-US") + " t" : Math.round(kg).toLocaleString("en-US") + " kg";
+  }
+  function lcThrust(kn) { if (kn == null) return null; return lcImp() ? Math.round(kn * 224.809).toLocaleString("en-US") + " lbf" : Math.round(kn).toLocaleString("en-US") + " kN"; }
+  function lcWhen(iso) {
+    if (!iso) return null; var t = Date.parse(iso); if (!isFinite(t)) return null;
+    return new Date(t).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) + " ET";
+  }
+  function lcDurIso(s) {
+    var m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?)?$/.exec(s || ""); if (!m) return null;
+    return (m[1] ? m[1] + " days " : "") + (m[2] ? m[2] + " h" : "") || null;
+  }
+  function lcRow(k, v, isHtml) { return "<dt>" + lcEsc(k) + "</dt><dd>" + (v == null || v === "" ? '<span class="np">not published</span>' : isHtml ? v : lcEsc(v)) + "</dd>"; }
+  function lcLink(u, t) { return /^https:\/\//.test(u || "") ? '<a href="' + lcEsc(u) + '" target="_blank" rel="noopener">' + lcEsc(t || u) + "</a>" : null; }
+  function lcDetailsHtml(d, L) {
+    var h = "", m = d.mission || {}, r = d.rocket || {}, p = d.pad || {}, pv = d.provider || {}, st = d.status || {};
+    h += "<h3>" + lcEsc(d.name || "") + "</h3>";
+    if (d.image) h += '<figure><img src="' + lcEsc(d.image.url) + '" alt="' + lcEsc(r.name || "Rocket") + '" loading="lazy"><figcaption>' + lcEsc(d.image.credit || "") + " \u00b7 " + (lcLink(d.image.license_url, d.image.license) || lcEsc(d.image.license)) + "</figcaption></figure>";
+    else h += '<p class="np">' + lcEsc(d.image_note || "No licensed image.") + "</p>";
+    h += "<h4>Mission</h4>" + (m.description ? "<p>" + lcEsc(m.description) + "</p>" : '<p class="np">Mission description not published.</p>');
+    h += "<dl>" + lcRow("Mission", m.name) + lcRow("Type", m.type) + lcRow("Orbit", m.orbit) +
+      lcRow("Customer / agency", (m.agencies || []).map(function (a) { return a.name + (a.type ? " (" + a.type + ")" : ""); }).join(", ") || null) +
+      lcRow("Status", (st.name || "") + (st.description ? " \u2014 " + st.description : "")) + (d.failreason ? lcRow("Failure reason", d.failreason) : "") +
+      lcRow("Launch time (NET)", lcWhen(d.net) ? lcWhen(d.net) + (d.net_precision ? " (precision: " + d.net_precision + ")" : "") : null) +
+      lcRow("Launch window", lcWhen(d.window_start) ? lcWhen(d.window_start) + " \u2013 " + lcWhen(d.window_end) : null) +
+      lcRow("Weather go", d.probability != null && d.probability >= 0 ? d.probability + "%" : null) + (d.weather_concerns ? lcRow("Weather concerns", d.weather_concerns) : "") + "</dl>";
+    h += "<h4>Rocket</h4><dl>" + lcRow("Rocket", r.name) + lcRow("Family", (r.families || []).join(", ") || null) + lcRow("Provider", pv.name ? pv.name + (pv.type ? " (" + pv.type + ")" : "") + (pv.country ? ", " + pv.country : "") : null) +
+      lcRow("Manufacturer", r.manufacturer) +
+      lcRow("Launch cost", r.launch_cost_usd ? "$" + r.launch_cost_usd.toLocaleString("en-US") + " (rocket list price in Launch Library 2, not this mission's contract)" : null) +
+      lcRow("Height", r.length_m ? lcLenTxt(r.length_m) : null) + lcRow("Diameter", r.diameter_m ? lcLenTxt(r.diameter_m) : null) +
+      lcRow("Liftoff mass", r.launch_mass_t ? lcMassKg(r.launch_mass_t * 1000) : null) + lcRow("Liftoff thrust", lcThrust(r.liftoff_thrust_kn)) +
+      lcRow("To low Earth orbit", lcMassKg(r.leo_capacity_kg)) + lcRow("To GTO", lcMassKg(r.gto_capacity_kg)) + lcRow("First flight", r.maiden_flight) +
+      lcRow("Record", r.total_launches != null ? r.total_launches + " launches, " + (r.successful_launches || 0) + " successful, " + (r.failed_launches || 0) + " failed" : null) + "</dl>";
+    (d.boosters || []).forEach(function (b) {
+      var ld = b.landing || {};
+      h += "<h4>Booster" + (b.serial ? " " + lcEsc(b.serial) : "") + "</h4><dl>" + lcRow("Serial", b.serial) + lcRow("This flight", b.flight_number != null ? "Flight " + b.flight_number + (b.reused ? " (reused)" : " (new)") : null) +
+        lcRow("Total flights", b.flights_total) + lcRow("Previous flight", lcWhen(b.previous_flight)) + lcRow("Turnaround", lcDurIso(b.turnaround)) + lcRow("First flew", lcWhen(b.first_launch)) +
+        lcRow("Landings", b.landings && b.landings.attempted != null ? b.landings.successful + " of " + b.landings.attempted + " attempts" : null) +
+        lcRow("Landing", ld.attempt ? (ld.location || ld.abbrev || "") + (ld.type ? " (" + ld.type + ")" : "") + (ld.success === true ? " \u2014 landed" : ld.success === false ? " \u2014 failed" : " \u2014 planned") : ld.attempt === false ? "No landing attempt" : null) +
+        (ld.downrange_km != null ? lcRow("Landing downrange", lcDistTxt(ld.downrange_km)) : "") + (ld.description ? lcRow("Landing note", ld.description) : "") + "</dl>";
+    });
+    (d.spacecraft || []).forEach(function (c) { h += "<h4>Spacecraft</h4><dl>" + lcRow("Name", c.name) + lcRow("Serial", c.serial) + lcRow("Destination", c.destination) + "</dl>"; });
+    h += "<h4>Pad</h4><dl>" + lcRow("Pad", p.name) + lcRow("Location", p.location) + lcRow("Launches from this pad", p.launches_from_pad) +
+      lcRow("Orbital launch of the year", d.counts && d.counts.orbital_attempt_year != null ? "#" + d.counts.orbital_attempt_year : null) + "</dl>";
+    h += "<h4>Mission patch</h4>" + ((d.patches || []).length ? '<p class="np">' + lcEsc(d.patches.map(function (x) { return x.name; }).join(", ")) + " (image not shown: Launch Library 2 publishes no licence for patch images)</p>" : '<p class="np">not published</p>');
+    var links = (d.webcasts || []).map(function (v) { return lcLink(v.url, (v.live ? "LIVE: " : "") + v.title); }).filter(Boolean)
+      .concat((d.info || []).map(function (v) { return lcLink(v.url, v.title); }).filter(Boolean));
+    if (d.flightclub_url) links.push(lcLink(d.flightclub_url, "Flight Club trajectory"));
+    h += "<h4>Webcast and links</h4>" + (links.length ? "<p>" + links.join("<br>") + "</p>" : '<p class="np">not published</p>');
+    h += '<p class="np">Data: ' + lcLink(d.source_url, d.source) + ". Path on the map is modeled, not telemetry.</p>";
+    return h;
+  }
+  function lcSheet(open) {
+    LC.open = !!open; if (!LC.bar) return;
+    var sh = LC.bar.querySelector(".nx-lc-sheet"), mb = LC.bar.querySelector('[data-a="more"]'), L = lcList()[LC.sel];
+    if (mb) { mb.setAttribute("aria-expanded", LC.open ? "true" : "false"); mb.textContent = LC.open ? "Hide" : "Details"; }
+    if (LC.note) LC.note.hidden = LC.open || LC.sel < 0;
+    if (!sh) return; sh.hidden = !LC.open; if (!LC.open || !L) return;
+    var id = L.id, have = LC.det[id];
+    if (have) { sh.innerHTML = lcDetailsHtml(have, L); return; }
+    sh.innerHTML = '<p class="np">Loading launch details\u2026</p>';
+    fetch("/api/netmap/launches/" + encodeURIComponent(id), { headers: { Accept: "application/json" } }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) { LC.det[id] = d; if (LC.open && lcList()[LC.sel] && lcList()[LC.sel].id === id) sh.innerHTML = lcDetailsHtml(d, L); },
+            function () { sh.innerHTML = '<p class="np">Launch details are unavailable right now.</p>'; });
+  }
   /* ---------- chip ---------- */
   function lcChip() {
     var sf = document.getElementById("nx_sf"); if (!sf || document.getElementById("nx_lc_chip")) return;
@@ -363,7 +452,7 @@
     if (!LC.on || document.hidden || !LC.lbl) return;
     LC.lbl.querySelectorAll("[data-clk]").forEach(function (el) { var L = lcList()[+el.dataset.clk]; if (L) el.textContent = lcVehicle(L) + " \u00b7 " + lcClock(L); });
     var c2 = LC.bar && LC.bar.querySelector("[data-clk2]"), L = lcList()[LC.sel]; if (c2 && L) c2.textContent = lcClock(L);
-    if (LC.anim && LC.anim.live && L) { LC.anim.t = (Date.now() - lcNetMs(L)) / 1000; lcBarTime(); lcRepaint(); }
+    if (LC.anim && LC.anim.live && L) { LC.anim.t = (Date.now() - lcNetMs(L)) / 1000; lcBarTime(); lcFollow(0.5); lcRepaint(); }
     if (Date.now() - LC.loadT > 600000) lcLoad().then(function () { if (LC.sel >= 0) { lcEvLabels(); lcBar(); lcBarTime(); } });
   }, 1000);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && LC.sel >= 0) lcClose(); });

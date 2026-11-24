@@ -972,10 +972,7 @@
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
       if (layer.vao) gl.bindVertexArray(layer.vao);
       gl.useProgram(layer.lnProg); gl.uniformMatrix4fv(layer.uMatL, false, m);
-      gl.bindBuffer(gl.ARRAY_BUFFER, layer.ringBuf);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-      gl.uniform4f(layer.uCol, 0.62, 0.66, 0.82, 0.28);
-      gl.drawArrays(gl.LINE_STRIP, 0, layer.ring.length / 3);
+      gl.enableVertexAttribArray(0);   /* pt1834u: the always-on GEO ring (35,786 km circle) is no longer drawn; only paths of a selected object */
       var path = SKY._path, pn = SKY._pathN || 0;
       if (pn > 1) {
         gl.bindBuffer(gl.ARRAY_BUFFER, layer.lnBuf);
@@ -1424,6 +1421,7 @@
     if (map) { map.resize(); if (v === "map" && !SKY.on) { try { history.replaceState(null, "", "#map"); } catch (e) {} } setMode(v); }
   }
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.addEventListener("click", function () { view(b.dataset.m); }); });
+  window.__nxSky = SKY; window.__nxSatCard = function (i) { satCard(i); };   /* skytrack.js: chip auto-framing + follow lock (pt1834u) */
   window.__nxView = view;   /* gridlayer.js: "Show on map" from the grid sheet */
   var m0 = document.body.classList.contains("nx-board") ? "status" : location.hash === "#sky" ? "sky" : "map";   /* pt1787u: Map is the default view */
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m0 ? "true" : "false"); });
