@@ -28,7 +28,8 @@
       ".s3-top>*{pointer-events:auto}.s3 button{font:inherit;color:#e8eaf0;background:rgba(10,12,18,.72);border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:6px 11px;cursor:pointer;white-space:nowrap}" +
       ".s3 button[aria-pressed=true]{background:#e8eaf0;color:#05060a}.s3-sp{flex:1}.s3-k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.7}" +
       ".s3-objs{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 46px);display:flex;gap:6px;overflow-x:auto;padding:0 10px 4px;scrollbar-width:none}.s3-objs::-webkit-scrollbar{display:none}.s3-objs button{font-size:12px;padding:4px 9px}" +
-      ".s3-lab{position:absolute;left:0;top:0;transform:translate(-50%,-130%);font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(5,6,10,.55);color:#dfe3ec;white-space:nowrap;cursor:pointer;user-select:none}" +
+      ".s3-labs{position:absolute;inset:0;pointer-events:none;z-index:2}.s3-lab{position:absolute;left:0;top:0;transform:translate(-50%,-130%);font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(5,6,10,.55);color:#dfe3ec;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;pointer-events:auto}" +
+      "@media (pointer:coarse),(hover:none){.s3-lab,.s3-pin{pointer-events:none}}" +
       ".s3-lab.sc{color:#b9c6ff}.s3-lab.sel{background:#e8eaf0;color:#05060a}" +
       ".s3-info{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:min(420px,calc(100% - 20px));max-height:34%;overflow:auto;background:linear-gradient(90deg,rgba(5,6,10,.72),rgba(5,6,10,.35));border-left:2px solid rgba(255,255,255,.5);padding:6px 10px;font-size:12px}" +
       ".s3-info h3{margin:0 0 2px;font-size:15px}.s3-info p{margin:2px 0}.s3-info .s3-tag{display:inline-block;font-size:10px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:2px;opacity:.85}" +
@@ -568,7 +569,7 @@
     LIST.forEach(function (x) { (x.node.userData.lines || []).forEach(function (l) { l.material.opacity = !sel ? l.userData.base : x === sel ? Math.min(1, l.userData.base * 3.2) : 0.06; }); });
     (S.rings || []).forEach(function (r) { r.material.opacity = sel ? 0.18 : 0.35; });
   }
-  function overview() { SEL = null; S._trk = null; tracks(null); var far = compressed ? 110 : 160; FLY = { t0: performance.now(), dur: 1000, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: new T.Vector3(), toP: new T.Vector3(0, far * 0.75, far) }; info(null); }
+  function overview() { SEL = null; S._trk = null; tracks(null); if (S.objs) S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", "false"); }); var far = compressed ? 110 : 160; FLY = { t0: performance.now(), dur: 1000, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: new T.Vector3(), toP: new T.Vector3(0, far * 0.75, far) }; info(null); }
   var tmp = new T.Vector3();
   function frame(now) {
     raf = w.requestAnimationFrame(frame); if (d.hidden) return;
@@ -623,6 +624,23 @@
     S.root = new T.Group(); S.scene.add(S.root); S.glow = glowTex();
     S.ctl = new T.OrbitControls(S.cam, S.r.domElement); S.ctl.enableDamping = true; S.ctl.dampingFactor = 0.08; S.ctl.minDistance = 0.05; S.ctl.maxDistance = 6000; S.ctl.zoomSpeed = 1.2;
     S.ctl.addEventListener("start", function () { FLY = null; });
+    (function () {
+      var x0 = 0, y0 = 0, pid = -1;
+      S.r.domElement.addEventListener("pointerdown", function (e) { x0 = e.clientX; y0 = e.clientY; pid = e.pointerId; });
+      S.r.domElement.addEventListener("pointerup", function (e) {
+        if (e.pointerId !== pid) return;
+        if (Math.hypot(e.clientX - x0, e.clientY - y0) > 12) return;
+        var labs = S.labs && S.labs.children; if (!labs || !labs.length) return;
+        var best = null, bestD = 36, i, r, d;
+        for (i = 0; i < labs.length; i++) {
+          if (labs[i].style.display === "none") continue;
+          r = labs[i].getBoundingClientRect();
+          d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+          if (d < bestD) { bestD = d; best = labs[i]; }
+        }
+        if (best && best.dataset.id) focus(best.dataset.id);
+      });
+    })();
     S.r.domElement.addEventListener("wheel", function () { FLY = null; }, { passive: true });
     el.querySelector("#s3_back").addEventListener("click", close);
     el.querySelector("#s3_all").addEventListener("click", overview);

@@ -67,10 +67,17 @@
   document.head.appendChild(css);
 
   /* ---------- data ---------- */
-  function lcLoad() {
-    if (LC.data && Date.now() - LC.loadT < 600000) return Promise.resolve(LC.data);
+  function lcLoad(force) {
+    if (!force && LC.data && LC.data.launches && LC.data.launches.length && Date.now() - LC.loadT < 600000) return Promise.resolve(LC.data);
     return fetch("/api/netmap/launches", { headers: { Accept: "application/json" } }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) { LC.data = j; LC.loadT = Date.now(); lcBuildPads(); return j; });
+      .then(function (j) {
+        LC.data = j; LC.loadT = Date.now(); lcBuildPads();
+        if (j && j.error && !(j.launches && j.launches.length) && LC._retries < 4) {
+          LC._retries = (LC._retries || 0) + 1;
+          setTimeout(function () { lcLoad(true).then(function () { if (LC.on) lcRepaint(); }); }, LC._retries === 1 ? 3000 : LC._retries === 2 ? 10000 : 20000);
+        } else if (j && j.launches && j.launches.length) { LC._retries = 0; }
+        return j;
+      });
   }
   function lcList() { return (LC.data && LC.data.launches) || []; }
   function lcBuildPads() {
