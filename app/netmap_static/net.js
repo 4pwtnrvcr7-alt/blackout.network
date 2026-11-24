@@ -106,7 +106,7 @@
   setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, map = null, ready = false;
-  var ON = { internet: true, power: true, cloud: true, dc: false, mobile: false, sat: false, pay: false, apps: false, sea: false, towers: false, grid: false, fiber: false };
+  var ON = { internet: true, power: true, cloud: true, dc: false, mobile: false, sat: false, pay: false, apps: false, sea: false, towers: false, grid: false };
   try { var sv = JSON.parse(localStorage.getItem("bn_net_layers") || "null"); if (sv && typeof sv === "object") for (var k0 in ON) if (k0 in sv) ON[k0] = !!sv[k0]; } catch (e) {}
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
@@ -115,7 +115,7 @@
     map = new maplibregl.Map({ container: "nx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD() }, minZoom: 1, maxZoom: 13,
       attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: reduce ? 0 : 300, renderWorldCopies: true });
     map.touchZoomRotate.disableRotation();
-    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a> · Towers: <a href="https://www.fcc.gov/antenna-structure-registration" target="_blank" rel="noopener">FCC ASR</a> · Power grid, fiber: OpenStreetMap (ODbL)' }), "bottom-right");
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a> · Towers: <a href="https://www.fcc.gov/antenna-structure-registration" target="_blank" rel="noopener">FCC ASR</a> · Power grid: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> (ODbL)' }), "bottom-right");
     setTimeout(function () { var a = document.querySelector(".nx-map .maplibregl-ctrl-attrib"); if (a) a.classList.remove("maplibregl-compact-show"); }, 1500);
     map.on("dataloading", function () { if (!ready) step("map", Math.min(0.8, P.map + 0.04)); });
     map.on("load", function () {
@@ -169,9 +169,10 @@
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
         if (sf.length) satCard(sf[0].properties.i, e.point); else { hideCard(true); SKY.sel = null; if (map.getSource("trk")) map.getSource("trk").setData(EMPTY); } return; }
       var f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["pt", "dc"].filter(function (l) { return map.getLayoutProperty(l, "visibility") !== "none"; }) })[0];
-      if (!f && (ON.towers || ON.grid || ON.fiber)) {
+      if (!f && (ON.towers || ON.grid)) {
         var il = []; INF_K.forEach(function (k) { if (ON[k]) il = il.concat(INF[k].Q); });
         f = map.queryRenderedFeatures([[e.point.x - 9, e.point.y - 9], [e.point.x + 9, e.point.y + 9]], { layers: il.filter(function (l) { return map.getLayer(l); }) })[0];
+        if (f && f.source === "grid") f.properties.kind = f.geometry.type === "Point" ? "ss" : "gl";
         if (f && f.properties.cluster) { var cid = f.properties.cluster_id, cc0 = f.geometry.coordinates; hideCard(true);
           map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
       }
@@ -263,7 +264,7 @@
         ((s.top || []).length ? '<ul>' + s.top.map(function (u) { return '<li>' + (url(u.web) ? '<a href="' + url(u.web) + '" target="_blank" rel="noopener noreferrer">' + esc(u.name) + '</a>' : esc(u.name)) + ' · ' + num(u.outages) + '</li>'; }).join("") + '</ul>' : '') +
         '<div class="acts"><a href="/grid">Open The Grid</a></div>';
     } else if (p.kind === "cable" || p.kind === "ls" || p.kind === "zone") { h = seaCard(p);
-    } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss" || p.kind === "fb") { h = infCard(p);
+    } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss") { h = infCard(p);
     } else if (p.kind === "cloud") {
       var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = lvCol(cl.level);
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p]) + ' · ' + esc(lvName(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(n.status || "") + '</p>' +
@@ -346,28 +347,17 @@
     return h;
   }
 
-  /* ---------- U.S. infrastructure (pt1785u Stage 3): FCC ASR towers, OSM power grid and publicly mapped long-haul fiber. All off by default, loaded on first use ---------- */
+  /* ---------- U.S. infrastructure (pt1785u Stage 3): FCC ASR towers and the OSM power grid. Both off by default, loaded on first use ---------- */
   var INF = {
     towers: { url: "/api/netmap/towers.json", L: ["tw-cl", "tw-cnt", "tw-pt"], Q: ["tw-cl", "tw-pt"], d: null, busy: false, err: false },
-    grid: { url: "/api/netmap/grid.json", L: ["gl-lo", "gl-hi", "gss"], Q: ["gss", "gl-hi", "gl-lo"], d: null, busy: false, err: false },
-    fiber: { url: "/api/netmap/fiber.json", L: ["fb-line"], Q: ["fb-line"], d: null, busy: false, err: false }
-  }, INF_K = ["towers", "grid", "fiber"], INF_L = [];
+    grid: { url: "/api/netmap/grid.json", L: ["gl-lo", "gl-hi", "gss"], Q: ["gss", "gl-hi", "gl-lo"], d: null, busy: false, err: false }
+  }, INF_K = ["towers", "grid"], INF_L = [];
   INF_K.forEach(function (k) { INF_L = INF_L.concat(INF[k].L); });
-  var TWC = "#9FB4FF", FBC = "#E58FD0";
+  var TWC = "#9FB4FF";
   function kvCol() { return ["step", ["get", "v"], "#6E6A9A", 300, "#9C8CE0", 450, "#C9B8FF", 700, "#F0F0FA"]; }
   function infLayers() {
     map.addSource("tw", { type: "geojson", data: EMPTY, cluster: true, clusterRadius: 46, clusterMaxZoom: 10, maxzoom: 12 });
-    map.addSource("grid", { type: "geojson", data: EMPTY, tolerance: 0.5 });
-    map.addSource("fib", { type: "geojson", data: EMPTY, tolerance: 0.5 });
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = "none"; map.addLayer(o, "glow"); }
-    L({ id: "gl-lo", type: "line", source: "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": kvCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
-    L({ id: "gl-hi", type: "line", source: "grid", filter: ["all", ["==", ["geometry-type"], "LineString"], [">=", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": kvCol(), "line-opacity": 0.8, "line-width": ["interpolate", ["linear"], ["zoom"], 2, ["case", [">=", ["get", "v"], 450], 0.9, 0.5], 6, ["case", [">=", ["get", "v"], 450], 1.8, 1.1], 10, 2.6] } });
-    L({ id: "gss", type: "circle", source: "grid", minzoom: 5.5, filter: ["==", ["geometry-type"], "Point"],
-      paint: { "circle-color": "#05060a", "circle-stroke-color": kvCol(), "circle-stroke-width": 1.4, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.5, 2, 10, 4.5] } });
-    L({ id: "fb-line", type: "line", source: "fib", layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": FBC, "line-opacity": 0.85, "line-width": ["interpolate", ["linear"], ["zoom"], 2, 1, 8, 2, 12, 3] } });
     L({ id: "tw-cl", type: "circle", source: "tw", filter: ["has", "point_count"],
       paint: { "circle-color": "rgba(159,180,255,.16)", "circle-stroke-color": TWC, "circle-stroke-width": 1, "circle-stroke-opacity": 0.6,
         "circle-radius": ["step", ["get", "point_count"], 9, 100, 13, 1000, 17, 5000, 22] } });
@@ -376,12 +366,24 @@
     L({ id: "tw-pt", type: "circle", source: "tw", filter: ["!", ["has", "point_count"]],
       paint: { "circle-color": TWC, "circle-stroke-color": "#05060a", "circle-stroke-width": 1, "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 2.5, 12, 5] } });
   }
+  function gridLayers() {
+    if (map.getSource("grid")) return;
+    map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 9 });
+    function L(o) { o.layout = o.layout || {}; o.layout.visibility = ON.grid && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
+    L({ id: "gl-lo", type: "line", source: "grid", "source-layer": "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": kvCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
+    L({ id: "gl-hi", type: "line", source: "grid", "source-layer": "grid", filter: ["all", ["==", ["geometry-type"], "LineString"], [">=", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": kvCol(), "line-opacity": 0.8, "line-width": ["interpolate", ["linear"], ["zoom"], 2, ["case", [">=", ["get", "v"], 450], 0.9, 0.5], 6, ["case", [">=", ["get", "v"], 450], 1.8, 1.1], 10, 2.6] } });
+    L({ id: "gss", type: "circle", source: "grid", "source-layer": "grid", minzoom: 5.5, filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-color": "#05060a", "circle-stroke-color": kvCol(), "circle-stroke-width": 1.4, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.5, 2, 10, 4.5] } });
+  }
   function infLoad(k) {
+    if (k === "grid" && map) gridLayers();
     var o = INF[k]; if (o.d || o.busy || !map) return; o.busy = true; o.err = false; infPanel();
     getJSON(o.url).then(function (j) {
       o.d = j; o.busy = false;
       if (k === "towers") map.getSource("tw").setData({ type: "FeatureCollection", features: j.p.map(function (r, i) { return { type: "Feature", geometry: { type: "Point", coordinates: [r[0], r[1]] }, properties: { kind: "tw", i: i } }; }) });
-      else { j.features.forEach(function (f, i) { f.properties.i = i; f.properties.kind = k === "fiber" ? "fb" : f.geometry.type === "Point" ? "ss" : "gl"; }); map.getSource(k === "fiber" ? "fib" : "grid").setData(j); }
+      // Grid geometry is fetched as vector tiles for the visible viewport, never a national GeoJSON download.
       infPanel();
     }, function () { o.busy = false; o.err = true; infPanel(); });
   }
@@ -391,8 +393,7 @@
     var row = function (k, key, txt) { var o = INF[k]; return '<li>' + key + '<span>' + (o.err ? "Unavailable right now" : o.busy || !o.d ? "Loading…" : txt(o.d)) + '</span></li>'; };
     el.innerHTML = '<ul>' + on.map(function (k) {
       if (k === "towers") return row(k, '<i style="background:' + TWC + '"></i><b>Cell towers</b>', function (d) { return num(d.p.length) + " FCC-registered towers · not every cell site"; });
-      if (k === "grid") return row(k, '<i class="ln" style="background:#C9B8FF"></i><b>Power grid</b>', function (d) { return "230 kV and up · brighter = higher voltage"; });
-      return row(k, '<i class="ln" style="background:' + FBC + '"></i><b>Long-haul fiber</b>', function (d) { return "Publicly mapped routes only (" + num(d.km) + " km). Street-level fiber isn't public."; });
+      return row(k, '<i class="ln" style="background:#C9B8FF"></i><b>Power grid</b>', function (d) { return "Lines and substations, 230 kV and up · brighter = higher voltage · © OpenStreetMap contributors"; });
     }).join("") + '</ul>';
   }
   function kvTxt(v) { return v ? v + " kV" : "Unknown"; }
@@ -405,15 +406,10 @@
         '<div class="acts">' + linkA("https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistration.jsp?regKey=" + r[5], "FCC registration record") + '</div>' +
         '<p class="age">FCC Antenna Structure Registration, data as of ' + esc(d.asof) + '. The owner registered the structure; the FCC file does not list which carriers use it. Shorter sites and rooftop or small cells are usually not registered.</p>';
     } else if (p.kind === "gl" || p.kind === "ss") {
-      var f = INF.grid.d.features[p.i].properties; c = "#C9B8FF";
+      var f = p; c = "#C9B8FF";
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
         '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") + '</dl>' +
-        '<p class="age">Mapped by OpenStreetMap contributors (ODbL). Shows lines and substations of 230 kV and up; coverage is good but not complete. Not a live status.</p>';
-    } else if (p.kind === "fb") {
-      var g = INF.fiber.d.features[p.i].properties;
-      h = '<span class="st" style="color:' + FBC + '"><i style="background:' + FBC + '"></i>Long-haul fiber route</span><h3>' + esc(g.n || g.op || "Fiber route") + '</h3><dl>' +
-        (g.op ? '<dt>Operator</dt><dd>' + esc(g.op) + '</dd>' : "") + '<dt>Length</dt><dd>' + num(g.km) + ' km</dd></dl>' +
-        '<p class="age">Route as publicly mapped in OpenStreetMap (ODbL). Most U.S. fiber, including all street-level fiber, is not public, so this is a small part of the real network. Not a live status.</p>';
+        '<p class="age">© OpenStreetMap contributors (ODbL). Shows lines and substations of 230 kV and up; coverage and voltage tags are incomplete. No distribution lines below 230 kV. Routes are simplified and can cross the border; not a live status.</p>';
     }
     return h;
   }
