@@ -111,11 +111,12 @@
     j.nets = ns; j.summary = s; j.live_only = true; return j;
   }
   window.__nxLive = liveOnly;
-  var pData = retry("/api/netmap/data", "nets", 3).then(liveOnly), pDc = retry("/api/netmap/dc", "dc", 2), pWorld = getJSON("/api/signal/world.geojson");
+  var pData = retry("/api/netmap/data", "nets", 3).then(liveOnly), pDc = retry("/api/netmap/dc", "dc", 2), pWorld = getJSON("/api/signal/world.geojson"),
+    pInet = Promise.all([getJSON("/api/netmap/inet"), getJSON("/api/netmap/inet.json")]);   /* pt1810u: internet status per state, territory, country */
   pData.then(function () { step("out", 0.5); }, function () {});
   setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
-  var D = null, DC = null, WORLD = null, map = null, ready = false;
+  var D = null, DC = null, WORLD = null, INET = null, INETG = null, map = null, ready = false;
   /* Nov 24 2026 (Matt): map pop-ups sit next to the tapped item, always fully inside the visible screen (below the header and chips,
      inside safe areas), scroll inside when tall, and can be dragged by their top strip (touch + mouse). Close: X, tap the map, Esc. */
   function cardBounds() {
@@ -175,6 +176,7 @@
         step("out", 1);
       });
       pDc.then(function (j) { DC = j; applyDc(); }, function () {});
+      pInet.then(function (r) { INET = r[0]; INETG = r[1]; applyInet(); }, function () {});
       var tk = setInterval(function () {   /* the first view's tiles are all in (the pulse animation would keep "idle" from ever firing) */
         if (map.areTilesLoaded() && map.isStyleLoaded()) { clearInterval(tk); ready = true; step("map", 1); startPulse(); if (location.hash === "#sky") setTimeout(function () { view("sky"); }, 400); }
       }, 150);
@@ -188,6 +190,9 @@
     map.addSource("cty", { type: "geojson", data: EMPTY });
     map.addLayer({ id: "cty-fill", type: "fill", source: "cty", paint: { "fill-color": ["get", "c"], "fill-opacity": ["case", ["get", "cur"], 0.26, 0.1] } }, "admin-state");
     map.addLayer({ id: "cty-line", type: "line", source: "cty", paint: { "line-color": ["get", "c"], "line-opacity": ["case", ["get", "cur"], 0.75, 0.35], "line-width": 1 } }, "admin-state");
+    map.addSource("inet", { type: "geojson", data: EMPTY, tolerance: 0.5 });
+    map.addLayer({ id: "inet-fill", type: "fill", source: "inet", paint: { "fill-color": ["get", "c"], "fill-opacity": ["get", "o"] } }, "admin-state");
+    map.addLayer({ id: "inet-line", type: "line", source: "inet", paint: { "line-color": ["get", "c"], "line-opacity": 0.45, "line-width": 0.6 } }, "admin-state");
     map.addSource("dc", { type: "geojson", data: EMPTY });
     map.addLayer({ id: "dc-glow", type: "circle", source: "dc", layout: { visibility: ON.dc ? "visible" : "none" }, paint: { "circle-color": COL.dc, "circle-blur": 1, "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.14, 6, 0.3],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2, ["*", 0.04, ["min", ["get", "n"], 200]]], 8, ["+", 6, ["*", 0.08, ["min", ["get", "n"], 200]]]] } });
@@ -226,10 +231,31 @@
           map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
       }
       if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["sea-ls", "sea-line"] })[0] || map.queryRenderedFeatures(e.point, { layers: ["seaz-fill"] })[0];
+      if (!f && ON.internet && INET && map.getLayer("inet-fill") && map.getLayoutProperty("inet-fill", "visibility") !== "none") f = map.queryRenderedFeatures(e.point, { layers: ["inet-fill"] })[0];
       if (f) showCard(f, e.point, true); else hideCard(true);
     });
   }
 
+  /* pt1810u: choropleth of IODA internet status. Green normal, amber degraded, red outage, grey = IODA has no live data for it. */
+  function inetCol(l) { return l >= 3 ? COL.out : l === 2 ? COL.deg : l === 0 ? COL.ok : COL.na; }
+  function applyInet() {
+    if (!INET || !INETG || !map || !map.getSource("inet")) return;
+    var P = INET.places || {};
+    map.getSource("inet").setData({ type: "FeatureCollection", features: (INETG.features || []).map(function (f) {
+      var r = P[f.properties.k], l = r ? r.level : -1;
+      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), o: l >= 3 ? 0.42 : l === 2 ? 0.34 : l === 0 ? 0.12 : 0.08 } }; }) });
+    if (D) applyData();
+  }
+  function inetCard(p) {
+    var r = (INET && INET.places || {})[p.k] || { name: p.n, level: -1, status: "No data", signals: [] }, c = inetCol(r.level);
+    var sig = (r.signals || []).map(function (s) { return '<li>' + esc(s.name) + ' · ' + (s.pct != null ? esc(s.pct) + '% of normal (' + esc(100 - s.pct) + '% drop)' : 'below normal') + (s.since ? ' · since ' + esc(ago(s.since)) : '') + '</li>'; }).join("");
+    return '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + esc(r.status) + '</span><h3>' + esc(r.name || p.n) + '</h3>' +
+      (r.level < 0 ? '<p>No live internet measurements for this place right now.</p>' :
+       sig ? '<p>Signals below their normal level:</p><ul>' + sig + '</ul>' : '<p>All IODA signals (routing, active probing, network telescope) at normal levels.</p>') +
+      '<dl>' + (r.since ? '<dt>Since</dt><dd>' + esc(ago(r.since)) + '</dd>' : '') + (r.alerts_24h != null ? '<dt>IODA alerts, 24 h</dt><dd>' + num(r.alerts_24h) + '</dd>' : '') +
+      '<dt>Last checked</dt><dd>' + esc(ago(r.checked || (INET && INET.generated))) + '</dd></dl>' +
+      '<div class="acts">' + linkA(r.src || "https://ioda.inetintel.cc.gatech.edu/", "Live IODA dashboard") + '</div><p class="age">Measured by IODA, Georgia Tech. A drop can be a local network problem, a power cut or a shutdown.</p>';
+  }
   function applyWorld() {
     if (!WORLD || !D || !map.getSource("cty")) return;
     var by = {}; (D.outages.countries || []).forEach(function (c) { by[c.geo] = c; });
@@ -248,11 +274,11 @@
   var PTS = [];
   function applyData() {
     var f = [];
-    (D.outages.countries || []).forEach(function (c, i) {
+    if (!INET) (D.outages.countries || []).forEach(function (c, i) {   /* pt1810u: the choropleth replaces these dots once it is in */
       if (c.lon == null) return;
       f.push(feat(c.lon, c.lat, { kind: "country", i: i, c: c.major ? COL.out : COL.deg, fill: c.cur ? (c.major ? COL.out : COL.deg) : "#05060a", sw: 2, r: c.cur ? 7 : 5, hot: !!c.cur, label: c.name, layer: "internet" }));
     });
-    (D.outages.us_regions || []).forEach(function (r, i) {
+    if (!INET) (D.outages.us_regions || []).forEach(function (r, i) {
       f.push(feat(r.lon + 0.6, r.lat - 0.4, { kind: "region", i: i, c: COL.deg, fill: "#05060a", sw: 2, r: 5, hot: false, label: r.name, layer: "internet" }));
     });
     ((D.power || {}).states || []).forEach(function (s, i) {
@@ -272,7 +298,8 @@
     if (SKY.on) return;
     ON.power = ON.ops = !!ON.grid;   /* Nov 24 2026 (Matt): one "Power grid" chip runs outages, operators and the 230 kV+ lines */
     map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return ON[x.properties.layer]; }) });
-    ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
+    ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet && !INET ? "visible" : "none"); });
+    ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
     SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.sea ? "visible" : "none"); });
     if (ON.sea) seaLoad(); seaPanel();
@@ -317,6 +344,7 @@
         '<div class="acts">' + (s.st ? '<button type="button" class="gx-fly" data-state="' + esc(s.st) + '">Utilities and outage maps</button>' : '') + '<button type="button" class="gx-fly" data-more="gx-outages">Outages by state</button></div>';
     } else if (p.kind === "cable" || p.kind === "ls" || p.kind === "zone") { h = seaCard(p);
     } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss") { h = infCard(p);
+    } else if (p.kind === "inet") { h = inetCard(p);
     } else if (p.kind === "cloud") {
       var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = lvCol(cl.level);
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p]) + ' · ' + esc(lvName(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(n.status || "") + '</p>' +
@@ -639,7 +667,7 @@
     $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = !sky; $("nx_leg").hidden = sky; hideCard(true);
     if (sky) SEA_L.concat(INF_L).forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
     try { history.replaceState(null, "", sky ? "#sky" : "#map"); } catch (e) {}
-    ["cty-fill", "cty-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
+    ["cty-fill", "cty-line", "inet-fill", "inet-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
     if (!sky) {
       clearInterval(SKY.timer); SKY.timer = null; SKY.sel = null;
       ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });

@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml"}
+FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -651,7 +651,7 @@ def page(qs=None):
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>
 <button type="button" class="nx-b" id="nx_home" aria-label="Show the whole U.S."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
 <div class="nx-leg" id="nx_leg" aria-label="Legend"><ul>
-<li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li><i class="s-dc"></i>Data center</li></ul>
+<li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li><i class="s-na" style="background:#7C8190"></i>No data</li><li><i class="s-dc"></i>Data center</li></ul>
 <ul class="nx-shapes" id="gx_leg"><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul><ul class="nx-lnk" aria-label="Power lines, coloured by their grid operator&#39;s live status"><li><i class="ln" style="background:#2FD67B"></i>Lines normal</li><li><i class="ln" style="background:#F5D547"></i>Strained</li><li><i class="ln" style="background:#FF3B3B"></i>Outage</li></ul></div>
 <button type="button" class="nx-more-btn" id="nx_more_btn" aria-controls="nx_more" aria-expanded="false"><span id="nx_more_lbl">All networks</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <button type="button" class="gx-more-btn" id="gx_more_btn" aria-controls="gx_more" aria-expanded="false"><span class="gx-ml">More about the grid</span><span class="gx-ms">Grid details</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
@@ -716,6 +716,12 @@ def handle_get(path, qs=None, headers=None):
             if r and not r.get("news_ok") and "cables" in _C and time.time() - _C["cables"][0] > 120: _C["cables"] = (time.time() - 600, r)   # news failed: try again soon (served stale meanwhile)
             return (200, r) if r else (503, {"error": "cable data is still loading"})
         except Exception as ex: return 503, {"error": "cable data unavailable", "detail": type(ex).__name__}
+    if p == "/api/netmap/inet":   # pt1810u: internet status per U.S. state, territory and country (IODA, 10 min cache)
+        import netinet
+        try:
+            r = swr("inet", 600, lambda: netinet.build(jget), wait=True)
+            return (200, r) if r else (503, {"error": "internet status is still loading"})
+        except Exception as ex: return 503, {"error": "internet status unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":
         import netsky
         return 200, netsky.space()
