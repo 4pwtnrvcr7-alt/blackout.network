@@ -172,6 +172,12 @@ NETS = [
 GROUPS = [("bank", "Banks and brokerages"), ("cards", "Card networks"), ("isp", "Internet providers"), ("mobile", "Mobile carriers"), ("sat", "Satellite internet"), ("cloud", "Cloud and web"),
           ("pay", "Payments and money"), ("rails", "Banking rails"), ("apps", "Apps and messaging"), ("gov", "Government and public")]
 NP_PAGES = {"aws", "azure", "m365", "gcp", "workspace", "cloudflare", "akamai", "starlink"}
+def _page_off(path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py, e.g. /network/starlink) get no "full page" link on the cards
+    try:
+        import deactivated
+        return deactivated.is_off(path)
+    except Exception:
+        return False
 
 def _day_index(t, n0):
     return (n0 - t.astimezone(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)).days
@@ -434,7 +440,7 @@ def build():
             else: r = asn_one(feed, asn.get())
         except Exception:
             r = dict(level=-1, status="Status feed unreachable right now", incidents=[], days=None, uptime=None, basis="")
-        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES else None,
+        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES and not _page_off(f"/network/{nid}") else None,
                  detail=f"/network/status/{nid}")
         return r
     with ThreadPoolExecutor(12) as ex:

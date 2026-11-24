@@ -32,5 +32,5 @@
    if(row&&row.querySelectorAll("a[href]").length===1&&(card||(row.textContent||"").trim().length<=t.length+40)){row.hidden=true;row.style.display="none";row.setAttribute("data-bn-off-row","1")}
    else if(a.classList.contains("bnt-btn")||a.classList.contains("w2-btn")||/btn|button|cta/.test(a.className||"")){a.hidden=true;a.style.display="none"}
    else{var s=document.createElement("span");s.className="bn-off-link";s.innerHTML=a.innerHTML;a.replaceWith(s)}}}
- function go(){apply(document);var tm=0;new MutationObserver(function(){clearTimeout(tm);tm=setTimeout(function(){apply(document)},200)}).observe(document.body,{childList:true,subtree:true})}
+ function go(){apply(document);var tm=0;new MutationObserver(function(){if(tm)return;tm=setTimeout(function(){tm=0;apply(document)},200)}).observe(document.body,{childList:true,subtree:true})}   /* throttle, not debounce: pages that re-render all the time (/network) still get checked */
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();
