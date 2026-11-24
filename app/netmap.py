@@ -27,7 +27,20 @@ def _v(name):
     except OSError: return "0"
 def now(): return datetime.now(timezone.utc)
 def iso(d): return d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if d else None
+# IODA back-off (Nov 24 2026): after a failed IODA call, every IODA call in this process fails fast for 1, 2, 4 ... 30 min,
+# so the server stops hammering IODA while it is not answering us. One success resets it.
+_IB = {"until": 0.0, "n": 0, "err": None}
+def ioda_state(): return {"backoff_s": max(0, round(_IB["until"] - time.time())), "fails": _IB["n"], "last_error": _IB["err"]}
 def http(url, timeout=12, cap=6_000_000):
+    if not url.startswith(IODA): return _http(url, timeout, cap)
+    if time.time() < _IB["until"]: raise OSError("IODA back-off")
+    try:
+        b = _http(url, timeout, cap)
+    except Exception as e:
+        _IB["n"] += 1; _IB["until"] = time.time() + min(1800, 60 * 2 ** (_IB["n"] - 1)); _IB["err"] = (type(e).__name__ + " " + str(getattr(e, "code", "") or ""))[:60]
+        raise
+    _IB.update(n=0, until=0.0); return b
+def _http(url, timeout=12, cap=6_000_000):
     with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json,*/*"}), timeout=timeout) as r:
         return r.read(cap)
 def jget(url, **k): return json.loads(http(url, **k).decode("utf-8", "replace"))
@@ -720,6 +733,7 @@ def handle_get(path, qs=None, headers=None):
         import netinet
         try:
             r = swr("inet", 600, lambda: netinet.build(jget), wait=True)
+            if r: r = dict(r, ioda=ioda_state())
             if r and not all((r.get("feeds") or {}).values()) and "inet" in _C and time.time() - _C["inet"][0] > 120: _C["inet"] = (time.time() - 600, r)   # IODA did not answer: grey now, try again soon
             return (200, r) if r else (503, {"error": "internet status is still loading"})
         except Exception as ex: return 503, {"error": "internet status unavailable", "detail": type(ex).__name__}
@@ -740,8 +754,11 @@ def handle_get(path, qs=None, headers=None):
 def _warm():
     def inet():   # follow-up pt1810u: first visitor after a deploy gets the Internet layer at once (was ~18 s cold)
         import netinet; swr("inet", 600, lambda: netinet.build(jget), wait=True)
-    for f in (data, dc, inet):
+    for f in (data, dc):
         try: f()
         except Exception: pass
+    time.sleep(90)   # stagger: the Internet layer's IODA calls do not overlap the 30-day ASN download and outage summaries
+    try: inet()
+    except Exception: pass
 if os.environ.get("BN_NETMAP_WARM", "1") != "0":
     threading.Thread(target=_warm, daemon=True, name="nm-warm").start()
