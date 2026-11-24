@@ -681,7 +681,7 @@ def page(qs=None):
 <div id="nx_map" class="nx-map" role="region" aria-label="Map of the power grid and network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
 {BOARD.replace('id="nb"', 'id="nb" data-logos="/api/netmap/logos.svg?v=' + _v("logos.svg") + '"', 1)}
-<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
+<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-units" id="nx_units" role="group" aria-label="Units"><button type="button" data-u="imperial" aria-pressed="true">mi</button><button type="button" data-u="metric" aria-pressed="false">km</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>

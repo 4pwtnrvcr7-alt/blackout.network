@@ -188,6 +188,11 @@ html body.nx button#nx_more_btn.nx-more-btn{border-radius:99px!important}
 html body.nx .nx-mode button{all:unset;cursor:pointer;padding:6px 12px;border-radius:99px!important;font:600 10.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--nx-mu);transition:background .25s,color .25s}
 html body.nx .nx-mode button[aria-pressed="true"]{background:rgba(240,240,250,.16);color:var(--nx-tx)}
 .nx-mode button:focus-visible{outline:2px solid #F2F2F4;outline-offset:1px}
+/* pt1827u: metric/imperial units pill, next to the Status/Map/Sky switch */
+.nx-units{flex:none;display:flex;gap:2px;padding:3px;border-radius:99px;background:rgba(5,6,10,.7);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+html body.nx .nx-units button{all:unset;cursor:pointer;padding:6px 9px;border-radius:99px!important;font:600 10.5px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;color:var(--nx-mu);transition:background .25s,color .25s}
+html body.nx .nx-units button[aria-pressed="true"]{background:rgba(240,240,250,.16);color:var(--nx-tx)}
+.nx-units button:focus-visible{outline:2px solid #F2F2F4;outline-offset:1px}
 .nx-top .nx-chip{min-width:0}
 .nx-f[hidden],.nx-sw[hidden],.nx-leg[hidden],.nx-leg-body[hidden]{display:none!important}
 .nx-sf button i{border-width:1px}
@@ -200,9 +205,10 @@ body.nx-sky .nx-map{background:#03040a}
 .nx-swm{margin:2px 0 0;font-size:11.5px;line-height:1.4}.nx-swm a{color:var(--nx-tx)}
 body.nx-sky .nx-more-btn{display:none}
 @media (max-width:767px){
- .nx-top{left:12px;right:12px;transform:none;max-width:none}
+ .nx-top{left:12px;right:12px;transform:none;max-width:none;gap:6px}
  html body.nx .nx-mode button{padding:6px 10px;font-size:10px;letter-spacing:.1em}
- .nx-top .nx-chip{flex:1;padding:8px 11px}
+ html body.nx .nx-units button{padding:6px 7px;font-size:10px;letter-spacing:.06em}
+ .nx-top .nx-chip{flex:1;min-width:0;padding:8px 11px}
  .nx-sw{left:12px;right:12px;width:auto;bottom:calc(14px + env(safe-area-inset-bottom));padding:10px 10px}
  .nx-cnt{grid-template-columns:1fr 1fr 1fr 1fr;gap:3px 8px;font-size:10.5px}.nx-cnt li b{margin-left:3px}
 }
