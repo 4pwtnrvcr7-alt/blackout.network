@@ -1459,7 +1459,7 @@ def _hold_unbriefed(issue, c=None):
         log(("brief hold: " + "; ".join(f"{sec} {cid} ({why})" for sec, cid, why in held))[:900], "analysis")
     return held
 
-_BRK_HELD = {"ids": None}
+_BRK_HELD = {"ids": None, "held": [], "at": None}
 
 def _breaking_brief_hold(cands, c=None):
     """Matt, Nov 13 (same rule as the newsletter's require_story_brief, _hold_unbriefed): a breaking alert goes out only when its story
@@ -1491,10 +1491,25 @@ def _breaking_brief_hold(cands, c=None):
         if why: held.append((cid, why))
         else: kept.append(x)
     ids = tuple(sorted(cid for cid, _ in held))
+    _BRK_HELD["held"] = [{"cluster_id": cid, "reason": why} for cid, why in held]; _BRK_HELD["at"] = iso(now())
     if held and ids != _BRK_HELD["ids"]:   # log when the held set changes, not every 45 s tick
         log(("breaking brief hold: " + "; ".join(f"{cid} ({why})" for cid, why in held))[:900], "breaking")
     _BRK_HELD["ids"] = ids
     return kept, held
+
+def breaking_status(n=5):
+    """Nov 24 (read-only, for the box-signed status): the last breaking runs and what the brief hold is holding right now, so a quiet
+    breaking channel can be told apart from a broken one. No subscriber data."""
+    k = db()
+    try:
+        runs = [dict(r) for r in k.execute("SELECT id, ts, cluster_ids, status, mode, n_targets, n_sent, note FROM breaking_runs ORDER BY id DESC LIMIT ?", (int(n),))]
+        seen = {r["status"]: r["n"] for r in k.execute("SELECT status, COUNT(*) n FROM breaking_seen GROUP BY status")}
+        optout = k.execute("SELECT COUNT(*) FROM subscribers WHERE status='active' AND breaking=0").fetchone()[0]
+    finally: k.close()
+    for r in runs: r["ts_et"] = fmt_et(parse_t(r["ts"]))
+    b = cfg().get("breaking") or {}
+    return {"enabled": bool(b.get("enabled", True)), "require_story_brief": bool(b.get("require_story_brief", True)), "runs": runs, "seen": seen,
+            "held_now": list(_BRK_HELD.get("held") or []), "held_checked": _BRK_HELD.get("at"), "active_opted_out": optout}
 
 def _attach_analysis(issue, at, c=None):
     """Analyst brief (what happened, analysis, trajectory, what to do). Read-only. A failure leaves the rest of the issue intact."""
@@ -2315,7 +2330,13 @@ def render_trending(t, links, at, c=None):
 def render_breaking(items, links, at, c=None, trend=None):
     """items: item_of() dicts with 'rule'. -> (subject, html, text)."""
     if not items and trend: return render_trending(trend, links, at, c)
-    c = c or cfg(); top = items[0]; addr, _ = _addr(c)
+    c = c or cfg()
+    try:   # Matt, Nov 21: breaking alerts follow the same style as the 7 AM / 7 PM issue (layout v4); any error falls back to the layout below
+        import newsletter_v4 as NV4
+        if NV4.on(c): return NV4.render_breaking(items, links, at, c)
+    except Exception as ex:
+        traceback.print_exc(); log(f"breaking v4 layout failed, using the fallback layout: {type(ex).__name__}: {ex}"[:300], "breaking")
+    top = items[0]; addr, _ = _addr(c)
     subj = f"BREAKING · {BRAND}: R{top['rank']} {_cut(_short(top['title'], 200), 80)}" + (f" (+{len(items) - 1} more)" if len(items) > 1 else "")
     _tt = _short(top['title'], 140).rstrip(" .")
     pre = f"{top['tier']} ({top['rank']}/10): {_tt}. {top['confidence']}."

@@ -323,3 +323,44 @@ def render(issue, links, c):
     text = V2.text_part(issue, links, c, subj, why, None, None, refs).replace(N.TAGLINE, TAGLINE)
     text = text.replace(f"{N.BRAND} · {TAGLINE}", f"{WORDMARK} · {TAGLINE}") + f"\nImage credits: {V2._base(c)}/credits\n"
     return (subj,) + N.utm_tag(html_, text, camp)
+
+def render_breaking(items, links, at, c):
+    """Breaking alert in the same v4 layout as the 7 AM / 7 PM issue (Matt, Nov 21 2026 6:39 PM ET). -> (subject, html, text).
+    items: item_of() dicts (rank 7+, 2+ independent sources) that already passed the story-brief hold in newsletter.run_breaking.
+    Same masthead, story cards, outlined button and footer controls as the brief; red only for the rank line (all breaking items are 7+)."""
+    N = _N(); refs = V2.Refs(); base = V2._base(c)
+    shell = {"main": items, "notable": [], "updates": [], "follow": [], "politics": [], "near": [], "watchlist": [],
+             "start": at - N.timedelta(hours=6), "end": at, "slot": "breaking"}
+    N._attach_analysis(shell, at, c)   # the desk / analyst what-happened line becomes each card's summary, as in the brief
+    top = items[0]; d = at.astimezone(N.ET).strftime("%b %-d")
+    subj = f"Breaking Alert, {d}: {N._subject_title(N.card_headline(top), 72)}" + (f" + {len(items) - 1} more" if len(items) > 1 else "")
+    when = N.fmt_et(at)
+    B = [_row(f'<a href="{E(base)}/" class="bnt" style="font:600 22px/26px {FACE};letter-spacing:-0.2px;color:{TX};text-decoration:none">{WORDMARK}</a>'
+              f'<div class="bnm" style="font:400 13px/18px {FACE};letter-spacing:1.8px;color:{MU};margin:6px 0 0 0">{TAGLINE.upper()}</div>'
+              f'<div class="bnm" style="font:400 13px/18px {FACE};letter-spacing:1.8px;color:{DIM};margin:22px 0 0 0">BREAKING ALERT &middot; {E(when.upper())}</div>',
+              "36px 24px 28px 24px")]
+    for k, it in enumerate(items):
+        B.append(story(it, c, refs, first=k == 0, big=k == 0))
+    b = c.get("breaking") or {}
+    B.append(_row(_summary(f"Why you got this: it is ranked 7 or higher and confirmed by 2 or more independent sources, and its full brief is live on the story page. "
+                           f"Breaking alerts are rare: at most one every {b.get('min_gap_hours', 3)} hours and {b.get('max_per_day', 3)} a day. Your regular briefs continue as usual."),
+                  "36px 24px 0 24px"))
+    why = f"You get breaking alerts because you subscribed to the {N.BRAND} newsletter. Turn them off with Stop breaking alerts or under Manage subscription."
+    pre = N.card_headline(top) + (f" + {len(items) - 1} more." if len(items) > 1 else "")
+    html_ = (_head(subj) + f'<body bgcolor="{BG}" class="bnb body" style="margin:0;padding:0;background:{BG};color:{TX};-webkit-text-size-adjust:100%">'
+             f'<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:{BG}">{E(pre)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>'
+             f'<table role="presentation" class="bnb" bgcolor="{BG}" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:{BG}"><tr><td bgcolor="{BG}" align="center" style="padding:0;background:{BG}">'
+             '<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->'
+             f'<table role="presentation" class="bnb" bgcolor="{BG}" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:{W}px;background:{BG};font-family:{FACE};color:{TX};text-align:left">'
+             + "".join(x for x in B if x) + _footer(links, c, why) + '</table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>')
+    addr, _ = N._addr(c)
+    T = [f"{WORDMARK} · {TAGLINE}", f"Breaking alert · {when}", ""]
+    for i, it in enumerate(items, 1):
+        rk = int(it.get("rank") or 0)
+        T += [f"{i}. {N.card_headline(it)}", f"   Rank {rk}" + (f" · {it.get('where')}" if it.get("where") else "")]
+        s = V2.summary(it)
+        if s: T.append(f"   {s}")
+        T += [f"   Read the full story: {N.wire_url(it['cluster_id'], c=c)}", ""]
+    T += ["Why you got this: ranked 7 or higher, confirmed by 2 or more independent sources, full brief live on the story page.", "",
+          N.DISCLAIMER, why, "--", f"{N.BRAND} · {addr or base}"] + N.footer_buttons_text(links)
+    return (subj,) + N.utm_tag(html_, "\n".join(T), f"breaking-{at.astimezone(N.ET).strftime('%Y-%m-%d')}")

@@ -27,9 +27,40 @@ def load():
     except Exception: _C["d"] = _C["d"] or {}
     return _C["d"] or {}
 
+_NL = {"t": 0, "v": None}
+def _nl_live():
+    """Nov 24 (subscriber count mismatch): the newsletter count is read live from this node's own newsletter.db, the list the 7 AM / 7 PM
+    sends use (status 'active', the same rule as the admin console and the signed status), cached 60 s. The box-built JSON's count came
+    from a box mirror of that database that can go stale (it last refreshed Nov 9 and showed 3 while 5 were active). Same privacy rule as
+    before: under 5 shows as <5, and signup sources under 5 are hidden. Falls back to the JSON's value if the database can't be read."""
+    if _NL["v"] is not None and time.time() - _NL["t"] < 60: return _NL["v"]
+    v = None
+    try:
+        import newsletter as NL
+        if os.path.exists(NL.P["db"]):
+            k = NL.db()
+            try:
+                n_ = k.execute("SELECT COUNT(*) FROM subscribers WHERE status='active'").fetchone()[0]
+                by = k.execute("SELECT COALESCE(NULLIF(signup_source,''),'form'), COUNT(*) FROM subscribers WHERE status='active' GROUP BY 1 ORDER BY 2 DESC").fetchall()
+            finally: k.close()
+            MIN = 5
+            src = [{"source": NL_SRC.get(a, a), "signups": b} for a, b in by if b >= MIN]
+            v = {"subscribers": n_ if n_ >= MIN else None, "lt5": n_ < MIN, "by_source": src, "by_source_hidden": sum(b for a, b in by if b < MIN) > 0, "live": True}
+    except Exception: v = None
+    _NL.update(t=time.time(), v=v)
+    return v
+NL_SRC = {"form": "Newsletter page form", "page": "Newsletter page", "footer": "Site footer", "feed": "In-feed card", "story": "Story pages",
+          "wire": "Story pages", "social": "Videos & posts", "stats": "Stats page", "popup": "Prompt", "x": "X", "youtube": "YouTube"}
+
+def _with_live_nl(d):
+    v = _nl_live()
+    if not v: return d
+    d = dict(d); d["newsletter"] = v
+    return d
+
 def public_json():
     """Only the published aggregates (the file holds nothing else, but keep the allow-list explicit)."""
-    d = load(); keep = {}
+    d = _with_live_nl(load()); keep = {}
     for k in ("generated", "min_bucket", "site", "newsletter", "youtube", "x", "growth"): keep[k] = d.get(k)
     if isinstance(keep.get("youtube"), dict): keep["youtube"] = {k: v for k, v in keep["youtube"].items() if k not in ("analytics_note", "daily", "traffic_sources", "views_28d", "minutes_28d", "subs_net_28d", "analytics")}   # audit Nov 1 2026: no YouTube Analytics data on public /stats
     if isinstance(keep.get("youtube"), dict):
@@ -225,7 +256,7 @@ def subs_chart(rows):
 CH_COLORS = {"Search": "#4aa3ff", "Social": "#FF4D4F", "Direct / bookmarks / apps": "#8B95A3", "Email": "#F5A524", "AI assistants": "#b37feb", "Other sites": "#2BB673"}
 
 def render():
-    d = load(); s = d.get("site") or {}; y = d.get("youtube") or {}; x = d.get("x") or {}; nl = d.get("newsletter") or {}; g = (d.get("growth") or {}).get("series") or []
+    d = _with_live_nl(load()); s = d.get("site") or {}; y = d.get("youtube") or {}; x = d.get("x") or {}; nl = d.get("newsletter") or {}; g = (d.get("growth") or {}).get("series") or []
     since = s.get("since"); since_txt = when(since, "%b %-d, %Y") if since else "—"
     today, week = s.get("today") or {}, s.get("week") or {}
     hero = (f'<section class="st-hero"><div class="row">{TILE}<div style="min-width:0;flex:1 1 260px"><div class="st-live"><i></i>Live stats</div>'
