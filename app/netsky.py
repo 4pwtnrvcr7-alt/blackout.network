@@ -227,6 +227,49 @@ def _horizons_observer(command, center, when):
             return {"delta_au": nums[0], "deldot_km_s": nums[1] if len(nums) > 1 else None, "light_min": None, "time": parts[0]}
     raise RuntimeError("Horizons table had no numeric row")
 
+def _gmst_deg(dt):
+    jd = dt.timestamp() / 86400.0 + 2440587.5
+    t = (jd - 2451545.0) / 36525.0
+    return (280.46061837 + 360.98564736629 * (jd - 2451545.0) + 0.000387933 * t * t - t * t * t / 38710000.0) % 360.0
+
+def _horizons_dir(command, when):
+    """Geocentric J2000 vector -> geographic lon/lat of the direction from Earth (approx, GMST)."""
+    import math, urllib.parse
+    start = when.strftime("%Y-%m-%d %H:%M")
+    stop = datetime.fromtimestamp(when.timestamp() + 3600, timezone.utc).strftime("%Y-%m-%d %H:%M")
+    q = dict(format="json", COMMAND=str(command), OBJ_DATA="NO", MAKE_EPHEM="YES", EPHEM_TYPE="VECTORS",
+             CENTER="500@399", REF_PLANE="FRAME", OUT_UNITS="KM", VEC_TABLE="1", CSV_FORMAT="YES",
+             START_TIME=start, STOP_TIME=stop, STEP_SIZE="1 h")
+    j = _j(HORIZONS_API + "?" + urllib.parse.urlencode(q))
+    if j.get("error"):
+        raise RuntimeError(str(j["error"])[:200])
+    res = j.get("result") or ""
+    a, b = res.find("$$SOE"), res.find("$$EOE")
+    if a < 0 or b < a:
+        raise RuntimeError("no Horizons vector table")
+    for line in res[a + 5:b].splitlines():
+        line = line.strip()
+        if not line or line.startswith("$"):
+            continue
+        nums = []
+        for x in line.split(","):
+            x = x.strip()
+            try:
+                nums.append(float(x))
+            except ValueError:
+                continue
+        # skip JD; take first X Y Z
+        if len(nums) >= 4:
+            x, y, z = nums[1], nums[2], nums[3]
+        elif len(nums) >= 3:
+            x, y, z = nums[0], nums[1], nums[2]
+        else:
+            continue
+        lon = (math.degrees(math.atan2(y, x)) - _gmst_deg(when) + 540.0) % 360.0 - 180.0
+        lat = math.degrees(math.atan2(z, math.hypot(x, y)))
+        return {"lon": round(lon, 3), "lat": round(lat, 3)}
+    raise RuntimeError("Horizons vector table had no numeric row")
+
 def _au_fields(row):
     if not row or row.get("delta_au") is None:
         return None
@@ -243,7 +286,7 @@ def _au_fields(row):
 
 def solar_system():
     """Heliocentric inset data: Roadster, Voyager 1, Voyager 2. Distances from JPL Horizons (keyless). Cached 1 h."""
-    hit = _MEM.get("ss")
+    hit = _MEM.get("ss2")
     if hit and time.time() - hit[0] < 3600:
         return hit[1]
     when = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
@@ -256,6 +299,12 @@ def solar_system():
             sun = _horizons_observer(meta["command"], "500@10", when)
             rec["earth"] = _au_fields(earth)
             rec["sun"] = _au_fields(sun)
+            try:
+                d = _horizons_dir(meta["command"], when)
+                if rec["earth"] is not None and d:
+                    rec["earth"]["lon"], rec["earth"]["lat"] = d["lon"], d["lat"]
+            except Exception:
+                pass
             rec["ok"] = rec["earth"] is not None and rec["sun"] is not None
             rec["epoch"] = (earth or {}).get("time") or when.strftime("%Y-%m-%dT%H:%M:%SZ")
         except Exception as e:
@@ -267,7 +316,7 @@ def solar_system():
                errors=errors or None)
     if not out["ok"] and hit:
         return dict(hit[1], stale=True, error="horizons_failed")
-    _MEM["ss"] = (time.time(), out)
+    _MEM["ss2"] = (time.time(), out)
     return out
 
 def size_from_h(h, albedo=0.14):

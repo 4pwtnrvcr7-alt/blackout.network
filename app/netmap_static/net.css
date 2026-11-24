@@ -344,3 +344,11 @@ body.nx-sky-focus .nx-ss{display:none!important}
   .nx-ss{top:calc(108px + env(safe-area-inset-top));right:8px;width:min(210px,calc(100vw - 16px));max-height:36dvh;padding:8px 10px}
   .nx-ss-svg{max-height:88px}
 }
+
+/* pt1822u follow-up: sky info lives on the map, not in the old inset/bottom panels */
+body.nx-sky .nx-sw,body.nx-sky .nx-ss,.nx-sw,.nx-ss{display:none!important}
+.nx-sky-labs{position:fixed;inset:0;z-index:19;pointer-events:none}
+.nx-sky-labs[hidden]{display:none!important}
+.nx-ss-pin,.nx-sw-pin{position:absolute;transform:translate(-50%,-50%);padding:4px 8px;border-radius:99px;background:rgba(5,6,10,.82);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font:600 11px/1.2 Inter,system-ui,sans-serif;color:var(--nx-tx);white-space:nowrap;letter-spacing:.02em}
+.nx-sw-pin{font-weight:600;color:rgba(240,240,250,.88)}
+@media (max-width:767px){.nx-ss-pin,.nx-sw-pin{font-size:10px;padding:3px 7px}}
