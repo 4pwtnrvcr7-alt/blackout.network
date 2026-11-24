@@ -16,7 +16,9 @@ GROUPS = [("starlink", "Starlink", "starlink", "SpaceX broadband, low Earth orbi
           ("beidou", "BeiDou", "beidou", "Chinese navigation, medium and geosynchronous orbits"),
           ("iridium", "Iridium", "iridium-NEXT", "Satellite phones and messaging, low Earth orbit"),
           ("oneweb", "OneWeb", "oneweb", "Eutelsat OneWeb broadband, low Earth orbit"),
-          ("goes", "GOES", "goes", "NOAA weather satellites, geostationary")]
+          ("goes", "GOES", "goes", "NOAA weather satellites, geostationary"),
+          ("iss", "ISS", "stations", "International Space Station, low Earth orbit")]
+ISS_NORAD = 25544
 _L = threading.Lock(); _KL = {}; _BO = {}; _ERR = {}; _MEM = {}
 
 SUP_STARLINK = "https://celestrak.org/NORAD/elements/supplemental/sup-gp.php?FILE=starlink&FORMAT=csv"
@@ -82,6 +84,8 @@ def sky(lite=False):
     sats = []; groups = []; newest = 0
     for gi, ((gid, label, grp, what), (p, mt, err)) in enumerate(zip(GROUPS, files)):
         rows = _rows(p, gi) if p else []
+        if gid == "iss":
+            rows = [r for r in rows if r[1] == ISS_NORAD]
         total = len(rows)
         if lite and gid == "starlink": rows = rows[::3]
         sats += rows; newest = max(newest, mt or 0)
@@ -129,4 +133,201 @@ def space():
         out = {"ok": False, "error": type(e).__name__}
         if hit: return dict(hit[1], stale=True)
     _MEM["space"] = (time.time(), out)
+    return out
+
+
+# Tracked debris groups published by CelesTrak (keyless GP CSV). Cosmos 1408 may be a short residual catalog.
+DEBRIS_GROUPS = (("fengyun-1c-debris", "Fengyun-1C debris"),
+                 ("iridium-33-debris", "Iridium 33 debris"),
+                 ("cosmos-2251-debris", "Cosmos 2251 debris"),
+                 ("cosmos-1408-debris", "Cosmos 1408 debris"))
+
+def debris(lite=False):
+    """TLE payload for the toggleable debris layer. Decimated on the server (heavier on phones)."""
+    files = [_fetch(gid, CT.format(g=gid)) for gid, _ in DEBRIS_GROUPS]
+    key = (lite, tuple(f[1] for f in files))
+    hit = _MEM.get("debris_lite" if lite else "debris_full")
+    if hit and hit[0] == key: return hit[1]
+    sats, groups, newest, total_all = [], [], 0, 0
+    step = 6 if lite else 2
+    for gi, ((gid, label), (p, mt, err)) in enumerate(zip(DEBRIS_GROUPS, files)):
+        rows = _rows(p, gi) if p else []
+        total = len(rows); total_all += total
+        rows = rows[::step]
+        sats += rows; newest = max(newest, mt or 0)
+        groups.append(dict(id=gid, name=label, total=total, shown=len(rows),
+                           fetched=datetime.fromtimestamp(mt, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if mt else None,
+                           error=None if p else (err or "not loaded yet")))
+    b = json.dumps({"groups": groups, "fields": ["g", "norad", "epoch_unix", "mean_motion", "ecc", "inc", "raan", "argp", "ma", "bstar", "name"],
+                    "sats": sats, "total": total_all, "shown": len(sats), "lite": lite, "step": step,
+                    "source": "CelesTrak GP data (debris groups)", "source_url": "https://celestrak.org/NORAD/elements/"}, separators=(",", ":")).encode()
+    _MEM["debris_lite" if lite else "debris_full"] = (key, b)
+    return b
+
+def debris_cached(lite=False):
+    k = "debris_lite" if lite else "debris_full"; hit = _MEM.get(k)
+    if hit and time.time() - _MEM.get(k + "_t", 0) < 600: return hit[1]
+    b = debris(lite); _MEM[k + "_t"] = time.time(); return b
+
+AU_KM = 149597870.7
+LD_KM = 384400.0  # conventional mean lunar distance used with close-approach distances
+CNEOS_H_SIZE = "https://cneos.jpl.nasa.gov/tools/ast_size_est.html"
+HORIZONS_API = "https://ssd.jpl.nasa.gov/api/horizons.api"
+CAD_API = "https://ssd-api.jpl.nasa.gov/cad.api"
+SBDB_LOOKUP = "https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr="
+
+# Launch dates and mission status are NASA (or JPL Horizons) published facts, not derived from the ephemeris.
+SS_BODIES = (
+    dict(id="roadster", name="Tesla Roadster / Starman", command="-143205",
+         launch="2018-02-06", launch_label="6 February 2018 (SpaceX Falcon Heavy test flight)",
+         status="Heliocentric orbit around the Sun. Derelict payload. Tracked by NASA/JPL Horizons as target -143205.",
+         source_name="NASA/JPL Horizons", source_url="https://ssd.jpl.nasa.gov/horizons/app.html#/"),
+    dict(id="voyager1", name="Voyager 1", command="-31",
+         launch="1977-09-05", launch_label="5 September 1977",
+         status="Operational. In interstellar space since 25 August 2012.",
+         source_name="NASA Voyager 1", source_url="https://science.nasa.gov/mission/voyager/voyager-1/"),
+    dict(id="voyager2", name="Voyager 2", command="-32",
+         launch="1977-08-20", launch_label="20 August 1977",
+         status="Operational. In interstellar space since 5 November 2018.",
+         source_name="NASA Voyager 2", source_url="https://science.nasa.gov/mission/voyager/voyager-2/"),
+)
+
+def _horizons_observer(command, center, when):
+    """One Horizons observer row: range (AU), range-rate (km/s), one-way light-time (minutes). when is UTC datetime."""
+    import urllib.parse
+    start = when.strftime("%Y-%m-%d %H:%M")
+    stop = datetime.fromtimestamp(when.timestamp() + 3600, timezone.utc).strftime("%Y-%m-%d %H:%M")
+    q = dict(format="json", COMMAND=str(command), OBJ_DATA="NO", MAKE_EPHEM="YES", EPHEM_TYPE="OBSERVER",
+             CENTER=str(center), QUANTITIES="20,21", CSV_FORMAT="YES", CAL_FORMAT="CAL",
+             START_TIME=start, STOP_TIME=stop, STEP_SIZE="1 h")
+    url = HORIZONS_API + "?" + urllib.parse.urlencode(q)
+    j = _j(url)
+    if j.get("error"):
+        raise RuntimeError(str(j["error"])[:200])
+    res = j.get("result") or ""
+    a, b = res.find("$SOE"), res.find("$$EOE")
+    if a < 0 or b < a:
+        raise RuntimeError("no Horizons ephemeris table")
+    for line in res[a + 4:b].splitlines():
+        line = line.strip()
+        if not line or line.startswith("$"):
+            continue
+        parts = [x.strip() for x in line.split(",")]
+        nums = []
+        for x in parts[1:]:
+            if not x or x in (".", "n.a.", "n.a"):
+                continue
+            try:
+                nums.append(float(x))
+            except ValueError:
+                continue
+        if len(nums) >= 3:
+            return {"delta_au": nums[0], "deldot_km_s": nums[1], "light_min": nums[2], "time": parts[0]}
+        if len(nums) >= 1:
+            return {"delta_au": nums[0], "deldot_km_s": nums[1] if len(nums) > 1 else None, "light_min": None, "time": parts[0]}
+    raise RuntimeError("Horizons table had no numeric row")
+
+def _au_fields(row):
+    if not row or row.get("delta_au") is None:
+        return None
+    au = float(row["delta_au"])
+    km = au * AU_KM
+    out = {"au": round(au, 6), "km": int(round(km))}
+    if row.get("light_min") is not None:
+        out["light_min"] = round(float(row["light_min"]), 4)
+    if row.get("deldot_km_s") is not None:
+        out["deldot_km_s"] = round(float(row["deldot_km_s"]), 4)
+    if row.get("time"):
+        out["time"] = row["time"]
+    return out
+
+def solar_system():
+    """Heliocentric inset data: Roadster, Voyager 1, Voyager 2. Distances from JPL Horizons (keyless). Cached 1 h."""
+    hit = _MEM.get("ss")
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
+    when = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    objs, errors = [], []
+    for meta in SS_BODIES:
+        rec = {k: meta[k] for k in ("id", "name", "command", "launch", "launch_label", "status", "source_name", "source_url")}
+        rec["ok"] = False
+        try:
+            earth = _horizons_observer(meta["command"], "500@399", when)
+            sun = _horizons_observer(meta["command"], "500@10", when)
+            rec["earth"] = _au_fields(earth)
+            rec["sun"] = _au_fields(sun)
+            rec["ok"] = rec["earth"] is not None and rec["sun"] is not None
+            rec["epoch"] = (earth or {}).get("time") or when.strftime("%Y-%m-%dT%H:%M:%SZ")
+        except Exception as e:
+            rec["error"] = type(e).__name__
+            errors.append(f"{meta['id']}:{type(e).__name__}")
+        objs.append(rec)
+    out = dict(ok=any(o.get("ok") for o in objs), objects=objs, epoch=when.strftime("%Y-%m-%dT%H:%M:%SZ"),
+               source="NASA/JPL Horizons", source_url="https://ssd.jpl.nasa.gov/horizons/",
+               errors=errors or None)
+    if not out["ok"] and hit:
+        return dict(hit[1], stale=True, error="horizons_failed")
+    _MEM["ss"] = (time.time(), out)
+    return out
+
+def size_from_h(h, albedo=0.14):
+    """Nominal diameter in km from absolute magnitude H (CNEOS convention, default albedo 0.14)."""
+    if h is None:
+        return None
+    return 1329.0 * (10 ** (-float(h) / 5.0)) / (float(albedo) ** 0.5)
+
+def cad():
+    """JPL SBDB close approaches to Earth, next 60 days, dist-max 0.05 AU. Cached 6 h."""
+    hit = _MEM.get("cad")
+    if hit and time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    start = datetime.now(timezone.utc).date()
+    from datetime import timedelta
+    end = start + timedelta(days=60)
+    import urllib.parse
+    q = urllib.parse.urlencode({"date-min": str(start), "date-max": str(end), "dist-max": "0.05",
+                                "diameter": "true", "fullname": "true"})
+    try:
+        j = _j(CAD_API + "?" + q)
+    except Exception as e:
+        if hit:
+            return dict(hit[1], stale=True, error=type(e).__name__)
+        return {"ok": False, "error": type(e).__name__, "objects": []}
+    fields = j.get("fields") or []
+    idx = {n: i for i, n in enumerate(fields)}
+    objs = []
+    for row in j.get("data") or []:
+        def cell(name):
+            i = idx.get(name)
+            return None if i is None or i >= len(row) else row[i]
+        dist = cell("dist")
+        try:
+            dist_au = float(dist)
+        except (TypeError, ValueError):
+            continue
+        dist_km = dist_au * AU_KM
+        dist_ld = dist_km / LD_KM
+        h = cell("h")
+        try:
+            h = float(h) if h is not None else None
+        except (TypeError, ValueError):
+            h = None
+        diam = cell("diameter")
+        try:
+            diam = float(diam) if diam not in (None, "") else None
+        except (TypeError, ValueError):
+            diam = None
+        est = None if diam is not None else (size_from_h(h) if h is not None else None)
+        des = (cell("des") or "").strip()
+        full = (cell("fullname") or "").strip() or des
+        objs.append(dict(des=des, name=full.strip(), cd=cell("cd"), jd=cell("jd"),
+                         dist_au=round(dist_au, 8), dist_km=int(round(dist_km)), dist_ld=round(dist_ld, 3),
+                         h=h, diameter_km=diam, size_est_km=None if est is None else round(est, 4),
+                         size_note=None if diam is not None else ("Nominal diameter from H at albedo 0.14 (CNEOS)." if est is not None else None),
+                         v_rel=cell("v_rel"), source_url=SBDB_LOOKUP + urllib.parse.quote(des)))
+    out = dict(ok=True, count=len(objs), date_min=str(start), date_max=str(end), dist_max_au=0.05,
+               objects=objs, source="NASA/JPL SBDB Close-Approach Data API",
+               source_url="https://ssd-api.jpl.nasa.gov/doc/cad.html",
+               size_ref=CNEOS_H_SIZE)
+    _MEM["cad"] = (time.time(), out)
     return out
