@@ -463,6 +463,12 @@ def summary(qs):
             sw, _ = sget(c, "swpc"); wx, _ = sget(c, "weather"); last, _ = sget(c, "last_cycle")
         except sqlite3.Error: pass
         finally: c.close()
+    if not secs:   # Nov 24 2026: the sync scrub can drop the 'sections'/'eia' rows (see gridlive.py); rebuild them here from keyless EIA-930
+        try:
+            import gridlive
+            secs, ets = gridlive.sections(sys.modules[__name__])
+            if secs: fresh["sections"] = fresh["eia"] = ets
+        except Exception: secs = None
     return 200, {"sections": secs, "freshness": {k: {"ts": v, "age_min": _age(v)} for k, v in fresh.items()}, "swpc": sw,
                  "weather": wx, "last_cycle": last, "generated": iso(),
                  "sources": [{"name": "EIA Hourly Electric Grid Monitor (EIA-930)", "url": "https://www.eia.gov/electricity/gridmonitor/"},
