@@ -117,3 +117,64 @@ def build(jget):
                 feeds={k: v is not None for k, v in ok.items()},
                 counts=dict(places=len(out), live=sum(1 for x in lv if x >= 0), outage=lv.count(3), degraded=lv.count(2), normal=lv.count(0)),
                 places=out)
+
+
+# ---------------------------------------------------------------- Nov 24 2026 (Matt): last good snapshot, box relay, news evidence
+# Green unless there is evidence of a problem. Evidence = IODA (server call, or the box relay snapshot when Render cannot reach
+# IODA) plus news headlines about an internet outage/shutdown naming the place. The last good snapshot is used, with its age,
+# until every source has been unavailable for over 1 hour; only then is the map grey.
+import re as _re
+RELAY = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "data", "ioda_relay.json")
+MAX_AGE = 3600
+_LG = {}
+NEWS_Q = '"internet outage" OR "internet shutdown" OR "internet blackout" OR "internet disruption"'
+
+def _ts(s):
+    try: return datetime.fromisoformat(str(s).replace("Z", "+00:00")).timestamp()
+    except Exception: return 0.0
+
+def _good(r): return bool(r and r.get("places") and any((r.get("feeds") or {}).values()))
+
+def relay():
+    try:
+        with open(RELAY, encoding="utf-8") as fh: r = _json.load(fh)
+        return r if _good(r) else None
+    except Exception: return None
+
+def news(rss):
+    """Headlines from the last 2 days about an internet outage or shutdown (Google News RSS, same helper as the cable layer)."""
+    return rss(NEWS_Q, 2)
+
+def _news_hits(items, places):
+    hits = {}
+    pats = [(k, p["name"]) for k, p in places.items() if p.get("name") and len(p["name"]) >= 4]
+    for it in items or []:
+        t = it.get("t") or ""
+        if not _re.search(r"internet|network|connectivity|online", t, _re.I) or not _re.search(r"outage|shutdown|blackout|disrupt|down\b", t, _re.I): continue
+        for k, nm in pats:
+            if _re.search(r"\b" + _re.escape(nm) + r"\b", t, _re.I):
+                hits.setdefault(k, []).append(dict(t=t, src=it.get("src"), url=it.get("url"), at=it.get("at"), shutdown=bool(_re.search(r"shutdown|blackout|nationwide", t, _re.I))))
+    return hits
+
+def serve(server, news_items=None, now=None):
+    """Pick the freshest good snapshot (server build, last good in memory, box relay) and add news evidence."""
+    now = now or time.time()
+    if _good(server): _LG["v"] = server
+    cands = [dict(x, via=v) for x, v in ((server if _good(server) else None, "server"), (_LG.get("v"), "server-last-good"), (relay(), "box-relay")) if x]
+    best = max(cands, key=lambda x: _ts(x.get("generated"))) if cands else None
+    age = now - _ts(best.get("generated")) if best else None
+    if not best or age > MAX_AGE:
+        out = dict(server or {}, via="none", age_s=None, all_down=True)
+        out["places"] = {k: dict(v) for k, v in ((server or {}).get("places") or {}).items()}
+    else:
+        out = dict(best, age_s=round(max(0, age)), all_down=False)
+        out["places"] = {k: dict(v) for k, v in best["places"].items()}
+        for v in out["places"].values():
+            if v.get("level", -1) < 0: v.update(level=0, status="Normal", signals=[])   # no evidence of a problem
+    for k, hs in _news_hits(news_items, out["places"]).items():
+        p = out["places"][k]; lvl = 3 if any(h["shutdown"] for h in hs) else 2
+        p["news"] = hs[:3]
+        if lvl > p.get("level", -1): p.update(level=lvl, status="Outage" if lvl == 3 else "Degraded")
+    lv = [p.get("level", -1) for p in out["places"].values()]
+    out["counts"] = dict(places=len(lv), live=sum(1 for x in lv if x >= 0), outage=lv.count(3), degraded=lv.count(2), normal=lv.count(0), no_data=lv.count(-1))
+    return out
