@@ -258,3 +258,28 @@ body.nx-sky .nx-lnk{display:none!important}
 @media (max-width:767px){.nx-leg .nx-lnk{display:flex;gap:9px;margin:4px 0 0;padding-top:4px}.nx-leg:has(.nx-lnk){border-radius:14px}}
 @media (max-width:767px){body:not(.nx-sky) .nx-side{top:calc(212px + env(safe-area-inset-top))}}
 .nx-chip.s-deg i{background:var(--nx-out)}   /* Nov 24 2026: a network "Disruption" is red, same as the Status cards */
+
+/* pt1813u: Sky view — hide chrome on mobile while a path is open; compact bottom chip */
+@media (max-width:767px){
+  body.nx-sky-focus .nx-sw,
+  body.nx-sky-focus .nx-sf,
+  body.nx-sky-focus .nx-chip,
+  body.nx-sky-focus .nx-ctl,
+  body.nx-sky-focus .nx-leg,
+  body.nx-sky-focus .maplibregl-ctrl-bottom-right{display:none!important}
+  body.nx-sky-focus .nx-card,
+  body.nx-sky-focus .nx-card.pin,
+  body.nx-sky-focus .nx-card.dragged{
+    left:10px!important;right:10px!important;top:auto!important;
+    bottom:calc(10px + env(safe-area-inset-bottom))!important;
+    width:auto!important;max-width:none;max-height:none;
+    padding:10px 44px 10px 12px;pointer-events:auto
+  }
+  body.nx-sky-focus .nx-card .bn-drag{display:none}
+  body.nx-sky-focus .nx-card .nx-sat-more{all:unset;cursor:pointer;display:flex;align-items:baseline;gap:8px 10px;flex-wrap:wrap;width:100%;color:inherit}
+  body.nx-sky-focus .nx-card h3{margin:0;font-size:14px;line-height:1.25}
+  body.nx-sky-focus .nx-card .nx-sat-alt{margin:0;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--nx-mu)}
+  body.nx-sky-focus .nx-card:not(.open) .nx-sat-extra{display:none}
+  body.nx-sky-focus .nx-card.open{max-height:42dvh;overflow:auto}
+  body.nx-sky-focus .nx-card.open .nx-sat-extra{display:block;margin-top:8px}
+}

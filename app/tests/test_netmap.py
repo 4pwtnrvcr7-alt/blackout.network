@@ -127,6 +127,26 @@ class NetSky(unittest.TestCase):
         b = netpages.handle_get("/grid", {})[1]
         for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
 
+    def test_sky_spin_layer_path_and_mobile_chip(self):
+        # pt1813u: globe auto-rotate, constellations layer in small-to-Starlink, two-orbit path, compact mobile chip
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1] / "netmap_static"
+        js = (root / "net.js").read_text()
+        css = (root / "net.css").read_text()
+        self.assertIn("function skySpinStart", js)
+        self.assertIn("function layerIn", js)
+        self.assertIn('if (a.id === "starlink") return 1', js)
+        self.assertIn("k <= 120", js)
+        self.assertIn("two orbits", js)
+        self.assertIn("nx-sky-focus", js)
+        self.assertIn("function clearSat", js)
+        self.assertIn("nx-sat-alt", js)
+        self.assertIn("nx-sky-focus", css)
+        self.assertIn("nx-sat-more", css)
+        added = css.split("pt1813u")[-1]
+        self.assertNotIn("#FFC21A", added)
+        self.assertNotIn("yellow", added.lower())
+
 class NetSkyStarlinkFallback(unittest.TestCase):
     def test_supgp_when_group_refused(self):
         import netsky, netstarlink, tempfile
