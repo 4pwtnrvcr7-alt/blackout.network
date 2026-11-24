@@ -1,14 +1,13 @@
-"""Undersea cables for the /network map (pt1785u, Stage 2).
+"""Undersea cables for the /grid map (pt1785u, pt1812u).
 
 Geometry: netmap_static/cables.json, built by tools/build_cables.py from OpenStreetMap (ODbL) and NOAA Office for Coastal
 Management (U.S. waters, public domain). TeleGeography's free map data is CC BY-NC-SA (non-commercial), so it is not used.
 
-Status is INFERRED, never official: no cable operator publishes a live status feed. We combine
-  - news headlines that name a cable or a chokepoint together with damage words (Google News RSS, 4 spaced queries an hour; a failed query keeps its last good result),
-  - IODA internet outage signals (Georgia Tech) in the countries around each chokepoint, from the map's own data build.
-Risk score per chokepoint (0-100, our model, shown with its parts): chokepoint base 20 + documented cuts in the last
-36 months (15 each, max 30) + conflict/security headlines in the last 7 days (5 each, max 25) + cable-damage news in the
-last 14 days (25).
+Each drawn cable is coloured by inferred status, never official (operators publish no live feed):
+  green  — working: no fault reports
+  yellow — service interruption / degraded, damage under investigation, or the route crosses a zone with recent cable-damage news
+  red    — out of service: a public report that the cable itself was cut, severed, or taken out of service
+Sources: Google News RSS (one cable-damage query an hour, last-good fallback) plus documented recent cuts we already record.
 """
 import json, os, re, time, urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -19,7 +18,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 GEO = os.path.join(BASE, "netmap_static", "cables.json")
 NEWS_DAYS, CONFLICT_DAYS, HIST_MONTHS = 14, 7, 36
 
-# Chokepoints (approximate outlines, drawn by us). Cut history: documented incidents with a public source.
+# Risk-area outlines, used only to mark cables that cross a zone with recent damage news. Not drawn on the map.
 ZONES = [
     dict(id="redsea", name="Red Sea and Bab el-Mandeb", cc=["YE", "DJ", "ER", "SA", "EG", "SD"],
          poly=[[32.55, 29.95], [32.7, 28.5], [33.6, 27.0], [34.3, 25.8], [35.2, 24.0], [35.8, 22.8], [36.9, 21.5], [37.3, 19.5], [38.5, 18.0], [39.6, 16.0], [40.8, 14.8], [42.5, 13.0], [43.2, 11.9], [43.7, 12.3], [43.4, 12.9], [42.8, 14.5], [42.6, 15.5], [41.8, 17.0], [40.6, 19.0], [39.2, 21.4], [38.4, 23.5], [37.2, 25.0], [36.0, 26.8], [35.0, 28.0], [33.6, 28.0], [32.8, 29.6]],
@@ -27,9 +26,7 @@ ZONES = [
          cuts=[dict(d="2024-02-24", t="Seacom, AAE-1 and EIG cut in the southern Red Sea; the leading explanation is the dragging anchor of the Rubymar after a Houthi missile strike",
                     src="Kentik", url="https://www.kentik.com/blog/what-caused-the-red-sea-submarine-cable-cuts/"),
                dict(d="2025-09-06", t="SMW4 and IMEWE cut near Jeddah; Microsoft Azure reported higher latency on Middle East routes",
-                    src="Reuters", url="https://www.reuters.com/world/middle-east/red-sea-cable-cuts-disrupt-internet-across-asia-middle-east-2025-09-07/")],
-         note="About 15 cables pass through Bab el-Mandeb (International Cable Protection Committee, via AP).",
-         note_url="https://apnews.com/article/red-sea-undersea-cables-cut-internet-disruption-0b08fc5f02daf72710e0010c11ea21ae"),
+                    src="Reuters", url="https://www.reuters.com/world/middle-east/red-sea-cable-cuts-disrupt-internet-across-asia-middle-east-2025-09-07/")]),
     dict(id="baltic", name="Baltic Sea and Gulf of Finland", cc=["FI", "EE", "LV", "LT", "SE", "DE", "PL", "DK"],
          poly=[[10.2, 54.2], [12.5, 54.0], [14.3, 53.9], [18.5, 54.5], [21.0, 55.2], [21.0, 56.9], [23.5, 57.4], [24.3, 59.3], [28.0, 59.5], [30.2, 59.9], [28.0, 60.5], [25.0, 60.3], [22.5, 60.0], [19.5, 60.3], [18.8, 59.4], [17.0, 57.5], [16.2, 56.2], [14.3, 55.4], [12.8, 55.5], [10.8, 55.2]],
          q='"Baltic Sea" (sabotage OR navy OR "shadow fleet" OR anchor OR warship OR investigation)', kw=r"baltic|gulf of finland|gotland|estlink|c-lion|finland|estonia|latvia|lithuania",
@@ -49,11 +46,13 @@ ZONES = [
 ]
 
 CABLE_Q = '("undersea cable" OR "subsea cable" OR "submarine cable") (cut OR damaged OR severed OR fault OR outage OR repair)'
-DAMAGE = re.compile(r"\b(cut|cuts|severed|damag\w*|fault\w*|outage|break|broken|rupture\w*|disrupt\w*)\b", re.I)
-CABLE = re.compile(r"\b(undersea|subsea|submarine|sea|seabed|fib(?:re|er)[- ]optic|internet|telecom\w*|data|communications?)\s+cables?\b|\bcables?\s+(?:cut|damage)", re.I)
+DAMAGE = re.compile(r"\b(cut|cuts|severed|damag\w*|fault\w*|outage|break|broken|rupture\w*|disrupt\w*|repair\w*|degrad\w*|intermittent)\b", re.I)
+CABLE = re.compile(r"\b(undersea|subsea|submarine|sea|seabed|fib(?:re|er)[- ]optic|internet|telecom\w*|data|communications?)\s+cables?\b|\bcables?\s+(?:cut|damage)|sea[\s\-]*me[\s\-]*we|\bsmw[\s\-]?\d", re.I)
 CONFLICT = re.compile(r"\b(attack\w*|strik\w*|missile\w*|drone\w*|sabotage\w*|seiz\w*|fired|hit|hits|clash\w*|incursion\w*|warship\w*|drills?|blockade\w*|shadow fleet|detain\w*|boarded)\b", re.I)
-_LAST = {}
+CUT = re.compile(r"\b(severed|out of service|ruptured)\b|\b(?:(?:the|an|a|its)\s+)?(?:undersea|subsea|submarine)?\s*cables?\s+(?:is|are|was|were|have been|has been)?\s*cut\b|\bcut(?:s)?\s+(?:in|on|to|of)\s+(?:the\s+)?(?:undersea|subsea|submarine)?\s*cables?\b|\bcables?\s+cut\b", re.I)
 NOT_CABLE = re.compile(r"\b(power cable|electricity cable|gas pipeline|pipeline)\b", re.I)
+_LAST = {}
+_GEO, _INDEX = None, None
 
 def _now(): return datetime.now(timezone.utc)
 def _iso(d): return d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if d else None
@@ -73,12 +72,11 @@ def _rss(q, days):
 
 def news():
     """Raises if every query failed, so the cache keeps the last good copy instead of saying 'no news'."""
-    # four requests an hour in all, spaced out, so Google News does not throttle us
     res = dict(cable=None, conflict={}); ok = 0
     for t in (0, 3):
         try: time.sleep(t); res["cable"] = _LAST["cable"] = _rss(CABLE_Q, NEWS_DAYS); ok += 1; break
         except Exception: res["cable"] = _LAST.get("cable")
-    for z in ZONES:   # one query per chokepoint, spaced out, hourly; a failed query keeps its last good list
+    for z in ZONES:   # kept so a failed hour can still use last-good conflict lists if we need them later
         time.sleep(2)
         try: res["conflict"][z["id"]] = _LAST[z["id"]] = [it for it in _rss(z["q"], CONFLICT_DAYS) if CONFLICT.search(it["t"])]; ok += 1
         except Exception: res["conflict"][z["id"]] = _LAST.get(z["id"])
@@ -86,17 +84,59 @@ def news():
     res["ok"] = ok == 1 + len(ZONES); res["at"] = _iso(_now())
     return res
 
+def _norm(s):
+    s = re.sub(r"\s*seg(?:ment)?\.?\s*[\w.]+", " ", (s or ""), flags=re.I)
+    s = re.sub(r"\s*\(([^)]*)\)\s*", r" \1 ", s)
+    s = re.sub(r"\s*(cable system|submarine cable system|submarine cable|system)\s*", " ", s, flags=re.I)
+    return re.sub(r"[^a-z0-9]+", "", s.lower())
+
+def _base(n):
+    n = re.sub(r"\s*seg(?:ment)?\.?\s*[\w.]+", "", (n or ""), flags=re.I).strip()
+    return n or (n or "").strip()
+
+def _aliases(n):
+    out, n0 = set(), (n or "").strip()
+    if not n0: return out
+    out.add(_norm(n0)); out.add(_norm(_base(n0)))
+    m = re.search(r"sea[\s\-]*me[\s\-]*we[\s\-]*(\d+)", n0, re.I) or re.search(r"\bsmw[\s\-]*(\d+)\b", n0, re.I)
+    if m: out.add("smw" + m.group(1)); out.add("seamewe" + m.group(1))
+    m = re.search(r"c[\s\-]*lion[\s\-]*(\d+)", n0, re.I)
+    if m: out.add("clion" + m.group(1))
+    return {a for a in out if len(a) >= 4}
+
+def _geo():
+    global _GEO
+    if _GEO is None:
+        try:
+            with open(GEO) as fh: _GEO = json.load(fh)
+        except Exception: _GEO = {"features": [], "names": []}
+    return _GEO
+
 _NAMES = None
 def cable_names():
     global _NAMES
     if _NAMES is None:
-        try:
-            with open(GEO) as fh: gj = json.load(fh)
-            fs = gj.get("features") or []
-            nm = set(gj.get("names") or []) or {f["properties"]["n"] for f in fs if f["geometry"]["type"] == "LineString" and f["properties"].get("n")}   # names: every cable, incl. routes not drawn
-            _NAMES = sorted({re.sub(r"\s*(cable system|submarine cable system|cable|system|seg(?:ment)?\.?\s*[\w.]+)\s*$", "", n, flags=re.I).strip() for n in nm} - {""}, key=len, reverse=True)
-        except Exception: _NAMES = []
+        gj = _geo(); fs = gj.get("features") or []
+        nm = set(gj.get("names") or []) or {f["properties"]["n"] for f in fs if (f.get("properties") or {}).get("n")}
+        nm |= {_base(n) for n in list(nm)}
+        nm |= {f["properties"]["n"] for f in fs if f.get("geometry", {}).get("type") == "LineString" and (f.get("properties") or {}).get("n")}
+        _NAMES = sorted({n.strip() for n in nm if n and n.strip()}, key=lambda x: (-len(x), x))
     return _NAMES
+
+def _index():
+    """Map alias tokens (smw3, seamewe3, …) to a preferred display name in our dataset."""
+    global _INDEX
+    if _INDEX is None:
+        pref = {}
+        def better(a, b):
+            asg, bsg = bool(re.search(r"seg", a, re.I)), bool(re.search(r"seg", b, re.I))
+            if asg != bsg: return not asg
+            return len(a) <= len(b)
+        for n in cable_names():
+            for a in _aliases(n):
+                if a not in pref or better(n, pref[a]): pref[a] = _base(n) or n
+        _INDEX = pref
+    return _INDEX
 
 def _age_h(at):
     try: return (_now() - datetime.fromisoformat(str(at).replace("Z", "+00:00"))).total_seconds() / 3600
@@ -110,41 +150,123 @@ def _dedupe(items):
         seen.add(k); out.append(it)
     return out
 
+def _level(title):
+    """2 = out of service, 1 = interruption / investigation, None = not a cable-fault report."""
+    t = title or ""
+    if NOT_CABLE.search(t) or not (DAMAGE.search(t) and CABLE.search(t)): return None
+    return 2 if CUT.search(t) else 1
+
+def _mentions(title):
+    """Display names from our dataset that this headline names (including SMW5-style aliases)."""
+    t, hit, idx = title or "", set(), _index()
+    for nm in cable_names():
+        if len(nm) >= 4 and re.search(r"(?<![\w-])" + re.escape(nm) + r"(?![\w-])", t, re.I):
+            hit.add(_base(nm) or nm)
+    extra = []
+    for m in re.finditer(r"sea[\s\-]*me[\s\-]*we[\s\-]*(\d+)|\bsmw[\s\-]*(\d+)\b", t, re.I):
+        num = m.group(1) or m.group(2)
+        extra += ["smw" + num, "seamewe" + num]
+    for m in re.finditer(r"c[\s\-]*lion[\s\-]*(\d+)", t, re.I):
+        extra.append("clion" + m.group(1))
+    for a in extra:
+        if a in idx: hit.add(idx[a])
+    return sorted(hit, key=len, reverse=True)
+
+
+def _in_poly(lon, lat, poly):
+    inside, n, j = False, len(poly), len(poly) - 1
+    for i in range(n):
+        xi, yi = poly[i]; xj, yj = poly[j]
+        if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+def _line_in_zone(coords, poly):
+    if not coords or not poly: return False
+    step = max(1, len(coords) // 80)
+    return any(_in_poly(p[0], p[1], poly) for p in coords[::step])
+
+def _variants(name):
+    """Every dataset spelling of the same cable (SEA-ME-WE 3 vs SEA-ME-WE3, segments stripped)."""
+    if not name: return set()
+    al = _aliases(name)
+    out = {_base(name) or name}
+    for n in cable_names():
+        if _aliases(n) & al:
+            out.add(_base(n) or n)
+    return out
+
+def _put(cables, name, lv, status, reason, src=None, url=None, at=None):
+    rec = dict(lv=lv, status=status, reason=reason)
+    if src: rec["src"] = src
+    if url: rec["url"] = url
+    if at: rec["at"] = at
+    for nm in _variants(name) or ({name} if name else set()):
+        cur = cables.get(nm)
+        if cur and cur["lv"] > lv: continue
+        if cur and cur["lv"] == lv and len(cur.get("reason") or "") >= len(reason or ""): continue
+        cables[nm] = dict(rec)
+
 def status(nw, outages=None):
-    """Zones with inferred status + risk score, and cable names that recent damage news mentions."""
-    n0 = _now(); cable_news = [it for it in (nw or {}).get("cable") or [] if DAMAGE.search(it["t"]) and CABLE.search(it["t"]) and not NOT_CABLE.search(it["t"])]
+    """Per-cable inferred status. outages is accepted for compatibility and is not used to colour cables."""
+    n0 = _now()
+    cable_news = [it for it in (nw or {}).get("cable") or [] if DAMAGE.search(it["t"]) and CABLE.search(it["t"]) and not NOT_CABLE.search(it["t"])]
     cable_news = _dedupe(sorted(cable_news, key=lambda x: x.get("at") or "", reverse=True))
-    ioda = {c["cc"]: c for c in ((outages or {}).get("countries") or []) if c.get("cur")}
-    names = cable_names(); hit_names = {}
+    cables = {}
     for it in cable_news:
         if _age_h(it.get("at")) > NEWS_DAYS * 24: continue
-        for nm in names:
-            if len(nm) >= 4 and re.search(r"(?<![\w-])" + re.escape(nm) + r"(?![\w-])", it["t"], re.I):
-                hit_names.setdefault(nm, it)
-    zones = []
+        lv = _level(it["t"])
+        if not lv: continue
+        st = "Out of service" if lv == 2 else "Service interruption"
+        for nm in _mentions(it["t"]):
+            _put(cables, nm, lv, st, it["t"], it.get("src"), it.get("url"), it.get("at"))
+    # Documented cuts we already record, only if the cut itself is still within the news window (repaired historic cuts stay green).
+    for z in ZONES:
+        for c in z["cuts"]:
+            try: age_d = (n0 - datetime.fromisoformat(c["d"]).replace(tzinfo=timezone.utc)).days
+            except Exception: continue
+            if age_d > NEWS_DAYS: continue
+            for nm in _mentions(c["t"]):
+                _put(cables, nm, 2, "Out of service", c["t"], c.get("src"), c.get("url"), c["d"] + "T12:00:00Z")
+    # Unnamed damage in a risk area: cables whose route crosses that area are in jeopardy (yellow), not assumed cut.
+    fs = [f for f in (_geo().get("features") or []) if f.get("geometry", {}).get("type") == "LineString"]
     for z in ZONES:
         zn = [it for it in cable_news if re.search(z["kw"], it["t"], re.I) and _age_h(it.get("at")) <= NEWS_DAYS * 24]
-        cf_raw = ((nw or {}).get("conflict") or {}).get(z["id"])
-        cf = _dedupe([it for it in (cf_raw or []) if _age_h(it.get("at")) <= CONFLICT_DAYS * 24])
-        hist = [c for c in z["cuts"] if datetime.fromisoformat(c["d"]).replace(tzinfo=timezone.utc) >= n0 - timedelta(days=HIST_MONTHS * 30.4)]
-        parts = [("Chokepoint", 20), (f"Documented cuts, last {HIST_MONTHS} months ({len(hist)})", min(30, 15 * len(hist))),
-                 (f"Conflict and security headlines, last {CONFLICT_DAYS} days ({len(cf)})" if cf_raw is not None else "Conflict headlines (search unavailable)", min(25, 5 * len(cf))),
-                 (f"Cable damage in the news, last {NEWS_DAYS} days" if (nw or {}).get("cable") is not None else "Cable damage news (search unavailable)", 25 if zn else 0)]
-        score = min(100, sum(p[1] for p in parts))
-        io = [dict(cc=c, name=ioda[c]["name"], url=ioda[c].get("ioda")) for c in z["cc"] if c in ioda]
-        if zn and io: st, lv = "Likely damage (inferred)", 2
-        elif zn: st, lv = "Possible damage (inferred)", 1
-        else: st, lv = "No damage reported (inferred)", 0
-        zones.append(dict(id=z["id"], name=z["name"], poly=z["poly"], score=score, parts=parts, status=st, lv=lv, ioda=io,
-                          news=zn[:5], conflict=cf[:5], cuts=sorted(z["cuts"], key=lambda c: c["d"], reverse=True), note=z.get("note"), note_url=z.get("note_url")))
-    return dict(generated=_iso(n0), zones=zones, news_ok=(nw or {}).get("ok"), news_at=(nw or {}).get("at"),
-                damaged={k: dict(t=v["t"], url=v["url"], src=v["src"], at=v["at"]) for k, v in hit_names.items()},
-                news=cable_news[:8],
-                basis="Inferred from news headlines and IODA internet outage signals. No cable operator publishes a live status feed.",
-                model="Risk score (our model): chokepoint 20 + documented cuts 15 each (max 30) + conflict headlines 5 each (max 25) + cable damage news 25.")
+        if not zn: continue
+        src_it = zn[0]
+        for f in fs:
+            p = f.get("properties") or {}; nm = _base(p.get("n") or "") or (p.get("n") or "")
+            if not nm or nm in cables: continue
+            if _line_in_zone(f.get("geometry", {}).get("coordinates") or [], z["poly"]):
+                _put(cables, nm, 1, "In jeopardy",
+                     f"Cable damage reported in the {z['name']}; this route crosses the area.",
+                     src_it.get("src"), src_it.get("url"), src_it.get("at"))
+    uniq, seen = [], set()
+    for f in fs:
+        raw = (f.get("properties") or {}).get("n") or ""
+        n = _base(raw) or raw
+        key = _norm(n) if n else "id:" + str((f.get("properties") or {}).get("id") or id(f))
+        if key in seen: continue
+        seen.add(key); uniq.append(n)
+    def _st_for(n):
+        if not n: return None
+        st, nn = None, _norm(n)
+        for k, v in cables.items():
+            kn = _norm(k)
+            if n == k or (nn and kn and (nn == kn or nn.startswith(kn) or kn.startswith(nn))):
+                if not st or v["lv"] > st["lv"]: st = v
+        return st
+    red = sum(1 for n in uniq if (_st_for(n) or {}).get("lv", 0) >= 2)
+    yel = sum(1 for n in uniq if (_st_for(n) or {}).get("lv") == 1)
+    working = len(uniq) - red - yel
+    return dict(generated=_iso(n0), news_ok=(nw or {}).get("ok"), news_at=(nw or {}).get("at"),
+                cables=cables, news=cable_news[:8],
+                counts=dict(out=red, degraded=yel, working=working, drawn=len(fs), unique=len(uniq)),
+                basis="Status is inferred from public fault and repair reports. Cable operators do not publish a live feed. Cables with no fault reports are shown as working.")
 
 def api(swr, outages_fn):
     nw = swr("cables:news", 3600, news, wait=True)
-    try: out = outages_fn()
-    except Exception: out = None
-    return status(nw, out)
+    try: outages_fn()
+    except Exception: pass
+    return status(nw, None)
