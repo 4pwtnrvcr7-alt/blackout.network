@@ -252,7 +252,7 @@
       var r = P[f.properties.k], l = r ? r.level : INET.all_down ? -1 : 0;   /* Matt: green unless there is evidence of a problem */
       return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), l: l, o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
     if (D) applyData();
-    var nd = document.querySelector("#nx_leg .s-na"); if (nd && nd.parentNode) nd.parentNode.hidden = !INET.all_down;   /* "No data" only when every feed is down */
+    var nd = document.querySelector("#nx_leg .s-na"); if (nd && nd.parentNode) nd.parentNode.style.display = INET.all_down ? "" : "none";   /* "No data" only when every feed is down */
   }
   function inetCard(p) {
     var r = (INET && INET.places || {})[p.k] || (INET && !INET.all_down ? { name: p.n, level: 0, status: "Normal", signals: [] } : { name: p.n, level: -1, status: "No data", signals: [] }), c = inetCol(r.level);
