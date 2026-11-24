@@ -249,18 +249,21 @@
     if (!INET || !INETG || !map || !map.getSource("inet")) return;
     var P = INET.places || {};
     map.getSource("inet").setData({ type: "FeatureCollection", features: (INETG.features || []).map(function (f) {
-      var r = P[f.properties.k], l = r ? r.level : -1;
+      var r = P[f.properties.k], l = r ? r.level : INET.all_down ? -1 : 0;   /* Matt: green unless there is evidence of a problem */
       return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
     if (D) applyData();
+    var nd = document.querySelector("#nx_leg .s-na"); if (nd && nd.parentNode) nd.parentNode.hidden = !INET.all_down;   /* "No data" only when every feed is down */
   }
   function inetCard(p) {
-    var r = (INET && INET.places || {})[p.k] || { name: p.n, level: -1, status: "No data", signals: [] }, c = inetCol(r.level);
+    var r = (INET && INET.places || {})[p.k] || (INET && !INET.all_down ? { name: p.n, level: 0, status: "Normal", signals: [] } : { name: p.n, level: -1, status: "No data", signals: [] }), c = inetCol(r.level);
+    var nws = (r.news || []).map(function (h) { return '<li>' + (url(h.url) ? '<a href="' + url(h.url) + '" target="_blank" rel="noopener noreferrer">' + esc(h.t) + '</a>' : esc(h.t)) + (h.src ? ' · ' + esc(h.src) : '') + (h.at ? ' · ' + esc(ago(h.at)) : '') + '</li>'; }).join("");
     var sig = (r.signals || []).map(function (s) { return '<li>' + esc(s.name) + ' · ' + (s.pct != null ? (s.live ? 'now ' : '') + esc(s.pct) + '% of normal (' + esc(100 - s.pct) + '% drop)' : 'below normal') + (s.since ? ' · since ' + esc(ago(s.since)) : '') + '</li>'; }).join("");
     return '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + esc(r.status) + '</span><h3>' + esc(r.name || p.n) + '</h3>' +
       (r.level < 0 ? '<p>No live internet measurements for this place right now.</p>' :
-       sig ? '<p>Signals below their normal level:</p><ul>' + sig + '</ul>' : '<p>All IODA signals (routing, active probing, network telescope) at normal levels.</p>') +
+       sig ? '<p>Signals below their normal level:</p><ul>' + sig + '</ul>' : nws ? '' : '<p>No problem reported. IODA signals (routing, active probing, network telescope) at normal levels.</p>') +
+      (nws ? '<p>In the news:</p><ul>' + nws + '</ul>' : '') +
       '<dl>' + (r.since ? '<dt>Since</dt><dd>' + esc(ago(r.since)) + '</dd>' : '') + (r.alerts_24h != null ? '<dt>IODA alerts, 24 h</dt><dd>' + num(r.alerts_24h) + '</dd>' : '') +
-      '<dt>Last checked</dt><dd>' + esc(ago(r.checked || (INET && INET.generated))) + '</dd></dl>' +
+      '<dt>IODA data from</dt><dd>' + esc(ago(INET && INET.generated || r.checked)) + (INET && INET.via === "box-relay" ? ' (relayed)' : '') + '</dd></dl>' +
       '<div class="acts">' + linkA(r.src || "https://ioda.inetintel.cc.gatech.edu/", "Live IODA dashboard") + '</div><p class="age">Measured by IODA, Georgia Tech. A drop can be a local network problem, a power cut or a shutdown.</p>';
   }
   function applyWorld() {

@@ -664,7 +664,7 @@ def page(qs=None):
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>
 <button type="button" class="nx-b" id="nx_home" aria-label="Show the whole U.S."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
 <div class="nx-leg" id="nx_leg" aria-label="Legend"><ul>
-<li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li><i class="s-na" style="background:#7C8190"></i>No data</li><li><i class="s-dc"></i>Data center</li></ul>
+<li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li hidden><i class="s-na" style="background:#7C8190"></i>No data</li><li><i class="s-dc"></i>Data center</li></ul>
 <ul class="nx-shapes" id="gx_leg"><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul><ul class="nx-lnk" aria-label="Power lines, coloured by their grid operator&#39;s live status"><li><i class="ln" style="background:#2FD67B"></i>Lines normal</li><li><i class="ln" style="background:#F5D547"></i>Strained</li><li><i class="ln" style="background:#FF3B3B"></i>Outage</li></ul></div>
 <button type="button" class="nx-more-btn" id="nx_more_btn" aria-controls="nx_more" aria-expanded="false"><span id="nx_more_lbl">All networks</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <button type="button" class="gx-more-btn" id="gx_more_btn" aria-controls="gx_more" aria-expanded="false"><span class="gx-ml">More about the grid</span><span class="gx-ms">Grid details</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
@@ -733,9 +733,13 @@ def handle_get(path, qs=None, headers=None):
         import netinet
         try:
             r = swr("inet", 600, lambda: netinet.build(jget), wait=True)
-            if r: r = dict(r, ioda=ioda_state())
-            if r and not all((r.get("feeds") or {}).values()) and "inet" in _C and time.time() - _C["inet"][0] > 120: _C["inet"] = (time.time() - 600, r)   # IODA did not answer: grey now, try again soon
-            return (200, r) if r else (503, {"error": "internet status is still loading"})
+            if r and not all((r.get("feeds") or {}).values()) and "inet" in _C and time.time() - _C["inet"][0] > 120: _C["inet"] = (time.time() - 600, r)   # IODA did not answer: try again soon
+            try:
+                import netcables; nw = swr("inet:news", 1800, lambda: netinet.news(netcables._rss), wait=False)
+            except Exception: nw = None
+            r = netinet.serve(r, nw)
+            r["ioda"] = ioda_state()
+            return (200, r) if r.get("places") else (503, {"error": "internet status is still loading"})
         except Exception as ex: return 503, {"error": "internet status unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":
         import netsky

@@ -56,6 +56,23 @@ class T(unittest.TestCase):
             self.assertEqual(len(calls), 1); self.assertGreater(netmap.ioda_state()["backoff_s"], 50)
         finally:
             netmap._http = orig; netmap._IB.update(n=0, until=0.0)
+    def test_serve_uses_relay_and_defaults_green(self):
+        import json, tempfile, time as _t
+        netinet._LG.clear()
+        snap = {"generated": netinet._iso(_t.time() - 300), "feeds": {"country": True, "region": True},
+                "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": 0}, "S:Florida": {"k": "S:Florida", "name": "Florida", "level": -1}}}
+        d = tempfile.mkdtemp(); netinet.RELAY = d + "/r.json"; json.dump(snap, open(netinet.RELAY, "w"))
+        dead = {"generated": netinet._iso(_t.time()), "feeds": {"country": False, "region": False}, "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": -1}}}
+        o = netinet.serve(dead, [{"t": "Internet outage hits Puerto Rico after storm", "src": "X", "url": "https://x"}])
+        self.assertEqual((o["via"], o["all_down"]), ("box-relay", False))
+        self.assertEqual(o["places"]["S:Florida"]["level"], 0); self.assertEqual(o["places"]["C:PR"]["level"], 2)
+        self.assertGreaterEqual(o["age_s"], 299)
+    def test_serve_all_down_after_an_hour(self):
+        import time as _t
+        netinet._LG.clear(); netinet.RELAY = "/nonexistent"
+        dead = {"generated": netinet._iso(_t.time()), "feeds": {"country": False, "region": False}, "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": -1}}}
+        o = netinet.serve(dead, [])
+        self.assertTrue(o["all_down"]); self.assertEqual(o["counts"]["no_data"], 1)
     def test_static_geo_served(self):
         st, body, ct = netmap.handle_get("/api/netmap/inet.json")
         self.assertEqual((st, ct), (200, "application/json")); self.assertIn(b'"S:Florida"', body); self.assertIn(b'"C:PR"', body)
