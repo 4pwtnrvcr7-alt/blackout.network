@@ -73,6 +73,24 @@ class T(unittest.TestCase):
         dead = {"generated": netinet._iso(_t.time()), "feeds": {"country": False, "region": False}, "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": -1}}}
         o = netinet.serve(dead, [])
         self.assertTrue(o["all_down"]); self.assertEqual(o["counts"]["no_data"], 1)
+    def test_news_disambiguation(self):
+        P = {k: {"name": n} for k, n in [("S:Georgia", "Georgia"), ("C:GE", "Georgia"), ("C:MX", "Mexico"), ("S:New Mexico", "New Mexico"),
+             ("C:PG", "Papua New Guinea"), ("C:GN", "Guinea"), ("S:Virginia", "Virginia"), ("S:West Virginia", "West Virginia")]}
+        H = lambda t: set(netinet._news_hits([{"t": t}], P))
+        self.assertEqual(H("Internet outage hits Atlanta, Georgia"), {"S:Georgia"})
+        self.assertEqual(H("Georgia: internet shutdown in Tbilisi"), {"C:GE"})
+        self.assertEqual(H("Georgia internet outage"), set())
+        self.assertEqual(H("New Mexico internet outage"), {"S:New Mexico"})
+        self.assertEqual(H("Papua New Guinea internet outage"), {"C:PG"})
+        self.assertEqual(H("West Virginia internet outage"), {"S:West Virginia"})
+    def test_data_relay_fallback(self):
+        import json, tempfile, time as _t
+        d = tempfile.mkdtemp(); netmap.RELAY_DATA = d + "/r.json"
+        json.dump({"generated": netinet._iso(_t.time() - 60), "cev": [{"x": 1}]}, open(netmap.RELAY_DATA, "w"))
+        def bad(): raise OSError("403")
+        self.assertEqual(netmap._relayed("cev", bad), [{"x": 1}])
+        json.dump({"generated": netinet._iso(_t.time() - 9000), "cev": [{"x": 1}]}, open(netmap.RELAY_DATA, "w"))
+        with self.assertRaises(OSError): netmap._relayed("cev", bad)
     def test_static_geo_served(self):
         st, body, ct = netmap.handle_get("/api/netmap/inet.json")
         self.assertEqual((st, ct), (200, "application/json")); self.assertIn(b'"S:Florida"', body); self.assertIn(b'"C:PR"', body)

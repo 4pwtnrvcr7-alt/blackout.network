@@ -7,9 +7,13 @@ UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; box relay, cac
 def jget(url, timeout=40, cap=20_000_000, **k):
     with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"}), timeout=timeout) as r:
         return json.loads(r.read(cap).decode("utf-8", "replace"))
-r = netinet.build(jget)
-if not any((r.get("feeds") or {}).values()): print("relay: IODA feeds failed, keep previous file"); sys.exit(1)
-r["relay"] = True
-out = os.path.join(D, "data", "ioda_relay.json"); tmp = out + ".tmp"
-with open(tmp, "w") as f: json.dump(r, f, separators=(",", ":"))
-os.replace(tmp, out); print("relay: ok", r["counts"], r["generated"])
+def main():
+    r = netinet.build(jget)
+    if not any((r.get("feeds") or {}).values()): print("relay: IODA feeds failed, keep previous file"); sys.exit(1)
+    r["relay"] = True
+    out = os.path.join(D, "data", "ioda_relay.json"); tmp = out + ".tmp"
+    with open(tmp, "w") as f: json.dump(r, f, separators=(",", ":"))
+    os.replace(tmp, out); print("relay: ok", r["counts"], r["generated"])
+
+if __name__ == "__main__":
+    main()

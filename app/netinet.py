@@ -145,15 +145,27 @@ def news(rss):
     """Headlines from the last 2 days about an internet outage or shutdown (Google News RSS, same helper as the cable layer)."""
     return rss(NEWS_Q, 2)
 
+# Place names that are ambiguous in headlines: only counted with context words (Nov 24 2026).
+AMBIG = {
+    "S:Georgia": r"atlanta|savannah|augusta|macon|columbus|athens, ga|\bga\b|georgia power|u\.s\.|\bus\b|county",
+    "C:GE": r"tbilisi|georgian|caucasus|batumi",
+    "S:Washington": r"seattle|spokane|tacoma|bellevue|washington state|\bwa\b",
+}
 def _news_hits(items, places):
+    """Longest names first and each matched span is blanked, so "New Mexico" does not also hit Mexico, "West Virginia" does not
+    hit Virginia, "Papua New Guinea" does not hit Guinea. Ambiguous names (Georgia, Washington) need context words (AMBIG)."""
     hits = {}
-    pats = [(k, p["name"]) for k, p in places.items() if p.get("name") and len(p["name"]) >= 4]
+    pats = sorted([(k, p["name"]) for k, p in places.items() if p.get("name") and len(p["name"]) >= 4], key=lambda x: -len(x[1]))
     for it in items or []:
         t = it.get("t") or ""
         if not _re.search(r"internet|network|connectivity|online", t, _re.I) or not _re.search(r"outage|shutdown|blackout|disrupt|down\b", t, _re.I): continue
+        rest = t
         for k, nm in pats:
-            if _re.search(r"\b" + _re.escape(nm) + r"\b", t, _re.I):
-                hits.setdefault(k, []).append(dict(t=t, src=it.get("src"), url=it.get("url"), at=it.get("at"), shutdown=bool(_re.search(r"shutdown|blackout|nationwide", t, _re.I))))
+            m = _re.search(r"(?<![\w-])" + _re.escape(nm) + r"(?![\w-])", rest, _re.I)
+            if not m: continue
+            if k in AMBIG and not _re.search(AMBIG[k], t, _re.I): continue   # no context: leave the name for the other place
+            rest = rest[:m.start()] + " " * (m.end() - m.start()) + rest[m.end():]
+            hits.setdefault(k, []).append(dict(t=t, src=it.get("src"), url=it.get("url"), at=it.get("at"), shutdown=bool(_re.search(r"shutdown|blackout|nationwide", t, _re.I))))
     return hits
 
 def serve(server, news_items=None, now=None):
