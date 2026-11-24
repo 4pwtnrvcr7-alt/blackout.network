@@ -124,6 +124,23 @@ class NetMap(unittest.TestCase):
         self.assertNotIn(".nx-leg{top:calc(146px + env(safe-area-inset-top));bottom:auto;left:50%", css.replace(" ", ""))
         self.assertNotIn(".nx-leg{bottom:auto;top:calc(104px + env(safe-area-inset-top));left:50%", css.replace(" ", ""))
 
+    def test_asset_version_is_content_hash(self):
+        """Asset ?v= is a short content hash, not mtime, so Cloudflare never reuses a stale immutable URL."""
+        import hashlib, netmap, netpages
+        from pathlib import Path
+        root = Path(APP) / "netmap_static"
+        css, js = (root / "net.css").read_bytes(), (root / "net.js").read_bytes()
+        want_css = hashlib.md5(css).hexdigest()[:12]
+        want_js = hashlib.md5(js).hexdigest()[:12]
+        self.assertRegex(want_css, r"^[0-9a-f]{12}$")
+        self.assertNotEqual(want_css, want_js)
+        self.assertEqual(netmap._v("net.css"), want_css)
+        self.assertEqual(netmap._v("net.js"), want_js)
+        self.assertEqual(netmap._v("does-not-exist.css"), "0")
+        html = netpages.handle_get("/grid", {})[1]
+        self.assertIn(f"net.css?v={want_css}", html)
+        self.assertIn(f"net.js?v={want_js}", html)
+        self.assertNotRegex(html, r"net\.css\?v=\d{9,}")
 
 if __name__ == "__main__":
     unittest.main()
