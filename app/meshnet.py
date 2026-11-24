@@ -136,7 +136,7 @@ def page(key, path, body, scripts=()):
             '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}</style></head><body>'
             '<a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>' + _top() +
             f'<main class="mx" id="main">{body}</main>'
-            '<footer class="mx-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/network">The Grid</a> · <a href="/mesh">Off-grid network map</a> · '
+            '<footer class="mx-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/grid">The Grid</a> · <a href="/mesh">Off-grid network map</a> · '
             + ('' if _off("/mesh/chat") else '<a href="/mesh/chat">Network chat</a> · ') + '<a href="/mesh/guide">Off-grid setup guide</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/tos#acknowledgments">Credits</a><br>'
             'Research only: not an official warning service.</footer>' + js + '</body></html>').encode("utf-8")
 

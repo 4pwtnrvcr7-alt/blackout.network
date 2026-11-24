@@ -1,4 +1,4 @@
-"""Network status board (/network, Nov 23 2026, pt1758u): "Down for me" reports, the incident timeline, 24 h history and
+"""Network status board (/grid, Nov 23 2026, pt1758u): "Down for me" reports, the incident timeline, 24 h history and
 documented chain reactions. Matt asked for a Downdetector-style board that is more useful than the map.
 
 Storage: tables in votes.db (Render-owned, so the box mirrors it and restores it after a restart, same as visitor votes).
@@ -232,7 +232,7 @@ def timeline(hours_back=72, limit=60):
         seen.add(k); r["mins"] = int(((e or now()) - s).total_seconds() // 60); out.append(r)
     return out[:limit]
 
-# ---------------------------------------------------------------- per-service history (pt1785u detail page /network/status/<id>)
+# ---------------------------------------------------------------- per-service history (pt1785u detail page /grid/status/<id>)
 def service_history(svc, days=90):
     """Stored on our side: daily worst level and hours with data (oldest first), daily report counts, and every logged incident."""
     t = int(time.time()); hr = t // 3600; d0 = t // 86400; lv = {}; hrs_seen = {}; reps = {}; inc = []; bad = 0; tot = 0
