@@ -131,6 +131,15 @@ def run_view(browser, name, w, h, base, live, shots):
     if shots:
         Path(shots).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(Path(shots) / f"{name}-moon-apollo11.png"), full_page=False)
+    # Mars focus + overview for visual QA (pt1841u)
+    page.evaluate("() => { if (window.BNSolar) window.BNSolar.focus('mars'); }")
+    page.wait_for_timeout(1600)
+    if shots:
+        page.screenshot(path=str(Path(shots) / f"{name}-mars.png"), full_page=False)
+    page.evaluate("() => { var b = document.getElementById('s3_all'); if (b) b.click(); }")
+    page.wait_for_timeout(1400)
+    if shots:
+        page.screenshot(path=str(Path(shots) / f"{name}-overview.png"), full_page=False)
     info = (st.get("info") or "")
     problems = []
     if errors:

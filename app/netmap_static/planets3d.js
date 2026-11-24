@@ -64,7 +64,7 @@
     loadTex(file, function (tex) {
       if (!tex) return;
       var prev = mesh.material;
-      mesh.material = new T.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0, color: 0xffffff });
+      mesh.material = new T.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, color: 0xffffff, toneMapped: false });
       if (o.id === "earth") mesh.material.metalness = 0.05;
       if (prev && prev !== mesh.material && prev.dispose) prev.dispose();
       CS[o.id] = { mesh: mesh, ready: true };
@@ -78,7 +78,7 @@
       tex.encoding && (tex.encoding = T.sRGBEncoding);
       var alpha = 22 * Math.PI / 180, r = o.size;
       var cap = new T.Mesh(new T.CircleGeometry(r * Math.sin(alpha), 64),
-        new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: T.DoubleSide }));
+        new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: T.DoubleSide, toneMapped: false }));
       cap.rotation.x = -Math.PI / 2;
       cap.position.y = r * Math.cos(alpha) * 1.001;
       cap.userData.cap = true;
@@ -87,35 +87,26 @@
     });
   }
 
-  function pinGeom() {
-    if (pinGeom.g) return pinGeom.g;
-    pinGeom.g = new T.ConeGeometry(1, 2.4, 8);
-    return pinGeom.g;
+  function pinMat(color, op) {
+    return new T.MeshBasicMaterial({ color: color, transparent: true, opacity: op, side: T.DoubleSide, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   }
   function addPin(o, rec, kind) {
     var mesh = sphereOf(o); if (!mesh) return;
-    var r = o.size, loc = latLonLocal(rec.lat, rec.lon, r * 1.01);
+    var r = o.size, loc = latLonLocal(rec.lat, rec.lon, r * 1.0018);
     var g = new T.Group(); g.position.copy(loc);
-    var outward = loc.clone().normalize();
-    g.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), outward);
-    var scale = Math.max(0.012, r * 0.045);
-    var mat = new T.MeshBasicMaterial({ color: kind === "feature" ? 0xd7c4a2 : 0xe8eaf0 });
-    var cone = new T.Mesh(pinGeom(), mat);
-    cone.position.y = scale * 1.2;
-    cone.scale.setScalar(scale);
-    cone.userData.pin = true; cone.userData.site = rec; cone.userData.body = o.id; cone.userData.kind = kind;
-    g.add(cone);
-    var stem = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 1, 6), mat);
-    stem.position.y = scale * 0.45; stem.scale.set(scale, scale, scale);
-    stem.userData.pin = true; stem.userData.site = rec; stem.userData.body = o.id;
-    g.add(stem);
+    g.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), loc.clone().normalize());
+    var accent = kind === "feature" ? 0xd7c4a2 : 0xf3f5f8;
+    var ring = new T.Mesh(new T.RingGeometry(0.36, 0.5, 28), pinMat(accent, 0.96));
+    var dot = new T.Mesh(new T.CircleGeometry(0.16, 16), pinMat(accent, 0.96));
+    var hit = new T.Mesh(new T.CircleGeometry(1.15, 16), new T.MeshBasicMaterial({ visible: false, side: T.DoubleSide }));
+    [ring, dot, hit].forEach(function (m) { m.userData.pin = true; m.userData.site = rec; m.userData.body = o.id; m.userData.kind = kind; g.add(m); });
     mesh.add(g);
     var lab = document.createElement("button");
     lab.type = "button"; lab.className = "s3-lab s3-pin"; lab.textContent = rec.name;
-    lab.hidden = true;
+    lab.style.display = "none";
     lab.addEventListener("click", function (e) { e.stopPropagation(); openSite(o, rec, kind); });
     if (API.S.labs) API.S.labs.appendChild(lab);
-    PINS.push({ o: o, rec: rec, kind: kind, group: g, cone: cone, lab: lab, loc: loc, r: r });
+    PINS.push({ o: o, rec: rec, kind: kind, group: g, lab: lab, loc: loc, r: r });
   }
 
   function clearPins() {
@@ -142,13 +133,13 @@
   function paintInfo(titleInner, bodyInner) {
     if (!API.S.info) return;
     var open = !!API.S.infoOpen;
-    var h = "<h3>" + titleInner + '<button type="button" class="s3-tog" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "Less" : "More") + "</button></h3><div class=\"s3-body\">" + bodyInner + "</div>";
+    var h = "<h3>" + titleInner + '<button type="button" class="s3-tog" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "Collapse" : "Expand") + "</button></h3><div class=\"s3-body\">" + bodyInner + "</div>";
     API.S.info.innerHTML = h; API.S.info.hidden = false; API.S.info.classList.toggle("open", open);
     var tg = API.S.info.querySelector(".s3-tog");
     if (tg) tg.addEventListener("click", function () {
       API.S.infoOpen = !API.S.infoOpen;
       API.S.info.classList.toggle("open", !!API.S.infoOpen);
-      tg.textContent = API.S.infoOpen ? "Less" : "More";
+      tg.textContent = API.S.infoOpen ? "Collapse" : "Expand";
       tg.setAttribute("aria-expanded", API.S.infoOpen ? "true" : "false");
     });
   }
@@ -176,7 +167,10 @@
     }
     if (o.info) h += "<p>" + esc(o.info) + "</p>";
     if (o.id === "jupiter") h += "<p>The Great Red Spot is marked as Cassini recorded it in December 2000. Tap the pin for details. Scroll to explore the cloud bands.</p>";
-    if (o.id === "saturn") h += "<p>The north-pole hexagon is marked; tap the pin or zoom in over the pole. Atmosphere bands are a natural-color stand-in; see credits.</p>";
+    if (o.id === "saturn") h += "<p>The north-pole hexagon is marked; tap the pin or zoom in over the pole. The globe map is a natural-color stand-in graded to Cassini true-color photos; the hexagon overlay is a real Cassini image. See credits.</p>";
+    if (o.id === "venus") h += "<p>The globe is a visible-light stand-in in pale cream, color-matched to how Venus looks in ordinary light, where cloud markings are very faint. It is not the Magellan radar surface map. See credits.</p>";
+    if (o.id === "uranus") h += "<p>The globe is a pale cyan stand-in color-matched to Voyager 2 true-color photos. See credits.</p>";
+    if (o.id === "neptune") h += "<p>The globe is a deep-blue stand-in color-matched to Voyager 2 true-color photos. See credits.</p>";
     if (o.id === "moon") h += "<p>Landing sites are marked (Apollo, Luna, Chang'e, Chandrayaan-3, SLIM, IM-1). Tap a pin or zoom in to read the site. Scroll to see craters.</p>";
     if (o.id === "mars") h += "<p>Landing sites are marked (Viking through Perseverance and Zhurong). Tap a pin or zoom in. Scroll to see craters and canyons.</p>";
     h += '<p class="s3-k">Surface: NASA / USGS public-domain imagery · <a href="/api/netmap/planets/CREDITS.txt" target="_blank" rel="noopener">credits</a></p>';
@@ -185,19 +179,28 @@
     return true;
   }
 
-  function updatePinLabels() {
+  var HOVER = null, LEADS = [];
+
+  function pxSize(cam, dist, px, H) {
+    return 2 * dist * Math.tan((cam.fov * Math.PI) / 360) / Math.max(1, H) * px;
+  }
+
+  function updatePins() {
     if (!API || !API.S || !API.S.cam) return;
     var cam = API.S.cam, W = API.S.W, H = API.S.H, tmp = new T.Vector3();
     PINS.forEach(function (p) {
-      if (!p.lab) return;
-      var mesh = sphereOf(p.o); if (!mesh) { p.lab.style.display = "none"; return; }
+      var mesh = sphereOf(p.o); if (!mesh) return;
       mesh.localToWorld(tmp.copy(p.loc));
       var dist = cam.position.distanceTo(tmp);
-      var close = dist < p.o.size * 9;
+      var world = pxSize(cam, dist, 10, H);
+      p.group.scale.setScalar(Math.max(world, p.r * 0.0004));
+      if (!p.lab) return;
       tmp.project(cam);
-      var vis = close && tmp.z < 1 && Math.abs(tmp.x) < 1.15 && Math.abs(tmp.y) < 1.15;
+      var on = (SITE && SITE.id === p.rec.id) || (HOVER && HOVER.rec === p.rec);
+      var vis = on && tmp.z < 1 && Math.abs(tmp.x) < 1.2 && Math.abs(tmp.y) < 1.2;
       if (vis) {
         p.lab.style.display = "";
+        p.lab.classList.toggle("sel", !!(SITE && SITE.id === p.rec.id));
         p.lab.style.transform = "translate(" + ((tmp.x + 1) / 2 * W).toFixed(1) + "px," + ((1 - tmp.y) / 2 * H).toFixed(1) + "px) translate(-50%,-150%)";
       } else p.lab.style.display = "none";
     });
@@ -206,23 +209,117 @@
   function onPointer(e) {
     if (!API || !API.S || !API.S.r || !PINS.length) return;
     var dn = onPointer._dn; if (!dn) return;
-    if (Math.hypot(e.clientX - dn[0], e.clientY - dn[1]) > 6) return;
+    if (Math.hypot(e.clientX - dn[0], e.clientY - dn[1]) > 8) return;
+    var rec = hitPin(e.clientX, e.clientY); if (!rec) return;
+    e.stopImmediatePropagation();
+    var o = API.OBJ[rec.body]; if (o) openSite(o, rec.site, rec.kind);
+  }
+  function onMove(e) {
+    if (!API || !PINS.length) return;
+    var rec = hitPin(e.clientX, e.clientY);
+    var next = rec && PINS.filter(function (p) { return p.rec === rec.site; })[0];
+    if (HOVER !== next) HOVER = next || null;
+  }
+  function hitPin(cx, cy) {
+    if (!API || !API.S || !API.S.r) return null;
     var rc = API.S.r.domElement.getBoundingClientRect();
     var ray = new T.Raycaster();
-    ray.setFromCamera(new T.Vector2((e.clientX - rc.left) / rc.width * 2 - 1, -(e.clientY - rc.top) / rc.height * 2 + 1), API.S.cam);
+    ray.params.Points = ray.params.Points || {};
+    ray.setFromCamera(new T.Vector2((cx - rc.left) / rc.width * 2 - 1, -(cy - rc.top) / rc.height * 2 + 1), API.S.cam);
     var objs = [];
     PINS.forEach(function (p) { p.group.traverse(function (c) { if (c.isMesh) objs.push(c); }); });
     var hit = ray.intersectObjects(objs, true)[0];
-    if (!hit || !hit.object.userData.site) return;
-    e.stopImmediatePropagation();
-    var rec = hit.object.userData.site, body = hit.object.userData.body, kind = hit.object.userData.kind;
-    var o = API.OBJ[body]; if (o) openSite(o, rec, kind);
+    if (!hit || !hit.object.userData.site) return null;
+    return { site: hit.object.userData.site, body: hit.object.userData.body, kind: hit.object.userData.kind };
+  }
+
+  function ensureLead(i) {
+    while (LEADS.length <= i) {
+      var el = document.createElement("div"); el.className = "s3-lead"; el.hidden = true;
+      if (API.S.labs) API.S.labs.appendChild(el);
+      LEADS.push(el);
+    }
+    return LEADS[i];
+  }
+  function hideLeads() { LEADS.forEach(function (el) { el.hidden = true; }); }
+
+  function declutterLabels() {
+    if (!API || !API.S || !API.S.cam || !API.LIST) { hideLeads(); return; }
+    var S = API.S, cam = S.cam, W = S.W, H = S.H, LIST = API.LIST;
+    var sel = API.sel ? API.sel() : null;
+    var tmp = new T.Vector3(), limb = new T.Vector3();
+    var disc = null;
+    if (sel && (sel.kind === "planet" || sel.id === "sun") && sel.node) {
+      sel.node.getWorldPosition(tmp);
+      var dist = cam.position.distanceTo(tmp);
+      var r = sel.size || 1;
+      var scr = tmp.clone().project(cam);
+      var cx = (scr.x + 1) / 2 * W, cy = (1 - scr.y) / 2 * H;
+      var px = pxSize(cam, Math.max(0.001, dist), 1, H);
+      disc = { o: sel, cx: cx, cy: cy, r: r / px * 1.05, world: tmp.clone(), rad: r };
+    }
+    var items = [];
+    LIST.forEach(function (o) {
+      if (!o.lab) return;
+      o.node.getWorldPosition(tmp);
+      var world = tmp.clone();
+      tmp.project(cam);
+      var sx = (tmp.x + 1) / 2 * W, sy = (1 - tmp.y) / 2 * H;
+      var hide = o.lab.style.display === "none";
+      if (!hide && disc && o !== disc.o && tmp.z < 1) {
+        var dx = sx - disc.cx, dy = sy - disc.cy;
+        if (dx * dx + dy * dy < (disc.r + 18) * (disc.r + 18)) {
+          var inFront = world.distanceTo(cam.position) < disc.world.distanceTo(cam.position) - disc.rad * 0.8;
+          if (!inFront) { o.lab.style.display = "none"; hide = true; }
+        }
+      }
+      if (hide) return;
+      var pri = (sel && o === sel) ? 3 : (o.kind === "planet" || o.id === "sun" ? 2 : 1);
+      items.push({ o: o, sx: sx, sy: sy, ox: sx, oy: sy, pri: pri });
+    });
+    items.sort(function (a, b) { return b.pri - a.pri; });
+    var lw = 118, lh = 16, pad = 6, i, j, iter;
+    for (iter = 0; iter < 10; iter++) {
+      for (i = 0; i < items.length; i++) {
+        for (j = i + 1; j < items.length; j++) {
+          var a = items[i], b = items[j], dx = b.sx - a.sx, dy = b.sy - a.sy;
+          if (Math.abs(dx) < lw && Math.abs(dy) < lh + pad) {
+            var pushY = (lh + pad - Math.abs(dy || 0.1)) / 2 + 1;
+            var sign = (dy === 0 ? (b.ox >= a.ox ? 1 : -1) : (dy > 0 ? 1 : -1));
+            if (b.pri <= a.pri) { b.sy += sign * pushY; if (Math.abs(dx) < lw * 0.6) b.sx += (dx >= 0 ? 1 : -1) * 4; }
+            else { a.sy -= sign * pushY; }
+          }
+        }
+      }
+    }
+    var li = 0;
+    items.forEach(function (it) {
+      it.sx = Math.max(8, Math.min(W - 8, it.sx));
+      it.sy = Math.max(10, Math.min(H - 10, it.sy));
+      it.o.lab.style.display = "";
+      it.o.lab.style.transform = "translate(" + it.sx.toFixed(1) + "px," + it.sy.toFixed(1) + "px) translate(-50%,-150%)";
+      var moved = Math.hypot(it.sx - it.ox, it.sy - it.oy);
+      if (moved > 8) {
+        var el = ensureLead(li++);
+        var ang = Math.atan2(it.sy - 10 - it.oy, it.sx - it.ox);
+        el.hidden = false;
+        el.style.width = moved.toFixed(1) + "px";
+        el.style.transform = "translate(" + it.ox.toFixed(1) + "px," + it.oy.toFixed(1) + "px) rotate(" + ang + "rad)";
+      }
+    });
+    for (; li < LEADS.length; li++) LEADS[li].hidden = true;
+  }
+
+  function tick() {
+    updatePins();
+    declutterLabels();
   }
 
   function css() {
     if (document.getElementById("s3p_css")) return;
     var st = document.createElement("style"); st.id = "s3p_css";
-    st.textContent = ".s3-pin{z-index:2;font-size:10px;padding:1px 6px}.s3-pin.sel{background:#e8eaf0;color:#05060a}";
+    st.textContent = ".s3-pin{z-index:3;font-size:10px;padding:1px 6px}.s3-pin.sel{background:#e8eaf0;color:#05060a}" +
+      ".s3-lead{position:absolute;left:0;top:0;height:1px;background:rgba(223,227,236,.45);transform-origin:0 50%;pointer-events:none;z-index:1}";
     document.head.appendChild(st);
   }
 
@@ -260,11 +357,7 @@
       attach._ptr = true;
       API.S.r.domElement.addEventListener("pointerdown", function (e) { onPointer._dn = [e.clientX, e.clientY]; }, true);
       API.S.r.domElement.addEventListener("pointerup", onPointer, true);
-    }
-    if (!attach._loop) {
-      attach._loop = true;
-      var tick = function () { updatePinLabels(); w.requestAnimationFrame(tick); };
-      w.requestAnimationFrame(tick);
+      API.S.r.domElement.addEventListener("pointermove", onMove, true);
     }
     w.addEventListener("bn-units", function () {
       if (SITE) {
@@ -296,6 +389,7 @@
     attach: attach,
     info: info,
     focusDist: focusDist,
+    tick: tick,
     openSite: function (body, id) {
       var o = API && API.OBJ[body]; if (!o) return;
       var p = PINS.filter(function (x) { return x.o === o && x.rec.id === id; })[0];
