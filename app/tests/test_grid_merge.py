@@ -40,7 +40,7 @@ class GridMerge(unittest.TestCase):
         self.assertIn('<h1 class="nx-vh">The Grid:', body)
         self.assertIn('og:title" content="The Grid:', body)
         self.assertNotIn("Network Status", body)
-        for s in ('data-k="ops"', 'id="gx_more_btn"', 'id="gx_more"', 'id="gx_card"', 'id="gx_reg"', 'id="gx_kpis"', 'id="nb_grid"',
+        for s in ('data-k="grid"', 'id="gx_more_btn"', 'id="gx_more"', 'id="gx_card"', 'id="gx_reg"', 'id="gx_kpis"', 'id="nb_grid"',
                   "/api/netmap/gridlayer.js", "/api/netmap/gridlayer.css", "Energizing the grid"):
             self.assertIn(s, body)
         for sid in ("gx-regions", "gx-world", "gx-outages", "gx-weather", "gx-threats", "gx-space", "gx-local", "gx-sources"):
@@ -56,8 +56,10 @@ class GridMerge(unittest.TestCase):
         self.assertIn("new maplibregl.Map", _read("netmap_static", "net.js"))
         self.assertNotIn("new maplibregl.Map", js)              # one map: the grid layer attaches to the network map
         self.assertIn("if (w.lat == null || w.lon == null) return;", js)   # alerts with no place stay off the map
-        self.assertIn('"ops"', _read("netmap.py"))
-        self.assertIn("ops: true", _read("netmap_static", "net.js"))
+        self.assertIn('("grid", "Power grid")', _read("netmap.py"))   # Nov 24 2026: one Power grid chip runs outages + operators + lines
+        self.assertIn("ON.power = ON.ops = !!ON.grid", _read("netmap_static", "net.js"))
+        for k in ('"ops"', '"power"', '"mobile"', '"sat"', '"pay"', '"apps"'):   # chips with no map items are gone (they live on Status)
+            self.assertNotIn("(" + k + ",", _read("netmap.py").split("CHIPS = ")[1].split("\n")[0])
 
     def test_old_grid_code_kept(self):
         for p in (("gridpage.py",), ("gridpage_static", "grid.js"), ("gridpage_static", "grid.css")):
