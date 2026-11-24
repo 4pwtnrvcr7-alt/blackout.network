@@ -14,6 +14,13 @@ def src(*p):
 def reset():
     RA._S.update(busy=False, started=0.0, finished=0.0, result=None, runs=0, taps=0); RA._S["inflight"].clear()
 
+import os as _os_d, sys as _sys_d
+_sys_d.path.insert(0, _os_d.path.dirname(_os_d.path.dirname(_os_d.path.abspath(__file__))))
+try:
+    import deactivated as _deact_mod; _DEACT_ON = _deact_mod.ON
+except Exception:
+    _DEACT_ON = False
+import unittest
 class Coalescing(unittest.TestCase):
     def setUp(self):
         reset(); self.calls = 0
@@ -194,6 +201,7 @@ class PhoneMenuRow(unittest.TestCase):
         self.assertIn(".bn-theme-row .bn-tl{position:absolute;width:1px", phone)           # icon-only, label for screen readers
         self.assertIn('if(b.classList.contains("bn-theme-row"))b.setAttribute("title"', src("static", "sitenav.js"))
 
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_wire_and_sources_stay_reachable_from_sections(self):
         dr = UI.drawer(sitenav, "")
         self.assertRegex(dr, r'<details class="bn-grp m3-p m3-latest"[\s\S]*?data-tab="threat"')
