@@ -693,7 +693,7 @@
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn("sky3d shader", gl.getShaderInfoLog(s)); gl.deleteShader(s); return null; }
     return s;
   }
-  function prog(gl, vsSrc, fsSrc, attribs) {
+  function glProg(gl, vsSrc, fsSrc, attribs) {   /* not prog(): that name is the loader's progress function (a second declaration replaced it and broke map setup) */
     var vs = shd(gl, gl.VERTEX_SHADER, vsSrc), fs = shd(gl, gl.FRAGMENT_SHADER, fsSrc); if (!vs || !fs) return null;
     var p = gl.createProgram(); gl.attachShader(p, vs); gl.attachShader(p, fs);
     (attribs || []).forEach(function (n, i) { gl.bindAttribLocation(p, i, n); });
@@ -728,8 +728,8 @@
     var lFS = gl2
       ? ["#version 300 es", "precision mediump float;", "uniform vec4 u_color;", "out vec4 outColor;", "void main(){ outColor = u_color; }"].join("\n")
       : ["precision mediump float;", "uniform vec4 u_color;", "void main(){ gl_FragColor = u_color; }"].join("\n");
-    layer.ptProg = prog(gl, pVS, pFS, ["a_pos", "a_col", "a_size"]);
-    layer.lnProg = prog(gl, lVS, lFS, ["a_pos"]);
+    layer.ptProg = glProg(gl, pVS, pFS, ["a_pos", "a_col", "a_size"]);
+    layer.lnProg = glProg(gl, lVS, lFS, ["a_pos"]);
     if (!layer.ptProg || !layer.lnProg) { SKY.alt3d = false; return; }
     layer.uMatP = gl.getUniformLocation(layer.ptProg, "u_matrix");
     layer.uMatL = gl.getUniformLocation(layer.lnProg, "u_matrix");
