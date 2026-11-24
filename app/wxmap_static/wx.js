@@ -1001,7 +1001,7 @@
         (p.wind_kt ? "<dt>Wind</dt><dd>" + esc(p.wind_kt) + " kt</dd>" : "") + (p.pressure ? "<dt>Pressure</dt><dd>" + esc(p.pressure) + " mb</dd>" : "") + (p.label ? "<dt>Point</dt><dd>" + esc(p.label) + "</dd>" : "") + "</dl>" +
         '<div class="acts"><a href="https://www.nhc.noaa.gov/" target="_blank" rel="noopener noreferrer">National Hurricane Center</a></div>';
     } else if (L === "warn-fill" || L === "warn-line" || L === "watch-line") {
-      var wc = WC[p.g] || "#7C8190";
+      var wc = p.watch ? "#E39B2A" : "#FF3B3B";   /* severity, not event-group color (flood was green) */
       h = stl(wc, p.watch ? "Watch" : "Warning") + "<h3>" + esc(p.event) + "</h3>" + (p.ends ? "<p class=\"age\">Until " + esc(stamp(tms(p.ends))) + "</p>" : "") + "<p>" + esc(p.area) + "</p>" + (p.sender ? '<p class="age">' + esc(p.sender) + "</p>" : "") +
         (url(p.url) ? '<div class="acts"><a href="' + url(p.url) + '" target="_blank" rel="noopener noreferrer">Full alert</a></div>' : "");
     } else if (L === "ol-fill" || L === "ol-line") {
