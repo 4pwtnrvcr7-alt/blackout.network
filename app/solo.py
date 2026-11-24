@@ -63,6 +63,22 @@ PAGES = {
                       title="Key figures: people in the news | BLACKOUT.NETWORK",
                       desc="A neutral reference to the people named in the stories BLACKOUT.NETWORK follows: their current role, why they are in the news and the latest headlines.",
                       css="/api/figures/app.css", js="figures"),
+    # batch 3
+    "ai":        dict(paths=("/ai", "/aithreats", "/ai-threats"), kind="tab", tab="ai", eb="Monitor", h1="AI threats",
+                      lede="AI-assisted hacking, rogue bots and agents, AI-enabled cyber attacks, deepfake fraud and model misuse, ranked 0 to 10.",
+                      title="AI Threats: AI-driven attacks and fraud | BLACKOUT.NETWORK",
+                      desc="BLACKOUT.NETWORK tracks AI threats: AI-assisted hacking, rogue bots and agents, AI-enabled cyber attacks, deepfake fraud and model misuse, ranked 0 to 10.",
+                      css="/api/ai/app.css", js="ai"),
+    "gunlaws":   dict(paths=("/gunlaws",), kind="tab", tab="gunlaws", eb="Law", h1="Gun laws",
+                      lede="Second Amendment cases in U.S. courts, gun bills in Congress and state ballot measures, with parties, odds and plain-English forecasts.",
+                      title="Gun Laws: court cases, bills and forecasts | BLACKOUT.NETWORK",
+                      desc="Second Amendment cases in U.S. courts, gun bills in Congress and state ballot measures on BLACKOUT.NETWORK, with parties, odds and plain-English forecasts.",
+                      css="/api/gunlaws/app.css", js="gunlaws"),
+    "spacex":    dict(paths=("/spacex",), kind="tab", tab="spacex", eb="Space", h1="SpaceX",
+                      lede="Next-launch countdown, the full launch schedule, Starship and Starlink updates, recent news and related prediction markets.",
+                      title="SpaceX: launches, Starship and Starlink | BLACKOUT.NETWORK",
+                      desc="SpaceX on BLACKOUT.NETWORK: next-launch countdown, the full launch schedule, Starship and Starlink updates, recent news and related prediction markets.",
+                      css="/api/spacex/app.css", js="spacex"),
 }
 PATHS = {p: k for k, v in PAGES.items() for p in v["paths"]}
 
@@ -103,7 +119,8 @@ def page_html(key):
     else:
         inner = pg.get("main") or _dash_main(tab)
         assets_css = f'<link rel="stylesheet" href="{pg["css"]}">'
-        assets_js = (SHIM + f'<script src="/api/solo/js/{pg["js"]}.js?v={_ver(_addon_js_path(pg["js"]))}"></script>')
+        assets_js = (f'<script src="/api/solo/shim.js?v={_ver(os.path.join(STATIC, "shim.js"))}"></script>'
+                     f'<script src="/api/solo/js/{pg["js"]}.js?v={_ver(_addon_js_path(pg["js"]))}"></script>')
     sv = _ver(os.path.join(STATIC, "solo.css"), os.path.join(STATIC, "solo.js"))
     # A tab whose add-on builds its own <main> (no markup in dashboard.html) gets an empty slot; solo.js moves the built <main> into it.
     main = (f'<main id="tab-{E(tab)}" data-addon="{E(tab)}" class="solo-main">{inner}</main>' if inner
@@ -122,13 +139,9 @@ def page_html(key):
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/credits">Image credits</a></p></footer>
 <script src="{w2}/wire2.js?v=3" defer></script>{assets_js}<script src="/api/solo/solo.js?v={sv}"></script></body></html>'''
 
-# The few dashboard helpers the old tab add-ons expect as globals (defined only when missing).
-SHIM = ('<script>(function(w){if(typeof w.$!=="function")w.$=function(id){return document.getElementById(id)};'
-        'if(typeof w.esc!=="function")w.esc=function(s){return String(s==null?"":s).replace(/[&<>"\']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;","\'":"&#39;"}[c]})};'
-        'if(typeof w.safeUrl!=="function")w.safeUrl=function(u){return/^https?:\\/\\//i.test(u||"")?u:"#"}})(window)</script>')
-
 ADDON_JS = {"games": "games_static", "preppers": "preppers_static", "noise": "bnoise_static", "politics": "politics_static",
-            "government": "government_static", "figures": "figures_static"}
+            "government": "government_static", "figures": "figures_static",
+            "ai": "tabfeeds_static", "gunlaws": "gunlaws_static", "spacex": "spacex_static"}
 ADDON_JS = {k: os.path.join(BASE, d, "app.js") for k, d in ADDON_JS.items()}
 def _addon_js_path(name): return ADDON_JS.get(name, "")
 
@@ -139,11 +152,18 @@ def handle_get(path, qs):
         return 200, page_html(PATHS[p]), "text/html"
     if path.startswith("/api/solo/"):
         n = path[len("/api/solo/"):]
-        if n in ("solo.css", "solo.js"):
+        if n in ("solo.css", "solo.js", "shim.js"):
             b = _read(os.path.join(STATIC, n))
             return (200, b.encode("utf-8"), "text/css" if n.endswith("css") else "application/javascript") if b else (404, {"error": "not found"})
         m = re.fullmatch(r"js/([a-z]+)\.js", n)
         if m and m.group(1) in ADDON_JS:
             b = _read(ADDON_JS[m.group(1)])
-            if b: return 200, demoji(b).encode("utf-8"), "application/javascript"
+            if b:
+                b = demoji(b)
+                if m.group(1) == "politics":
+                    # Don't depend on dashboard.html's dataRange or a $() that missed #pol_range (pt1847u).
+                    b = b.replace(
+                        'try{$("pol_range").textContent=(typeof dataRange=="function"?dataRange(AL):"")+` · alerts updated ${etF(D.generated)}`}catch(_){}',
+                        'try{var el=document.getElementById("pol_range");if(el)el.textContent=(typeof dataRange=="function"?dataRange(AL||[]):"Data range: no items loaded")+" · alerts updated "+etF(D.generated)}catch(_){}')
+                return 200, b.encode("utf-8"), "application/javascript"
     return 404, {"error": "not found"}
