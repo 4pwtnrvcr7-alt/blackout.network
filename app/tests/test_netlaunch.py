@@ -116,6 +116,10 @@ class Launches(unittest.TestCase):
         self.assertEqual(self.N.rocket_photo("Falcon Heavy")["key"], "falconheavy")
         self.assertEqual(self.N.rocket_photo("Long March 2F", "Long March 2")["key"], "longmarch")
         self.assertIsNone(self.N.rocket_photo("Ariane 62"))   # no usable photo -> none shown
+        for v, k in (("Long March 5B", "lm5"), ("Long March 7A", "lm7"), ("Long March 3B", "longmarch"), ("Soyuz 2.1a", "soyuz2"), ("Soyuz-FG", "soyuz"),
+                     ("H3-22S", "h3"), ("PSLV-XL", "pslv"), ("Vega-C", "vega"), ("Epsilon", "epsilon"), ("Antares 330", "antares"), ("Nuri", "nuri"), ("Atlas V 551", "atlasv")):
+            self.assertEqual((self.N.rocket_photo(v) or {}).get("key"), k, v)
+        self.assertGreaterEqual(len(man), 26)
         d = self.N.launches(); lid = self.by(d, "USSF-266")["id"]
         self.assertEqual(netmap.handle_get("/api/netmap/launches/" + lid)[1]["rocket_photo"]["key"], "falcon9")
 
