@@ -181,7 +181,8 @@ def render(cid, since=""):
     elec = ""
     try:   # seo/midterms-phases: election-tagged stories (midterms_hub.is_election_story) link to the /midterms hub
         import midterms_hub as MH
-        if MH.is_election_story(r.get("category"), r.get("title")):
+        import deactivated as _DA
+        if not _DA.is_off("/midterms") and MH.is_election_story(r.get("category"), r.get("title")):
             elec = ('<section class="card" id="bn_midterms_rel"><h2>2026 midterm elections</h2><p><a href="/midterms">2026 midterm elections: '
                     'where to vote, poll closing times and official results by state</a></p></section>')
     except Exception: elec = ""
@@ -197,7 +198,7 @@ def render(cid, since=""):
             + '<div class="bng-inline-slot" data-src="inline_story"><p><a class="btn p" href="/newsletter?utm_source=site&amp;utm_medium=inline&amp;utm_campaign=story">Get the free 7 AM / 7 PM brief</a></p></div>'
             + '<details class="card bnt-sacc"><summary><h2>How confident are we?</h2></summary><p>'
             + S.E(f"{eff} independent source{'' if eff == 1 else 's'}" + (f", including official sources: {', '.join(officials[:6])}." if officials else ". No official source yet."))
-            + ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></details>'
+            + (' Ranks come from published rules.</p></details>' if _scoring_off() else ' Ranks come from published rules; see <a href="/scoring">How we score</a>.</p></details>')
             + f'<details class="card bnt-sacc"><summary><h2>Timeline and sources</h2></summary><ul class="tl">{"".join(li) or "<li>No reports stored.</li>"}</ul></details>'
             + '<section class="card" id="follow" data-bnt-skip><h2>Follow this story</h2><p>Get an UPDATE in your BLACKOUT.NETWORK brief only when this story develops. '
               'Subscribers: tap “Follow this story” under the item in any brief. Not subscribed yet? <a href="/newsletter">Get the free morning/evening brief</a>.</p></section>'
@@ -261,3 +262,10 @@ def handle_get(path, qs):
     if len(_C) > 500: _C.clear()
     _C[key] = (mt, time.time(), code, body)
     return code, body, "text/html"
+
+def _scoring_off():
+    try:
+        import deactivated
+        return deactivated.is_off("/scoring")
+    except Exception:
+        return False

@@ -188,7 +188,8 @@
       ["Click " + B("File") + " in the menu bar", sceneBar("top", [{ n: "file", side: "l", t: 1 }], 0, "")],
       ["Click " + B("Add to Dock…"), sceneMenu("File", [["New Window", ""], ["Share", "share"], ["Add to Dock…", "dock"]], 2, "top")],
       ["Click " + B("Add"), sceneInstall("")]] };
-    if (d.browser === "chrome" || d.browser === "edge") return { key: "desktop-" + d.browser, sub: d.browser === "edge" ? "Edge" : "Chrome", desktop: true, steps: [
+    if (d.browser === "chrome" || d.browser === "edge") return { key: "desktop-" + d.browser, sub: d.browser === "edge" ? "Edge" : "Chrome", desktop: true,
+      note: "No icon? " + (d.browser === "edge" ? "Open " + B("•••") + " › " + B("Apps") + " › " + B("Install this site as an app") : "Open " + B("⋮") + " › " + B("Cast, save and share") + " › " + B("Install page as app")) + ".", steps: [
       ["Click the install icon in the address bar", sceneBar("top", [{ n: "back", side: "l" }, { n: "install", t: 1 }, { n: "dotsv" }])],
       ["Click " + B("Install"), sceneInstall("")]] };
     return null;
@@ -208,8 +209,8 @@
   // ---------------- sheet ----------------
   var deferred = null, D = null, el = null, F = null, cur = 0, timer = null, forced = null;
   window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault(); deferred = e;                                            // kept for the menu's "Install on home screen" button (tap only)
     if (isInstalled() || isDismissed()) { if (!forced) return; }
-    e.preventDefault(); deferred = e;
     if (el && D) { render(); } else if (D && D.ready && !D.mobile && !ss(SKEY)) show();   // desktop Chromium: only shown once install is really possible
   });
   window.addEventListener("appinstalled", function () { markInstalled(); hide(); });
@@ -300,6 +301,7 @@
       if (a === "later") { if (!forcedNa) ls(NKEY, String(Date.now())); return naHide(); }
       if (a === "done") return naHide();
       if (a === "bell") { naHide(); try { window.BN.enableAlerts({}); } catch (er) {} }
+      if (a === "install") { naHide(); try { window.BN.showInstallGuide(); } catch (er) {} }
     });
     na.addEventListener("keydown", function (e) { if (e.key === "Escape") { if (!forcedNa && na.dataset.state === "ask") ls(NKEY, String(Date.now())); naHide(); } });
     return na;
@@ -334,6 +336,20 @@
       h = naHead("gear", "Notifications are off", "You can turn them on later in Settings.", "done") +
         '<ol class="bnna-steps"><li><span class="n">1</span><span>' + how + '</span></li><li><span class="n">2</span><span>Come back here and tap the bell to finish.</span></li></ol>' +
         '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="done">Got it</button></div>';
+    } else if (state === "ios") {                                             // iPhone/iPad Safari tab: web push needs the Home Screen app (iOS 16.4+)
+      var dd = D || detect(), old = dd.ver !== null && dd.ver < 16.4, what = dd.device === "ipad" ? "iPad" : "iPhone";
+      h = naHead("bell", "Alerts on your " + what, old ? "Needs iOS 16.4 or later" : "Add the app first, then allow", "done") +
+        '<div class="bnig-stage">' + sceneNotif() + '</div>' +
+        '<ol class="bnna-steps"><li><span class="n">1</span><span>Tap <b>Share</b> then <b>Add to Home Screen</b>.</span></li>' +
+        '<li><span class="n">2</span><span>Open <b>BLACKOUT</b> from your Home Screen.</span></li>' +
+        '<li><span class="n">3</span><span>Open the menu, tap <b>Turn on notifications</b>, then <b>Allow</b>. Change it later in <b>Settings</b> › <b>Notifications</b>.</span></li></ol>' +
+        (old ? '<p class="bnig-note">This ' + what + ' runs iOS ' + dd.ver + '. Web alerts need iOS 16.4 or later.</p>' : '') +
+        '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="install">Show me how</button><button type="button" class="bnig-sec" data-na="done">Close</button></div>';
+    } else if (state === "unsupported") {
+      h = naHead("gear", "This browser can't get alerts", "Web push isn't available here", "done") +
+        '<ol class="bnna-steps"><li><span class="n">1</span><span>Open blackout.network in <b>Chrome</b>, <b>Edge</b>, <b>Firefox</b> or <b>Safari</b> (Mac).</span></li>' +
+        '<li><span class="n">2</span><span>Open the menu, tap <b>Turn on notifications</b>, then <b>Allow</b>.</span></li></ol>' +
+        '<div class="bnig-row"><button type="button" class="bnig-pri bnna-pri" data-na="done">Got it</button></div>';
     } else if (state === "error") {
       h = naHead("bell", "Couldn’t turn on alerts", "Notifications are allowed. One more try should do it.", "done") +
         '<p class="bnig-note bnna-msg bnna-err" role="status">' + ((info && info.error) || "Something went wrong. Please try again.").replace(/[<>&]/g, "") + '</p>' +
@@ -365,8 +381,22 @@
     setTimeout(function () { if (Notification.permission === "default" && !document.querySelector(".bnal.bnal-open")) naRender("ask"); }, DELAY + 600);
   }
   window.BN = window.BN || {};
+  // Menu buttons (menu5.py, Nov 24 2026): tap only, never automatic.
+  window.BN.installApp = function () {
+    if (deferred) { var p = deferred; deferred = null; try { p.prompt(); } catch (e) { return window.BN.showInstallGuide(); }
+      (p.userChoice || Promise.resolve({})).then(function (r) { if (r && r.outcome === "accepted") markInstalled(); }); return; }
+    window.BN.showInstallGuide();
+  };
+  window.BN.showNotifyGuide = function () {
+    D = D || detect(); var E2 = naEnv(); forcedNa = null;
+    if (!E2.api) return naRender(E2.ios && !standalone() ? "ios" : "unsupported");
+    if (Notification.permission === "denied") return naRender("denied");
+    try { if (Notification.permission === "granted" && (JSON.parse(ls("bn_alerts") || "{}") || {}).on) return naRender("granted", { live: true }); } catch (e) {}
+    naRender("ask");
+  };
   window.BN.showInstallGuide = function () {                                    // used by the Alerts panel's "Show me how" button
     D = D || detect(); if (el) { el.hidden = false; render(); void el.offsetWidth; pad(true); setTimeout(function () { el.classList.add("bnig-on"); }, 30); } else show();
+    if (!el || !F) toast("This browser can't add web apps. Open blackout.network in Chrome, Edge or Safari.");
   };
   function start() {
     var q = (location.search.match(/[?&]bnig=([\w-]+)/) || [])[1] || null; forced = q;

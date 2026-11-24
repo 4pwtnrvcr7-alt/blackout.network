@@ -293,7 +293,7 @@
   function back() {
     var ref = d.referrer || "";
     try { if (ref && new URL(ref).origin === location.origin && history.length > 1 && !/\/map(\?|$)/.test(new URL(ref).pathname)) { history.back(); return; } } catch (e) {}
-    location.href = "/live";
+    location.href = (window.BN_OFF && BN_OFF.live) ? "/wire" : "/live";   // Nov 24 2026: /live deactivated
   }
 
   /* ---------- map ---------- */
@@ -404,7 +404,7 @@
     $("bnm_zin").onclick = function () { map && map.zoomIn({ duration: reduce ? 0 : 300 }); };
     $("bnm_zout").onclick = function () { map && map.zoomOut({ duration: reduce ? 0 : 300 }); };
     $("bnm_x").onclick = back;
-    $("bnm_report").onclick = function () { var f = d.querySelector(".bnr-fab"); if (f) f.click(); else location.href = "/sources"; };
+    $("bnm_report").onclick = function () { var f = d.querySelector(".bnr-fab"); if (f) f.click(); else location.href = (window.BN_OFF && BN_OFF.on && (BN_OFF.prefixes || []).indexOf("/sources") >= 0) ? "/report-status" : "/sources"; };
     $("bnm_edge").addEventListener("mouseenter", function () { head(true); });
     $("bnm_edge").addEventListener("click", function () { head(true); });
     var hd = $("bnm_head");

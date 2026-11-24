@@ -74,6 +74,10 @@ def sitemap():
         pages = STATIC_PAGES   # seo/batch-1: /stats was listed twice
         if os.environ.get("BN_MESH_UI", "0") != "1": pages = [x for x in pages if not x[0].startswith("/mesh")]   # Nov 17 (Matt 8:19 AM): /mesh unlisted
         pages = [x for x in pages if x[0] not in ("/social", "/stats", "/network/near")]   # Nov 21 (Matt pt1687u): unlisted hubs stay reachable by URL
+        try:
+            import deactivated   # Nov 24 2026 (Matt): deactivated pages leave the sitemap
+            pages = [x for x in pages if not deactivated.is_off(x[0])]
+        except Exception: pass
         u = [(SITE + p, now if f in ("hourly", "daily") else None, f, pr) for p, f, pr in pages]
         try:
             import social
@@ -241,6 +245,10 @@ def handle_get(path, qs):
     if path == "/robots.txt": return 200, ROBOTS.encode(), "text/plain; charset=utf-8"
     if path == "/llms.txt":   # Nov 17 (Matt 8:19 AM): /mesh lines unlisted unless BN_MESH_UI=1
         txt = LLMS if os.environ.get("BN_MESH_UI", "0") == "1" else "\n".join(l for l in LLMS.split("\n") if "/mesh" not in l)
+        try:
+            import deactivated, re as _re   # Nov 24 2026: no deactivated pages in llms.txt
+            txt = "\n".join(l for l in txt.split("\n") if not any(deactivated.href_off(u) for u in _re.findall(r"https?://(?:www\.)?blackout\.network(/[^\s)\]>\"']*)", l)))
+        except Exception: pass
         return 200, txt.encode(), "text/plain; charset=utf-8"
     if path == "/sitemap.xml": return 200, sitemap(), "application/xml; charset=utf-8"
     if path == "/news-sitemap.xml": return 200, news_sitemap(), "application/xml; charset=utf-8"

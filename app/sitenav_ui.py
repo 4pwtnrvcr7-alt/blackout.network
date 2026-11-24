@@ -26,6 +26,12 @@ def logo_html():
 
 # Text links shown in the bar on wide screens (everything is also in the sidebar).
 PRIMARY = [("threat", "/wire", "The Wire"), ("sources", "/sources", "Sources"), ("newsletter", "/newsletter", "Newsletter")]
+try:   # Nov 24 2026 (Matt): deactivated pages (deactivated.py) leave every menu
+    import deactivated as _DEACT
+except Exception:
+    _DEACT = None
+def _off(key): return bool(_DEACT and _DEACT.key_off(key))
+PRIMARY = [p for p in PRIMARY if not _off(p[0])]
 
 _SVG = 'aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24"'
 I_MENU = ('<span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span>')
@@ -172,6 +178,9 @@ if _os.environ.get("BN_TIPS", "0") != "1":
 if _os.environ.get("BN_MESH_UI", "0") != "1":
     MENU3 = [(a, b, c, [x for x in its if x[0] not in ("@mesh", "meshguide")]) for a, b, c, its in MENU3]
     MENU = [(g, [k for k in ks if k not in ("@mesh", "meshguide")]) for g, ks in MENU]
+# Nov 24 2026 (Matt): deactivated pages (deactivated.py) are dropped from both menu layouts
+MENU3 = [(a, b, c, [x for x in its if not _off(x[0])]) for a, b, c, its in MENU3]
+MENU = [(g, [k for k in ks if not _off(k)]) for g, ks in MENU]
 # empty preview slots, filled by bn-v3.js from same-origin endpoints only when the menu opens (nothing is fetched at first paint)
 M3_PV = {
  "latest": '<span class="m3-k">Top of The Wire</span><a class="m3-h" href="/wire" data-pv="wire-title">Loading the latest ranked item</a><span class="m3-meter" data-pv="wire-meter"></span><span class="m3-asof" data-pv="wire-asof"></span>',
@@ -210,6 +219,7 @@ def menu3_sections(sn):
     for sid, name, desc, its in secs:
         rows = []
         for key, label in its:
+            if _off(key): continue
             it = nav.get(key)
             hidden = bool(it and len(it) > 5 and it[5])
             if key in M3_SOON or hidden: rows.append((key, label, None))
@@ -218,8 +228,22 @@ def menu3_sections(sn):
             elif it: rows.append((key, label, it[1] if it[1].startswith("/") else "/live#" + it[1]))   # dashboard tabs live on /live (Nov 17)
             elif key in M3_HREF: rows.append((key, label, M3_HREF[key]))
             else: rows.append((key, label, None))
-        out.append((sid, name, desc, rows))
+        if rows or not _DEACT: out.append((sid, name, desc, rows))   # Nov 24 2026: a section left empty by deactivated pages is dropped
     return out
+
+def _m5_on():
+    try:
+        import menu5; return menu5.on()
+    except Exception:
+        return False
+def _m5():
+    import menu5; return menu5
+def _active_href(sn, active):
+    """Menu key of the current page -> its menu href (for aria-current in menu v5)."""
+    for k, h, _ in PRIMARY:
+        if k == active: return h
+    return {"@map": "/map", "heatmap": "/map", "@markets": "/markets", "finance": "/markets", "grid": "/grid", "weather": "/weather",
+            "net": "/network", "newsletter": "/newsletter", "threat": "/wire"}.get(active)
 
 def drawer(sn, active=""):
     """The v3 graphical menu (<div id="bn-menu">): full-viewport overlay on desktop/tablet (all seven sections open, no scroll),
@@ -227,7 +251,7 @@ def drawer(sn, active=""):
     Escape, search, theme) stays in sitenav.js; art, previews and motion are added by bn-v3.js when the menu first opens."""
     # Sticky top row (bn-mbar): wordmark home + Close. It stays on screen and clears the
     # standalone status bar (env safe-area-inset-top). Search and the other tools stay in bn-ph.
-    m4 = menu_v2_on()
+    m4 = menu_v2_on(); m5 = m4 and _m5_on()
     out = [(M4_CSS if m4 else "") + '<div class="bn-drawer bn-m3' + (' bn-m4' if m4 else '') + '" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
            '<nav class="bn-panel" aria-label="Site menu"><div class="bn-mhead"><div class="bn-mbar">'
            f'<a class="bn-logo" href="/" aria-label="{E(sn.BRAND)} home">{logo_html()}</a>'
@@ -239,8 +263,8 @@ def drawer(sn, active=""):
            + theme_btn("bn-js-only bn-theme-row m3-tl") +
            '<button type="button" class="m3-tl bn-gear-row bn-js-only" aria-controls="bn_settings">Settings</button>'
            '<a class="bn-cta m3-cta" href="/newsletter">Free brief</a></div></div></div>'
-           + (M4_LEAD if m4 else '') + '<div class="m3-grid">']
-    for n, (sid, name, desc, rows) in enumerate(menu3_sections(sn), 1):
+           + ((_m5().html_block(_active_href(sn, active)) + '<div class="m3-grid" hidden>') if m5 else ((M4_LEAD if m4 else '') + '<div class="m3-grid">'))]
+    for n, (sid, name, desc, rows) in enumerate([] if m5 else menu3_sections(sn), 1):
         # No section is pre-opened in the markup: on phones the menu must start fully collapsed
         # (current page, remembered state and the old "Latest always open" default all stay shut).
         # Desktop/tablet (>=768px) open the full board in bn-v3.js m3desk, with a CSS fallback when JS is off.
@@ -258,11 +282,13 @@ def drawer(sn, active=""):
                 tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms", "/grid", "/weather", "/network") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
                 out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
-    out.append('</div><div class="m3-foot"><div class="m3-follow"><span class="m3-k">Follow</span>'
+    follow = ('' if m5 else '<div class="m3-follow"><span class="m3-k">Follow</span>'
                f'<a href="{E(sn.YT_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on YouTube {sn.HANDLE} (opens in a new tab)">YouTube</a>'
-               f'<a href="{E(sn.X_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on X {sn.HANDLE} (opens in a new tab)">X</a></div>'
+               f'<a href="{E(sn.X_URL)}" target="_blank" rel="noopener me" aria-label="Follow us on X {sn.HANDLE} (opens in a new tab)">X</a></div>')
+    legal = "".join(f'<a href="{h}">{t}</a>' for h, t in (("/scoring", "How we score"), ("/privacy", "Privacy"), ("/tos", "Terms"), ("/report-status", "Report status")) if not (_DEACT and _DEACT.is_off(h)))
+    out.append('</div><div class="m3-foot">' + follow +
                '<div class="m3-stamp" id="m3_stamp" aria-live="off"></div>'
-               '<p class="bn-dfoot m3-legal"><a href="/scoring">How we score</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/report-status">Report status</a></p>'
+               '<p class="bn-dfoot m3-legal">' + legal + '</p>'
                '</div></nav></div>')
     if m4: out.append(M4_JS)
     return "".join(out)

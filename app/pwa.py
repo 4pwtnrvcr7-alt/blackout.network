@@ -18,6 +18,11 @@ def handle_get(path, qs):
         name, ct = FIXED[path]; b = _read(name)
         if name == "install-guide.js":   # Matt, Nov 17 2026: no pop-ups. Auto install sheet + alerts soft-ask only when BN_POPUPS=1
             b = b.replace(b'"__BN_POPUPS__"', b"1" if os.environ.get("BN_POPUPS", "0").strip() == "1" else b"0")
+        if name == "manifest.webmanifest":   # Nov 24 2026: /live deactivated (deactivated.py) -> the installed app opens on The Wire
+            try:
+                import deactivated
+                if deactivated.is_off("/live"): b = b.replace(b'"start_url": "/live"', b'"start_url": "/wire"')
+            except Exception: pass
         return 200, b, ct
     if path.startswith("/icons/"):
         name = path[len("/icons/"):]

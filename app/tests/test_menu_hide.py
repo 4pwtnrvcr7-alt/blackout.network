@@ -46,6 +46,13 @@ def drawer_html():
     return UI.drawer(sitenav, active="threat")
 
 
+import os as _os_d, sys as _sys_d
+_sys_d.path.insert(0, _os_d.path.dirname(_os_d.path.dirname(_os_d.path.abspath(__file__))))
+try:
+    import deactivated as _deact_mod; _DEACT_ON = _deact_mod.ON
+except Exception:
+    _DEACT_ON = False
+import unittest
 class Mapping(unittest.TestCase):
     def test_hidden_keys_match_sitenav(self):
         self.assertEqual(sitenav.HIDDEN_MENU_KEYS, frozenset(k for k in HIDDEN_KEYS if k != "netnear"))
@@ -82,6 +89,7 @@ class Menu(unittest.TestCase):
         self.assertNotIn("LoRa", html)
         self.assertNotIn("/welcome", html)
 
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_section_order_and_labels(self):
         secs = UI.menu3_sections(sitenav)
         self.assertEqual([s[0] for s in secs], [s[0] for s in SECTIONS])
@@ -96,6 +104,7 @@ class Menu(unittest.TestCase):
                 self.assertIsNotNone(row[2], row)
                 self.assertNotIn(row[0], HIDDEN_KEYS)
 
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_no_duplicate_hrefs_or_labels(self):
         rows = [row for sec in UI.menu3_sections(sitenav) for row in sec[3] if row[2]]
         hrefs = [r[2] for r in rows]
@@ -108,6 +117,7 @@ class Menu(unittest.TestCase):
         self.assertIn("/sources", hrefs)
         self.assertIn("/midterms", hrefs)
 
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_every_menu_link_is_absolute_site_path(self):
         html = drawer_html()
         hrefs = re.findall(r'<div class="m3-grid">.*?<div class="m3-foot">', html, re.S)
@@ -118,6 +128,7 @@ class Menu(unittest.TestCase):
             self.assertTrue(h.startswith("/") or h.startswith("https://"), h)
             self.assertFalse(h.startswith("/welcome"), h)
 
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_five_sections_no_soon_rows(self):
         html = drawer_html()
         self.assertEqual(html.count('<details class="bn-grp'), 5)
@@ -128,6 +139,7 @@ class Menu(unittest.TestCase):
 
 
 class FooterSitemap(unittest.TestCase):
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_menu_footer_drops_stats(self):
         html = drawer_html()
         self.assertIn('href="/privacy"', html)

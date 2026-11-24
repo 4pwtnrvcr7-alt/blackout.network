@@ -11,6 +11,13 @@ STATE = {"generated": "2026-11-17T04:42:20Z", "watchlist_count": 3, "interval_mi
          "volume": [{"d": "2026-11-15", "category": "cyber", "n": 4}, {"d": "2026-11-16", "category": "political", "n": 9}],
          "sources": [{"ok": 1}, {"ok": 0}], "scans": [{"finished": "2026-11-17T04:37:26Z", "fetched": 900, "new_items": 13}]}
 
+import os as _os_d, sys as _sys_d
+_sys_d.path.insert(0, _os_d.path.dirname(_os_d.path.dirname(_os_d.path.abspath(__file__))))
+try:
+    import deactivated as _deact_mod; _DEACT_ON = _deact_mod.ON
+except Exception:
+    _DEACT_ON = False
+import unittest
 class Summary(unittest.TestCase):
     def setUp(self):
         fake = types.SimpleNamespace(api_state=lambda: STATE)
@@ -27,6 +34,7 @@ class Summary(unittest.TestCase):
         self.assertEqual(s["volume"][-1], {"d": "Mon", "n": 9}); self.assertEqual(s["cats"], {"Politics": 9})
 
 class Home(unittest.TestCase):
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_home_page(self):
         h = theme.home_page()
         self.assertIn('<link rel="canonical" href="https://blackout.network/">', h)
