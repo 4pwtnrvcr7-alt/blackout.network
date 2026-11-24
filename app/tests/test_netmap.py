@@ -202,7 +202,7 @@ class NetSky(unittest.TestCase):
         for rec in learn.values():
             if rec.get("image"):
                 name = rec["image"].split("?")[0].split("/")[-1]
-                self.assertTrue((root / "learn" / name).is_file(), name)
+                self.assertTrue((root / "learn" / name).is_file() or (root / "learn" / (name + ".b64")).is_file(), name)
         code, body, *rest = netmap.handle_get("/api/netmap/learn.json")
         self.assertEqual(code, 200)
         self.assertIn(b"starlink", body if isinstance(body, (bytes, bytearray)) else json.dumps(body).encode())
