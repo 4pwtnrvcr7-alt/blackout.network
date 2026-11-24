@@ -1192,7 +1192,7 @@
           var sub = map.project([lon, lat]), dx = sub.x - p0.x, dy = sub.y - p0.y, L = Math.hypot(dx, dy) || 1;
           x = p0.x + dx / L * (R + 10); y = p0.y + dy / L * (R + 10);
         } else { x = p0.x; y = p0.y + R + 14; }
-        h += '<span class="nx-ss-pin" style="left:' + x.toFixed(0) + 'px;top:' + y.toFixed(0) + 'px">' + esc(label) + "</span>";
+        h += '<span class="nx-ss-pin" data-s3="' + esc(o.id) + '" role="button" tabindex="0" style="pointer-events:auto;cursor:pointer;left:' + x.toFixed(0) + 'px;top:' + y.toFixed(0) + 'px">' + esc(label) + "</span>";
       });
     } else if (showSs) {
       h += '<span class="nx-ss-pin" style="left:' + p0.x.toFixed(0) + 'px;top:' + (p0.y + R + 14).toFixed(0) + 'px">Solar system distances unavailable</span>';
@@ -1200,7 +1200,7 @@
     if (showSw) {
       var w = SKY.SW, txt = "Space weather unavailable";
       if (w && w.ok) txt = "Kp " + (w.kp != null ? Number(w.kp).toFixed(1) : "–") + " · R" + w.scales.R + " S" + w.scales.S + " G" + w.scales.G;
-      h += '<span class="nx-sw-pin" style="left:' + p0.x.toFixed(0) + 'px;top:' + (p0.y + R + (showSs ? 36 : 14)).toFixed(0) + 'px">' + esc(txt) + "</span>";
+      h += '<span class="nx-sw-pin" data-s3="sw" role="button" tabindex="0" style="pointer-events:auto;cursor:pointer;left:' + p0.x.toFixed(0) + 'px;top:' + (p0.y + R + (showSs ? 36 : 14)).toFixed(0) + 'px">' + esc(txt) + "</span>";
     }
     box.innerHTML = h;
   }
@@ -1253,6 +1253,15 @@
       });
     });
   }
+  /* pt1828u: 3D solar system explorer, lazy-loaded (three147.js + solar3d.js, content-hash URLs in window.BN_SOLAR3D) */
+  function solarOpen(id) {
+    var u = window.BN_SOLAR3D; if (!u) return;
+    var go = function () { if (window.BNSolar) window.BNSolar.open(id); };
+    if (window.BNSolar) return go();
+    if (!SKY.s3p) SKY.s3p = new Promise(function (ok, no) { var i = 0; (function nx() { if (i >= u.length) return ok(); var sc = document.createElement("script"); sc.src = u[i++]; sc.onload = nx; sc.onerror = no; document.head.appendChild(sc); })(); });
+    SKY.s3p.then(go, function () { SKY.s3p = null; });
+  }
+  (function () { var bx = $("nx_sky_labs"); if (bx) bx.addEventListener("click", function (e) { var t = e.target.closest && e.target.closest("[data-s3]"); if (t) solarOpen(t.getAttribute("data-s3")); }); })();
   function ssLoad() {
     if (SKY.ssLoading) return SKY.ssLoading;
     SKY.ssLoading = Promise.all([
@@ -1320,10 +1329,10 @@
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m0 ? "true" : "false"); });
   document.querySelectorAll("#nx_sf button").forEach(function (b) {
     b.addEventListener("click", function () {
-      var g = b.dataset.g; SKY.show[g] = !(SKY.show[g] !== false); b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
+      var g = b.dataset.g; SKY.show[g] = !SKY.show[g];   /* ss/sw are not in SKY.groups: undefined used to flip to false, so the first tap did nothing */ b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
       if (g === "debris") { SKY.reveal.debris = !!SKY.show.debris; if (SKY.show.debris) debrisLoad(); }
-      else if (g === "ss") { if (SKY.show.ss) ssLoad(); skyLabs(); return; }
-      else if (g === "sw") { skyLabs(); return; }
+      else if (g === "ss") { if (SKY.show.ss) { ssLoad(); solarOpen(); } skyLabs(); return; }
+      else if (g === "sw") { if (SKY.show.sw) solarOpen("sw"); skyLabs(); return; }
       else SKY.reveal[g] = !!SKY.show[g];
       prop();
     });
