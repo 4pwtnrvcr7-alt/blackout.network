@@ -46,7 +46,9 @@ ZONES = [
 ]
 
 CABLE_Q = '("undersea cable" OR "subsea cable" OR "submarine cable") (cut OR damaged OR severed OR fault OR outage OR repair)'
-DAMAGE = re.compile(r"\b(cut|cuts|severed|damag\w*|fault\w*|outage|break|broken|rupture\w*|disrupt\w*|repair\w*|degrad\w*|intermittent)\b", re.I)
+DAMAGE = re.compile(r"\b(cut|cuts|severed|damag\w*|fault\w*|outage|break|broken|rupture\w*|disrupt\w*|degrad\w*|intermittent|under repair|repair continues|being repaired)\b", re.I)
+# Funding, preparedness or repair-capacity stories are not a current cable fault.
+PREP = re.compile(r"\b(repair capacity|repair[- ]readiness|preparedness|co-funding|awarded|procurement|procure|funds? (?:baltic|eu|for)|eu funds)\b", re.I)
 CABLE = re.compile(r"\b(undersea|subsea|submarine|sea|seabed|fib(?:re|er)[- ]optic|internet|telecom\w*|data|communications?)\s+cables?\b|\bcables?\s+(?:cut|damage)|sea[\s\-]*me[\s\-]*we|\bsmw[\s\-]?\d", re.I)
 CONFLICT = re.compile(r"\b(attack\w*|strik\w*|missile\w*|drone\w*|sabotage\w*|seiz\w*|fired|hit|hits|clash\w*|incursion\w*|warship\w*|drills?|blockade\w*|shadow fleet|detain\w*|boarded)\b", re.I)
 CUT = re.compile(r"\b(severed|out of service|ruptured)\b|\b(?:(?:the|an|a|its)\s+)?(?:undersea|subsea|submarine)?\s*cables?\s+(?:is|are|was|were|have been|has been)?\s*cut\b|\bcut(?:s)?\s+(?:in|on|to|of)\s+(?:the\s+)?(?:undersea|subsea|submarine)?\s*cables?\b|\bcables?\s+cut\b", re.I)
@@ -211,7 +213,7 @@ def _put(cables, name, lv, status, reason, src=None, url=None, at=None):
 def status(nw, outages=None):
     """Per-cable inferred status. outages is accepted for compatibility and is not used to colour cables."""
     n0 = _now()
-    cable_news = [it for it in (nw or {}).get("cable") or [] if DAMAGE.search(it["t"]) and CABLE.search(it["t"]) and not NOT_CABLE.search(it["t"])]
+    cable_news = [it for it in (nw or {}).get("cable") or [] if DAMAGE.search(it["t"]) and CABLE.search(it["t"]) and not NOT_CABLE.search(it["t"]) and not PREP.search(it["t"])]
     cable_news = _dedupe(sorted(cable_news, key=lambda x: x.get("at") or "", reverse=True))
     cables = {}
     for it in cable_news:

@@ -51,6 +51,11 @@ class Cables(unittest.TestCase):
         power = C.status(nw([dict(t="Baltic power cable damaged near Gotland", src="X", url="https://e.com/a", at=at(3))]))
         self.assertEqual(power["cables"], {})
 
+    def test_funding_story_is_not_jeopardy(self):
+        r = C.status(nw([dict(t="EU Funds Baltic Subsea Cable Repair Capacity", src="SubTel Forum", url="https://subtelforum.com/eu-funds-baltic-subsea-cable-repair-capacity/", at=at(3))]))
+        self.assertEqual(r["cables"], {})
+        self.assertEqual(r["counts"]["degraded"], 0)
+
     def test_page_has_no_chokepoint_notes(self):
         html = netmap.page()
         self.assertNotIn("Chokepoint risk", html)
