@@ -16,12 +16,14 @@
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();
 /* Deactivated pages (Nov 24 2026, Matt): links to a page in deactivated.py (window.BN_OFF, set in <head> by server.py) are removed
    on every page, including lists rendered later. A row/card that is only that link is hidden; a link inside other text becomes plain
-   text. The pages themselves 302 to "/". Reactivate: remove the page from deactivated.py. */
+   text. "off" pages 302 to "/"; "unlisted" pages still serve and keep links to themselves. Reactivate: remove the page from deactivated.py. */
 (function(){if(window.__bnOffGuard)return;window.__bnOffGuard=1;var O=window.BN_OFF;if(!O||!O.on||!O.prefixes||!O.prefixes.length)return;
  var H={};(O.hashes||[]).forEach(function(h){H[h]=1});
+ function inp(p,xs){for(var i=0;i<xs.length;i++){var x=xs[i];if(p===x||p.indexOf(x+"/")===0)return true}return false}
+ var here=(location.pathname||"/").toLowerCase().replace(/\/+$/,"")||"/",own=[];(O.groups||[]).forEach(function(g){if(inp(here,g))own=g});   /* an "unlisted" page keeps links to itself */
  function off(href){try{var u=new URL(href,location.href);if(!/^https?:$/.test(u.protocol))return false;
    if(u.host!==location.host&&!/^(www\.)?blackout\.network$/i.test(u.hostname))return false;
-   var p=(u.pathname||"/").toLowerCase().replace(/\/+$/,"")||"/";
+   var p=(u.pathname||"/").toLowerCase().replace(/\/+$/,"")||"/";if(own.length&&inp(p,own))return false;
    for(var i=0;i<O.prefixes.length;i++){var x=O.prefixes[i];if(p===x||p.indexOf(x+"/")===0)return true}
    return (p==="/"||p==="/index.html")&&!!H[(u.hash||"").slice(1).toLowerCase()]}catch(e){return false}}
  function apply(root){var as=(root||document).querySelectorAll('a[href]:not([data-bn-off])');
