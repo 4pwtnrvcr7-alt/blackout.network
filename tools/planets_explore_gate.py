@@ -136,6 +136,14 @@ def run_view(browser, name, w, h, base, live, shots):
     page.wait_for_timeout(1600)
     if shots:
         page.screenshot(path=str(Path(shots) / f"{name}-mars.png"), full_page=False)
+    page.evaluate("() => { if (window.BNSolar) window.BNSolar.focus('earth'); }")
+    page.wait_for_timeout(1600)
+    if shots:
+        page.screenshot(path=str(Path(shots) / f"{name}-earth-aurora.png"), full_page=False)
+    page.evaluate("() => { if (window.BNSolar) window.BNSolar.focus('jupiter'); }")
+    page.wait_for_timeout(1600)
+    if shots:
+        page.screenshot(path=str(Path(shots) / f"{name}-jupiter-aurora.png"), full_page=False)
     page.evaluate("() => { var b = document.getElementById('s3_all'); if (b) b.click(); }")
     page.wait_for_timeout(1400)
     if shots:
@@ -150,6 +158,10 @@ def run_view(browser, name, w, h, base, live, shots):
         problems.append("Apollo 11 info missing: " + info[:240])
     if st.get("planets") and not st["planets"].get("attached"):
         problems.append("BNPlanets not attached")
+    au = (st.get("planets") or {}).get("auroras") or []
+    for need in ("earth", "jupiter", "saturn"):
+        if need not in au:
+            problems.append("aurora missing: " + need)
     # camera should be close to the Moon (focusDist ~ size*2.2, moon size 0.18)
     print(name, "FAIL" if problems else "OK", json.dumps({"errors": errors, "info": info[:400], "state": {k: st[k] for k in st if k != "infoHtml"}, "problems": problems}))
     page.close()

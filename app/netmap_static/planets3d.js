@@ -87,6 +87,41 @@
     });
   }
 
+  function addAurora(o, opt) {
+    var mesh = sphereOf(o); if (!mesh) return;
+    mesh.children.slice().forEach(function (c) { if (c.userData && c.userData.aurora) mesh.remove(c); });
+    function ringAt(axis) {
+      var g = new T.Group();
+      g.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), axis.clone().normalize());
+      var R = o.size * Math.sin(opt.oval) * 1.018;
+      var tube = Math.max(o.size * opt.width * 0.38, o.size * 0.006);
+      var layers = [
+        { t: 0.85, op: opt.gain * 0.55 },
+        { t: 2.0, op: opt.gain * 0.22 }
+      ];
+      layers.forEach(function (L) {
+        var mat = new T.MeshBasicMaterial({
+          color: opt.color,
+          transparent: true,
+          opacity: L.op,
+          blending: T.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+          side: T.DoubleSide
+        });
+        var m = new T.Mesh(new T.TorusGeometry(R, tube * L.t, 12, 96), mat);
+        m.rotation.x = Math.PI / 2;
+        m.position.y = o.size * Math.cos(opt.oval) * 1.018;
+        m.userData.aurora = true;
+        g.add(m);
+      });
+      g.userData.aurora = true;
+      mesh.add(g);
+    }
+    ringAt(latLonLocal(opt.nlat, opt.nlon, 1));
+    ringAt(latLonLocal(opt.slat, opt.slon, 1));
+  }
+
   function pinMat(color, op) {
     return new T.MeshBasicMaterial({ color: color, transparent: true, opacity: op, side: T.DoubleSide, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   }
@@ -166,8 +201,9 @@
       h += "<p>Orbital speed: " + API.fmtV(c.v_km_s) + "</p>";
     }
     if (o.info) h += "<p>" + esc(o.info) + "</p>";
-    if (o.id === "jupiter") h += "<p>The Great Red Spot is marked as Cassini recorded it in December 2000. Tap the pin for details. Scroll to explore the cloud bands.</p>";
-    if (o.id === "saturn") h += "<p>The north-pole hexagon is marked; tap the pin or zoom in over the pole. The globe map is a natural-color stand-in graded to Cassini true-color photos; the hexagon overlay is a real Cassini image. See credits.</p>";
+    if (o.id === "earth") h += "<p>A faint auroral oval sits around each magnetic pole. It is an illustrative shader, not a live space-weather map.</p>";
+    if (o.id === "jupiter") h += "<p>The Great Red Spot is marked as Cassini recorded it in December 2000. Tap the pin for details. Scroll to explore the cloud bands. A faint persistent auroral oval is drawn at each magnetic pole (illustrative shader).</p>";
+    if (o.id === "saturn") h += "<p>The north-pole hexagon is marked; tap the pin or zoom in over the pole. The globe map is a natural-color stand-in graded to Cassini true-color photos; the hexagon overlay is a real Cassini image. A faint auroral oval is drawn at each pole (illustrative shader). See credits.</p>";
     if (o.id === "venus") h += "<p>The globe is a visible-light stand-in in pale cream, color-matched to how Venus looks in ordinary light, where cloud markings are very faint. It is not the Magellan radar surface map. See credits.</p>";
     if (o.id === "uranus") h += "<p>The globe is a pale cyan stand-in color-matched to Voyager 2 true-color photos. See credits.</p>";
     if (o.id === "neptune") h += "<p>The globe is a deep-blue stand-in color-matched to Voyager 2 true-color photos. See credits.</p>";
@@ -332,6 +368,11 @@
       var o = API.OBJ[id]; if (o) applyMap(o, map[id]);
     });
     var sat = API.OBJ.saturn; if (sat) addHexCap(sat);
+    var earth = API.OBJ.earth;
+    if (earth) addAurora(earth, { nlat: 80.7, nlon: -72.7, slat: -74.3, slon: 125.6, oval: 0.40, width: 0.060, gain: 0.34, night: 1, color: 0x3ae87a });
+    var jup = API.OBJ.jupiter;
+    if (jup) addAurora(jup, { nlat: 80.0, nlon: 200.0, slat: -80.0, slon: 20.0, oval: 0.28, width: 0.042, gain: 0.30, night: 0, color: 0xd98cff });
+    if (sat) addAurora(sat, { nlat: 90, nlon: 0, slat: -90, slon: 0, oval: 0.26, width: 0.038, gain: 0.24, night: 0, color: 0x7aa8ff });
     function pinsWhenReady() {
       var moon = API.OBJ.moon, mars = API.OBJ.mars;
       if (SITES && SITES.moon && moon) SITES.moon.forEach(function (rec) { addPin(moon, rec, "landing"); });
@@ -396,7 +437,13 @@
       if (p) openSite(p.o, p.rec, p.kind);
     },
     _state: function () {
-      return { attached: !!API, sites: !!(SITES && SITES.moon), pins: PINS.map(function (p) { return p.rec.id; }), site: SITE && SITE.id, textures: Object.keys(TEX) };
+      var au = [];
+      ["earth", "jupiter", "saturn"].forEach(function (id) {
+        var o = API && API.OBJ[id], m = sphereOf(o), has = false;
+        if (m) m.traverse(function (c) { if (c.userData && c.userData.aurora) has = true; });
+        if (has) au.push(id);
+      });
+      return { attached: !!API, sites: !!(SITES && SITES.moon), pins: PINS.map(function (p) { return p.rec.id; }), site: SITE && SITE.id, textures: Object.keys(TEX), auroras: au };
     }
   };
 })(window);
