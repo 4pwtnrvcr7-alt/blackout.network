@@ -840,6 +840,15 @@ def page(qs=None):
 </section>
 <aside class="wx-card" id="wx_card" hidden aria-live="polite"></aside>
 <div class="wx-dock" id="wx_dock">
+<div class="wx-abar" id="wx_abar" hidden>
+<div class="wx-abar-panel" id="wx_abar_panel" hidden></div>
+<button type="button" class="wx-abar-bar" id="wx_abar_bar" aria-expanded="false" aria-controls="wx_abar_panel">
+<span class="wx-abar-ico" aria-hidden="true">{_ico('<path d="M12 3.8L2.6 20.2h18.8L12 3.8z"/><path d="M12 9.5v5.2M12 16.8v.8"/>')}</span>
+<span class="wx-abar-sum" id="wx_abar_sum"></span>
+<span class="wx-abar-n" id="wx_abar_n" hidden></span>
+<span class="wx-abar-chev" aria-hidden="true">{_ico('<path d="M6 14l6-6 6 6"/>')}</span>
+</button>
+</div>
 <div class="wx-leg" id="wx_leg" aria-label="Legend"></div>
 <div class="wx-tl" id="wx_tl">
 <button type="button" class="wx-play" id="wx_play" aria-label="Play">{_ico('<path class="i-play" d="M8 5.5v13l10.5-6.5z"/><path class="i-pause" d="M8 5h3v14H8zM13 5h3v14h-3z"/>')}</button>

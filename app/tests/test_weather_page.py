@@ -24,7 +24,7 @@ class WeatherPage(unittest.TestCase):
         self.assertEqual(wxmap.handle_get("/api/wxmap/nope", {})[0], 404)
         self.assertEqual(wxmap.handle_get("/api/wxmap/wx.js", {})[0], 200)
         self.assertEqual(wxmap.handle_get("/api/wxmap/wxw.js", {})[0], 200)   # decode worker
-        for s in ('id="wx_reg"', 'data-r="world"', 'id="wx_srcs"', 'id="wx_ldcv"', 'id="wx_ldn"', 'id="wx_ldphase"'):
+        for s in ('id="wx_reg"', 'data-r="world"', 'id="wx_srcs"', 'id="wx_ldcv"', 'id="wx_ldn"', 'id="wx_ldphase"', 'id="wx_abar"', 'id="wx_abar_bar"', 'id="wx_abar_panel"'):
             self.assertIn(s, body)
 
     def test_grid_regions_and_global_alerts(self):
@@ -73,6 +73,45 @@ class WeatherPage(unittest.TestCase):
             for c in ("#f5a524", "#ffd", "#ffcc00", "#ffeb3b", "#fde047", "#facc15"): self.assertNotIn(c, t)
         js = open(os.path.join(APP, "wxmap_static", "wx.js"), encoding="utf-8").read().lower()
         for c in ("#ffcc00", "#ffeb3b", "#fde047", "#facc15", "#f5a524"): self.assertNotIn(c, js)
+
+    def test_alert_bar_starts_collapsed_above_timeline(self):
+        """pt1843u: NWS alert details start as a slim bar above the radar timeline, never in the top-left over the wordmark."""
+        html = open(os.path.join(APP, "wxmap.py"), encoding="utf-8").read()
+        js = open(os.path.join(APP, "wxmap_static", "wx.js"), encoding="utf-8").read()
+        css = open(os.path.join(APP, "wxmap_static", "wx.css"), encoding="utf-8").read()
+        # bar lives in the bottom dock, before the legend and timeline
+        dock = html.split('id="wx_dock"', 1)[1].split('id="wx_tl"', 1)[0]
+        self.assertIn('id="wx_abar"', dock)
+        self.assertLess(dock.find('id="wx_abar"'), dock.find('id="wx_leg"'))
+        self.assertIn("showAbar", js)
+        self.assertIn("showAbar(warns, e.lngLat, false)", js)   # starts collapsed
+        self.assertIn("setAbarOpen(!abarOpen())", js)           # tap the bar to expand
+        self.assertIn("data-abar-col", js)                      # collapse control
+        self.assertIn("uniqAlerts", js)
+        self.assertIn('badge.textContent = String(n)', js)      # overlap count
+        self.assertIn("alertSev", js)
+        self.assertIn('return "sev"', js)
+        self.assertIn('return "warn"', js)
+        self.assertIn("#E39B2A", css)                          # amber for watches / lesser alerts
+        self.assertIn("#FF3B3B", css)                          # red for severe
+        self.assertNotIn("#FFC21A", css)
+        self.assertNotIn("#FFC21A", js)
+        self.assertNotIn("16px", js.split("function place")[1].split("function showCard")[0])  # no top-left pin
+        self.assertNotIn('card.style.top = "124px"', js)
+        self.assertIn("wx-abar", css)
+        self.assertIn("var(--wx-abar-h", css)
+        # icons, not emoji
+        self.assertNotIn("⚠", js + css + html)
+        self.assertNotIn("▸", js + css + html)
+
+    def test_radar_autoplays_after_load_screen(self):
+        """Radar loops once the preload screen has finished; play/pause still works."""
+        js = open(os.path.join(APP, "wxmap_static", "wx.js"), encoding="utf-8").read()
+        self.assertIn("function maybeAutoplay()", js)
+        self.assertIn('document.body.classList.add("wx-ready"); maybeAutoplay();', js)
+        self.assertIn("maybeAutoplay();", js.split("function buildFrames")[1].split("function nearest")[0])
+        self.assertIn('if (playing) stop(); else play();', js)
+        self.assertIn("autoPlayed = true", js)
 
 if __name__ == "__main__": unittest.main()
 
