@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached 15 min)"
 LL2 = "https://ll.thespacedevs.com/2.3.0/launches/"
 MAX_AGE = 15 * 60; BACKOFF = 30 * 60
-PAST_DAYS = 7; NEXT_DAYS = 14
+PAST_DAYS = 14; NEXT_DAYS = 45   # one call, limit 100 (LL2 maximum page)
 EARTH_R = 6371.0088
 _L = threading.Lock(); _ST = {"err": None, "err_t": 0}; _MEM = {}
 
@@ -26,7 +26,7 @@ def _dir():
 def _url(now):
     a = (now - timedelta(days=PAST_DAYS)).strftime("%Y-%m-%dT%H:00:00Z")
     b = (now + timedelta(days=NEXT_DAYS)).strftime("%Y-%m-%dT%H:00:00Z")
-    return LL2 + "?" + urllib.parse.urlencode({"net__gte": a, "net__lte": b, "ordering": "net", "mode": "detailed", "limit": "40"})
+    return LL2 + "?" + urllib.parse.urlencode({"net__gte": a, "net__lte": b, "ordering": "net", "mode": "detailed", "limit": "100"})
 
 def _raw():
     """LL2 window JSON, from disk if fresh; otherwise one polite call. Returns (dict or None, fetched_unix, error)."""
@@ -231,3 +231,72 @@ def launches_cached():
     if hit and time.time() - hit[0] < 120: return hit[1]
     b = json.dumps(launches(), separators=(",", ":")).encode()
     _MEM["b"] = (time.time(), b); return b
+
+
+# ---------- details sheet (pt1834u): every published LL2 field for one launch; images only with a commercial-use licence ----------
+_OK_LIC = re.compile(r"^(public domain|cc0\b|cc[- ]by(-sa)?[- ]\d|nasa image and media guidelines|us government work)", re.I)
+
+def image_ok(im):
+    """LL2 image object -> dict for display, or None. Allowed: public domain, CC0, CC BY, CC BY-SA, NASA media guidelines.
+    Refused: any NC or ND licence, 'Unknown', agency-specific policies (SpaceX CC BY-NC, ESA Standard Licence, Roscosmos)."""
+    if not isinstance(im, dict) or not im.get("image_url"): return None
+    lic = (im.get("license") or {}); name = (lic.get("name") or "").strip()
+    if not name or re.search(r"\bNC\b|\bND\b|non-?commercial|unknown", name, re.I) or not _OK_LIC.search(name): return None
+    return dict(url=im.get("thumbnail_url") or im["image_url"], full=im["image_url"], credit=im.get("credit") or "", license=name, license_url=lic.get("link"))
+
+def _n(v):
+    return v if v not in (None, "", []) else None
+
+def details(r):
+    cfg = ((r.get("rocket") or {}).get("configuration") or {}); mis = r.get("mission") or {}; pad = r.get("pad") or {}
+    lsp = r.get("launch_service_provider") or {}; st = r.get("status") or {}
+    boosters = []
+    for s in (r.get("rocket") or {}).get("launcher_stage") or []:
+        L = s.get("launcher") or {}; ld = s.get("landing") or {}; ll = ld.get("landing_location") or {}
+        boosters.append(dict(type=s.get("type"), serial=_n(L.get("serial_number")), flight_number=s.get("launcher_flight_number"), flights_total=L.get("flights"),
+                             reused=s.get("reused"), previous_flight=_n(s.get("previous_flight_date")), turnaround=_n(s.get("turn_around_time")),
+                             first_launch=_n(L.get("first_launch_date")), status=((L.get("status") or {}).get("name")),
+                             landings=dict(attempted=L.get("attempted_landings"), successful=L.get("successful_landings")),
+                             landing=dict(attempt=ld.get("attempt"), success=ld.get("success"), description=_n(ld.get("description")),
+                                          location=_n(ll.get("name")), abbrev=_n(ll.get("abbrev")), type=((ld.get("type") or {}).get("name")),
+                                          downrange_km=ld.get("downrange_distance")) if ld else None))
+    sc = []
+    for s in [(r.get("rocket") or {}).get("spacecraft_stage")] if isinstance((r.get("rocket") or {}).get("spacecraft_stage"), dict) else ((r.get("rocket") or {}).get("spacecraft_stage") or []):
+        if not s: continue
+        c = s.get("spacecraft") or {}
+        sc.append(dict(name=_n(c.get("name")), serial=_n(c.get("serial_number")), destination=_n(s.get("destination")), flights=((c.get("spacecraft_config") or {}).get("name"))))
+    vids = [dict(url=v.get("url"), title=v.get("title") or v.get("publisher") or "Webcast", publisher=v.get("publisher"), live=v.get("live"))
+            for v in (r.get("vid_urls") or []) if v.get("url", "").startswith("https://")][:4]
+    infos = [dict(url=v.get("url"), title=v.get("title") or v.get("source") or "Info") for v in (r.get("info_urls") or []) if str(v.get("url", "")).startswith("https://")][:4]
+    patches = [dict(name=p.get("name"), agency=((p.get("agency") or {}).get("name"))) for p in (r.get("mission_patches") or [])]
+    cost = cfg.get("launch_cost")
+    try: cost = int(float(cost)) if cost not in (None, "") else None
+    except Exception: cost = None
+    img = image_ok(r.get("image")) or image_ok(cfg.get("image"))
+    return dict(id=r.get("id"), name=r.get("name"),
+        mission=dict(name=_n(mis.get("name")), type=_n(mis.get("type")), description=_n(mis.get("description")),
+                     orbit=_n(((mis.get("orbit") or {}).get("name"))),
+                     agencies=[dict(name=a.get("name"), type=((a.get("type") or {}).get("name"))) for a in (mis.get("agencies") or [])]),
+        status=dict(name=st.get("name"), abbrev=st.get("abbrev"), description=_n(st.get("description"))), failreason=_n(r.get("failreason")),
+        net=r.get("net"), net_precision=((r.get("net_precision") or {}).get("name")), window_start=r.get("window_start"), window_end=r.get("window_end"),
+        probability=r.get("probability"), weather_concerns=_n(r.get("weather_concerns")),
+        provider=dict(name=_n(lsp.get("name")), type=((lsp.get("type") or {}).get("name")), country=", ".join(c.get("name", "") for c in (lsp.get("country") or []) if isinstance(c, dict)) or None),
+        rocket=dict(name=_n(cfg.get("full_name") or cfg.get("name")), families=[f.get("name") for f in (cfg.get("families") or []) if isinstance(f, dict)] or None,
+                    variant=_n(cfg.get("variant")), manufacturer=_n(((cfg.get("manufacturer") or {}).get("name"))),
+                    launch_cost_usd=cost, length_m=cfg.get("length"), diameter_m=cfg.get("diameter"), launch_mass_t=cfg.get("launch_mass"),
+                    leo_capacity_kg=cfg.get("leo_capacity"), gto_capacity_kg=cfg.get("gto_capacity"), liftoff_thrust_kn=cfg.get("to_thrust"),
+                    maiden_flight=_n(cfg.get("maiden_flight")), total_launches=cfg.get("total_launch_count"), successful_launches=cfg.get("successful_launches"),
+                    failed_launches=cfg.get("failed_launches"), reusable=cfg.get("reusable"), wiki_url=_n(cfg.get("wiki_url"))),
+        pad=dict(name=_n(pad.get("name")), location=_n(((pad.get("location") or {}).get("name"))), lat=pad.get("latitude"), lon=pad.get("longitude"),
+                 map_url=_n(pad.get("map_url")), launches_from_pad=pad.get("total_launch_count")),
+        boosters=boosters, spacecraft=sc, webcasts=vids, info=infos, patches=patches, flightclub_url=_n(r.get("flightclub_url")),
+        counts=dict(orbital_attempt=r.get("orbital_launch_attempt_count"), orbital_attempt_year=r.get("orbital_launch_attempt_count_year"),
+                    pad_attempt=r.get("pad_launch_attempt_count"), agency_attempt=r.get("agency_launch_attempt_count")),
+        image=img, image_note=None if img else "No image with a commercial-use licence in Launch Library 2 for this launch.",
+        source="The Space Devs Launch Library 2", source_url="https://thespacedevs.com/llapi")
+
+def detail(lid):
+    j, mt, err = _raw()
+    for r in (j or {}).get("results") or []:
+        if str(r.get("id")) == str(lid): return details(r)
+    return None

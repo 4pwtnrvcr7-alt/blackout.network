@@ -68,12 +68,35 @@ class Launches(unittest.TestCase):
         low = re.sub(r"/\*.*?\*/", "", js.lower(), flags=re.S)
         self.assertNotIn("yellow", low)
         for c in ("#f5d547", "#f5a524", "#ffcc00", "#facc15"): self.assertNotIn(c, low)
-        self.assertNotIn("<img", low)   # no imagery in the launch view
+        self.assertEqual(low.count("<img"), 1)   # one image slot, only filled from image_ok() (commercial-use licence)
+        self.assertIn("d.image.license", js)
         import netpages
         self.assertIn("/api/netmap/launches.js", netpages.handle_get("/grid", {})[1])
         self.assertIn('aria-pressed", LC.on ? "true" : "false"', js)
         self.assertIn("window.__nxLaunchLayerIn = lcLayerIn", js)
         self.assertIn("LC.reveal", js)
+
+    def test_details_and_image_licences(self):
+        import netmap
+        d = self.N.launches(); lid = self.by(d, "USSF-266")["id"]
+        code, body = netmap.handle_get("/api/netmap/launches/" + lid)[:2]
+        self.assertEqual(code, 200)
+        self.assertEqual(body["boosters"][0]["serial"], "B1081"); self.assertEqual(body["rocket"]["launch_cost_usd"], 52000000)
+        self.assertIsNone(body["image"])   # SpaceX images in LL2 are CC BY-NC 2.0 / Unknown: never shown
+        self.assertEqual(netmap.handle_get("/api/netmap/launches/00000000-0000-0000-0000-000000000000")[0], 404)
+        ok = lambda n: self.N.image_ok({"image_url": "https://x/y.jpg", "license": {"name": n}})
+        for n in ("CC BY-NC 2.0", "Unknown", "ESA Standard Licence", "Roscosmos Image Use Policy", "CC BY-ND 4.0", ""): self.assertIsNone(ok(n), n)
+        for n in ("Public Domain", "CC BY 2.0", "CC BY-SA 4.0", "CC0 1.0", "NASA Image and Media Guidelines"): self.assertIsNotNone(ok(n), n)
+
+    def test_geo_ring_removed_and_track_js(self):
+        net = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
+        self.assertNotIn("layer.ring.length / 3", net)   # pt1834u: no always-on GEO ring
+        self.assertIn("window.__nxSky = SKY", net)
+        tr = open(os.path.join(APP, "netmap_static", "skytrack.js"), encoding="utf-8").read()
+        theirs = set(re.findall(r"function (\w+)\s*\(", net))
+        self.assertEqual(set(re.findall(r"function (\w+)\s*\(", tr)) & theirs, set())
+        import netpages
+        self.assertIn("/api/netmap/skytrack.js", netpages.handle_get("/grid", {})[1])
 
 if __name__ == "__main__":
     unittest.main()
