@@ -867,3 +867,9 @@ def _warm():
     except Exception: pass
 if os.environ.get("BN_NETMAP_WARM", "1") != "0":
     threading.Thread(target=_warm, daemon=True, name="nm-warm").start()
+    def _warm_s3():   # pt1828u: build the solar-system explorer cache (~30 Horizons calls, ~35 s) before the first visitor asks
+        time.sleep(20)
+        try:
+            import netsky; netsky.solar3d()
+        except Exception: pass
+    threading.Thread(target=_warm_s3, daemon=True, name="nm-warm-s3").start()
