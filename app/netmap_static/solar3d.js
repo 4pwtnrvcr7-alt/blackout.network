@@ -81,43 +81,55 @@
     m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.normalize()); g.add(m); return m;
   }
   function at(g, geo, mat, x, y, z, rx, ry, rz) { var m = new T.Mesh(geo, mat); m.position.set(x, y, z); if (rx || ry || rz) m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; }
-  /* Car body after the 2008 Tesla Roadster (Lotus Elise based): low, wide, short wheelbase, valley hood between rounded front fenders,
-     cockpit well back, raised rear deck. Lofted rounded cross-sections along x (x forward, y up, +z right; driver is left, -z). */
+  /* Roadster v3 (pt1840u): rebuilt after the real 2008 Tesla Roadster (Lotus Elise based). Low, wide, short; tall front-fender
+     humps over a dipped carbon-fibre hood; almond smoked headlights on the fender tops; slim slatted lower grille; twin roll hoops.
+     Lofted superellipse cross-sections along x (x forward, y up, +z right; driver is left, -z). Original procedural geometry. */
+  var BODY_N = 3.2, BX0 = -1.98, BX1 = 1.98, BWX = [[-1.18, 0.335], [1.17, 0.325]];
+  function bHalf(x) {   /* plan-view half width: rounded bulbous nose, near-square tail, flared rear hips */
+    var u = (x - BX0) / (BX1 - BX0), f = u > 0.5 ? Math.pow(Math.max(0, 1 - Math.pow((u - 0.5) * 2, 3.2)), 0.42) : Math.pow(Math.max(0, 1 - Math.pow((0.5 - u) * 2, 7)), 0.3);
+    var w = 0.88 * f + 0.05 * Math.exp(-Math.pow((x + 1.12) / 0.45, 2)) + 0.03 * Math.exp(-Math.pow((x - 1.12) / 0.38, 2)) - 0.02 * Math.exp(-Math.pow((x + 0.15) / 0.42, 2));
+    return w + 0.004;
+  }
+  function bTop(x, r) {   /* top height at relative lateral position r (0 centre .. 1 side) */
+    if (x < -0.8) {        /* raised rear deck with rounded tail and slightly raised rear fender crowns */
+      var deck = 0.92 + 0.03 * ss(0.4, 0.8, r) * (1 - ss(0.85, 1, r));
+      return deck - 0.2 * (1 - ss(-1.98, -1.7, x));
+    }
+    if (x < 0.36) { var belt = 0.83; return belt + (0.92 - belt) * (1 - ss(-0.85, -0.68, x)); }   /* doors / belt line */
+    /* front: fender crowns peak over the front wheel and stand well above the dipped hood valley */
+    var fen = 0.83 + 0.07 * Math.exp(-Math.pow((x - 1.12) / 0.42, 2)) - 0.3 * ss(1.5, 1.98, x);
+    var hood = 0.72 - 0.1 * ss(0.36, 1.5, x) - 0.2 * ss(1.5, 1.98, x);
+    var crown = ss(0.18, 0.62, r) * (1 - 0.35 * ss(0.85, 1, r));
+    return hood + (fen - hood) * crown;
+  }
+  function bBot(x, r) {   /* underside; wheel arches cut in only toward the sides (r > ~0.5) so they never poke through the hood */
+    var u = (x - BX0) / (BX1 - BX0), b = 0.17 + 0.16 * (1 - ss(0, 0.07, u)) + 0.14 * ss(0.9, 1, u);
+    BWX.forEach(function (w) { var dx = Math.abs(x - w[0]), R = w[1] + 0.06; if (dx < R) b = Math.max(b, b + (0.31 + Math.sqrt(R * R - dx * dx) * 0.97 - b) * ss(0.42, 0.62, r == null ? 1 : r)); });
+    return b;
+  }
+  function bYC(t) { return Math.min(t - 0.06, 0.5); }
+  function surfY(x, z) {   /* height of the top surface at (x, z) */
+    var w = bHalf(x), Z = Math.min(0.999, Math.abs(z) / w), t = bTop(x, Z), yc = bYC(t);
+    return yc + (t - yc) * Math.pow(1 - Math.pow(Z, BODY_N), 1 / BODY_N);
+  }
+  function inBody(x, y, z) {
+    var w = bHalf(x); if (w <= 0.005) return false; var Z = Math.abs(z) / w; if (Z >= 1) return false;
+    var t = bTop(x, Z), yc = bYC(t), Y = y >= yc ? (y - yc) / (t - yc) : (yc - y) / (yc - bBot(x, Z));
+    return Math.pow(Z, BODY_N) + Math.pow(Math.abs(Y), BODY_N) <= 1;
+  }
+  function noseX(y, z) { for (var x = BX1; x > 1.2; x -= 0.003) if (inBody(x, y, z)) return x; return 1.2; }
   function carBody(mat) {
-    var NX = 130, NA = 64, pos = [], idx = [], X0 = -1.98, X1 = 1.98;
-    var WX = [[-1.18, 0.34], [1.17, 0.33]];
-    function half(u, x) {
-      var w = 0.9 * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(2 * u - 1), 5)), 0.3);
-      w += 0.035 * Math.exp(-Math.pow((x - 1.17) / 0.35, 2)) + 0.05 * Math.exp(-Math.pow((x + 1.15) / 0.45, 2)) - 0.02 * Math.exp(-Math.pow((x + 0.1) / 0.4, 2));
-      return w + 0.004;
-    }
-    function topY(u, x, r) {   /* r = |z| / half-width, 0 centre .. 1 side */
-      var deck = 0.9 + 0.02 * (1 - r * r), belt = 0.82, side = 0.6;
-      var t;
-      if (x < -0.82) { t = deck - 0.15 * (1 - ss(-1.98, -1.75, x)); }                         /* rear deck, rounding down at the tail */
-      else if (x < 0.3) { t = belt + (deck - belt) * (1 - ss(-0.85, -0.7, x)); }            /* door / belt line */
-      else {                                                                               /* hood valley between the front fenders */
-        var hc = 0.72 - 0.3 * ss(0.3, 1.98, x), hf = 0.82 - 0.02 * ss(0.3, 1.3, x) - 0.36 * ss(1.4, 1.98, x);
-        t = hc + (hf - hc) * ss(0.25, 0.72, r);
-        t = t * (1 - ss(0.0, 0.3, 0.3 - x + 0.3) * 0) ;
-      }
-      return t - 0.12 * ss(0.8, 1, r) * 0;
-    }
-    function bot(x, u) {
-      var b = 0.16 + 0.12 * (1 - ss(0, 0.1, u)) + 0.1 * ss(0.88, 1, u);
-      WX.forEach(function (w) { var dx = Math.abs(x - w[0]), R = w[1] + 0.06; if (dx < R) b = Math.max(b, 0.3 + Math.sqrt(R * R - dx * dx) * 0.95); });
-      return b;
-    }
-    function cock(x) { return ss(-0.82, -0.72, x) * (1 - ss(0.22, 0.34, x)); }
+    var NX = 150, NA = 72, pos = [], idx = [];
+    function cock(x) { return ss(-0.8, -0.7, x) * (1 - ss(0.2, 0.32, x)); }
     for (var i = 0; i <= NX; i++) {
-      var u = i / NX, x = X0 + (X1 - X0) * u, w = half(u, x), cw = cock(x), b = bot(x, u);
+      var u = i / NX, x = BX0 + (BX1 - BX0) * u, w = bHalf(x), cw = cock(x);
       for (var j = 0; j < NA; j++) {
-        var th = j / NA * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), n = 3.4;
+        var th = j / NA * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), n = BODY_N;
         var zz = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), yy = Math.sign(s) * Math.pow(Math.abs(s), 2 / n), z = w * zz, r = Math.abs(zz);
-        var t = topY(u, x, r), yc = Math.min(t - 0.05, 0.5), y;
+        var t = bTop(x, r), yc = bYC(t), b = bBot(x, r), y;
         if (yy >= 0) {
           y = yc + (t - yc) * yy;
-          var k = cw * (1 - ss(0.78, 0.9, r)) * ss(0.2, 0.75, yy);   /* open cockpit well, floor at 0.3 */
+          var k = cw * (1 - ss(0.8, 0.9, r)) * ss(0.15, 0.7, yy);   /* open cockpit tub, floor at 0.3 */
           y = y + (0.3 - y) * k;
         } else y = yc + (yc - b) * yy;
         pos.push(x, y, z);
@@ -130,107 +142,160 @@
     var geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
     var m = new T.Mesh(geo, mat); m.material.side = T.DoubleSide; return m;
   }
-  function wheel(g, x, z, tire, rim, disc) {   /* 5-spoke alloy, dark tire */
-    var w = new T.Group(), sd = Math.sign(z); w.position.set(x, 0.31, z);
-    at(w, new T.TorusGeometry(0.24, 0.085, 18, 44), tire, 0, 0, 0);
-    at(w, new T.TorusGeometry(0.2, 0.018, 8, 40), rim, 0, 0, sd * 0.06);
-    for (var k = 0; k < 5; k++) { var sp = new T.Mesh(new T.BoxGeometry(0.06, 0.17, 0.035), rim); sp.position.z = sd * 0.06; sp.rotation.z = k / 5 * Math.PI * 2; sp.translateY(0.1); w.add(sp); }
-    at(w, new T.CylinderGeometry(0.15, 0.15, 0.04, 28), disc, 0, 0, 0, Math.PI / 2);
-    at(w, new T.CylinderGeometry(0.045, 0.045, 0.16, 12), rim, 0, 0, 0, Math.PI / 2);
-    g.add(w);
+  /* A panel that hugs the top surface: grid over (x, z) in [x0,x1] x [-1,1]*hw(x), kept where keep(x, z) is true, lifted by off. */
+  function skin(x0, x1, hw, off, mat, nx, nz, zc) {
+    var pos = [], idx = [], uv = []; nx = nx || 40; nz = nz || 20; zc = zc || 0;
+    for (var i = 0; i <= nx; i++) for (var j = 0; j <= nz; j++) {
+      var x = x0 + (x1 - x0) * i / nx, h = hw(x), z = zc + h * (2 * j / nz - 1);
+      pos.push(x, surfY(x, z) + off, z); uv.push(i / nx, j / nz);
+    }
+    for (i = 0; i < nx; i++) for (j = 0; j < nz; j++) { var a = i * (nz + 1) + j, b = a + 1, c = a + nz + 1, e = c + 1; idx.push(a, b, c, b, e, c); }
+    var geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    var m = new T.Mesh(geo, mat); m.material.side = T.DoubleSide; return m;
   }
-  function screenTex() {
-    var c = d.createElement("canvas"); c.width = 512; c.height = 200; var g = c.getContext("2d");
-    var gr = g.createLinearGradient(0, 0, 0, 200); gr.addColorStop(0, "#071a10"); gr.addColorStop(1, "#020805"); g.fillStyle = gr; g.fillRect(0, 0, 512, 200);
-    g.fillStyle = "#8dffaa"; g.shadowColor = "#3cff7a"; g.shadowBlur = 18; g.textAlign = "center"; g.textBaseline = "middle"; var fs = 92; g.font = "bold " + fs + "px Arial,Helvetica,sans-serif"; var mw = g.measureText("DON'T PANIC").width; if (mw > 440) { fs = Math.floor(fs * 440 / mw); g.font = "bold " + fs + "px Arial,Helvetica,sans-serif"; } g.fillText("DON'T PANIC", 256, 102); g.shadowBlur = 0; g.strokeStyle = "rgba(141,255,170,.35)"; g.lineWidth = 6; g.strokeRect(8, 8, 496, 184);
-    var t = new T.CanvasTexture(c); t.anisotropy = 8; return t;
+  function weaveTex() {   /* fine 2x2 twill for the bare carbon hood */
+    var c = d.createElement("canvas"); c.width = c.height = 64; var g = c.getContext("2d"); g.fillStyle = "#26282c"; g.fillRect(0, 0, 64, 64);
+    for (var y = 0; y < 16; y++) for (var x = 0; x < 16; x++) { g.fillStyle = ((x + y) >> 1) % 2 ? "#3a3d43" : "#1b1c1f"; g.fillRect(x * 4, y * 4, 4, 4); }
+    var t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(10, 5); t.anisotropy = 8; return t;
+  }
+  function wheel(g, x, z, tire, rim) {   /* black alloy, 5 double spokes */
+    var w = new T.Group(), sd = Math.sign(z); w.position.set(x, 0.31, z);
+    var tr = at(w, new T.TorusGeometry(0.235, 0.085, 18, 48), tire, 0, 0, 0); tr.scale.set(1, 1, 1.5);
+    at(w, new T.CylinderGeometry(0.205, 0.205, 0.2, 40, 1, true), rim, 0, 0, 0, Math.PI / 2);                 /* barrel */
+    at(w, new T.TorusGeometry(0.2, 0.014, 8, 44), rim, 0, 0, sd * 0.1);                                    /* lip */
+    for (var k = 0; k < 5; k++) [-0.11, 0.11].forEach(function (o) {
+      var sp = new T.Mesh(new T.BoxGeometry(0.026, 0.165, 0.03), rim); sp.position.z = sd * 0.085; sp.rotation.z = k / 5 * Math.PI * 2 + o; sp.translateY(0.11); w.add(sp);
+    });
+    at(w, new T.CylinderGeometry(0.06, 0.06, 0.05, 20), rim, 0, 0, sd * 0.08, Math.PI / 2);                  /* hub */
+    at(w, new T.CylinderGeometry(0.16, 0.16, 0.02, 32), P(0x3a3c40, { metalness: 0.9, roughness: 0.45 }), 0, 0, sd * 0.01, Math.PI / 2);   /* brake disc */
+    g.add(w);
   }
   function roadster() {
     var g = new T.Group();
-    var paint = P(0x9e0b16, { metalness: 0.5, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05 });
-    var leather = P(0x121214, { roughness: 0.6 }), insert = P(0x8a1d14, { roughness: 0.65 }), carbon = P(0x18191c, { roughness: 0.32, metalness: 0.35, clearcoat: 0.7 }), chrome = P(0xdfe3e8, { metalness: 1, roughness: 0.12 });
-    var tire = P(0x0c0c0d, { roughness: 0.85 }), rim = P(0xc4c8ce, { metalness: 1, roughness: 0.2 }), disc = P(0x55585e, { metalness: 0.9, roughness: 0.4 }), black = P(0x050506, { roughness: 0.4 });
-    var glass = P(0x9fb9cc, { transparent: true, opacity: 0.25, roughness: 0.02, clearcoat: 1, side: T.DoubleSide, depthWrite: false });
+    var paint = P(0x8c0712, { metalness: 0.55, roughness: 0.22, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.25, sheen: 0.4, sheenColor: new T.Color(0xff3040) });
+    var mirrorPaint = paint.clone(); mirrorPaint.side = T.FrontSide;
+    var leather = P(0x111113, { roughness: 0.62 }), insert = P(0xb32a3e, { roughness: 0.6 }), carbon = P(0x2a2c30, { roughness: 0.28, metalness: 0.4, clearcoat: 1, clearcoatRoughness: 0.05, map: weaveTex() });
+    var chrome = P(0xe4e8ee, { metalness: 1, roughness: 0.1 }), tire = P(0x0b0b0c, { roughness: 0.88 }), rim = P(0x17181a, { metalness: 0.7, roughness: 0.32, clearcoat: 0.6 }), black = P(0x060607, { roughness: 0.42 });
+    var smoke = P(0x0d0f13, { metalness: 0.3, roughness: 0.03, clearcoat: 1, envMapIntensity: 1.6 });
+    var glass = P(0x9fb9cc, { transparent: true, opacity: 0.22, roughness: 0.02, clearcoat: 1, side: T.DoubleSide, depthWrite: false });
     g.add(carBody(paint));
-    at(g, new T.BoxGeometry(1.05, 0.04, 1.4), carbon, -0.26, 0.3, 0);                                  /* cockpit floor */
-    at(g, new T.BoxGeometry(0.05, 0.5, 1.45), carbon, -0.8, 0.58, 0);                                  /* rear bulkhead */
-    /* seats (black with red inserts), driver left (-z), passenger right (+z) empty */
+    /* bare carbon hood: windshield base to just above the nose, between the fender crowns */
+    g.add(skin(0.34, 1.84, function (x) { return 0.36 - 0.14 * ss(0.5, 1.84, x); }, 0.006, carbon, 48, 16));
+    /* almond smoked headlights on the front fender tops, angled outward, two round lamps each */
+    [-1, 1].forEach(function (sd) {
+      var cx = 1.66, cz = sd * 0.56, L = 0.2, Wd = 0.095, ang = -sd * 0.38, ca = Math.cos(ang), sa = Math.sin(ang), pos = [], idx = [], NR = 14, NT = 40;
+      for (var i = 0; i <= NR; i++) for (var j = 0; j < NT; j++) {
+        var th = j / NT * Math.PI * 2, rr = i / NR, ex = Math.cos(th), ez = Math.sin(th) * (0.62 + 0.38 * ex);   /* teardrop: fuller at the front */
+        var lx = ex * L * rr, lz = ez * Wd * rr, x = cx + lx * ca - lz * sa * sd * 0, z = cz + lz + lx * sa;
+        x = cx + lx * ca; z = cz + lx * sa + lz * ca;
+        pos.push(x, surfY(x, z) + 0.012 + 0.012 * (1 - rr * rr), z);
+      }
+      for (i = 0; i < NR; i++) for (j = 0; j < NT; j++) { var a = i * NT + j, b = i * NT + (j + 1) % NT, c = a + NT, e = b + NT; idx.push(a, b, c, b, e, c); }
+      var hg = new T.BufferGeometry(); hg.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); hg.setIndex(idx); hg.computeVertexNormals();
+      var hm = new T.Mesh(hg, smoke); hm.material.side = T.DoubleSide; g.add(hm);
+      [0.09, -0.05].forEach(function (o, k) {   /* two lamps along the lens */
+        var x = cx + o * ca, z = cz + o * sa, y = surfY(x, z) + 0.014, nrm = new T.Vector3(surfY(x - 0.01, z) - surfY(x + 0.01, z), 0.02, surfY(x, z - 0.01) - surfY(x, z + 0.01)).normalize();
+        var lp = new T.Group(); lp.position.set(x, y, z); lp.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), nrm); g.add(lp);
+        at(lp, new T.CylinderGeometry(0.042 - k * 0.006, 0.042 - k * 0.006, 0.012, 24), chrome, 0, 0, 0);
+        at(lp, new T.CylinderGeometry(0.028 - k * 0.005, 0.028 - k * 0.005, 0.016, 20), P(0xf4f6ff, { emissive: 0x9aa0b0, roughness: 0.05 }), 0, 0.002, 0);
+      });
+    });
+    /* slim wide lower grille with black horizontal slats, small chrome T badge above it */
+    (function () {
+      var pos = [], idx = [], NZ = 40, NY = 6, Y0 = 0.33, Y1 = 0.42, HW = 0.5;
+      for (var i = 0; i <= NZ; i++) for (var j = 0; j <= NY; j++) { var z = HW * (2 * i / NZ - 1), y = Y0 + (Y1 - Y0) * j / NY, hw = HW * (1 - 0.25 * Math.pow((y - Y0) / (Y1 - Y0), 2)); z = z * hw / HW; pos.push(noseX(y, z) + 0.004, y, z); }
+      for (i = 0; i < NZ; i++) for (j = 0; j < NY; j++) { var a = i * (NY + 1) + j, b = a + 1, c = a + NY + 1, e = c + 1; idx.push(a, c, b, b, c, e); }
+      var gg = new T.BufferGeometry(); gg.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); gg.setIndex(idx); gg.computeVertexNormals();
+      var gm = new T.Mesh(gg, P(0x020203, { roughness: 0.9 })); gm.material.side = T.DoubleSide; g.add(gm);
+      [0.35, 0.375, 0.4].forEach(function (y) {
+        var pts = []; for (var k = 0; k <= 24; k++) { var z = 0.48 * (2 * k / 24 - 1); pts.push(new T.Vector3(noseX(y, z) + 0.01, y, z)); }
+        g.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 40, 0.006, 6, false), P(0x3a3c40, { metalness: 0.7, roughness: 0.3 })));
+      });
+      var bx = noseX(0.53, 0) + 0.008, bd = new T.Group(); bd.position.set(bx, 0.53, 0); bd.rotation.z = -0.5; g.add(bd);
+      at(bd, new T.BoxGeometry(0.012, 0.018, 0.1), chrome, 0, 0.03, 0); at(bd, new T.BoxGeometry(0.012, 0.07, 0.018), chrome, 0, -0.01, 0);
+    })();
+    /* black louvered vents on the raised rear deck */
+    for (var lv = 0; lv < 7; lv++) {
+      var lx = -1.05 - lv * 0.085;
+      g.add(skin(lx - 0.025, lx + 0.025, function () { return 0.34; }, 0.008, black, 2, 12));
+    }
+    /* open cockpit: tub floor, bulkhead, tunnel, cowl, dashboard */
+    at(g, new T.BoxGeometry(1.1, 0.04, 1.45), carbon, -0.24, 0.3, 0);
+    at(g, new T.BoxGeometry(0.05, 0.52, 1.5), black, -0.8, 0.6, 0);
+    at(g, new T.BoxGeometry(0.85, 0.16, 0.18), carbon, -0.2, 0.38, 0);
+    at(g, new T.BoxGeometry(0.42, 0.05, 1.5), black, 0.24, 0.68, 0);
+    var dash = at(g, new T.CapsuleGeometry(0.12, 1.25, 6, 18), black, 0.32, 0.74, 0, Math.PI / 2, 0, 0); dash.scale.set(1.1, 1, 0.8);
+    /* seats: black shells with red/pink centre inserts; driver left (-z), passenger right (+z) */
     [-0.37, 0.37].forEach(function (z) {
       var cu = at(g, new T.CapsuleGeometry(0.17, 0.2, 6, 14), leather, -0.45, 0.38, z, 0, 0, Math.PI / 2 - 0.12); cu.scale.set(0.55, 1, 1.35);
-      var bk = at(g, new T.CapsuleGeometry(0.19, 0.4, 6, 14), leather, -0.66, 0.68, z, 0, 0, -0.38); bk.scale.set(0.42, 1, 1.3);
-      var ins = at(g, new T.CapsuleGeometry(0.11, 0.34, 4, 10), insert, -0.6, 0.68, z, 0, 0, -0.38); ins.scale.set(0.3, 1, 1.2);
-      [-0.22, 0.22].forEach(function (o) { at(g, new T.CapsuleGeometry(0.04, 0.34, 4, 8), leather, -0.63, 0.66, z + o, 0, 0, -0.38); });
+      var ci = at(g, new T.CapsuleGeometry(0.1, 0.16, 4, 10), insert, -0.44, 0.43, z, 0, 0, Math.PI / 2 - 0.12); ci.scale.set(0.35, 1, 1.1);
+      var bk = at(g, new T.CapsuleGeometry(0.19, 0.42, 6, 14), leather, -0.66, 0.7, z, 0, 0, -0.36); bk.scale.set(0.42, 1, 1.3);
+      var ins = at(g, new T.CapsuleGeometry(0.11, 0.36, 4, 10), insert, -0.6, 0.7, z, 0, 0, -0.36); ins.scale.set(0.3, 1, 1.15);
+      [-0.22, 0.22].forEach(function (o) { at(g, new T.CapsuleGeometry(0.045, 0.36, 4, 8), leather, -0.62, 0.68, z + o, 0, 0, -0.36); });
+      /* black roll hoop behind each seat */
+      var hoop = at(g, new T.TorusGeometry(0.2, 0.034, 12, 32, Math.PI), black, -0.84, 0.86, z, 0, Math.PI / 2, 0); hoop.scale.set(1, 1.25, 1);
+      [-0.2, 0.2].forEach(function (o) { limb(g, [-0.84, 0.86, z + o], [-0.83, 0.66, z + o * 1.05], 0.034, black); });
     });
-    at(g, new T.BoxGeometry(0.85, 0.16, 0.18), carbon, -0.2, 0.38, 0);                                  /* centre tunnel */
-    at(g, new T.BoxGeometry(0.42, 0.05, 1.5), carbon, 0.22, 0.66, 0);   /* cowl over the footwell */
-    /* dashboard across the cockpit, DON'T PANIC screen in the centre */
-    var dash = at(g, new T.CapsuleGeometry(0.12, 1.25, 6, 18), carbon, 0.3, 0.74, 0, Math.PI / 2, 0, 0); dash.scale.set(1.1, 1, 0.8);
-    /* screen on a short stalk above the centre dash, clear of the dash, tilted up toward the driver side */
+    /* DON'T PANIC screen on a short stalk above the centre dash, tilted toward the driver */
     var sN = new T.Vector3(-0.2, 0.35, -0.91).normalize(), sX = new T.Vector3(0, 1, 0).cross(sN).normalize(), sY = sN.clone().cross(sX);
-    var scr = at(g, new T.PlaneGeometry(0.25, 0.098), new T.MeshBasicMaterial({ map: screenTex(), toneMapped: false }), 0.05, 0.9, 0.0); scr.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(sX, sY, sN));
+    var scr = at(g, new T.PlaneGeometry(0.25, 0.098), new T.MeshBasicMaterial({ map: screenTex(), toneMapped: false }), 0.07, 0.9, 0.0); scr.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(sX, sY, sN));
     var bz = new T.Mesh(new T.BoxGeometry(0.28, 0.122, 0.02), black); bz.position.set(0, 0, -0.012); scr.add(bz);
-    limb(g, [0.12, 0.76, 0.0], [0.06, 0.88, 0.02], 0.018, carbon);
-    /* steering wheel in front of the left seat: round rim, three spokes, hub, column into the dash */
+    limb(g, [0.14, 0.76, 0.0], [0.08, 0.88, 0.02], 0.018, black);
+    /* round steering wheel in front of the left seat: rim, three spokes, hub, column into the dash */
     var wN = new T.Vector3(-Math.cos(0.44), Math.sin(0.44), 0), wX = new T.Vector3(0, 0, 1), wY = wN.clone().cross(wX);
-    var swg = new T.Group(); swg.position.set(-0.02, 0.85, -0.37); swg.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(wX, wY, wN));
-    at(swg, new T.TorusGeometry(0.16, 0.019, 14, 56), leather, 0, 0, 0);                                     /* rim */
+    var swg = new T.Group(); swg.position.set(0.0, 0.85, -0.37); swg.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(wX, wY, wN));
+    at(swg, new T.TorusGeometry(0.16, 0.02, 14, 56), leather, 0, 0, 0);
     [0, Math.PI, -Math.PI / 2].forEach(function (a) { var sp = new T.Mesh(new T.BoxGeometry(0.12, a === -Math.PI / 2 ? 0.05 : 0.034, 0.012), chrome); sp.rotation.z = a; sp.translateX(0.085); sp.position.z = -0.01; swg.add(sp); });
-    at(swg, new T.CylinderGeometry(0.048, 0.052, 0.04, 24), black, 0, 0, -0.012, Math.PI / 2);              /* hub */
-    at(swg, new T.CylinderGeometry(0.03, 0.03, 0.012, 20), chrome, 0, 0, 0.012, Math.PI / 2);              /* centre cap */
-    at(swg, new T.CylinderGeometry(0.026, 0.034, 0.3, 14), black, 0, 0, -0.18, Math.PI / 2);                /* column */
+    at(swg, new T.CylinderGeometry(0.048, 0.052, 0.04, 24), black, 0, 0, -0.012, Math.PI / 2);
+    at(swg, new T.CylinderGeometry(0.03, 0.03, 0.012, 20), chrome, 0, 0, 0.012, Math.PI / 2);
+    at(swg, new T.CylinderGeometry(0.026, 0.034, 0.3, 14), black, 0, 0, -0.18, Math.PI / 2);
     g.add(swg);
-    /* raked windshield and black frame */
-    var wsg = new T.Group(); wsg.position.set(0.2, 0.98, 0); g.add(wsg);
-    var ws = new T.Mesh(new T.PlaneGeometry(1.5, 0.48), glass); ws.rotation.y = Math.PI / 2; wsg.add(ws); wsg.rotation.z = 0.84;
-    var fr = new T.CatmullRomCurve3([new T.Vector3(0.38, 0.82, -0.78), new T.Vector3(0.05, 1.12, -0.72), new T.Vector3(0.0, 1.15, 0), new T.Vector3(0.05, 1.12, 0.72), new T.Vector3(0.38, 0.82, 0.78)]);
-    g.add(new T.Mesh(new T.TubeGeometry(fr, 56, 0.024, 8, false), black));
-    /* black roll hoop (targa bar) behind the seats */
-    var hp = new T.CatmullRomCurve3([new T.Vector3(-0.86, 0.85, -0.8), new T.Vector3(-0.88, 1.08, -0.62), new T.Vector3(-0.9, 1.12, 0), new T.Vector3(-0.88, 1.08, 0.62), new T.Vector3(-0.86, 0.85, 0.8)]);
-    g.add(new T.Mesh(new T.TubeGeometry(hp, 48, 0.05, 10, false), black));
-    /* door mirrors */
-    [-1, 1].forEach(function (sd) { var mm = at(g, new T.SphereGeometry(0.075, 18, 12), black, 0.3, 0.92, sd * 0.97); mm.scale.set(0.55, 0.65, 1.1); limb(g, [0.33, 0.83, sd * 0.85], [0.31, 0.9, sd * 0.94], 0.014, black); });
-    /* swept-back almond headlights on the front fenders */
+    /* steeply raked windshield in a thick black frame */
+    var wsg = new T.Group(); wsg.position.set(0.22, 0.99, 0); g.add(wsg);
+    var ws = new T.Mesh(new T.PlaneGeometry(1.42, 0.46), glass); ws.rotation.y = Math.PI / 2; wsg.add(ws); wsg.rotation.z = 0.9;
+    var fr = new T.CatmullRomCurve3([new T.Vector3(0.4, 0.78, -0.78), new T.Vector3(0.08, 1.14, -0.7), new T.Vector3(0.03, 1.17, 0), new T.Vector3(0.08, 1.14, 0.7), new T.Vector3(0.4, 0.78, 0.78)]);
+    g.add(new T.Mesh(new T.TubeGeometry(fr, 64, 0.036, 10, false), black));
+    var fb = new T.CatmullRomCurve3([new T.Vector3(0.4, 0.77, -0.78), new T.Vector3(0.38, 0.735, 0), new T.Vector3(0.4, 0.77, 0.78)]);
+    g.add(new T.Mesh(new T.TubeGeometry(fb, 32, 0.03, 8, false), black));
+    /* small body-colour mirrors on black stalks at the A-pillar base */
     [-1, 1].forEach(function (sd) {
-      var hl = at(g, new T.SphereGeometry(0.2, 24, 14), P(0x1a1c22, { metalness: 0.6, roughness: 0.05, clearcoat: 1 }), 1.62, 0.69, sd * 0.6); hl.scale.set(1.25, 0.2, 0.45); hl.rotation.set(0, sd * 0.45, sd * 0.12);
-      var lens = at(g, new T.SphereGeometry(0.06, 14, 10), P(0xf0f4ff, { emissive: 0x30343e, roughness: 0.05 }), 1.72, 0.7, sd * 0.56); lens.scale.set(1, 0.6, 1);
+      var mm = at(g, new T.SphereGeometry(0.07, 20, 14), mirrorPaint, 0.3, 0.95, sd * 1.0); mm.scale.set(0.6, 0.62, 1.15);
+      at(g, new T.CircleGeometry(0.05, 18), black, 0.26, 0.95, sd * 1.0, 0, -Math.PI / 2, 0).scale.set(1.2, 0.85, 1);
+      limb(g, [0.36, 0.84, sd * 0.86], [0.31, 0.93, sd * 0.96], 0.014, black);
     });
-    /* narrow Tesla nose opening + wide lower intake */
-    var nose = at(g, new T.SphereGeometry(0.2, 20, 10), black, 1.95, 0.52, 0); nose.scale.set(0.12, 0.18, 1.0);
-    var mouth = at(g, new T.SphereGeometry(0.4, 24, 10), black, 1.92, 0.32, 0); mouth.scale.set(0.12, 0.17, 1.35);
-    /* side air scoops behind the doors (in front of the rear wheels) */
-    [-1, 1].forEach(function (sd) { var sc = at(g, new T.SphereGeometry(0.2, 18, 12), black, -0.68, 0.52, sd * 0.86); sc.scale.set(1.1, 0.42, 0.32); sc.rotation.z = -0.15; });
-    /* raised rear deck: twin round tail lights each side in black surrounds */
+    /* side air scoops ahead of the rear wheels */
+    [-1, 1].forEach(function (sd) { var sc = at(g, new T.SphereGeometry(0.2, 18, 12), black, -0.66, 0.55, sd * 0.88); sc.scale.set(0.85, 0.32, 0.3); sc.rotation.z = -0.15; });
+    /* tail: twin round lamps each side in black surrounds, small carbon lip */
     [-1, 1].forEach(function (sd) {
-      var sur = at(g, new T.SphereGeometry(0.2, 20, 12), black, -1.95, 0.64, sd * 0.47); sur.scale.set(0.16, 0.42, 1.05);
-      [0.36, 0.58].forEach(function (zz, i) { var tl = at(g, new T.CylinderGeometry(0.065, 0.065, 0.05, 20), P(i ? 0xff2a3a : 0xd8d8dc, { emissive: i ? 0x550008 : 0x202022, roughness: 0.15, clearcoat: 1 }), -1.985, 0.64, sd * zz, 0, 0, Math.PI / 2); });
+      var sur = at(g, new T.SphereGeometry(0.2, 20, 12), black, -1.95, 0.66, sd * 0.5); sur.scale.set(0.16, 0.4, 1.05);
+      [0.38, 0.6].forEach(function (zz, i) { at(g, new T.CylinderGeometry(0.065, 0.065, 0.05, 20), P(i ? 0xff2a3a : 0xd8d8dc, { emissive: i ? 0x550008 : 0x202022, roughness: 0.15, clearcoat: 1 }), -1.985, 0.66, sd * zz, 0, 0, Math.PI / 2); });
     });
-    var spoiler = at(g, new T.BoxGeometry(0.16, 0.03, 1.35), carbon, -1.88, 0.86, 0, 0, 0, -0.12);
-    [[1.17, -0.8], [1.17, 0.8], [-1.18, -0.82], [-1.18, 0.82]].forEach(function (p) { wheel(g, p[0], p[1], tire, rim, disc); });
+    [[1.17, -0.8], [1.17, 0.8], [-1.18, -0.82], [-1.18, 0.82]].forEach(function (p) { wheel(g, p[0], p[1], tire, rim); });
     g.add(starman());
     g.userData.size = 4.2;
     return g;
   }
-  /* Starman (after the 2018 SpaceX photos): left-hand driver's seat, left arm resting on the door sill, right hand on the wheel,
-     white suit with black panels, white helmet with a large dark visor. */
+  /* Starman (after the 2018 SpaceX photos): left-hand driver's seat, sitting low with shoulders and helmet above the door line,
+     left arm resting on the door sill, right hand on the wheel; white suit, black side panels and seatbelt, white helmet, dark gold-tint visor. */
   function starman() {
-    var sm = new T.Group(), suit = P(0xf2f2f0, { roughness: 0.55, clearcoat: 0.3 }), blk = P(0x141517, { roughness: 0.5 }), visor = P(0x050607, { metalness: 1, roughness: 0.03, clearcoat: 1 });
-    var Z = -0.37, hip = [-0.5, 0.48, Z], sh = [-0.6, 0.96, Z];
-    limb(sm, hip, sh, 0.165, suit);                                                         /* torso */
-    var chest = at(sm, new T.BoxGeometry(0.05, 0.18, 0.17), blk, -0.43, 0.84, Z, 0, 0, -0.2);
-    limb(sm, [-0.49, 0.55, Z - 0.15], [-0.59, 0.92, Z - 0.17], 0.028, blk);                    /* black side panels */
-    limb(sm, [-0.49, 0.55, Z + 0.15], [-0.59, 0.92, Z + 0.17], 0.028, blk);
-    at(sm, new T.TorusGeometry(0.1, 0.028, 10, 24), blk, -0.6, 1.05, Z, Math.PI / 2, 0, 0.2);    /* neck ring */
-    var helm = at(sm, new T.SphereGeometry(0.15, 32, 22), suit, -0.58, 1.18, Z); helm.scale.set(1.06, 1.06, 0.98);
-    var vis = at(sm, new T.SphereGeometry(0.152, 32, 22, -Math.PI * 0.45, Math.PI * 0.9, Math.PI * 0.26, Math.PI * 0.42), visor, -0.575, 1.18, Z, 0, Math.PI, 0); vis.scale.set(1.07, 1.08, 1.0);
-    [-1, 1].forEach(function (sd) { var ear = at(sm, new T.CylinderGeometry(0.05, 0.05, 0.03, 16), blk, -0.6, 1.17, Z + sd * 0.148, Math.PI / 2, 0, 0); });
-    /* right arm (centre side, +z) to the wheel; left arm (door side, -z) over the door sill */
-    var rS = [-0.58, 0.93, Z + 0.19], rE = [-0.34, 0.69, Z + 0.24], rH = [0.014, 0.922, Z + 0.139];
-    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.36, 0.84, Z - 0.48], lH = [0.04, 0.87, Z - 0.5];
+    var sm = new T.Group(), suit = P(0xf2f2f0, { roughness: 0.55, clearcoat: 0.3 }), blk = P(0x141517, { roughness: 0.5 }), visor = P(0x1a1206, { metalness: 1, roughness: 0.04, clearcoat: 1, envMapIntensity: 1.4 });
+    var Z = -0.37, hip = [-0.5, 0.46, Z], sh = [-0.6, 0.93, Z];
+    limb(sm, hip, sh, 0.165, suit);
+    limb(sm, [-0.49, 0.53, Z - 0.155], [-0.59, 0.9, Z - 0.17], 0.028, blk);   /* black side panels */
+    limb(sm, [-0.49, 0.53, Z + 0.155], [-0.59, 0.9, Z + 0.17], 0.028, blk);
+    limb(sm, [-0.41, 0.9, Z - 0.13], [-0.36, 0.55, Z + 0.12], 0.02, blk);     /* seatbelt sash */
+    limb(sm, [-0.37, 0.5, Z - 0.15], [-0.37, 0.5, Z + 0.15], 0.02, blk);      /* lap belt */
+    at(sm, new T.TorusGeometry(0.1, 0.028, 10, 24), blk, -0.6, 1.02, Z, Math.PI / 2, 0, 0.2);
+    var helm = at(sm, new T.SphereGeometry(0.15, 32, 22), suit, -0.58, 1.15, Z); helm.scale.set(1.06, 1.06, 0.98);
+    var vis = at(sm, new T.SphereGeometry(0.153, 32, 22, -Math.PI * 0.47, Math.PI * 0.94, Math.PI * 0.24, Math.PI * 0.45), visor, -0.575, 1.15, Z, 0, Math.PI, 0); vis.scale.set(1.07, 1.08, 1.0);
+    [-1, 1].forEach(function (sd) { at(sm, new T.CylinderGeometry(0.05, 0.05, 0.03, 16), blk, -0.6, 1.14, Z + sd * 0.148, Math.PI / 2, 0, 0); });
+    var rS = [-0.58, 0.9, Z + 0.19], rE = [-0.34, 0.68, Z + 0.24], rH = [0.034, 0.922, Z + 0.139];
+    var lS = [-0.58, 0.9, Z - 0.19], lE = [-0.36, 0.84, Z - 0.48], lH = [0.04, 0.87, Z - 0.5];
     [[rS, rE, rH], [lS, lE, lH]].forEach(function (a) {
-      at(sm, new T.SphereGeometry(0.072, 16, 12), blk, a[0][0], a[0][1] + 0.02, a[0][2]);           /* shoulder panel */
+      at(sm, new T.SphereGeometry(0.072, 16, 12), blk, a[0][0], a[0][1] + 0.02, a[0][2]);
       limb(sm, a[0], a[1], 0.055, suit); limb(sm, a[1], a[2], 0.05, suit);
-      limb(sm, [a[1][0] + (a[2][0] - a[1][0]) * 0.55, a[1][1] + (a[2][1] - a[1][1]) * 0.55, a[1][2] + (a[2][2] - a[1][2]) * 0.55], [a[1][0] + (a[2][0] - a[1][0]) * 0.75, a[1][1] + (a[2][1] - a[1][1]) * 0.75, a[1][2] + (a[2][2] - a[1][2]) * 0.75], 0.056, blk);   /* cuff */
-      at(sm, new T.SphereGeometry(0.048, 12, 10), blk, a[2][0], a[2][1], a[2][2]);                     /* glove */
+      limb(sm, [a[1][0] + (a[2][0] - a[1][0]) * 0.55, a[1][1] + (a[2][1] - a[1][1]) * 0.55, a[1][2] + (a[2][2] - a[1][2]) * 0.55], [a[1][0] + (a[2][0] - a[1][0]) * 0.75, a[1][1] + (a[2][1] - a[1][1]) * 0.75, a[1][2] + (a[2][2] - a[1][2]) * 0.75], 0.056, blk);
+      at(sm, new T.SphereGeometry(0.048, 12, 10), blk, a[2][0], a[2][1], a[2][2]);
     });
     [-1, 1].forEach(function (sd) {
       var hp = [hip[0] + 0.02, hip[1] - 0.04, Z + sd * 0.1], kn = [-0.06, 0.52, Z + sd * 0.12], ft = [0.36, 0.33, Z + sd * 0.12];
@@ -239,6 +304,12 @@
       at(sm, new T.CapsuleGeometry(0.058, 0.12, 4, 10), blk, ft[0] + 0.05, ft[1] - 0.02, ft[2], 0, 0, Math.PI / 2);
     });
     return sm;
+  }
+  function screenTex() {
+    var c = d.createElement("canvas"); c.width = 512; c.height = 200; var g = c.getContext("2d");
+    var gr = g.createLinearGradient(0, 0, 0, 200); gr.addColorStop(0, "#071a10"); gr.addColorStop(1, "#020805"); g.fillStyle = gr; g.fillRect(0, 0, 512, 200);
+    g.fillStyle = "#8dffaa"; g.shadowColor = "#3cff7a"; g.shadowBlur = 18; g.textAlign = "center"; g.textBaseline = "middle"; var fs = 92; g.font = "bold " + fs + "px Arial,Helvetica,sans-serif"; var mw = g.measureText("DON'T PANIC").width; if (mw > 440) { fs = Math.floor(fs * 440 / mw); g.font = "bold " + fs + "px Arial,Helvetica,sans-serif"; } g.fillText("DON'T PANIC", 256, 102); g.shadowBlur = 0; g.strokeStyle = "rgba(141,255,170,.35)"; g.lineWidth = 6; g.strokeRect(8, 8, 496, 184);
+    var t = new T.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   /* Spacecraft (original, simplified, recognizable). */
   function dishGeo(R, depth, n) { var pts = []; for (var i = 0; i <= 16; i++) { var r = R * i / 16; pts.push(new T.Vector2(r, depth * (r / R) * (r / R))); } return new T.LatheGeometry(pts, n || 40); }
