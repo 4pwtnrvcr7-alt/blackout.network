@@ -213,6 +213,17 @@ class NetSky(unittest.TestCase):
         self.assertEqual(netmap.handle_get("/api/netmap/learn/../net.js")[0], 404)
         self.assertEqual(netmap.handle_get("/api/netmap/learn/nope.jpg")[0], 404)
 
+
+    def test_sky_3d_retries_without_idle(self):
+        # 3D layer must retry if style is not ready; waiting only on map "idle" never installed sats3d (startPulse keeps idle from firing)
+        from pathlib import Path
+        js = (Path(__file__).resolve().parents[1] / "netmap_static" / "net.js").read_text()
+        self.assertIn("function sky3dRetry", js)
+        self.assertIn("function sky3dEnsure", js)
+        self.assertIn("startPulse() can keep idle from firing", js)
+        self.assertIn("if (!SKY.alt3d && !SKY._3dFail) sky3dEnsure()", js)
+        self.assertNotIn('map.once("idle", function () { if (SKY.on) sky3dEnsure(); })', js)
+
 class NetSkyStarlinkFallback(unittest.TestCase):
     def test_supgp_when_group_refused(self):
         import netsky, netstarlink, tempfile

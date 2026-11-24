@@ -793,17 +793,36 @@
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
     } catch (err) { console.warn("sky3d render", err); }
   }
+  function sky3dRetry(ms) {
+    if (SKY._3dWait) return;
+    SKY._3dWait = setTimeout(function () {
+      SKY._3dWait = 0;
+      if (SKY.on && !SKY3 && !SKY._3dFail) sky3dEnsure();
+    }, ms || 200);
+  }
   function sky3dEnsure() {
     if (!map || SKY3 || SKY._3dFail) return;
-    if (!map.isStyleLoaded || !map.isStyleLoaded()) { map.once("idle", function () { if (SKY.on) sky3dEnsure(); }); return; }
+    /* do not wait only on map "idle": startPulse() can keep idle from firing, which left the 3D layer uninstalled */
+    if (!map.isStyleLoaded || !map.isStyleLoaded()) { sky3dRetry(200); return; }
     try {
+      if (map.getLayer("sats3d")) { sky2dVis(); return; }
       map.addLayer({ id: "sats3d", type: "custom", renderingMode: "3d",
         onAdd: function (m, gl) { sky3dOnAdd(this, m, gl); },
         onRemove: function (m, gl) { sky3dOnRemove(this, gl); },
         render: function (gl, args) { sky3dRender(this, gl, args); } });
-      if (!SKY.alt3d) SKY._3dFail = true;
+      if (!SKY.alt3d) {
+        SKY._3dTries = (SKY._3dTries || 0) + 1;
+        if (SKY._3dTries >= 6) SKY._3dFail = true;
+        else sky3dRetry(250);
+      }
       sky2dVis();
-    } catch (e) { console.warn("sky3d", e); SKY.alt3d = false; SKY._3dFail = true; sky2dVis(); }
+    } catch (e) {
+      console.warn("sky3d", e);
+      SKY.alt3d = false;
+      SKY._3dTries = (SKY._3dTries || 0) + 1;
+      if (SKY._3dTries >= 8) { SKY._3dFail = true; sky2dVis(); }
+      else sky3dRetry(250);
+    }
   }
   function sky3dUpdate() {
     if (!SKY.alt3d) return;
@@ -832,6 +851,7 @@
   }
   function prop() {
     if (!SKY.on || !SKY.loaded) return;
+    if (!SKY.alt3d && !SKY._3dFail) sky3dEnsure();
     var sat = window.satellite, d = new Date(), gm = sat.gstime(d), f = [], n = 0;
     var focus = SKY.sel != null && document.body.classList.contains("nx-sky-focus");
     for (var i = 0; i < SKY.recs.length; i++) {
