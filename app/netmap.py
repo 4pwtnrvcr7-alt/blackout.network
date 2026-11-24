@@ -655,7 +655,9 @@ def page(qs=None):
     title = "The Grid: live status of power, internet, mobile, cloud and apps | BLACKOUT.NETWORK"
     desc = ("The Grid: live status of the power grid and the networks that run on it. Grid operators colored by status, outages by state, weather threats, "
             "plus plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, apps and government services, an incident log and a satellite globe.")
-    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="false"><i style="background:{c};border-color:{c}"></i><span>{E(t)}</span></button>' for g, t, c in SKY_CHIPS)
+    # pt1832u: restore #128 defaults — constellation chips on; debris, solar system and space weather stay off
+    _sky_off = {"debris", "ss", "sw"}
+    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="{"false" if g in _sky_off else "true"}"><i style="background:{c};border-color:{c}"></i><span>{E(t)}</span></button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="true"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
