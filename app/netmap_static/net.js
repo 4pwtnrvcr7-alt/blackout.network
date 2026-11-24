@@ -177,6 +177,10 @@
       });
       pDc.then(function (j) { DC = j; applyDc(); }, function () {});
       pInet.then(function (r) { INET = r[0]; INETG = r[1]; applyInet(); }, function () {});
+      setInterval(function () {   /* refresh the Internet layer every 5 min (server cache is 10 min); keeps the last good copy on failure */
+        if (document.hidden) return;
+        Promise.all([getJSON("/api/netmap/inet"), INETG ? Promise.resolve(INETG) : getJSON("/api/netmap/inet.json")]).then(function (r) { INET = r[0]; INETG = r[1]; applyInet(); }, function () {});
+      }, 300000);
       var tk = setInterval(function () {   /* the first view's tiles are all in (the pulse animation would keep "idle" from ever firing) */
         if (map.areTilesLoaded() && map.isStyleLoaded()) { clearInterval(tk); ready = true; step("map", 1); startPulse(); if (location.hash === "#sky") setTimeout(function () { view("sky"); }, 400); }
       }, 150);
