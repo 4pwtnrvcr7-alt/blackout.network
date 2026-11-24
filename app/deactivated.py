@@ -39,7 +39,11 @@ DEACTIVATED_PAGES = [
     ("Private Jets",         {"jets"},            ["/jets"], "off"),   # Matt said "private chats" on voice; the menu item is Private Jets
     ("Games",                {"games"},           ["/games"], "off"),
     ("Mesh Chat",            {"mesh-chat"},       ["/mesh/chat"], "off"),   # Nov 24 7:50 AM ET (Matt): "private chats" also means the off-grid mesh chat; /mesh and /mesh/guide stay up
+    ("The Grid (old page)",  {"grid"},            ["/grid"], "off"),   # Nov 24 7:54 AM ET (Matt pt1795u): merged into /network (renamed The Grid); 302s to /network (MOVED)
 ]
+
+# "off" pages whose content moved to another page: the 302 goes there instead of "/" (gridpage.py code stays in the repo).
+MOVED = {"/grid": "/network"}
 
 ON = os.environ.get("BN_DEACTIVATE_PAGES", "1") != "0"
 KEYS = frozenset(k for _, ks, _, _st in DEACTIVATED_PAGES for k in ks) if ON else frozenset()
@@ -68,6 +72,13 @@ def redirects(path):
     if not ON: return False
     p = _norm(path)
     return any(p == x or p.startswith(x + "/") for x in REDIRECT_PREFIXES)
+
+def location(path):
+    """Where an "off" page's 302 goes: its new home if it was merged into another page (MOVED), else "/"."""
+    p = _norm(path)
+    for x, to in MOVED.items():
+        if p == x or p.startswith(x + "/"): return to
+    return "/"
 
 def href_off(href):
     """True if an <a href> on our own site points at a deactivated page (incl. "/#noise" / "/live#noise" tab links)."""
