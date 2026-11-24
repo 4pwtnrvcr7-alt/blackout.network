@@ -1,15 +1,15 @@
 {
  "falcon9": {
   "file": "falcon9.jpg",
-  "pictured": "Falcon 9 first stage after landing at LZ-1",
-  "source_url": "https://commons.wikimedia.org/wiki/File:Falcon_9_first_stage_at_LZ-1(two).jpg",
-  "title": "File:Falcon 9 first stage at LZ-1(two).jpg",
-  "author": "SpaceX Photos",
-  "license": "CC0",
-  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
-  "bytes": 54822,
-  "w": 900,
-  "h": 606
+  "pictured": "Falcon 9 liftoff (NASA's SpaceX Crew-9)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:NASA%27s_SpaceX_Crew-9_Liftoff_(KSC-20240928-PH-KLS03_0013).jpg",
+  "title": "File:NASA's SpaceX Crew-9 Liftoff (KSC-20240928-PH-KLS03 0013).jpg",
+  "author": "NASA Kennedy Space Center / NASA/Kim Shiflett",
+  "license": "Public domain",
+  "license_url": null,
+  "bytes": 58779,
+  "w": 600,
+  "h": 900
  },
  "falconheavy": {
   "file": "falconheavy.jpg",
@@ -202,5 +202,113 @@
   "bytes": 80964,
   "w": 900,
   "h": 600
+ },
+ "antares": {
+  "file": "antares.jpg",
+  "pictured": "Antares (Orb-D1 launch from Wallops)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Antares_Orb-D1_launches_from_Wallops_(201309180016HQ).jpg",
+  "title": "File:Antares Orb-D1 launches from Wallops (201309180016HQ).jpg",
+  "author": "Bill Ingalls",
+  "license": "Public domain",
+  "license_url": null,
+  "bytes": 115564,
+  "w": 732,
+  "h": 900
+ },
+ "vega": {
+  "file": "vega.jpg",
+  "pictured": "Vega (flight VV20 from Kourou)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Vega_launch_VV20.jpg",
+  "title": "File:Vega launch VV20.jpg",
+  "author": "Chris Gunn",
+  "license": "Public domain",
+  "license_url": null,
+  "bytes": 93616,
+  "w": 720,
+  "h": 900
+ },
+ "epsilon": {
+  "file": "epsilon.jpg",
+  "pictured": "Epsilon (first launch, Hisaki)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Epsilon-1_launching_HISAKI.jpg",
+  "title": "File:Epsilon-1 launching HISAKI.jpg",
+  "author": "NARITA Masahiro",
+  "license": "CC BY-SA 3.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/3.0",
+  "bytes": 33781,
+  "w": 600,
+  "h": 900
+ },
+ "h3": {
+  "file": "h3.jpg",
+  "pictured": "H3 (Test Flight 2)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:2024.2.17H3%E3%83%AD%E3%82%B1%E3%83%83%E3%83%88TF2%E6%89%93%E4%B8%8A%E3%81%92.jpg",
+  "title": "File:2024.2.17H3ロケットTF2打上げ.jpg",
+  "author": "nvs-live.com",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0",
+  "bytes": 42452,
+  "w": 900,
+  "h": 506
+ },
+ "pslv": {
+  "file": "pslv.jpg",
+  "pictured": "PSLV (PSLV-C11 / Chandrayaan-1 launch)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:KSC-08pd3405_PSLV-C11.jpg",
+  "title": "File:KSC-08pd3405 PSLV-C11.jpg",
+  "author": "NASA",
+  "license": "Public domain",
+  "license_url": null,
+  "bytes": 79293,
+  "w": 702,
+  "h": 900
+ },
+ "nuri": {
+  "file": "nuri.jpg",
+  "pictured": "Nuri / KSLV-II on the pad at Naro (first flight)",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Pas-de-tir-du-lanceur-KSLV-II-%C3%A0-Naro-2.jpg",
+  "title": "File:Pas-de-tir-du-lanceur-KSLV-II-à-Naro-2.jpg",
+  "author": "한국항공우주연구원(KARI)",
+  "license": "CC BY 3.0",
+  "license_url": "https://creativecommons.org/licenses/by/3.0",
+  "bytes": 58690,
+  "w": 900,
+  "h": 557
+ },
+ "lm5": {
+  "file": "lm5.jpg",
+  "pictured": "Long March 5 on the pad at Wenchang",
+  "source_url": "https://commons.wikimedia.org/wiki/File:CZ-5_at_WSLS_01.jpg",
+  "title": "File:CZ-5 at WSLS 01.jpg",
+  "author": "Shujianyang",
+  "license": "CC0",
+  "license_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "bytes": 76303,
+  "w": 900,
+  "h": 600
+ },
+ "lm7": {
+  "file": "lm7.jpg",
+  "pictured": "Long March 7 launch from Wenchang",
+  "source_url": "https://commons.wikimedia.org/wiki/File:CZ-7_launch_from_Wenchang.jpg",
+  "title": "File:CZ-7 launch from Wenchang.jpg",
+  "author": "中国新闻社",
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0",
+  "bytes": 69429,
+  "w": 900,
+  "h": 524
+ },
+ "soyuz2": {
+  "file": "soyuz2.jpg",
+  "pictured": "Soyuz-2.1a with MetOp at Baikonur",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Soyuz_2_metop.jpg",
+  "title": "File:Soyuz 2 metop.jpg",
+  "author": "ru:Участник:Arie",
+  "license": "Public domain",
+  "license_url": null,
+  "bytes": 92794,
+  "w": 675,
+  "h": 900
  }
 }

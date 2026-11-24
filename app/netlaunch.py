@@ -252,9 +252,11 @@ def _n(v):
 _ROCKET_KEYS = [  # (regex on vehicle full name + families, key) - first match wins
     (r"falcon heavy", "falconheavy"), (r"falcon 9|falcon9", "falcon9"), (r"starship|super heavy", "starship"),
     (r"\bhaste\b", "haste"), (r"electron", "electron"), (r"vulcan", "vulcan"), (r"atlas v|atlas 5", "atlasv"),
-    (r"new glenn", "newglenn"), (r"long march|changzheng|\bcz-", "longmarch"), (r"soyuz", "soyuz"), (r"minotaur", "minotaur"),
+    (r"new glenn", "newglenn"), (r"long march 5|\bcz-5", "lm5"), (r"long march 7|\bcz-7", "lm7"),
+    (r"long march|changzheng|\bcz-", "longmarch"), (r"soyuz[- ]?2", "soyuz2"), (r"soyuz", "soyuz"), (r"minotaur", "minotaur"),
     (r"space launch system|\bsls\b", "sls"), (r"firefly alpha|^alpha\b", "firefly"), (r"proton", "proton"), (r"h-iia|h-2a", "h2a"),
     (r"gslv", "gslv"), (r"angara", "angara"),
+    (r"antares", "antares"), (r"\bvega\b", "vega"), (r"epsilon", "epsilon"), (r"\bh3\b|\bh-3\b|\bh-iii\b", "h3"), (r"\bpslv\b", "pslv"), (r"\bnuri\b|kslv-ii", "nuri"),
 ]
 _ROCKETS = None
 def _rockets():
