@@ -10,8 +10,8 @@ import zipfile
 
 @functools.lru_cache(maxsize=1)
 def archive(static):
-    with open(os.path.join(static, "gridtiles.b64"), "rb") as f:
-        return zipfile.ZipFile(io.BytesIO(base64.b64decode(f.read())))
+    raw = b"".join(open(os.path.join(static, f"gridtiles.b64.{i}"), "rb").read() for i in range(2))   # split in two to stay under the push size limit
+    return zipfile.ZipFile(io.BytesIO(base64.b64decode(raw)))
 
 def tile(static, z, x, y):
     if not (0 <= z <= 9 and 0 <= x < 2 ** z and 0 <= y < 2 ** z):
