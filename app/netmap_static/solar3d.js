@@ -32,7 +32,7 @@
       ".s3-lab.sc{color:#b9c6ff}.s3-lab.sel{background:#e8eaf0;color:#05060a}" +
       ".s3-info{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:min(420px,calc(100% - 20px));max-height:34%;overflow:auto;background:linear-gradient(90deg,rgba(5,6,10,.72),rgba(5,6,10,.35));border-left:2px solid rgba(255,255,255,.5);padding:6px 10px;font-size:12px}" +
       ".s3-info h3{margin:0 0 2px;font-size:15px}.s3-info p{margin:2px 0}.s3-info .s3-tag{display:inline-block;font-size:10px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:2px;opacity:.85}" +
-      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}.s3 .s3-tog{display:none;margin-left:8px;padding:1px 9px;font-size:11px;vertical-align:2px}@media (max-width:600px){.s3 .s3-tog{display:inline-block}.s3-info:not(.open) .s3-body{display:none}.s3-info{max-height:45%;font-size:11.5px}.s3-info h3{font-size:14px;margin:0}.s3-ph img{max-height:120px}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
+      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;max-width:100%;max-height:42vh;width:auto;height:auto;object-fit:contain;margin:0 auto;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}.s3 .s3-tog{display:inline-block;margin-left:8px;padding:1px 9px;font-size:11px;vertical-align:2px}.s3-info:not(.open) .s3-body{display:none}.s3-info:not(.open) h3{margin:0}.s3-info.open{max-height:62%}@media (max-width:600px){.s3-info{font-size:11.5px}.s3-info h3{font-size:14px}.s3-info.open{max-height:58%}.s3-ph img{max-height:34vh}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
     d.head.appendChild(st);
   }
   function imperial() { try { return !w.BNUnits || !w.BNUnits.isImperial || w.BNUnits.isImperial(); } catch (e) { return true; } }
@@ -142,7 +142,7 @@
   function screenTex() {
     var c = d.createElement("canvas"); c.width = 512; c.height = 200; var g = c.getContext("2d");
     var gr = g.createLinearGradient(0, 0, 0, 200); gr.addColorStop(0, "#071a10"); gr.addColorStop(1, "#020805"); g.fillStyle = gr; g.fillRect(0, 0, 512, 200);
-    g.fillStyle = "#8dffaa"; g.shadowColor = "#3cff7a"; g.shadowBlur = 18; g.font = "bold 86px Arial,Helvetica,sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("DON'T PANIC", 256, 102);
+    g.fillStyle = "#8dffaa"; g.shadowColor = "#3cff7a"; g.shadowBlur = 18; g.textAlign = "center"; g.textBaseline = "middle"; var fs = 92; g.font = "bold " + fs + "px Arial,Helvetica,sans-serif"; var mw = g.measureText("DON'T PANIC").width; if (mw > 440) { fs = Math.floor(fs * 440 / mw); g.font = "bold " + fs + "px Arial,Helvetica,sans-serif"; } g.fillText("DON'T PANIC", 256, 102); g.shadowBlur = 0; g.strokeStyle = "rgba(141,255,170,.35)"; g.lineWidth = 6; g.strokeRect(8, 8, 496, 184);
     var t = new T.CanvasTexture(c); t.anisotropy = 8; return t;
   }
   function roadster() {
@@ -162,16 +162,23 @@
       [-0.22, 0.22].forEach(function (o) { at(g, new T.CapsuleGeometry(0.04, 0.34, 4, 8), leather, -0.63, 0.66, z + o, 0, 0, -0.38); });
     });
     at(g, new T.BoxGeometry(0.85, 0.16, 0.18), carbon, -0.2, 0.38, 0);                                  /* centre tunnel */
-    at(g, new T.BoxGeometry(0.42, 0.05, 1.5), carbon, 0.2, 0.7, 0);   /* cowl over the footwell */
+    at(g, new T.BoxGeometry(0.42, 0.05, 1.5), carbon, 0.22, 0.66, 0);   /* cowl over the footwell */
     /* dashboard across the cockpit, DON'T PANIC screen in the centre */
     var dash = at(g, new T.CapsuleGeometry(0.12, 1.25, 6, 18), carbon, 0.3, 0.74, 0, Math.PI / 2, 0, 0); dash.scale.set(1.1, 1, 0.8);
-    var scr = at(g, new T.PlaneGeometry(0.3, 0.12), new T.MeshBasicMaterial({ map: screenTex(), toneMapped: false }), 0.2, 0.8, 0.0); scr.rotation.set(0, -Math.PI / 2 - 0.75, 0); scr.rotateX(-0.45); var bz = new T.Mesh(new T.PlaneGeometry(0.34, 0.15), black); bz.position.set(0, 0, -0.004); scr.add(bz);
-    /* steering wheel in front of the driver */
-    var swg = new T.Group(); swg.position.set(0.1, 0.8, -0.37); swg.rotation.set(0, Math.PI / 2, 0); swg.rotateX(-0.5);
-    at(swg, new T.TorusGeometry(0.13, 0.02, 10, 36), leather, 0, 0, 0);
-    [Math.PI / 2, -Math.PI / 6, Math.PI + Math.PI / 6].forEach(function (a) { var sp = new T.Mesh(new T.BoxGeometry(0.025, 0.14, 0.02), chrome); sp.rotation.z = a; sp.translateY(0.07); swg.add(sp); });
-    at(swg, new T.CylinderGeometry(0.04, 0.04, 0.04, 16), black, 0, 0, 0, Math.PI / 2);
-    g.add(swg); limb(g, [0.1, 0.83, -0.37], [0.3, 0.72, -0.37], 0.025, carbon);
+    /* screen on a short stalk above the centre dash, clear of the dash, tilted up toward the driver side */
+    var sN = new T.Vector3(-0.2, 0.35, -0.91).normalize(), sX = new T.Vector3(0, 1, 0).cross(sN).normalize(), sY = sN.clone().cross(sX);
+    var scr = at(g, new T.PlaneGeometry(0.25, 0.098), new T.MeshBasicMaterial({ map: screenTex(), toneMapped: false }), 0.05, 0.9, 0.0); scr.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(sX, sY, sN));
+    var bz = new T.Mesh(new T.BoxGeometry(0.28, 0.122, 0.02), black); bz.position.set(0, 0, -0.012); scr.add(bz);
+    limb(g, [0.12, 0.76, 0.0], [0.06, 0.88, 0.02], 0.018, carbon);
+    /* steering wheel in front of the left seat: round rim, three spokes, hub, column into the dash */
+    var wN = new T.Vector3(-Math.cos(0.44), Math.sin(0.44), 0), wX = new T.Vector3(0, 0, 1), wY = wN.clone().cross(wX);
+    var swg = new T.Group(); swg.position.set(-0.02, 0.85, -0.37); swg.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(wX, wY, wN));
+    at(swg, new T.TorusGeometry(0.16, 0.019, 14, 56), leather, 0, 0, 0);                                     /* rim */
+    [0, Math.PI, -Math.PI / 2].forEach(function (a) { var sp = new T.Mesh(new T.BoxGeometry(0.12, a === -Math.PI / 2 ? 0.05 : 0.034, 0.012), chrome); sp.rotation.z = a; sp.translateX(0.085); sp.position.z = -0.01; swg.add(sp); });
+    at(swg, new T.CylinderGeometry(0.048, 0.052, 0.04, 24), black, 0, 0, -0.012, Math.PI / 2);              /* hub */
+    at(swg, new T.CylinderGeometry(0.03, 0.03, 0.012, 20), chrome, 0, 0, 0.012, Math.PI / 2);              /* centre cap */
+    at(swg, new T.CylinderGeometry(0.026, 0.034, 0.3, 14), black, 0, 0, -0.18, Math.PI / 2);                /* column */
+    g.add(swg);
     /* raked windshield and black frame */
     var wsg = new T.Group(); wsg.position.set(0.2, 0.98, 0); g.add(wsg);
     var ws = new T.Mesh(new T.PlaneGeometry(1.5, 0.48), glass); ws.rotation.y = Math.PI / 2; wsg.add(ws); wsg.rotation.z = 0.84;
@@ -217,8 +224,8 @@
     var vis = at(sm, new T.SphereGeometry(0.152, 32, 22, -Math.PI * 0.45, Math.PI * 0.9, Math.PI * 0.26, Math.PI * 0.42), visor, -0.575, 1.18, Z, 0, Math.PI, 0); vis.scale.set(1.07, 1.08, 1.0);
     [-1, 1].forEach(function (sd) { var ear = at(sm, new T.CylinderGeometry(0.05, 0.05, 0.03, 16), blk, -0.6, 1.17, Z + sd * 0.148, Math.PI / 2, 0, 0); });
     /* right arm (centre side, +z) to the wheel; left arm (door side, -z) over the door sill */
-    var rS = [-0.58, 0.93, Z + 0.19], rE = [-0.36, 0.66, Z + 0.25], rH = [0.08, 0.865, Z + 0.113];
-    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.5, 0.84, Z - 0.47], lH = [-0.16, 0.86, Z - 0.51];
+    var rS = [-0.58, 0.93, Z + 0.19], rE = [-0.34, 0.69, Z + 0.24], rH = [0.014, 0.922, Z + 0.139];
+    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.36, 0.84, Z - 0.48], lH = [0.04, 0.87, Z - 0.5];
     [[rS, rE, rH], [lS, lE, lH]].forEach(function (a) {
       at(sm, new T.SphereGeometry(0.072, 16, 12), blk, a[0][0], a[0][1] + 0.02, a[0][2]);           /* shoulder panel */
       limb(sm, a[0], a[1], 0.055, suit); limb(sm, a[1], a[2], 0.05, suit);
@@ -425,7 +432,7 @@
   }
   function info(o) {
     if (!o) { S.info.hidden = true; return; }
-    var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + '<button type="button" class="s3-tog" aria-expanded="' + (S.infoOpen ? "true" : "false") + '">' + (S.infoOpen ? "Less" : "More") + "</button></h3><div class=\"s3-body\">", c = o.d;
+    var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + '<button type="button" class="s3-tog" aria-expanded="' + (S.infoOpen ? "true" : "false") + '">' + (S.infoOpen ? "Collapse" : "Expand") + "</button></h3><div class=\"s3-body\">", c = o.d;
     var earth = OBJ.earth && OBJ.earth.d;
     if (o.kind === "sun") h += "<p>" + esc(o.info) + "</p>" + (earth ? "<p>From Earth: " + fmtAU(Math.hypot.apply(null, earth.pos)) + "</p>" : "");
     else if (o.kind === "planet") {
@@ -443,7 +450,7 @@
     }
     h += '<p class="s3-k">Positions: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a>' + (DATA && DATA.epoch ? " · " + esc(DATA.epoch.slice(0, 16).replace("T", " ")) + " UTC" : "") + "</p>";
     S.info.innerHTML = h + "</div>"; S.info.hidden = false; S.info.classList.toggle("open", !!S.infoOpen);
-    var tg = S.info.querySelector(".s3-tog"); if (tg) tg.addEventListener("click", function () { S.infoOpen = !S.infoOpen; S.info.classList.toggle("open", S.infoOpen); tg.textContent = S.infoOpen ? "Less" : "More"; tg.setAttribute("aria-expanded", S.infoOpen ? "true" : "false"); });
+    var tg = S.info.querySelector(".s3-tog"); if (tg) tg.addEventListener("click", function () { S.infoOpen = !S.infoOpen; S.info.classList.toggle("open", S.infoOpen); tg.textContent = S.infoOpen ? "Collapse" : "Expand"; tg.setAttribute("aria-expanded", S.infoOpen ? "true" : "false"); });
   }
   function focus(id, vdir, vmul) {
     var o = OBJ[id]; if (!o) return; SEL = o;
