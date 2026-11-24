@@ -381,6 +381,25 @@
   }
   function addObj(o) { OBJ[o.id] = o; LIST.push(o); S.root.add(o.node); }
 
+  function flyTo(toT, toP, dur) {
+    FLY = { t0: performance.now(), dur: dur || 1100, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: toT.clone(), toP: toP.clone() };
+  }
+  function hookApi() {
+    return { T: T, S: S, LIST: LIST, OBJ: OBJ, esc: esc, imperial: imperial, fmtAU: fmtAU, fmtV: fmtV, flyTo: flyTo };
+  }
+  function attachPlanets() {
+    var run = function () { try { if (w.BNPlanets && w.BNPlanets.attach) w.BNPlanets.attach(hookApi()); } catch (e) {} };
+    if (w.BNPlanets) return run();
+    if (attachPlanets.l) return;
+    attachPlanets.l = 1;
+    var s = d.createElement("script");
+    s.src = w.BN_PLANETS3D || "/api/netmap/planets3d.js";
+    s.async = true;
+    s.onload = run;
+    d.head.appendChild(s);
+  }
+
+
   function build() {
     var root = S.root; while (root.children.length) root.remove(root.children[0]); OBJ = {}; LIST = []; S.rings = [];
     var sun = new T.Group(); sun.add(new T.Mesh(new T.SphereGeometry(3, 40, 24), new T.MeshBasicMaterial({ color: 0xfff1d0 })));
@@ -418,6 +437,7 @@
       addObj({ id: c.id, name: c.name, kind: "craft", node: node, model: model, size: (model.userData.size || 4) * sc, d: c });
     });
     labels();
+    try { attachPlanets(); } catch (e) {}
   }
   function labels() {
     S.labs.innerHTML = "";
@@ -432,6 +452,7 @@
   }
   function info(o) {
     if (!o) { S.info.hidden = true; return; }
+    if (w.BNPlanets && w.BNPlanets.info && w.BNPlanets.info(o, S.info)) return;
     var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + '<button type="button" class="s3-tog" aria-expanded="' + (S.infoOpen ? "true" : "false") + '">' + (S.infoOpen ? "Collapse" : "Expand") + "</button></h3><div class=\"s3-body\">", c = o.d;
     var earth = OBJ.earth && OBJ.earth.d;
     if (o.kind === "sun") h += "<p>" + esc(o.info) + "</p>" + (earth ? "<p>From Earth: " + fmtAU(Math.hypot.apply(null, earth.pos)) + "</p>" : "");
@@ -457,6 +478,7 @@
     LIST.forEach(function (x) { if (x.lab) x.lab.classList.toggle("sel", x === o); });
     S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.id === id ? "true" : "false"); });
     var tgt = o.node.getWorldPosition(new T.Vector3()); if (o.id === "roadster") tgt.y += 0.06; var dist = o.kind === "craft" ? o.size * (o.id === "roadster" ? (S.W < 500 ? 2.1 : 0.95) : 2.2) : o.kind === "sun" ? 26 : Math.max(o.size * 6, 1.5);
+    if (w.BNPlanets && w.BNPlanets.focusDist) dist = w.BNPlanets.focusDist(o, dist, S);
     var dir = S.cam.position.clone().sub(S.ctl.target); if (dir.lengthSq() < 1e-9) dir.set(0, 0.4, 1); dir.normalize();
     if (o.kind === "craft") { dir.set(0.55, 0.35, 0.75); if (o.id === "roadster") { S.spin0 = performance.now(); dir.set(0.3, 0.6, -0.74); } dir.normalize(); }
     if (vdir) { dir.fromArray(vdir).normalize(); dist *= vmul || 1; }
