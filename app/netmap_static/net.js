@@ -222,16 +222,19 @@
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
         if (sf.length) satCard(sf[0].properties.i, e.point); else { hideCard(true); SKY.sel = null; if (map.getSource("trk")) map.getSource("trk").setData(EMPTY); } return; }
       if (window.__gxWxHit && window.__gxWxHit(e.point)) { hideCard(true); return; }   /* a grid alert diamond on top: gridlayer.js shows its card */
-      var f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["pt", "dc"].filter(function (l) { return map.getLayoutProperty(l, "visibility") !== "none"; }) })[0];
+      /* follow-up pt1810u: inside an Internet region (chip on), other items win only on a tight 3 px hit; otherwise the region card opens */
+      var inetHit = ON.internet && INET && map.getLayer("inet-fill") && map.getLayoutProperty("inet-fill", "visibility") !== "none" ? map.queryRenderedFeatures(e.point, { layers: ["inet-fill"] })[0] : null,
+        T = inetHit ? 3 : 8, T9 = inetHit ? 3 : 9;
+      var f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["pt", "dc"].filter(function (l) { return map.getLayoutProperty(l, "visibility") !== "none"; }) })[0];
       if (!f && (ON.towers || ON.grid)) {
         var il = []; INF_K.forEach(function (k) { if (ON[k]) il = il.concat(INF[k].Q); });
-        f = map.queryRenderedFeatures([[e.point.x - 9, e.point.y - 9], [e.point.x + 9, e.point.y + 9]], { layers: il.filter(function (l) { return map.getLayer(l); }) })[0];
+        f = map.queryRenderedFeatures([[e.point.x - T9, e.point.y - T9], [e.point.x + T9, e.point.y + T9]], { layers: il.filter(function (l) { return map.getLayer(l); }) })[0];
         if (f && f.source === "grid") f.properties.kind = f.geometry.type === "Point" ? "ss" : "gl";
         if (f && f.properties.cluster) { var cid = f.properties.cluster_id, cc0 = f.geometry.coordinates; hideCard(true);
           map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
       }
-      if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["sea-ls", "sea-line"] })[0] || map.queryRenderedFeatures(e.point, { layers: ["seaz-fill"] })[0];
-      if (!f && ON.internet && INET && map.getLayer("inet-fill") && map.getLayoutProperty("inet-fill", "visibility") !== "none") f = map.queryRenderedFeatures(e.point, { layers: ["inet-fill"] })[0];
+      if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["sea-ls", "sea-line"] })[0] || (inetHit ? null : map.queryRenderedFeatures(e.point, { layers: ["seaz-fill"] })[0]);
+      if (!f) f = inetHit;
       if (f) showCard(f, e.point, true); else hideCard(true);
     });
   }
@@ -243,12 +246,12 @@
     var P = INET.places || {};
     map.getSource("inet").setData({ type: "FeatureCollection", features: (INETG.features || []).map(function (f) {
       var r = P[f.properties.k], l = r ? r.level : -1;
-      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), o: l >= 3 ? 0.42 : l === 2 ? 0.34 : l === 0 ? 0.12 : 0.08 } }; }) });
+      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
     if (D) applyData();
   }
   function inetCard(p) {
     var r = (INET && INET.places || {})[p.k] || { name: p.n, level: -1, status: "No data", signals: [] }, c = inetCol(r.level);
-    var sig = (r.signals || []).map(function (s) { return '<li>' + esc(s.name) + ' · ' + (s.pct != null ? esc(s.pct) + '% of normal (' + esc(100 - s.pct) + '% drop)' : 'below normal') + (s.since ? ' · since ' + esc(ago(s.since)) : '') + '</li>'; }).join("");
+    var sig = (r.signals || []).map(function (s) { return '<li>' + esc(s.name) + ' · ' + (s.pct != null ? (s.live ? 'now ' : '') + esc(s.pct) + '% of normal (' + esc(100 - s.pct) + '% drop)' : 'below normal') + (s.since ? ' · since ' + esc(ago(s.since)) : '') + '</li>'; }).join("");
     return '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + esc(r.status) + '</span><h3>' + esc(r.name || p.n) + '</h3>' +
       (r.level < 0 ? '<p>No live internet measurements for this place right now.</p>' :
        sig ? '<p>Signals below their normal level:</p><ul>' + sig + '</ul>' : '<p>All IODA signals (routing, active probing, network telescope) at normal levels.</p>') +

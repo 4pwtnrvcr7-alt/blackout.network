@@ -737,7 +737,9 @@ def handle_get(path, qs=None, headers=None):
 
 # warm both caches in the background when the module loads, so the first visitor after a deploy gets live data at once
 def _warm():
-    for f in (data, dc):
+    def inet():   # follow-up pt1810u: first visitor after a deploy gets the Internet layer at once (was ~18 s cold)
+        import netinet; swr("inet", 600, lambda: netinet.build(jget), wait=True)
+    for f in (data, dc, inet):
         try: f()
         except Exception: pass
 if os.environ.get("BN_NETMAP_WARM", "1") != "0":

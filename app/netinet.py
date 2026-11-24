@@ -3,7 +3,7 @@ Source: IODA (Georgia Tech Internet Intelligence Lab), public keyless API v2. In
 monitors) and the last 24 h of outage alerts for countries and regions. Per place and signal the latest alert wins:
 a signal whose latest alert is not "normal" is down. Status: red (outage) if routing (BGP) or active probing is critical,
 or two or more signals are down; amber (degraded) if any one signal is down; green if IODA monitors the place and no
-signal is down (a dip to 95 % of baseline or more is ignored); grey (no data) if IODA does not monitor it or IODA did not answer. Cached 10 min server-side (netmap.swr),
+signal is down (a dip to 95 % of baseline or more is ignored, and a down signal is re-read from IODA raw signals: if its latest value is back at 95 % or more of baseline it counts as recovered); grey (no data) if IODA does not monitor it or IODA did not answer. Cached 10 min server-side (netmap.swr),
 no keys, no writes. Territories (PR, GU, VI, AS, MP) are country-level entities in IODA."""
 import time
 from datetime import datetime, timezone
@@ -26,8 +26,8 @@ def alerts(jget, et):
     n = int(time.time())
     return jget(f"{IODA}/outages/alerts?entityType={et}&from={n - WINDOW}&until={n}&limit=20000", timeout=40, cap=20_000_000).get("data") or []
 
-def judge(al):
-    """al: IODA alerts for one place. Returns (level 0/2/3, signals-down list, since, alert count)."""
+def judge(al, cur=None):
+    """al: IODA alerts for one place; cur: {datasource: latest raw value} for signals re-checked now. Returns (level 0/2/3, signals-down list, since, alert count)."""
     by = {}
     for a in sorted(al, key=lambda a: a.get("time") or 0):
         ds = a.get("datasource"); lv = a.get("level") or "normal"
@@ -40,13 +40,39 @@ def judge(al):
     down = []
     for ds, st in by.items():
         if st["lv"] == "normal": continue
-        pct = round(100 * st["v"] / st["h"]) if st.get("h") and st.get("v") is not None else None
+        v = st.get("v"); live = False
+        if cur and cur.get(ds) is not None: v = cur[ds]; live = True       # current value beats the alert's value
+        pct = round(100 * v / st["h"]) if st.get("h") and v is not None else None
         if pct is not None and pct >= MINOR: continue      # a 1-4 % dip is noise, not an outage (IODA still lists it)
-        down.append(dict(ds=ds, name=SIG[ds], level=st["lv"], pct=pct, value=st.get("v"), baseline=st.get("h"), since=_iso(st["since"])))
+        down.append(dict(ds=ds, name=SIG[ds], level=st["lv"], pct=pct, value=v, live=live, baseline=st.get("h"), since=_iso(st["since"])))
     crit = any(d["level"] == "critical" and d["ds"] in STRONG and (d["pct"] is None or d["pct"] <= 75) for d in down)
     lvl = 3 if (crit or len(down) >= 2) else 2 if down else 0
     since = min((d["since"] for d in down if d["since"]), default=None)
     return lvl, sorted(down, key=lambda d: d["ds"]), since, len(al)
+
+def current(jget, et, code, ds):
+    """Latest non-empty raw value of one IODA signal in the last 2 h (None if IODA has none yet)."""
+    n = int(time.time())
+    d = jget(f"{IODA}/signals/raw/{et}/{code}?from={n - 7200}&until={n}&datasource={ds}", timeout=15).get("data") or []
+    while d and isinstance(d[0], list): d = d[0]
+    vals = [x for x in ((d[0] if d else {}).get("values") or []) if x is not None]
+    return vals[-1] if vals else None
+
+def recheck(jget, todo, cap=40):
+    """todo: [(et, code, ds)] signals the alert window says are down. Returns {(et, code): {ds: value}}."""
+    from concurrent.futures import ThreadPoolExecutor
+    out = {}
+    def one(t):
+        try: return t, current(jget, *t)
+        except Exception: return t, None
+    with ThreadPoolExecutor(8) as ex:
+        for (et, code, ds), v in ex.map(one, todo[:cap]):
+            if v is not None: out.setdefault((et, code), {})[ds] = v
+    return out
+
+def seen_ok(ents, et, code):
+    if et == "country": return {(et, code)} if code in ents["c"] and code != "US" else set()
+    return {(et, code)} if code in ents["r"].values() else set()
 
 def build(jget):
     ents = entities(jget); out = {}
@@ -60,11 +86,15 @@ def build(jget):
             e = a.get("entity") or {}
             if et == "region" and (e.get("attrs") or {}).get("country_code") != "US": continue
             groups.setdefault((et, e.get("code")), []).append(a)
+    todo = []
+    for (et, code), al in groups.items():
+        if (et, code) in seen_ok(ents, et, code): todo += [(et, code, d["ds"]) for d in judge(al)[1]]
+    cur = recheck(jget, todo)     # signals that recovered since their last alert show normal, not stuck amber/red
     chk = _iso(time.time())
     def row(key, name, et, code):
         feed = ok[et] is not None
         if not feed: return dict(k=key, name=name, level=-1, status="No data", signals=[], checked=chk, src=f"{UI}/{et}/{code}")
-        lvl, down, since, n = judge(groups.get((et, code), []))
+        lvl, down, since, n = judge(groups.get((et, code), []), cur.get((et, code)))
         return dict(k=key, name=name, level=lvl, status={3: "Outage", 2: "Degraded", 0: "Normal"}[lvl], signals=down, since=since,
                     alerts_24h=n, checked=chk, src=f"{UI}/{et}/{code}")
     for code, name in ents["c"].items():
