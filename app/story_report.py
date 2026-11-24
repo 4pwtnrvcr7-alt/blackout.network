@@ -407,7 +407,7 @@ def snapshot(rank, rows, officials, eff, high_at=None, first=None):
     return (f'<figure class="sr-snapfig"><figcaption class="sr-lab">Signal snapshot</figcaption>{scale(rank, RANK_NAME.get(rank, ""))}'
             f'<p class="sr-snap-ax">Rank {rank} of 10 \u00b7 {E(RANK_NAME.get(rank, ""))}</p>'
             f'<dl class="sr-stats">{li}</dl>'
-            f'<p class="sr-note">Built from the reports BLACKOUT.NETWORK logged for this story. Rank rules: <a href="/scoring">How we score</a>.</p></figure>')
+            f'<p class="sr-note">Built from the reports BLACKOUT.NETWORK logged for this story. ' + ('Ranks follow our published rules.' if __import__("deactivated").is_off("/scoring") else 'Rank rules: <a href="/scoring">How we score</a>.') + '</p></figure>')
 
 def share_card(sh):
     """Outlet share image shown as a link-preview card (credited, links to the article). Only cards the desk approved render."""
