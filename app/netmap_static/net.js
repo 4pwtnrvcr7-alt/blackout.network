@@ -545,13 +545,17 @@
   function infCard(p) {
     var h = "", c;
     if (p.kind === "hy") {
-      var hd = INF.hydro.d, hr = hd.p[p.i], lv = HLV[hr[7]], hs = lv ? lv.status : "na"; c = HCOL[hs];
-      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Hydroelectric dam · ' + esc(HWORD[hs]) + '</span><h3>' + esc(lv ? lv.dam : hr[2]) + '</h3><dl>' +
+      var hd = INF.hydro.d, hr = hd.p[p.i], lv = HLV[hr[7]], hs = lv ? lv.status : "na", sat = lv && lv.method === "satellite, relative to usual level"; c = HCOL[hs];
+      var hw = sat && hs !== "na" ? { ok: "Near usual level (satellite)", low: "Well below usual level (satellite)", out: "Far below usual level (satellite)" }[hs] : HWORD[hs];
+      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Hydroelectric dam · ' + esc(hw) + '</span><h3>' + esc(lv && lv.dam ? lv.dam : hr[2]) + '</h3><dl>' +
         '<dt>Capacity</dt><dd>' + num(hr[3]) + ' MW</dd>' + (hr[4] ? '<dt>Operator</dt><dd>' + esc(hr[4]) + '</dd>' : "") + (hr[5] ? '<dt>In service</dt><dd>' + hr[5] + '</dd>' : "") + '<dt>Country</dt><dd>' + esc(hr[6]) + '</dd>' +
-        (lv && lv.ft != null ? '<dt>' + esc(lv.lake) + '</dt><dd>' + num(Math.round(lv.ft)) + ' ft, ' + num(Math.round(lv.above_min)) + ' ft above minimum power pool (' + num(lv.min_pool) + ' ft)</dd>' +
-          '<dt>7-day trend</dt><dd>' + (lv.chg7 == null ? "–" : (lv.chg7 >= 0 ? "+" : "") + lv.chg7.toFixed(1) + " ft") + '</dd><dt>Reading</dt><dd>' + esc(lv.date) + '</dd>' : "") + '</dl>' +
-        (lv ? '<div class="acts">' + linkA(lv.url, "Reclamation lake levels") + '</div><p class="age">Amber at or below ' + num(lv.amber) + ' ft, red at or below ' + num(lv.red) + ' ft. Source: ' + esc(lv.src) + '.</p>'
-          : '<p class="age">No free live water-level feed with a published minimum power pool for this reservoir, so no risk colour is shown.</p>') +
+        (lv && !sat && lv.ft != null ? '<dt>' + esc(lv.lake) + '</dt><dd>' + num(Math.round(lv.ft)) + ' ft, ' + num(Math.round(lv.above_min)) + ' ft above ' + esc(lv.min_name || "minimum power pool") + ' (' + num(lv.min_pool) + ' ft)</dd>' +
+          '<dt>7-day trend</dt><dd>' + (lv.chg7 == null ? "–" : (lv.chg7 >= 0 ? "+" : "") + lv.chg7.toFixed(1) + " ft") + '</dd><dt>Reading</dt><dd>' + esc(lv.date) + '</dd>' : "") +
+        (sat && lv.dev_m != null ? '<dt>Reservoir</dt><dd>' + esc(lv.lake) + ' (satellite)</dd><dt>Vs. usual level</dt><dd>' + (lv.dev_m >= 0 ? "+" : "") + lv.dev_m.toFixed(1) + ' m vs. the median for this time of year (' + lv.years + ' years since ' + lv.since + ')</dd><dt>Satellite pass</dt><dd>' + esc(lv.date) + '</dd>' : "") +
+        (sat && lv.dev_m == null && lv.date ? '<dt>Last satellite pass</dt><dd>' + esc(lv.date) + '</dd>' : "") + '</dl>' +
+        (!lv ? '<p class="age">No free live water-level feed for this reservoir, so no risk colour is shown.</p>'
+          : sat ? '<div class="acts">' + linkA(lv.url, "NASA G-REALM lake levels") + '</div><p class="age">Method: satellite, relative to usual level. Amber when below the 20th percentile for this time of year and 0.5 m or more under the median; red below the 5th percentile and 1 m or more under. No power-pool threshold is published for this lake.' + (hs === "na" ? " Grey: " + esc(lv.err || "no recent reading") + "." : "") + ' Source: ' + esc(lv.src) + '.</p>'
+          : '<div class="acts">' + linkA(lv.url, /Army/.test(lv.src) ? "USACE project data" : "Reclamation lake levels") + '</div><p class="age">Method: lake elevation vs. the official ' + esc(lv.min_name || "minimum power pool") + (lv.level ? ' (CWMS "' + esc(lv.level) + '")' : "") + '. Amber at or below ' + num(lv.amber) + ' ft, red at or below ' + num(lv.red) + ' ft.' + (lv.top ? ' Planned seasonal drawdown can bring this pool low.' : "") + ' Source: ' + esc(lv.src) + '.</p>') +
         '<p class="age">Plant data: WRI Global Power Plant Database (2021), CC BY 4.0. Plants of 25 MW and up.</p>';
     } else if (p.kind === "tw") {
       var d = INF.towers.d, r = d.p[p.i];
