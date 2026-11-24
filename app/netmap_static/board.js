@@ -193,24 +193,60 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     if (r) { var mx = Math.max.apply(null, r.concat([1])), bw2 = W / 24; r.forEach(function (v, i) { var bh = v ? 3 + (H - 3) * v / mx : 1; s += '<rect x="' + (i * bw2 + 0.6).toFixed(1) + '" y="' + (H - bh).toFixed(1) + '" width="' + (bw2 - 1.2).toFixed(1) + '" height="' + bh.toFixed(1) + '" class="b-rp"/>'; }); return { svg: s + '</svg>', lbl: "Reports, 24 h" }; }
     return { svg: strip(n), lbl: "24 h" };
   }
+  /* Nov 24 2026 (Matt): cards open an inline accordion (no navigation) with the real detail; white mark top-right (Simple Icons CC0 or an
+     original generic icon for the type, served from /api/netmap/logos.svg); one colour per state for label, dot, border and bars. */
+  var LOGOS = root.getAttribute("data-logos") || "/api/netmap/logos.svg";
+  function logo(n) { return '<svg class="nb-lg" aria-hidden="true" focusable="false"><use href="' + esc(LOGOS) + '#l-' + esc(n.id) + '"/></svg>'; }
+  function hrsOk(n) {   /* hours per state over the last 24 h, from the provider's own status */
+    var h = n.h24 || [], c = [0, 0, 0], have = 0; h.forEach(function (v) { if (v == null || v < 0) return; have++; c[v === 0 ? 0 : v === 1 ? 1 : 2]++; });
+    if (!have) return ""; var o = []; if (c[0]) o.push("Normal " + c[0] + " h"); if (c[1]) o.push("Minor issue " + c[1] + " h"); if (c[2]) o.push("Disruption / outage " + c[2] + " h"); return o.join(" · ");
+  }
+  function areas(n) {   /* affected components / regions, from the provider's own incident titles ("Service: ...", "... in <place>") */
+    var a = []; (n.incidents || []).forEach(function (i) { var t = i.t || "", m = /^([^:]{2,60}):/.exec(t), r = / in ([A-Z][\w .,'()-]{1,40})$/.exec(t);
+      if (m && a.indexOf(m[1]) < 0) a.push(m[1]); if (r && a.indexOf(r[1]) < 0) a.push(r[1]); }); return a.slice(0, 6);
+  }
+  function detail(n) {
+    var r = rep(n.id), inc = n.incidents || [], h = "", lv = LV(n.level), m = chart24(n), ar = areas(n);
+    h += '<p class="nb-dst"><i></i>' + esc(n.link_only ? "Official status page only" : (n.status || word(n))) + '</p>';
+    if (inc.length) {
+      h += '<p class="nb-dk">Active incidents</p><ul class="nb-di">' + inc.slice(0, 5).map(function (i) {
+        var rc = (n.recent || []).filter(function (x) { return x.t === i.t; })[0];
+        return '<li><b>' + esc(i.t) + '</b><span>Started ' + esc(when(i.since)) + ' (' + esc(ago(i.since)) + ')' + (rc && rc.e ? ' · resolved ' + esc(ago(rc.e)) : " · ongoing") + (i.impact ? ' · impact ' + esc(i.impact) : "") + '</span></li>';
+      }).join("") + (inc.length > 5 ? '<li><span>+' + (inc.length - 5) + ' more on the full details page</span></li>' : "") + '</ul>';
+    } else h += '<p class="nb-dno">No active incidents</p>';
+    if (ar.length) h += '<p class="nb-dk">Affected</p><p class="nb-da">' + ar.map(esc).join(" · ") + '</p>';
+    var past = (n.recent || []).filter(function (x) { return x.e; }).slice(0, 2);
+    if (past.length) h += '<p class="nb-dk">Recently resolved</p><ul class="nb-di">' + past.map(function (x) { return '<li><b>' + esc(x.t) + '</b><span>' + esc(when(x.s)) + ' to ' + esc(when(x.e)) + '</span></li>'; }).join("") + '</ul>';
+    h += '<dl class="nb-dd"><dt>Last checked</dt><dd>' + (D && D.generated ? esc(when(D.generated)) + ' (' + esc(ago(D.generated)) + ')' : "–") + '</dd>' +
+      '<dt>24 h</dt><dd>' + esc(hrsOk(n) || (n.watch ? m.lbl : "No hourly history yet")) + '</dd>' +
+      '<dt>30 d uptime</dt><dd>' + (n.uptime != null ? n.uptime.toFixed(2) + '%' + (n.basis ? ' <small>(' + esc(n.basis) + ')</small>' : "") : "Not published") + '</dd>' +
+      '<dt>Reports</dt><dd>' + (r.h24 || 0) + ' in 24 h' + (r.h1 ? ' · ' + r.h1 + ' in the last hour' : "") + '</dd></dl>';
+    h += '<div class="nb-dc">' + m.svg + '</div>';
+    h += '<div class="nb-fa">' + (url(n.status_url || n.ioda) ? '<a class="nb-fe" href="' + url(n.status_url || n.ioda) + '" target="_blank" rel="noopener">Official status</a>' : "") +
+      '<a class="nb-fe" href="' + (url(n.detail) || "/grid/status/" + esc(n.id)) + '">Full details</a>' +
+      (n.link_only ? "" : '<button type="button" class="nb-fd" data-down="' + esc(n.id) + '">' + (mine(n.id) ? "Reported" : "Down for me") + '</button>') + '</div>';
+    return h;
+  }
   function tile(n) {
-    var r = rep(n.id), st = "s-" + LV(n.level) + (r.surge && n.level < 2 ? " s-rep" : ""), ch = chainHits(n.id), f = !!FLIP[n.id], nm = short(n.name);
-    var front = '<button type="button" class="nb-t nb-ff ' + st + '" data-flip="' + esc(n.id) + '" aria-pressed="' + f + '" aria-expanded="' + f + '" aria-label="' + esc(nm + ": " + word(n) + ". Show details") + '">' +
+    var r = rep(n.id), st = "s-" + LV(n.level) + (r.surge && n.level < 2 ? " s-rep" : ""), ch = chainHits(n.id), f = !!FLIP[n.id], nm = short(n.name), pid = "nbd_" + esc(n.id);
+    var head = '<button type="button" class="nb-t nb-ff ' + st + '" data-flip="' + esc(n.id) + '" aria-expanded="' + f + '" aria-controls="' + pid + '" aria-label="' + esc(nm + ": " + word(n) + (f ? ". Hide details" : ". Show details")) + '">' + logo(n) +
       '<span class="nb-tn">' + esc(nm) + '</span>' + (sub(n.name) ? '<span class="nb-ts">' + esc(sub(n.name)) + '</span>' : '<span class="nb-ts">&nbsp;</span>') +
       '<span class="nb-tw"><i></i>' + esc(n.link_only ? "Link to status" : r.surge && n.level < 2 ? "People report problems" : word(n)) + (ch.length && n.level < 2 ? '<em>Likely affected</em>' : "") + '</span>' + strip(n) +
-      '<span class="nb-tf"><span>24 h</span>' + (r.h1 ? '<span class="nb-tr">' + r.h1 + ' report' + (r.h1 > 1 ? "s" : "") + ' / h</span>' : (n.uptime != null ? '<span>' + n.uptime.toFixed(2) + '% · 30 d</span>' : "")) + '</span></button>';
-    var m = chart24(n), txt = n.link_only ? "Official status page only" : (n.status || word(n));
-    var back = '<div class="nb-fb ' + st + '"' + (f ? "" : ' aria-hidden="true"') + '><button type="button" class="nb-fx" data-flip="' + esc(n.id) + '" aria-label="Back to the front of ' + esc(nm) + '"' + (f ? "" : ' tabindex="-1"') + '>' +
-      '<span class="nb-fw"><i></i>' + esc(nm) + '</span><span class="nb-fs">' + esc(txt) + '</span>' + m.svg + '<span class="nb-tf"><span>' + esc(m.lbl) + '</span><span>' + esc(m.tail || (r.h24 ? r.h24 + " reports today" : n.kind === "asn" ? "IODA signal" : "Status page")) + '</span></span></button>' +
-      '<div class="nb-fa"><a class="nb-fe" href="/grid/status/' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>Expand</a>' +
-      (n.link_only ? "" : '<button type="button" class="nb-fd" data-down="' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>' + (mine(n.id) ? "Reported" : "Down for me") + '</button>') + '</div></div>';
-    return '<div class="nb-fc' + (f ? " flip" : "") + '" data-fc="' + esc(n.id) + '"><div class="nb-fi">' + front + back + '</div></div>';
+      '<span class="nb-tf"><span>24 h</span>' + (r.h1 ? '<span class="nb-tr">' + r.h1 + ' report' + (r.h1 > 1 ? "s" : "") + ' / h</span>' : (n.uptime != null ? '<span>' + n.uptime.toFixed(2) + '% · 30 d</span>' : "")) + '</span>' +
+      '<span class="nb-tx" aria-hidden="true">' + (f ? "Hide details" : "Expand") + '<i></i></span></button>';
+    var panel = '<div class="nb-fb ' + st + '" id="' + pid + '" role="region" aria-label="' + esc(nm) + ' details"' + (f ? "" : " hidden") + '>' + (f ? detail(n) : "") + '</div>';
+    return '<div class="nb-fc' + (f ? " open" : "") + '" data-fc="' + esc(n.id) + '">' + head + panel + '</div>';
   }
   function flip(id, on) {
-    var cards = root.querySelectorAll('[data-fc="' + id + '"]'); FLIP[id] = on == null ? !FLIP[id] : on; if (!FLIP[id]) delete FLIP[id];
-    cards.forEach(function (c) { c.classList.toggle("flip", !!FLIP[id]); var b = c.querySelector(".nb-fb"), ff = c.querySelector(".nb-ff");
-      if (b) { b.setAttribute("aria-hidden", FLIP[id] ? "false" : "true"); b.querySelectorAll("a,button").forEach(function (x) { if (FLIP[id]) x.removeAttribute("tabindex"); else x.setAttribute("tabindex", "-1"); }); }
-      if (ff) { ff.setAttribute("aria-pressed", !!FLIP[id]); ff.setAttribute("aria-expanded", !!FLIP[id]); if (FLIP[id]) ff.setAttribute("tabindex", "-1"); else ff.removeAttribute("tabindex"); } });
+    FLIP[id] = on == null ? !FLIP[id] : on; if (!FLIP[id]) delete FLIP[id];
+    var n = byId(id);
+    root.querySelectorAll('[data-fc="' + id + '"]').forEach(function (c) {
+      var o = !!FLIP[id], b = c.querySelector(".nb-fb"), ff = c.querySelector(".nb-ff"), tx = c.querySelector(".nb-tx");
+      c.classList.toggle("open", o);
+      if (b) { if (o && n) b.innerHTML = detail(n); b.hidden = !o; }
+      if (ff) { ff.setAttribute("aria-expanded", o); ff.setAttribute("aria-label", short(n ? n.name : id) + ": " + word(n) + (o ? ". Hide details" : ". Show details")); }
+      if (tx) tx.innerHTML = (o ? "Hide details" : "Expand") + "<i></i>";
+    });
   }
   function groups() {
     var all = nets(), h = "";
@@ -223,7 +259,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
       x.ns.forEach(function (n) { h += tile(n); });
       h += '</div></section>';
     });
-    $("nb_groups").innerHTML = h;
+    $("nb_groups").innerHTML = '<ul class="nb-key" aria-label="Colour key"><li class="s-ok"><i></i>Normal</li><li class="s-minor"><i></i>Minor issue</li><li class="s-out"><i></i>Disruption / outage</li></ul>' + h;
   }
 
   /* ---------- problems now + chain reactions + report map ---------- */

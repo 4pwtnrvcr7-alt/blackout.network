@@ -257,3 +257,4 @@ body.nx-board .nx-side,body.nx-sky .nx-side{display:none}
 body.nx-sky .nx-lnk{display:none!important}
 @media (max-width:767px){.nx-leg .nx-lnk{display:flex;gap:9px;margin:4px 0 0;padding-top:4px}.nx-leg:has(.nx-lnk){border-radius:14px}}
 @media (max-width:767px){body:not(.nx-sky) .nx-side{top:calc(212px + env(safe-area-inset-top))}}
+.nx-chip.s-deg i{background:var(--nx-out)}   /* Nov 24 2026: a network "Disruption" is red, same as the Status cards */

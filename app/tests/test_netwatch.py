@@ -47,21 +47,23 @@ class Watch(unittest.TestCase):
             netmap.data = lambda: dict(generated="2026-11-23T20:00:00Z", nets=[dict(id="wellsfargo", name="Wells Fargo", group="bank", kind="watch", level=-1, watch=True,
                                        status="No live signal", sig=dict(news=0, news48=0, web="reachable"), news=[], h24=[0] * 24,
                                        status_url=None, support="https://www.wellsfargo.com/help/", basis="no public status page")])
-            code, html, ct = netmap.handle_get("/network/status/wellsfargo")
+            code, html, ct = netmap.handle_get("/grid/status/wellsfargo")
             self.assertEqual(code, 200); h = html.decode() if isinstance(html, bytes) else html
             for s in ("Wells Fargo", "Uptime, last 90 days", "Incident history", "Not published", "sd_down", "None published", "No live signal", "Website reachable"): self.assertIn(s, h)
             self.assertNotIn("No outage reported", h)
             self.assertNotIn("#F5A524", h)
-            self.assertEqual(netmap.handle_get("/network/status/nope")[0], 404)
+            self.assertEqual(netmap.handle_get("/grid/status/nope")[0], 404)
             import netpages
-            self.assertEqual(netpages.handle_get("/network/status/wellsfargo", {})[0], 200)
+            self.assertEqual(netpages.handle_get("/grid/status/wellsfargo", {})[0], 200)
         finally: netmap.data = orig
 
-    def test_flip_cards(self):
+    def test_accordion_cards(self):
         js = open(os.path.join(APP, "netmap_static", "board.js"), encoding="utf-8").read()
         css = open(os.path.join(APP, "netmap_static", "board.css"), encoding="utf-8").read()
-        for s in ("data-flip", "/network/status/", "Expand", "nb-fb", "wells fargo"): self.assertIn(s, js)
-        for s in (".nb-fc.flip .nb-fi", "backface-visibility", "rotateY(180deg)", "prefers-reduced-motion"): self.assertIn(s, css)
+        # Nov 24 2026 (Matt): inline accordion instead of the flip; Full details keeps the bookmarkable /grid/status/<id> page
+        for s in ("data-flip", "/grid/status/", "Expand", "Hide details", "nb-fb", "wells fargo", "Full details", "Official status", "No active incidents", "Last checked", "aria-expanded", "nb-lg", "nb-key"): self.assertIn(s, js)
+        for s in (".nb-fc.open", ".nb-fb[hidden]", ".nb-lg", ".nb-key", "prefers-reduced-motion"): self.assertIn(s, css)
+        self.assertNotIn("rotateY", css); self.assertNotIn("location.href", js)   # no flip, no auto-navigation
         self.assertNotIn("nb-grid", js)   # bnt/theme.css forces every *-grid to one column on phones
 
     def test_history_keeps_90_days(self):
