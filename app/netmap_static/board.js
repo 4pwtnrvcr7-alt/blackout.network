@@ -36,11 +36,17 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
   function when(ts) { var d = new Date(ts); if (!isFinite(d)) return ""; var dl = dayLbl(ts); return (dl === "Today" ? "" : dl + ", ") + tm(ts) + (TZ ? " " + TZ : ""); }
   function dur(m) { m = Math.max(1, Math.round(m)); return m < 60 ? m + " min" : m < 1440 ? Math.floor(m / 60) + " h" + (m % 60 ? " " + (m % 60) + " min" : "") : Math.round(m / 1440) + " d"; }
   function ago(ts) { var m = (Date.now() - Date.parse(ts)) / 60000; return !isFinite(m) ? "" : m < 1 ? "just now" : m < 60 ? Math.round(m) + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; }
-  function nets() { return D && D.nets ? D.nets : []; }
+  function nets() { return D && D.nets ? D.nets.filter(function (n) { return !n.link_only && n.level >= 0; }) : []; }   /* pt1787u: live signal only */
   function byId(id) { var a = nets(); for (var i = 0; i < a.length; i++) if (a[i].id === id) return a[i]; return null; }
   function rep(id) { return (B && B.reports && B.reports[id]) || { h1: 0, h24: 0, hrs: null, states: {}, surge: false, base: 0 }; }
   function deps() { return (B && B.deps) || []; }
   function hot(n) { return n.level >= 2 || rep(n.id).surge; }
+  function eff(n) { return Math.max(n.level >= 0 ? n.level : 0, rep(n.id).surge ? 2 : 0); }   /* pt1787u: red (3) > orange (2) > minor (1) > green (0) */
+  function changed(n) {   /* latest state change we know of: an incident start or end */
+    var t = 0; (n.incidents || []).forEach(function (i) { t = Math.max(t, Date.parse(i.since) || 0); });
+    (n.recent || []).forEach(function (i) { t = Math.max(t, Date.parse(i.s) || 0, Date.parse(i.e) || 0); }); return t;
+  }
+  function order(a, b) { return (eff(b) - eff(a)) || (changed(b) - changed(a)) || a.name.localeCompare(b.name); }
   function score(n) { var r = rep(n.id); return (n.level >= 0 ? n.level : 0) * 10 + (r.surge ? 15 : 0) + Math.min(9, r.h1); }
   function upsOf(id) { return deps().filter(function (d) { return d.down.indexOf(id) >= 0; }); }
   function chainHits(id) { return upsOf(id).filter(function (d) { var u = byId(d.up); return u && u.level >= 2; }); }
@@ -208,9 +214,9 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
   }
   function groups() {
     var all = nets(), h = "";
-    var gs = GB.map(function (g) { var ns = all.filter(function (n) { return g.g.indexOf(n.group) >= 0; }); ns.sort(function (a, b) { return (score(b) - score(a)) || a.name.localeCompare(b.name); });
-      return { g: g, ns: ns, worst: ns.reduce(function (m, n) { return Math.max(m, score(n)); }, 0) }; }).filter(function (x) { return x.ns.length; });
-    gs.sort(function (a, b) { return (b.worst >= 20 ? b.worst : 0) - (a.worst >= 20 ? a.worst : 0); });   /* groups with a real problem move up; otherwise the fixed order */
+    var gs = GB.map(function (g) { var ns = all.filter(function (n) { return g.g.indexOf(n.group) >= 0; }); ns.sort(order);
+      return { g: g, ns: ns, i: GB.indexOf(g), worst: ns.length ? eff(ns[0]) : 0, last: ns.length && eff(ns[0]) ? changed(ns[0]) : 0 }; }).filter(function (x) { return x.ns.length; });
+    gs.sort(function (a, b) { return (b.worst - a.worst) || (b.last - a.last) || (a.i - b.i); });   /* pt1787u: sections with problems move to the top, worst first, re-sorted on every refresh */
     gs.forEach(function (x) {
       var bad = x.ns.filter(function (n) { return n.level >= 2; }).length, ok = x.ns.filter(function (n) { return n.level === 0 || n.level === 1; }).length, mi = x.ns.filter(function (n) { return n.level === 1; }).length;
       h += '<section class="nb-g" aria-label="' + esc(x.g.name) + '"><div class="nb-gh"><h2>' + esc(x.g.name) + '</h2><span class="' + (bad ? "c-deg" : "") + '">' + (bad ? bad + " with problems" : (mi ? (ok - mi) + " normal · " + mi + " minor" : ok + " of " + x.ns.length + " normal")) + '</span></div><div class="nb-tl">';
@@ -231,13 +237,13 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
       '<p class="nb-chs"><a href="' + url(d.src) + '" target="_blank" rel="noopener">' + esc(d.why) + '</a></p></div>';
   }
   function now() {
-    var all = nets().filter(function (n) { return !n.link_only; }), bad = all.filter(hot).sort(function (a, b) { return score(b) - score(a); });
+    var all = nets().filter(function (n) { return !n.link_only; }), bad = all.filter(hot).sort(function (a, b) { return (score(b) - score(a)) || (changed(b) - changed(a)); });
     var tracked = all.filter(function (n) { return n.level >= 0; }), ok = tracked.filter(function (n) { return n.level <= 1; }).length, minor = tracked.filter(function (n) { return n.level === 1; }).length;
     var pulse = $("nb_pulse"), sec = $("nb_now");
     var worst = bad.length ? Math.max.apply(null, bad.map(function (n) { return n.level; })) : 0;
     pulse.className = "nb-pulse c-" + (bad.length ? (worst >= 3 ? "out" : worst === 2 ? "deg" : "rep") : "ok");
     pulse.innerHTML = '<i></i><div><p class="nb-pt">' + (bad.length ? bad.length + (bad.length > 1 ? " services have problems right now" : " service has a problem right now") : "No major U.S. outages right now") + '</p>' +
-      '<p class="nb-ps">' + (ok - minor) + " normal" + (minor ? " · " + minor + " minor issue" + (minor > 1 ? "s" : "") : "") + (D && D.summary && D.summary.no_signal ? " · " + D.summary.no_signal + " no live signal" : "") + " · " + all.length + " tracked" + (D && D.generated ? " · checked " + ago(D.generated) : "") + '</p></div>';
+      '<p class="nb-ps">' + (ok - minor) + " normal" + (minor ? " · " + minor + " minor issue" + (minor > 1 ? "s" : "") : "") + " · " + all.length + " tracked" + (D && D.generated ? " · checked " + ago(D.generated) : "") + '</p></div>';
     var chains = deps().filter(function (d) { var u = byId(d.up); return u && u.level >= 2; });
     if (!bad.length) { sec.hidden = true; sec.innerHTML = ""; }
     else {
@@ -322,7 +328,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
   }
   var pB = loadBoard().then(function () { if (window.__nxStep) window.__nxStep("rep", 1); });
   (window.__nxData || fetch("/api/netmap/data").then(function (r) { return r.json(); })).then(function (j) {
-    D = j; render();
+    D = window.__nxLive ? window.__nxLive(j) : j; render();
     var q = new URLSearchParams(location.search).get("q"); if (q) { qi.value = q; var h = find(q); if (h.length) showVerdict(h[0]); }
   }, function () { $("nb_pulse").innerHTML = '<i></i><div><p class="nb-pt">Network data is unavailable right now</p><p class="nb-ps">Try again in a minute.</p></div>'; });
   document.addEventListener("nx:data", function (e) { D = e.detail; render(); });

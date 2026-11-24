@@ -91,8 +91,9 @@ def cable_names():
     global _NAMES
     if _NAMES is None:
         try:
-            fs = json.load(open(GEO)).get("features") or []
-            nm = {f["properties"]["n"] for f in fs if f["geometry"]["type"] == "LineString" and f["properties"].get("n")}
+            with open(GEO) as fh: gj = json.load(fh)
+            fs = gj.get("features") or []
+            nm = set(gj.get("names") or []) or {f["properties"]["n"] for f in fs if f["geometry"]["type"] == "LineString" and f["properties"].get("n")}   # names: every cable, incl. routes not drawn
             _NAMES = sorted({re.sub(r"\s*(cable system|submarine cable system|cable|system|seg(?:ment)?\.?\s*[\w.]+)\s*$", "", n, flags=re.I).strip() for n in nm} - {""}, key=len, reverse=True)
         except Exception: _NAMES = []
     return _NAMES
