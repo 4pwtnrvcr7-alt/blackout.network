@@ -158,7 +158,7 @@ MENU3 = [
  ("latest", "Live", "The Wire, the heat map and what's happening now.",
   [("threat", "The Wire"), ("heatmap", "Heat Map"), ("weather", "Weather"), ("noise", "Background Noise")]),
  ("threats", "Threats", "Grid, network, space weather, AI and crime.",
-  [("grid", "The Grid"), ("net", "Network Status"), ("solar_seismic", "Solar & Seismic"),
+  [("net", "The Grid"), ("solar_seismic", "Solar & Seismic"),
    ("ai", "AI Threats"), ("@crime", "Crime"), ("starlink", "Starlink")]),
  ("politics", "News", "The brief, politics, elections and markets.",
   [("newsletter", "Newsletter"), ("midterms", "Midterms 2026"), ("politics", "Politics"), ("gov", "Government"),
@@ -199,7 +199,7 @@ M3_SOON = set()
 M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets"),   # Nov 18 (pt1661u): Markets opens the /markets overview
            "newsletter": ("newsletter", "/newsletter"), "sources": ("sources", "/sources"),
            "midterms": ("midterms", "/midterms"),
-           "grid": ("grid", "/grid"),
+           "grid": ("grid", "/network"),   # Nov 24 2026: The Grid merged into /network
            "weather": ("weather", "/weather"),
            "net": ("net", "/network")}   # Nov 23 2026 (pt1763u): Network Status opens the /network board, not /live#network
              # Nov 21 2026 (pt1737u): The Grid opens the full-screen /grid page, not the old /live#grid dashboard tab   # Nov 21: menu opens the standalone pages, same as the top bar
@@ -242,7 +242,7 @@ def _active_href(sn, active):
     """Menu key of the current page -> its menu href (for aria-current in menu v5)."""
     for k, h, _ in PRIMARY:
         if k == active: return h
-    return {"@map": "/map", "heatmap": "/map", "@markets": "/markets", "finance": "/markets", "grid": "/grid", "weather": "/weather",
+    return {"@map": "/map", "heatmap": "/map", "@markets": "/markets", "finance": "/markets", "grid": "/network", "weather": "/weather",
             "net": "/network", "newsletter": "/newsletter", "threat": "/wire"}.get(active)
 
 def drawer(sn, active=""):

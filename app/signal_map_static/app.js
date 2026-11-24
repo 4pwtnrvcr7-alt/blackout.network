@@ -56,7 +56,7 @@
     if (/\b(swpc|space weather|solar flare|geomagnetic)\b/i.test(b))
       return { href: "/#solar", ext: false, kind: "tracker", label: "Solar & Seismic on BLACKOUT.NETWORK ›" };
     if (/\b(power grid|grid status)\b/i.test(b))
-      return { href: "/grid", ext: false, kind: "tracker", label: "Energy grid on BLACKOUT.NETWORK ›" };
+      return { href: "/network", ext: false, kind: "tracker", label: "The Grid on BLACKOUT.NETWORK ›" };
     return null;
   }
   function fallback(c) {

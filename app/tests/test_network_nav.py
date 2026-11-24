@@ -11,9 +11,10 @@ class NetworkStatusNav(unittest.TestCase):
     def test_menu_links_the_status_board(self):
         import sitenav, sitenav_ui
         rows = {k: (l, h) for _, _, _, rs in sitenav_ui.menu3_sections(sitenav) for k, l, h in rs}
-        self.assertEqual(rows["net"], ("Network Status", "/network"))
+        self.assertEqual(rows["net"], ("The Grid", "/network"))   # Nov 24 2026 (pt1795u): renamed, merged with The Grid
         html = sitenav.header_html("")
-        self.assertIn('<a href="/network">Network Status</a>', html)
+        self.assertIn('href="/network"', html)
+        self.assertNotIn("Network Status", html)
         self.assertNotIn("/live#network", html)
         self.assertNotIn('href="/#network"', html)
         self.assertNotIn('href="/#net"', html)
@@ -43,7 +44,7 @@ class NetworkStatusNav(unittest.TestCase):
     def test_provider_crumbs_point_at_the_board(self):
         for name in ("netpages.py", "netstarlink.py"):
             t = _read(name)
-            self.assertIn('<a href="/network">Network Status</a>', t, name)
+            self.assertIn('<a href="/network">The Grid</a>', t, name)
             self.assertNotIn('href="/#net"', t, name)
 
 

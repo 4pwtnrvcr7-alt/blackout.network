@@ -70,7 +70,7 @@
   /* ---------- loader: glowing network built in front of you, progress tracks the real preload ---------- */
   var P = { map: 0, nets: 0, out: 0, dc: 0, rep: 0 }, W8 = { map: 0.3, nets: 0.3, out: 0.1, dc: 0.15, rep: 0.15 }, shown = 0, ldDone = false, t0 = performance.now();
   function prog() { var p = 0; for (var k in P) p += W8[k] * P[k]; return Math.min(1, p); }
-  function step(k, v) { P[k] = Math.max(P[k], v); if (v >= 1) { var li = document.querySelector('.nx-lds li[data-s="' + k + '"]'); if (li) li.classList.add("on"); } if (prog() >= 0.999) setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0))); }   /* never a flash: the build shows for at least ~2.6 s */
+  function step(k, v) { P[k] = Math.max(P[k], v); if (v >= 1) { var li = document.querySelector('#nx_ld li[data-s="' + k + '"]'); if (li) li.classList.add("on"); } if (!BOOT && !ldDone) { var pn = $("nx_ldn"); if (pn) pn.textContent = ("0" + Math.min(99, Math.round(prog() * 100))).slice(-2) + "%"; } if (prog() >= 0.999) setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0))); }   /* never a flash: the build shows for at least ~2.6 s */
   function finish() {
     if (ldDone) return; ldDone = true; shown = 1; if (!BOOT) $("nx_ldn").textContent = "100%";
     var gone = false;
@@ -116,7 +116,7 @@
   setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, map = null, ready = false;
-  var ON = { internet: true, power: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
+  var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
   function boot() {
@@ -124,6 +124,7 @@
     map = new maplibregl.Map({ container: "nx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD() }, minZoom: 1, maxZoom: 13,
       attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: reduce ? 0 : 300, renderWorldCopies: true });
     map.touchZoomRotate.disableRotation();
+    window.__nxMap = map; try { document.dispatchEvent(new CustomEvent("nx:map", { detail: map })); } catch (e) {}   /* gridlayer.js adds the grid operator layer to this map */
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a> · Towers: <a href="https://www.fcc.gov/antenna-structure-registration" target="_blank" rel="noopener">FCC ASR</a> · Power grid: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> (ODbL)' }), "bottom-right");
     setTimeout(function () { var a = document.querySelector(".nx-map .maplibregl-ctrl-attrib"); if (a) a.classList.remove("maplibregl-compact-show"); }, 1500);
     map.on("dataloading", function () { if (!ready) step("map", Math.min(0.8, P.map + 0.04)); });
@@ -237,6 +238,7 @@
     if (ON.sea) seaLoad(); seaPanel();
     INF_K.forEach(function (k) { INF[k].L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON[k] ? "visible" : "none"); }); if (ON[k]) infLoad(k); }); infPanel();
     document.querySelectorAll("#nx_f button").forEach(function (b) { b.setAttribute("aria-pressed", ON[b.dataset.k] ? "true" : "false"); });
+    try { document.dispatchEvent(new CustomEvent("nx:layers", { detail: { ops: !!ON.ops } })); } catch (e) {}   /* gridlayer.js (merged The Grid) */
   }
 
   function summary() {
@@ -271,7 +273,7 @@
       var s = D.power.states[p.i]; c = s.outages >= 1500 ? COL.deg : COL.minor;
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Power · ' + (s.outages >= 1500 ? "Major outages" : "Outages reported") + '</span><h3>' + esc(s.name) + '</h3><dl><dt>Customers out</dt><dd>' + num(s.outages) + '</dd></dl>' +
         ((s.top || []).length ? '<ul>' + s.top.map(function (u) { return '<li>' + (url(u.web) ? '<a href="' + url(u.web) + '" target="_blank" rel="noopener noreferrer">' + esc(u.name) + '</a>' : esc(u.name)) + ' · ' + num(u.outages) + '</li>'; }).join("") + '</ul>' : '') +
-        '<div class="acts"><a href="/grid">Open The Grid</a></div>';
+        '<div class="acts">' + (s.st ? '<button type="button" class="gx-fly" data-state="' + esc(s.st) + '">Utilities and outage maps</button>' : '') + '<button type="button" class="gx-fly" data-more="gx-outages">Outages by state</button></div>';
     } else if (p.kind === "cable" || p.kind === "ls" || p.kind === "zone") { h = seaCard(p);
     } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss") { h = infCard(p);
     } else if (p.kind === "cloud") {
@@ -598,6 +600,7 @@
     if (map) { map.resize(); if (v === "map" && !SKY.on) { try { history.replaceState(null, "", "#map"); } catch (e) {} } setMode(v); }
   }
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.addEventListener("click", function () { view(b.dataset.m); }); });
+  window.__nxView = view;   /* gridlayer.js: "Show on map" from the grid sheet */
   var m0 = document.body.classList.contains("nx-board") ? "status" : location.hash === "#sky" ? "sky" : "map";   /* pt1787u: Map is the default view */
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m0 ? "true" : "false"); });
   document.querySelectorAll("#nx_sf button").forEach(function (b) {

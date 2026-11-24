@@ -701,7 +701,7 @@ def render(slug):
     others = " · ".join(f'<a href="/network/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug) + ' · <a href="/network/starlink">Starlink</a>'
     nl = ('<div class="np-nl"><div><b>Know about the next big outage first</b><div class="np-mu">The free BLACKOUT.NETWORK newsletter: major outages, threats and what to do. Follow us on YouTube and X too.</div></div>'
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=' + slug + '">Get the free newsletter</a></div>')
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">Network Status</a> › <a href="/network/providers">Providers</a> › {E(p["name"])}</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › <a href="/network/providers">Providers</a> › {E(p["name"])}</p>'
             + hero + sec_live + f'<div class="np-grid2 np-gap">{sec_mon}{sec_hist}</div>' + sec_rc + sec_nt + nl + sec_ck + sec_ln
             + f'<p class="np-mu">Other providers: {others} · <a href="/network">All network checks</a>. Research only; not affiliated with {E(p["long"])}. Names identify services only.</p></div>'
             f'<style>{CSS}</style>{JS}')
@@ -712,7 +712,7 @@ def render(slug):
            "isPartOf": {"@type": "WebSite", "name": "BLACKOUT.NETWORK", "url": SITE}, "about": {"@type": "Organization", "name": p["long"], "url": p["status"][1]},
            "publisher": {"@type": "Organization", "name": "BLACKOUT.NETWORK", "url": SITE, "logo": {"@type": "ImageObject", "url": f"{SITE}/icons/icon-512.png"}}},
           {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
-              {"@type": "ListItem", "position": 1, "name": "BLACKOUT.NETWORK", "item": SITE + "/"}, {"@type": "ListItem", "position": 2, "name": "Network Status", "item": SITE + "/network"},
+              {"@type": "ListItem", "position": 1, "name": "BLACKOUT.NETWORK", "item": SITE + "/"}, {"@type": "ListItem", "position": 2, "name": "The Grid", "item": SITE + "/network"},
               {"@type": "ListItem", "position": 3, "name": p["name"], "item": f"{SITE}/network/{slug}"}]},
           {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
               {"@type": "Question", "name": f"Is {p['name']} down right now?", "acceptedAnswer": {"@type": "Answer", "text": (f"{p['name']} reports {len(act)} active incident(s)." if act else f"{p['name']}'s official feed shows no active incidents.") + f" Latest status: {p['status'][1]}"}},
@@ -751,7 +751,7 @@ def render_hub():
     big = f"{ok} of {n} normal" if ok < n else "All normal"
     sub = (f"{len(bad)} with issues · worst: {LVN.get(worst, '')}" if bad else "Every provider feed reports normal service.")
     now_l, _z = to_et(datetime.now(timezone.utc)); stamp = now_l.strftime("%-I:%M %p")
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">Network Status</a> › Providers</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › Providers</p>'
             f'<section class="np-hero page-header-band"><div class="np-hrow"><div style="min-width:0"><div class="np-kick">NETWORK STATUS</div><h1>Cloud status</h1>'
             '<p>Official provider feeds. Times in ET.</p></div></div></section>'
             f'<section class="np-sum"><div class="np-big">{E(big)}</div><p class="np-mu">{E(sub)}</p><div class="bnt-tstamp">Updated {stamp} ET · next in 1m</div></section>'

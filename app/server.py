@@ -808,7 +808,10 @@ class H(BaseHTTPRequestHandler):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
             if _deactivated_off(u.path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py, state "off") -> temporary 302 to "/"
-                self.send_response(302); self.send_header("Location", "/"); self.send_header("Content-Length", "0")
+                try:
+                    import deactivated; loc = deactivated.location(u.path)   # merged pages (deactivated.MOVED, e.g. /grid -> /network) go to their new home
+                except Exception: loc = "/"
+                self.send_response(302); self.send_header("Location", loc); self.send_header("Content-Length", "0")
                 self.send_header("Cache-Control", "no-store"); self.end_headers(); return
             if u.path in ("/", "/index.html"):
                 if new_home_on():   # Nov 17 2026: "/" = cinematic onboarding (theme.py); the dashboard moved to /live. BN_NEW_HOME=0 = old "/"
