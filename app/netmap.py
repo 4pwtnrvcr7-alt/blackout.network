@@ -621,8 +621,10 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
   '<p><a href="/grid/providers">Cloud provider pages</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a></p></footer>'
   '</div></section>')
 
+# Launches chip will be added later by another worker; leave this list easy to extend.
 SKY_CHIPS = [("iss", "ISS", "#FFFFFF"), ("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
-             ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0"), ("debris", "Debris", "#8A94A8")]
+             ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0"), ("debris", "Debris", "#8A94A8"),
+             ("ss", "Solar system", "#F0E6D2"), ("sw", "Space weather", "#7FD4FF")]
 # Nov 24 2026 (Matt): one "Power grid" chip (outages + operators + 230 kV+ lines); chips with no map items (Mobile, Satellite, Payments, Apps) live on Status only
 CHIPS = [("internet", "Internet"), ("grid", "Power grid"), ("hydro", "Hydro dams"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers")]
 
@@ -640,7 +642,7 @@ def page(qs=None):
     title = "The Grid: live status of power, internet, mobile, cloud and apps | BLACKOUT.NETWORK"
     desc = ("The Grid: live status of the power grid and the networks that run on it. Grid operators colored by status, outages by state, weather threats, "
             "plus plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, apps and government services, an incident log and a satellite globe.")
-    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="{"false" if g == "debris" else "true"}"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
+    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="false"><i style="background:{c};border-color:{c}"></i><span>{E(t)}</span></button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="true"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
@@ -670,7 +672,7 @@ def page(qs=None):
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
-<aside class="nx-ss" id="nx_ss" hidden></aside>
+<aside class="nx-ss" id="nx_ss" hidden></aside><div class="nx-sky-labs" id="nx_sky_labs" hidden></div>
 <div class="nx-side"><aside class="nx-sea" id="nx_sea" hidden aria-label="Undersea cables"></aside></div>
 <div class="nx-ctl"><button type="button" class="nx-b" id="nx_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>

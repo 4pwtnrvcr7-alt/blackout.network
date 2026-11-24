@@ -626,7 +626,7 @@
   }
 
   /* ---------- Sky view: satellite constellations, propagated live in the browser (satellite.js SGP4, CelesTrak elements) ---------- */
-  var SKYC = { iss: "#FFFFFF", starlink: "#E8ECF5", gps: "#4FC3F7", glonass: "#B39DFF", galileo: "#5CE1B6", beidou: "#FF8FB1", iridium: "#9DB4FF", oneweb: "#FFA270", goes: "#FF7AE0", debris: "#8A94A8" };
+  var SKYC = { iss: "#FFFFFF", starlink: "#E8ECF5", gps: "#4FC3F7", glonass: "#B39DFF", galileo: "#5CE1B6", beidou: "#FF8FB1", iridium: "#9DB4FF", oneweb: "#FFA270", goes: "#FF7AE0", debris: "#8A94A8", ss: "#F0E6D2", sw: "#7FD4FF" };
   SKY = { on: false, loaded: false, loading: null, recs: [], groups: [], show: {}, reveal: {}, timer: null, layerT: 0, sel: null, SW: null, ss: null, cad: null, spinPaused: false, spinRaf: 0, spinT: 0, bound: false, learn: {}, alt3d: false, mvp: null, path3: [], vis: [] };
   var mob = innerWidth < 768;
   function loadScript(u, i) { return new Promise(function (ok, no) { if (window.satellite) return ok(); var s = document.createElement("script"); s.src = u; s.integrity = i; s.crossOrigin = "anonymous"; s.onload = ok; s.onerror = function () { no(new Error("satellite.js did not load")); }; document.head.appendChild(s); }); }
@@ -635,7 +635,7 @@
     var sj = window.BN_SATJS || [];
     SKY.loading = Promise.all([loadScript(sj[0], sj[1]), getJSON("/api/netmap/sky" + (mob ? "?lite=1" : "")), getJSON("/api/netmap/space").catch(function () { return null; }), getJSON("/api/netmap/learn.json").catch(function () { return {}; })]).then(function (r) {
       var D2 = r[1], sat = window.satellite; SKY.SW = r[2]; SKY.learn = r[3] || {}; SKY.groups = D2.groups || [];
-      SKY.groups.forEach(function (g) { SKY.show[g.id] = true; });
+      SKY.groups.forEach(function (g) { SKY.show[g.id] = false; }); skyChipLabels();
       (D2.sats || []).forEach(function (s) {
         try {
           var g = SKY.groups[s[0]].id;
@@ -909,7 +909,9 @@
     else if (map.getSource("sats")) map.getSource("sats").setData({ type: "FeatureCollection", features: f });
     if (SKY.sel != null) track(SKY.sel, false);
     $("nx_chip").className = "nx-chip";
-    $("nx_sum").textContent = "Tracking " + num(n) + " satellites live" + (nDeb ? " · " + num(nDeb) + " debris" : "");
+    if (!n && !nDeb) $("nx_sum").textContent = "Tap a chip to show a layer";
+    else $("nx_sum").textContent = "Tracking " + num(n) + " satellites live" + (nDeb ? " · " + num(nDeb) + " debris" : "");
+    skyLabs();
   }
   function track(i, fly) {
     var o = SKY.recs[i], sat = window.satellite; if (!o) return;
@@ -947,17 +949,8 @@
   }
   function layerIn() {
     if (SKY.layerT) { clearTimeout(SKY.layerT); SKY.layerT = 0; }
-    SKY.reveal = {};
-    var gs = (SKY.groups || []).filter(function (g) { return g.id !== "debris"; }).slice().sort(function (a, b) {
-      if (a.id === "starlink") return 1; if (b.id === "starlink") return -1;
-      return (a.total || 0) - (b.total || 0) || String(a.name || "").localeCompare(String(b.name || ""));
-    });
-    if (reduce || !gs.length) { gs.forEach(function (g) { SKY.reveal[g.id] = true; }); prop(); return; }
-    var i = 0, gap = Math.max(280, Math.min(600, 3200 / Math.max(gs.length, 1)));
-    (function next() {
-      if (!SKY.on) return;
-      if (i < gs.length) { SKY.reveal[gs[i].id] = true; i += 1; prop(); if (i < gs.length) SKY.layerT = setTimeout(next, gap); }
-    })();
+    (SKY.groups || []).forEach(function (g) { SKY.reveal[g.id] = !!SKY.show[g.id]; });
+    prop();
   }
   function skySpinStop() { if (SKY.spinRaf) { cancelAnimationFrame(SKY.spinRaf); SKY.spinRaf = 0; } if (SKY.spinT) { clearTimeout(SKY.spinT); SKY.spinT = 0; } }
   function skySpinPause() { SKY.spinPaused = true; if (SKY.spinT) { clearTimeout(SKY.spinT); SKY.spinT = 0; } }
@@ -1035,8 +1028,8 @@
       SKY.groups.push({ id: "debris", name: "Debris", what: "Tracked space debris from CelesTrak debris groups", total: (D2 && D2.total) || 0, shown: (D2 && D2.shown) || ((D2 && D2.sats) || []).length, source_url: D2 && D2.source_url });
       addSkyRecs("debris", (D2 && D2.sats) || [], gi);
       SKY.debrisLoaded = true;
-      SKY.reveal.debris = !!SKY.show.debris;
-      if (SKY.on) { swPanel(); prop(); }
+      SKY.reveal.debris = !!SKY.show.debris; skyChipLabels();
+      if (SKY.on) prop();
     }).catch(function () { SKY.debrisLoading = null; });
     return SKY.debrisLoading;
   }
@@ -1080,6 +1073,49 @@
     });
     h += "</svg><p class=\"nx-ss-note\">Log scale from the Sun (not a sky chart).</p>";
     return h;
+  }
+  function skyChipLabels() {
+    var names = { iss: "ISS", starlink: "Starlink", gps: "GPS", glonass: "GLONASS", galileo: "Galileo", beidou: "BeiDou", iridium: "Iridium", oneweb: "OneWeb", goes: "GOES", debris: "Debris", ss: "Solar system", sw: "Space weather" };
+    document.querySelectorAll("#nx_sf button").forEach(function (b) {
+      var g = b.dataset.g, span = b.querySelector("span") || b, label = names[g] || span.textContent.replace(/\s[\d.]+k?$/, ""), grp = (SKY.groups || []).filter(function (x) { return x.id === g; })[0];
+      if (g === "ss" || g === "sw" || !grp) { if (span) span.textContent = label; return; }
+      var n = grp.shown || grp.total || 0, s = n >= 1000 ? ((n / 1000).toFixed(n >= 10000 ? 0 : 1) + "k") : String(n);
+      span.textContent = label + " " + s;
+    });
+  }
+  function dest90(lon, lat, brng) {
+    var φ1 = lat * Math.PI / 180, λ1 = lon * Math.PI / 180, θ = brng * Math.PI / 180, δ = Math.PI / 2;
+    var φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
+    var λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1), Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2));
+    return [((λ2 * 180 / Math.PI + 540) % 360) - 180, φ2 * 180 / Math.PI];
+  }
+  function skyLabs() {
+    var box = $("nx_sky_labs"); if (!box || !map || !SKY.on) { if (box) { box.hidden = true; box.innerHTML = ""; } return; }
+    var showSs = !!SKY.show.ss, showSw = !!SKY.show.sw;
+    if (!showSs && !showSw) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    var c = map.getCenter(), p0 = map.project(c), rim = map.project(dest90(c.lng, c.lat, 0));
+    var R = Math.max(48, Math.hypot(rim.x - p0.x, rim.y - p0.y));
+    var h = "";
+    if (showSs && SKY.ss && SKY.ss.ok) {
+      (SKY.ss.objects || []).forEach(function (o) {
+        var au = o.earth && o.earth.au, label = (o.id === "roadster" ? "Roadster" : o.name) + (au != null ? " · " + (au >= 10 ? au.toFixed(0) : au.toFixed(1)) + " AU" : "");
+        var lon = o.earth && o.earth.lon, lat = o.earth && o.earth.lat, x, y;
+        if (lon != null && lat != null) {
+          var sub = map.project([lon, lat]), dx = sub.x - p0.x, dy = sub.y - p0.y, L = Math.hypot(dx, dy) || 1;
+          x = p0.x + dx / L * (R + 10); y = p0.y + dy / L * (R + 10);
+        } else { x = p0.x; y = p0.y + R + 14; }
+        h += '<span class="nx-ss-pin" style="left:' + x.toFixed(0) + 'px;top:' + y.toFixed(0) + 'px">' + esc(label) + "</span>";
+      });
+    } else if (showSs) {
+      h += '<span class="nx-ss-pin" style="left:' + p0.x.toFixed(0) + 'px;top:' + (p0.y + R + 14).toFixed(0) + 'px">Solar system distances unavailable</span>';
+    }
+    if (showSw) {
+      var w = SKY.SW, txt = "Space weather unavailable";
+      if (w && w.ok) txt = "Kp " + (w.kp != null ? Number(w.kp).toFixed(1) : "–") + " · R" + w.scales.R + " S" + w.scales.S + " G" + w.scales.G;
+      h += '<span class="nx-sw-pin" style="left:' + p0.x.toFixed(0) + 'px;top:' + (p0.y + R + (showSs ? 36 : 14)).toFixed(0) + 'px">' + esc(txt) + "</span>";
+    }
+    box.innerHTML = h;
   }
   function ssPanel() {
     var el = $("nx_ss"); if (!el) return;
@@ -1137,7 +1173,7 @@
       getJSON("/api/netmap/cad").catch(function () { return null; })
     ]).then(function (r) {
       SKY.ss = r[0]; SKY.cad = r[1];
-      if (SKY.on) ssPanel();
+      if (SKY.on) skyLabs();
     });
     return SKY.ssLoading;
   }
@@ -1158,7 +1194,7 @@
     var sky = m === "sky"; if (sky === SKY.on || !map) return;
     SKY.on = sky; document.body.classList.toggle("nx-sky", sky);
     document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"); });
-    $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = !sky; if ($("nx_ss")) $("nx_ss").hidden = !sky; $("nx_leg").hidden = sky; if (sky) { var lb = $("nx_leg_body"), lt = $("nx_leg_btn"); if (lb) lb.hidden = true; if (lt) lt.setAttribute("aria-expanded", "false"); } hideCard(true);
+    $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = true; if ($("nx_ss")) $("nx_ss").hidden = true; if ($("nx_sky_labs")) $("nx_sky_labs").hidden = !sky; $("nx_leg").hidden = sky; if (sky) { var lb = $("nx_leg_body"), lt = $("nx_leg_btn"); if (lb) lb.hidden = true; if (lt) lt.setAttribute("aria-expanded", "false"); } hideCard(true);
     if (sky) SEA_L.concat(INF_L).forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
     try { history.replaceState(null, "", sky ? "#sky" : "#map"); } catch (e) {}
     ["cty-fill", "cty-line", "inet-fill", "inet-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
@@ -1178,7 +1214,7 @@
     map.easeTo({ center: [-95, 20], zoom: mob ? -0.55 : -0.4, duration: reduce ? 0 : 1200 });
     $("nx_sum").textContent = "Loading satellites…";
     skyLayers(); sky3dEnsure(); skySpinBind(); sky2dVis();
-    skyLoad().then(function () { if (!SKY.on) return; swPanel(); layerIn(); ssLoad(); clearInterval(SKY.timer); SKY.timer = setInterval(function () { if (!document.hidden) prop(); }, reduce ? 10000 : (mob ? 2000 : 1200));
+    skyLoad().then(function () { if (!SKY.on) return; layerIn(); ssLoad(); skyChipLabels(); skyLabs(); if (!SKY._labMove && map) { SKY._labMove = true; map.on("move", skyLabs); map.on("pitch", skyLabs); map.on("rotate", skyLabs); } clearInterval(SKY.timer); SKY.timer = setInterval(function () { if (!document.hidden) prop(); }, reduce ? 10000 : (mob ? 2000 : 1200));
       setTimeout(function () { if (SKY.on) skySpinStart(); }, reduce ? 0 : 1300); },
       function () { $("nx_sum").textContent = "Orbital data is unavailable right now"; });
   }
@@ -1199,6 +1235,9 @@
     b.addEventListener("click", function () {
       var g = b.dataset.g; SKY.show[g] = !(SKY.show[g] !== false); b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
       if (g === "debris") { SKY.reveal.debris = !!SKY.show.debris; if (SKY.show.debris) debrisLoad(); }
+      else if (g === "ss") { if (SKY.show.ss) ssLoad(); skyLabs(); return; }
+      else if (g === "sw") { skyLabs(); return; }
+      else SKY.reveal[g] = !!SKY.show[g];
       prop();
     });
   });
