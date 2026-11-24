@@ -1,4 +1,4 @@
-/* Network Status (/network, Nov 23 2026, pt1755u). Same language as /grid and /weather. Dark only. No yellow: green / orange / red (major only) / grey; data centers ice blue. */
+/* Network Status (/grid, Nov 23 2026, pt1755u). Same language as /grid and /weather. Dark only. No yellow: green / orange / red (major only) / grey; data centers ice blue. */
 :root{--nx-ok:#2FD67B;--nx-strain:#FF7A1A;--nx-out:#FF3B3B;--nx-na:#7C8190;--nx-tx:#F0F0FA;--nx-mu:rgba(240,240,250,.62);--nx-bd:rgba(240,240,250,.12);--nx-bg:#05060a;--nx-ease:cubic-bezier(.2,.7,.2,1)}
 html.nx-root,html.nx-root body{height:100%;margin:0;overflow:hidden;background:var(--nx-bg);overscroll-behavior:none}
 body.nx{color:var(--nx-tx);font-family:Inter,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
