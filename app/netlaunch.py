@@ -28,6 +28,33 @@ def _url(now):
     b = (now + timedelta(days=NEXT_DAYS)).strftime("%Y-%m-%dT%H:00:00Z")
     return LL2 + "?" + urllib.parse.urlencode({"net__gte": a, "net__lte": b, "ordering": "net", "mode": "detailed", "limit": "100"})
 
+
+def _fetch_ll2(timeout):
+    req = urllib.request.Request(_url(datetime.now(timezone.utc)), headers={"User-Agent": UA, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r: b = r.read()
+    j = json.loads(b)
+    if not isinstance(j.get("results"), list): raise ValueError("no results")
+    return j, b
+
+def _save(p, b):
+    tmp = p + ".tmp"
+    with open(tmp, "wb") as f: f.write(b)
+    os.replace(tmp, p)
+
+def _kick_bg(p):
+    if _ST.get("bg"): return
+    _ST["bg"] = True
+    def run():
+        try:
+            j, b = _fetch_ll2(45)
+            _save(p, b); _ST["err"] = None; _ST["err_t"] = 0; _MEM.pop("b", None)
+        except Exception as e:
+            _ST["err"] = getattr(e, "code", None) and f"HTTP {e.code}" or type(e).__name__
+            _ST["err_t"] = time.time()
+        finally:
+            _ST["bg"] = False
+    threading.Thread(target=run, daemon=True).start()
+
 def _raw():
     """LL2 window JSON, from disk if fresh; otherwise one polite call. Returns (dict or None, fetched_unix, error)."""
     p = os.path.join(_dir(), "ll2_window.json")
@@ -40,18 +67,18 @@ def _raw():
     with _L:
         mt = os.path.getmtime(p) if os.path.exists(p) else 0
         if mt and time.time() - mt < MAX_AGE: return disk(), mt, None
-        if time.time() - _ST["err_t"] < BACKOFF: return disk(), mt, _ST["err"]
+        cached = disk()
+        wait = BACKOFF if cached else 15
+        if time.time() - _ST["err_t"] < wait:
+            if not cached: _kick_bg(p)
+            return cached, mt, _ST["err"]
         try:
-            req = urllib.request.Request(_url(datetime.now(timezone.utc)), headers={"User-Agent": UA, "Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=20) as r: b = r.read()
-            j = json.loads(b)
-            if not isinstance(j.get("results"), list): raise ValueError("no results")
-            tmp = p + ".tmp"
-            with open(tmp, "wb") as f: f.write(b)
-            os.replace(tmp, p); _ST["err"] = None
+            j, b = _fetch_ll2(28)
+            _save(p, b); _ST["err"] = None; _ST["err_t"] = 0
             return j, os.path.getmtime(p), None
         except Exception as e:
             _ST["err"] = getattr(e, "code", None) and f"HTTP {e.code}" or type(e).__name__; _ST["err_t"] = time.time()
+            if not disk(): _kick_bg(p)
             return disk(), mt, _ST["err"]
 
 def _dur(s):
@@ -229,8 +256,11 @@ def launches():
 def launches_cached():
     hit = _MEM.get("b")
     if hit and time.time() - hit[0] < 120: return hit[1]
-    b = json.dumps(launches(), separators=(",", ":")).encode()
-    _MEM["b"] = (time.time(), b); return b
+    payload = launches()
+    b = json.dumps(payload, separators=(",", ":")).encode()
+    if payload.get("count") or not payload.get("error"):
+        _MEM["b"] = (time.time(), b)
+    return b
 
 
 # ---------- details sheet (pt1834u): every published LL2 field for one launch; images only with a commercial-use licence ----------
