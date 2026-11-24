@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json"}
+FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -640,7 +640,7 @@ def page(qs=None):
 <h1 class="nx-vh">The Grid: live status of the power grid, internet, mobile, cloud, payments, apps and government services</h1>
 <div id="nx_map" class="nx-map" role="region" aria-label="Map of the power grid and network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
-{BOARD}
+{BOARD.replace('id="nb"', 'id="nb" data-logos="/api/netmap/logos.svg?v=' + _v("logos.svg") + '"', 1)}
 <div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
