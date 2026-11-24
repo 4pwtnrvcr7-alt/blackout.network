@@ -10,8 +10,17 @@ body.nx{color:var(--nx-tx);font-family:Inter,system-ui,sans-serif;-webkit-tap-hi
 .nx-map{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;background:var(--nx-bg);opacity:0;transition:opacity .8s var(--nx-ease)}
 body.nx-ready .nx-map{opacity:1}
 .nx-map .maplibregl-canvas{outline:none}
-.nx-map .maplibregl-ctrl-attrib{background:rgba(5,6,10,.6)!important;color:rgba(240,240,250,.45)}
-.nx-map .maplibregl-ctrl-attrib a{color:rgba(240,240,250,.55)}
+.nx-map .maplibregl-ctrl-bottom-right{z-index:21}
+.nx-map .maplibregl-ctrl-attrib{background:rgba(5,6,10,.78)!important;color:rgba(240,240,250,.55);border:1px solid rgba(240,240,250,.28)}
+.nx-map .maplibregl-ctrl-attrib a{color:rgba(240,240,250,.7)}
+/* pt1831u: always a small info button until the user opens it; CSS holds even if MapLibre re-adds compact-show */
+.nx-map .maplibregl-ctrl-attrib.maplibregl-compact{box-sizing:border-box;width:28px;height:28px;min-height:28px;padding:0;margin:8px;overflow:hidden;border-radius:99px;background:rgba(5,6,10,.78)!important}
+.nx-map .maplibregl-ctrl-attrib.maplibregl-compact:not(.nx-attrib-open) .maplibregl-ctrl-attrib-inner{display:none!important}
+.nx-map .maplibregl-ctrl-attrib.nx-attrib-open{width:auto;height:auto;max-width:min(280px,calc(100vw - 24px));max-height:min(40dvh,calc(100dvh - 80px));padding:8px 48px 8px 10px;overflow:auto;border-radius:14px;line-height:1.45;font-size:11px}
+.nx-attrib-x{all:unset;box-sizing:border-box;position:absolute;top:4px;right:26px;width:22px;height:22px;display:none;cursor:pointer;color:#F2F2F4}
+.nx-attrib-open .nx-attrib-x{display:flex;align-items:center;justify-content:center}
+.nx-attrib-x svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nx-attrib-x:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}
 /* ---------- chrome on the map ---------- */
 .nx-top{position:fixed;z-index:20;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);max-width:calc(100vw - 32px)}
 .nx-chip{display:flex;align-items:center;gap:9px;padding:9px 14px;border-radius:99px;background:rgba(5,6,10,.7);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);font:600 11.5px/1.2 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -217,7 +226,8 @@ body.nx-sky .nx-more-btn{display:none}
  .nx-cnt li{gap:3px;white-space:nowrap}.nx-cnt li i{width:6px;height:6px}.nx-cnt li b{margin-left:2px}
  .nx-swl{font-size:11.5px}.nx-swm{font-size:10.5px}.nx-sw .nx-swm.nx-imp{display:none}
  body.nx-sky .nx-ctl{bottom:calc(236px + env(safe-area-inset-bottom))}
- body.nx-sky .maplibregl-ctrl-bottom-right{bottom:196px}
+ body.nx-sky .maplibregl-ctrl-bottom-right{bottom:0;right:0} /* was 196px, which parked credits mid-map after the old bottom panels were hidden */
+ body:not(.nx-sky) .maplibregl-ctrl-bottom-right{bottom:calc(8px + env(safe-area-inset-bottom));right:0}
 }
 /* ---------- boot loader (pt1759u): text in its own opaque panel, nothing drawn behind it ---------- */
 .nx-ldp{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(28px + env(safe-area-inset-bottom));width:min(460px,calc(100% - 28px));box-sizing:border-box;padding:20px 22px 18px;border-radius:18px;background:#07080f;border:1px solid rgba(160,170,255,.16);box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:2}
