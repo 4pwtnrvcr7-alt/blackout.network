@@ -6,7 +6,8 @@ Nothing is deleted: templates, handlers, JS/CSS, data and the APIs behind these 
 
 Reactivate one page: delete its row below (or set Render env BN_DEACTIVATE_PAGES=0 to bring all of them back) and redeploy.
 
-Per-page state (Matt, Nov 24 2026 7:51 AM ET), the 4th column:
+Per-page state (Matt, Nov 24 2026 7:51 AM ET), the 4th column. Reworked pages (solo.py, Nov 24 2026 pt1846u) move from "off" to
+"unlisted" so they serve for review but stay off every menu until Matt approves them:
   "off"       the route 302s to "/" and every link to it is removed.
   "unlisted"  the route still serves (200) because newsletter emails link to it, but it is removed from every menu,
               footer, the homepage, the sitemap/llms.txt and every internal link, the same as "off".
@@ -27,17 +28,17 @@ DEACTIVATED_PAGES = [
     ("Government",           {"gov"},             ["/government"], "off"),
     ("Gun Laws",             {"gunlaws"},         ["/gunlaws"], "off"),
     ("Key Figures",          {"figures"},         ["/figures", "/elon"], "off"),
-    ("Preppers",             {"preppers"},        ["/preppers"], "off"),
+    ("Preppers",             {"preppers"},        ["/preppers"], "unlisted"),
     ("Local Resources",      {"res"},             ["/resources"], "off"),
     ("Offline Maps",         {"maps"},            ["/maps"], "off"),
-    ("First Aid",            {"med"},             ["/medical", "/first-aid"], "off"),
-    ("Bushcraft",            {"bush"},            ["/bushcraft"], "off"),
+    ("First Aid",            {"med"},             ["/medical", "/first-aid"], "unlisted"),
+    ("Bushcraft",            {"bush"},            ["/bushcraft"], "unlisted"),
     ("Sources",              {"sources"},         ["/sources"], "unlisted"),
     ("How We Score",         {"@scoring"},        ["/scoring", "/about/scoring"], "unlisted"),
     ("SpaceX",               {"spacex"},          ["/spacex"], "off"),   # newsletter_v2 links /spacex, but /spacex is only a tab of /live (no page of its own), so it cannot stay up while /live is off
     ("CERN & LHC",           {"@cern"},           ["/cern", "/lhc"], "off"),
     ("Private Jets",         {"jets"},            ["/jets"], "off"),   # Matt said "private chats" on voice; the menu item is Private Jets
-    ("Games",                {"games"},           ["/games"], "off"),
+    ("Games",                {"games"},           ["/games"], "unlisted"),
     ("Mesh Chat",            {"mesh-chat"},       ["/mesh/chat"], "off"),   # Nov 24 7:50 AM ET (Matt): "private chats" also means the off-grid mesh chat; /mesh and /mesh/guide stay up
     ("The Grid (old menu item)", {"grid"},        [], "off"),   # Nov 24 2026 (Matt): the old "Energy Grid"/"The Grid" menu key stays hidden; The Grid is the "net" item at /grid (no route is redirected by this row)
 ]
