@@ -50,6 +50,26 @@ class NetMap(unittest.TestCase):
         self.assertIn('map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"])', js)
         self.assertIn("l: l, o: l >= 3", js)
 
+    def test_disruption_dots_match_card_red(self):
+        """pt1846u: map disruption (level 2 / deg) is red like the Status cards, not orange.
+        Amber is only for minor/watch (degraded). Power-line yellow is unchanged."""
+        js = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
+        css = open(os.path.join(APP, "netmap_static", "net.css"), encoding="utf-8").read()
+        self.assertIn('deg: "#FF3B3B"', js)
+        self.assertIn('out: "#FF3B3B"', js)
+        self.assertIn('watch: "#FFA040"', js)
+        self.assertIn("function lvCol(l) { return l >= 2 ? COL.out", js)
+        self.assertIn("function inetCol(l) { return l >= 2 ? COL.out", js)
+        self.assertNotIn('deg: "#FF7A1A"', js)
+        self.assertIn("--nx-deg:#FF3B3B", css)
+        self.assertNotIn("--nx-deg:#FF7A1A", css)
+        # power lines stay green / yellow / red (Matt exception)
+        self.assertIn('var LCOL = { ok: "#2FD67B", strain: "#F5D547", out: "#FF3B3B", na: "#7C8190" }', js)
+        import netdetail
+        self.assertEqual(netdetail.LVC[2], "#FF3B3B")
+        self.assertEqual(netdetail.LVC[3], "#FF3B3B")
+        self.assertEqual(netdetail.LVC[1], "#FFA040")
+
     def test_boot_loader(self):
         """Nov 24 2026 (pt1795u): the loader is the old /grid "Energizing the grid" animation (boot.js kept in the repo, no longer loaded).
         Progress ids net.js drives are present, reduced motion is honored, no yellow or red neon."""
