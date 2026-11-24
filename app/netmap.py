@@ -7,7 +7,7 @@ one refresh at a time, never per request) and re-served as one compact JSON:
   DOE/ORNL ODIN power outages via gridpage.py (gridstatus.db).
 Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py, config.json, the newsletter or the QA gate.
 Routes: /grid (page, via netpages.py), /api/netmap/data, /api/netmap/dc, /api/netmap/<static file>."""
-import os, re, json, time, math, threading, urllib.request, html as _html
+import os, re, json, time, math, threading, urllib.request, hashlib, html as _html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
@@ -22,9 +22,22 @@ SATJS = ("https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"
 STRONG = {"bgp", "ping-slash24"}
 MAX_EVENT_S = 72 * 3600    # IODA events longer than 3 days are baseline shifts, not outages
 
+_V = {}
 def _v(name):
-    try: return str(int(os.path.getmtime(os.path.join(STATIC, name))))
-    except OSError: return "0"
+    """Cache-bust query from a short content hash so a new file never reuses a Cloudflare-immutable URL."""
+    path = os.path.join(STATIC, name)
+    try:
+        st = os.stat(path)
+        key = (st.st_mtime_ns, st.st_size)
+        hit = _V.get(name)
+        if hit and hit[0] == key:
+            return hit[1]
+        with open(path, "rb") as f:
+            v = hashlib.md5(f.read()).hexdigest()[:12]
+        _V[name] = (key, v)
+        return v
+    except OSError:
+        return "0"
 def now(): return datetime.now(timezone.utc)
 def iso(d): return d.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if d else None
 # IODA back-off (Nov 24 2026): after a failed IODA call, every IODA call in this process fails fast for 1, 2, 4 ... 30 min,
