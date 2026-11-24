@@ -7,9 +7,10 @@ Sources (all allow commercial use with credit; nothing here needs an account or 
   - Power grid: OpenStreetMap contributors, ODbL 1.0. power=line ways and power=substation features of 230 kV and up.
   - Long-haul fiber: OpenStreetMap contributors, ODbL 1.0. telecom=line / communication=line ways on land (submarine excluded),
     joined per operator/name, kept only when the joined route is at least MIN_FIBER_KM long. Street-level fiber is not public.
+    NOT shipped (Nov 23 2026): OSM has almost no U.S. land long-haul fiber, so the map has no fiber layer.
 Usage:
   python3 tools/build_infra.py towers ASR_DIR > app/netmap_static/towers.json
-  python3 tools/build_infra.py grid POWER.geojsonseq > app/netmap_static/grid.json
+  python3 tools/build_infra.py grid REGION1.geojsonseq [REGION2 ...] > app/netmap_static/grid.json
   python3 tools/build_infra.py fiber TELECOM.geojsonseq > app/netmap_static/fiber.json
 The .geojsonseq inputs come from Geofabrik U.S. extracts filtered with osmium (see the PR notes); geometry is simplified with RDP.
 """
@@ -99,6 +100,14 @@ def kv(t):
         except ValueError: pass
     return max(vs) if vs else 0
 
+def kvs(t):
+    vs = []
+    for x in re.split(r"[;,]", t.get("voltage") or ""):
+        try: k = int(float(x.strip())) // 1000
+        except ValueError: continue
+        if k and k not in vs: vs.append(k)
+    return " / ".join(map(str, sorted(vs, reverse=True))) + " kV" if vs else ""
+
 def lines(g):
     if g["type"] == "LineString": return [g["coordinates"]]
     if g["type"] == "MultiLineString": return g["coordinates"]
@@ -110,17 +119,23 @@ def center(g):
     ring = c[0] if g["type"] == "Polygon" else c[0][0] if g["type"] == "MultiPolygon" else c
     return [sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring)]
 
-def grid(path):
-    out, ss = [], []
-    for f in feats(path):
+def grid(*paths):
+    out, ss, seen = [], [], set()   # Geofabrik regions overlap at their edges: drop exact duplicates
+    for f in (f for p in paths for f in feats(p)):
         t = f.get("properties") or {}; v = kv(t)
         if v < 230: continue
-        nm = (t.get("name") or t.get("ref") or "")[:80]; op = (t.get("operator") or "")[:60]
+        nm = (t.get("name") or t.get("ref") or "").replace(";", " · ")[:80]; op = (t.get("operator") or "").replace(";", " · ")[:60]
         if t.get("power") == "substation":
-            ss.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": r3(center(f["geometry"]))}, "properties": {"v": v, "vt": (t.get("voltage") or "")[:40], "n": nm, "op": op}})
+            c = r3(center(f["geometry"]))
+            if ("s", tuple(c)) in seen: continue
+            seen.add(("s", tuple(c)))
+            ss.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": c}, "properties": {"v": v, "vt": kvs(t), "n": nm, "op": op}})
         elif t.get("power") == "line":
             for g in lines(f["geometry"]):
-                g = [r3(p) for p in rdp(g, 0.004)]
+                g = [r3(p) for p in rdp(g, 0.007)]
+                k = tuple(map(tuple, g))
+                if k in seen: continue
+                seen.add(k)
                 if len(g) >= 2 and g[0] != g[-1] or len(g) > 2:
                     out.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": g}, "properties": {"v": v, "n": nm, "op": op}})
     return {"type": "FeatureCollection", "features": out + ss, "credit": "Power lines and substations (c) OpenStreetMap contributors (ODbL), 230 kV and up"}
@@ -150,5 +165,5 @@ def fiber(path):
     return {"type": "FeatureCollection", "features": out, "km": round(tot), "credit": "Fiber routes (c) OpenStreetMap contributors (ODbL); publicly mapped long-haul routes only"}
 
 if __name__ == "__main__":
-    kind, src = sys.argv[1], sys.argv[2]
-    json.dump({"towers": towers, "grid": grid, "fiber": fiber}[kind](src), sys.stdout, separators=(",", ":"))
+    kind, src = sys.argv[1], sys.argv[2:]
+    json.dump({"towers": towers, "grid": grid, "fiber": fiber}[kind](*src), sys.stdout, separators=(",", ":"))

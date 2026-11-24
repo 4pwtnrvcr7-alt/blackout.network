@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json"}
+FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -557,7 +557,7 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
 
 SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
              ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
-CHIPS = [("internet", "Internet"), ("power", "Power"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
+CHIPS = [("internet", "Internet"), ("power", "Power"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("grid", "Power grid"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
 
 def page(qs=None):
     try:
@@ -674,6 +674,10 @@ def handle_get(path, qs=None, headers=None):
     if p == "/api/netmap/space":
         import netsky
         return 200, netsky.space()
+    mt = re.fullmatch(r"/api/netmap/gridtiles/(\d{1,2})/(\d{1,4})/(\d{1,4})\.pbf", p)
+    if mt:
+        import netinfra
+        return netinfra.tile(STATIC, *map(int, mt.groups()))
     if p.startswith("/api/netmap/"):
         n = p[len("/api/netmap/"):]
         if n not in FILES: return 404, {"error": "not found"}
