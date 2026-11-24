@@ -87,9 +87,9 @@ PAGES = {
                     card="Weather",
                     desc="Current conditions, official severe-weather alerts and the forecast for any place you choose, on BLACKOUT.NETWORK. Free, with no account or sign-up needed.",
                     bg=("media", "noise-d.jpg"), tagline=True),  # NASA ISS imagery of Hurricane Dorian, 2019, public domain; also the site ranking-band still
-    "network": dict(path="/network", title="Network Status: internet and cloud | BLACKOUT.NETWORK",
-                    card="Network Status",
-                    desc="Live status of the internet, cloud providers, major apps and ISPs on BLACKOUT.NETWORK, with outage alerts and recent history so you know if it is just you.",
+    "network": dict(path="/network", title="The Grid: power grid, internet and cloud status | BLACKOUT.NETWORK",
+                    card="The Grid",
+                    desc="Live status of the power grid and the networks that run on it on BLACKOUT.NETWORK: grid operators, outages by state, internet, cloud, apps and ISPs.",
                     bg=("media", "planet-d.jpg"), tagline=True),  # NASA ISS Earth limb, 2024, public domain
     "sources": dict(path="/sources", title="Sources | BLACKOUT.NETWORK",
                     card="Sources",
