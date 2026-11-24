@@ -250,7 +250,7 @@
     var P = INET.places || {};
     map.getSource("inet").setData({ type: "FeatureCollection", features: (INETG.features || []).map(function (f) {
       var r = P[f.properties.k], l = r ? r.level : INET.all_down ? -1 : 0;   /* Matt: green unless there is evidence of a problem */
-      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
+      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), l: l, o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
     if (D) applyData();
     var nd = document.querySelector("#nx_leg .s-na"); if (nd && nd.parentNode) nd.parentNode.hidden = !INET.all_down;   /* "No data" only when every feed is down */
   }
@@ -310,6 +310,9 @@
     map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return ON[x.properties.layer]; }) });
     ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet && !INET ? "visible" : "none"); });
     ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
+    /* Nov 24 2026 (pt1816u): with Power grid on, the "normal" internet green is a faint tint so the green / yellow / red power lines stay readable (#129 raised it to 0.28 and washed every U.S. line green) */
+    if (map.getLayer("inet-fill")) map.setPaintProperty("inet-fill", "fill-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"]);
+    if (map.getLayer("inet-line")) map.setPaintProperty("inet-line", "line-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.12, 0.45] : 0.45);
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
     SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.sea ? "visible" : "none"); });
     if (ON.sea) seaLoad();
@@ -474,7 +477,7 @@
   function gridLayers() {
     if (map.getSource("grid")) return;
     fetch("/api/netmap/gridops.json").then(function (r) { return r.json(); }).then(function (j) { OPS = j.ops || []; gridColor(); }).catch(function () {});
-    map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 9 });
+    map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 8 });
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = ON.grid && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
     L({ id: "gl-lo", type: "line", source: "grid", "source-layer": "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": lineCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
@@ -499,7 +502,7 @@
     var row = function (k, key, txt) { var o = INF[k]; return '<li>' + key + '<span>' + (o.err ? "Unavailable right now" : o.busy || !o.d ? "Loading…" : txt(o.d)) + '</span></li>'; };
     el.innerHTML = '<ul>' + on.map(function (k) {
       if (k === "towers") return row(k, '<i style="background:' + TWC + '"></i><b>Cell towers</b>', function (d) { return num(d.p.length) + " FCC-registered towers · not every cell site"; });
-      return row(k, '<i class="ln" style="background:' + LCOL.ok + '"></i><i class="ln" style="background:' + LCOL.strain + '"></i><i class="ln" style="background:' + LCOL.out + '"></i><b>Power grid</b>', function (d) { return "Lines and substations, 230 kV and up, coloured by their operator's live status: green normal, yellow strained or warning, red outage or emergency, grey crosses operator areas · © OpenStreetMap contributors"; });
+      return row(k, '<i class="ln" style="background:' + LCOL.ok + '"></i><i class="ln" style="background:' + LCOL.strain + '"></i><i class="ln" style="background:' + LCOL.out + '"></i><b>Power grid</b>', function (d) { return "Worldwide lines and substations, 220 kV and up. Lines in a U.S. operator area with a live feed are coloured green normal, yellow strained or warning, red outage or emergency; grey means no live operator status (most of the world) · © OpenStreetMap contributors, Overture Maps Foundation"; });
     }).join("") + '</ul>';
   }
   function kvTxt(v) { return v ? v + " kV" : "Unknown"; }
@@ -514,9 +517,9 @@
     } else if (p.kind === "gl" || p.kind === "ss") {
       var f = p, oa = map && LASTPT ? opAt(map.unproject([LASTPT.x, LASTPT.y])) : null, os = oa ? opSt(oa.id) : "na"; c = LCOL[os];
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + ' · ' + esc(LWORD[os]) + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
-        '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Owner</dt><dd>' + esc(f.op) + '</dd>' : "") + '<dt>Grid area</dt><dd>' + (oa ? esc(oa.name) : "Outside U.S. operator areas") + '</dd></dl>' +
+        '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Owner</dt><dd>' + esc(f.op) + '</dd>' : "") + '<dt>Grid area</dt><dd>' + (oa ? esc(oa.name) : "No live operator feed here") + '</dd></dl>' +
         '<p class="age">' + (oa ? 'Status from ' + esc(oa.name) + ' live feed (EIA-930 demand, ODIN outages, NWS alerts). There is no public per-line status: the colour is the operator area\'s status, and lines that cross operator areas stay grey.' : 'No operator live status here; there is no public per-line status.') + '</p>' +
-        '<p class="age">© OpenStreetMap contributors (ODbL). Shows lines and substations of 230 kV and up; coverage and voltage tags are incomplete. No distribution lines below 230 kV. Routes are simplified and can cross the border.</p>';
+        '<p class="age">© OpenStreetMap contributors (ODbL). Shows lines and substations of 220 kV and up worldwide; coverage and voltage tags are incomplete and vary by country. No lines below 220 kV. Routes are simplified.' + (f.u ? ' Underground or submarine cable.' : '') + '</p>';
     }
     return h;
   }

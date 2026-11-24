@@ -20,7 +20,11 @@ class Infra(unittest.TestCase):
         self.assertEqual(netinfra.tile(ST, 12, 0, 0)[0], 404)
         self.assertEqual(netinfra.tile(ST, 1, 2, 0)[0], 404)
         self.assertEqual(netmap.handle_get("/api/netmap/gridtiles/0/0/0.pbf")[0], 200)
-        self.assertEqual(netinfra.tile(ST, 9, 0, 0)[1], b"")
+        self.assertEqual(netinfra.tile(ST, 9, 0, 0)[0], 404)   # tiles stop at z8; the client overzooms
+        self.assertEqual(netinfra.tile(ST, 8, 0, 0)[1], b"")
+        for z, x, y in ((4, 8, 5), (4, 12, 6), (4, 9, 9), (4, 14, 9), (4, 3, 6)):   # Europe, China, southern Africa, Australia, U.S.
+            self.assertGreater(len(netinfra.tile(ST, z, x, y)[1]), 1000, (z, x, y))
+        self.assertIn('maxzoom: 8 }', open(os.path.join(ST, "net.js")).read())
         js = open(os.path.join(ST, "net.js")).read()
         self.assertIn('type: "vector", tiles:', js)
         self.assertIn("© OpenStreetMap contributors", js)
