@@ -16,6 +16,9 @@ class Solo(unittest.TestCase):
             r = solo.handle_get("/api/solo/" + n, {}); self.assertEqual(r[0], 200, n)
         self.assertIsNone(solo._EMO.search(solo.handle_get("/api/solo/js/preppers.js", {})[1].decode()))
         self.assertEqual(solo.handle_get("/api/solo/js/../x.js", {})[0], 404)
+        self.assertEqual(solo.handle_get("/api/solo/shim.js", {})[0], 200)
+        pol = solo.handle_get("/api/solo/js/politics.js", {})[1].decode()
+        self.assertIn('getElementById("pol_range")', pol)
     def test_kill_switch(self):
         os.environ["BN_SOLO"] = "0"
         try: self.assertEqual(solo.handle_get("/games", {})[0], 404)
