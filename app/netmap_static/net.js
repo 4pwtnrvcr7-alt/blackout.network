@@ -116,6 +116,44 @@
   setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, map = null, ready = false;
+  /* Nov 24 2026 (Matt): map pop-ups sit next to the tapped item, always fully inside the visible screen (below the header and chips,
+     inside safe areas), scroll inside when tall, and can be dragged by their top strip (touch + mouse). Close: X, tap the map, Esc. */
+  function cardBounds() {
+    var vv = window.visualViewport, VW = vv ? vv.width : innerWidth, VH = vv ? vv.height : innerHeight, top = 12;
+    ["#bn_topbar", ".nx-top"].forEach(function (q) { var e = document.querySelector(q); if (!e || !e.offsetParent && getComputedStyle(e).position !== "fixed") return;
+      var r = e.getBoundingClientRect(); if (r.height && r.bottom < VH / 2) top = Math.max(top, Math.round(r.bottom) + 8); });
+    return { l: 10, t: top, r: VW - 10, b: VH - 12 - (innerWidth < 768 ? 64 : 0) };
+  }
+  function clampCard(c, x, y) {
+    var B = cardBounds(), w = c.offsetWidth, h = c.offsetHeight;
+    x = Math.max(B.l, Math.min(x, B.r - w)); y = Math.max(B.t, Math.min(y, B.b - h));
+    c.style.left = x + "px"; c.style.top = y + "px"; c.style.setProperty("--dx", x + "px"); c.style.setProperty("--dy", y + "px");
+  }
+  function placeCard(c, pt) {
+    if (!c) return;
+    c.classList.remove("dragged");
+    var B = cardBounds(); c.style.maxHeight = Math.max(140, B.b - B.t) + "px";
+    if (!c.querySelector(".bn-drag")) c.insertAdjacentHTML("afterbegin", '<div class="bn-drag" title="Drag to move" aria-hidden="true"><i></i></div>');
+    if (innerWidth < 768) return;   /* phones: bottom sheet (CSS), capped height with its own scroll; drag frees it */
+    var w = c.offsetWidth, x = pt ? pt.x + 18 : B.r - w, y = pt ? pt.y - 20 : B.t;
+    if (pt && x + w > B.r) x = pt.x - w - 18;
+    clampCard(c, x, y);
+  }
+  function dragCard(c) {
+    if (!c || c.__drag) return; c.__drag = 1;
+    var st = null;
+    c.addEventListener("pointerdown", function (e) {
+      var h = e.target.closest(".bn-drag, .st, h3"); if (!h || e.target.closest("a,button") || (e.pointerType === "mouse" && e.button)) return;
+      var r = c.getBoundingClientRect(); st = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+      c.style.maxHeight = Math.max(140, cardBounds().b - cardBounds().t) + "px";
+      c.classList.add("dragged", "dragging"); clampCard(c, r.left, r.top); try { c.setPointerCapture(e.pointerId); } catch (x) {} e.preventDefault();
+    });
+    c.addEventListener("pointermove", function (e) { if (st && e.pointerId === st.id) { clampCard(c, e.clientX - st.dx, e.clientY - st.dy); e.preventDefault(); } });
+    function end(e) { if (st && e.pointerId === st.id) { st = null; c.classList.remove("dragging"); } }
+    c.addEventListener("pointerup", end); c.addEventListener("pointercancel", end);
+  }
+  window.__bnPlace = function (c, pt) { dragCard(c); placeCard(c, pt); };
+  addEventListener("resize", function () { ["nx_card", "gx_card"].forEach(function (id) { var c = document.getElementById(id); if (c && !c.hidden) { var r = c.getBoundingClientRect(); clampCard(c, r.left, r.top); } }); });
   var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
@@ -232,6 +270,7 @@
   function vis() {
     if (!map || !map.getSource("pts")) return;
     if (SKY.on) return;
+    ON.power = ON.ops = !!ON.grid;   /* Nov 24 2026 (Matt): one "Power grid" chip runs outages, operators and the 230 kV+ lines */
     map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return ON[x.properties.layer]; }) });
     ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
@@ -257,6 +296,7 @@
   var card = $("nx_card"), pinned = false;
   function linkA(u, t) { var h = url(u); return h ? '<a href="' + h + '"' + (/^\//.test(u) ? "" : ' target="_blank" rel="noopener noreferrer"') + '>' + esc(t) + '</a>' : ""; }
   function showCard(ft, pt, pin) {
+    LASTPT = pt;
     var p = ft.properties, h = "", c;
     if (p.kind === "dc") {
       var ix = {}; (DC.cols || []).forEach(function (k, i) { ix[k] = i; }); var r = DC.rows[p.i];
@@ -285,7 +325,7 @@
     card.innerHTML = h + '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
     card.hidden = false; requestAnimationFrame(function () { card.classList.add("in"); });
     pinned = !!pin; card.classList.toggle("pin", pinned);
-    if (innerWidth >= 768) { var x = pt.x + 18, y = pt.y - 20; if (x + 330 > innerWidth) x = pt.x - 338; card.style.left = Math.max(12, x) + "px"; card.style.top = Math.max(70, Math.min(y, innerHeight - card.offsetHeight - 16)) + "px"; }
+    window.__bnPlace(card, pt);
     var cxb = card.querySelector(".nx-cx"); if (cxb) cxb.onclick = function () { hideCard(true); };
   }
   function hideCard(force) { if (pinned && !force) return; pinned = false; card.classList.remove("in", "pin"); setTimeout(function () { if (!card.classList.contains("in")) card.hidden = true; }, 200); }
@@ -366,6 +406,27 @@
   }, INF_K = ["towers", "grid"], INF_L = [];
   INF_K.forEach(function (k) { INF_L = INF_L.concat(INF[k].L); });
   var TWC = "#9FB4FF";
+  /* Nov 24 2026 (Matt): 230 kV+ lines coloured by the live status of the U.S. operator/BA area they sit in (no public per-line status exists).
+     green normal, yellow strained/warning, red outage/emergency, grey = crosses operator areas or outside them. */
+  var LCOL = { ok: "#2FD67B", strain: "#F5D547", out: "#FF3B3B", na: "#7C8190" }, LWORD = { ok: "Normal", strain: "Strained or warning", out: "Outage or emergency", na: "No live status" };
+  var OPS = null, LASTPT = null;
+  function opSt(id) { return (window.__gxRegionStatus || {})[id] || "na"; }
+  function lineCol() {
+    if (!OPS || !OPS.length) return LCOL.na;
+    var e = ["case"]; OPS.forEach(function (o) { e.push(["within", o.g], LCOL[opSt(o.id)] || LCOL.na); }); e.push(LCOL.na); return e;
+  }
+  function gridColor() {
+    if (!map) return; var c = lineCol();
+    ["gl-lo", "gl-hi"].forEach(function (l) { if (map.getLayer(l)) map.setPaintProperty(l, "line-color", c); });
+    if (map.getLayer("gss")) map.setPaintProperty("gss", "circle-stroke-color", c);
+  }
+  function inRing(x, y, r) { var c = false; for (var i = 0, j = r.length - 1; i < r.length; j = i++) { var a = r[i], b = r[j]; if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; }
+  function opAt(ll) {
+    if (!OPS || !ll) return null;
+    for (var i = 0; i < OPS.length; i++) { var ps = OPS[i].g.coordinates; for (var k = 0; k < ps.length; k++) if (inRing(ll.lng, ll.lat, ps[k][0]) && !ps[k].slice(1).some(function (h) { return inRing(ll.lng, ll.lat, h); })) return OPS[i]; }
+    return null;
+  }
+  document.addEventListener("gx:status", gridColor);
   function kvCol() { return ["step", ["get", "v"], "#6E6A9A", 300, "#9C8CE0", 450, "#C9B8FF", 700, "#F0F0FA"]; }
   function infLayers() {
     map.addSource("tw", { type: "geojson", data: EMPTY, cluster: true, clusterRadius: 46, clusterMaxZoom: 10, maxzoom: 12 });
@@ -380,14 +441,15 @@
   }
   function gridLayers() {
     if (map.getSource("grid")) return;
+    fetch("/api/netmap/gridops.json").then(function (r) { return r.json(); }).then(function (j) { OPS = j.ops || []; gridColor(); }).catch(function () {});
     map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 9 });
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = ON.grid && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
     L({ id: "gl-lo", type: "line", source: "grid", "source-layer": "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": kvCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
+      paint: { "line-color": lineCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
     L({ id: "gl-hi", type: "line", source: "grid", "source-layer": "grid", filter: ["all", ["==", ["geometry-type"], "LineString"], [">=", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": kvCol(), "line-opacity": 0.8, "line-width": ["interpolate", ["linear"], ["zoom"], 2, ["case", [">=", ["get", "v"], 450], 0.9, 0.5], 6, ["case", [">=", ["get", "v"], 450], 1.8, 1.1], 10, 2.6] } });
+      paint: { "line-color": lineCol(), "line-opacity": 0.8, "line-width": ["interpolate", ["linear"], ["zoom"], 2, ["case", [">=", ["get", "v"], 450], 0.9, 0.5], 6, ["case", [">=", ["get", "v"], 450], 1.8, 1.1], 10, 2.6] } });
     L({ id: "gss", type: "circle", source: "grid", "source-layer": "grid", minzoom: 5.5, filter: ["==", ["geometry-type"], "Point"],
-      paint: { "circle-color": "#05060a", "circle-stroke-color": kvCol(), "circle-stroke-width": 1.4, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.5, 2, 10, 4.5] } });
+      paint: { "circle-color": "#05060a", "circle-stroke-color": lineCol(), "circle-stroke-width": 1.4, "circle-radius": ["interpolate", ["linear"], ["zoom"], 5.5, 2, 10, 4.5] } });
   }
   function infLoad(k) {
     if (k === "grid" && map) gridLayers();
@@ -405,7 +467,7 @@
     var row = function (k, key, txt) { var o = INF[k]; return '<li>' + key + '<span>' + (o.err ? "Unavailable right now" : o.busy || !o.d ? "Loading…" : txt(o.d)) + '</span></li>'; };
     el.innerHTML = '<ul>' + on.map(function (k) {
       if (k === "towers") return row(k, '<i style="background:' + TWC + '"></i><b>Cell towers</b>', function (d) { return num(d.p.length) + " FCC-registered towers · not every cell site"; });
-      return row(k, '<i class="ln" style="background:#C9B8FF"></i><b>Power grid</b>', function (d) { return "Lines and substations, 230 kV and up · brighter = higher voltage · © OpenStreetMap contributors"; });
+      return row(k, '<i class="ln" style="background:' + LCOL.ok + '"></i><i class="ln" style="background:' + LCOL.strain + '"></i><i class="ln" style="background:' + LCOL.out + '"></i><b>Power grid</b>', function (d) { return "Lines and substations, 230 kV and up, coloured by their operator's live status: green normal, yellow strained or warning, red outage or emergency, grey crosses operator areas · © OpenStreetMap contributors"; });
     }).join("") + '</ul>';
   }
   function kvTxt(v) { return v ? v + " kV" : "Unknown"; }
@@ -418,10 +480,11 @@
         '<div class="acts">' + linkA("https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistration.jsp?regKey=" + r[5], "FCC registration record") + '</div>' +
         '<p class="age">FCC Antenna Structure Registration, data as of ' + esc(d.asof) + '. The owner registered the structure; the FCC file does not list which carriers use it. Shorter sites and rooftop or small cells are usually not registered.</p>';
     } else if (p.kind === "gl" || p.kind === "ss") {
-      var f = p; c = "#C9B8FF";
-      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
-        '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") + '</dl>' +
-        '<p class="age">© OpenStreetMap contributors (ODbL). Shows lines and substations of 230 kV and up; coverage and voltage tags are incomplete. No distribution lines below 230 kV. Routes are simplified and can cross the border; not a live status.</p>';
+      var f = p, oa = map && LASTPT ? opAt(map.unproject([LASTPT.x, LASTPT.y])) : null, os = oa ? opSt(oa.id) : "na"; c = LCOL[os];
+      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + ' · ' + esc(LWORD[os]) + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
+        '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Owner</dt><dd>' + esc(f.op) + '</dd>' : "") + '<dt>Grid area</dt><dd>' + (oa ? esc(oa.name) : "Outside U.S. operator areas") + '</dd></dl>' +
+        '<p class="age">' + (oa ? 'Status from ' + esc(oa.name) + ' live feed (EIA-930 demand, ODIN outages, NWS alerts). There is no public per-line status: the colour is the operator area\'s status, and lines that cross operator areas stay grey.' : 'No operator live status here; there is no public per-line status.') + '</p>' +
+        '<p class="age">© OpenStreetMap contributors (ODbL). Shows lines and substations of 230 kV and up; coverage and voltage tags are incomplete. No distribution lines below 230 kV. Routes are simplified and can cross the border.</p>';
     }
     return h;
   }
@@ -432,7 +495,6 @@
       var k = b.dataset.k; ON[k] = !ON[k];
       vis(); if (D) list();
       if (ON[k] && k === "dc" && map) map.easeTo({ zoom: Math.max(map.getZoom(), 2.6), duration: reduce ? 0 : 700 });
-      if (ON[k] && ["mobile", "sat", "pay", "apps"].indexOf(k) >= 0) { more(true); var g = $("nxg-" + GMAP[k][0]); if (g) setTimeout(function () { g.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); }, 420); }
     });
   });
   vis();
@@ -555,7 +617,7 @@
       '<div class="acts">' + linkA("https://celestrak.org/satcat/table-satcat.php?CATNR=" + o.no, "CelesTrak record") + '</div>' +
       '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
     card.hidden = false; requestAnimationFrame(function () { card.classList.add("in"); }); pinned = true; card.classList.add("pin");
-    if (innerWidth >= 768) { var x = pt.x + 18, y = pt.y - 20; if (x + 330 > innerWidth) x = pt.x - 338; card.style.left = Math.max(12, x) + "px"; card.style.top = Math.max(70, Math.min(y, innerHeight - card.offsetHeight - 16)) + "px"; }
+    window.__bnPlace(card, pt);
     card.querySelector(".nx-cx").onclick = function () { hideCard(true); SKY.sel = null; map.getSource("trk").setData(EMPTY); };
   }
   function swPanel() {
