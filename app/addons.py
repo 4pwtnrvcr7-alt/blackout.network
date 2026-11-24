@@ -131,6 +131,8 @@ ROUTES = {
     "/static/ready": "ready_files",  # seo/ready-hub: the guide PDFs + first-page thumbnails (application/pdf, inline, 1-day cache)
     "/midterms": "midterms", "/election": "midterms", "/elections": "midterms",
     "/api/preppers": "preppers",
+    "/games": "solo", "/preppers": "solo", "/bushcraft": "solo", "/medical": "solo", "/first-aid": "solo", "/noise": "solo", "/politics": "solo", "/government": "solo", "/figures": "solo", "/elon": "solo",   # Nov 24 2026 (pt1846u): reworked standalone pages (solo.py), unlisted until Matt approves
+    "/api/solo": "solo",             # solo.css / solo.js and the emoji-free copy of each reworked tab add-on
     "/api/report": "reports",
     "/api/reports": "reports",
     "/report-status": "reports",
