@@ -47,7 +47,7 @@
   if(!ph)return;if(!n){box&&box.remove();return}
   if(!box){box=d.createElement("a");box.id="bna_malert";box.className="bna-malert";box.href="/network";var anchor=ph.closest(".bn-mhead")||ph;anchor.parentNode.insertBefore(box,anchor.nextSibling);
    box.addEventListener("click",function(e){e.preventDefault();try{if(window.bnMenuClose)bnMenuClose(true,{noHist:true})}catch(err){}location.href="/network"})}
-  box.innerHTML='<span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open Network Status</span></span>'}
+  box.innerHTML='<span><b>Network alert'+(n>1?"s ("+n+")":"")+'</b> '+esc(list.join("; "))+'. <span class="bna-mopen">Open The Grid</span></span>'}
  function load(){fetch("/api/netstatus/alerts",{cache:"no-store"}).then(function(r){return r.json()}).then(alerts).catch(function(){})}
  function go(){tools();load();setInterval(load,300000)}
  // same-page hash links in the menu (The Wire, network alert, other /#tab links without a data-tab handler): close the menu and go to the top
