@@ -13,7 +13,7 @@ import email.utils, json, os, re, socket, ssl, sqlite3, time, urllib.error, urll
 from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
+UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 NEWS_HOT_H = 6      # a matching headline this recent marks a disruption
 NEWS_KEEP_H = 48    # headlines this recent are listed on the detail page
 

@@ -1,11 +1,11 @@
-"""Sky view data for /network (Nov 23 2026, pt1755u): satellite constellations and space weather, keyless and cached.
+"""Sky view data for /grid (Nov 23 2026, pt1755u): satellite constellations and space weather, keyless and cached.
 Orbital elements: CelesTrak GP data (CSV), one download per group at most every 6 h, 2 h back-off after an error (CelesTrak's
 published usage rules); Starlink reuses the Starlink page's cached copy. Propagation happens in the browser (satellite.js SGP4).
 Space weather: NOAA SWPC scales (R/S/G) and planetary Kp, cached 10 min. Read-only; no keys; nothing estimated."""
 import os, csv, io, json, time, threading, urllib.request
 from datetime import datetime, timezone
 
-UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached 6 h per group)"
+UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached 6 h per group)"
 CT = "https://celestrak.org/NORAD/elements/gp.php?GROUP={g}&FORMAT=csv"
 MAX_AGE = 6 * 3600; BACKOFF = 2 * 3600 + 300
 # id, label, CelesTrak group, what it is
