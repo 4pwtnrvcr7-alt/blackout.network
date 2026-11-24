@@ -233,7 +233,7 @@
         if (f && f.properties.cluster) { var cid = f.properties.cluster_id, cc0 = f.geometry.coordinates; hideCard(true);
           map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
       }
-      if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["sea-ls", "sea-line"] })[0] || (inetHit ? null : map.queryRenderedFeatures(e.point, { layers: ["seaz-fill"] })[0]);
+      if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["sea-ls", "sea-line"] })[0];
       if (!f) f = inetHit;
       if (f) showCard(f, e.point, true); else hideCard(true);
     });
@@ -305,7 +305,7 @@
     ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
     SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.sea ? "visible" : "none"); });
-    if (ON.sea) seaLoad(); seaPanel();
+    if (ON.sea) seaLoad();
     INF_K.forEach(function (k) { INF[k].L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON[k] ? "visible" : "none"); }); if (ON[k]) infLoad(k); }); infPanel();
     document.querySelectorAll("#nx_f button").forEach(function (b) { b.setAttribute("aria-pressed", ON[b.dataset.k] ? "true" : "false"); });
     try { document.dispatchEvent(new CustomEvent("nx:layers", { detail: { ops: !!ON.ops } })); } catch (e) {}   /* gridlayer.js (merged The Grid) */
@@ -345,7 +345,7 @@
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Power · ' + (s.outages >= 1500 ? "Major outages" : "Outages reported") + '</span><h3>' + esc(s.name) + '</h3><dl><dt>Customers out</dt><dd>' + num(s.outages) + '</dd></dl>' +
         ((s.top || []).length ? '<ul>' + s.top.map(function (u) { return '<li>' + (url(u.web) ? '<a href="' + url(u.web) + '" target="_blank" rel="noopener noreferrer">' + esc(u.name) + '</a>' : esc(u.name)) + ' · ' + num(u.outages) + '</li>'; }).join("") + '</ul>' : '') +
         '<div class="acts">' + (s.st ? '<button type="button" class="gx-fly" data-state="' + esc(s.st) + '">Utilities and outage maps</button>' : '') + '<button type="button" class="gx-fly" data-more="gx-outages">Outages by state</button></div>';
-    } else if (p.kind === "cable" || p.kind === "ls" || p.kind === "zone") { h = seaCard(p);
+    } else if (p.kind === "cable" || p.kind === "ls") { h = seaCard(p);
     } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss") { h = infCard(p);
     } else if (p.kind === "inet") { h = inetCard(p);
     } else if (p.kind === "cloud") {
@@ -363,71 +363,65 @@
   addEventListener("keydown", function (e) { if (e.key === "Escape") { if (SKY.on && SKY.sel != null) clearSat(); else hideCard(true); more(false); } });
 
 
-  /* ---------- undersea cables (pt1785u Stage 2): OSM + NOAA routes, chokepoint risk, status inferred, never official ---------- */
-  var SEA = { geo: null, st: null, busy: false }, SEA_L = ["seaz-fill", "seaz-line", "sea-line", "sea-ls"];
+  /* ---------- undersea cables (pt1812u): OSM + NOAA routes, coloured green / yellow / red by inferred status. No chokepoint notes. ---------- */
+  var SEA = { geo: null, st: null, busy: false }, SEA_L = ["sea-line", "sea-ls"];
+  var CCOL = { 0: "#2FD67B", 1: "#F5D547", 2: "#FF3B3B" };
+  function seaCol(lv) { return CCOL[lv] || CCOL[0]; }
   function seaLayers() {
     map.addSource("sea", { type: "geojson", data: EMPTY, tolerance: 0.6 });
-    map.addSource("seaz", { type: "geojson", data: EMPTY });
     var vz = ON.sea ? "visible" : "none";
-    map.addLayer({ id: "seaz-fill", type: "fill", source: "seaz", layout: { visibility: vz }, paint: { "fill-color": ["get", "c"], "fill-opacity": 0.13 } }, "glow");
-    map.addLayer({ id: "seaz-line", type: "line", source: "seaz", layout: { visibility: vz }, paint: { "line-color": ["get", "c"], "line-width": 1.2, "line-opacity": 0.8, "line-dasharray": [2, 2] } }, "glow");
     map.addLayer({ id: "sea-line", type: "line", source: "sea", filter: ["==", ["geometry-type"], "LineString"], layout: { visibility: vz, "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["case", ["get", "dmg"], COL.deg, ["==", ["get", "s"], "noaa"], "#6FB7E8", "#4C9BD6"], "line-opacity": ["case", ["get", "dmg"], 0.95, 0.7],
-        "line-width": ["interpolate", ["linear"], ["zoom"], 1, ["case", ["get", "dmg"], 1.6, 0.7], 6, ["case", ["get", "dmg"], 3, 1.5], 10, 2.4] } }, "glow");
+      paint: { "line-color": ["match", ["get", "lv"], 2, CCOL[2], 1, CCOL[1], CCOL[0]], "line-opacity": ["case", [">", ["get", "lv"], 0], 0.95, 0.75],
+        "line-width": ["interpolate", ["linear"], ["zoom"], 1, ["case", [">", ["get", "lv"], 0], 1.6, 0.7], 6, ["case", [">", ["get", "lv"], 0], 3, 1.5], 10, 2.4] } }, "glow");
     map.addLayer({ id: "sea-ls", type: "circle", source: "sea", filter: ["==", ["geometry-type"], "Point"], minzoom: 2.5, layout: { visibility: vz },
       paint: { "circle-color": "#05060a", "circle-stroke-color": "#E8ECF5", "circle-stroke-width": 1.2, "circle-radius": ["interpolate", ["linear"], ["zoom"], 2.5, 2, 8, 4.5] } }, "glow");
   }
-  function zCol(z) { return z.lv >= 2 ? COL.deg : z.lv === 1 || z.score >= 70 ? "#FFA040" : "#C9CCD6"; }
   function seaLoad() {
-    if (SEA.geo || SEA.busy || !map) return; SEA.busy = true; $("nx_sea").innerHTML = '<p class="nx-k">Undersea cables</p><p class="nx-swm">Loading cable routes…</p>';
+    if (SEA.geo || SEA.busy || !map) return; SEA.busy = true;
+    var el = $("nx_sea"); if (el) el.hidden = true;
     Promise.all([getJSON("/api/netmap/cables.json"), getJSON("/api/netmap/cables").catch(function () { return null; })]).then(function (r) {
-      SEA.geo = r[0]; SEA.st = r[1]; SEA.busy = false; seaApply(); seaPanel();
-    }, function () { SEA.busy = false; $("nx_sea").innerHTML = '<p class="nx-k">Undersea cables</p><p class="nx-swm">Cable data is unavailable right now.</p>'; });
+      SEA.geo = r[0]; SEA.st = r[1]; SEA.busy = false; seaApply();
+    }, function () { SEA.busy = false; });
   }
-  function seaDmg(n) {
-    var d = (SEA.st && SEA.st.damaged) || {}, k; if (!n) return null;
-    for (k in d) if (n.toLowerCase().indexOf(k.toLowerCase()) === 0) return d[k];
-    return null;
+  function seaSquish(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, ""); }
+  function seaInfo(n) {
+    var d = (SEA.st && SEA.st.cables) || {}, k, best = null; if (!n) return null;
+    var ns = seaSquish(n);
+    for (k in d) {
+      var ks = seaSquish(k);
+      if (ns && ks && (ns === ks || ns.indexOf(ks) === 0 || ks.indexOf(ns) === 0)) {
+        if (!best || ks.length > (best._ks || "").length) best = Object.assign({ _ks: ks }, d[k]);
+      }
+    }
+    return best;
   }
   function seaApply() {
     if (!map.getSource("sea") || !SEA.geo) return;
-    SEA.geo.features.forEach(function (f, i) { var p = f.properties; p.kind = f.geometry.type === "Point" ? "ls" : "cable"; p.i = i; p.dmg = p.kind === "cable" && !!seaDmg(p.n); });
+    SEA.geo.features.forEach(function (f, i) {
+      var p = f.properties; p.kind = f.geometry.type === "Point" ? "ls" : "cable"; p.i = i;
+      var inf = p.kind === "cable" ? seaInfo(p.n) : null; p.lv = inf ? inf.lv : 0;
+    });
     map.getSource("sea").setData(SEA.geo);
-    var zs = ((SEA.st || {}).zones || []).map(function (z, i) { return { type: "Feature", geometry: { type: "Polygon", coordinates: [z.poly.concat([z.poly[0]])] }, properties: { kind: "zone", i: i, c: zCol(z) } }; });
-    map.getSource("seaz").setData({ type: "FeatureCollection", features: zs });
-  }
-  function seaPanel() {
-    var el = $("nx_sea"); if (!el) return; el.hidden = !ON.sea || SKY.on; if (el.hidden || !SEA.geo) return;
-    var zs = (SEA.st || {}).zones || [];
-    el.innerHTML = '<p class="nx-k">Chokepoint risk <span>our model · status inferred</span></p><div class="nx-zb">' + zs.map(function (z, i) {
-      return '<button type="button" data-z="' + i + '"><i style="background:' + zCol(z) + '"></i><b>' + esc(z.name.split(" and ")[0]) + '</b><em>' + z.score + '</em></button>'; }).join("") + '</div>' +
-      (SEA.st ? "" : '<p class="nx-swm">Status is unavailable right now; routes only.</p>');
-    el.querySelectorAll("[data-z]").forEach(function (b) { b.onclick = function () { var z = zs[+b.dataset.z], xs = z.poly.map(function (p) { return p[0]; }), ys = z.poly.map(function (p) { return p[1]; });
-      map.fitBounds([[Math.min.apply(null, xs), Math.min.apply(null, ys)], [Math.max.apply(null, xs), Math.max.apply(null, ys)]], { padding: innerWidth < 768 ? { top: 250, bottom: Math.round(innerHeight * 0.42), left: 24, right: 24 } : PAD(), duration: reduce ? 0 : 900, maxZoom: 5.5 });
-      showCard({ properties: { kind: "zone", i: +b.dataset.z } }, { x: innerWidth / 2, y: 140 }, true); }; });
   }
   function seaWhen(ts) { var d = new Date(ts); return isFinite(d) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""; }
   function seaCard(p) {
-    var c, h = "";
-    if (p.kind === "zone") {
-      var z = SEA.st.zones[p.i]; c = z.lv >= 2 ? COL.deg : z.lv === 1 ? "#FFA040" : "#C9CCD6";
-      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(z.status) + '</span><h3>' + esc(z.name) + '</h3>' +
-        '<p><b style="color:' + zCol(z) + '">Risk ' + z.score + '/100</b> <span class="age">our model, not a forecast</span></p><dl>' + z.parts.map(function (q) { return '<dt>' + esc(q[0]) + '</dt><dd>+' + q[1] + '</dd>'; }).join("") + '</dl>' +
-        (z.ioda.length ? '<p>IODA internet outage signal now: ' + z.ioda.map(function (o) { return linkA(o.url, o.name); }).join(", ") + '</p>' : "") +
-        (z.news.length ? '<p class="nx-k">Cable damage in the news</p><ul>' + z.news.map(function (n) { return '<li>' + linkA(n.url, n.t) + ' · ' + esc(n.src) + ', ' + esc(seaWhen(n.at)) + '</li>'; }).join("") + '</ul>' : "") +
-        (innerWidth < 768 ? '<details class="nx-det"><summary>Cuts, headlines and method</summary>' : '') + '<p class="nx-k">Documented cuts</p><ul>' + z.cuts.map(function (k) { return '<li>' + esc(seaWhen(k.d + "T12:00:00Z")) + ': ' + esc(k.t) + ' · ' + linkA(k.url, k.src) + '</li>'; }).join("") + '</ul>' +
-        (z.conflict.length ? '<p class="nx-k">Security headlines, last 7 days</p><ul>' + z.conflict.slice(0, 3).map(function (n) { return '<li>' + linkA(n.url, n.t) + ' · ' + esc(n.src) + '</li>'; }).join("") + '</ul>' : "") +
-        (z.note ? '<p class="age">' + linkA(z.note_url, z.note) + '</p>' : "") + '<p class="age">' + esc(SEA.st.basis) + ' ' + esc(SEA.st.model) + '</p>' + (innerWidth < 768 ? '</details>' : '');
-    } else {
-      var f = SEA.geo.features[p.i].properties, dm = p.kind === "cable" ? seaDmg(f.n) : null; c = dm ? COL.deg : "#6FB7E8";
-      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ls" ? "Cable landing station" : dm ? "Damage reported in the news (inferred)" : "Undersea cable · no damage reported (inferred)") + '</span>' +
-        '<h3>' + esc(f.n || (p.kind === "ls" ? "Cable landing station" : "Unnamed cable")) + '</h3><dl>' + (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") +
-        (f.st ? '<dt>Status (NOAA)</dt><dd>' + esc(f.st) + '</dd>' : "") + '<dt>Source</dt><dd>' + (f.s === "noaa" ? "NOAA cable area, U.S. waters" : "OpenStreetMap") + '</dd></dl>' +
-        (dm ? '<p>' + linkA(dm.url, dm.t) + ' · ' + esc(dm.src) + ', ' + esc(seaWhen(dm.at)) + '</p>' : "") +
-        '<p class="age">' + (f.s === "noaa" ? "General location of the cable area, from NOAA Office for Coastal Management." : "Route as mapped by OpenStreetMap contributors; coverage is incomplete.") +
-        ' Operators publish no live status, so this is inferred from news and IODA signals.</p>';
+    var f = SEA.geo.features[p.i].properties;
+    if (p.kind === "ls") {
+      return '<span class="st">Cable landing station</span><h3>' + esc(f.n || "Cable landing station") + '</h3><dl>' +
+        (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") +
+        '<dt>Source</dt><dd>' + (f.s === "noaa" ? "NOAA cable area, U.S. waters" : "OpenStreetMap") + '</dd></dl>' +
+        '<p class="age">' + (f.s === "noaa" ? "General location of the cable area, from NOAA Office for Coastal Management." : "Landing station as mapped by OpenStreetMap contributors.") + '</p>';
     }
-    return h;
+    var inf = seaInfo(f.n), lv = inf ? inf.lv : 0, c = seaCol(lv), st = inf ? inf.status : "Working";
+    var why = inf && inf.reason ? esc(inf.reason) : "No fault reports.";
+    var src = "";
+    if (inf && (inf.src || inf.url)) src = '<dt>Source</dt><dd>' + (inf.url ? linkA(inf.url, inf.src || "Source") : esc(inf.src || "")) + (inf.at ? ", " + esc(seaWhen(inf.at)) : "") + '</dd>';
+    return '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(st) + '</span>' +
+      '<h3>' + esc(f.n || "Unnamed cable") + '</h3><dl>' + (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") +
+      '<dt>Status</dt><dd>' + esc(st) + '</dd><dt>Why</dt><dd>' + why + '</dd>' + src +
+      (f.st ? '<dt>NOAA record</dt><dd>' + esc(f.st) + '</dd>' : "") +
+      '<dt>Route source</dt><dd>' + (f.s === "noaa" ? "NOAA cable area, U.S. waters" : "OpenStreetMap") + '</dd></dl>' +
+      '<p class="age">' + esc((SEA.st && SEA.st.basis) || "Status is inferred from public fault reports. Operators publish no live feed.") + '</p>';
   }
 
   /* ---------- U.S. infrastructure (pt1785u Stage 3): FCC ASR towers and the OSM power grid. Both off by default, loaded on first use ---------- */
