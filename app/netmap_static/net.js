@@ -450,13 +450,14 @@
   /* Nov 24 2026 (Matt): 230 kV+ lines coloured by the live status of the U.S. operator/BA area they sit in (no public per-line status exists).
      green normal, yellow strained/warning, red outage/emergency, grey = crosses operator areas or outside them. */
   var LCOL = { ok: "#2FD67B", strain: "#F5D547", out: "#FF3B3B", na: "#7C8190" }, LWORD = { ok: "Normal", strain: "Strained or warning", out: "Outage or emergency", na: "No live status" };
-  var OPS = null, LASTPT = null;
-  function opSt(id) { return (window.__gxRegionStatus || {})[id] || "na"; }
+  var OPS = null, LASTPT = null, FOPS = null, FST = {};   /* pt1815u: FOPS = synchronous areas outside the U.S. with a keyless live frequency feed */
+  function opSt(id) { return (window.__gxRegionStatus || {})[id] || FST[id] || "na"; }
   function lineCol() {
     if (!OPS || !OPS.length) return LCOL.na;
     var e = ["case"]; OPS.forEach(function (o) { e.push(["within", o.g], LCOL[opSt(o.id)] || LCOL.na); }); e.push(LCOL.na); return e;
   }
   function gridColor() {
+    if (FOPS && !(OPS && OPS.__f)) { OPS = (OPS || []).concat(FOPS); OPS.__f = 1; }   /* gridops.json may land before or after the frequency areas */
     if (!map) return; var c = lineCol();
     ["gl-lo", "gl-hi"].forEach(function (l) { if (map.getLayer(l)) map.setPaintProperty(l, "line-color", c); });
     if (map.getLayer("gss")) map.setPaintProperty("gss", "circle-stroke-color", c);
@@ -483,6 +484,10 @@
   function gridLayers() {
     if (map.getSource("grid")) return;
     fetch("/api/netmap/gridops.json").then(function (r) { return r.json(); }).then(function (j) { OPS = j.ops || []; gridColor(); }).catch(function () {});
+    function freq() { fetch("/api/netmap/gridfreq").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) {
+      FST = {}; FOPS = (j.areas || []).map(function (a) { FST[a.id] = a.status; return { id: a.id, name: a.name, g: a.g, fr: a }; }); if (OPS) OPS.__f = 0; gridColor(); infPanel();
+      var lv = $("gx_live"); if (lv) lv.textContent = "Live line status: U.S., " + FOPS.map(function (a) { return a.name.replace(/ synchronous grid| grid \(NESO\)/, ""); }).join(", ") + ". Grey: no free live feed."; }).catch(function () {}); }
+    freq(); setInterval(function () { if (!document.hidden) freq(); }, 300000);
     map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 8 });
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = ON.grid && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
     L({ id: "gl-lo", type: "line", source: "grid", "source-layer": "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
@@ -508,7 +513,7 @@
     var row = function (k, key, txt) { var o = INF[k]; return '<li>' + key + '<span>' + (o.err ? "Unavailable right now" : o.busy || !o.d ? "Loading…" : txt(o.d)) + '</span></li>'; };
     el.innerHTML = '<ul>' + on.map(function (k) {
       if (k === "towers") return row(k, '<i style="background:' + TWC + '"></i><b>Cell towers</b>', function (d) { return num(d.p.length) + " FCC-registered towers · not every cell site"; });
-      return row(k, '<i class="ln" style="background:' + LCOL.ok + '"></i><i class="ln" style="background:' + LCOL.strain + '"></i><i class="ln" style="background:' + LCOL.out + '"></i><b>Power grid</b>', function (d) { return "Worldwide lines and substations, 220 kV and up. Lines in a U.S. operator area with a live feed are coloured green normal, yellow strained or warning, red outage or emergency; grey means no live operator status (most of the world) · © OpenStreetMap contributors, Overture Maps Foundation"; });
+      return row(k, '<i class="ln" style="background:' + LCOL.ok + '"></i><i class="ln" style="background:' + LCOL.strain + '"></i><i class="ln" style="background:' + LCOL.out + '"></i><b>Power grid</b>', function (d) { return "Worldwide lines and substations, 220 kV and up: green normal, yellow strained or warning, red outage or emergency. Live status: U.S. grid operator areas" + (FOPS ? ", " + FOPS.map(function (a) { return a.name.replace(/ synchronous grid| grid \(NESO\)/, ""); }).join(", ") + " (grid frequency)" : "") + ". Grey: no free live status feed · © OpenStreetMap contributors, Overture Maps Foundation"; });
     }).join("") + '</ul>';
   }
   function kvTxt(v) { return v ? v + " kV" : "Unknown"; }
@@ -524,7 +529,7 @@
       var f = p, oa = map && LASTPT ? opAt(map.unproject([LASTPT.x, LASTPT.y])) : null, os = oa ? opSt(oa.id) : "na"; c = LCOL[os];
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + ' · ' + esc(LWORD[os]) + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
         '<dt>Voltage</dt><dd>' + esc(f.vt || kvTxt(f.v)) + '</dd>' + (f.op ? '<dt>Owner</dt><dd>' + esc(f.op) + '</dd>' : "") + '<dt>Grid area</dt><dd>' + (oa ? esc(oa.name) : "No live operator feed here") + '</dd></dl>' +
-        '<p class="age">' + (oa ? 'Status from ' + esc(oa.name) + ' live feed (EIA-930 demand, ODIN outages, NWS alerts). There is no public per-line status: the colour is the operator area\'s status, and lines that cross operator areas stay grey.' : 'No operator live status here; there is no public per-line status.') + '</p>' +
+        '<p class="age">' + (oa && oa.fr ? 'Status from live grid frequency for the whole ' + esc(oa.name) + (oa.fr.hz ? ' (' + oa.fr.hz.toFixed(3) + ' Hz now, largest swing in 5 min ' + oa.fr.dev_mhz + ' mHz)' : '') + ': within 0.2 Hz of 50 Hz is normal, 0.2-0.8 Hz strained, beyond 0.8 Hz emergency. Source: ' + esc(oa.fr.src) + '. There is no public per-line status.' : oa ? 'Status from ' + esc(oa.name) + ' live feed (EIA-930 demand, ODIN outages, NWS alerts). There is no public per-line status: the colour is the operator area\'s status, and lines that cross operator areas stay grey.' : 'No live operator status here; there is no public per-line status.') + '</p>' +
         '<p class="age">© OpenStreetMap contributors (ODbL). Shows lines and substations of 220 kV and up worldwide; coverage and voltage tags are incomplete and vary by country. No lines below 220 kV. Routes are simplified.' + (f.u ? ' Underground or submarine cable.' : '') + '</p>';
     }
     return h;

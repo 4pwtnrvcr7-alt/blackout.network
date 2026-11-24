@@ -254,8 +254,9 @@ body.nx-board .nx-side,body.nx-sky .nx-side{display:none}
 .nx-card.dragged,.gx-card.dragged{left:var(--dx)!important;top:var(--dy)!important;right:auto!important;bottom:auto!important;width:min(320px,calc(100vw - 20px))!important}
 .nx-card .nx-cx,.gx-card .gx-cx{z-index:3}
 .nx-leg .nx-lnk{display:flex;gap:10px;margin:6px 0 0;padding-top:7px;border-top:1px solid var(--nx-bd)}.nx-leg .nx-lnk i.ln{width:14px;height:3px;border-radius:2px}
-body.nx-sky .nx-lnk{display:none!important}
-@media (max-width:767px){.nx-leg .nx-lnk{display:flex;gap:9px;margin:4px 0 0;padding-top:4px}.nx-leg:has(.nx-lnk){border-radius:14px}}
+body.nx-sky .nx-lnk,body.nx-sky .nx-live{display:none!important}
+.nx-leg .nx-live{margin:4px 0 0;font-size:10.5px;line-height:1.35;color:rgba(240,240,250,.62);max-width:240px}
+@media (max-width:767px){.nx-leg .nx-live{white-space:normal;max-width:calc(100vw - 48px);font-size:10px}.nx-leg .nx-lnk{display:flex;gap:9px;margin:4px 0 0;padding-top:4px}.nx-leg:has(.nx-lnk){border-radius:14px}}
 @media (max-width:767px){body:not(.nx-sky) .nx-side{top:calc(212px + env(safe-area-inset-top))}}
 .nx-chip.s-deg i{background:var(--nx-out)}   /* Nov 24 2026: a network "Disruption" is red, same as the Status cards */
 
