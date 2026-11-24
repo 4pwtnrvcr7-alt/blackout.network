@@ -11,7 +11,7 @@ class Cables(unittest.TestCase):
         self.assertLess(os.path.getsize(p), 450_000)
         d = json.load(open(p)); self.assertIn("OpenStreetMap", d["credit"]); self.assertIn("NOAA", d["credit"])
         self.assertNotIn("telegeography", open(p).read().lower())   # CC BY-NC-SA: not used
-        self.assertGreater(sum(1 for f in d["features"] if f["geometry"]["type"] == "LineString"), 500)
+        self.assertGreater(sum(1 for f in d["features"] if f["geometry"]["type"] == "LineString"), 200)   # pt1787u: landing-to-landing routes only
         self.assertEqual(netmap.handle_get("/api/netmap/cables.json")[0], 200)
 
     def test_quiet_news_is_inferred_never_official(self):

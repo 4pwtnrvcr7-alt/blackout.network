@@ -25,11 +25,35 @@ class Infra(unittest.TestCase):
         self.assertIn('type: "vector", tiles:', js)
         self.assertIn("© OpenStreetMap contributors", js)
 
-    def test_heavy_layers_off_by_default(self):
+    def test_opens_on_map_with_every_layer_on(self):   # pt1787u
         js = open(os.path.join(ST, "net.js")).read()
-        self.assertIn("sea: false, towers: false, grid: false }", js)
+        self.assertIn("sea: true, towers: true, grid: true }", js)
+        self.assertNotIn("false, ", js[js.index("var ON = {"):js.index("};", js.index("var ON = {"))])
+        self.assertNotIn('localStorage.getItem("bn_net_layers")', js)
         html = netmap.page({})
-        for k in ("towers", "grid"): self.assertIn(f'data-k="{k}" aria-pressed="false"', html)
+        self.assertNotIn('aria-pressed="false"><i></i>', html)
+        for k in ("sea", "towers", "grid", "dc"): self.assertIn(f'data-k="{k}" aria-pressed="true"', html)
+        self.assertIn('<body class="nx">', html); self.assertIn('data-m="map" aria-pressed="true"', html)
+
+    def test_cables_drawn_landing_to_landing(self):   # pt1787u: dead ends at sea are not drawn; news matching keeps every name
+        import json, netcables
+        gj = json.load(open(os.path.join(ST, "cables.json")))
+        drawn = {f["properties"]["n"] for f in gj["features"] if f["geometry"]["type"] == "LineString" and f["properties"].get("n")}
+        self.assertIn("note", gj); self.assertTrue(drawn <= set(gj["names"])); self.assertGreater(len(gj["names"]), len(drawn))
+        self.assertGreater(len(netcables.cable_names()), 200)
+
+    def test_board_shows_live_signal_only_problems_first(self):   # pt1787u
+        js = open(os.path.join(ST, "net.js")).read(); bj = open(os.path.join(ST, "board.js")).read()
+        self.assertIn("return !n.link_only && n.level >= 0;", js); self.assertIn("s.networks = ns.length", js)
+        self.assertIn("D = liveOnly(j)", js); self.assertIn(".then(liveOnly)", js)
+        self.assertIn("return !n.link_only && n.level >= 0; }) : [];", bj); self.assertIn("ns.sort(order)", bj)
+        self.assertIn("(eff(b) - eff(a)) || (changed(b) - changed(a))", bj); self.assertNotIn("no live signal\" : \"\")", bj)
+
+    def test_layer_panel_removed_credit_kept(self):   # pt1787u
+        html = netmap.page({}); js = open(os.path.join(ST, "net.js")).read()
+        self.assertNotIn('id="nx_inf"', html); self.assertIn('id="nx_sea"', html)
+        self.assertRegex(js, r'Power grid: <a href="https://www.openstreetmap.org/copyright"[^>]*>© OpenStreetMap contributors</a> \(ODbL\)')   # map credit line
+        self.assertIn("© OpenStreetMap contributors (ODbL). Shows lines and substations", js)
 
     def test_voltage_and_fiber_filters(self):
         self.assertEqual(B.kv({"voltage": "345000;138000"}), 345); self.assertEqual(B.kv({"voltage": "n/a"}), 0)
