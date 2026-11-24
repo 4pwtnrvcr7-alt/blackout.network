@@ -42,6 +42,27 @@ PAGES = {
                       lede="What to do until help arrives: scene safety, bleeding, burns, CPR, choking, heat illness and medicines.",
                       title="First aid: what to do until help arrives | BLACKOUT.NETWORK",
                       desc="Plain-language first aid for emergencies and outages: bleeding control, burns, fractures, CPR, choking, allergic reactions, heat illness and medication storage."),
+    # batch 2 (data tabs)
+    "noise":     dict(paths=("/noise",), kind="tab", tab="noise", eb="Signals", h1="Background noise",
+                      lede="Every lower-priority alert the scanner logs, ranked 0 to 6 and newest first: what is simmering before it becomes news.",
+                      title="Background noise: low-rank alerts | BLACKOUT.NETWORK",
+                      desc="Every lower-priority alert BLACKOUT.NETWORK's scanner logs, ranked 0 to 6 and newest first, so you can see what is simmering before it becomes news.",
+                      css="/api/noise/app.css", js="noise"),
+    "politics":  dict(paths=("/politics",), kind="tab", tab="politics", eb="Politics", h1="Politics",
+                      lede="Political developments flagged by the scanner, next to public prediction-market prices: what might shift and how fast.",
+                      title="Politics: developments and markets | BLACKOUT.NETWORK",
+                      desc="Political developments flagged by BLACKOUT.NETWORK's scanner, alongside public prediction-market prices, so you can see what might shift and how fast.",
+                      css="/api/politics/app.css", js="politics"),
+    "government": dict(paths=("/government",), kind="tab", tab="gov", eb="Government", h1="Government",
+                      lede="Government organisations we track: who runs what, how they are organised and the latest from each.",
+                      title="Government: organisations and leadership | BLACKOUT.NETWORK",
+                      desc="Government organisations tracked on BLACKOUT.NETWORK: an org chart, leadership profiles and the latest updates.",
+                      css="/api/government/app.css", js="government"),
+    "figures":   dict(paths=("/figures", "/elon"), kind="tab", tab="figures", eb="People", h1="Key figures",
+                      lede="A neutral reference to the people named in the stories we follow: current role, why they are in the news and the latest headlines.",
+                      title="Key figures: people in the news | BLACKOUT.NETWORK",
+                      desc="A neutral reference to the people named in the stories BLACKOUT.NETWORK follows: their current role, why they are in the news and the latest headlines.",
+                      css="/api/figures/app.css", js="figures"),
 }
 PATHS = {p: k for k, v in PAGES.items() for p in v["paths"]}
 
@@ -82,8 +103,11 @@ def page_html(key):
     else:
         inner = pg.get("main") or _dash_main(tab)
         assets_css = f'<link rel="stylesheet" href="{pg["css"]}">'
-        assets_js = f'<script src="/api/solo/js/{pg["js"]}.js?v={_ver(_addon_js_path(pg["js"]))}"></script>'
+        assets_js = (SHIM + f'<script src="/api/solo/js/{pg["js"]}.js?v={_ver(_addon_js_path(pg["js"]))}"></script>')
     sv = _ver(os.path.join(STATIC, "solo.css"), os.path.join(STATIC, "solo.js"))
+    # A tab whose add-on builds its own <main> (no markup in dashboard.html) gets an empty slot; solo.js moves the built <main> into it.
+    main = (f'<main id="tab-{E(tab)}" data-addon="{E(tab)}" class="solo-main">{inner}</main>' if inner
+            else f'<div id="solo_slot" class="solo-main solo-slot"><p class="meta">Loading</p></div>')
     return f'''<!doctype html><html lang="en" data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(pg["title"])}</title><meta name="description" content="{E(pg["desc"])}"><link rel="canonical" href="{canon}">
 {ogmeta}<meta name="theme-color" content="#000">
@@ -94,11 +118,18 @@ def page_html(key):
 <section class="solo-hero" aria-label="{E(pg["h1"])}"><div class="solo-hc"><p class="w2-eb">{E(pg["eb"])}</p><h1 class="w2-ht">{E(pg["h1"])}</h1>
 <p class="w2-hl">{E(pg["lede"])}</p></div></section>
 <nav class="tabs" hidden aria-hidden="true"></nav>
-<main id="tab-{E(tab)}" data-addon="{E(tab)}" class="solo-main">{inner}</main>
+{main}
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/credits">Image credits</a></p></footer>
 <script src="{w2}/wire2.js?v=3" defer></script>{assets_js}<script src="/api/solo/solo.js?v={sv}"></script></body></html>'''
 
-ADDON_JS = {"games": os.path.join(BASE, "games_static", "app.js"), "preppers": os.path.join(BASE, "preppers_static", "app.js")}
+# The few dashboard helpers the old tab add-ons expect as globals (defined only when missing).
+SHIM = ('<script>(function(w){if(typeof w.$!=="function")w.$=function(id){return document.getElementById(id)};'
+        'if(typeof w.esc!=="function")w.esc=function(s){return String(s==null?"":s).replace(/[&<>"\']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;","\'":"&#39;"}[c]})};'
+        'if(typeof w.safeUrl!=="function")w.safeUrl=function(u){return/^https?:\\/\\//i.test(u||"")?u:"#"}})(window)</script>')
+
+ADDON_JS = {"games": "games_static", "preppers": "preppers_static", "noise": "bnoise_static", "politics": "politics_static",
+            "government": "government_static", "figures": "figures_static"}
+ADDON_JS = {k: os.path.join(BASE, d, "app.js") for k, d in ADDON_JS.items()}
 def _addon_js_path(name): return ADDON_JS.get(name, "")
 
 def handle_get(path, qs):

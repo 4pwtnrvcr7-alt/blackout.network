@@ -1,6 +1,9 @@
 // Reworked standalone pages (solo.py): run the old tab add-on inside this page's single <main>, plus guide TOC/print helpers.
 (function(){"use strict";
-var key=document.body.getAttribute("data-solo"),M=document.getElementById("tab-"+key);if(!M)return;
+var key=document.body.getAttribute("data-solo"),M=document.getElementById("tab-"+key),slot=document.getElementById("solo_slot");
+// Add-ons that build their own <main> append it to <body>; move it into the page slot.
+if(M&&slot){M.classList.add("solo-main");slot.replaceWith(M)}
+if(!M)return;
 M.style.display="block";
 // Links to other site pages open at the top (Matt's rule): only an in-page #anchor keeps its scroll target.
 if("scrollRestoration" in history)history.scrollRestoration="manual";
