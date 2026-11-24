@@ -250,7 +250,7 @@
     var P = INET.places || {};
     map.getSource("inet").setData({ type: "FeatureCollection", features: (INETG.features || []).map(function (f) {
       var r = P[f.properties.k], l = r ? r.level : INET.all_down ? -1 : 0;   /* Matt: green unless there is evidence of a problem */
-      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
+      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), l: l, o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
     if (D) applyData();
     var nd = document.querySelector("#nx_leg .s-na"); if (nd && nd.parentNode) nd.parentNode.hidden = !INET.all_down;   /* "No data" only when every feed is down */
   }
@@ -310,6 +310,9 @@
     map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return ON[x.properties.layer]; }) });
     ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet && !INET ? "visible" : "none"); });
     ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
+    /* Nov 24 2026 (pt1816u): with Power grid on, the "normal" internet green is a faint tint so the green / yellow / red power lines stay readable (#129 raised it to 0.28 and washed every U.S. line green) */
+    if (map.getLayer("inet-fill")) map.setPaintProperty("inet-fill", "fill-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"]);
+    if (map.getLayer("inet-line")) map.setPaintProperty("inet-line", "line-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.12, 0.45] : 0.45);
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
     SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.sea ? "visible" : "none"); });
     if (ON.sea) seaLoad();
