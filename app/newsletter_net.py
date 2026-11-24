@@ -1,6 +1,6 @@
 """Network outage report for the 7 AM / 7 PM brief (Matt, pt1755u, Nov 23 2026). Opt-in per reader (subscribers.net_brief).
 
-for_sub(sub, c) -> dict or None. Data is the same snapshot as /network (netmap.py): official provider status pages,
+for_sub(sub, c) -> dict or None. Data is the same snapshot as /grid (netmap.py): official provider status pages,
 IODA internet outage signals and ODIN power outages. Uses the in-process copy when this process already has one,
 otherwise reads the public /api/netmap/data endpoint once (cached 10 min).
 Never raises: any failure returns None and the issue simply has no network section.
@@ -58,7 +58,7 @@ def build(d, c=None):
         for n in bad[:5]:
             inc = (n.get("incidents") or [{}])[0].get("t") or n.get("status") or ""
             rows.append(dict(name=str(n.get("name") or "")[:80], level=int(n["level"]), what="Major outage" if int(n["level"]) >= 3 else "Disruption",
-                             note=str(inc)[:150], url=n.get("status_url") or (_base(c) + "/network")))
+                             note=str(inc)[:150], url=n.get("status_url") or (_base(c) + "/grid")))
         total = int(s.get("networks") or len(nets)); ok = int(s.get("ok") or 0)
         if bad: head = f"{len(bad)} of {total} tracked networks disrupted right now"
         else: head = f"No major U.S. network outages right now · {ok} of {total} tracked networks normal"
@@ -66,13 +66,13 @@ def build(d, c=None):
         if minor and not bad: lines.append(f"{len(minor)} with minor issues reported by the provider.")
         if cs: lines.append("Internet outage signals now in " + ", ".join(x["name"] for x in cs[:4]) + (f" and {len(cs) - 4} more" if len(cs) > 4 else "") + " (IODA).")
         if pw >= 10000: lines.append(f"{pw:,} U.S. power customers out (ODIN).")
-        lines = _log_lines(d) + lines   # pt1758u: the /network incident timeline, recovered problems first
-        return dict(head=head, rows=rows, lines=lines[:3], url=_base(c) + "/network", generated=d.get("generated"), issues=len(bad))
+        lines = _log_lines(d) + lines   # pt1758u: the /grid incident timeline, recovered problems first
+        return dict(head=head, rows=rows, lines=lines[:3], url=_base(c) + "/grid", generated=d.get("generated"), issues=len(bad))
     except Exception:
         return None
 
 def _log_lines(d, hours=12):
-    """Up to 2 plain-English lines from the /network incident timeline: real problems (level 2+) that recovered in the last `hours` hours."""
+    """Up to 2 plain-English lines from the /grid incident timeline: real problems (level 2+) that recovered in the last `hours` hours."""
     try:
         from datetime import datetime, timezone, timedelta
         from zoneinfo import ZoneInfo

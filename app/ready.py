@@ -46,7 +46,7 @@ GUIDES = [
                "The checklist covers the kit itself, a written list of each person's medicines, doses and allergies, and what to ask your pharmacist about extra supply and refrigerated medicines.",
                "It ends with a pointer to a Red Cross first aid class."]},
 ]
-RELATED = [("/preppers", "Preppers", "Kits, suppliers and checklists"), ("/network", "The Grid", "Live US grid status and outages"),
+RELATED = [("/preppers", "Preppers", "Kits, suppliers and checklists"), ("/grid", "The Grid", "Live US grid status and outages"),
            ("/weather", "Weather", "Official alerts and forecast"), ("/guides/medical.html", "First aid", "The full first aid guide"),
            ("/resources", "Local help", "Emergency services near you"), ("/newsletter", "Newsletter", "The free morning and evening brief")]
 
