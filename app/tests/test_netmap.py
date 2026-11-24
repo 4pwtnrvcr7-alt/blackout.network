@@ -242,3 +242,12 @@ class NetRails(unittest.TestCase):
             r = netmap.spc_one(("https://x.example", r"^(FedWire|FedACH)$"))
         self.assertEqual(r["level"], 0); self.assertEqual(r["incidents"], [])
         self.assertEqual(netmap.link_one("see page")["level"], -1)
+
+class NoDuplicateFunctions(unittest.TestCase):
+    def test_net_js_declares_each_function_once(self):
+        """Regression (Nov 24 2026): a second `function prog(...)` (sky shaders) replaced the loader's prog() and broke map setup."""
+        import collections
+        js = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
+        c = collections.Counter(re.findall(r"^  function (\w+)\(", js, re.M))
+        self.assertEqual([k for k, n in c.items() if n > 1], [])
+
