@@ -220,7 +220,7 @@
         var cc = map.getCenter(), R = Math.PI / 180;
         sf = sf.filter(function (f) { var q = f.geometry.coordinates; return Math.sin(cc.lat * R) * Math.sin(q[1] * R) + Math.cos(cc.lat * R) * Math.cos(q[1] * R) * Math.cos((q[0] - cc.lng) * R) > 0.05; });
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
-        if (sf.length) satCard(sf[0].properties.i, e.point); else { hideCard(true); SKY.sel = null; if (map.getSource("trk")) map.getSource("trk").setData(EMPTY); } return; }
+        if (sf.length) satCard(sf[0].properties.i, e.point); else clearSat(); return; }
       if (window.__gxWxHit && window.__gxWxHit(e.point)) { hideCard(true); return; }   /* a grid alert diamond on top: gridlayer.js shows its card */
       /* follow-up pt1810u: inside an Internet region (chip on), other items win only on a tight 3 px hit; otherwise the region card opens */
       var inetHit = ON.internet && INET && map.getLayer("inet-fill") && map.getLayoutProperty("inet-fill", "visibility") !== "none" ? map.queryRenderedFeatures(e.point, { layers: ["inet-fill"] })[0] : null,
@@ -360,7 +360,7 @@
     var cxb = card.querySelector(".nx-cx"); if (cxb) cxb.onclick = function () { hideCard(true); };
   }
   function hideCard(force) { if (pinned && !force) return; pinned = false; card.classList.remove("in", "pin"); setTimeout(function () { if (!card.classList.contains("in")) card.hidden = true; }, 200); }
-  addEventListener("keydown", function (e) { if (e.key === "Escape") { hideCard(true); more(false); } });
+  addEventListener("keydown", function (e) { if (e.key === "Escape") { if (SKY.on && SKY.sel != null) clearSat(); else hideCard(true); more(false); } });
 
 
   /* ---------- undersea cables (pt1785u Stage 2): OSM + NOAA routes, chokepoint risk, status inferred, never official ---------- */
@@ -572,7 +572,7 @@
 
   /* ---------- Sky view: satellite constellations, propagated live in the browser (satellite.js SGP4, CelesTrak elements) ---------- */
   var SKYC = { starlink: "#E8ECF5", gps: "#4FC3F7", glonass: "#B39DFF", galileo: "#5CE1B6", beidou: "#FF8FB1", iridium: "#9DB4FF", oneweb: "#FFA270", goes: "#FF7AE0" };
-  SKY = { on: false, loaded: false, loading: null, recs: [], groups: [], show: {}, timer: null, sel: null, SW: null };
+  SKY = { on: false, loaded: false, loading: null, recs: [], groups: [], show: {}, reveal: {}, timer: null, layerT: 0, sel: null, SW: null, spinPaused: false, spinRaf: 0, spinT: 0, bound: false };
   var mob = innerWidth < 768;
   function loadScript(u, i) { return new Promise(function (ok, no) { if (window.satellite) return ok(); var s = document.createElement("script"); s.src = u; s.integrity = i; s.crossOrigin = "anonymous"; s.onload = ok; s.onerror = function () { no(new Error("satellite.js did not load")); }; document.head.appendChild(s); }); }
   function skyLoad() {
@@ -609,8 +609,10 @@
   function prop() {
     if (!SKY.on || !SKY.loaded) return;
     var sat = window.satellite, d = new Date(), gm = sat.gstime(d), f = [], n = 0;
+    var focus = SKY.sel != null && document.body.classList.contains("nx-sky-focus");
     for (var i = 0; i < SKY.recs.length; i++) {
-      var o = SKY.recs[i]; if (!SKY.show[o.g]) continue;
+      var o = SKY.recs[i]; if (!SKY.show[o.g] || !SKY.reveal[o.g]) continue;
+      if (focus && i !== SKY.sel) continue;
       try {
         var pv = sat.propagate(o.r, d); if (!pv || !pv.position) continue;
         var gd = sat.eciToGeodetic(pv.position, gm), lon = sat.degreesLong(gd.longitude), lat = sat.degreesLat(gd.latitude);
@@ -625,7 +627,7 @@
   function track(i, fly) {
     var o = SKY.recs[i], sat = window.satellite; if (!o) return;
     var per = 1440 / o.mm, pts = [], seg = [], now = Date.now(), last = null;
-    for (var k = -60; k <= 60; k++) {
+    for (var k = -120; k <= 120; k++) {   /* two full orbits (was one, a short-looking arc on the globe) */
       var t = new Date(now + k * per / 120 * 60000);
       try { var pv = sat.propagate(o.r, t); if (!pv || !pv.position) continue; var gd = sat.eciToGeodetic(pv.position, sat.gstime(t)); var lon = sat.degreesLong(gd.longitude), lat = sat.degreesLat(gd.latitude);
         if (last != null && Math.abs(lon - last) > 180) { if (seg.length > 1) pts.push(seg); seg = []; } seg.push([lon, lat]); last = lon; } catch (e) {}
@@ -637,19 +639,87 @@
     if (fly && o.p) map.easeTo({ center: [o.p[0], o.p[1]], duration: reduce ? 0 : 900 });
   }
   function orbitClass(o) { var h = o.p ? o.p[2] : null; return h == null ? "" : h < 2000 ? "Low Earth orbit" : h < 30000 ? "Medium Earth orbit" : "Geosynchronous orbit"; }
-  function satCard(i, pt) {
-    var o = SKY.recs[i]; if (!o) return; SKY.sel = i; track(i, false);
-    var g = SKY.groups[o.gi] || {}, c = SKYC[o.g];
-    var age = (Date.now() / 1000 - o.ep) / 3600;
-    card.innerHTML = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + ' · ' + esc(orbitClass(o)) + '</span><h3>' + esc(o.name) + '</h3>' +
-      '<dl><dt>Altitude</dt><dd>' + (o.p ? num(o.p[2]) + ' km' : '–') + '</dd><dt>Speed</dt><dd>' + (o.p && o.p[3] ? o.p[3].toFixed(2) + ' km/s' : '–') + '</dd><dt>One orbit</dt><dd>' + (1440 / o.mm).toFixed(0) + ' min</dd>' +
+  function satFacts(o, g, age) {
+    return '<dl><dt>Altitude</dt><dd>' + (o.p ? num(o.p[2]) + ' km' : '–') + '</dd><dt>Speed</dt><dd>' + (o.p && o.p[3] ? o.p[3].toFixed(2) + ' km/s' : '–') + '</dd><dt>One orbit</dt><dd>' + (1440 / o.mm).toFixed(0) + ' min</dd>' +
       '<dt>Inclination</dt><dd>' + o.inc.toFixed(1) + '°</dd><dt>Over</dt><dd>' + (o.p ? Math.abs(o.p[1]).toFixed(1) + '°' + (o.p[1] >= 0 ? 'N' : 'S') + ' ' + Math.abs(o.p[0]).toFixed(1) + '°' + (o.p[0] >= 0 ? 'E' : 'W') : '–') + '</dd><dt>NORAD ID</dt><dd>' + esc(o.no) + '</dd></dl>' +
-      '<p class="age">' + esc(g.what || "") + '. Position computed live from CelesTrak elements ' + (age < 48 ? Math.round(age) + ' h' : Math.round(age / 24) + ' days') + ' old. The dashed line is one orbit.</p>' +
-      '<div class="acts">' + linkA("https://celestrak.org/satcat/table-satcat.php?CATNR=" + o.no, "CelesTrak record") + '</div>' +
-      '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+      '<p class="age">' + esc(g.what || "") + '. Position computed live from CelesTrak elements ' + (age < 48 ? Math.round(age) + ' h' : Math.round(age / 24) + ' days') + ' old. The dashed line is two orbits.</p>' +
+      '<div class="acts">' + linkA("https://celestrak.org/satcat/table-satcat.php?CATNR=" + o.no, "CelesTrak record") + '</div>';
+  }
+  function clearSat() {
+    hideCard(true); SKY.sel = null; document.body.classList.remove("nx-sky-focus");
+    card.classList.remove("nx-sat-chip", "open");
+    if (map && map.getSource("trk")) map.getSource("trk").setData(EMPTY);
+    if (SKY.on && SKY.loaded) prop();
+    skySpinResume(1800);
+  }
+  function layerIn() {
+    if (SKY.layerT) { clearTimeout(SKY.layerT); SKY.layerT = 0; }
+    SKY.reveal = {};
+    var gs = (SKY.groups || []).slice().sort(function (a, b) {
+      if (a.id === "starlink") return 1; if (b.id === "starlink") return -1;
+      return (a.total || 0) - (b.total || 0) || String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    if (reduce || !gs.length) { gs.forEach(function (g) { SKY.reveal[g.id] = true; }); prop(); return; }
+    var i = 0, gap = Math.max(280, Math.min(600, 3200 / Math.max(gs.length, 1)));
+    (function next() {
+      if (!SKY.on) return;
+      if (i < gs.length) { SKY.reveal[gs[i].id] = true; i += 1; prop(); if (i < gs.length) SKY.layerT = setTimeout(next, gap); }
+    })();
+  }
+  function skySpinStop() { if (SKY.spinRaf) { cancelAnimationFrame(SKY.spinRaf); SKY.spinRaf = 0; } if (SKY.spinT) { clearTimeout(SKY.spinT); SKY.spinT = 0; } }
+  function skySpinPause() { SKY.spinPaused = true; if (SKY.spinT) { clearTimeout(SKY.spinT); SKY.spinT = 0; } }
+  function skySpinResume(ms) {
+    if (SKY.spinT) clearTimeout(SKY.spinT);
+    SKY.spinT = setTimeout(function () { SKY.spinT = 0; if (SKY.on && SKY.sel == null) SKY.spinPaused = false; }, ms || 2200);
+  }
+  function skySpinStart() {
+    if (reduce || SKY.spinRaf) return;
+    SKY.spinPaused = false;
+    var last = performance.now();
+    (function tick(now) {
+      SKY.spinRaf = requestAnimationFrame(tick);
+      var dt = Math.min(64, now - last); last = now;
+      if (!SKY.on || SKY.spinPaused || SKY.sel != null || document.hidden) return;
+      var c = map.getCenter(); map.setCenter([c.lng + 1.5 * dt / 1000, c.lat]);   /* ~4 minutes per revolution */
+    })(last);
+  }
+  function skySpinBind() {
+    if (SKY.bound || !map) return; SKY.bound = true;
+    map.on("dragstart", skySpinPause); map.on("zoomstart", skySpinPause);
+    map.on("rotatestart", skySpinPause); map.on("pitchstart", skySpinPause);
+    map.on("dragend", function () { skySpinResume(2200); });
+    map.on("zoomend", function () { skySpinResume(2200); });
+    map.on("rotateend", function () { skySpinResume(2200); });
+    map.on("pitchend", function () { skySpinResume(2200); });
+    var cv = map.getCanvas();
+    cv.addEventListener("wheel", skySpinPause, { passive: true });
+    cv.addEventListener("touchstart", skySpinPause, { passive: true });
+    cv.addEventListener("touchend", function () { skySpinResume(2200); }, { passive: true });
+  }
+  function satCard(i, pt) {
+    var o = SKY.recs[i]; if (!o) return; SKY.sel = i; skySpinPause(); track(i, false);
+    var g = SKY.groups[o.gi] || {}, c = SKYC[o.g], compact = innerWidth < 768;
+    var age = (Date.now() / 1000 - o.ep) / 3600, alt = o.p ? num(o.p[2]) + " km" : "–";
+    var facts = satFacts(o, g, age);
+    var cx = '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+    card.classList.remove("dragged", "open", "nx-sat-chip");
+    card.style.left = card.style.top = card.style.right = card.style.bottom = card.style.width = "";
+    if (compact) {
+      document.body.classList.add("nx-sky-focus"); prop();
+      card.classList.add("nx-sat-chip");
+      card.innerHTML = '<button type="button" class="nx-sat-more" aria-expanded="false" aria-label="Show satellite details"><span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + '</span><h3>' + esc(o.name) + '</h3><p class="nx-sat-alt">' + alt + '</p></button><div class="nx-sat-extra" hidden>' + facts + '</div>' + cx;
+    } else {
+      document.body.classList.remove("nx-sky-focus");
+      card.innerHTML = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + ' · ' + esc(orbitClass(o)) + '</span><h3>' + esc(o.name) + '</h3>' + facts + cx;
+    }
     card.hidden = false; requestAnimationFrame(function () { card.classList.add("in"); }); pinned = true; card.classList.add("pin");
-    window.__bnPlace(card, pt);
-    card.querySelector(".nx-cx").onclick = function () { hideCard(true); SKY.sel = null; map.getSource("trk").setData(EMPTY); };
+    if (!compact) window.__bnPlace(card, pt);
+    var moreBtn = card.querySelector(".nx-sat-more");
+    if (moreBtn) moreBtn.onclick = function () {
+      var open = card.classList.toggle("open"); this.setAttribute("aria-expanded", open ? "true" : "false");
+      var ex = card.querySelector(".nx-sat-extra"); if (ex) ex.hidden = !open;
+    };
+    card.querySelector(".nx-cx").onclick = function () { clearSat(); };
   }
   function swPanel() {
     var w = SKY.SW, el = $("nx_sw"); if (!el) return;
@@ -673,6 +743,8 @@
     ["cty-fill", "cty-line", "inet-fill", "inet-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
     if (!sky) {
       clearInterval(SKY.timer); SKY.timer = null; SKY.sel = null;
+      if (SKY.layerT) { clearTimeout(SKY.layerT); SKY.layerT = 0; }
+      skySpinStop(); document.body.classList.remove("nx-sky-focus"); SKY.reveal = {};
       ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
       try { map.setProjection({ type: "mercator" }); } catch (e) {}
       vis(); if (D) summary(); map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900 }); return;
@@ -680,8 +752,9 @@
     try { map.setProjection({ type: "globe" }); } catch (e) {}
     map.easeTo({ center: [-95, 30], zoom: mob ? 0.9 : 1.7, duration: reduce ? 0 : 1200 });
     $("nx_sum").textContent = "Loading satellites…";
-    skyLayers(); ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { map.setLayoutProperty(l, "visibility", "visible"); });
-    skyLoad().then(function () { if (!SKY.on) return; swPanel(); prop(); clearInterval(SKY.timer); SKY.timer = setInterval(function () { if (!document.hidden) prop(); }, reduce ? 10000 : (mob ? 2000 : 1200)); },
+    skyLayers(); skySpinBind(); ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { map.setLayoutProperty(l, "visibility", "visible"); });
+    skyLoad().then(function () { if (!SKY.on) return; swPanel(); layerIn(); clearInterval(SKY.timer); SKY.timer = setInterval(function () { if (!document.hidden) prop(); }, reduce ? 10000 : (mob ? 2000 : 1200));
+      setTimeout(function () { if (SKY.on) skySpinStart(); }, reduce ? 0 : 1300); },
       function () { $("nx_sum").textContent = "Orbital data is unavailable right now"; });
   }
   /* pt1758u: three views. Status (the board, default) sits over the map; Map and Sky are the map views */
