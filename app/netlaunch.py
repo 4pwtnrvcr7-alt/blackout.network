@@ -247,6 +247,34 @@ def image_ok(im):
 def _n(v):
     return v if v not in (None, "", []) else None
 
+# ---------- one licensed photo per rocket type (follow-up to pt1834u): files in netmap_static/rockets/, credits in rockets.json ----------
+# Sources: Wikimedia Commons only, licence public domain / CC0 / CC BY / CC BY-SA (never NC/ND). Rockets with no usable photo show none.
+_ROCKET_KEYS = [  # (regex on vehicle full name + families, key) - first match wins
+    (r"falcon heavy", "falconheavy"), (r"falcon 9|falcon9", "falcon9"), (r"starship|super heavy", "starship"),
+    (r"\bhaste\b", "haste"), (r"electron", "electron"), (r"vulcan", "vulcan"), (r"atlas v|atlas 5", "atlasv"),
+    (r"new glenn", "newglenn"), (r"long march|changzheng|\bcz-", "longmarch"), (r"soyuz", "soyuz"), (r"minotaur", "minotaur"),
+    (r"space launch system|\bsls\b", "sls"), (r"firefly alpha|^alpha\b", "firefly"), (r"proton", "proton"), (r"h-iia|h-2a", "h2a"),
+    (r"gslv", "gslv"), (r"angara", "angara"),
+]
+_ROCKETS = None
+def _rockets():
+    global _ROCKETS
+    if _ROCKETS is None:
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "netmap_static", "rockets", "rockets.json")) as fh: _ROCKETS = json.load(fh)
+        except Exception: _ROCKETS = {}
+    return _ROCKETS
+
+def rocket_photo(*names):
+    hay = " | ".join(n for n in names if n).lower()
+    for rx, key in _ROCKET_KEYS:
+        if re.search(rx, hay):
+            m = _rockets().get(key)
+            if not m or not _OK_LIC.match(m.get("license") or ""): return None
+            return dict(key=key, url=f"/api/netmap/rockets/{m['file']}", pictured=m.get("pictured"), author=m.get("author"),
+                        license=m.get("license"), license_url=m.get("license_url"), source_url=m.get("source_url"), w=m.get("w"), h=m.get("h"))
+    return None
+
 def details(r):
     cfg = ((r.get("rocket") or {}).get("configuration") or {}); mis = r.get("mission") or {}; pad = r.get("pad") or {}
     lsp = r.get("launch_service_provider") or {}; st = r.get("status") or {}
@@ -273,6 +301,7 @@ def details(r):
     try: cost = int(float(cost)) if cost not in (None, "") else None
     except Exception: cost = None
     img = image_ok(r.get("image")) or image_ok(cfg.get("image"))
+    photo = rocket_photo(cfg.get("full_name") or cfg.get("name"), cfg.get("name"), *[f.get("name") for f in (cfg.get("families") or []) if isinstance(f, dict)])
     return dict(id=r.get("id"), name=r.get("name"),
         mission=dict(name=_n(mis.get("name")), type=_n(mis.get("type")), description=_n(mis.get("description")),
                      orbit=_n(((mis.get("orbit") or {}).get("name"))),
@@ -292,6 +321,7 @@ def details(r):
         boosters=boosters, spacecraft=sc, webcasts=vids, info=infos, patches=patches, flightclub_url=_n(r.get("flightclub_url")),
         counts=dict(orbital_attempt=r.get("orbital_launch_attempt_count"), orbital_attempt_year=r.get("orbital_launch_attempt_count_year"),
                     pad_attempt=r.get("pad_launch_attempt_count"), agency_attempt=r.get("agency_launch_attempt_count")),
+        rocket_photo=photo,
         image=img, image_note=None if img else "No image with a commercial-use licence in Launch Library 2 for this launch.",
         source="The Space Devs Launch Library 2", source_url="https://thespacedevs.com/llapi")
 

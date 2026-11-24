@@ -836,7 +836,7 @@ def handle_get(path, qs=None, headers=None):
         return netinfra.tile(STATIC, *map(int, mt.groups()))
     if p.startswith("/api/netmap/"):
         n = p[len("/api/netmap/"):]
-        if n == "learn.json" or re.fullmatch(r"learn/[a-z0-9_-]+\.(jpg|jpeg|png|webp|txt)", n):
+        if n in ("learn.json", "rockets/rockets.json") or re.fullmatch(r"(learn|rockets)/[a-z0-9_-]+\.(jpg|jpeg|png|webp|txt)", n):   # rockets/: licensed per-rocket photos (follow-up to pt1834u)
             path = os.path.join(STATIC, n)
             root = os.path.abspath(STATIC) + os.sep
             if not os.path.abspath(path).startswith(root):
