@@ -4,7 +4,7 @@
 if(window.BNT)return;window.BNT={};
 var d=document,reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
 /* 1. hash bridge: "/" is now the intro; dashboard tabs live on /live */
-function bridge(a){try{if(!a||!a.getAttribute)return;var h=a.getAttribute("href")||"";if(!/^(https?:\/\/(www\.)?blackout\.network)?\/(index\.html)?(\?[^#]*)?#[^_]/.test(h))return;
+function bridge(a){try{if(window.BN_OFF&&BN_OFF.live)return;if(!a||!a.getAttribute)return;var h=a.getAttribute("href")||"";if(!/^(https?:\/\/(www\.)?blackout\.network)?\/(index\.html)?(\?[^#]*)?#[^_]/.test(h))return;
  var u=new URL(h,location.href);if(u.origin!==location.origin&&!/blackout\.network$/.test(u.hostname))return;if(u.hash==="#bn-menu")return;
  a.setAttribute("href","/live"+u.search+u.hash)}catch(e){}}
 ["pointerdown","click","keydown","focusin"].forEach(function(t){d.addEventListener(t,function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href]");if(a)bridge(a)},true)});

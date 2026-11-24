@@ -14,3 +14,21 @@
  function go(){try{var c=JSON.parse(sessionStorage.getItem(K)||"null");if(c&&Date.now()-c.t<36e5){start(c.u);return}}catch(e){}
   fetch("/api/linkcheck/dead").then(function(r){return r.ok?r.json():null}).then(function(j){if(!j)return;try{sessionStorage.setItem(K,JSON.stringify({t:Date.now(),u:j.urls||[]}))}catch(e){}start(j.urls)}).catch(function(){})}
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();
+/* Deactivated pages (Nov 24 2026, Matt): links to a page in deactivated.py (window.BN_OFF, set in <head> by server.py) are removed
+   on every page, including lists rendered later. A row/card that is only that link is hidden; a link inside other text becomes plain
+   text. The pages themselves 302 to "/". Reactivate: remove the page from deactivated.py. */
+(function(){if(window.__bnOffGuard)return;window.__bnOffGuard=1;var O=window.BN_OFF;if(!O||!O.on||!O.prefixes||!O.prefixes.length)return;
+ var H={};(O.hashes||[]).forEach(function(h){H[h]=1});
+ function off(href){try{var u=new URL(href,location.href);if(!/^https?:$/.test(u.protocol))return false;
+   if(u.host!==location.host&&!/^(www\.)?blackout\.network$/i.test(u.hostname))return false;
+   var p=(u.pathname||"/").toLowerCase().replace(/\/+$/,"")||"/";
+   for(var i=0;i<O.prefixes.length;i++){var x=O.prefixes[i];if(p===x||p.indexOf(x+"/")===0)return true}
+   return (p==="/"||p==="/index.html")&&!!H[(u.hash||"").slice(1).toLowerCase()]}catch(e){return false}}
+ function apply(root){var as=(root||document).querySelectorAll('a[href]:not([data-bn-off])');
+  for(var i=0;i<as.length;i++){var a=as[i];if(!off(a.getAttribute("href")))continue;a.setAttribute("data-bn-off","1");
+   var card=a.closest(".bnt-card,.h-chip,.m3-p"),row=card||a.closest("li,tr,.card,[role=listitem]"),t=(a.textContent||"").trim();
+   if(row&&row.querySelectorAll("a[href]").length===1&&(card||(row.textContent||"").trim().length<=t.length+40)){row.hidden=true;row.style.display="none";row.setAttribute("data-bn-off-row","1")}
+   else if(a.classList.contains("bnt-btn")||a.classList.contains("w2-btn")||/btn|button|cta/.test(a.className||"")){a.hidden=true;a.style.display="none"}
+   else{var s=document.createElement("span");s.className="bn-off-link";s.innerHTML=a.innerHTML;a.replaceWith(s)}}}
+ function go(){apply(document);var tm=0;new MutationObserver(function(){clearTimeout(tm);tm=setTimeout(function(){apply(document)},200)}).observe(document.body,{childList:true,subtree:true})}
+ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();
