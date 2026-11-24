@@ -59,7 +59,7 @@
     var S = API && API.S; if (!S || !S.scene) return;
     S.scene.traverse(function (obj) {
       if (obj.isAmbientLight) obj.intensity = 0.045;
-      if (obj.isPointLight) { obj.intensity = 2.7; obj.color.setHex(0xfff1dc); obj.decay = 0; obj.distance = 0; }
+      if (obj.isPointLight) { obj.intensity = 1.15; obj.color.setHex(0xffffff); obj.decay = 0; obj.distance = 0; }
       if (obj.isDirectionalLight) obj.intensity = 0;
     });
     if (S.r) S.r.toneMappingExposure = 1.08;
@@ -77,11 +77,13 @@
       for (i = 0; i < d.length; i += 4) {
         var r = d[i], g = d[i + 1], b = d[i + 2];
         var ocean = b > r + 16 && b > g + 6;
-        var v = ocean ? 85 : 210;
+        var v = ocean ? 180 : 230;
         d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
       }
       ctx.putImageData(data, 0, 0);
       var rt = new T.CanvasTexture(c);
+      if ("SRGBColorSpace" in T) rt.colorSpace = T.LinearSRGBColorSpace || T.NoColorSpace || rt.colorSpace;
+      else if ("LinearEncoding" in T) rt.encoding = T.LinearEncoding;
       rt.wrapS = T.ClampToEdgeWrapping; rt.wrapT = T.ClampToEdgeWrapping;
       done(rt);
     } catch (e) { done(null); }
@@ -178,23 +180,24 @@
       if (!tex) return;
       var isEarth = o.id === "earth";
       var prev = mesh.material;
-      var mat = new T.MeshStandardMaterial({
+      var mat = isEarth ? new T.MeshLambertMaterial({
         map: tex,
-        roughness: isEarth ? 0.62 : 0.72,
-        metalness: isEarth ? 0.14 : 0.02,
         color: 0xffffff,
-        toneMapped: true
+        emissive: 0x000000,
+        toneMapped: false
+      }) : new T.MeshStandardMaterial({
+        map: tex,
+        color: 0xffffff,
+        roughness: 0.72,
+        metalness: 0,
+        emissive: 0x000000,
+        emissiveIntensity: 0,
+        toneMapped: false
       });
       mesh.material = mat;
       if (prev && prev !== mat && prev.dispose) prev.dispose();
       CS[o.id] = { mesh: mesh, ready: true, mat: mat };
       if (isEarth) {
-        oceanRoughness(tex, function (rm) {
-          if (!rm) return;
-          mat.roughnessMap = rm;
-          mat.roughness = 1;
-          mat.needsUpdate = true;
-        });
         loadTex("earth_night.jpg", function (night) {
           if (!night) return;
           addNightLights(o, mesh, night);
@@ -532,16 +535,19 @@
     var S = API && API.S; if (!S || !S.cam) return;
     var cam = S.cam, H = Math.max(1, S.H || 900);
     var half = (cam.fov * Math.PI / 180) / 2;
+    var sel = API.sel && API.sel();
     (API.LIST || []).forEach(function (o) {
       if (!o || o.kind !== "craft" || !o.node) return;
+      var selected = sel === o;
+      if (o.model) o.model.visible = selected;
       var dot = o.node.userData.dot; if (!dot) return;
       var dd = cam.position.distanceTo(o.node.position);
-      var world = 2 * Math.tan(half) * dd * (5.5 / H);
+      var world = 2 * Math.tan(half) * dd * (5 / H);
       var sc = world / 0.09;
-      if (sc * 0.09 > 0.022) sc = 0.022 / 0.09;
-      if (sc < 0.05) sc = 0.05;
+      if (sc * 0.09 > 0.016) sc = 0.016 / 0.09;
+      if (sc < 0.04) sc = 0.04;
       dot.scale.setScalar(sc);
-      dot.visible = dd > Math.max(o.size * 8, 0.7);
+      dot.visible = !selected;
     });
   }
 
@@ -639,10 +645,23 @@
     return dist;
   }
 
+  function focusDir(o, dir) {
+    if (!o || o.id !== "earth" || !o.node) return dir;
+    var sunFrom = o.node.position.clone();
+    if (sunFrom.lengthSq() < 1e-8) return dir;
+    sunFrom.normalize();
+    var up = new T.Vector3(0, 1, 0);
+    var side = new T.Vector3().crossVectors(sunFrom, up);
+    if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+    side.normalize();
+    return side.add(up.multiplyScalar(0.28)).add(sunFrom.multiplyScalar(-0.35)).normalize();
+  }
+
   w.BNPlanets = {
     attach: attach,
     info: info,
     focusDist: focusDist,
+    focusDir: focusDir,
     tick: tick,
     openSite: function (body, id) {
       var o = API && API.OBJ[body]; if (!o) return;
