@@ -98,6 +98,9 @@ def _nl_lookup(NL, em):
     try: r = k.execute("SELECT status, created, confirmed_at FROM subscribers WHERE email=?", (str(em).strip().lower(),)).fetchone()
     finally: k.close()
     return dict(r) if r else "not found"
+def _nl_breaking(NL):   # Nov 24: read-only breaking-alert state for the signed status (never fails the status call)
+    try: return NL.breaking_status()
+    except Exception as ex: return {"error": f"{type(ex).__name__}: {ex}"[:200]}
 NL_READY = {"at": None}   # Nov 16: first moment this process could run the scheduler (restored + render_scheduler on)
 def _nl_tick():
     import fcntl
@@ -592,7 +595,8 @@ class RH(server.H):
                 st = NL.admin_stats()
                 return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
                                        "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"], "held": dict(NL.HELD),
-                                       "lookup": _nl_lookup(NL, d.get("email"))})
+                                       "lookup": _nl_lookup(NL, d.get("email")), "active_by_frequency": st.get("active_by_frequency"),
+                                       "breaking": _nl_breaking(NL)})
             if path.endswith("/send_now"):   # Nov 8: owner-approved one-off send of a brief slot (e.g. a missed morning). Box-signed; once per key.
                 slot = d.get("slot") if d.get("slot") in ("morning", "evening") else None
                 tag = "".join(ch for ch in str(d.get("tag") or "manual") if ch.isalnum())[:20] or "manual"
