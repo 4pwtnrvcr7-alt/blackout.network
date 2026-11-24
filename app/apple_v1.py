@@ -504,8 +504,8 @@ def quake_map(big):
 BOARD = [("el", "Elections", "Midterms 2026, live on election night", [("el_next", "Polls closing", "/midterms"), ("el_sen", "Senate: closest races", "/midterms"), ("el_gov", "Governor: closest races", "/midterms"), ("el_house", "House: closest races", "/midterms"), ("el_disp", "Election disputes", "/#wire")]),
          ("cf", "War and conflict", "Stories on The Wire by region", [("c_nuke", "Nuclear threat", "/#wire"), ("c_il", "Israel, Gaza and region", "/#wire"), ("c_ir", "Iran", "/#wire"), ("c_ru", "Russia and Ukraine", "/#wire"), ("c_uk", "UK and London", "/#wire"), ("c_other", "Other conflict zones", "/map")]),
          ("hl", "Health and outbreaks", "Outbreak reports on The Wire", [("h_ebola", "Ebola", "/#medical"), ("h_measles", "Measles", "/#medical"), ("h_other", "Other outbreaks", "/#medical")]),
-         ("hd", "Hardship risks", "Power, communications, supply and civil order", [("grid", "U.S. power grid", "/network"), ("comms", "Phones, internet and cloud", "/network"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Civil unrest", "/#wire")]),
-         ("nh", "Natural hazards", "Earthquakes, space weather and severe weather", [("quake", "Earthquakes", "/#solar"), ("kp", "Geomagnetic storms", "/#solar"), ("wx", "Weather threats to power", "/network"), ("flare", "Solar flares", "/#solar")])]
+         ("hd", "Hardship risks", "Power, communications, supply and civil order", [("grid", "U.S. power grid", "/grid"), ("comms", "Phones, internet and cloud", "/grid"), ("food", "Food and supply chain", "/#wire"), ("unrest", "Civil unrest", "/#wire")]),
+         ("nh", "Natural hazards", "Earthquakes, space weather and severe weather", [("quake", "Earthquakes", "/#solar"), ("kp", "Geomagnetic storms", "/#solar"), ("wx", "Weather threats to power", "/grid"), ("flare", "Solar flares", "/#solar")])]
 BOARD = [g for k in ("cf", "el", "hl", "hd", "nh") for g in BOARD if g[0] == k]   # t106u: War and conflict first
 def _board_html():
     def card(k, label, href):
@@ -687,7 +687,7 @@ def _css_v():
 def head_tag():
     """Early, render-blocking switch: '/' with no hash (or #home) shows the new homepage; any tab hash shows the dashboard."""
     # bna-home: the new homepage (dashboard path "/" with no tab hash). bna-pg: the page groups restyled so far
-    # (The Wire, Threats tabs, /crime, /network, /wire/<id> event pages); every other page keeps its current look.
+    # (The Wire, Threats tabs, /crime, /grid, /wire/<id> event pages); every other page keeps its current look.
     return (b'<script>(function(){var d=document.documentElement,p=location.pathname;function f(){var h=location.hash.replace(/^#/,""),home=(p=="/"||p=="/live")&&(!h||h=="home");'
             b'var was=d.classList.contains("bna-home");'
             b'd.classList.toggle("bna-home",home);d.classList.toggle("bna-pg",!home);'

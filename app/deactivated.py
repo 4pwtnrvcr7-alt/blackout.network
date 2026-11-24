@@ -21,7 +21,7 @@ DEACTIVATED_PAGES = [
     ("Solar & Seismic",      {"solar_seismic"},   ["/solar", "/solar_seismic", "/solar-seismic"], "off"),
     ("AI Threats",           {"ai"},              ["/ai", "/aithreats", "/ai-threats"], "off"),
     ("Crime",                {"@crime"},          ["/crime"], "unlisted"),
-    ("Starlink",             {"starlink"},        ["/network/starlink"], "off"),
+    ("Starlink",             {"starlink"},        ["/network/starlink", "/grid/starlink"], "off"),
     ("Midterms 2026",        {"midterms"},        ["/midterms", "/election", "/elections"], "off"),
     ("Politics",             {"politics"},        ["/politics"], "off"),
     ("Government",           {"gov"},             ["/government"], "off"),
@@ -39,11 +39,27 @@ DEACTIVATED_PAGES = [
     ("Private Jets",         {"jets"},            ["/jets"], "off"),   # Matt said "private chats" on voice; the menu item is Private Jets
     ("Games",                {"games"},           ["/games"], "off"),
     ("Mesh Chat",            {"mesh-chat"},       ["/mesh/chat"], "off"),   # Nov 24 7:50 AM ET (Matt): "private chats" also means the off-grid mesh chat; /mesh and /mesh/guide stay up
-    ("The Grid (old page)",  {"grid"},            ["/grid"], "off"),   # Nov 24 7:54 AM ET (Matt pt1795u): merged into /network (renamed The Grid); 302s to /network (MOVED)
+    ("The Grid (old menu item)", {"grid"},        [], "off"),   # Nov 24 2026 (Matt): the old "Energy Grid"/"The Grid" menu key stays hidden; The Grid is the "net" item at /grid (no route is redirected by this row)
 ]
 
-# "off" pages whose content moved to another page: the 302 goes there instead of "/" (gridpage.py code stays in the repo).
-MOVED = {"/grid": "/network"}
+# "off" pages whose content moved to another page: the 302 goes there instead of "/".
+MOVED = {}
+# Nov 24 2026 8:32 AM ET (Matt): The Grid's canonical URL is /grid. /network and every /network/<path> 302 to the same path under /grid
+# (path and query kept, so /network/status/aws -> /grid/status/aws; #status survives because browsers keep the fragment).
+# The old full-screen /grid page (gridpage.py) is replaced by the merged page; its code and /api/gridpage/* stay.
+RENAMED = {"/network": "/grid"}
+
+def renamed(path, query=""):
+    """Location for a renamed route (RENAMED, subpaths included, case-insensitive prefix), or None."""
+    pth = (path or "").split("?", 1)[0]
+    low = pth.lower()
+    for old, new in RENAMED.items():
+        if low == old or low == old + "/" or low.startswith(old + "/"):
+            rest = pth[len(old):].rstrip("/") if low != old + "/" else ""
+            return new + rest + ("?" + query if query else "")
+    if low in ("/grid", "/grid/") and pth != "/grid":   # /GRID, /Grid/, /grid/ -> /grid
+        return "/grid" + ("?" + query if query else "")
+    return None
 
 ON = os.environ.get("BN_DEACTIVATE_PAGES", "1") != "0"
 KEYS = frozenset(k for _, ks, _, _st in DEACTIVATED_PAGES for k in ks) if ON else frozenset()

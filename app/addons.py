@@ -118,7 +118,7 @@ ROUTES = {
     "/api/ai": "aithreats",          # tab #ai (t231; in the nav since t233)
     "/api/grid": "gridwatch",        # tab #grid (t231; in the nav since t233)
     "/api/gridstatus": "gridstatus", # #grid status map, local outages, weather-triggered checks (t234)
-    "/grid": "gridpage",             # Nov 21 2026 (pt1737u): The Grid, full-screen grid map page (menu link; replaces /live#grid)
+    "/grid": "netpages",             # Nov 24 2026 (Matt): The Grid (merged map + status board, netmap.py) and its subpages; /network 302s here. Old gridpage.py page kept, unrouted
     "/api/gridpage": "gridpage",     # /api/gridpage/data + grid.js / grid.css
     "/weather": "wxmap",             # Nov 22 2026 (pt1742u): full-screen Weather map page (menu link; replaces /live#weather)
     "/api/wxmap": "wxmap",           # /api/wxmap/frames|grid|alerts|storms|tropical + wx.js / wx.css
