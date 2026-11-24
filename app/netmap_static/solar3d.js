@@ -32,7 +32,7 @@
       ".s3-lab.sc{color:#b9c6ff}.s3-lab.sel{background:#e8eaf0;color:#05060a}" +
       ".s3-info{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:min(420px,calc(100% - 20px));max-height:34%;overflow:auto;background:linear-gradient(90deg,rgba(5,6,10,.72),rgba(5,6,10,.35));border-left:2px solid rgba(255,255,255,.5);padding:6px 10px;font-size:12px}" +
       ".s3-info h3{margin:0 0 2px;font-size:15px}.s3-info p{margin:2px 0}.s3-info .s3-tag{display:inline-block;font-size:10px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:2px;opacity:.85}" +
-      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}@media (max-width:600px){.s3-ph img{max-height:72px}.s3-info{max-height:30%;font-size:11.5px}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
+      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}.s3 .s3-tog{display:none;margin-left:8px;padding:1px 9px;font-size:11px;vertical-align:2px}@media (max-width:600px){.s3 .s3-tog{display:inline-block}.s3-info:not(.open) .s3-body{display:none}.s3-info{max-height:45%;font-size:11.5px}.s3-info h3{font-size:14px;margin:0}.s3-ph img{max-height:120px}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
     d.head.appendChild(st);
   }
   function imperial() { try { return !w.BNUnits || !w.BNUnits.isImperial || w.BNUnits.isImperial(); } catch (e) { return true; } }
@@ -92,19 +92,19 @@
       return w + 0.004;
     }
     function topY(u, x, r) {   /* r = |z| / half-width, 0 centre .. 1 side */
-      var deck = 0.93 + 0.02 * (1 - r * r), belt = 0.82, side = 0.6;
+      var deck = 0.9 + 0.02 * (1 - r * r), belt = 0.82, side = 0.6;
       var t;
-      if (x < -0.82) { t = deck - 0.22 * (1 - ss(-1.98, -1.7, x)); }                         /* rear deck, rounding down at the tail */
+      if (x < -0.82) { t = deck - 0.15 * (1 - ss(-1.98, -1.75, x)); }                         /* rear deck, rounding down at the tail */
       else if (x < 0.3) { t = belt + (deck - belt) * (1 - ss(-0.85, -0.7, x)); }            /* door / belt line */
       else {                                                                               /* hood valley between the front fenders */
-        var hc = 0.74 - 0.26 * ss(0.3, 1.98, x), hf = 0.83 - 0.02 * ss(0.3, 1.3, x) - 0.3 * ss(1.45, 1.98, x);
+        var hc = 0.72 - 0.3 * ss(0.3, 1.98, x), hf = 0.82 - 0.02 * ss(0.3, 1.3, x) - 0.36 * ss(1.4, 1.98, x);
         t = hc + (hf - hc) * ss(0.25, 0.72, r);
         t = t * (1 - ss(0.0, 0.3, 0.3 - x + 0.3) * 0) ;
       }
       return t - 0.12 * ss(0.8, 1, r) * 0;
     }
     function bot(x, u) {
-      var b = 0.16 + 0.12 * (1 - ss(0, 0.1, u)) + 0.14 * ss(0.88, 1, u);
+      var b = 0.16 + 0.12 * (1 - ss(0, 0.1, u)) + 0.1 * ss(0.88, 1, u);
       WX.forEach(function (w) { var dx = Math.abs(x - w[0]), R = w[1] + 0.06; if (dx < R) b = Math.max(b, 0.3 + Math.sqrt(R * R - dx * dx) * 0.95); });
       return b;
     }
@@ -112,7 +112,7 @@
     for (var i = 0; i <= NX; i++) {
       var u = i / NX, x = X0 + (X1 - X0) * u, w = half(u, x), cw = cock(x), b = bot(x, u);
       for (var j = 0; j < NA; j++) {
-        var th = j / NA * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), n = 3.0;
+        var th = j / NA * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), n = 3.4;
         var zz = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), yy = Math.sign(s) * Math.pow(Math.abs(s), 2 / n), z = w * zz, r = Math.abs(zz);
         var t = topY(u, x, r), yc = Math.min(t - 0.05, 0.5), y;
         if (yy >= 0) {
@@ -165,8 +165,7 @@
     at(g, new T.BoxGeometry(0.42, 0.05, 1.5), carbon, 0.2, 0.7, 0);   /* cowl over the footwell */
     /* dashboard across the cockpit, DON'T PANIC screen in the centre */
     var dash = at(g, new T.CapsuleGeometry(0.12, 1.25, 6, 18), carbon, 0.3, 0.74, 0, Math.PI / 2, 0, 0); dash.scale.set(1.1, 1, 0.8);
-    var scr = at(g, new T.PlaneGeometry(0.3, 0.12), new T.MeshBasicMaterial({ map: screenTex(), toneMapped: false }), 0.2, 0.8, 0.0); scr.rotation.set(0, -Math.PI / 2, 0); scr.rotateX(-0.5);
-    at(g, new T.BoxGeometry(0.02, 0.14, 0.33), black, 0.212, 0.8, 0, 0, 0, -0.5);
+    var scr = at(g, new T.PlaneGeometry(0.3, 0.12), new T.MeshBasicMaterial({ map: screenTex(), toneMapped: false }), 0.2, 0.8, 0.0); scr.rotation.set(0, -Math.PI / 2 - 0.75, 0); scr.rotateX(-0.45); var bz = new T.Mesh(new T.PlaneGeometry(0.34, 0.15), black); bz.position.set(0, 0, -0.004); scr.add(bz);
     /* steering wheel in front of the driver */
     var swg = new T.Group(); swg.position.set(0.1, 0.8, -0.37); swg.rotation.set(0, Math.PI / 2, 0); swg.rotateX(-0.5);
     at(swg, new T.TorusGeometry(0.13, 0.02, 10, 36), leather, 0, 0, 0);
@@ -195,10 +194,10 @@
     [-1, 1].forEach(function (sd) { var sc = at(g, new T.SphereGeometry(0.2, 18, 12), black, -0.68, 0.52, sd * 0.86); sc.scale.set(1.1, 0.42, 0.32); sc.rotation.z = -0.15; });
     /* raised rear deck: twin round tail lights each side in black surrounds */
     [-1, 1].forEach(function (sd) {
-      var sur = at(g, new T.SphereGeometry(0.2, 20, 12), black, -1.95, 0.72, sd * 0.47); sur.scale.set(0.16, 0.42, 1.05);
-      [0.36, 0.58].forEach(function (zz, i) { var tl = at(g, new T.CylinderGeometry(0.065, 0.065, 0.05, 20), P(i ? 0xff2a3a : 0xd8d8dc, { emissive: i ? 0x550008 : 0x202022, roughness: 0.15, clearcoat: 1 }), -1.985, 0.72, sd * zz, 0, 0, Math.PI / 2); });
+      var sur = at(g, new T.SphereGeometry(0.2, 20, 12), black, -1.95, 0.64, sd * 0.47); sur.scale.set(0.16, 0.42, 1.05);
+      [0.36, 0.58].forEach(function (zz, i) { var tl = at(g, new T.CylinderGeometry(0.065, 0.065, 0.05, 20), P(i ? 0xff2a3a : 0xd8d8dc, { emissive: i ? 0x550008 : 0x202022, roughness: 0.15, clearcoat: 1 }), -1.985, 0.64, sd * zz, 0, 0, Math.PI / 2); });
     });
-    var spoiler = at(g, new T.BoxGeometry(0.16, 0.03, 1.35), carbon, -1.88, 0.93, 0, 0, 0, -0.12);
+    var spoiler = at(g, new T.BoxGeometry(0.16, 0.03, 1.35), carbon, -1.88, 0.86, 0, 0, 0, -0.12);
     [[1.17, -0.8], [1.17, 0.8], [-1.18, -0.82], [-1.18, 0.82]].forEach(function (p) { wheel(g, p[0], p[1], tire, rim, disc); });
     g.add(starman());
     g.userData.size = 4.2;
@@ -218,8 +217,8 @@
     var vis = at(sm, new T.SphereGeometry(0.152, 32, 22, -Math.PI * 0.45, Math.PI * 0.9, Math.PI * 0.26, Math.PI * 0.42), visor, -0.575, 1.18, Z, 0, Math.PI, 0); vis.scale.set(1.07, 1.08, 1.0);
     [-1, 1].forEach(function (sd) { var ear = at(sm, new T.CylinderGeometry(0.05, 0.05, 0.03, 16), blk, -0.6, 1.17, Z + sd * 0.148, Math.PI / 2, 0, 0); });
     /* right arm (centre side, +z) to the wheel; left arm (door side, -z) over the door sill */
-    var rS = [-0.58, 0.93, Z + 0.19], rE = [-0.32, 0.72, Z + 0.24], rH = [0.03, 0.86, Z + 0.12];
-    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.46, 0.82, Z - 0.34], lH = [-0.16, 0.85, Z - 0.5];
+    var rS = [-0.58, 0.93, Z + 0.19], rE = [-0.36, 0.66, Z + 0.25], rH = [0.08, 0.865, Z + 0.113];
+    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.5, 0.84, Z - 0.47], lH = [-0.16, 0.86, Z - 0.51];
     [[rS, rE, rH], [lS, lE, lH]].forEach(function (a) {
       at(sm, new T.SphereGeometry(0.072, 16, 12), blk, a[0][0], a[0][1] + 0.02, a[0][2]);           /* shoulder panel */
       limb(sm, a[0], a[1], 0.055, suit); limb(sm, a[1], a[2], 0.05, suit);
@@ -426,7 +425,7 @@
   }
   function info(o) {
     if (!o) { S.info.hidden = true; return; }
-    var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + "</h3>", c = o.d;
+    var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + '<button type="button" class="s3-tog" aria-expanded="' + (S.infoOpen ? "true" : "false") + '">' + (S.infoOpen ? "Less" : "More") + "</button></h3><div class=\"s3-body\">", c = o.d;
     var earth = OBJ.earth && OBJ.earth.d;
     if (o.kind === "sun") h += "<p>" + esc(o.info) + "</p>" + (earth ? "<p>From Earth: " + fmtAU(Math.hypot.apply(null, earth.pos)) + "</p>" : "");
     else if (o.kind === "planet") {
@@ -443,15 +442,16 @@
       if (ph) h += '<figure class="s3-ph"><img src="/api/netmap/learn/s3_' + esc(c.id) + '.jpg" alt="' + esc(ph.c) + '" loading="lazy"><figcaption>Real photo: ' + esc(ph.c) + '. ' + esc(ph.by) + ' (' + esc(ph.lic) + '), <a href="' + esc(ph.src) + '" target="_blank" rel="noopener">source</a>.</figcaption></figure>';
     }
     h += '<p class="s3-k">Positions: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a>' + (DATA && DATA.epoch ? " · " + esc(DATA.epoch.slice(0, 16).replace("T", " ")) + " UTC" : "") + "</p>";
-    S.info.innerHTML = h; S.info.hidden = false;
+    S.info.innerHTML = h + "</div>"; S.info.hidden = false; S.info.classList.toggle("open", !!S.infoOpen);
+    var tg = S.info.querySelector(".s3-tog"); if (tg) tg.addEventListener("click", function () { S.infoOpen = !S.infoOpen; S.info.classList.toggle("open", S.infoOpen); tg.textContent = S.infoOpen ? "Less" : "More"; tg.setAttribute("aria-expanded", S.infoOpen ? "true" : "false"); });
   }
   function focus(id, vdir, vmul) {
     var o = OBJ[id]; if (!o) return; SEL = o;
     LIST.forEach(function (x) { if (x.lab) x.lab.classList.toggle("sel", x === o); });
     S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.id === id ? "true" : "false"); });
-    var tgt = o.node.getWorldPosition(new T.Vector3()); if (o.id === "roadster") tgt.y += 0.06; var dist = o.kind === "craft" ? o.size * (o.id === "roadster" ? (S.W < 500 ? 1.5 : 0.95) : 2.2) : o.kind === "sun" ? 26 : Math.max(o.size * 6, 1.5);
+    var tgt = o.node.getWorldPosition(new T.Vector3()); if (o.id === "roadster") tgt.y += 0.06; var dist = o.kind === "craft" ? o.size * (o.id === "roadster" ? (S.W < 500 ? 2.1 : 0.95) : 2.2) : o.kind === "sun" ? 26 : Math.max(o.size * 6, 1.5);
     var dir = S.cam.position.clone().sub(S.ctl.target); if (dir.lengthSq() < 1e-9) dir.set(0, 0.4, 1); dir.normalize();
-    if (o.kind === "craft") { dir.set(0.55, 0.35, 0.75); if (o.id === "roadster") { S.spin0 = performance.now(); dir.set(-0.55, 0.78, 0.42); } dir.normalize(); }
+    if (o.kind === "craft") { dir.set(0.55, 0.35, 0.75); if (o.id === "roadster") { S.spin0 = performance.now(); dir.set(0.3, 0.6, -0.74); } dir.normalize(); }
     if (vdir) { dir.fromArray(vdir).normalize(); dist *= vmul || 1; }
     tracks(o);
     FLY = { t0: performance.now(), dur: 1300, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: tgt, toP: tgt.clone().add(dir.multiplyScalar(dist)) };
