@@ -12,7 +12,7 @@ class Solo(unittest.TestCase):
             self.assertIsNone(re.search(r"#(?:ffd666|facc15|fbbf24)\b", b, re.I), p)
             self.assertTrue(D.is_off(p), p); self.assertFalse(D.redirects(p), p)
     def test_assets(self):
-        for n in ("solo.css", "solo.js", "js/games.js", "js/preppers.js"):
+        for n in ["solo.css", "solo.js"] + ["js/%s.js" % k for k in solo.ADDON_JS]:
             r = solo.handle_get("/api/solo/" + n, {}); self.assertEqual(r[0], 200, n)
         self.assertIsNone(solo._EMO.search(solo.handle_get("/api/solo/js/preppers.js", {})[1].decode()))
         self.assertEqual(solo.handle_get("/api/solo/js/../x.js", {})[0], 404)

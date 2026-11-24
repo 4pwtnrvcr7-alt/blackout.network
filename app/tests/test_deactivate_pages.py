@@ -7,7 +7,7 @@ import deactivated as D
 ROUTES = ["/live", "/live/", "/dashboard", "/noise", "/solar", "/ai", "/crime", "/crime/zip/32771", "/grid/starlink", "/midterms", "/elections",
           "/politics", "/government", "/gunlaws", "/figures", "/elon", "/preppers", "/resources", "/maps", "/maps/x.pdf", "/medical",
           "/bushcraft", "/sources", "/scoring", "/about/scoring", "/spacex", "/cern", "/lhc", "/jets", "/games", "/mesh/chat", "/mesh/chat/x"]
-UNLISTED = ["/sources", "/sources/", "/scoring", "/about/scoring", "/crime", "/crime/zip/32771", "/games", "/preppers", "/bushcraft", "/medical", "/first-aid"]   # + reworked pages (solo.py, pt1846u), unlisted until Matt approves   # hidden, but still served (newsletter links)
+UNLISTED = ["/sources", "/sources/", "/scoring", "/about/scoring", "/crime", "/crime/zip/32771", "/games", "/preppers", "/bushcraft", "/medical", "/first-aid", "/noise", "/politics", "/government", "/figures", "/elon"]   # + reworked pages (solo.py, pt1846u), unlisted until Matt approves   # hidden, but still served (newsletter links)
 KEEP = ["/", "/wire", "/map", "/weather", "/grid", "/grid/aws", "/markets", "/newsletter", "/privacy", "/tos", "/ready", "/api/live/summary",
         "/api/sources/x", "/api/crime/x", "/livestream", "/sourcesx", "/mesh", "/mesh/guide", "/api/mesh/chat"]
 
