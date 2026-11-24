@@ -716,7 +716,12 @@
     var sj = window.BN_SATJS || [];
     SKY.loading = Promise.all([loadScript(sj[0], sj[1]), getJSON("/api/netmap/sky" + (mob ? "?lite=1" : "")), getJSON("/api/netmap/space").catch(function () { return null; }), getJSON("/api/netmap/learn.json").catch(function () { return {}; })]).then(function (r) {
       var D2 = r[1], sat = window.satellite; SKY.SW = r[2]; SKY.learn = r[3] || {}; SKY.groups = D2.groups || [];
-      SKY.groups.forEach(function (g) { SKY.show[g.id] = false; }); skyChipLabels();
+      SKY.groups.forEach(function (g) { SKY.show[g.id] = g.id !== "debris"; });
+      SKY.show.ss = false; SKY.show.sw = false;
+      document.querySelectorAll("#nx_sf button[data-g]").forEach(function (b) {
+        var g = b.dataset.g; if (SKY.show[g] !== undefined) b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
+      });
+      skyChipLabels();
       (D2.sats || []).forEach(function (s) {
         try {
           var g = SKY.groups[s[0]].id;
@@ -1034,10 +1039,27 @@
     if (SKY.on && SKY.loaded) prop();
     skySpinResume(1800);
   }
+  function launchLayerIn() {
+    if (typeof window.__nxLaunchLayerIn === "function") window.__nxLaunchLayerIn();
+    else window.__nxLaunchLayerInQueued = true;
+  }
   function layerIn() {
     if (SKY.layerT) { clearTimeout(SKY.layerT); SKY.layerT = 0; }
-    (SKY.groups || []).forEach(function (g) { SKY.reveal[g.id] = !!SKY.show[g.id]; });
-    prop();
+    SKY.reveal = {};
+    var gs = (SKY.groups || []).filter(function (g) { return g.id !== "debris" && SKY.show[g.id]; }).slice().sort(function (a, b) {
+      if (a.id === "starlink") return 1; if (b.id === "starlink") return -1;
+      return (a.total || 0) - (b.total || 0) || String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    if (reduce || !gs.length) { gs.forEach(function (g) { SKY.reveal[g.id] = true; }); prop(); launchLayerIn(); return; }
+    var i = 0, gap = Math.max(280, Math.min(600, 3200 / Math.max(gs.length + 1, 1)));
+    (function next() {
+      if (!SKY.on) return;
+      if (i < gs.length) {
+        if (SKY.show[gs[i].id]) SKY.reveal[gs[i].id] = true;
+        i += 1; prop();
+        SKY.layerT = setTimeout(i < gs.length ? next : launchLayerIn, gap);
+      }
+    })();
   }
   function skySpinStop() { if (SKY.spinRaf) { cancelAnimationFrame(SKY.spinRaf); SKY.spinRaf = 0; } if (SKY.spinT) { clearTimeout(SKY.spinT); SKY.spinT = 0; } }
   function skySpinPause() { SKY.spinPaused = true; if (SKY.spinT) { clearTimeout(SKY.spinT); SKY.spinT = 0; } }

@@ -5,7 +5,7 @@
 (function () {
   "use strict";
   var ER = 6371008.8, mob = matchMedia("(max-width: 760px)").matches, reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var LC = { on: false, data: null, sel: -1, anim: null, layer: null, lbl: null, bar: null, t0: 0, loadT: 0, hidden: null };
+  var LC = { on: true, reveal: false, data: null, sel: -1, anim: null, layer: null, lbl: null, bar: null, t0: 0, loadT: 0, hidden: null };
   var COL = { up: [0.91, 0.93, 0.96], past: [0.62, 0.66, 0.74], boost: [0.31, 0.76, 0.97], ok: [0.36, 0.88, 0.71], bad: [1, 0.35, 0.35] };
   function lcEsc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function lcPos(lon, lat, alt) {
@@ -132,7 +132,7 @@
     var focus = LC.sel >= 0, padPlaced = [];
     LC.lbl.querySelectorAll(".nx-lc-pad").forEach(function (el) {
       var p = LC.pads[+el.dataset.pad], L = lcList()[p.i];
-      if (!LC.on || focus) { el.style.transform = "translate(-9999px,0)"; return; }
+      if (!LC.on || !LC.reveal || focus) { el.style.transform = "translate(-9999px,0)"; return; }
       lcPlace(el, m, lcPos(L.pad_lon, L.pad_lat, 0), cw, ch, cen, padPlaced);
     });
     var L = lcList()[LC.sel];
@@ -199,7 +199,7 @@
   }
   function lcRender(layer, gl, args) {
     var mat = args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix;
-    if (!mat || !layer.prog || !LC.on || !document.body.classList.contains("nx-sky")) { if (LC.lbl) LC.lbl.style.display = "none"; return; }
+    if (!mat || !layer.prog || !LC.on || !LC.reveal || !document.body.classList.contains("nx-sky")) { if (LC.lbl) LC.lbl.style.display = "none"; return; }
     var m = mat instanceof Float32Array ? mat : new Float32Array(mat);
     if (LC.lbl) LC.lbl.style.display = "";
     try {
@@ -328,22 +328,36 @@
   /* ---------- chip ---------- */
   function lcChip() {
     var sf = document.getElementById("nx_sf"); if (!sf || document.getElementById("nx_lc_chip")) return;
-    var b = document.createElement("button"); b.type = "button"; b.id = "nx_lc_chip"; b.setAttribute("aria-pressed", "false");
+    var b = document.createElement("button"); b.type = "button"; b.id = "nx_lc_chip"; b.setAttribute("aria-pressed", LC.on ? "true" : "false");
     b.innerHTML = '<i style="background:#E8ECF5;border-color:#E8ECF5"></i>Launches';
     b.addEventListener("click", function (e) {
       e.stopPropagation(); LC.on = !LC.on; b.setAttribute("aria-pressed", LC.on ? "true" : "false");
-      if (!LC.on) { if (LC.sel >= 0) lcClose(); lcRepaint(); return; }
+      if (!LC.on) { LC.reveal = false; if (LC.sel >= 0) lcClose(); lcRepaint(); return; }
+      LC.reveal = true;
       lcEnsureLayer();
-      lcLoad().then(function () { lcRepaint(); }, function () { b.setAttribute("aria-pressed", "false"); LC.on = false; b.title = "Launch data is unavailable right now"; });
+      lcLoad().then(function () { lcRepaint(); }, function () { b.setAttribute("aria-pressed", "false"); LC.on = false; LC.reveal = false; b.title = "Launch data is unavailable right now"; });
     });
     sf.insertBefore(b, sf.firstChild);   /* first chip, so it is visible without scrolling the row */
   }
   function lcSkyChanged() {
     var sky = document.body.classList.contains("nx-sky");
     if (!sky && LC.sel >= 0) { LC.sel = -1; LC.anim = null; window.__nxSpinHold = false; document.body.classList.remove("nx-lc-focus"); LC.hidden = null; lcEvLabels(); lcBar(); }
-    if (LC.lbl) LC.lbl.style.display = sky && LC.on ? "" : "none";
-    if (sky) { lcChip(); if (LC.on) lcEnsureLayer(); }
+    if (LC.lbl) LC.lbl.style.display = sky && LC.on && LC.reveal ? "" : "none";
+    if (sky) { lcChip(); if (LC.on) lcLoad(); }
   }
+  function lcLayerIn() {
+    if (!document.body.classList.contains("nx-sky") || !LC.on) return;
+    LC.reveal = true;
+    var b = document.getElementById("nx_lc_chip"); if (b) b.setAttribute("aria-pressed", "true");
+    lcEnsureLayer();
+    lcLoad().then(function () { lcRepaint(); }, function () {
+      var c = document.getElementById("nx_lc_chip");
+      if (c) { c.setAttribute("aria-pressed", "false"); c.title = "Launch data is unavailable right now"; }
+      LC.on = false; LC.reveal = false;
+    });
+  }
+  window.__nxLaunchLayerIn = lcLayerIn;
+  if (window.__nxLaunchLayerInQueued) { window.__nxLaunchLayerInQueued = false; lcLayerIn(); }
   new MutationObserver(lcSkyChanged).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   setInterval(function () { /* countdown text */
     if (!LC.on || document.hidden || !LC.lbl) return;

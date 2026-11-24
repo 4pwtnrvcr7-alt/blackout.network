@@ -199,10 +199,12 @@ class NetSky(unittest.TestCase):
         self.assertIn('data-g="ss"', b)
         self.assertIn('data-g="sw"', b)
         self.assertIn('id="nx_sky_labs"', b)
-        # every sky chip, including ISS and Starlink, starts off so the globe is clean
-        self.assertNotIn('data-g="iss" aria-pressed="true"', b)
-        self.assertNotIn('data-g="starlink" aria-pressed="true"', b)
-        self.assertIn('data-g="iss" aria-pressed="false"', b)
+        # pt1832u: restore #128 — constellation chips on; debris / solar system / space weather stay off
+        self.assertIn('data-g="iss" aria-pressed="true"', b)
+        self.assertIn('data-g="starlink" aria-pressed="true"', b)
+        self.assertIn('data-g="ss" aria-pressed="false"', b)
+        self.assertIn('data-g="sw" aria-pressed="false"', b)
+        self.assertNotIn('data-g="iss" aria-pressed="false"', b)
 
     def test_sky_spin_layer_path_and_mobile_chip(self):
         # pt1813u: globe auto-rotate, constellations layer in small-to-Starlink, two-orbit path, compact mobile chip
@@ -212,7 +214,9 @@ class NetSky(unittest.TestCase):
         css = (root / "net.css").read_text()
         self.assertIn("function skySpinStart", js)
         self.assertIn("function layerIn", js)
-        self.assertIn("SKY.reveal[g.id] = !!SKY.show[g.id]", js)
+        self.assertIn('if (a.id === "starlink") return 1', js)
+        self.assertIn("function launchLayerIn", js)
+        self.assertIn("__nxLaunchLayerIn", js)
         self.assertIn("k <= 120", js)
         self.assertIn("two orbits", js)
         self.assertIn("nx-sky-focus", js)
@@ -387,7 +391,8 @@ class NetSky(unittest.TestCase):
             self.assertIn(s, js)
         self.assertIn("nx-ss-pin", css)
         self.assertIn("Tap a chip to show a layer", js)
-        self.assertIn('SKY.show[g.id] = false', js)
+        self.assertIn('SKY.show[g.id] = g.id !== "debris"', js)
+        self.assertNotIn('SKY.groups.forEach(function (g) { SKY.show[g.id] = false; })', js)
         self.assertNotIn("function prog(", js.split("function glProg")[-1] if "function glProg" in js else "")
         self.assertIn("function glProg", js)
         self.assertEqual(js.count("function debrisLoad"), 1)
