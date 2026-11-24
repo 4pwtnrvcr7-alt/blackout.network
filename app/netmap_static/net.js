@@ -220,7 +220,9 @@
       map.on("mouseleave", id, function () { if (!pinned) hideCard(); map.getCanvas().style.cursor = ""; });
     });
     map.on("click", function (e) {
-      if (SKY.on) { var sf = map.getLayer("sat") ? map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["sat"] }) : [];
+      if (SKY.on) {
+        if (SKY.alt3d) { var pi = skyPick(e.point); if (pi != null) satCard(pi, e.point); else clearSat(); return; }
+        var sf = map.getLayer("sat") ? map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["sat"] }) : [];
         var cc = map.getCenter(), R = Math.PI / 180;
         sf = sf.filter(function (f) { var q = f.geometry.coordinates; return Math.sin(cc.lat * R) * Math.sin(q[1] * R) + Math.cos(cc.lat * R) * Math.cos(q[1] * R) * Math.cos((q[0] - cc.lng) * R) > 0.05; });
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
@@ -576,14 +578,14 @@
 
   /* ---------- Sky view: satellite constellations, propagated live in the browser (satellite.js SGP4, CelesTrak elements) ---------- */
   var SKYC = { starlink: "#E8ECF5", gps: "#4FC3F7", glonass: "#B39DFF", galileo: "#5CE1B6", beidou: "#FF8FB1", iridium: "#9DB4FF", oneweb: "#FFA270", goes: "#FF7AE0" };
-  SKY = { on: false, loaded: false, loading: null, recs: [], groups: [], show: {}, reveal: {}, timer: null, layerT: 0, sel: null, SW: null, spinPaused: false, spinRaf: 0, spinT: 0, bound: false };
+  SKY = { on: false, loaded: false, loading: null, recs: [], groups: [], show: {}, reveal: {}, timer: null, layerT: 0, sel: null, SW: null, spinPaused: false, spinRaf: 0, spinT: 0, bound: false, learn: {}, alt3d: false, mvp: null, path3: [], vis: [] };
   var mob = innerWidth < 768;
   function loadScript(u, i) { return new Promise(function (ok, no) { if (window.satellite) return ok(); var s = document.createElement("script"); s.src = u; s.integrity = i; s.crossOrigin = "anonymous"; s.onload = ok; s.onerror = function () { no(new Error("satellite.js did not load")); }; document.head.appendChild(s); }); }
   function skyLoad() {
     if (SKY.loading) return SKY.loading;
     var sj = window.BN_SATJS || [];
-    SKY.loading = Promise.all([loadScript(sj[0], sj[1]), getJSON("/api/netmap/sky" + (mob ? "?lite=1" : "")), getJSON("/api/netmap/space").catch(function () { return null; })]).then(function (r) {
-      var D2 = r[1], sat = window.satellite; SKY.SW = r[2]; SKY.groups = D2.groups || [];
+    SKY.loading = Promise.all([loadScript(sj[0], sj[1]), getJSON("/api/netmap/sky" + (mob ? "?lite=1" : "")), getJSON("/api/netmap/space").catch(function () { return null; }), getJSON("/api/netmap/learn.json").catch(function () { return {}; })]).then(function (r) {
+      var D2 = r[1], sat = window.satellite; SKY.SW = r[2]; SKY.learn = r[3] || {}; SKY.groups = D2.groups || [];
       SKY.groups.forEach(function (g) { SKY.show[g.id] = true; });
       (D2.sats || []).forEach(function (s) {
         try {
@@ -610,6 +612,215 @@
     map.on("mousemove", "sat", function (e) { if (!SKY.on) return; map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "sat", function () { map.getCanvas().style.cursor = ""; });
   }
+  var EARTH_R = 6371008.8, GEO_ALT = 35786000, SKY3 = null;   /* MapLibre globe unit sphere; Op = 6371008.8 m */
+  function hexRgb(h) {
+    h = String(h || "#C9CCD6").replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255];
+  }
+  function globePos(lon, lat, altM) {
+    var r = 1 + (altM || 0) / EARTH_R, la = lat * Math.PI / 180, lo = lon * Math.PI / 180, cl = Math.cos(la);
+    return [r * cl * Math.sin(lo), r * Math.sin(la), r * cl * Math.cos(lo)];
+  }
+  function mulMVP(m, x, y, z) {
+    var w = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (Math.abs(w) < 1e-8) return null;
+    return [(m[0] * x + m[4] * y + m[8] * z + m[12]) / w, (m[1] * x + m[5] * y + m[9] * z + m[13]) / w, (m[2] * x + m[6] * y + m[10] * z + m[14]) / w];
+  }
+  function camFrame() {
+    var c = map.getCenter(), dir = globePos(c.lng, c.lat, 0);
+    return { dir: dir, dist: Math.max(3.2, Math.pow(2, 1.8 - map.getZoom())) };
+  }
+  function skyVisible(pos, camDir, camDist) {
+    var cx = camDir[0] * camDist, cy = camDir[1] * camDist, cz = camDir[2] * camDist;
+    var dx = pos[0] - cx, dy = pos[1] - cy, dz = pos[2] - cz;
+    var a = dx * dx + dy * dy + dz * dz, b = 2 * (cx * dx + cy * dy + cz * dz), c0 = cx * cx + cy * cy + cz * cz - 1, disc = b * b - 4 * a * c0;
+    if (disc <= 0) return true;
+    var t = (-b - Math.sqrt(disc)) / (2 * a);
+    return !(t > 0.002 && t < 0.998);
+  }
+  function skyPick(pt) {
+    var m = SKY.mvp, vis = SKY.vis; if (!m || !vis || !vis.length) return null;
+    var hit = null, best = 20, cnv = map.getCanvas(), w = cnv.clientWidth, h = cnv.clientHeight, cam = camFrame();
+    for (var i = 0; i < vis.length; i++) {
+      var v = vis[i];
+      if (!skyVisible([v.x, v.y, v.z], cam.dir, cam.dist)) continue;
+      var ndc = mulMVP(m, v.x, v.y, v.z);
+      if (!ndc || ndc[2] < -1 || ndc[2] > 1) continue;
+      var d = Math.hypot((ndc[0] + 1) * 0.5 * w - pt.x, (1 - ndc[1]) * 0.5 * h - pt.y);
+      if (d < Math.max(16, (v.sz || 6) * 0.8) && d < best) { best = d; hit = v.i; }
+    }
+    return hit;
+  }
+  function yearsInOrbit(iso) {
+    if (!iso) return "";
+    var t = Date.parse(iso.length === 10 ? iso + "T00:00:00Z" : iso);
+    if (!isFinite(t)) return "";
+    var y = (Date.now() - t) / (365.25 * 864e5);
+    if (y < 1) return Math.max(1, Math.round(y * 12)) + " months in orbit";
+    return (y < 10 ? y.toFixed(1) : String(Math.round(y))) + " years in orbit";
+  }
+  function learnHtml(gId) {
+    var L = (SKY.learn || {})[gId]; if (!L) return "";
+    var yrs = yearsInOrbit(L.first), h = '<div class="nx-learn">';
+    if (L.image) {
+      h += '<figure class="nx-learn-fig"><img src="' + esc(L.image) + '" alt="' + esc(L.alt || L.name || "") + '" width="900" loading="lazy"><figcaption>' + esc(L.credit || "");
+      if (L.license_url) h += " " + linkA(L.license_url, L.license || "License");
+      h += "</figcaption></figure>";
+    }
+    h += '<dl class="nx-learn-dl">';
+    if (L.operator) h += "<dt>Operator</dt><dd>" + esc(L.operator) + "</dd>";
+    if (L.first_label) h += "<dt>First in orbit</dt><dd>" + esc(L.first_label) + (yrs ? " · " + esc(yrs) : "") + "</dd>";
+    else if (yrs) h += "<dt>Years in orbit</dt><dd>" + esc(yrs) + "</dd>";
+    if (L.purpose) h += "<dt>Purpose</dt><dd>" + esc(L.purpose) + "</dd>";
+    if (L.depends) h += "<dt>Who depends on it</dt><dd>" + esc(L.depends) + "</dd>";
+    if (L.failure) h += "<dt>If it failed</dt><dd>" + esc(L.failure) + "</dd>";
+    h += "</dl>";
+    if (L.sources && L.sources.length) h += '<p class="nx-learn-src">Sources: ' + L.sources.map(function (s) { return linkA(s.url, s.name); }).join(" · ") + "</p>";
+    return h + "</div>";
+  }
+  function shd(gl, type, src) {
+    var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn("sky3d shader", gl.getShaderInfoLog(s)); gl.deleteShader(s); return null; }
+    return s;
+  }
+  function prog(gl, vsSrc, fsSrc, attribs) {
+    var vs = shd(gl, gl.VERTEX_SHADER, vsSrc), fs = shd(gl, gl.FRAGMENT_SHADER, fsSrc); if (!vs || !fs) return null;
+    var p = gl.createProgram(); gl.attachShader(p, vs); gl.attachShader(p, fs);
+    (attribs || []).forEach(function (n, i) { gl.bindAttribLocation(p, i, n); });
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { console.warn("sky3d program", gl.getProgramInfoLog(p)); return null; }
+    return p;
+  }
+  function geoRing() {
+    var pts = [], n = 128, r = 1 + GEO_ALT / EARTH_R;
+    for (var i = 0; i <= n; i++) { var a = (i / n) * Math.PI * 2; pts.push(r * Math.sin(a), 0, r * Math.cos(a)); }
+    return new Float32Array(pts);
+  }
+  function sky2dVis() {
+    var v = (SKY.on && !SKY.alt3d) ? "visible" : "none";
+    ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", v); });
+  }
+  function sky3dOnAdd(layer, mapObj, gl) {
+    var gl2 = typeof WebGL2RenderingContext !== "undefined" && gl instanceof WebGL2RenderingContext;
+    var pVS = gl2
+      ? ["#version 300 es", "uniform mat4 u_matrix;", "in vec3 a_pos;", "in vec3 a_col;", "in float a_size;", "out vec3 v_col;",
+        "void main(){ gl_Position = u_matrix * vec4(a_pos,1.0); gl_PointSize = max(1.0, a_size); v_col = a_col; }"].join("\n")
+      : ["uniform mat4 u_matrix;", "attribute vec3 a_pos;", "attribute vec3 a_col;", "attribute float a_size;", "varying vec3 v_col;",
+        "void main(){ gl_Position = u_matrix * vec4(a_pos,1.0); gl_PointSize = max(1.0, a_size); v_col = a_col; }"].join("\n");
+    var pFS = gl2
+      ? ["#version 300 es", "precision mediump float;", "in vec3 v_col;", "out vec4 outColor;",
+        "void main(){ vec2 p = gl_PointCoord * 2.0 - 1.0; float r = length(p); if (r > 1.0) discard; float a = smoothstep(1.0, 0.4, r); outColor = vec4(v_col * a, a); }"].join("\n")
+      : ["precision mediump float;", "varying vec3 v_col;",
+        "void main(){ vec2 p = gl_PointCoord * 2.0 - 1.0; float r = length(p); if (r > 1.0) discard; float a = smoothstep(1.0, 0.4, r); gl_FragColor = vec4(v_col * a, a); }"].join("\n");
+    var lVS = gl2
+      ? ["#version 300 es", "uniform mat4 u_matrix;", "in vec3 a_pos;", "void main(){ gl_Position = u_matrix * vec4(a_pos,1.0); }"].join("\n")
+      : ["uniform mat4 u_matrix;", "attribute vec3 a_pos;", "void main(){ gl_Position = u_matrix * vec4(a_pos,1.0); }"].join("\n");
+    var lFS = gl2
+      ? ["#version 300 es", "precision mediump float;", "uniform vec4 u_color;", "out vec4 outColor;", "void main(){ outColor = u_color; }"].join("\n")
+      : ["precision mediump float;", "uniform vec4 u_color;", "void main(){ gl_FragColor = u_color; }"].join("\n");
+    layer.ptProg = prog(gl, pVS, pFS, ["a_pos", "a_col", "a_size"]);
+    layer.lnProg = prog(gl, lVS, lFS, ["a_pos"]);
+    if (!layer.ptProg || !layer.lnProg) { SKY.alt3d = false; return; }
+    layer.uMatP = gl.getUniformLocation(layer.ptProg, "u_matrix");
+    layer.uMatL = gl.getUniformLocation(layer.lnProg, "u_matrix");
+    layer.uCol = gl.getUniformLocation(layer.lnProg, "u_color");
+    layer.ptBuf = gl.createBuffer(); layer.lnBuf = gl.createBuffer(); layer.ringBuf = gl.createBuffer();
+    layer.ring = geoRing();
+    gl.bindBuffer(gl.ARRAY_BUFFER, layer.ringBuf); gl.bufferData(gl.ARRAY_BUFFER, layer.ring, gl.STATIC_DRAW);
+    layer.vao = gl.createVertexArray ? gl.createVertexArray() : null;
+    SKY3 = layer; SKY.alt3d = true; sky2dVis();
+    if (!SKY._pickMove) {
+      SKY._pickMove = true;
+      map.on("mousemove", function (e) {
+        if (!SKY.on || !SKY.alt3d) return;
+        map.getCanvas().style.cursor = skyPick(e.point) != null ? "pointer" : "";
+      });
+    }
+  }
+  function sky3dOnRemove(layer, gl) {
+    ["ptBuf", "lnBuf", "ringBuf"].forEach(function (k) { if (layer[k]) gl.deleteBuffer(layer[k]); });
+    if (layer.vao && gl.deleteVertexArray) gl.deleteVertexArray(layer.vao);
+    SKY3 = null; SKY.alt3d = false;
+  }
+  function sky3dRender(layer, gl, args) {
+    if (!SKY.on || !SKY.alt3d || !layer.ptProg) return;
+    var mat = args && args.defaultProjectionData && args.defaultProjectionData.mainMatrix;
+    if (!mat) return;
+    SKY.mvp = mat;
+    var m = mat instanceof Float32Array ? mat : new Float32Array(mat);
+    try {
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
+      if (layer.vao) gl.bindVertexArray(layer.vao);
+      gl.useProgram(layer.lnProg); gl.uniformMatrix4fv(layer.uMatL, false, m);
+      gl.bindBuffer(gl.ARRAY_BUFFER, layer.ringBuf);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+      gl.uniform4f(layer.uCol, 0.62, 0.66, 0.82, 0.28);
+      gl.drawArrays(gl.LINE_STRIP, 0, layer.ring.length / 3);
+      var path = SKY._path, pn = SKY._pathN || 0;
+      if (pn > 1) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, layer.lnBuf);
+        if (SKY._pathDirty) { gl.bufferData(gl.ARRAY_BUFFER, path, gl.DYNAMIC_DRAW); SKY._pathDirty = false; }
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        var col = hexRgb(SKY.sel != null && SKY.recs[SKY.sel] ? SKYC[SKY.recs[SKY.sel].g] : "#C9CCD6");
+        gl.uniform4f(layer.uCol, col[0], col[1], col[2], 0.85);
+        gl.drawArrays(gl.LINE_STRIP, 0, pn);
+      }
+      var n = SKY._ptN || 0;
+      if (n) {
+        gl.useProgram(layer.ptProg); gl.uniformMatrix4fv(layer.uMatP, false, m);
+        gl.bindBuffer(gl.ARRAY_BUFFER, layer.ptBuf);
+        if (SKY._ptsDirty) { gl.bufferData(gl.ARRAY_BUFFER, SKY._pts.subarray(0, n * 7), gl.DYNAMIC_DRAW); SKY._ptsDirty = false; }
+        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 28, 0);
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 28, 12);
+        gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 28, 24);
+        gl.drawArrays(gl.POINTS, 0, n);
+        gl.disableVertexAttribArray(1); gl.disableVertexAttribArray(2);
+      }
+      gl.disableVertexAttribArray(0);
+      if (layer.vao) gl.bindVertexArray(null);
+      gl.depthMask(true);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    } catch (err) { console.warn("sky3d render", err); }
+  }
+  function sky3dEnsure() {
+    if (!map || SKY3 || SKY._3dFail) return;
+    if (!map.isStyleLoaded || !map.isStyleLoaded()) { map.once("idle", function () { if (SKY.on) sky3dEnsure(); }); return; }
+    try {
+      map.addLayer({ id: "sats3d", type: "custom", renderingMode: "3d",
+        onAdd: function (m, gl) { sky3dOnAdd(this, m, gl); },
+        onRemove: function (m, gl) { sky3dOnRemove(this, gl); },
+        render: function (gl, args) { sky3dRender(this, gl, args); } });
+      if (!SKY.alt3d) SKY._3dFail = true;
+      sky2dVis();
+    } catch (e) { console.warn("sky3d", e); SKY.alt3d = false; SKY._3dFail = true; sky2dVis(); }
+  }
+  function sky3dUpdate() {
+    if (!SKY.alt3d) return;
+    var recs = SKY.recs, dpr = Math.min(2, window.devicePixelRatio || 1);
+    var n = 0, vis = [], cap = Math.max(recs.length, 8), focus = SKY.sel != null && document.body.classList.contains("nx-sky-focus");
+    if (!SKY._pts || SKY._pts.length < cap * 7) SKY._pts = new Float32Array(cap * 7);
+    var buf = SKY._pts;
+    for (var i = 0; i < recs.length; i++) {
+      var o = recs[i]; if (!o.p || !SKY.show[o.g] || !SKY.reveal[o.g]) continue;
+      if (focus && i !== SKY.sel) continue;
+      var g = globePos(o.p[0], o.p[1], o.p[2] * 1000);
+      var c = hexRgb(SKYC[o.g]);
+      var sz = (o.g === "starlink" ? 3.4 : o.g === "oneweb" ? 4.6 : o.g === "goes" ? 8.5 : 6.8) * dpr;
+      if (SKY.sel === i) sz *= 1.85;
+      var o7 = n * 7;
+      buf[o7] = g[0]; buf[o7 + 1] = g[1]; buf[o7 + 2] = g[2];
+      buf[o7 + 3] = c[0]; buf[o7 + 4] = c[1]; buf[o7 + 5] = c[2];
+      buf[o7 + 6] = Math.min(24, sz);
+      vis.push({ i: i, x: g[0], y: g[1], z: g[2], sz: sz / dpr }); n++;
+    }
+    SKY._ptN = n; SKY.vis = vis; SKY._ptsDirty = true;
+    var path = SKY.path3 || [];
+    SKY._path = path instanceof Float32Array ? path : new Float32Array(path);
+    SKY._pathN = SKY._path.length / 3; SKY._pathDirty = true;
+    if (map) map.triggerRepaint();
+  }
   function prop() {
     if (!SKY.on || !SKY.loaded) return;
     var sat = window.satellite, d = new Date(), gm = sat.gstime(d), f = [], n = 0;
@@ -624,22 +835,29 @@
         f.push({ type: "Feature", id: i, geometry: { type: "Point", coordinates: [lon, lat] }, properties: { i: i, g: o.g, c: SKYC[o.g] || "#C9CCD6" } }); n++;
       } catch (e) {}
     }
-    map.getSource("sats").setData({ type: "FeatureCollection", features: f });
+    if (SKY.alt3d) sky3dUpdate();
+    else if (map.getSource("sats")) map.getSource("sats").setData({ type: "FeatureCollection", features: f });
     if (SKY.sel != null) track(SKY.sel, false);
+    $("nx_chip").className = "nx-chip";
     $("nx_sum").textContent = "Tracking " + num(n) + " satellites live";
   }
   function track(i, fly) {
     var o = SKY.recs[i], sat = window.satellite; if (!o) return;
-    var per = 1440 / o.mm, pts = [], seg = [], now = Date.now(), last = null;
+    var per = 1440 / o.mm, pts = [], seg = [], path3 = [], now = Date.now(), last = null;
     for (var k = -120; k <= 120; k++) {   /* two full orbits (was one, a short-looking arc on the globe) */
       var t = new Date(now + k * per / 120 * 60000);
       try { var pv = sat.propagate(o.r, t); if (!pv || !pv.position) continue; var gd = sat.eciToGeodetic(pv.position, sat.gstime(t)); var lon = sat.degreesLong(gd.longitude), lat = sat.degreesLat(gd.latitude);
+        var gp = globePos(lon, lat, gd.height * 1000); path3.push(gp[0], gp[1], gp[2]);
         if (last != null && Math.abs(lon - last) > 180) { if (seg.length > 1) pts.push(seg); seg = []; } seg.push([lon, lat]); last = lon; } catch (e) {}
     }
     if (seg.length > 1) pts.push(seg);
-    var fs = pts.map(function (sg) { return { type: "Feature", geometry: { type: "LineString", coordinates: sg }, properties: { c: SKYC[o.g] } }; });
-    if (o.p) fs.push({ type: "Feature", geometry: { type: "Point", coordinates: [o.p[0], o.p[1]] }, properties: {} });
-    map.getSource("trk").setData({ type: "FeatureCollection", features: fs });
+    SKY.path3 = path3;
+    if (SKY.alt3d) sky3dUpdate();
+    else if (map.getSource("trk")) {
+      var fs = pts.map(function (sg) { return { type: "Feature", geometry: { type: "LineString", coordinates: sg }, properties: { c: SKYC[o.g] } }; });
+      if (o.p) fs.push({ type: "Feature", geometry: { type: "Point", coordinates: [o.p[0], o.p[1]] }, properties: {} });
+      map.getSource("trk").setData({ type: "FeatureCollection", features: fs });
+    }
     if (fly && o.p) map.easeTo({ center: [o.p[0], o.p[1]], duration: reduce ? 0 : 900 });
   }
   function orbitClass(o) { var h = o.p ? o.p[2] : null; return h == null ? "" : h < 2000 ? "Low Earth orbit" : h < 30000 ? "Medium Earth orbit" : "Geosynchronous orbit"; }
@@ -651,7 +869,8 @@
   }
   function clearSat() {
     hideCard(true); SKY.sel = null; document.body.classList.remove("nx-sky-focus");
-    card.classList.remove("nx-sat-chip", "open");
+    card.classList.remove("nx-sat-chip", "open", "nx-learn-panel");
+    SKY.path3 = []; if (SKY.alt3d) sky3dUpdate();
     if (map && map.getSource("trk")) map.getSource("trk").setData(EMPTY);
     if (SKY.on && SKY.loaded) prop();
     skySpinResume(1800);
@@ -704,20 +923,20 @@
     var o = SKY.recs[i]; if (!o) return; SKY.sel = i; skySpinPause(); track(i, false);
     var g = SKY.groups[o.gi] || {}, c = SKYC[o.g], compact = innerWidth < 768;
     var age = (Date.now() / 1000 - o.ep) / 3600, alt = o.p ? num(o.p[2]) + " km" : "–";
-    var facts = satFacts(o, g, age);
+    var facts = satFacts(o, g, age), learn = learnHtml(o.g);
     var cx = '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
-    card.classList.remove("dragged", "open", "nx-sat-chip");
+    card.classList.remove("dragged", "open", "nx-sat-chip", "nx-learn-panel");
     card.style.left = card.style.top = card.style.right = card.style.bottom = card.style.width = "";
+    document.body.classList.add("nx-sky-focus");
     if (compact) {
-      document.body.classList.add("nx-sky-focus"); prop();
+      prop();
       card.classList.add("nx-sat-chip");
-      card.innerHTML = '<button type="button" class="nx-sat-more" aria-expanded="false" aria-label="Show satellite details"><span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + '</span><h3>' + esc(o.name) + '</h3><p class="nx-sat-alt">' + alt + '</p></button><div class="nx-sat-extra" hidden>' + facts + '</div>' + cx;
+      card.innerHTML = '<button type="button" class="nx-sat-more" aria-expanded="false" aria-label="Show satellite details"><span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + '</span><h3>' + esc(o.name) + '</h3><p class="nx-sat-alt">' + alt + '</p></button><div class="nx-sat-extra" hidden>' + facts + learn + '</div>' + cx;
     } else {
-      document.body.classList.remove("nx-sky-focus");
-      card.innerHTML = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + ' · ' + esc(orbitClass(o)) + '</span><h3>' + esc(o.name) + '</h3>' + facts + cx;
+      card.classList.add("nx-learn-panel");
+      card.innerHTML = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + ' · ' + esc(orbitClass(o)) + '</span><h3>' + esc(o.name) + '</h3>' + facts + learn + cx;
     }
     card.hidden = false; requestAnimationFrame(function () { card.classList.add("in"); }); pinned = true; card.classList.add("pin");
-    if (!compact) window.__bnPlace(card, pt);
     var moreBtn = card.querySelector(".nx-sat-more");
     if (moreBtn) moreBtn.onclick = function () {
       var open = card.classList.toggle("open"); this.setAttribute("aria-expanded", open ? "true" : "false");
@@ -735,6 +954,7 @@
         '<p class="nx-swm">Radio R' + w.scales.R + ' · Radiation S' + w.scales.S + ' · Geomagnetic G' + w.scales.G + (w.kp != null ? ' · Kp ' + Number(w.kp).toFixed(1) : '') + '</p>' +
         '<p class="nx-swm' + (w.gnss === "Normal" ? ' nx-imp' : '') + '">' + esc((w.impacts || [])[0] || "") + '</p><p class="nx-swm">' + linkA(w.source_url, "NOAA SWPC") + ' · ' + linkA(w.jamming.url, "GPS jamming map") + ' · Orbits ' + linkA("https://celestrak.org/", "CelesTrak") + '</p>';
     }
+    h += '<p class="nx-swm nx-scale">Drawn to scale from Earth. GPS sits about 20,200 km up; a geostationary satellite about 35,786 km. The faint ring is geostationary altitude.</p>';
     el.innerHTML = h;
   }
   function setMode(m) {
@@ -748,15 +968,19 @@
     if (!sky) {
       clearInterval(SKY.timer); SKY.timer = null; SKY.sel = null;
       if (SKY.layerT) { clearTimeout(SKY.layerT); SKY.layerT = 0; }
-      skySpinStop(); document.body.classList.remove("nx-sky-focus"); SKY.reveal = {};
+      skySpinStop(); document.body.classList.remove("nx-sky-focus"); SKY.reveal = {}; SKY.path3 = [];
+      if (card) card.classList.remove("nx-learn-panel", "nx-sat-chip");
       ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
+      try { map.setMinZoom(1); } catch (e) {}
       try { map.setProjection({ type: "mercator" }); } catch (e) {}
       vis(); if (D) summary(); map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900 }); return;
     }
     try { map.setProjection({ type: "globe" }); } catch (e) {}
-    map.easeTo({ center: [-95, 30], zoom: mob ? 0.9 : 1.7, duration: reduce ? 0 : 1200 });
+    try { map.setMinZoom(-2); } catch (e) {}
+    $("nx_chip").className = "nx-chip";
+    map.easeTo({ center: [-95, 20], zoom: mob ? -0.55 : -0.4, duration: reduce ? 0 : 1200 });
     $("nx_sum").textContent = "Loading satellites…";
-    skyLayers(); skySpinBind(); ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { map.setLayoutProperty(l, "visibility", "visible"); });
+    skyLayers(); sky3dEnsure(); skySpinBind(); sky2dVis();
     skyLoad().then(function () { if (!SKY.on) return; swPanel(); layerIn(); clearInterval(SKY.timer); SKY.timer = setInterval(function () { if (!document.hidden) prop(); }, reduce ? 10000 : (mob ? 2000 : 1200));
       setTimeout(function () { if (SKY.on) skySpinStart(); }, reduce ? 0 : 1300); },
       function () { $("nx_sum").textContent = "Orbital data is unavailable right now"; });
