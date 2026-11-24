@@ -190,6 +190,17 @@ def _apply_tar(tmp, source="push"):
             src = tf.extractfile(m)
             dfd, dtmp = tempfile.mkstemp(dir=os.path.dirname(os.path.join(BASE, m.name)) if os.path.isdir(os.path.dirname(os.path.join(BASE, m.name))) else BASE, prefix=".bnsync_")
             with os.fdopen(dfd, "wb") as out: shutil.copyfileobj(src, out)
+            # Nov 24 (pt1847u): never replace a live newsletter.db with an older or smaller box-mirror copy
+            if kind == "owned" and m.name == "newsletter.db":
+                import nl_restore_guard as _NLG
+                _ok, _why = _NLG.should_restore(os.path.join(BASE, m.name), dtmp)
+                print("newsletter.db restore: " + _why, flush=True)
+                if not _ok:
+                    try: os.unlink(dtmp)
+                    except FileNotFoundError: pass
+                    refused.append(m.name)
+                    SYNC["restored"] = True   # the live list was kept; do not leave the scheduler waiting on a skipped restore
+                    continue
             _install(m.name, dtmp, kind)
             with _mlock: MAN[m.name] = (meta.get("hashes") or {}).get(m.name) or _sha(os.path.join(BASE, m.name))
             if source == "push": PUSHED_SINCE_BOOT.add(m.name)
