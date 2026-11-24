@@ -85,7 +85,7 @@ class Board(unittest.TestCase):
         for f in ("board.js", "board.css"): self.assertEqual(netmap.handle_get("/api/netmap/" + f)[0], 200)
         import netpages
         h = netpages.handle_get("/network", {})[1]
-        for s in ('id="nb"', 'id="nb_q"', 'data-m="status"', 'data-m="map"', 'data-m="sky"', 'class="nx nx-board"', "/api/netmap/board.js", "/api/netmap/board.css", 'data-s="rep"'):
+        for s in ('id="nb"', 'id="nb_q"', 'data-m="status"', 'data-m="map"', 'data-m="sky"', 'class="nx"', "/api/netmap/board.js", "/api/netmap/board.css", 'data-s="rep"'):
             self.assertIn(s, h)
         self.assertLess(h.index("/api/netmap/net.js"), h.index("/api/netmap/board.js"))
 
