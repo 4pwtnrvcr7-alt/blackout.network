@@ -28,6 +28,13 @@ def visible_text(h):
     return re.sub(r"<[^>]+>", " ", h)
 
 
+import os as _os_d, sys as _sys_d
+_sys_d.path.insert(0, _os_d.path.dirname(_os_d.path.dirname(_os_d.path.abspath(__file__))))
+try:
+    import deactivated as _deact_mod; _DEACT_ON = _deact_mod.ON
+except Exception:
+    _DEACT_ON = False
+import unittest
 class Page(unittest.TestCase):
     def test_sections_and_key_facts(self):
         h = page()
@@ -160,6 +167,7 @@ class Routes(unittest.TestCase):
 
 
 class Nav(unittest.TestCase):
+    @unittest.skipIf(_DEACT_ON, "Nov 24 2026 (Matt): old menu layout / deactivated pages; replaced by menu v5 + tests/test_deactivate_pages.py")
     def test_nav_and_menus(self):
         keys = [t[0] for _, tabs in sitenav.NAV for t in tabs]
         self.assertIn("@cern", keys)
