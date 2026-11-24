@@ -37,6 +37,12 @@ class T(unittest.TestCase):
             raise OSError(url)
         r = netinet.build(jget)
         self.assertEqual(r["places"]["C:IQ"]["level"], 0)
+    def test_ioda_down_gives_grey_not_error(self):
+        netinet._ENTS.clear()
+        def jget(url, **k): raise OSError("IODA unreachable")
+        r = netinet.build(jget)
+        self.assertIn("S:Florida", r["places"]); self.assertIn("C:PR", r["places"]); self.assertNotIn("C:US", r["places"])
+        self.assertTrue(all(p["level"] == -1 for p in r["places"].values()))
     def test_static_geo_served(self):
         st, body, ct = netmap.handle_get("/api/netmap/inet.json")
         self.assertEqual((st, ct), (200, "application/json")); self.assertIn(b'"S:Florida"', body); self.assertIn(b'"C:PR"', body)
