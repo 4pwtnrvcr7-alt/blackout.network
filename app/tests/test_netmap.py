@@ -410,6 +410,85 @@ class NetRails(unittest.TestCase):
         self.assertEqual(r["level"], 0); self.assertEqual(r["incidents"], [])
         self.assertEqual(netmap.link_one("see page")["level"], -1)
 
+
+_BN_UNITS_PROBE = """
+const fs = require("fs");
+const vm = require("vm");
+const src = fs.readFileSync(process.argv[2], "utf8");
+const cut = src.indexOf("\\n(function () {");
+if (cut < 0) { console.error("no main iife"); process.exit(1); }
+const store = {};
+const w = {
+  localStorage: { getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = String(v); } },
+  dispatchEvent: () => {}, addEventListener: () => {},
+  CustomEvent: function (n, i) { this.type = n; this.detail = i && i.detail; },
+  document: { getElementById: () => null, readyState: "complete", addEventListener: () => {} }
+};
+w.window = w;
+const ctx = { window: w, document: w.document, console };
+vm.createContext(ctx);
+vm.runInContext(src.slice(0, cut), ctx);
+const U = ctx.window.BNUnits;
+function eq(a, b, m) { if (a !== b) { console.error("FAIL", m, JSON.stringify(a), "want", JSON.stringify(b)); process.exit(2); } }
+eq(U.system(), "imperial", "default");
+eq(U.isImperial(), true, "isImperial");
+eq(U.fmtSpeed(7.66, "s"), "4.76 mi/s", "speed");
+eq(U.fmtAlt(400), "249 mi", "iss alt");
+eq(U.fmtDist(20200), "12,552 mi", "gps");
+eq(U.fmtDist(35786), "22,236 mi", "geo");
+eq(U.fmtLenM(100), "328 ft", "tower");
+eq(U.fmtFt(1065), "1,065 ft", "lake");
+eq(U.fmtSizeKm(0.5), "1,640 ft", "size m");
+U.set("metric");
+eq(U.system(), "metric", "metric");
+eq(U.fmtSpeed(7.66, "s"), "7.66 km/s", "speed km");
+eq(U.fmtAlt(400), "400 km", "alt km");
+eq(U.fmtDist(20200), "20,200 km", "gps km");
+eq(U.fmtLenM(100), "100 m", "tower m");
+eq(U.fmtFt(1065), "325 m", "lake m");
+eq(store["bn-units"], "metric", "persist");
+console.log("UNITS_OK");
+"""
+
+class GridUnits(unittest.TestCase):
+    def test_units_toggle(self):
+        """pt1827u: Metric/Imperial pill defaults to imperial, persists, and formats speeds/distances/altitudes."""
+        import netpages, subprocess, tempfile
+        from pathlib import Path
+        b = netpages.handle_get("/grid", {})[1]
+        if isinstance(b, bytes):
+            b = b.decode("utf-8")
+        self.assertIn('id="nx_units"', b)
+        self.assertIn('aria-label="Units"', b)
+        self.assertIn('data-u="imperial" aria-pressed="true"', b)
+        self.assertIn('data-u="metric" aria-pressed="false"', b)
+        self.assertIn(">mi</button>", b)
+        self.assertIn(">km</button>", b)
+        root = Path(APP) / "netmap_static"
+        js, css = (root / "net.js").read_text(), (root / "net.css").read_text()
+        self.assertIn("window.BNUnits", js)
+        self.assertIn("fmtSpeed", js)
+        self.assertIn("fmtDist", js)
+        self.assertIn("fmtAlt", js)
+        self.assertIn('new CustomEvent("bn-units"', js)
+        self.assertIn('localStorage.setItem(KEY, imperial ? "imperial" : "metric")', js)
+        self.assertIn("window.BNUnits.fmtAlt(o.p[2])", js)
+        self.assertIn('window.BNUnits.fmtSpeed(o.p[3], "s")', js)
+        self.assertIn("window.BNUnits.fmtDist(km)", js)
+        self.assertIn("window.BNUnits.fmtFt(lv.ft)", js)
+        self.assertIn("window.BNUnits.fmtLenM(r[3])", js)
+        self.assertIn('document.addEventListener("bn-units"', js)
+        self.assertIn(".nx-units", css)
+        added = css.split("pt1827u")[-1]
+        self.assertNotIn("#FFC21A", added)
+        self.assertNotIn("yellow", added.lower())
+        script = Path(tempfile.gettempdir()) / "bn_units_probe.js"
+        script.write_text(_BN_UNITS_PROBE)
+        r = subprocess.run(["node", str(script), str(root / "net.js")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + "\n" + r.stderr)
+        self.assertIn("UNITS_OK", r.stdout)
+
+
 class NoDuplicateFunctions(unittest.TestCase):
     def test_net_js_declares_each_function_once(self):
         """Regression (Nov 24 2026): a second `function prog(...)` (sky shaders) replaced the loader's prog() and broke map setup."""
