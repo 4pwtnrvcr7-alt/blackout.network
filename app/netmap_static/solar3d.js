@@ -456,7 +456,7 @@
     FLY = { t0: performance.now(), dur: dur || 1100, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: toT.clone(), toP: toP.clone() };
   }
   function hookApi() {
-    return { T: T, S: S, LIST: LIST, OBJ: OBJ, esc: esc, imperial: imperial, fmtAU: fmtAU, fmtV: fmtV, flyTo: flyTo };
+    return { T: T, S: S, LIST: LIST, OBJ: OBJ, esc: esc, imperial: imperial, fmtAU: fmtAU, fmtV: fmtV, flyTo: flyTo, cancelFly: function () { FLY = null; }, sel: function () { return SEL; } };
   }
   function attachPlanets() {
     var run = function () { try { if (w.BNPlanets && w.BNPlanets.attach) w.BNPlanets.attach(hookApi()); } catch (e) {} };
@@ -554,6 +554,7 @@
     if (o.kind === "craft") { dir.set(0.55, 0.35, 0.75); if (o.id === "roadster") { S.spin0 = performance.now(); dir.set(0.3, 0.6, -0.74); } dir.normalize(); }
     if (vdir) { dir.fromArray(vdir).normalize(); dist *= vmul || 1; }
     tracks(o);
+    S._trk = null;
     FLY = { t0: performance.now(), dur: 1300, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: tgt, toP: tgt.clone().add(dir.multiplyScalar(dist)) };
     info(o);
   }
@@ -561,11 +562,16 @@
     LIST.forEach(function (x) { (x.node.userData.lines || []).forEach(function (l) { l.material.opacity = !sel ? l.userData.base : x === sel ? Math.min(1, l.userData.base * 3.2) : 0.06; }); });
     (S.rings || []).forEach(function (r) { r.material.opacity = sel ? 0.18 : 0.35; });
   }
-  function overview() { SEL = null; tracks(null); var far = compressed ? 110 : 160; FLY = { t0: performance.now(), dur: 1000, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: new T.Vector3(), toP: new T.Vector3(0, far * 0.75, far) }; info(null); }
+  function overview() { SEL = null; S._trk = null; tracks(null); var far = compressed ? 110 : 160; FLY = { t0: performance.now(), dur: 1000, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: new T.Vector3(), toP: new T.Vector3(0, far * 0.75, far) }; info(null); }
   var tmp = new T.Vector3();
   function frame(now) {
     raf = w.requestAnimationFrame(frame); if (d.hidden) return;
-    if (FLY) { var k = Math.min(1, (now - FLY.t0) / FLY.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; S.cam.position.lerpVectors(FLY.fromP, FLY.toP, e); S.ctl.target.lerpVectors(FLY.fromT, FLY.toT, e); if (k >= 1) FLY = null; }
+    if (FLY) { var k = Math.min(1, (now - FLY.t0) / FLY.dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; S.cam.position.lerpVectors(FLY.fromP, FLY.toP, e); S.ctl.target.lerpVectors(FLY.fromT, FLY.toT, e); if (k >= 1) { FLY = null; S._trk = null; } }
+    if (SEL && !FLY) {
+      var tpos = SEL.node.getWorldPosition(new T.Vector3()); if (SEL.id === "roadster") tpos.y += 0.06;
+      if (S._trk) { var dx = tpos.x - S._trk.x, dy = tpos.y - S._trk.y, dz = tpos.z - S._trk.z; S.ctl.target.x += dx; S.ctl.target.y += dy; S.ctl.target.z += dz; S.cam.position.x += dx; S.cam.position.y += dy; S.cam.position.z += dz; }
+      S._trk = tpos;
+    } else if (!SEL) S._trk = null;
     S.ctl.update();
     var cd = S.cam.position.length();
     LIST.forEach(function (o) {
@@ -582,6 +588,7 @@
         else o.lab.style.display = "none";
       }
     });
+    if (w.BNPlanets && w.BNPlanets.tick) w.BNPlanets.tick();
     S.r.render(S.scene, S.cam);
   }
   function resize() { S.W = S.el.clientWidth; S.H = S.el.clientHeight; S.r.setSize(S.W, S.H, false); S.cam.aspect = S.W / Math.max(1, S.H); S.cam.updateProjectionMatrix(); }
@@ -609,6 +616,7 @@
     S.root = new T.Group(); S.scene.add(S.root); S.glow = glowTex();
     S.ctl = new T.OrbitControls(S.cam, S.r.domElement); S.ctl.enableDamping = true; S.ctl.dampingFactor = 0.08; S.ctl.minDistance = 0.05; S.ctl.maxDistance = 6000; S.ctl.zoomSpeed = 1.2;
     S.ctl.addEventListener("start", function () { FLY = null; });
+    S.r.domElement.addEventListener("wheel", function () { FLY = null; }, { passive: true });
     el.querySelector("#s3_back").addEventListener("click", close);
     el.querySelector("#s3_all").addEventListener("click", overview);
     el.querySelector("#s3_sun").addEventListener("click", function () { focus("sun"); });
@@ -616,10 +624,10 @@
     var ray = new T.Raycaster(), dn = null;
     S.r.domElement.addEventListener("pointerdown", function (e) { dn = [e.clientX, e.clientY]; });
     S.r.domElement.addEventListener("pointerup", function (e) {
-      if (!dn || Math.hypot(e.clientX - dn[0], e.clientY - dn[1]) > 6) return;
+      if (!dn || Math.hypot(e.clientX - dn[0], e.clientY - dn[1]) > 8) return;
       var rc = S.r.domElement.getBoundingClientRect(); ray.setFromCamera(new T.Vector2((e.clientX - rc.left) / rc.width * 2 - 1, -(e.clientY - rc.top) / rc.height * 2 + 1), S.cam);
       var hit = ray.intersectObjects(S.root.children, true).filter(function (h) { return h.object.type === "Mesh"; })[0];
-      if (!hit) return; var n = hit.object; while (n && n.parent !== S.root) n = n.parent; var o = LIST.filter(function (x) { return x.node === n; })[0]; if (o) focus(o.id);
+      if (!hit) return; var n = hit.object; while (n && n.parent !== S.root) n = n.parent; var o = LIST.filter(function (x) { return x.node === n; })[0]; if (o && o !== SEL) focus(o.id);
     });
     w.addEventListener("resize", function () { if (S.el && !S.el.hidden) resize(); });
     w.addEventListener("bn-units", function () { if (SEL) info(SEL); });
