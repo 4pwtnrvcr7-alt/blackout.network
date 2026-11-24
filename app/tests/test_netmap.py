@@ -179,6 +179,13 @@ class NetSky(unittest.TestCase):
         b = netpages.handle_get("/grid", {})[1]
         for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', 'id="nx_ss"', 'data-g="iss"', 'data-g="debris"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
         self.assertIn('data-g="debris" aria-pressed="false"', b)
+        self.assertIn('data-g="ss"', b)
+        self.assertIn('data-g="sw"', b)
+        self.assertIn('id="nx_sky_labs"', b)
+        # every sky chip, including ISS and Starlink, starts off so the globe is clean
+        self.assertNotIn('data-g="iss" aria-pressed="true"', b)
+        self.assertNotIn('data-g="starlink" aria-pressed="true"', b)
+        self.assertIn('data-g="iss" aria-pressed="false"', b)
 
     def test_sky_spin_layer_path_and_mobile_chip(self):
         # pt1813u: globe auto-rotate, constellations layer in small-to-Starlink, two-orbit path, compact mobile chip
@@ -188,7 +195,7 @@ class NetSky(unittest.TestCase):
         css = (root / "net.css").read_text()
         self.assertIn("function skySpinStart", js)
         self.assertIn("function layerIn", js)
-        self.assertIn('if (a.id === "starlink") return 1', js)
+        self.assertIn("SKY.reveal[g.id] = !!SKY.show[g.id]", js)
         self.assertIn("k <= 120", js)
         self.assertIn("two orbits", js)
         self.assertIn("nx-sky-focus", js)
@@ -358,9 +365,12 @@ class NetSky(unittest.TestCase):
         root = Path(APP) / "netmap_static"
         js = (root / "net.js").read_text()
         css = (root / "net.css").read_text()
-        for s in ("function debrisLoad", "function ssLoad", "function ssPanel", "function ssDiagram",
+        for s in ("function debrisLoad", "function ssLoad", "function skyLabs", "function skyChipLabels",
                   'SKYC = { iss: "#FFFFFF"', 'g === "debris"', "/api/netmap/ss", "/api/netmap/cad", "/api/netmap/debris"):
             self.assertIn(s, js)
+        self.assertIn("nx-ss-pin", css)
+        self.assertIn("Tap a chip to show a layer", js)
+        self.assertIn('SKY.show[g.id] = false', js)
         self.assertNotIn("function prog(", js.split("function glProg")[-1] if "function glProg" in js else "")
         self.assertIn("function glProg", js)
         self.assertEqual(js.count("function debrisLoad"), 1)
