@@ -68,8 +68,9 @@ class Launches(unittest.TestCase):
         low = re.sub(r"/\*.*?\*/", "", js.lower(), flags=re.S)
         self.assertNotIn("yellow", low)
         for c in ("#f5d547", "#f5a524", "#ffcc00", "#facc15"): self.assertNotIn(c, low)
-        self.assertEqual(low.count("<img"), 1)   # one image slot, only filled from image_ok() (commercial-use licence)
-        self.assertIn("d.image.license", js)
+        self.assertEqual(low.count("<img"), 1)   # one image slot: the per-rocket Commons photo, with its credit
+        self.assertIn("d.rocket_photo", js); self.assertNotIn("d.image.url", js)   # LL2 images are not used
+        self.assertIn("lcFeatured", js); self.assertIn("lim = z < base + 0.9 ? 5", js)   # next 5 + live when zoomed out
         import netpages
         self.assertIn("/api/netmap/launches.js", netpages.handle_get("/grid", {})[1])
         self.assertIn('aria-pressed", LC.on ? "true" : "false"', js)
@@ -97,6 +98,33 @@ class Launches(unittest.TestCase):
         self.assertEqual(set(re.findall(r"function (\w+)\s*\(", tr)) & theirs, set())
         import netpages
         self.assertIn("/api/netmap/skytrack.js", netpages.handle_get("/grid", {})[1])
+
+    def test_rocket_photos(self):
+        import netmap, base64
+        man = json.load(open(os.path.join(APP, "netmap_static", "rockets", "rockets.json"), encoding="utf-8"))
+        self.assertGreaterEqual(len(man), 15)
+        for k, m in man.items():
+            self.assertRegex(k, r"^[a-z0-9]+$")
+            self.assertIsNotNone(self.N._OK_LIC.match(m["license"]), k)   # PD / CC0 / CC BY / CC BY-SA only
+            self.assertNotRegex(m["license"].lower(), r"\bnc\b|nd\b|non-?commercial")
+            self.assertTrue(m["source_url"].startswith("https://commons.wikimedia.org/wiki/File:"), k)
+            self.assertTrue(m["author"] and m["pictured"], k)
+            code, body, ct = netmap.handle_get("/api/netmap/rockets/" + m["file"])
+            self.assertEqual((code, ct), (200, "image/jpeg")); self.assertEqual(body[:2], b"\xff\xd8")
+        self.assertEqual(netmap.handle_get("/api/netmap/rockets/../netmap.py")[0], 404)
+        self.assertEqual(self.N.rocket_photo("Falcon 9 Block 5")["key"], "falcon9")
+        self.assertEqual(self.N.rocket_photo("Falcon Heavy")["key"], "falconheavy")
+        self.assertEqual(self.N.rocket_photo("Long March 2F", "Long March 2")["key"], "longmarch")
+        self.assertIsNone(self.N.rocket_photo("Ariane 62"))   # no usable photo -> none shown
+        d = self.N.launches(); lid = self.by(d, "USSF-266")["id"]
+        self.assertEqual(netmap.handle_get("/api/netmap/launches/" + lid)[1]["rocket_photo"]["key"], "falcon9")
+
+    def test_chip_frame_then_hide(self):
+        tr = open(os.path.join(APP, "netmap_static", "skytrack.js"), encoding="utf-8").read()
+        js = open(os.path.join(APP, "netmap_static", "launches.js"), encoding="utf-8").read()
+        self.assertIn("Tap again to hide", tr); self.assertIn("}, true);", tr)   # capture listener runs before net.js toggles
+        self.assertIn('T.framed() !== "launches"', js)
+        self.assertIn("selecting a launch turns the Launches chip back on", js)
 
 if __name__ == "__main__":
     unittest.main()

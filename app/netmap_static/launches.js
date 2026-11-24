@@ -42,6 +42,8 @@
     ".nx-lc-pad{pointer-events:auto;cursor:pointer;background:rgba(8,10,16,.72);border:1px solid rgba(232,236,245,.35);border-radius:6px;padding:3px 6px;margin:-6px 0 0 8px}",
     ".nx-lc-pad small{display:block;font-weight:500;color:#AEB4C4;font-variant-numeric:tabular-nums}",
     ".nx-lc-pad.past{border-color:rgba(174,180,196,.25)}",
+    ".nx-lc-pad .cnt{display:none}.nx-lc-pad.badge{padding:0;margin:-9px 0 0 -9px;width:18px;height:18px;border-radius:50%;text-align:center}.nx-lc-pad.badge .full{display:none}.nx-lc-pad.badge .cnt{display:block;font-size:10px;line-height:18px;font-weight:650;font-variant-numeric:tabular-nums}",
+    ".nx-lc-sheet .src{font-size:11px;color:#AEB4C4}",
     ".nx-lc-ev{font-weight:500;color:#C9CCD6;padding-left:8px}",
     ".nx-lc-ev.k-land{color:#5CE1B6}.nx-lc-ev.k-landfail,.nx-lc-ev.k-fail{color:#FF5A5A}.nx-lc-ev.k-boost{color:#4FC3F7}",
     ".nx-lc-ev:before{content:'';position:absolute;left:-3px;top:4px;width:6px;height:6px;border-radius:50%;background:currentColor}",
@@ -81,7 +83,7 @@
     LC.pads = Object.keys(by).map(function (k) {
       var ids = by[k].ids, up = ids.filter(function (i) { return lcNetMs(lcList()[i]) >= now - 1800000; });
       var pick = up.length ? up[0] : ids[ids.length - 1];
-      return { i: pick, n: ids.length, ids: ids };
+      return { i: pick, n: ids.length, ids: ids, next: up.length ? lcNetMs(lcList()[pick]) : Infinity };
     });
     lcLabelsDom();
   }
@@ -93,12 +95,20 @@
     var h = "";
     (LC.pads || []).forEach(function (p, j) {
       var L = lcList()[p.i], past = lcNetMs(L) < Date.now();
-      h += '<div class="nx-lc-l nx-lc-pad' + (past ? " past" : "") + '" data-pad="' + j + '" role="button" tabindex="0" aria-label="' + lcEsc(lcMission(L)) + ' launch">' + lcEsc(lcMission(L)) +
-        (p.n > 1 ? ' <span style="color:#AEB4C4;font-weight:500">+' + (p.n - 1) + "</span>" : "") + '<small data-clk="' + p.i + '">' + lcEsc(lcVehicle(L)) + " \u00b7 " + lcEsc(lcClock(L)) + "</small></div>";
+      h += '<div class="nx-lc-l nx-lc-pad' + (past ? " past" : "") + '" data-pad="' + j + '" role="button" tabindex="0" aria-label="' + lcEsc(lcMission(L)) + ' launch"><span class="cnt">' + p.n + '</span><span class="full">' + lcEsc(lcMission(L)) +
+        (p.n > 1 ? ' <span style="color:#AEB4C4;font-weight:500">+' + (p.n - 1) + "</span>" : "") + '<small data-clk="' + p.i + '">' + lcEsc(lcVehicle(L)) + " \u00b7 " + lcEsc(lcClock(L)) + "</small></span></div>";
     });
     LC.lbl.innerHTML = h + '<div class="nx-lc-evs"></div>';
     LC.lbl.querySelectorAll(".nx-lc-pad").forEach(function (el) {
-      function go(e) { e.stopPropagation(); e.preventDefault(); lcSelect((LC.pads[+el.dataset.pad] || {}).i); }
+      function go(e) {
+        e.stopPropagation(); e.preventDefault(); var p = LC.pads[+el.dataset.pad] || {}, map = window.__nxMap, L = lcList()[p.i];
+        if (el.classList.contains("badge") && map && L) {   /* count badge: zoom toward the pad so its label appears */
+          window.__nxSpinHold = true; setTimeout(function () { if (LC.sel < 0) window.__nxSpinHold = false; }, reduce ? 50 : 1300);
+          try { map.easeTo({ center: [L.pad_lon, L.pad_lat], zoom: Math.min(4, map.getZoom() + 1.4), duration: reduce ? 0 : 900 }); } catch (x) {}
+          return;
+        }
+        lcSelect(p.i);
+      }
       el.addEventListener("click", go); el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") go(e); });
     });
   }
@@ -131,14 +141,26 @@
   function lcFront(p, cen) { /* hide labels on the far side of the globe */
     var r = Math.hypot(p[0], p[1], p[2]); return (p[0] * cen[0] + p[1] * cen[1] + p[2] * cen[2]) / r > 0.12;
   }
+  function lcLive(L) { var s = (Date.now() - lcNetMs(L)) / 1000; return L.status === "In Flight" || (s >= 0 && s < lcTEnd(L) && L.status !== "Success" && L.status !== "Failure"); }
+  function lcFeatured(map) {
+    /* zoomed out: full labels only for the next 5 upcoming launches plus anything flying now; other pads are count badges.
+       More labels appear as you zoom in (12 at +0.9 zoom, all at +1.8). */
+    var z = map.getZoom(), base = mob ? -0.55 : -0.4, lim = z < base + 0.9 ? 5 : z < base + 1.8 ? 12 : 1e9, out = {};
+    var ord = (LC.pads || []).map(function (p, j) { return j; }).filter(function (j) { return LC.pads[j].next < Infinity; })
+      .sort(function (a, b) { return LC.pads[a].next - LC.pads[b].next; });
+    ord.slice(0, lim).forEach(function (j) { out[j] = 1; });
+    (LC.pads || []).forEach(function (p, j) { if (lim > 1e8) out[j] = 1; p.ids.forEach(function (i) { if (lcLive(lcList()[i])) out[j] = 1; }); });
+    return out;
+  }
   function lcLabelsFrame(m) {
     if (!LC.lbl) return;
     var map = window.__nxMap, cnv = map.getCanvas(), cw = cnv.clientWidth, ch = cnv.clientHeight, c = map.getCenter(), cen = lcPos(c.lng, c.lat, 0);
-    var focus = LC.sel >= 0, padPlaced = [];
+    var focus = LC.sel >= 0, padPlaced = [], feat = lcFeatured(map);
     LC.lbl.querySelectorAll(".nx-lc-pad").forEach(function (el) {
-      var p = LC.pads[+el.dataset.pad], L = lcList()[p.i];
+      var j = +el.dataset.pad, p = LC.pads[j], L = lcList()[p.i];
       if (!LC.on || !LC.reveal || focus) { el.style.transform = "translate(-9999px,0)"; return; }
-      lcPlace(el, m, lcPos(L.pad_lon, L.pad_lat, 0), cw, ch, cen, padPlaced);
+      var badge = !feat[j]; if (el.classList.contains("badge") !== badge) el.classList.toggle("badge", badge);
+      lcPlace(el, m, lcPos(L.pad_lon, L.pad_lat, 0), cw, ch, cen, badge ? null : padPlaced);
     });
     var L = lcList()[LC.sel];
     if (!L) return;
@@ -318,6 +340,10 @@
   }
   function lcSelect(i) {
     var L = lcList()[i], map = window.__nxMap; if (!L || !map) return;
+    if (!LC.on || !LC.reveal) {   /* selecting a launch turns the Launches chip back on */
+      LC.on = true; LC.reveal = true; var cb = document.getElementById("nx_lc_chip"); if (cb) cb.setAttribute("aria-pressed", "true");
+      if (LC.lbl) LC.lbl.style.display = ""; lcEnsureLayer();
+    }
     LC.sel = i; LC.anim = null; LC.follow = true; window.__nxSpinHold = true;
     document.body.classList.add("nx-lc-focus"); lcHideOthers(true);
     lcEvLabels(); lcBar();
@@ -366,8 +392,9 @@
   function lcDetailsHtml(d, L) {
     var h = "", m = d.mission || {}, r = d.rocket || {}, p = d.pad || {}, pv = d.provider || {}, st = d.status || {};
     h += "<h3>" + lcEsc(d.name || "") + "</h3>";
-    if (d.image) h += '<figure><img src="' + lcEsc(d.image.url) + '" alt="' + lcEsc(r.name || "Rocket") + '" loading="lazy"><figcaption>' + lcEsc(d.image.credit || "") + " \u00b7 " + (lcLink(d.image.license_url, d.image.license) || lcEsc(d.image.license)) + "</figcaption></figure>";
-    else h += '<p class="np">' + lcEsc(d.image_note || "No licensed image.") + "</p>";
+    var ph = d.rocket_photo;   /* one Wikimedia Commons photo per rocket type (PD / CC0 / CC BY / CC BY-SA); LL2 images are not used */
+    if (ph && /^\/api\/netmap\/rockets\/[a-z0-9_-]+\.jpg$/.test(ph.url || "")) h += '<figure><img src="' + lcEsc(ph.url) + '" alt="' + lcEsc(ph.pictured || r.name || "Rocket") + '" loading="lazy"' + (ph.w ? ' width="' + (+ph.w) + '" height="' + (+ph.h) + '" style="width:auto;height:auto"' : "") + '><figcaption>Pictured: ' + lcEsc(ph.pictured || r.name || "") + ' (representative photo of this rocket type, not this launch).<br>Photo: ' + lcEsc(ph.author || "see source") + " \u00b7 " + (lcLink(ph.license_url, ph.license) || lcEsc(ph.license)) + " \u00b7 " + (lcLink(ph.source_url, "Wikimedia Commons") || "") + "</figcaption></figure>";
+    else h += '<p class="np">No openly licensed photo of this rocket type yet.</p>';
     h += "<h4>Mission</h4>" + (m.description ? "<p>" + lcEsc(m.description) + "</p>" : '<p class="np">Mission description not published.</p>');
     h += "<dl>" + lcRow("Mission", m.name) + lcRow("Type", m.type) + lcRow("Orbit", m.orbit) +
       lcRow("Customer / agency", (m.agencies || []).map(function (a) { return a.name + (a.type ? " (" + a.type + ")" : ""); }).join(", ") || null) +
@@ -420,13 +447,23 @@
     var b = document.createElement("button"); b.type = "button"; b.id = "nx_lc_chip"; b.setAttribute("aria-pressed", LC.on ? "true" : "false");
     b.innerHTML = '<i style="background:#E8ECF5;border-color:#E8ECF5"></i>Launches';
     b.addEventListener("click", function (e) {
-      e.stopPropagation(); LC.on = !LC.on; b.setAttribute("aria-pressed", LC.on ? "true" : "false");
+      e.stopPropagation(); var T = window.__nxTrack;
+      /* first tap on an ON chip frames the launches; a second tap while framed turns it off (Matt's request) */
+      if (LC.on && LC.reveal && T && T.framed() !== "launches") { lcFrame(); T.setFramed("launches"); T.hint(b); return; }
+      LC.on = !LC.on; b.setAttribute("aria-pressed", LC.on ? "true" : "false");
+      if (T) T.setFramed(LC.on ? "launches" : null);
       if (!LC.on) { LC.reveal = false; if (LC.sel >= 0) lcClose(); lcRepaint(); return; }
-      LC.reveal = true;
+      LC.reveal = true; lcFrame();
       lcEnsureLayer();
       lcLoad().then(function () { lcRepaint(); }, function () { b.setAttribute("aria-pressed", "false"); LC.on = false; LC.reveal = false; b.title = "Launch data is unavailable right now"; });
     });
     sf.insertBefore(b, sf.firstChild);   /* first chip, so it is visible without scrolling the row */
+  }
+  function lcFrame() {   /* face the next upcoming launch pad at a zoom where the next few labels read */
+    var map = window.__nxMap; if (!map) return; if (LC.sel >= 0) lcClose();
+    var now = Date.now(), L = lcList().filter(function (x) { return lcNetMs(x) >= now - 1800000; })[0];
+    window.__nxSpinHold = true; setTimeout(function () { if (LC.sel < 0) window.__nxSpinHold = false; }, reduce ? 50 : 1300);
+    try { map.easeTo({ center: L ? [L.pad_lon, Math.max(-30, Math.min(30, L.pad_lat))] : map.getCenter(), zoom: mob ? 0.25 : 0.4, pitch: 0, duration: reduce ? 0 : 1000 }); } catch (e) {}
   }
   function lcSkyChanged() {
     var sky = document.body.classList.contains("nx-sky");
