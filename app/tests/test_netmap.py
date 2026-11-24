@@ -20,7 +20,10 @@ class NetMap(unittest.TestCase):
     def test_static_rules(self):
         for f in ("net.css", "net.js"):
             t = open(os.path.join(APP, "netmap_static", f), encoding="utf-8").read().lower()
+            # Nov 24 2026 (Matt): the one allowed yellow is the 230 kV+ line status colour (LCOL.strain #F5D547) and its legend words
+            t = t.replace("yellow strained or warning", "").replace('strain: "#f5d547"', "")
             self.assertNotIn("yellow", re.sub(r"/\*.*?\*/", "", t, flags=re.S))
+            self.assertNotIn("f5d547", t)
             self.assertNotIn("tile.openstreetmap.org", t)
             for c in ("#f5a524", "#ffd", "#ffcc00", "#ffeb3b", "#fde047", "#facc15", "#ff9900"): self.assertNotIn(c, t)
             self.assertIn("prefers-reduced-motion", t) if f == "net.js" else None

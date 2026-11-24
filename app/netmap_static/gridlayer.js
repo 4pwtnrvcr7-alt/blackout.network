@@ -105,11 +105,7 @@
     if (!pin && pinned) return;
     card.innerHTML = cardHTML(k); card.hidden = false; card.classList.toggle("pin", !!pin);
     if (pin) pinned = k;
-    if (!touch && pt && innerWidth >= 768) {
-      var w = card.offsetWidth, h = card.offsetHeight, x = pt.x + 18, y = pt.y + 18;
-      if (x + w > innerWidth - 12) x = pt.x - w - 18; if (y + h > innerHeight - 12) y = Math.max(12, innerHeight - h - 12);
-      card.style.left = Math.max(12, x) + "px"; card.style.top = Math.max(70, y) + "px";
-    }
+    if (window.__bnPlace) window.__bnPlace(card, pt);   /* Nov 24 2026: next to the item, clamped inside the screen, draggable (net.js) */
     requestAnimationFrame(function () { card.classList.add("in"); });
   }
   function hideCard(force) {
@@ -175,7 +171,6 @@
       if (f) { pinned = null; showCard(f.properties.k, e.point, true); map.easeTo({ center: f.geometry.coordinates, duration: 700, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, offset: (touch || innerWidth < 768) ? [0, -innerHeight * 0.18] : [0, 0] }); }
       else hideCard(true);
     });
-    fetch("/api/gridstatus/sections.geojson").then(function (r) { return r.json(); }).then(function (g) { SECG = g; paint(); }).catch(function () {});
     ready = true; paint(); applyVis();
   }
   function attach(m) {
@@ -188,6 +183,7 @@
   new MutationObserver(applyVis).observe(document.body, { attributes: true, attributeFilter: ["class"] });
 
   var SECG = null, ready = false, WD = null;
+  fetch("/api/gridstatus/sections.geojson").then(function (r) { return r.json(); }).then(function (g) { SECG = g; paint(); }).catch(function () {});   /* Nov 24 2026: operator outlines load in parallel with the map, not after it */
   var VIEWS = { us: { b: US }, eu: { b: [[-11, 35], [32, 61]] }, apac: { b: [[66, -46], [179, 50]] }, world: { c: [12, 22], z: innerWidth < 768 ? 0.6 : 1.4 } };
   function region(r) {
     var v = VIEWS[r]; if (!map || !v) return;
@@ -199,6 +195,7 @@
   }
   document.getElementById("gx_reg").addEventListener("click", function (e) { var b = e.target.closest("button[data-r]"); if (b) region(b.dataset.r); });
   function paint() {
+    if (D) { var rs = {}; D.regions.forEach(function (r) { rs[r.id] = regStatus(r.status); }); window.__gxRegionStatus = rs; try { document.dispatchEvent(new CustomEvent("gx:status")); } catch (e) {} }   /* net.js colours the 230 kV+ lines by area */
     if (!ready || !D) return;
     map.getSource("gx-pts").setData(features());
     if (SECG) {
@@ -311,7 +308,7 @@
     if (b.dataset.state) { openMore("gx-local"); var s = $("gx_st"); if (s) { s.value = b.dataset.state; loadState(b.dataset.state); } return; }
     var o = IDX[b.dataset.fly]; if (!o) return;
     toMap(); if (innerWidth < 768) closeMore();
-    if (!opsOn) { var ch = document.querySelector('#nx_f [data-k="ops"]'); if (ch && b.dataset.fly[0] !== "s") ch.click(); }   /* "Show on map" turns the Grid operators layer back on */
+    if (!opsOn) { var ch = document.querySelector('#nx_f [data-k="grid"]'); if (ch && b.dataset.fly[0] !== "s") ch.click(); }   /* "Show on map" turns the Grid operators layer back on */
     fly(o.lon, o.lat, b.dataset.fly[0] === "r" ? 4.6 : 6);
     map && map.once("moveend", function () { showCard(b.dataset.fly, map.project([o.lon, o.lat]), true); });
   });
