@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 import html, json
 from datetime import datetime, timezone, timedelta
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
-LVC = {3: "#FF4D4F", 2: "#FF7A1A", 1: "#FFA040", 0: "#2BB673", -1: "#2a3039"}
+LVC = {3: "#FF3B3B", 2: "#FF3B3B", 1: "#FFA040", 0: "#2BB673", -1: "#2a3039"}  # match Status cards: red = disruption/outage, amber = minor
 WORD = {3: "Major outage", 2: "Disruption", 1: "Minor issue", 0: "Normal", -1: "No live feed"}
 
 def _et(ts, day=False):

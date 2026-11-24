@@ -134,10 +134,10 @@
     var m = Math.max(0, Math.round((Date.now() - t) / 60000));
     return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago";
   }
-  var COL = { ok: "#2FD67B", deg: "#FF7A1A", out: "#FF3B3B", na: "#7C8190", dc: "#7FD4FF", minor: "#C9CCD6" };
+  var COL = { ok: "#2FD67B", deg: "#FF3B3B", out: "#FF3B3B", na: "#7C8190", dc: "#7FD4FF", minor: "#C9CCD6", watch: "#FFA040" };
   var PROV = { aws: "#9DB4FF", azure: "#4FC3F7", gcp: "#B39DFF" };
   var PNAME = { aws: "AWS", azure: "Microsoft Azure", gcp: "Google Cloud" };
-  function lvCol(l) { return l >= 3 ? COL.out : l === 2 ? COL.deg : l === 1 ? COL.minor : l === 0 ? COL.ok : COL.na; }
+  function lvCol(l) { return l >= 2 ? COL.out : l === 1 ? COL.watch : l === 0 ? COL.ok : COL.na; }
   function lvName(l) { return l >= 3 ? "Major outage" : l === 2 ? "Disruption" : l === 1 ? "Minor issue" : l === 0 ? "Normal" : "No live data"; }
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   var SKY = { on: false };
@@ -399,8 +399,8 @@
     });
   }
 
-  /* pt1810u: choropleth of IODA internet status. Green normal, amber degraded, red outage, grey = IODA has no live data for it. */
-  function inetCol(l) { return l >= 3 ? COL.out : l === 2 ? COL.deg : l === 0 ? COL.ok : COL.na; }
+  /* IODA internet status. Green normal, red disruption or outage (same as Status cards), grey = IODA has no live data. */
+  function inetCol(l) { return l >= 2 ? COL.out : l === 0 ? COL.ok : COL.na; }
   function applyInet() {
     if (!INET || !INETG || !map || !map.getSource("inet")) return;
     var P = INET.places || {};
@@ -1374,7 +1374,7 @@
     var counts = SKY.groups.map(function (g) { return '<li><i style="background:' + SKYC[g.id] + '"></i>' + esc(g.name) + '<b>' + (mob && g.total >= 1000 ? (g.total / 1000).toFixed(1) + 'k' : num(g.total)) + '</b></li>'; }).join("");
     var h = '<p class="nx-k">Constellations</p><ul class="nx-cnt">' + counts + '</ul>';
     if (w && w.ok) {
-      var col = w.gnss === "Degraded" ? COL.out : w.gnss === "Watch" ? COL.deg : COL.ok;
+      var col = w.gnss === "Degraded" ? COL.out : w.gnss === "Watch" ? COL.watch : COL.ok;
       h += '<p class="nx-k" style="margin-top:12px">Space weather</p><p class="nx-swl"><i style="background:' + col + '"></i>GPS and satellite links: <b>' + esc(w.gnss) + '</b></p>' +
         '<p class="nx-swm">Radio R' + w.scales.R + ' · Radiation S' + w.scales.S + ' · Geomagnetic G' + w.scales.G + (w.kp != null ? ' · Kp ' + Number(w.kp).toFixed(1) : '') + '</p>' +
         '<p class="nx-swm' + (w.gnss === "Normal" ? ' nx-imp' : '') + '">' + esc((w.impacts || [])[0] || "") + '</p><p class="nx-swm">' + linkA(w.source_url, "NOAA SWPC") + ' · ' + linkA(w.jamming.url, "GPS jamming map") + ' · Orbits ' + linkA("https://celestrak.org/", "CelesTrak") + '</p>';

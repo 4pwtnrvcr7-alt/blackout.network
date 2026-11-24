@@ -138,7 +138,7 @@ body.nx-more-on .nx-more{transform:none;visibility:visible}
 .nx-g b{display:block;font:700 18px Montserrat,Inter,sans-serif}.nx-g span{font-size:11.5px;color:var(--nx-mu)}
 .nx-nojs{position:fixed;inset:auto 16px 16px;z-index:50}
 
-:root{--nx-deg:#FF7A1A;--nx-dc:#7FD4FF}
+:root{--nx-deg:#FF3B3B;--nx-dc:#7FD4FF}  /* disruption matches Status cards (red), same as --nx-out */
 .nx-map{background:#232a3a}
 /* ---------- loader: a glowing network being built node by node; progress = real preload ---------- */
 .nx-ld{position:fixed;inset:0;z-index:40;background:#03040a;transition:opacity .7s var(--nx-ease),visibility .7s}
