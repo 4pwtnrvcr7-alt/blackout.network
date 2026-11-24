@@ -1,0 +1,76 @@
+"""Sky view Launches chip (Nov 24 2026, pt1824u): LL2 parsing, modeled paths, landing outcome, failure marker, caching rules."""
+import os, sys, json, re, shutil, tempfile, unittest, copy
+APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, APP)
+os.environ["BN_NETMAP_WARM"] = "0"
+FIX = os.path.join(APP, "tests", "fixtures", "ll2_launch_window.json")
+
+class Launches(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(); os.environ["BN_STATE_DIR"] = self.tmp
+        os.makedirs(os.path.join(self.tmp, "bn_launch")); shutil.copy(FIX, os.path.join(self.tmp, "bn_launch", "ll2_window.json"))
+        import netlaunch; self.N = netlaunch; netlaunch._MEM.clear()
+    def tearDown(self): shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def by(self, d, key): return next(l for l in d["launches"] if key in l["name"])
+
+    def test_parse_and_model(self):
+        d = self.N.launches()
+        self.assertEqual(d["count"], 3); self.assertIsNone(d["error"])
+        self.assertIn("not telemetry", d["modeled"])
+        a = self.by(d, "USSF-266")   # polar from Vandenberg, droneship OCISLY 574 km downrange, landed
+        self.assertAlmostEqual(a["azimuth"], 180.0, delta=1)
+        self.assertEqual(a["landing"]["where"], "OCISLY"); self.assertIs(a["landing"]["success"], True)
+        self.assertEqual(a["timeline_source"], "LL2 mission timeline")
+        lon, lat = a["booster"][-1][:2]; self.assertAlmostEqual(lat, 34.632 - 574 / 111.2, delta=0.3); self.assertEqual(a["booster"][-1][2], 0)
+        self.assertEqual(a["ascent"][0][:3], [-120.611, 34.632, 0])
+        alts = [p[2] for p in a["ascent"]]; self.assertTrue(all(b >= x for x, b in zip(alts, alts[1:])))
+        self.assertTrue(60000 <= next(p[2] for p in a["ascent"] if p[3] >= 149) <= 80000)   # staging ~65-80 km
+        ks = [b["k"] for b in a["labels"]]
+        for k in ("liftoff", "maxq", "sep", "seco", "land", "orbit"): self.assertIn(k, ks)
+        sep = next(b for b in a["labels"] if b["k"] == "sep"); self.assertIn("T+2:29", sep["text"])
+        r = self.by(d, "NROL-136")   # return to launch site LZ-4: booster ends at the LL2 coordinates
+        self.assertEqual(r["landing"]["type"], "RTLS")
+        self.assertAlmostEqual(r["booster"][-1][0], -120.615193, places=3); self.assertAlmostEqual(r["booster"][-1][1], 34.632994, places=3)
+        s = self.by(d, "Shenzhou 24")
+        self.assertEqual(s["booster"], []); self.assertIsNone(s["landing"]); self.assertAlmostEqual(s["inclination"], 41.47)
+
+    def test_failure_and_landing_failure(self):
+        j = json.load(open(FIX)); r = copy.deepcopy(j["results"][0])
+        r["status"] = {"abbrev": "Failure", "name": "Launch Failure"}; r["failreason"] = ""
+        r["rocket"]["launcher_stage"][0]["landing"]["success"] = False
+        m = self.N.model(r)
+        ks = [b["k"] for b in m["labels"]]; self.assertIn("fail", ks); self.assertIn("landfail", ks)
+        self.assertIn("not published", next(b for b in m["labels"] if b["k"] == "fail")["text"])
+
+    def test_durations(self):
+        self.assertEqual(self.N._dur("PT2M26S"), 146); self.assertEqual(self.N._dur("-PT3S"), -3); self.assertEqual(self.N._dur("P0D"), 0)
+        self.assertEqual(self.N._dur("PT1H6M"), 3960)
+
+    def test_route_and_no_network_when_fresh(self):
+        import netmap, urllib.request
+        real = urllib.request.urlopen
+        urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(AssertionError("fetched while cache fresh"))
+        try:
+            code, body, ct = netmap.handle_get("/api/netmap/launches")
+        finally:
+            urllib.request.urlopen = real
+        self.assertEqual((code, ct), (200, "application/json")); self.assertEqual(json.loads(body)["count"], 3)
+        self.assertEqual(netmap.handle_get("/api/netmap/launches.js")[0], 200)
+        self.assertGreaterEqual(self.N.MAX_AGE, 600)   # LL2 free tier ~15 calls/h
+
+    def test_js_rules(self):
+        js = open(os.path.join(APP, "netmap_static", "launches.js"), encoding="utf-8").read()
+        net = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
+        mine = set(re.findall(r"function (\w+)\s*\(", js)); theirs = set(re.findall(r"function (\w+)\s*\(", net))
+        self.assertEqual(mine & theirs, set())
+        self.assertIn("not telemetry", js)
+        low = re.sub(r"/\*.*?\*/", "", js.lower(), flags=re.S)
+        self.assertNotIn("yellow", low)
+        for c in ("#f5d547", "#f5a524", "#ffcc00", "#facc15"): self.assertNotIn(c, low)
+        self.assertNotIn("<img", low)   # no imagery in the launch view
+        import netpages
+        self.assertIn("/api/netmap/launches.js", netpages.handle_get("/grid", {})[1])
+
+if __name__ == "__main__":
+    unittest.main()

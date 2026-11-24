@@ -1052,7 +1052,7 @@
     (function tick(now) {
       SKY.spinRaf = requestAnimationFrame(tick);
       var dt = Math.min(64, now - last); last = now;
-      if (!SKY.on || SKY.spinPaused || SKY.sel != null || document.hidden) return;
+      if (!SKY.on || SKY.spinPaused || SKY.sel != null || window.__nxSpinHold || document.hidden) return;   /* launches.js holds the spin while a launch is open */
       var c = map.getCenter(); map.setCenter([c.lng + 1.5 * dt / 1000, c.lat]);   /* ~4 minutes per revolution */
     })(last);
   }
