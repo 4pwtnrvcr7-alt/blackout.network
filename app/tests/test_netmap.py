@@ -21,13 +21,34 @@ class NetMap(unittest.TestCase):
         for f in ("net.css", "net.js"):
             t = open(os.path.join(APP, "netmap_static", f), encoding="utf-8").read().lower()
             # Nov 24 2026 (Matt): the one allowed yellow is the 230 kV+ line status colour (LCOL.strain #F5D547) and its legend words
-            t = t.replace("yellow strained or warning", "").replace('strain: "#f5d547"', "")
+            t = t.replace("yellow strained or warning", "").replace('strain: "#f5d547"', "").replace('1: "#f5d547"', "")   # + the undersea cable status yellow (CCOL[1], pt1812u)
             self.assertNotIn("yellow", re.sub(r"/\*.*?\*/", "", t, flags=re.S))
             self.assertNotIn("f5d547", t)
             self.assertNotIn("tile.openstreetmap.org", t)
             for c in ("#f5a524", "#ffd", "#ffcc00", "#ffeb3b", "#fde047", "#facc15", "#ff9900"): self.assertNotIn(c, t)
             self.assertIn("prefers-reduced-motion", t) if f == "net.js" else None
         self.assertIn("25000", open(os.path.join(APP, "netmap_static", "net.js")).read())
+
+    def test_power_line_status_colours(self):
+        """Regression (pt1816u, Nov 24 2026): U.S. 230 kV+ lines must stay green / yellow / red by operator status, never one colour."""
+        js = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
+        self.assertIn('var LCOL = { ok: "#2FD67B", strain: "#F5D547", out: "#FF3B3B", na: "#7C8190" }', js)
+        self.assertRegex(js, r'OPS\.forEach\(function \(o\) \{ e\.push\(\["within", o\.g\], LCOL\[opSt\(o\.id\)\]')
+        for lid in ("gl-lo", "gl-hi"):   # both line layers paint with the status expression, not the old single-hue kV ramp
+            m = re.search(r'id: "' + lid + r'".*?"line-color": (\w+)\(\)', js, re.S)
+            self.assertEqual(m.group(1), "lineCol", lid)
+        self.assertIn('document.addEventListener("gx:status", gridColor)', js)
+        self.assertIn('then(function (j) { OPS = j.ops || []; gridColor(); })', js)
+        gl = open(os.path.join(APP, "netmap_static", "gridlayer.js"), encoding="utf-8").read()
+        self.assertIn('window.__gxRegionStatus = rs', gl)
+        self.assertIn('new CustomEvent("gx:status")', gl)
+        # every operator outline has a live status id, so lines can take more than one colour
+        ops = __import__("json").load(open(os.path.join(APP, "netmap_static", "gridops.json")))["ops"]
+        self.assertGreaterEqual(len(ops), 8)
+        for o in ops: self.assertIn(o["g"]["type"], ("Polygon", "MultiPolygon"))
+        # the normal internet tint must not wash the lines green while Power grid is on
+        self.assertIn('map.setPaintProperty("inet-fill", "fill-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"])', js)
+        self.assertIn("l: l, o: l >= 3", js)
 
     def test_boot_loader(self):
         """Nov 24 2026 (pt1795u): the loader is the old /grid "Energizing the grid" animation (boot.js kept in the repo, no longer loaded).
