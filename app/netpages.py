@@ -20,7 +20,7 @@ BASE = os.path.dirname(os.path.abspath(__file__)); SITE = "https://blackout.netw
 UA = "BlackoutNetwork-status/1.0 (+https://blackout.network/grid; cached 10 min)"
 TTL = 600
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
-LVC = {0: "#2BB673", 1: "#F5A524", 2: "#FF7A1A", 3: "#FF4D4F", -1: "#5b6573"}
+LVC = {0: "#2BB673", 1: "#FFA040", 2: "#FF3B3B", 3: "#FF3B3B", -1: "#5b6573"}  # same as Status cards: amber minor, red disruption/outage
 LVN = {0: "Operational", 1: "Minor issue", 2: "Degraded", 3: "Major outage", -1: "Feed unreachable"}
 
 # ---------------------------------------------------------------- time (US Eastern without tzdata; python:slim has none)
@@ -535,7 +535,7 @@ def ext(url, text): return f'<a href="{E(url)}" target="_blank" rel="noopener">{
 # ---------------------------------------------------------------- page styles (Signal: near-black + red, Montserrat headings, Inter body)
 CSS = """
 .wrap{max-width:1120px!important}
-.np{--hot:#FF4D4F;--line:var(--bd,#232a33);font-family:var(--bn-font-body,Inter,system-ui,sans-serif)}
+.np{--hot:#FF3B3B;--line:var(--bd,#232a33);font-family:var(--bn-font-body,Inter,system-ui,sans-serif)}
 .np h1,.np h2,.np h3{font-family:var(--bn-font-ui,Montserrat,system-ui,sans-serif);letter-spacing:-.01em}
 .np-ic{width:20px;height:20px;flex:none}.np-ic.sm{width:14px;height:14px}
 .np-hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:18px;padding:20px;margin:6px 0 16px;background:radial-gradient(120% 140% at 100% 0,rgba(200,16,46,.2),transparent 55%),var(--pn,#12161b)}
@@ -606,10 +606,10 @@ html[data-theme=light] .np-hero,html[data-theme=light] .np-sec,html[data-theme=l
 JS = """<script>document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-copy]");if(!b)return;var el=document.getElementById(b.dataset.copy),t=el.innerText;
 (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(function(){b.textContent="Copied";setTimeout(function(){b.textContent="Copy"},1800)}).catch(function(){var r=document.createRange();r.selectNodeContents(el);var s=getSelection();s.removeAllRanges();s.addRange(r)})});
 document.querySelectorAll(".np-steps input[type=checkbox]").forEach(function(c){var k="np_ck_"+c.id;try{c.checked=localStorage.getItem(k)==="1"}catch(_){}c.addEventListener("change",function(){try{localStorage.setItem(k,c.checked?"1":"0")}catch(_){}})});</script>"""
-LEG = '<div class="np-legend"><span><i style="background:#2BB673"></i>Operational</span><span><i style="background:#F5A524"></i>Minor</span><span><i style="background:#FF7A1A"></i>Degraded</span><span><i style="background:#FF4D4F"></i>Major</span><span><i style="border:1px dashed #3a424d"></i>No data</span></div>'
+LEG = '<div class="np-legend"><span><i style="background:#2BB673"></i>Operational</span><span><i style="background:#FFA040"></i>Minor</span><span><i style="background:#FF3B3B"></i>Degraded</span><span><i style="background:#FF3B3B"></i>Major</span><span><i style="border:1px dashed #3a424d"></i>No data</span></div>'
 
 def inc_card(i, active=False):
-    c = LVC.get(i.get("sev", 1), "#F5A524")
+    c = LVC.get(i.get("sev", 1), "#FFA040")
     w = when(i) + (f' → {fmt_et(i["end"])}' if i.get("end") else (" · long-running, still open" if i.get("longrun") else (" · ongoing" if active else "")))
     sv = i.get("services") or []
     tags = "".join(f'<span class="np-tag" title="{E(x)}">{ic("globe", "np-ic sm")} {E(x)}</span>' for x in (i.get("regions") or [])[:6]) + "".join(f'<span class="np-tag" title="{E(x)}">{E(x)}</span>' for x in sv[:8])
@@ -644,7 +644,7 @@ def render(slug):
             tot = max(1, g["total"]); okp = 100 * g["ok"] / tot; mp = 100 * g["maint"] / tot; bp = max(0, 100 - okp - mp)
             tiles.append(f'<div class="np-t"><b><i style="background:{LVC[0 if g["bad"] == 0 else (1 if g["bad"] < 3 else 2)]}"></i>{ic("globe", "np-ic sm")}{E(g["name"])}</b><small>{g["ok"]} of {g["total"]} sites normal'
                          + (f' · {g["maint"]} in maintenance' if g["maint"] else "") + (f' · {g["bad"]} degraded or re-routed' if g["bad"] else "") + '</small>'
-                         f'<div class="np-meter" role="img" aria-label="{g["ok"]} normal, {g["maint"]} maintenance, {g["bad"]} degraded"><span style="width:{okp:.1f}%;background:#2BB673"></span><span style="width:{mp:.1f}%;background:#4aa3ff"></span><span style="width:{bp:.1f}%;background:#FF7A1A"></span></div>'
+                         f'<div class="np-meter" role="img" aria-label="{g["ok"]} normal, {g["maint"]} maintenance, {g["bad"]} degraded"><span style="width:{okp:.1f}%;background:#2BB673"></span><span style="width:{mp:.1f}%;background:#4aa3ff"></span><span style="width:{bp:.1f}%;background:#FF3B3B"></span></div>'
                          + (f'<small>{E(", ".join(g["worst"][:3]))}</small>' if g["worst"] else "") + '</div>')
         svc = [k for g in d["groups"] if g["small"] for k in g["kids"]] + (d.get("components") or [])
         if tiles: comp += f'<h3 class="np-h3">Edge data centers by region</h3><div class="np-tiles">{"".join(tiles)}</div><p class="np-mu" style="margin-top:6px">Green = normal, blue = planned maintenance, orange = degraded or re-routed. A few sites re-routed at any time is normal; traffic moves to the next site.</p>'
@@ -660,7 +660,7 @@ def render(slug):
         comp += f'<p class="np-mu" style="margin-top:10px">{E(p["name"])} does not publish a public per-region component list; when an incident is open, its regions and services appear on the incident above.</p>'
     sec_live = f'<section class="np-sec" id="live"><h2>{ic("eye")}Live status</h2><p class="np-sub">From {E(", ".join(f[0] for f in p["feeds"]))}. Times in Eastern (ET).</p>{live}{comp}</section>'
     days = "".join(f'<div class="np-day"><b style="color:{LVC[0] if x["pct"] >= 99.5 else (LVC[1] if x["pct"] >= 95 else LVC[3])}">{x["pct"]:.0f}%</b>{E(x["day"])}</div>' for x in mon.get("days", [])[-8:])
-    runs = "".join(f'<li style="--c:{LVC.get(r["level"], "#F5A524")}"><div class="w">{E(fmt_et(pdt(r["start"])))} → {"ongoing" if r.get("open") else E(fmt_et(pdt(r["end"])))}</div><h3>{E(r["status"])}</h3>'
+    runs = "".join(f'<li style="--c:{LVC.get(r["level"], "#FFA040")}"><div class="w">{E(fmt_et(pdt(r["start"])))} → {"ongoing" if r.get("open") else E(fmt_et(pdt(r["end"])))}</div><h3>{E(r["status"])}</h3>'
                    + (f'<p>{E(r["detail"][:240])}</p>' if r.get("detail") else "") + '</li>' for r in mon.get("runs", [])[:6])
     sec_mon = (f'<section class="np-sec"><h2>{ic("chart")}Our 5-minute checks · last 7 days</h2><p class="np-sub">We read {E(p["name"])}\'s official status every 5 minutes. Each sliver is one hour, colored by the worst status seen; the daily figure is the share of checks with no degraded or major status.'
                + (f' Stored since {E(fmt_et(pdt(mon["first"])))}.' if mon.get("first") else "") + '</p>' + hour_strip(mon.get("hours"))
@@ -785,7 +785,7 @@ HUBQ = ('<div class="np-hubq"><b>{pin}Networks near me</b><form action="/grid/ne
 
 # ---------------------------------------------------------------- accordion for the dashboard's Network Status tab (enhances #ns_list rows in place)
 ACC_JS = r"""(function(){
-var MAP=__MAP__,OPEN={},CACHE={},C={0:"#2BB673",1:"#F5A524",2:"#FF7A1A",3:"#FF4D4F","-1":"#5b6573"};
+var MAP=__MAP__,OPEN={},CACHE={},C={0:"#2BB673",1:"#FFA040",2:"#FF3B3B",3:"#FF3B3B","-1":"#5b6573"};
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function css(){if(document.getElementById("nsa-css"))return;var s=document.createElement("style");s.id="nsa-css";s.textContent=
 ".nsa{margin:3px 0;border-radius:8px;background:var(--bn-surface,#161b21);border:1px solid transparent;min-width:0}.nsa.open{border-color:rgba(200,16,46,.55)}"+
