@@ -574,7 +574,7 @@ def page(qs=None):
     desc = ("Is it down right now? Plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, banking, apps and government "
             "services, from official status pages, IODA internet measurements and user reports, plus chain reactions, an incident log, a data center map and a live satellite globe.")
     skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="true"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
-    chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="{"true" if k in ("internet", "power", "cloud") else "false"}"><i></i>{E(t)}</button>' for k, t in CHIPS)
+    chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="true"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
 <title>{E(title)}</title><meta name="description" content="{E(desc)}">
@@ -589,8 +589,8 @@ def page(qs=None):
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/netmap/net.css?v={_v("net.css")}">
 <script src="/sitenav.js" defer></script>
 <link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}">
-</head><body class="nx nx-board">
-<script>(function(){{var h=location.hash;if(h==="#map"||h==="#sky"){{document.body.classList.remove("nx-board");}}}})()</script>
+</head><body class="nx">
+<script>(function(){{if(location.hash==="#status"){{document.body.classList.add("nx-board");}}}})()</script>
 <a class="skip" href="#nb_q">Skip to the outage search</a>
 <div class="nx-head">{top}</div>
 <script>(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
@@ -599,11 +599,11 @@ def page(qs=None):
 <div id="nx_map" class="nx-map" role="region" aria-label="Map of network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
 {BOARD}
-<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="true">Status</button><button type="button" data-m="map" aria-pressed="false">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
+<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
-<div class="nx-side"><aside class="nx-sea" id="nx_sea" hidden aria-label="Undersea cable chokepoints"></aside><aside class="nx-inf" id="nx_inf" hidden aria-label="Infrastructure layers"></aside></div>
+<div class="nx-side"><aside class="nx-sea" id="nx_sea" hidden aria-label="Undersea cable chokepoints"></aside></div>
 <div class="nx-ctl"><button type="button" class="nx-b" id="nx_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>

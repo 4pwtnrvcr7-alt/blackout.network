@@ -101,13 +101,22 @@
         step(k, 1); throw e; });
   }
   window.__nxStep = step;   /* board.js reports its own preload (reports + timeline) */
-  var pData = retry("/api/netmap/data", "nets", 3), pDc = retry("/api/netmap/dc", "dc", 2), pWorld = getJSON("/api/signal/world.geojson");
+  /* pt1787u: the page shows only services with a live signal; feedless ("No live signal") and link-only entries are dropped,
+     and the counts are recomputed from what is shown. board.js reads the same filtered object. */
+  function liveOnly(j) {
+    if (!j || !j.nets) return j;
+    var ns = j.nets.filter(function (n) { return !n.link_only && n.level >= 0; }), s = {}, k;
+    for (k in (j.summary || {})) s[k] = j.summary[k];
+    s.networks = ns.length; s.ok = ns.filter(function (n) { return n.level <= 1; }).length; s.issues = ns.filter(function (n) { return n.level >= 2; }).length; s.unknown = 0; s.no_signal = 0;
+    j.nets = ns; j.summary = s; j.live_only = true; return j;
+  }
+  window.__nxLive = liveOnly;
+  var pData = retry("/api/netmap/data", "nets", 3).then(liveOnly), pDc = retry("/api/netmap/dc", "dc", 2), pWorld = getJSON("/api/signal/world.geojson");
   pData.then(function () { step("out", 0.5); }, function () {});
   setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, map = null, ready = false;
-  var ON = { internet: true, power: true, cloud: true, dc: false, mobile: false, sat: false, pay: false, apps: false, sea: false, towers: false, grid: false };
-  try { var sv = JSON.parse(localStorage.getItem("bn_net_layers") || "null"); if (sv && typeof sv === "object") for (var k0 in ON) if (k0 in sv) ON[k0] = !!sv[k0]; } catch (e) {}
+  var ON = { internet: true, power: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
   function boot() {
@@ -418,7 +427,6 @@
   document.querySelectorAll("#nx_f button").forEach(function (b) {
     b.addEventListener("click", function () {
       var k = b.dataset.k; ON[k] = !ON[k];
-      try { localStorage.setItem("bn_net_layers", JSON.stringify(ON)); } catch (e) {}
       vis(); if (D) list();
       if (ON[k] && k === "dc" && map) map.easeTo({ zoom: Math.max(map.getZoom(), 2.6), duration: reduce ? 0 : 700 });
       if (ON[k] && ["mobile", "sat", "pay", "apps"].indexOf(k) >= 0) { more(true); var g = $("nxg-" + GMAP[k][0]); if (g) setTimeout(function () { g.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); }, 420); }
@@ -586,15 +594,16 @@
     if (board && SKY.on) setMode("map");   /* leave the globe first, so its own button state does not win */
     document.body.classList.toggle("nx-board", board);
     document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === v ? "true" : "false"); });
-    if (board) { hideCard(true); document.body.classList.remove("nx-more-on"); try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} return; }
+    if (board) { hideCard(true); document.body.classList.remove("nx-more-on"); try { history.replaceState(null, "", "#status"); } catch (e) {} return; }
     if (map) { map.resize(); if (v === "map" && !SKY.on) { try { history.replaceState(null, "", "#map"); } catch (e) {} } setMode(v); }
   }
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.addEventListener("click", function () { view(b.dataset.m); }); });
-  if (!document.body.classList.contains("nx-board")) document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === (location.hash === "#sky" ? "sky" : "map") ? "true" : "false"); });
+  var m0 = document.body.classList.contains("nx-board") ? "status" : location.hash === "#sky" ? "sky" : "map";   /* pt1787u: Map is the default view */
+  document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m0 ? "true" : "false"); });
   document.querySelectorAll("#nx_sf button").forEach(function (b) {
     b.addEventListener("click", function () { var g = b.dataset.g; SKY.show[g] = !(SKY.show[g] !== false); b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false"); prop(); });
   });
 
   /* ---------- live refresh every 5 minutes ---------- */
-  setInterval(function () { if (document.hidden) return; getJSON("/api/netmap/data").then(function (j) { D = j; applyData(); try { document.dispatchEvent(new CustomEvent("nx:data", { detail: j })); } catch (e) {} }, function () {}); }, 300000);
+  setInterval(function () { if (document.hidden) return; getJSON("/api/netmap/data").then(function (j) { D = liveOnly(j); applyData(); try { document.dispatchEvent(new CustomEvent("nx:data", { detail: j })); } catch (e) {} }, function () {}); }, 300000);
 })();
