@@ -306,7 +306,18 @@
     PTS = f; vis(); summary(); list(); if (WORLD) applyWorld();
   }
   function feat(lon, lat, p) { return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: p }; }
+  function leg() {
+    var box = $("nx_leg"); if (!box) return;
+    box.querySelectorAll("[data-leg]").forEach(function (el) { el.hidden = !ON[el.getAttribute("data-leg")]; });
+  }
+  function key() {
+    var btn = $("nx_leg_btn"), body = $("nx_leg_body"); if (!btn || !body) return;
+    var open = body.hidden;
+    body.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
   function vis() {
+    leg();
     if (!map || !map.getSource("pts")) return;
     if (SKY.on) return;
     ON.power = ON.ops = !!ON.grid;   /* Nov 24 2026 (Matt): one "Power grid" chip runs outages, operators and the 230 kV+ lines */
@@ -499,7 +510,7 @@
     fetch("/api/netmap/gridops.json").then(function (r) { return r.json(); }).then(function (j) { OPS = j.ops || []; gridColor(); }).catch(function () {});
     function freq() { fetch("/api/netmap/gridfreq").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) {
       FST = {}; FOPS = (j.areas || []).map(function (a) { FST[a.id] = a.status; return { id: a.id, name: a.name, g: a.g, fr: a }; }); if (OPS) OPS.__f = 0; gridColor(); infPanel();
-      var lv = $("gx_live"); if (lv) lv.textContent = "Live line status: U.S., " + FOPS.map(function (a) { return a.name.replace(/ synchronous grid| grid \(NESO\)/, ""); }).join(", ") + ". Grey: no free live feed."; }).catch(function () {}); }
+      var lv = $("gx_live"); if (lv) lv.textContent = "Live: U.S., " + FOPS.map(function (a) { return a.name.replace(/ synchronous grid| grid \(NESO\)/, "").replace("Continental Europe", "Europe").replace("Great Britain", "GB"); }).join(", "); }).catch(function () {}); }
     freq(); setInterval(function () { if (!document.hidden) freq(); }, 300000);
     map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 8 });
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = ON.grid && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
@@ -565,6 +576,12 @@
       vis(); if (D) list();
       if (ON[k] && k === "dc" && map) map.easeTo({ zoom: Math.max(map.getZoom(), 2.6), duration: reduce ? 0 : 700 });
     });
+  });
+  if ($("nx_leg_btn")) $("nx_leg_btn").addEventListener("click", function (e) { e.stopPropagation(); key(); });
+  document.addEventListener("click", function (e) {
+    var box = $("nx_leg"), body = $("nx_leg_body"), btn = $("nx_leg_btn");
+    if (!box || !body || body.hidden || box.contains(e.target)) return;
+    body.hidden = true; if (btn) btn.setAttribute("aria-expanded", "false");
   });
   vis();
   $("nx_zin").onclick = function () { map && map.zoomIn(); };
@@ -1141,7 +1158,7 @@
     var sky = m === "sky"; if (sky === SKY.on || !map) return;
     SKY.on = sky; document.body.classList.toggle("nx-sky", sky);
     document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"); });
-    $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = !sky; if ($("nx_ss")) $("nx_ss").hidden = !sky; $("nx_leg").hidden = sky; hideCard(true);
+    $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = !sky; if ($("nx_ss")) $("nx_ss").hidden = !sky; $("nx_leg").hidden = sky; if (sky) { var lb = $("nx_leg_body"), lt = $("nx_leg_btn"); if (lb) lb.hidden = true; if (lt) lt.setAttribute("aria-expanded", "false"); } hideCard(true);
     if (sky) SEA_L.concat(INF_L).forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
     try { history.replaceState(null, "", sky ? "#sky" : "#map"); } catch (e) {}
     ["cty-fill", "cty-line", "inet-fill", "inet-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });

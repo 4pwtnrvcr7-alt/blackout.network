@@ -96,6 +96,35 @@ class NetMap(unittest.TestCase):
             self.assertTrue((n[5] is None and n[3] == "watch" or n[5].startswith("https://")) and n[6].startswith("https://"), n[0])   # feedless banks have no status page
             self.assertIn(n[2], {g for g, _ in netmap.GROUPS})
 
+    def test_legend_is_a_collapsed_key(self):
+        """pt1822u: the map key is a collapsed Key pill at the bottom, not a box at the top of the map."""
+        import netpages
+        from pathlib import Path
+        b = netpages.handle_get("/grid", {})[1]
+        self.assertIn('id="nx_leg_btn"', b)
+        self.assertIn(">Key</button>", b)
+        self.assertIn('aria-expanded="false"', b)
+        self.assertIn('id="nx_leg_body" hidden', b)
+        self.assertIn('data-leg="internet"', b)
+        self.assertIn('data-leg="grid"', b)
+        self.assertIn('data-leg="hydro"', b)
+        self.assertIn('data-leg="dc"', b)
+        self.assertIn("Live: U.S., Europe, GB, Nordic", b)
+        self.assertNotIn("Live line status:", b)
+        root = Path(__file__).resolve().parents[1] / "netmap_static"
+        css, js = (root / "net.css").read_text(), (root / "net.js").read_text()
+        self.assertIn("function leg(", js)
+        self.assertIn("function key(", js)
+        self.assertIn('lv.textContent = "Live: U.S., "', js)
+        self.assertNotIn("Live line status:", js)
+        self.assertIn(".nx-leg-btn", css)
+        self.assertIn("bottom:calc(66px + env(safe-area-inset-bottom))", css)  # phone: above All networks / Grid details
+        self.assertIn(".nx-leg [hidden]{display:none!important}", css)
+        # later rules must not park the legend at the top of the map
+        self.assertNotIn(".nx-leg{top:calc(146px + env(safe-area-inset-top));bottom:auto;left:50%", css.replace(" ", ""))
+        self.assertNotIn(".nx-leg{bottom:auto;top:calc(104px + env(safe-area-inset-top));left:50%", css.replace(" ", ""))
+
+
 if __name__ == "__main__":
     unittest.main()
 

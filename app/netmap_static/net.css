@@ -24,10 +24,19 @@ body.nx-ready .nx-map{opacity:1}
 .nx-b:hover,.nx-x:hover{border-color:rgba(240,240,250,.5)}.nx-b:active{transform:scale(.94)}
 .nx-b:focus-visible,.nx-x:focus-visible,.nx-more-btn:focus-visible,.nx-sec summary:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}
 .nx-b svg,.nx-x svg,.nx-more-btn svg,.nx-cx svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.nx-leg{position:fixed;z-index:20;left:calc(14px + env(safe-area-inset-left));bottom:calc(18px + env(safe-area-inset-bottom));padding:12px 14px;border-radius:14px;background:rgba(5,6,10,.7);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);font-size:12px;color:var(--nx-mu)}
+/* pt1822u: collapsed Key pill at the bottom edge of the map; tap to expand. Desktop bottom-left, phone bottom-right so it does not cover All networks / Grid details. */
+.nx-leg{position:fixed;z-index:20;left:calc(14px + env(safe-area-inset-left));bottom:calc(18px + env(safe-area-inset-bottom));top:auto;transform:none;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:8px;padding:0;border:0;border-radius:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;font-size:12px;color:var(--nx-mu);white-space:normal}
+.nx-leg-btn{all:unset;box-sizing:border-box;cursor:pointer;padding:7px 12px;border-radius:99px;background:rgba(5,6,10,.78);border:1px solid rgba(240,240,250,.28);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);font:600 10.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--nx-tx)}
+.nx-leg-btn:hover{border-color:rgba(240,240,250,.6);background:rgba(20,22,30,.85)}
+.nx-leg-btn:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}
+.nx-leg-btn[aria-expanded="true"]{border-color:rgba(240,240,250,.5)}
+.nx-leg-body{padding:10px 12px;border-radius:14px;background:rgba(5,6,10,.86);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);max-width:min(260px,calc(100vw - 28px));max-height:min(46dvh,calc(100dvh - 120px));overflow:auto}
+.nx-leg-body[hidden],.nx-leg [hidden]{display:none!important}
 .nx-leg ul{list-style:none;margin:0 0 6px;padding:0;display:grid;gap:5px}
+.nx-leg ul:last-child{margin-bottom:0}
 .nx-leg li{display:flex;align-items:center;gap:8px}
 .nx-leg i{flex:none;width:10px;height:10px;border-radius:50%}
+body.nx-more-on .nx-leg,body.gx-more-on .nx-leg{opacity:0;pointer-events:none}
 .nx-k{margin:0 0 6px;font:600 10px/1 Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,240,250,.42)}
 .nx-leg i.s-ok{background:var(--nx-ok)}.nx-leg i.s-strain{background:var(--nx-strain)}.nx-leg i.s-out{background:var(--nx-out)}.nx-leg i.s-na{background:var(--nx-na)}
 .nx-shapes i{background:none;border:1.6px solid var(--nx-tx)}
@@ -65,9 +74,8 @@ body.nx-more-on .nx-more-btn{opacity:0;pointer-events:none}
 .nx-spark polyline{fill:none;stroke-width:1.6;vector-effect:non-scaling-stroke}
 @media (max-width:767px){
  .nx-card{left:10px!important;right:10px;top:auto!important;bottom:calc(76px + env(safe-area-inset-bottom));width:auto;max-height:58dvh;overflow:auto}
- .nx-leg{bottom:auto;top:calc(104px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);padding:7px 12px;border-radius:99px;font-size:10.5px;white-space:nowrap}
  .nx-leg .nx-k,.nx-leg .nx-shapes{display:none}
- .nx-leg ul{display:flex;gap:12px;margin:0}.nx-leg i{width:8px;height:8px}
+ .nx-leg i{width:8px;height:8px}
  .nx-chip{font-size:10.5px;letter-spacing:.06em}
  .nx-kpi b{font-size:18px}
  .nx-ctl{top:auto;bottom:calc(84px + env(safe-area-inset-bottom));transform:none}
@@ -138,7 +146,11 @@ body.nx-ready .nx-ld{opacity:0;visibility:hidden;pointer-events:none}
 .nx-f button:focus-visible{outline:2px solid #F2F2F4;outline-offset:1px}
 @media (max-width:767px){.nx-f{top:calc(100px + env(safe-area-inset-top));left:0;right:0;transform:none;max-width:none}}
 .nx-leg i.s-deg{background:var(--nx-deg)}.nx-leg i.s-dc{background:var(--nx-dc);width:7px;height:7px;margin:0 1.5px}
-@media (max-width:767px){.nx-leg{top:auto;bottom:calc(76px + env(safe-area-inset-bottom));left:12px;transform:none}}
+@media (max-width:767px){
+ .nx-leg{top:auto;left:calc(12px + env(safe-area-inset-left));right:auto;bottom:calc(66px + env(safe-area-inset-bottom));transform:none;align-items:flex-start;padding:0;border-radius:0;white-space:normal}
+ .nx-leg-btn{padding:6px 11px;font-size:10px}
+ .nx-leg-body{max-width:min(220px,calc(100vw - 24px));font-size:10px}
+}
 .nx-chip.s-deg i{background:var(--nx-deg)}
 /* ---------- list ---------- */
 .nx-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -165,11 +177,8 @@ body.nx-ready .nx-ld{opacity:0;visibility:hidden;pointer-events:none}
 .nx-acts a{display:inline-flex;align-items:center;padding:7px 12px;border-radius:99px;border:1px solid rgba(240,240,250,.3);color:var(--nx-tx);text-decoration:none;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
 .nx-acts a:hover{border-color:rgba(240,240,250,.7)}
 .nx-src{font-size:12px;color:var(--nx-mu);margin-top:26px}.nx-src a{color:var(--nx-tx)}
-@media (max-width:767px){
- .nx-leg{top:calc(146px + env(safe-area-inset-top));bottom:auto;left:50%;transform:translateX(-50%)}
 
-}
-@media (max-width:767px){.nx-leg{font-size:10px;padding:6px 11px}.nx-leg ul{gap:10px}}
+@media (max-width:767px){.nx-leg{font-size:10px}.nx-leg ul{gap:6px}}
 /* stage 2: an opaque layer under the map so the site footer never shows through while the map fades in; theme-proof pill button */
 body.nx::before{content:"";position:fixed;inset:0;background:#232a3a;pointer-events:none}
 html body.nx button#nx_more_btn.nx-more-btn{border-radius:99px!important}
@@ -180,7 +189,7 @@ html body.nx .nx-mode button{all:unset;cursor:pointer;padding:6px 12px;border-ra
 html body.nx .nx-mode button[aria-pressed="true"]{background:rgba(240,240,250,.16);color:var(--nx-tx)}
 .nx-mode button:focus-visible{outline:2px solid #F2F2F4;outline-offset:1px}
 .nx-top .nx-chip{min-width:0}
-.nx-f[hidden],.nx-sw[hidden],.nx-leg[hidden]{display:none!important}
+.nx-f[hidden],.nx-sw[hidden],.nx-leg[hidden],.nx-leg-body[hidden]{display:none!important}
 .nx-sf button i{border-width:1px}
 .nx-sf button[aria-pressed="false"] i{background:transparent!important}
 body.nx-sky .nx-map{background:#03040a}
@@ -253,10 +262,10 @@ body.nx-board .nx-side,body.nx-sky .nx-side{display:none}
 .pin .st,.pin h3{touch-action:none}
 .nx-card.dragged,.gx-card.dragged{left:var(--dx)!important;top:var(--dy)!important;right:auto!important;bottom:auto!important;width:min(320px,calc(100vw - 20px))!important}
 .nx-card .nx-cx,.gx-card .gx-cx{z-index:3}
-.nx-leg .nx-lnk{display:flex;gap:10px;margin:6px 0 0;padding-top:7px;border-top:1px solid var(--nx-bd)}.nx-leg .nx-lnk i.ln{width:14px;height:3px;border-radius:2px}
+.nx-leg .nx-lnk{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 0;padding-top:7px;border-top:1px solid var(--nx-bd)}.nx-leg .nx-lnk i.ln{width:14px;height:3px;border-radius:2px}
 body.nx-sky .nx-lnk,body.nx-sky .nx-live{display:none!important}
-.nx-leg .nx-live{margin:4px 0 0;font-size:10.5px;line-height:1.35;color:rgba(240,240,250,.62);max-width:240px}
-@media (max-width:767px){.nx-leg .nx-live{white-space:normal;max-width:calc(100vw - 48px);font-size:10px}.nx-leg .nx-lnk{display:flex;gap:9px;margin:4px 0 0;padding-top:4px}.nx-leg:has(.nx-lnk){border-radius:14px}}
+.nx-leg .nx-live{margin:4px 0 0;font-size:10.5px;line-height:1.35;color:rgba(240,240,250,.62);max-width:none}
+@media (max-width:767px){.nx-leg .nx-live{white-space:normal;max-width:none;font-size:10px}.nx-leg .nx-lnk{display:flex;flex-wrap:wrap;gap:9px;margin:4px 0 0;padding-top:4px}}
 @media (max-width:767px){body:not(.nx-sky) .nx-side{top:calc(212px + env(safe-area-inset-top))}}
 .nx-chip.s-deg i{background:var(--nx-out)}   /* Nov 24 2026: a network "Disruption" is red, same as the Status cards */
 
