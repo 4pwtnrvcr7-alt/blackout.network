@@ -20,13 +20,13 @@ DEACTIVATED_PAGES = [
     ("Live",                 {"live"},            ["/live", "/dashboard"], "off"),
     ("Background Noise",     {"noise"},           ["/noise"], "unlisted"),
     ("Solar & Seismic",      {"solar_seismic"},   ["/solar", "/solar_seismic", "/solar-seismic"], "off"),
-    ("AI Threats",           {"ai"},              ["/ai", "/aithreats", "/ai-threats"], "off"),
+    ("AI Threats",           {"ai"},              ["/ai", "/aithreats", "/ai-threats"], "unlisted"),
     ("Crime",                {"@crime"},          ["/crime"], "unlisted"),
     ("Starlink",             {"starlink"},        ["/network/starlink", "/grid/starlink"], "off"),
     ("Midterms 2026",        {"midterms"},        ["/midterms", "/election", "/elections"], "off"),
     ("Politics",             {"politics"},        ["/politics"], "unlisted"),
     ("Government",           {"gov"},             ["/government"], "unlisted"),
-    ("Gun Laws",             {"gunlaws"},         ["/gunlaws"], "off"),
+    ("Gun Laws",             {"gunlaws"},         ["/gunlaws"], "unlisted"),
     ("Key Figures",          {"figures"},         ["/figures", "/elon"], "unlisted"),
     ("Preppers",             {"preppers"},        ["/preppers"], "unlisted"),
     ("Local Resources",      {"res"},             ["/resources"], "off"),
@@ -35,7 +35,7 @@ DEACTIVATED_PAGES = [
     ("Bushcraft",            {"bush"},            ["/bushcraft"], "unlisted"),
     ("Sources",              {"sources"},         ["/sources"], "unlisted"),
     ("How We Score",         {"@scoring"},        ["/scoring", "/about/scoring"], "unlisted"),
-    ("SpaceX",               {"spacex"},          ["/spacex"], "off"),   # newsletter_v2 links /spacex, but /spacex is only a tab of /live (no page of its own), so it cannot stay up while /live is off
+    ("SpaceX",               {"spacex"},          ["/spacex"], "unlisted"),   # newsletter_v2 links /spacex, but /spacex is only a tab of /live (no page of its own), so it cannot stay up while /live is off
     ("CERN & LHC",           {"@cern"},           ["/cern", "/lhc"], "off"),
     ("Private Jets",         {"jets"},            ["/jets"], "off"),   # Matt said "private chats" on voice; the menu item is Private Jets
     ("Games",                {"games"},           ["/games"], "unlisted"),

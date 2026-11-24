@@ -44,3 +44,5 @@ html body.solo #tab-preppers [class^=pp-],html body.solo #tab-preppers [class*="
 html body.solo #tab-preppers button,html body.solo #tab-games button:not(.gm-card){border-radius:0!important}
 html body.solo .solo-hero .w2-hl{display:block!important;-webkit-line-clamp:unset!important;line-clamp:unset!important;overflow:visible!important;max-height:none!important;white-space:normal!important}
 html body.solo .solo-main .gd .toc,html body.solo .solo-main .gd .warn,html body.solo .solo-main .gd section,html body.solo .solo-main .gd [class^=bv-]{border-radius:2px!important}
+/* Disclaimer chips are not a "degraded" status — don't use amber/yellow as a brand accent. */
+html body.solo .gl-tag,html body.solo .solo-main [class$="-tag"]:not([class*="rank"]){color:#c4c8ce!important;border-color:#2e3238!important;background:#0a0b0d!important;border-radius:0!important}
