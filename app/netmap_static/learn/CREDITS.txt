@@ -44,3 +44,24 @@ iss.jpg
 No photograph is included for GLONASS, BeiDou or OneWeb: a clearly licensed public-domain or Creative Commons spacecraft image was not confirmed in time. The learn panel shows sourced text only for those groups. No images were generated or fabricated.
 
 The JPEGs are stored in the repo as <name>.jpg.b64 (base64 of the resized file) and decoded when served at /api/netmap/learn/<name>.jpg.
+
+
+Solar system explorer photos (pt1828u, Nov 24 2026), served at /api/netmap/learn/s3_<id>.jpg, resized to 800 px and recompressed:
+- s3_voyager1.jpg: Voyager proof-test model, a full-scale twin of the flight craft, at JPL. Credit: NASA/JPL-Caltech/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/PIA21477
+- s3_voyager2.jpg: Voyager 2 being encapsulated for launch, 1977. Credit: NASA/JPL-Caltech. License: Public domain (NASA). Source: https://images.nasa.gov/details/PIA21728
+- s3_newhorizons.jpg: New Horizons during processing at Kennedy, 2005. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-05pd2493
+- s3_parker.jpg: Parker Solar Probe solar array deployment test, Astrotech, 2018. Credit: NASA/Kim Shiflett. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-20180603-PH_KLS01_0029
+- s3_solo.jpg: Solar Orbiter at Astrotech, Titusville, Dec 2019. Credit: NASA/Frank Michaux. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-20191216-PH-FWM01_0149
+- s3_soho.jpg: SOHO during processing at Kennedy, 1995. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-95PC-1159
+- s3_stereoa.jpg: STEREO observatory at Astrotech, 2006. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-06pd1862
+- s3_ace.jpg: ACE during processing at Kennedy, 1997. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-97PC905
+- s3_dscovr.jpg: DSCOVR after arrival at Kennedy, 2014. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-314D-0517_0052
+- s3_wind.jpg: Wind spacecraft during processing at Kennedy, 1994. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-94PC-1147
+- s3_jwst.jpg: Webb's gold primary mirror at NASA Goddard. Credit: NASA/Chris Gunn. License: Public domain (NASA). Source: https://images.nasa.gov/details/GSFC_20171208_Archive_e000079
+- s3_juno.jpg: Juno during processing at Astrotech, 2011. Credit: NASA/KSC. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-2011-3106
+- s3_lucy.jpg: Lucy at Astrotech before launch, 2021. Credit: NASA/Ben Smegelsky. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-20210929-PH-JBS01_0093
+- s3_psyche.jpg: Psyche unwrapped at Astrotech, 2022. Credit: NASA/Isaac Watson. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-20220503-PH-ILW01_0062
+- s3_clipper.jpg: Europa Clipper unboxed at Kennedy, 2024. Credit: NASA/Kim Shiflett. License: Public domain (NASA). Source: https://images.nasa.gov/details/KSC-20240528-PH-KLS01_0040
+- s3_juice.jpg: JUICE in the Airbus Astrolabe facility, Toulouse. Credit: Don-vip (Wikimedia France). License: CC BY-SA 4.0. Source: https://commons.wikimedia.org/wiki/File:JUICE_inside_Airbus_Defence_and_Space_Astrolabe_facilities_11.jpg
+- s3_aditya.jpg: Photo of an Aditya-L1 display model at an exhibition in Kolkata, 2022 (not the flight craft). Credit: Debapratim and Chinakpradhan. License: CC BY-SA 2.0. Source: https://commons.wikimedia.org/wiki/File:Aditya_L1.jpg
+- s3_roadster.jpg: Starman in the Roadster with Earth behind, 6 Feb 2018 (real photo). Credit: SpaceX. License: CC0 1.0. Source: https://commons.wikimedia.org/wiki/File:Elon_Musk%27s_Tesla_Roadster_(40143096241).jpg
