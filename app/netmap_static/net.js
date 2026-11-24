@@ -233,6 +233,31 @@
   window.__bnPlace = function (c, pt) { dragCard(c); placeCard(c, pt); };
   addEventListener("resize", function () { ["nx_card", "gx_card"].forEach(function (id) { var c = document.getElementById(id); if (c && !c.hidden) { var r = c.getBoundingClientRect(); clampCard(c, r.left, r.top); } }); });
   var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, hydro: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
+  var MAPR = { show: {}, timer: 0, seq: 0 };
+  var MAP_ORDER = ["internet", "grid", "sea", "dc", "towers", "hydro", "cloud"];   /* pt1833u: Map layers in one at a time, ~400 ms apart */
+  function mapOn(k) {
+    if (k === "power" || k === "ops") k = "grid";
+    return !!ON[k] && !!MAPR.show[k];
+  }
+  function mapLayerIn() {
+    if (SKY.on) return;
+    if (MAPR.timer) { clearTimeout(MAPR.timer); MAPR.timer = 0; }
+    MAPR.show = {}; MAPR.seq += 1;
+    var seq = MAPR.seq;
+    vis();
+    var keys = MAP_ORDER.filter(function (k) { return ON[k]; });
+    if (reduce || !keys.length) { keys.forEach(function (k) { MAPR.show[k] = true; }); vis(); return; }
+    var i = 0, gap = 400;
+    (function next() {
+      if (seq !== MAPR.seq || SKY.on) return;
+      if (i < keys.length) {
+        MAPR.show[keys[i]] = true;
+        try { (window.__mapLayerInAt = window.__mapLayerInAt || []).push({ k: keys[i], t: performance.now() }); } catch (e) {}
+        i += 1; vis();
+        if (i < keys.length) MAPR.timer = setTimeout(next, gap);
+      }
+    })();
+  }
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
   function bindAttrib() {   /* pt1831u: credits stay a collapsed info button; MapLibre compact starts open and re-opens on source/resize */
@@ -296,7 +321,7 @@
     bindAttrib();
     map.on("dataloading", function () { if (!ready) step("map", Math.min(0.8, P.map + 0.04)); });
     map.on("load", function () {
-      step("map", 0.5); addLayers(); seaLayers(); infLayers(); bindLayers();
+      step("map", 0.5); addLayers(); seaLayers(); infLayers(); bindLayers(); if (location.hash !== "#sky") mapLayerIn();
       Promise.allSettled([pData, pWorld]).then(function (r) {
         if (r[0].status === "fulfilled") { D = r[0].value; applyData(); }
         else { $("nx_sum").textContent = "Network data is unavailable right now"; }
@@ -326,9 +351,9 @@
     map.addLayer({ id: "inet-fill", type: "fill", source: "inet", paint: { "fill-color": ["get", "c"], "fill-opacity": ["get", "o"] } }, "admin-state");
     map.addLayer({ id: "inet-line", type: "line", source: "inet", paint: { "line-color": ["get", "c"], "line-opacity": 0.45, "line-width": 0.6 } }, "admin-state");
     map.addSource("dc", { type: "geojson", data: EMPTY });
-    map.addLayer({ id: "dc-glow", type: "circle", source: "dc", layout: { visibility: ON.dc ? "visible" : "none" }, paint: { "circle-color": COL.dc, "circle-blur": 1, "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.14, 6, 0.3],
+    map.addLayer({ id: "dc-glow", type: "circle", source: "dc", layout: { visibility: "none" }, paint: { "circle-color": COL.dc, "circle-blur": 1, "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.14, 6, 0.3],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2, ["*", 0.04, ["min", ["get", "n"], 200]]], 8, ["+", 6, ["*", 0.08, ["min", ["get", "n"], 200]]]] } });
-    map.addLayer({ id: "dc", type: "circle", source: "dc", layout: { visibility: ON.dc ? "visible" : "none" }, paint: { "circle-color": COL.dc, "circle-opacity": 0.9,
+    map.addLayer({ id: "dc", type: "circle", source: "dc", layout: { visibility: "none" }, paint: { "circle-color": COL.dc, "circle-opacity": 0.9,
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 0.9, 5, 1.8, 10, 3.6] } });
     map.addSource("pts", { type: "geojson", data: EMPTY });
     map.addLayer({ id: "glow", type: "circle", source: "pts", paint: { "circle-color": ["get", "c"], "circle-blur": 1, "circle-opacity": ["case", ["get", "hot"], 0.45, 0.2],
@@ -449,18 +474,18 @@
     if (!map || !map.getSource("pts")) return;
     if (SKY.on) return;
     ON.power = ON.ops = !!ON.grid;   /* Nov 24 2026 (Matt): one "Power grid" chip runs outages, operators and the 230 kV+ lines */
-    map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return ON[x.properties.layer]; }) });
-    ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet && !INET ? "visible" : "none"); });
-    ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.internet ? "visible" : "none"); });
+    map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return mapOn(x.properties.layer); }) });
+    ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("internet") && !INET ? "visible" : "none"); });
+    ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("internet") ? "visible" : "none"); });
     /* Nov 24 2026 (pt1816u): with Power grid on, the "normal" internet green is a faint tint so the green / yellow / red power lines stay readable (#129 raised it to 0.28 and washed every U.S. line green) */
-    if (map.getLayer("inet-fill")) map.setPaintProperty("inet-fill", "fill-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"]);
-    if (map.getLayer("inet-line")) map.setPaintProperty("inet-line", "line-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.12, 0.45] : 0.45);
-    ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.dc ? "visible" : "none"); });
-    SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON.sea ? "visible" : "none"); });
-    if (ON.sea) seaLoad();
-    INF_K.forEach(function (k) { INF[k].L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", ON[k] ? "visible" : "none"); }); if (ON[k]) infLoad(k); }); infPanel();
+    if (map.getLayer("inet-fill")) map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"]);
+    if (map.getLayer("inet-line")) map.setPaintProperty("inet-line", "line-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.12, 0.45] : 0.45);
+    ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("dc") ? "visible" : "none"); });
+    SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("sea") ? "visible" : "none"); });
+    if (mapOn("sea")) seaLoad();
+    INF_K.forEach(function (k) { INF[k].L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn(k) ? "visible" : "none"); }); if (mapOn(k)) infLoad(k); }); infPanel();
     document.querySelectorAll("#nx_f button").forEach(function (b) { b.setAttribute("aria-pressed", ON[b.dataset.k] ? "true" : "false"); });
-    try { document.dispatchEvent(new CustomEvent("nx:layers", { detail: { ops: !!ON.ops } })); } catch (e) {}   /* gridlayer.js (merged The Grid) */
+    try { document.dispatchEvent(new CustomEvent("nx:layers", { detail: { ops: mapOn("grid") } })); } catch (e) {}   /* gridlayer.js (merged The Grid) */
   }
 
   function summary() {
@@ -521,7 +546,7 @@
   function seaCol(lv) { return CCOL[lv] || CCOL[0]; }
   function seaLayers() {
     map.addSource("sea", { type: "geojson", data: EMPTY, tolerance: 0.6 });
-    var vz = ON.sea ? "visible" : "none";
+    var vz = "none";   /* pt1833u: mapLayerIn reveals sea after internet and the grid */
     var seaPaint = { "line-color": ["match", ["get", "lv"], 2, CCOL[2], 1, CCOL[1], CCOL[0]], "line-opacity": ["case", [">", ["get", "lv"], 0], 0.95, 0.75],
         "line-width": ["interpolate", ["linear"], ["zoom"], 1, ["case", [">", ["get", "lv"], 0], 1.6, 0.7], 6, ["case", [">", ["get", "lv"], 0], 3, 1.5], 10, 2.4] };
     map.addLayer({ id: "sea-line", type: "line", source: "sea", filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "s"], "approx"]], layout: { visibility: vz, "line-cap": "round", "line-join": "round" },
@@ -641,7 +666,7 @@
       var lv = $("gx_live"); if (lv) lv.textContent = "Live: U.S., " + FOPS.map(function (a) { return a.name.replace(/ synchronous grid| grid \(NESO\)/, "").replace("Continental Europe", "Europe").replace("Great Britain", "GB"); }).join(", "); }).catch(function () {}); }
     freq(); setInterval(function () { if (!document.hidden) freq(); }, 300000);
     map.addSource("grid", { type: "vector", tiles: [location.origin + "/api/netmap/gridtiles/{z}/{x}/{y}.pbf"], minzoom: 0, maxzoom: 8 });
-    function L(o) { o.layout = o.layout || {}; o.layout.visibility = ON.grid && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
+    function L(o) { o.layout = o.layout || {}; o.layout.visibility = mapOn("grid") && !SKY.on ? "visible" : "none"; map.addLayer(o, "glow"); }
     L({ id: "gl-lo", type: "line", source: "grid", "source-layer": "grid", minzoom: 5, filter: ["all", ["==", ["geometry-type"], "LineString"], ["<", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": lineCol(), "line-opacity": 0.75, "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.6, 10, 1.6] } });
     L({ id: "gl-hi", type: "line", source: "grid", "source-layer": "grid", filter: ["all", ["==", ["geometry-type"], "LineString"], [">=", ["get", "v"], 300]], layout: { "line-cap": "round", "line-join": "round" },
@@ -705,6 +730,7 @@
   document.querySelectorAll("#nx_f button").forEach(function (b) {
     b.addEventListener("click", function () {
       var k = b.dataset.k; ON[k] = !ON[k];
+      if (ON[k]) MAPR.show[k] = true; else MAPR.show[k] = false;
       vis(); if (D) list();
       if (ON[k] && k === "dc" && map) map.easeTo({ zoom: Math.max(map.getZoom(), 2.6), duration: reduce ? 0 : 700 });
     });
@@ -1364,9 +1390,10 @@
     SKY.on = sky; document.body.classList.toggle("nx-sky", sky);
     document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m ? "true" : "false"); });
     $("nx_f").hidden = sky; $("nx_sf").hidden = !sky; $("nx_sw").hidden = true; if ($("nx_ss")) $("nx_ss").hidden = true; if ($("nx_sky_labs")) $("nx_sky_labs").hidden = !sky; $("nx_leg").hidden = sky; if (sky) { var lb = $("nx_leg_body"), lt = $("nx_leg_btn"); if (lb) lb.hidden = true; if (lt) lt.setAttribute("aria-expanded", "false"); } hideCard(true);
+    if (sky) { if (MAPR.timer) { clearTimeout(MAPR.timer); MAPR.timer = 0; } MAPR.seq += 1; MAPR.show = {}; }
     if (sky) SEA_L.concat(INF_L).forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
     try { history.replaceState(null, "", sky ? "#sky" : "#map"); } catch (e) {}
-    ["cty-fill", "cty-line", "inet-fill", "inet-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", sky ? "none" : "visible"); });
+    ["cty-fill", "cty-line", "inet-fill", "inet-line", "dc", "dc-glow", "glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
     if (!sky) {
       clearInterval(SKY.timer); SKY.timer = null; SKY.sel = null;
       if (SKY.layerT) { clearTimeout(SKY.layerT); SKY.layerT = 0; }
@@ -1375,7 +1402,7 @@
       ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
       try { map.setMinZoom(1); } catch (e) {}
       try { map.setProjection({ type: "mercator" }); } catch (e) {}
-      vis(); if (D) summary(); map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900 }); return;
+      mapLayerIn(); if (D) summary(); map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900 }); return;
     }
     try { map.setProjection({ type: "globe" }); } catch (e) {}
     try { map.setMinZoom(-2); } catch (e) {}
