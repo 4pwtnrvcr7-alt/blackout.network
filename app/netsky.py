@@ -380,3 +380,119 @@ def cad():
                size_ref=CNEOS_H_SIZE)
     _MEM["cad"] = (time.time(), out)
     return out
+
+# ---------- Solar system explorer (pt1828u): heliocentric ecliptic J2000 vectors from JPL Horizons, keyless ----------
+# One Horizons VECTORS call per object (past + near-future trajectory, current position interpolated to now).
+# Built in a background thread, cached 6 h in memory, so visitors never wait on (or hammer) Horizons.
+S3_PLANETS = (("mercury", "Mercury", "199"), ("venus", "Venus", "299"), ("earth", "Earth", "399"), ("mars", "Mars", "499"),
+              ("jupiter", "Jupiter", "599"), ("saturn", "Saturn", "699"), ("uranus", "Uranus", "799"), ("neptune", "Neptune", "899"))
+# id, name, Horizons command, operator, launch (ISO), mission/status, what it monitors, past days, future days, step
+S3_CRAFT = (
+    ("roadster", "Tesla Roadster / Starman", "-143205", "SpaceX (payload), tracked by NASA/JPL", "2018-02-06",
+     "Derelict demo payload from the first Falcon Heavy flight, in a heliocentric orbit between Earth and Mars.", "Nothing: a car with a mannequin (Starman) in a SpaceX suit. No working instruments.", 3000, 365, "8 d"),
+    ("voyager1", "Voyager 1", "-31", "NASA / JPL", "1977-09-05", "Operational. In interstellar space since 25 Aug 2012; farthest human-made object.", "Interstellar plasma, magnetic fields and cosmic rays.", 17500, 1825, "60 d"),
+    ("voyager2", "Voyager 2", "-32", "NASA / JPL", "1977-08-20", "Operational. In interstellar space since 5 Nov 2018; only probe to visit Uranus and Neptune.", "Interstellar plasma, magnetic fields and cosmic rays.", 17500, 1825, "60 d"),
+    ("newhorizons", "New Horizons", "-98", "NASA / JHU APL", "2006-01-19", "Extended mission in the Kuiper Belt after Pluto (2015) and Arrokoth (2019) flybys.", "Kuiper Belt objects and the outer heliosphere.", 7200, 1825, "30 d"),
+    ("parker", "Parker Solar Probe", "-96", "NASA / JHU APL", "2018-08-12", "Operational. Closest-ever approaches to the Sun (about 3.8 million mi).", "The Sun's corona and the origin of the solar wind.", 120, 60, "12 h"),
+    ("solo", "Solar Orbiter", "-144", "ESA / NASA", "2020-02-10", "Operational. Imaging the Sun's poles from an inclined orbit.", "The Sun, its poles and the solar wind.", 365, 120, "2 d"),
+    ("soho", "SOHO", "-21", "ESA / NASA", "1995-12-02", "Operational at Sun-Earth L1, about 930,000 mi sunward of Earth.", "The Sun's corona and CMEs (coronagraph imagery used for space-weather forecasts).", 365, 60, "4 d"),
+    ("stereoa", "STEREO-A", "-234", "NASA", "2006-10-26", "Operational. Orbits the Sun near Earth's orbit, seeing the Sun from a different angle.", "CMEs and the Sun from a second vantage point.", 365, 120, "4 d"),
+    ("ace", "ACE", "-92", "NASA", "1997-08-25", "Operational at Sun-Earth L1.", "Solar wind particles upstream of Earth (real-time solar wind for NOAA).", 365, 60, "4 d"),
+    ("dscovr", "DSCOVR", "-78", "NOAA / NASA / USAF", "2015-02-11", "At Sun-Earth L1. NOAA's real-time solar wind monitor for geomagnetic storm warnings.", "Solar wind speed, density and magnetic field; full-disk Earth images (EPIC).", 365, 60, "4 d"),
+    ("wind", "Wind", "-8", "NASA", "1994-11-01", "Operational at Sun-Earth L1.", "Solar wind plasma and magnetic field.", 365, 60, "4 d"),
+    ("jwst", "James Webb Space Telescope", "-170", "NASA / ESA / CSA", "2021-12-25", "Operational at Sun-Earth L2, about 930,000 mi from Earth (away from the Sun).", "Infrared astronomy (not a Sun monitor).", 365, 60, "4 d"),
+    ("juno", "Juno", "-61", "NASA / JPL", "2011-08-05", "In orbit around Jupiter.", "Jupiter's interior, magnetic field and moons.", 1500, 180, "10 d"),
+    ("lucy", "Lucy", "-49", "NASA / SwRI", "2021-10-16", "Cruising to the Jupiter Trojan asteroids.", "Trojan asteroids.", 1500, 730, "10 d"),
+    ("psyche", "Psyche", "-255", "NASA / JPL", "2023-10-13", "Cruising to metal-rich asteroid 16 Psyche.", "Asteroid 16 Psyche.", 1100, 730, "10 d"),
+    ("clipper", "Europa Clipper", "-159", "NASA / JPL", "2024-10-14", "Cruising to Jupiter's moon Europa.", "Europa's ice shell and ocean.", 750, 730, "6 d"),
+    ("juice", "JUICE", "-28", "ESA", "2023-04-14", "Cruising to Jupiter's icy moons.", "Ganymede, Callisto and Europa.", 950, 730, "6 d"),
+)
+S3_SUNWATCH = ("parker", "solo", "soho", "stereoa", "ace", "dscovr", "wind")
+
+def _hz_vec(command, start, stop, step, center="500@10"):
+    import urllib.parse
+    q = dict(format="json", COMMAND=f"'{command}'", OBJ_DATA="NO", MAKE_EPHEM="YES", EPHEM_TYPE="VECTORS",
+             CENTER=f"'{center}'", REF_PLANE="ECLIPTIC", OUT_UNITS="KM-S", VEC_TABLE="2", CSV_FORMAT="YES",
+             START_TIME=f"'{start}'", STOP_TIME=f"'{stop}'", STEP_SIZE=f"'{step}'")
+    j = _j(HORIZONS_API + "?" + urllib.parse.urlencode(q))
+    res = (j or {}).get("result") or ""
+    a, b = res.find("$$SOE"), res.find("$$EOE")
+    if a < 0 or b < a:
+        raise RuntimeError("no Horizons vectors: " + res[:120].replace("\n", " "))
+    rows = []
+    for line in res[a + 5:b].splitlines():
+        p = [x.strip() for x in line.split(",")]
+        if len(p) < 8: continue
+        try: rows.append([float(p[0])] + [float(x) for x in p[2:8]])
+        except ValueError: continue
+    if not rows: raise RuntimeError("empty Horizons table")
+    return rows   # [jd, x, y, z (km), vx, vy, vz (km/s)]
+
+def _interp(rows, jd):
+    if jd <= rows[0][0]: return rows[0][1:]
+    if jd >= rows[-1][0]: return rows[-1][1:]
+    for i in range(1, len(rows)):
+        if rows[i][0] >= jd:
+            a, b = rows[i - 1], rows[i]; t = (jd - a[0]) / ((b[0] - a[0]) or 1)
+            return [a[k] + (b[k] - a[k]) * t for k in range(1, 7)]
+    return rows[-1][1:]
+
+def _s3_build():
+    import math
+    from datetime import timedelta
+    nowd = datetime.now(timezone.utc); jd = nowd.timestamp() / 86400.0 + 2440587.5
+    f = lambda d: d.strftime("%Y-%m-%d %H:%M")
+    au = lambda v: [round(v[0] / AU_KM, 6), round(v[1] / AU_KM, 6), round(v[2] / AU_KM, 6)]
+    planets, craft, errors = [], [], []
+    for pid, name, cmd in S3_PLANETS:
+        try:
+            r = _hz_vec(cmd, f(nowd - timedelta(days=1)), f(nowd + timedelta(days=1)), "6 h")
+            s = _interp(r, jd); planets.append(dict(id=pid, name=name, pos=au(s), v_km_s=round(math.sqrt(s[3]**2 + s[4]**2 + s[5]**2), 3)))
+        except Exception as e: errors.append(f"{pid}:{type(e).__name__}")
+        time.sleep(0.15)
+    moon = None
+    try:
+        r = _hz_vec("301", f(nowd - timedelta(days=1)), f(nowd + timedelta(days=1)), "6 h", center="500@399")
+        s = _interp(r, jd); moon = dict(id="moon", name="Moon", geo_km=[round(s[0]), round(s[1]), round(s[2])])
+    except Exception as e: errors.append(f"moon:{type(e).__name__}")
+    earth = next((p["pos"] for p in planets if p["id"] == "earth"), None)
+    for (cid, name, cmd, op, launch, status, mon, past, fut, step) in S3_CRAFT:
+        time.sleep(0.15)
+        l0 = datetime.strptime(launch, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=3)
+        start = max(nowd - timedelta(days=past), l0)
+        r = None
+        for st, sp, fu in ((start, step, fut), (start, step, 30), (nowd - timedelta(days=30), "1 d", 1)):
+            try: r = _hz_vec(cmd, f(st), f(nowd + timedelta(days=fu)), sp); break
+            except Exception: r = None
+        if not r: errors.append(f"{cid}:nodata"); continue
+        s = _interp(r, jd); pos = au(s)
+        rec = dict(id=cid, name=name, horizons=cmd, operator=op, launch=launch, status=status, monitors=mon,
+                   sunwatch=cid in S3_SUNWATCH, pos=pos, v_km_s=round(math.sqrt(s[3]**2 + s[4]**2 + s[5]**2), 3),
+                   sun_au=round(math.sqrt(sum(x * x for x in pos)), 6),
+                   track=[[round(x[0] - 2440587.5, 3)] + au(x[1:4]) for x in r])  # [unix day, x, y, z AU]
+        if earth: rec["earth_au"] = round(math.sqrt(sum((pos[k] - earth[k]) ** 2 for k in range(3))), 6)
+        if cid in ("soho", "ace", "dscovr", "wind", "jwst"):   # L1/L2 craft: geocentric offset so the scene can show them beside Earth
+            try:
+                g = _interp(_hz_vec(cmd, f(nowd - timedelta(hours=12)), f(nowd + timedelta(hours=12)), "6 h", center="500@399"), jd)
+                rec["geo_km"] = [round(g[0]), round(g[1]), round(g[2])]; rec["earth_au"] = round(math.sqrt(g[0]**2 + g[1]**2 + g[2]**2) / AU_KM, 6)
+            except Exception: pass
+        craft.append(rec)
+    return dict(ok=bool(planets), epoch=nowd.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                frame="Heliocentric ecliptic J2000, AU", planets=planets, moon=moon, craft=craft, errors=errors or None,
+                source="NASA/JPL Horizons", source_url="https://ssd.jpl.nasa.gov/horizons/")
+
+_S3_LOCK = __import__("threading").Lock()
+def solar3d():
+    """Cached 6 h; first call after a deploy starts a background build and returns {loading: true} (client retries)."""
+    hit = _MEM.get("s3")
+    fresh = hit and time.time() - hit[0] < 6 * 3600
+    if not fresh and _S3_LOCK.acquire(blocking=False):
+        def run():
+            try:
+                out = _s3_build()
+                if out.get("ok"): _MEM["s3"] = (time.time(), out)
+            except Exception: pass
+            finally: _S3_LOCK.release()
+        __import__("threading").Thread(target=run, daemon=True).start()
+    if hit: return hit[1] if fresh else dict(hit[1], stale=True)
+    return {"ok": False, "loading": True}
