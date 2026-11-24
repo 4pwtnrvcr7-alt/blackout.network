@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json"}
+FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json", "inet_ents.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -720,6 +720,7 @@ def handle_get(path, qs=None, headers=None):
         import netinet
         try:
             r = swr("inet", 600, lambda: netinet.build(jget), wait=True)
+            if r and not all((r.get("feeds") or {}).values()) and "inet" in _C and time.time() - _C["inet"][0] > 120: _C["inet"] = (time.time() - 600, r)   # IODA did not answer: grey now, try again soon
             return (200, r) if r else (503, {"error": "internet status is still loading"})
         except Exception as ex: return 503, {"error": "internet status unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/space":

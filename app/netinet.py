@@ -16,7 +16,17 @@ MINOR = 95
 
 def _iso(t): return datetime.fromtimestamp(int(t), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if t else None
 
+import json as _json, os as _os
+_ENTS = {}
 def entities(jget):
+    """IODA's monitored places. Last good list is kept; if IODA does not answer, the bundled list (inet_ents.json, Nov 24 2026) is used."""
+    try:
+        e = _entities(jget); _ENTS.update(e); return e
+    except Exception:
+        if _ENTS: return dict(_ENTS)
+        with open(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "netmap_static", "inet_ents.json"), encoding="utf-8") as fh: return _json.load(fh)
+
+def _entities(jget):
     c = jget(f"{IODA}/entities/query?entityType=country", timeout=40).get("data") or []
     r = jget(f"{IODA}/entities/query?entityType=region&relatedTo=country/US", timeout=40).get("data") or []
     return dict(c={e["code"]: e.get("name") for e in c if e.get("code")},
@@ -58,14 +68,14 @@ def current(jget, et, code, ds):
     vals = [x for x in ((d[0] if d else {}).get("values") or []) if x is not None]
     return vals[-1] if vals else None
 
-def recheck(jget, todo, cap=40):
+def recheck(jget, todo, cap=15):
     """todo: [(et, code, ds)] signals the alert window says are down. Returns {(et, code): {ds: value}}."""
     from concurrent.futures import ThreadPoolExecutor
     out = {}
     def one(t):
         try: return t, current(jget, *t)
         except Exception: return t, None
-    with ThreadPoolExecutor(8) as ex:
+    with ThreadPoolExecutor(4) as ex:
         for (et, code, ds), v in ex.map(one, todo[:cap]):
             if v is not None: out.setdefault((et, code), {})[ds] = v
     return out
