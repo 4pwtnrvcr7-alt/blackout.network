@@ -117,6 +117,7 @@ CSS = ('<style id="bn_m5">'
  '.m5.m5-go .m5-art{transform:translateY(-50%)!important}}'
  # instruction panels sit above the full-screen menu
  '#bnig,#bnna{z-index:2147482000!important}'
+ '#bnig.bnig-on,#bnna.bnig-on{visibility:visible!important}'   # tapped from the menu: show even while the open menu locks the page (html.bn-lock)
  '</style>')
 
 JS = ('<script id="bn_m5js">(function(){if(window.__bnM5)return;window.__bnM5=1;'
@@ -129,9 +130,14 @@ JS = ('<script id="bn_m5js">(function(){if(window.__bnM5)return;window.__bnM5=1;
  'a.parentNode.classList.add("m5-hit");m.classList.add("m5-go");setTimeout(function(){location.href=a.href},RM?140:400)},true);'
  'addEventListener("pageshow",function(){[].forEach.call(document.querySelectorAll(".m5.m5-go"),function(m){m.classList.remove("m5-go");'
  '[].forEach.call(m.querySelectorAll(".m5-hit"),function(h){h.classList.remove("m5-hit")})})});'
- 'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-m5-act]");if(!b)return;e.preventDefault();var B=window.BN||{},k=b.getAttribute("data-m5-act");'
- 'if(k==="install"){if(B.installApp)B.installApp();else if(B.showInstallGuide)B.showInstallGuide()}'
- 'else if(k==="notify"){if(B.showNotifyGuide)B.showNotifyGuide();else if(B.enableAlerts)B.enableAlerts({})}})'
+ 'function m5load(src,cb){var x=document.querySelector(\'script[data-m5-src="\'+src+\'"]\');if(x){x.addEventListener("load",cb);return}'
+ 'var t=document.createElement("script");t.src=src;t.setAttribute("data-m5-src",src);t.onload=cb;document.head.appendChild(t)}'
+ # Nov 24 2026: pages that skip pwa_head (/mesh, /mesh/guide, /stats, /report-status) do not load the install guide or alerts; load them on tap
+ 'function m5act(k){var B=window.BN||{};'
+ 'if(k==="install"){if(B.installApp)B.installApp();else if(B.showInstallGuide)B.showInstallGuide();else return false}'
+ 'else{if(B.showNotifyGuide)B.showNotifyGuide();else if(B.enableAlerts)B.enableAlerts({});else return false}return true}'
+ 'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-m5-act]");if(!b)return;e.preventDefault();var k=b.getAttribute("data-m5-act");'
+ 'if(m5act(k))return;if(!document.querySelector(\'link[href*="install-guide.css"]\')){var l=document.createElement("link");l.rel="stylesheet";l.href="/install-guide.css";document.head.appendChild(l)}m5load("/alerts.js",function(){m5load("/install-guide.js",function(){m5act(k)})})})'
  '})()</script>')
 
 def html_block(active_href=None, intro_href=None):
