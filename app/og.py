@@ -87,7 +87,7 @@ PAGES = {
                     card="Weather",
                     desc="Current conditions, official severe-weather alerts and the forecast for any place you choose, on BLACKOUT.NETWORK. Free, with no account or sign-up needed.",
                     bg=("media", "noise-d.jpg"), tagline=True),  # NASA ISS imagery of Hurricane Dorian, 2019, public domain; also the site ranking-band still
-    "network": dict(path="/network", title="The Grid: power grid, internet and cloud status | BLACKOUT.NETWORK",
+    "network": dict(path="/grid", title="The Grid: power grid, internet and cloud status | BLACKOUT.NETWORK",
                     card="The Grid",
                     desc="Live status of the power grid and the networks that run on it on BLACKOUT.NETWORK: grid operators, outages by state, internet, cloud, apps and ISPs.",
                     bg=("media", "planet-d.jpg"), tagline=True),  # NASA ISS Earth limb, 2024, public domain
@@ -151,10 +151,10 @@ PAGES = {
                    card="Trends",
                    desc="See how BLACKOUT.NETWORK's alert volume, severity mix and source health have moved over hours, days and weeks, with charts you can read on any screen.",
                    bg=("media", "trvid-d.jpg"), tagline=True),
-    "grid": dict(path="/grid", title="Energy Grid: power grid status | BLACKOUT.NETWORK",
-                 card="Energy Grid",
-                 desc="BLACKOUT.NETWORK maps the U.S. power grid by operator, colored by current status, with local outage counts, grid alerts and weather-driven stress checks.",
-                 bg=("media", "hero-d.jpg"), tagline=True),
+    "grid": dict(path="/grid", title="The Grid: power grid, internet and cloud status | BLACKOUT.NETWORK",   # Nov 24 2026: /grid is The Grid's canonical URL
+                 card="The Grid",
+                 desc="Live status of the power grid and the networks that run on it on BLACKOUT.NETWORK: grid operators, outages by state, internet, cloud, apps and ISPs.",
+                 bg=("media", "planet-d.jpg"), tagline=True),
     "ai": dict(path="/ai", title="AI Threats: AI-driven attacks and fraud | BLACKOUT.NETWORK",
                card="AI Threats",
                desc="BLACKOUT.NETWORK tracks AI threats: AI-assisted hacking, rogue bots and agents, AI-enabled cyber attacks, deepfake fraud and model misuse, ranked 0–10.",
@@ -232,7 +232,7 @@ TAB_SHARE = ("solar", "weather", "streams", "broadcasts", "radio", "noise", "tre
              "medical", "resources", "bushcraft", "ranked", "thread", "wire")
 
 # Paths that already have a real HTML page (do not intercept as a share shim).
-REAL_PATHS = {"wire", "network", "map", "crime", "sources", "credits", "newsletter",
+REAL_PATHS = {"wire", "network", "grid", "map", "crime", "sources", "credits", "newsletter",
               "scoring", "privacy", "tos", "cookies", "privacy-choices", "social",
               "stats", "cern", "welcome", "mesh", "live", "home"}
 

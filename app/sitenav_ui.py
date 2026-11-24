@@ -192,16 +192,16 @@ M3_PV = {
  "about": '<span class="m3-k">Sources in the feed</span><b class="m3-big" data-pv="sources">&ndash;</b><span class="m3-asof" data-pv="sources-asof"></span>',
 }
 # Launched pages that are not dashboard tabs. Anything left in M3_SOON stays plain text tagged "soon".
-M3_HREF = {"starlink": "/network/starlink", "netnear": "/network/near", "meshguide": "/mesh/guide"}
+M3_HREF = {"starlink": "/grid/starlink", "netnear": "/grid/near", "meshguide": "/mesh/guide"}
 M3_SOON = set()
 # Menu items that open a full page rather than their /live tab (Matt 5:25 PM: Heat Map is always the full-screen /map).
 # No data-tab on these links so dashboard JS cannot intercept the click as a tab switch.
 M3_PAGE = {"heatmap": ("@map", "/map"), "finance": ("@markets", "/markets"),   # Nov 18 (pt1661u): Markets opens the /markets overview
            "newsletter": ("newsletter", "/newsletter"), "sources": ("sources", "/sources"),
            "midterms": ("midterms", "/midterms"),
-           "grid": ("grid", "/network"),   # Nov 24 2026: The Grid merged into /network
+           "grid": ("grid", "/grid"),   # Nov 24 2026: The Grid merged into /grid
            "weather": ("weather", "/weather"),
-           "net": ("net", "/network")}   # Nov 23 2026 (pt1763u): Network Status opens the /network board, not /live#network
+           "net": ("net", "/grid")}   # Nov 23 2026 (pt1763u): Network Status opens the /grid board, not /live#network
              # Nov 21 2026 (pt1737u): The Grid opens the full-screen /grid page, not the old /live#grid dashboard tab   # Nov 21: menu opens the standalone pages, same as the top bar
 
 def menu3_sections(sn):
@@ -242,8 +242,8 @@ def _active_href(sn, active):
     """Menu key of the current page -> its menu href (for aria-current in menu v5)."""
     for k, h, _ in PRIMARY:
         if k == active: return h
-    return {"@map": "/map", "heatmap": "/map", "@markets": "/markets", "finance": "/markets", "grid": "/network", "weather": "/weather",
-            "net": "/network", "newsletter": "/newsletter", "threat": "/wire"}.get(active)
+    return {"@map": "/map", "heatmap": "/map", "@markets": "/markets", "finance": "/markets", "grid": "/grid", "weather": "/weather",
+            "net": "/grid", "newsletter": "/newsletter", "threat": "/wire"}.get(active)
 
 def drawer(sn, active=""):
     """The v3 graphical menu (<div id="bn-menu">): full-viewport overlay on desktop/tablet (all seven sections open, no scroll),
@@ -279,7 +279,7 @@ def drawer(sn, active=""):
                 out.append(f'<li class="m3-soon"><span>{E(label)}</span><em>soon</em></li>')
             else:
                 cur = ' aria-current="page"' if key == active else ""
-                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms", "/grid", "/weather", "/network") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
+                tab = "" if (href or "").split("?")[0] in ("/map", "/markets", "/newsletter", "/sources", "/midterms", "/grid", "/weather", "/grid") or key in ("@map", "@markets") else f' data-tab="{E(key)}"'
                 out.append(f'<li><a href="{E(href)}"{tab}{cur}>{E(label)}</a></li>')
         out.append('</ul></div></details>')
     follow = ('' if m5 else '<div class="m3-follow"><span class="m3-k">Follow</span>'

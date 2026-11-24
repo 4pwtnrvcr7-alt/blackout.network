@@ -52,11 +52,11 @@
     if (/\b(nws|noaa|meteoalarm)\b/i.test(b) || /weather\.gov/i.test(b))
       return { href: "/weather", ext: false, kind: "tracker", label: "Weather on BLACKOUT.NETWORK ›" };
     if (/\bioda\b|internet outage/i.test(b))
-      return { href: "/network", ext: false, kind: "tracker", label: "Network status on BLACKOUT.NETWORK ›" };
+      return { href: "/grid", ext: false, kind: "tracker", label: "Network status on BLACKOUT.NETWORK ›" };
     if (/\b(swpc|space weather|solar flare|geomagnetic)\b/i.test(b))
       return { href: "/#solar", ext: false, kind: "tracker", label: "Solar & Seismic on BLACKOUT.NETWORK ›" };
     if (/\b(power grid|grid status)\b/i.test(b))
-      return { href: "/network", ext: false, kind: "tracker", label: "The Grid on BLACKOUT.NETWORK ›" };
+      return { href: "/grid", ext: false, kind: "tracker", label: "The Grid on BLACKOUT.NETWORK ›" };
     return null;
   }
   function fallback(c) {

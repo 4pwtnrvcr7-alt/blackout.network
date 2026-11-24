@@ -1,12 +1,12 @@
 """Network provider pages (t398, Nov 1 2026): the Network Status tab's big-cloud and DNS/CDN rows become accordions, and each provider
-gets a full page at /network/<slug> (aws, azure, m365, gcp, workspace, cloudflare, akamai) plus a hub at /network.
+gets a full page at /grid/<slug> (aws, azure, m365, gcp, workspace, cloudflare, akamai) plus a hub at /grid.
 
 Data, all keyless and official, fetched on request and cached in memory for 10 minutes (stale copy served if a feed fails):
   AWS Health public events JSON + AWS status RSS · Azure status RSS + Azure status history (Post Incident Reviews) ·
   Microsoft 365 consumer status API · Google Cloud incidents.json · Google Workspace incidents.json ·
   Cloudflare and Akamai Statuspage APIs (summary + incidents) · netstatus.db (this site's own 5-minute checks, read-only).
 Root causes are only shown when the provider's own report states one; otherwise "Unconfirmed / not yet disclosed".
-Starlink (/network/starlink) and "Networks near me" (/network/near) live in netstarlink.py, loaded below.
+Starlink (/grid/starlink) and "Networks near me" (/grid/near) live in netstarlink.py, loaded below.
 Never touches scanner.py, scoring, push.py, jets.py, config.json or aviation_watch.py."""
 import html, json, math, os, re, sqlite3, threading, time, urllib.request, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -17,7 +17,7 @@ except Exception:
     site_page = None
 
 BASE = os.path.dirname(os.path.abspath(__file__)); SITE = "https://blackout.network"
-UA = "BlackoutNetwork-status/1.0 (+https://blackout.network/network; cached 10 min)"
+UA = "BlackoutNetwork-status/1.0 (+https://blackout.network/grid; cached 10 min)"
 TTL = 600
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 LVC = {0: "#2BB673", 1: "#F5A524", 2: "#FF7A1A", 3: "#FF4D4F", -1: "#5b6573"}
@@ -453,7 +453,7 @@ def brief(slug):
     nl = sum(1 for i in d.get("active", []) if i.get("longrun"))
     st = (f'{len(d["active"])} active incident(s)' + (f', {nl} long-running (open more than 72 h)' if nl else "")) if d.get("active") else (d.get("indicator") or "No active incidents in the official feed")
     return dict(slug=slug, name=p["name"], level=lv, level_name=LVN.get(lv, ""), status=st, active=len(d.get("active", [])), latest=jsonable(pick) if pick else None,
-                weeks=weekly(allinc, capped=d.get("capped")), uptime7=mon["days"][-8:], uptime_pct=mon["pct"], tips=p["tips"], page=f"/network/{slug}",
+                weeks=weekly(allinc, capped=d.get("capped")), uptime7=mon["days"][-8:], uptime_pct=mon["pct"], tips=p["tips"], page=f"/grid/{slug}",
                 status_url=p["status"][1], status_name=p["status"][0], console=p["console"][0], coverage=d.get("coverage", ""), error=d.get("error"), stale=d.get("stale"),
                 fetched=d.get("fetched"), fetched_et=fmt_et(pdt(d.get("fetched"))) if d.get("fetched") else None)
 
@@ -698,27 +698,27 @@ def render(slug):
              + f'<li>{ic("phone")}<div><b>Phone support</b><small style="font-size:13px">{p["phone"]}</small></div></li>'
              + li("x", [(h, u, "Official account on X") for h, u in p["x"]]) + li("bell", [(t, u, "Get alerts") for t, u in p["subscribe"]]))
     sec_ln = f'<section class="np-sec"><h2>{ic("link")}Official links, contacts and alerts</h2><p class="np-sub">Every link checked before publishing. Phone numbers only where {E(p["name"])} publishes them.</p><ul class="np-links">{links}</ul></section>'
-    others = " · ".join(f'<a href="/network/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug) + ' · <a href="/network/starlink">Starlink</a>'
+    others = " · ".join(f'<a href="/grid/{s}">{E(P[s]["name"])}</a>' for s in ORDER if s != slug) + ' · <a href="/grid/starlink">Starlink</a>'
     nl = ('<div class="np-nl"><div><b>Know about the next big outage first</b><div class="np-mu">The free BLACKOUT.NETWORK newsletter: major outages, threats and what to do. Follow us on YouTube and X too.</div></div>'
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=' + slug + '">Get the free newsletter</a></div>')
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › <a href="/network/providers">Providers</a> › {E(p["name"])}</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/grid">The Grid</a> › <a href="/grid/providers">Providers</a> › {E(p["name"])}</p>'
             + hero + sec_live + f'<div class="np-grid2 np-gap">{sec_mon}{sec_hist}</div>' + sec_rc + sec_nt + nl + sec_ck + sec_ln
-            + f'<p class="np-mu">Other providers: {others} · <a href="/network">All network checks</a>. Research only; not affiliated with {E(p["long"])}. Names identify services only.</p></div>'
+            + f'<p class="np-mu">Other providers: {others} · <a href="/grid">All network checks</a>. Research only; not affiliated with {E(p["long"])}. Names identify services only.</p></div>'
             f'<style>{CSS}</style>{JS}')
     title = f"Is {p['name']} down? Live status, outages and root causes"
     desc = (f"Live {p['name']} status from the official feed, incident history, root causes (config error, cyberattack, power, DNS), notable past outages, "
             f"a business action checklist and official support links. Checked every 5 minutes.")[:300]
-    ld = [{"@context": "https://schema.org", "@type": "WebPage", "name": title, "description": desc, "url": f"{SITE}/network/{slug}", "dateModified": iso(now),
+    ld = [{"@context": "https://schema.org", "@type": "WebPage", "name": title, "description": desc, "url": f"{SITE}/grid/{slug}", "dateModified": iso(now),
            "isPartOf": {"@type": "WebSite", "name": "BLACKOUT.NETWORK", "url": SITE}, "about": {"@type": "Organization", "name": p["long"], "url": p["status"][1]},
            "publisher": {"@type": "Organization", "name": "BLACKOUT.NETWORK", "url": SITE, "logo": {"@type": "ImageObject", "url": f"{SITE}/icons/icon-512.png"}}},
           {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
-              {"@type": "ListItem", "position": 1, "name": "BLACKOUT.NETWORK", "item": SITE + "/"}, {"@type": "ListItem", "position": 2, "name": "The Grid", "item": SITE + "/network"},
-              {"@type": "ListItem", "position": 3, "name": p["name"], "item": f"{SITE}/network/{slug}"}]},
+              {"@type": "ListItem", "position": 1, "name": "BLACKOUT.NETWORK", "item": SITE + "/"}, {"@type": "ListItem", "position": 2, "name": "The Grid", "item": SITE + "/grid"},
+              {"@type": "ListItem", "position": 3, "name": p["name"], "item": f"{SITE}/grid/{slug}"}]},
           {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
               {"@type": "Question", "name": f"Is {p['name']} down right now?", "acceptedAnswer": {"@type": "Answer", "text": (f"{p['name']} reports {len(act)} active incident(s)." if act else f"{p['name']}'s official feed shows no active incidents.") + f" Latest status: {p['status'][1]}"}},
               {"@type": "Question", "name": f"Where do I check {p['name']} status for my own account?", "acceptedAnswer": {"@type": "Answer", "text": f"{p['console'][0][0]}: {p['console'][0][1]}"}},
               {"@type": "Question", "name": f"What caused past {p['name']} outages?", "acceptedAnswer": {"@type": "Answer", "text": " ".join(f"{n['date']}: {n['title']} ({CAT_NAME[n['cat']]})." for n in p["notable"][:3])}}]}]
-    return site_page.page(title, desc, body, f"/network/{slug}", active="net", jsonld=ld, og_type="website")
+    return site_page.page(title, desc, body, f"/grid/{slug}", active="net", jsonld=ld, og_type="website")
 
 HUBCSS = """
 .np-sum{margin:28px 0 30px}.np-big{font:700 clamp(34px,6vw,56px)/1.05 Montserrat,Inter,system-ui,sans-serif;letter-spacing:-.01em;color:#F2F2F4}
@@ -739,30 +739,30 @@ def render_hub():
     for s, b in bs:
         p = P[s]; lt = b.get("latest"); lv.append(b.get("level"))
         cards.append(f'<details class="np-acc"><summary><span class="np-an">{ic(p["icon"])}{E(p["name"])}</span>{lvchip(b["level"])}</summary><div class="np-ab"><p>{E(b["status"])}</p>'
-                     + (f'<p class="np-mu">Latest: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else "") + f'{bars_weeks(b["weeks"])}<a class="bnt-btn" href="/network/{s}">Full analysis</a></div></details>')
+                     + (f'<p class="np-mu">Latest: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else "") + f'{bars_weeks(b["weeks"])}<a class="bnt-btn" href="/grid/{s}">Full analysis</a></div></details>')
     lt = slb.get("latest"); lv.append(slb.get("level"))
     try: attr = sl().ioda_credit_html(_sys_mod(), fmt_et(datetime.now(timezone.utc)))
     except Exception: attr = ""
     cards.append(f'<details class="np-acc"><summary><span class="np-an">{ic("network")}Starlink</span>{lvchip(slb["level"])}</summary><div class="np-ab"><p>{E(slb["status"])}</p>'
                  + (f'<p class="np-mu">Latest signal: {E(lt["title"][:110])} · {E(lt["start_et"])}</p>' if lt else '<p class="np-mu">Satellite internet. Independent measurements (IODA).</p>')
-                 + (bars_weeks(slb["weeks"]) if slb.get("weeks") else "") + '<a class="bnt-btn" href="/network/starlink">Status and satellites</a>' + attr + '</div></details>')
+                 + (bars_weeks(slb["weeks"]) if slb.get("weeks") else "") + '<a class="bnt-btn" href="/grid/starlink">Status and satellites</a>' + attr + '</div></details>')
     n = len(lv); ok = sum(1 for x in lv if x == 0); bad = [x for x in lv if isinstance(x, int) and x > 0]
     worst = max(bad) if bad else 0
     big = f"{ok} of {n} normal" if ok < n else "All normal"
     sub = (f"{len(bad)} with issues · worst: {LVN.get(worst, '')}" if bad else "Every provider feed reports normal service.")
     now_l, _z = to_et(datetime.now(timezone.utc)); stamp = now_l.strftime("%-I:%M %p")
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › Providers</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/grid">The Grid</a> › Providers</p>'
             f'<section class="np-hero page-header-band"><div class="np-hrow"><div style="min-width:0"><div class="np-kick">NETWORK STATUS</div><h1>Cloud status</h1>'
             '<p>Official provider feeds. Times in ET.</p></div></div></section>'
             f'<section class="np-sum"><div class="np-big">{E(big)}</div><p class="np-mu">{E(sub)}</p><div class="bnt-tstamp">Updated {stamp} ET · next in 1m</div></section>'
             + f'<div class="np-accs">{"".join(cards)}</div>'
             + '<details class="bnt-more np-key"><summary>Key</summary>' + LEG + '<p class="np-mu" style="margin-top:8px">Bars: incidents per week over the last 13 weeks from each official feed (Starlink: IODA outage signals).</p></details>'
-            + '<p class="np-mu" style="margin-top:18px"><a href="/network">Every network check</a></p></div>'
+            + '<p class="np-mu" style="margin-top:18px"><a href="/grid">Every network check</a></p></div>'
             + f'<style>{CSS}{HUBCSS}</style>')
     desc = "Is AWS, Azure, Microsoft 365, Google Cloud, Google Workspace, Cloudflare, Akamai or Starlink down? Live status, incidents, root causes and what to do, plus a networks-near-me check."
-    ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Cloud and network provider status", "url": SITE + "/network", "description": desc,
-          "hasPart": [{"@type": "WebPage", "name": f"{P[s]['name']} status", "url": f"{SITE}/network/{s}"} for s in ORDER] + [{"@type": "WebPage", "name": "Starlink status", "url": f"{SITE}/network/starlink"}]}
-    return site_page.page("Is the cloud down? AWS, Azure, Microsoft 365, Google, Cloudflare status", desc, body, "/network", active="net", jsonld=ld, og_type="website")
+    ld = {"@context": "https://schema.org", "@type": "CollectionPage", "name": "Cloud and network provider status", "url": SITE + "/grid", "description": desc,
+          "hasPart": [{"@type": "WebPage", "name": f"{P[s]['name']} status", "url": f"{SITE}/grid/{s}"} for s in ORDER] + [{"@type": "WebPage", "name": "Starlink status", "url": f"{SITE}/grid/starlink"}]}
+    return site_page.page("Is the cloud down? AWS, Azure, Microsoft 365, Google, Cloudflare status", desc, body, "/grid", active="net", jsonld=ld, og_type="website")
 
 # ---------------------------------------------------------------- Starlink + Networks near me (netstarlink.py; reloaded when that file changes)
 _SLM = [None, None]
@@ -775,11 +775,11 @@ def sl():
     return _SLM[1]
 def sl_brief():
     try: return sl().brief(_sys_mod())
-    except Exception as e: return dict(slug="starlink", name="Starlink", level=-1, level_name=LVN[-1], status=f"Measurements unavailable ({type(e).__name__})", latest=None, weeks=[], page="/network/starlink")
+    except Exception as e: return dict(slug="starlink", name="Starlink", level=-1, level_name=LVN[-1], status=f"Measurements unavailable ({type(e).__name__})", latest=None, weeks=[], page="/grid/starlink")
 def _sys_mod():
     import sys as _sys
     return _sys.modules[__name__]
-HUBQ = ('<div class="np-hubq"><b>{pin}Networks near me</b><form action="/network/near" method="get" role="search"><label for="hub_q" class="np-mu" style="position:absolute;left:-9999px">ZIP code or city</label>'
+HUBQ = ('<div class="np-hubq"><b>{pin}Networks near me</b><form action="/grid/near" method="get" role="search"><label for="hub_q" class="np-mu" style="position:absolute;left:-9999px">ZIP code or city</label>'
         '<input id="hub_q" name="where" placeholder="ZIP code or city, e.g. 80202 or Denver" maxlength="120" style="flex:1 1 200px;min-width:0;font:500 15px/1.2 var(--bn-font-body,Inter,sans-serif);padding:10px 12px;border-radius:10px;border:1px solid var(--bd2,#2f3742);background:var(--bn-surface,#161b21);color:var(--tx,#e6e9ee)">'
         '<button class="np-btn p" type="submit">Check status and weather</button></form></div>')
 
@@ -821,7 +821,7 @@ function panel(b){var L=b.latest,h='<div class="nsa-in"><div>';
  return h+'</div></div>'}
 function load(slug,box){if(CACHE[slug]&&Date.now()-CACHE[slug].t<300000){box.innerHTML=panel(CACHE[slug].b);return}
  if(!box.innerHTML)box.innerHTML='<div class="nsa-in"><div class="nsa-cap">Loading the official feed…</div></div>';
- fetch("/api/network/"+slug+"/brief").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(b){CACHE[slug]={t:Date.now(),b:b};box.innerHTML=panel(b)}).catch(function(){box.innerHTML='<div class="nsa-in"><div class="nsa-cap">Could not load right now. <a href="/network/'+slug+'">Open the full page</a>.</div></div>'})}
+ fetch("/api/network/"+slug+"/brief").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(b){CACHE[slug]={t:Date.now(),b:b};box.innerHTML=panel(b)}).catch(function(){box.innerHTML='<div class="nsa-in"><div class="nsa-cap">Could not load right now. <a href="/grid/'+slug+'">Open the full page</a>.</div></div>'})}
 function toggle(w,force){var o=force!=null?force:!w.classList.contains("open"),slug=w.dataset.slug,b=w.querySelector(".nsa-b"),p=w.querySelector(".nsa-p");
  w.classList.toggle("open",o);b.setAttribute("aria-expanded",o?"true":"false");p.setAttribute("aria-hidden",o?"false":"true");if(o){OPEN[slug]=1;load(slug,p.firstChild)}else delete OPEN[slug]}
 var SLB=null,SLT=0;
@@ -837,7 +837,7 @@ function slFetch(){if(Date.now()-SLT<300000)return;SLT=Date.now();fetch("/api/ne
  var w=document.querySelector('.nsa[data-slug="starlink"]');if(w){var st=w.querySelector(".nsa-b .st"),d=w.querySelector(".nsa-b .d");if(st&&b.status)st.textContent=b.status;if(d&&b.level!=null&&b.level>=0)d.className="d ns-l"+b.level}
  var row=document.querySelector(".ns-row[data-sl]");if(row){var st2=row.querySelector(".st");if(st2&&b.status)st2.textContent=b.status}}).catch(function(){})}
 function enhance(){var list=document.getElementById("ns_list");if(!list)return;css();if(list.querySelector(".ns-row")){slRow(list);slFetch()}
- list.querySelectorAll("h3").forEach(function(h){if(h.querySelector(".nsa-hub"))return;var n=h.firstChild,t=((n&&n.nodeType===3?n.textContent:h.textContent)||"").trim();if(t==="DNS & CDN"){h.insertAdjacentHTML("beforeend",' <a class="nsa-hub" href="/network" style="float:right;font-size:11px;letter-spacing:.04em;color:#ff6b6e;text-decoration:none;text-transform:none">Provider pages &rarr;</a>')}});
+ list.querySelectorAll("h3").forEach(function(h){if(h.querySelector(".nsa-hub"))return;var n=h.firstChild,t=((n&&n.nodeType===3?n.textContent:h.textContent)||"").trim();if(t==="DNS & CDN"){h.insertAdjacentHTML("beforeend",' <a class="nsa-hub" href="/grid" style="float:right;font-size:11px;letter-spacing:.04em;color:#ff6b6e;text-decoration:none;text-transform:none">Provider pages &rarr;</a>')}});
  list.querySelectorAll(".ns-row").forEach(function(r){var nmEl=r.children[1],nm=(nmEl&&nmEl.textContent||"").trim(),slug=MAP[nm];if(!slug)return;
   var w=document.createElement("div");w.className="nsa";w.dataset.slug=slug;var id="nsa-p-"+slug;
   w.innerHTML='<button type="button" class="nsa-b" aria-expanded="false" aria-controls="'+id+'">'+r.children[0].outerHTML+'<span class="nm">'+esc(nm)+'<small>DETAILS &amp; WHAT TO DO</small></span><span class="c3">'+(r.children[2]?r.children[2].innerHTML:"")+'</span>'+(r.children[3]?r.children[3].outerHTML:"")+CHEV+'</button><div class="nsa-p" id="'+id+'" role="region" aria-hidden="true" aria-label="'+esc(nm)+' details"><div></div></div>';
@@ -850,7 +850,7 @@ def acc_js(): return ACC_JS.replace("__MAP__", json.dumps(dict(SRC2SLUG, Starlin
 _PC = {}
 _PC_BUSY = set(); _PC_LOCK = threading.Lock()
 def _pc_build(k):
-    return render_hub() if k == "/network" else render(k.rsplit("/", 1)[1])
+    return render_hub() if k == "/grid" else render(k.rsplit("/", 1)[1])
 def _pc_refresh(k):
     with _PC_LOCK:
         if k in _PC_BUSY: return
@@ -863,25 +863,25 @@ def _pc_refresh(k):
     threading.Thread(target=job, daemon=True, name="np-swr").start()
 def handle_get(path, qs, headers=None):
     p = path.rstrip("/") or "/"
-    if p == "/network" and os.environ.get("BN_NETMAP", "1") != "0":   # Nov 23 2026 (pt1755u): full-screen Network Status map (netmap.py); BN_NETMAP=0 = old hub
+    if p == "/grid" and os.environ.get("BN_NETMAP", "1") != "0":   # Nov 23 2026 (pt1755u): full-screen Network Status map (netmap.py); BN_NETMAP=0 = old hub
         import netmap
         return netmap.handle_get(p, qs)
-    if re.fullmatch(r"/network/status/[a-z0-9]+", p):   # pt1785u: per-service detail pages behind the board's tiles
+    if re.fullmatch(r"/grid/status/[a-z0-9]+", p):   # pt1785u: per-service detail pages behind the board's tiles
         import netmap
         return netmap.handle_get(p, qs)
-    if p == "/network/providers": p = "/network"   # the previous provider hub stays reachable here
-    if p in ("/network/starlink", "/network/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
+    if p == "/grid/providers": p = "/grid"   # the previous provider hub stays reachable here
+    if p in ("/grid/starlink", "/grid/near") or p.startswith("/api/network/starlink") or p == "/api/network/near":
         r = sl().handle_get(p, qs or {}, _sys_mod(), headers)
         if r is not None: return r
-    if p == "/network" or re.fullmatch(r"/network/[a-z0-9]+", p):   # Nov 17 push C: 45 s page cache (the hub took 1.5-8 s per request and timed out headless checks)
+    if p == "/grid" or re.fullmatch(r"/grid/[a-z0-9]+", p):   # Nov 17 push C: 45 s page cache (the hub took 1.5-8 s per request and timed out headless checks)
         # Push E: stale-while-revalidate. Fresh (<45 s) or stale (<30 min) copies are served at once; a stale copy triggers one background rebuild.
-        if p != "/network" and p.rsplit("/", 1)[1] not in P: return 404, {"error": "not found"}
+        if p != "/grid" and p.rsplit("/", 1)[1] not in P: return 404, {"error": "not found"}
         k = p; hit = _PC.get(k); age = time.time() - hit[0] if hit else None
         if hit and age < 45: return 200, hit[1], "text/html"
         if hit and age < 1800:
             _pc_refresh(k); return 200, hit[1], "text/html"
         out = _pc_build(k); _PC[k] = (time.time(), out); return 200, out, "text/html"
-    m = re.fullmatch(r"/network/([a-z0-9]+)", p)
+    m = re.fullmatch(r"/grid/([a-z0-9]+)", p)
     if m and m.group(1) in P: return 200, render(m.group(1)), "text/html"
     if p == "/api/network/accordion.js": return 200, acc_js(), "application/javascript; charset=utf-8"
     m = re.fullmatch(r"/api/network/([a-z0-9]+)/brief", p)
@@ -891,7 +891,7 @@ def handle_get(path, qs, headers=None):
         d = data(m.group(1))
         return 200, {"slug": m.group(1), "active": [jsonable(i) for i in d.get("active", [])], "history": [jsonable(i) for i in d.get("history", [])[:60]],
                      "coverage": d.get("coverage"), "fetched": d.get("fetched"), "error": d.get("error")}
-    if p == "/api/network": return 200, {"providers": [{"slug": s, "name": P[s]["name"], "page": f"/network/{s}", "api": f"/api/network/{s}/brief"} for s in ORDER]
-                                         + [{"slug": "starlink", "name": "Starlink", "page": "/network/starlink", "api": "/api/network/starlink/brief"}],
-                                         "near_me": {"page": "/network/near", "api": "/api/network/near?q=<ZIP or place>"}}
+    if p == "/api/network": return 200, {"providers": [{"slug": s, "name": P[s]["name"], "page": f"/grid/{s}", "api": f"/api/network/{s}/brief"} for s in ORDER]
+                                         + [{"slug": "starlink", "name": "Starlink", "page": "/grid/starlink", "api": "/api/network/starlink/brief"}],
+                                         "near_me": {"page": "/grid/near", "api": "/api/network/near?q=<ZIP or place>"}}
     return 404, {"error": "not found"}

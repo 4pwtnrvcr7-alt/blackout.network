@@ -1,5 +1,5 @@
-"""Starlink page (/network/starlink) and "Networks near me" (/network/near) for the network status pages (t479, Nov 1 2026).
-Called from netpages.py (routes /network/starlink, /network/near, /api/network/starlink*, /api/network/near); never imported elsewhere
+"""Starlink page (/grid/starlink) and "Networks near me" (/grid/near) for the network status pages (t479, Nov 1 2026).
+Called from netpages.py (routes /grid/starlink, /grid/near, /api/network/starlink*, /api/network/near); never imported elsewhere
 except spacex.py, which reuses the shared CelesTrak Starlink file so this host downloads GROUP=starlink once per refresh, not twice.
 
 Data (all free; nothing about the visitor is stored; a searched place is only kept as rounded coordinates in a 10-minute memory cache):
@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__)); SITE = "https://blackout.network"
-UA = "BlackoutNetwork-status/1.0 (+https://blackout.network/network/starlink; cached, polite)"
+UA = "BlackoutNetwork-status/1.0 (+https://blackout.network/grid/starlink; cached, polite)"
 GP_URL = "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=csv"
 SATCAT_URL = "https://celestrak.org/satcat/records.php?NAME=STARLINK&FORMAT=CSV"
 GP_MAX_AGE = 6 * 3600; SATCAT_MAX_AGE = 12 * 3600; ERR_BACKOFF = 2 * 3600 + 300
@@ -319,7 +319,7 @@ def _ioda_meta(d, np, when):
     return d
 def brief_out(np, headers):
     if not same_origin(headers):
-        return {"slug": "starlink", "name": "Starlink", "page": "/network/starlink",
+        return {"slug": "starlink", "name": "Starlink", "page": "/grid/starlink",
                 "note": "IODA outage measurements are shown on the Starlink page and are not included in this response."}
     b = brief(np)
     return _ioda_meta(b, np, b.get("fetched_et") or np.fmt_et(now()))
@@ -370,7 +370,7 @@ def brief(np):
     s = starlink_status(); incs = [_ev_inc(e) for e in s["events"] if e.get("start")]; incs.sort(key=lambda i: i["start"], reverse=True)
     lt = incs[0] if incs else None; lv = s["level"]
     return dict(slug="starlink", name="Starlink", level=lv, level_name=np.LVN.get(lv, ""), status=s["text"], active=1 if lv > 0 else 0,
-                latest=np.jsonable(lt) if lt else None, weeks=np.weekly(incs), uptime7=[], uptime_pct=None, page="/network/starlink",
+                latest=np.jsonable(lt) if lt else None, weeks=np.weekly(incs), uptime7=[], uptime_pct=None, page="/grid/starlink",
                 tips=["Open the Starlink app: it shows outages, obstructions and dish status", "Restart the dish and router by unplugging power for a minute", "Heavy rain or snow can slow Starlink; check the weather where the dish is"],
                 status_url=f"{IODA_WEB}/asn/{ASN}", status_name="IODA: Starlink AS14593", console=["Starlink support", "https://www.starlink.com/support"],
                 coverage="IODA outage events for AS14593 over the last 13 weeks. Starlink publishes no public status feed", latest_label="Latest outage signal (IODA)", source_label="IODA event",
@@ -558,21 +558,21 @@ def render(np):
               '<p class="np-mu" style="margin-top:10px">Satellite data: CelesTrak (celestrak.org), from US Space Force tracking; refreshed at most every 6 hours (catalog every 12). '
               'Network measurements: IODA, Internet Intelligence Lab, Georgia Tech. Speeds: Ookla (published report) and Cloudflare Radar (CC BY-NC 4.0). Not affiliated with SpaceX or Starlink.</p>'
               + ioda_html + radar_html + '</section>')
-    others = " · ".join(f'<a href="/network/{s}">{E(np.P[s]["name"])}</a>' for s in np.ORDER)
+    others = " · ".join(f'<a href="/grid/{s}">{E(np.P[s]["name"])}</a>' for s in np.ORDER)
     nl = ('<div class="np-nl"><div><b>Know about the next big outage first</b><div class="np-mu">The free BLACKOUT.NETWORK newsletter: major outages, threats and what to do. Follow us on YouTube and X too.</div></div>'
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=starlink">Get the free newsletter</a></div>')
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › <a href="/network/providers">Providers</a> › Starlink</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/grid">The Grid</a> › <a href="/grid/providers">Providers</a> › Starlink</p>'
             + hero + sec_glb + f'<div class="np-grid2 np-gap">{sec_st}{sec_h}</div>' + sec_sp + sec_wx + nl + sec_ck + sec_ln
             + f'<p class="np-mu">Other providers: {others}. Research only; not affiliated with SpaceX. Names identify services only.</p></div>'
             f'<style>{np.CSS}{SL_CSS}</style>{GLOBE_JS}')
     title = "Is Starlink down? Live status, satellites in orbit and speeds"
     desc = "Starlink network status from independent measurements, a live map of Starlink satellites, operational counts, launches, published speeds and how weather affects Starlink."
-    ld = [{"@context": "https://schema.org", "@type": "WebPage", "name": title, "description": desc, "url": f"{SITE}/network/starlink", "dateModified": iso(t),
+    ld = [{"@context": "https://schema.org", "@type": "WebPage", "name": title, "description": desc, "url": f"{SITE}/grid/starlink", "dateModified": iso(t),
            "isPartOf": {"@type": "WebSite", "name": "BLACKOUT.NETWORK", "url": SITE}, "about": {"@type": "Organization", "name": "Starlink (SpaceX)", "url": "https://www.starlink.com"}},
           {"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
-              {"@type": "ListItem", "position": 1, "name": "BLACKOUT.NETWORK", "item": SITE + "/"}, {"@type": "ListItem", "position": 2, "name": "Network providers", "item": SITE + "/network"},
-              {"@type": "ListItem", "position": 3, "name": "Starlink", "item": f"{SITE}/network/starlink"}]}]
-    return np.site_page.page(title, desc, body, "/network/starlink", active="net", jsonld=ld, og_type="website")
+              {"@type": "ListItem", "position": 1, "name": "BLACKOUT.NETWORK", "item": SITE + "/"}, {"@type": "ListItem", "position": 2, "name": "Network providers", "item": SITE + "/grid"},
+              {"@type": "ListItem", "position": 3, "name": "Starlink", "item": f"{SITE}/grid/starlink"}]}]
+    return np.site_page.page(title, desc, body, "/grid/starlink", active="net", jsonld=ld, og_type="website")
 
 # ---------------------------------------------------------------- Networks near me
 US_STATES = {"AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware", "DC": "District of Columbia",
@@ -705,7 +705,7 @@ def _near_build(loc, np):
         f_cl = [(s, ex.submit(np.brief, s)) for s in np.ORDER]
         sl, _ = res(f_sl); av = starlink_avail(cc)
         nets.append(dict(id="starlink", group="satellite", name="Starlink (satellite internet)", level=sl["level"] if sl else -1, status=sl["text"] if sl else "Measurements unavailable",
-                         avail=av, why="Network-wide signal for Starlink's AS14593 (IODA). Starlink has no public status feed.", page="/network/starlink"))
+                         avail=av, why="Network-wide signal for Starlink's AS14593 (IODA). Starlink has no public status feed.", page="/grid/starlink"))
         if f_rg:
             al, _ = res(f_rg); lv, txt, _ = hl(al)
             nets.append(dict(id="region", group="local", name=f"All internet in {rc[1]}", level=lv, status=txt, why="Every provider in this state or region together, measured by IODA (Georgia Tech).", url=f"{IODA_WEB}/region/{rc[0]}"))
@@ -718,7 +718,7 @@ def _near_build(loc, np):
             nets.append(dict(id=f"as{a}", group="isp", name=n, level=lv, status=txt, why=f"National network AS{a} (IODA). A local outage may not show at this level.", url=f"{IODA_WEB}/asn/{a}"))
         for s, f in f_cl:
             b, _ = res(f)
-            nets.append(dict(id=s, group="cloud", name=np.P[s]["name"], level=b["level"] if b else -1, status=b["status"] if b else "Feed unreachable", page=f"/network/{s}",
+            nets.append(dict(id=s, group="cloud", name=np.P[s]["name"], level=b["level"] if b else -1, status=b["status"] if b else "Feed unreachable", page=f"/grid/{s}",
                              why="Runs apps and websites used everywhere, so it applies wherever you are."))
         wx, _ = res(f_wx)
     wx = wx or dict(alerts=[], gdacs=[], current=None, note="Weather data is unavailable right now.", sources=[], generated=None)
@@ -763,13 +763,13 @@ function go(qstr,label){out.innerHTML='<p class="np-mu">Checking networks and we
  fetch("/api/network/near?"+qstr).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.error||"error");return j})}).then(function(d){render(d);
   try{if(window.gtag)gtag("event","network_search",{search_type:d.ga.search_type,region:d.ga.region,country:d.ga.country})}catch(e){}})
  .catch(function(e){out.innerHTML='<p class="np-note">'+esc(e.message||"Could not check right now.")+'</p>'})}
-f.addEventListener("submit",function(e){e.preventDefault();var v=q.value.trim();if(v.length<2)return;try{history.replaceState(null,"","/network/near?where="+encodeURIComponent(v))}catch(_){}go("q="+encodeURIComponent(v))});
+f.addEventListener("submit",function(e){e.preventDefault();var v=q.value.trim();if(v.length<2)return;try{history.replaceState(null,"","/grid/near?where="+encodeURIComponent(v))}catch(_){}go("q="+encodeURIComponent(v))});
 var qs=new URLSearchParams(location.search),p=qs.get("where")||qs.get("zip")||qs.get("q");if(p){q.value=p;go("q="+encodeURIComponent(p))}
 })();</script>"""
 
 def render_near(np):
     ic = lambda n, c="np-ic": _ic(np, n, c)
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › <a href="/network/providers">Providers</a> › Networks near me</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/grid">The Grid</a> › <a href="/grid/providers">Providers</a> › Networks near me</p>'
             f'<section class="np-hero page-header-band"><div class="np-hrow">{np.TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div>'
             '<h1>Networks near me</h1><p>Type a ZIP code, city or address. We show the networks that serve that place and their status right now, '
             'active weather alerts there, and a plain note on how that weather can affect your connection.</p></div></div>'
@@ -782,15 +782,15 @@ def render_near(np):
             + ioda_credit_html(np, np.fmt_et(now())) + '</div>'
             f'<style>{np.CSS}{SL_CSS}</style>{NEAR_JS}')
     desc = "Type a ZIP code or city to see the internet networks that serve it, their status right now, and active weather alerts that can affect them, including Starlink."
-    ld = {"@context": "https://schema.org", "@type": "WebPage", "name": "Networks near me: internet status and weather", "url": f"{SITE}/network/near", "description": desc}
-    return np.site_page.page("Is the internet down near me? Network status and weather by ZIP code", desc, body, "/network/near", active="net", jsonld=ld, og_type="website", noindex=True)
+    ld = {"@context": "https://schema.org", "@type": "WebPage", "name": "Networks near me: internet status and weather", "url": f"{SITE}/grid/near", "description": desc}
+    return np.site_page.page("Is the internet down near me? Network status and weather by ZIP code", desc, body, "/grid/near", active="net", jsonld=ld, og_type="website", noindex=True)
 
 def handle_get(path, qs, np, headers=None):
     """Returns a response tuple, or None when the path is not ours.
     /api/network/starlink/brief and /api/network/near include IODA measurements only for same-origin requests from our pages."""
     p = path.rstrip("/")
-    if p == "/network/starlink": return 200, render(np), "text/html"
-    if p == "/network/near": return 200, render_near(np), "text/html"
+    if p == "/grid/starlink": return 200, render(np), "text/html"
+    if p == "/grid/near": return 200, render_near(np), "text/html"
     if p == "/api/network/starlink/brief": return 200, brief_out(np, headers)
     if p == "/api/network/starlink/gp":
         try: n = int((qs.get("n") or ["1500"])[0])

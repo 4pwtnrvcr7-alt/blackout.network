@@ -3485,7 +3485,7 @@ def prefs_form(tok, r):
             '<fieldset><legend>Network outages</legend><input type="hidden" name="net_present" value="1">'
             f'<label class="nl-chk"><input type="checkbox" name="net_brief" value="1"{" checked" if _row_get(r, "net_brief", 0) else ""}> Include the network outage report in my briefs</label>'
             '<p class="nl-sm">Internet, mobile, cloud, payments and power outages from official status pages, IODA and ODIN. '
-            '<a href="/network">See the live outage map</a>.</p></fieldset>'
+            '<a href="/grid">See the live outage map</a>.</p></fieldset>'
             + tracking_fieldset(r) +
             '<button class="pri" type="submit">Save preferences</button> '
             '<p class="nl-msg" role="status" aria-live="polite"></p></form>')

@@ -807,9 +807,15 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
+            try:
+                import deactivated; _rn = deactivated.renamed(u.path, u.query)   # Nov 24 2026: /network(/...) -> /grid(/...) (The Grid's canonical URL)
+            except Exception: _rn = None
+            if _rn:
+                self.send_response(302); self.send_header("Location", _rn); self.send_header("Content-Length", "0")
+                self.send_header("Cache-Control", "no-store"); self.end_headers(); return
             if _deactivated_off(u.path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py, state "off") -> temporary 302 to "/"
                 try:
-                    import deactivated; loc = deactivated.location(u.path)   # merged pages (deactivated.MOVED, e.g. /grid -> /network) go to their new home
+                    import deactivated; loc = deactivated.location(u.path)   # merged pages (deactivated.MOVED) go to their new home
                 except Exception: loc = "/"
                 self.send_response(302); self.send_header("Location", loc); self.send_header("Content-Length", "0")
                 self.send_header("Cache-Control", "no-store"); self.end_headers(); return

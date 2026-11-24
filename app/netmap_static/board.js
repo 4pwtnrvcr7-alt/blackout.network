@@ -1,4 +1,4 @@
-/* Network status board (/network, Nov 23 2026, pt1758u). The main view: "Is it down?" search with a plain-English verdict,
+/* Network status board (/grid, Nov 23 2026, pt1758u). The main view: "Is it down?" search with a plain-English verdict,
    live tiles by group with a 24 h strip, chain reactions, one-tap "Down for me" reports, a US report map that appears only
    during an incident, and the incident timeline. Data: /api/netmap/data (shared with net.js) + /api/netmap/board. */
 (function () {
@@ -111,7 +111,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     a += (url(n.status_url) ? '<a class="nb-lnk" href="' + url(n.status_url) + '" target="_blank" rel="noopener">Official status</a>' : "") +
       (url(n.support) ? '<a class="nb-lnk" href="' + url(n.support) + '" target="_blank" rel="noopener">Contact</a>' : "") +
       (url(n.ioda) ? '<a class="nb-lnk" href="' + url(n.ioda) + '" target="_blank" rel="noopener">IODA</a>' : "") +
-      '<a class="nb-lnk" href="/network/status/' + esc(n.id) + '">History and details</a>' + (url(n.page) ? '<a class="nb-lnk" href="' + url(n.page) + '">Provider analysis</a>' : "") + '</div><div class="nb-zip" data-zipfor="' + esc(n.id) + '" hidden></div>';
+      '<a class="nb-lnk" href="/grid/status/' + esc(n.id) + '">History and details</a>' + (url(n.page) ? '<a class="nb-lnk" href="' + url(n.page) + '">Provider analysis</a>' : "") + '</div><div class="nb-zip" data-zipfor="' + esc(n.id) + '" hidden></div>';
     return a;
   }
   function untracked(app) {
@@ -202,7 +202,7 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
     var m = chart24(n), txt = n.link_only ? "Official status page only" : (n.status || word(n));
     var back = '<div class="nb-fb ' + st + '"' + (f ? "" : ' aria-hidden="true"') + '><button type="button" class="nb-fx" data-flip="' + esc(n.id) + '" aria-label="Back to the front of ' + esc(nm) + '"' + (f ? "" : ' tabindex="-1"') + '>' +
       '<span class="nb-fw"><i></i>' + esc(nm) + '</span><span class="nb-fs">' + esc(txt) + '</span>' + m.svg + '<span class="nb-tf"><span>' + esc(m.lbl) + '</span><span>' + esc(m.tail || (r.h24 ? r.h24 + " reports today" : n.kind === "asn" ? "IODA signal" : "Status page")) + '</span></span></button>' +
-      '<div class="nb-fa"><a class="nb-fe" href="/network/status/' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>Expand</a>' +
+      '<div class="nb-fa"><a class="nb-fe" href="/grid/status/' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>Expand</a>' +
       (n.link_only ? "" : '<button type="button" class="nb-fd" data-down="' + esc(n.id) + '"' + (f ? "" : ' tabindex="-1"') + '>' + (mine(n.id) ? "Reported" : "Down for me") + '</button>') + '</div></div>';
     return '<div class="nb-fc' + (f ? " flip" : "") + '" data-fc="' + esc(n.id) + '"><div class="nb-fi">' + front + back + '</div></div>';
   }

@@ -1,5 +1,5 @@
 /* The Grid, merged (Nov 24 2026, Matt pt1795u): the old /grid page's grid operator layer, detail cards and "More about the grid"
-   sheet, running on the /network map (net.js creates the map; this file adds the "Grid operators" layer to it). Adapted from
+   sheet, running on the /grid map (net.js creates the map; this file adds the "Grid operators" layer to it). Adapted from
    gridpage_static/grid.js (kept in the repo). Read-only: /api/gridpage/data, /api/gridpage/world, /api/gridstatus/*, /api/grid.
    Colors: green normal, orange strained or degraded, red only for an operator outage or a rank 7+ alert, grey no live data. No yellow. */
 (function () {

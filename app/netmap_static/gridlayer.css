@@ -1,5 +1,5 @@
 /* The Grid, merged (Nov 24 2026, Matt pt1795u): styles for the old /grid page's loader, operator cards and "More about the grid"
-   sheet on /network. Copied from gridpage_static/grid.css (kept in the repo). Dark only. No yellow: green / orange / red / grey. */
+   sheet on /grid. Copied from gridpage_static/grid.css (kept in the repo). Dark only. No yellow: green / orange / red / grey. */
 :root{--gx-ok:#2FD67B;--gx-strain:#FF7A1A;--gx-out:#FF3B3B;--gx-na:#7C8190;--gx-tx:#F0F0FA;--gx-mu:rgba(240,240,250,.62);--gx-bd:rgba(240,240,250,.12);--gx-bg:#05060a;--gx-ease:cubic-bezier(.2,.7,.2,1)}
 /* ---------- loader: current runs down three feeder lines into a 3x3 grid of nodes that switch on in sequence ---------- */
 .gx-ld{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(55% 45% at 50% 45%,rgba(47,214,123,.07),transparent 70%),var(--gx-bg);transition:opacity .6s var(--gx-ease),visibility .6s}

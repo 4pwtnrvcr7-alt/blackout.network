@@ -1,4 +1,4 @@
-/* Network status board (/network main view, Nov 23 2026, pt1758u). Dark only, no yellow; red only for a major outage. */
+/* Network status board (/grid main view, Nov 23 2026, pt1758u). Dark only, no yellow; red only for a major outage. */
 .nb{--g:#2FD67B;--mi:#FFA040;--dg:#FF7A1A;--rd:#FF3B3B;--rp:#A98BFF;--cy:#22E5FF;--na:#7C8190;--tx:#F0F0FA;--mu:rgba(240,240,250,.64);--bd:rgba(240,240,250,.11);--card:#0a0c14;
  position:fixed;inset:0;z-index:15;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
  background:radial-gradient(900px 420px at 50% -120px,rgba(77,141,255,.10),transparent 70%),#05060a;color:var(--tx);font-family:Inter,system-ui,sans-serif;

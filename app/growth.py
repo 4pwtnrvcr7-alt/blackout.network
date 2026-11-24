@@ -60,9 +60,9 @@ def _ro():
     c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=10); c.row_factory = sqlite3.Row; return c
 
 STATIC_PAGES = [("/", "hourly", "1.0"), ("/wire", "hourly", "0.9"), ("/newsletter", "daily", "0.9"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
-                ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/crime", "hourly", "0.8"), ("/network", "hourly", "0.8"), ("/mesh", "hourly", "0.7"), ("/mesh/chat", "weekly", "0.5"), ("/mesh/guide", "monthly", "0.6"), ("/cern", "weekly", "0.7"),
-                ("/network/aws", "hourly", "0.7"), ("/network/azure", "hourly", "0.7"), ("/network/m365", "hourly", "0.7"), ("/network/gcp", "hourly", "0.7"),
-                ("/network/workspace", "hourly", "0.7"), ("/network/cloudflare", "hourly", "0.7"), ("/network/akamai", "hourly", "0.7"), ("/network/starlink", "hourly", "0.7"), ("/network/near", "weekly", "0.6"), ("/newsletter/sample", "daily", "0.5"),
+                ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/crime", "hourly", "0.8"), ("/grid", "hourly", "0.8"), ("/mesh", "hourly", "0.7"), ("/mesh/chat", "weekly", "0.5"), ("/mesh/guide", "monthly", "0.6"), ("/cern", "weekly", "0.7"),
+                ("/grid/aws", "hourly", "0.7"), ("/grid/azure", "hourly", "0.7"), ("/grid/m365", "hourly", "0.7"), ("/grid/gcp", "hourly", "0.7"),
+                ("/grid/workspace", "hourly", "0.7"), ("/grid/cloudflare", "hourly", "0.7"), ("/grid/akamai", "hourly", "0.7"), ("/grid/starlink", "hourly", "0.7"), ("/grid/near", "weekly", "0.6"), ("/newsletter/sample", "daily", "0.5"),
                 ("/cookies", "yearly", "0.2"), ("/privacy-choices", "yearly", "0.2"),
                 ("/privacy", "yearly", "0.2"), ("/tos", "yearly", "0.2"),
                 ("/midterms", "hourly", "0.8"), ("/ready", "monthly", "0.7"), ("/map", "hourly", "0.6")]   # seo/ready-hub: Everyday Readiness guides   # seo/batch-2: /midterms is now a real server-rendered hub   # /map: global signal map
@@ -73,7 +73,7 @@ def sitemap():
         now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         pages = STATIC_PAGES   # seo/batch-1: /stats was listed twice
         if os.environ.get("BN_MESH_UI", "0") != "1": pages = [x for x in pages if not x[0].startswith("/mesh")]   # Nov 17 (Matt 8:19 AM): /mesh unlisted
-        pages = [x for x in pages if x[0] not in ("/social", "/stats", "/network/near")]   # Nov 21 (Matt pt1687u): unlisted hubs stay reachable by URL
+        pages = [x for x in pages if x[0] not in ("/social", "/stats", "/grid/near")]   # Nov 21 (Matt pt1687u): unlisted hubs stay reachable by URL
         try:
             import deactivated   # Nov 24 2026 (Matt): deactivated pages leave the sitemap
             pages = [x for x in pages if not deactivated.is_off(x[0])]
@@ -157,7 +157,9 @@ and situational awareness only; it is not an official warning service. Follow of
 - [Off-grid network map]({SITE}/mesh): live map of public off-grid mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
 ## Dashboard tabs
 
-- [The Grid]({SITE}/network), [Solar & Seismic]({SITE}/#solar), [Weather]({SITE}/weather)
+- [The Grid]({SITE}/grid): live status of the U.S. power grid operators, outages by state, internet, mobile, cloud and apps
+- [Weather]({SITE}/weather): current conditions, severe-weather alerts and the forecast
+- [Solar & Seismic]({SITE}/#solar)
 - [Midterms 2026]({SITE}/midterms), [Government]({SITE}/#government), [Politics]({SITE}/#politics)
 - [Preppers]({SITE}/#preppers), [Bushcraft]({SITE}/#bushcraft), [Medical]({SITE}/#medical), [Maps]({SITE}/#maps)
 

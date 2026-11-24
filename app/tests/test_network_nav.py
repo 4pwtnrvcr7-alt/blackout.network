@@ -1,4 +1,4 @@
-"""Network Status menu and leftover hashes go to /network (Nov 23 2026, pt1763u)."""
+"""Network Status menu and leftover hashes go to /grid (Nov 23 2026, pt1763u)."""
 import os, sys, unittest
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP)
@@ -11,9 +11,9 @@ class NetworkStatusNav(unittest.TestCase):
     def test_menu_links_the_status_board(self):
         import sitenav, sitenav_ui
         rows = {k: (l, h) for _, _, _, rs in sitenav_ui.menu3_sections(sitenav) for k, l, h in rs}
-        self.assertEqual(rows["net"], ("The Grid", "/network"))   # Nov 24 2026 (pt1795u): renamed, merged with The Grid
+        self.assertEqual(rows["net"], ("The Grid", "/grid"))   # Nov 24 2026 (pt1795u): renamed, merged with The Grid
         html = sitenav.header_html("")
-        self.assertIn('href="/network"', html)
+        self.assertIn('href="/grid"', html)
         self.assertNotIn("Network Status", html)
         self.assertNotIn("/live#network", html)
         self.assertNotIn('href="/#network"', html)
@@ -23,28 +23,28 @@ class NetworkStatusNav(unittest.TestCase):
     def test_hash_redirect_and_click_trap(self):
         js = _read("static", "sitenav.js")
         self.assertIn('(_hm==="network"||_hm==="net")', js)
-        self.assertIn('location.replace("/network"', js)
-        self.assertIn('k==="net"||href==="/network"', js)
+        self.assertIn('location.replace("/grid"', js)
+        self.assertIn('k==="net"||href==="/grid"', js)
 
     def test_other_entry_points(self):
         theme = _read("theme.py")
-        self.assertIn('"/network")', theme)
+        self.assertIn('"/grid")', theme)
         self.assertNotIn("/live#network", theme)
         welcome = _read("welcome.py")
-        self.assertIn('"/network")', welcome)
+        self.assertIn('"/grid")', welcome)
         self.assertNotIn('"/#network"', welcome)
         apple = _read("apple_v1.py")
-        self.assertIn('"/network")', apple)
+        self.assertIn('"/grid")', apple)
         js = _read("static", "bn-apple.js")
-        self.assertIn('box.href="/network"', js)
-        self.assertIn('location.href="/network"', js)
+        self.assertIn('box.href="/grid"', js)
+        self.assertIn('location.href="/grid"', js)
         self.assertNotIn("/live#network", js)
         self.assertNotIn("/#network", js)
 
     def test_provider_crumbs_point_at_the_board(self):
         for name in ("netpages.py", "netstarlink.py"):
             t = _read(name)
-            self.assertIn('<a href="/network">The Grid</a>', t, name)
+            self.assertIn('<a href="/grid">The Grid</a>', t, name)
             self.assertNotIn('href="/#net"', t, name)
 
 

@@ -22,7 +22,7 @@ YT_URL = "https://www.youtube.com/@blkoutntw"
 
 # Wanted order; anything deactivated is dropped. (key, label, href)
 ORDER = [("intro", "Intro", "/?intro=1"), ("threat", "The Wire", "/wire"), ("heatmap", "Heat Map", "/map"), ("weather", "Weather", "/weather"),
-         ("net", "The Grid", "/network"),   # Nov 24 2026 (Matt pt1795u): Network Status merged with The Grid; /grid 302s to /network
+         ("net", "The Grid", "/grid"),   # Nov 24 2026 (Matt pt1795u): Network Status merged with The Grid; /grid 302s to /grid
          ("finance", "Markets", "/markets"),
          ("newsletter", "Newsletter", "/newsletter")]
 

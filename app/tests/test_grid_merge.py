@@ -15,24 +15,26 @@ class GridMerge(unittest.TestCase):
         labels = [l for _, l, _ in its]
         self.assertEqual(labels.count("The Grid"), 1)
         self.assertNotIn("Network Status", labels)
-        self.assertIn(("net", "The Grid", "/network"), its)
-        self.assertFalse(any(h.split("?")[0] == "/grid" for _, _, h in its))
+        self.assertIn(("net", "The Grid", "/grid"), its)   # Nov 24 2026 8:32 AM ET: /grid is canonical
+        self.assertFalse(any(h.split("?")[0] == "/network" for _, _, h in its))
 
-    def test_old_grid_url_redirects_to_network(self):
+    def test_network_redirects_to_grid(self):
+        """Nov 24 2026 8:32 AM ET (Matt): /grid is canonical; /network and /network/* 302 to the same path under /grid."""
         import deactivated as D
-        if not D.ON: self.skipTest("BN_DEACTIVATE_PAGES=0")
-        for p in ("/grid", "/grid/", "/GRID", "/grid/anything"):
-            self.assertTrue(D.redirects(p), p)
-            self.assertEqual(D.location(p), "/network", p)
-        self.assertEqual(D.location("/live"), "/")
-        for p in ("/network", "/api/gridpage/data", "/api/gridpage/grid.js", "/api/gridstatus", "/gridx"):
-            self.assertFalse(D.redirects(p), p)
-        self.assertTrue(D.href_off("/grid"))
-        self.assertIn("grid", D.KEYS)
+        self.assertEqual(D.renamed("/network"), "/grid")
+        self.assertEqual(D.renamed("/network", "a=1"), "/grid?a=1")
+        self.assertEqual(D.renamed("/network/"), "/grid")
+        self.assertEqual(D.renamed("/network/status/aws"), "/grid/status/aws")
+        self.assertEqual(D.renamed("/GRID"), "/grid")
+        for p in ("/grid", "/grid/aws", "/api/network/aws/brief", "/api/netmap/data", "/networks", "/api/gridpage/data"):
+            self.assertIsNone(D.renamed(p), p)
+        self.assertFalse(D.redirects("/grid")); self.assertFalse(D.is_off("/grid"))
+        self.assertTrue(D.redirects("/grid/starlink"))
+        self.assertIn("grid", D.KEYS)   # the old menu key stays hidden; The Grid is the "net" item
 
     def test_page_has_the_merged_grid(self):
         import netpages, netmap
-        code, body, ct = netpages.handle_get("/network", {})
+        code, body, ct = netpages.handle_get("/grid", {})
         self.assertEqual(code, 200)
         self.assertIn("<title>The Grid:", body)
         self.assertIn('<h1 class="nx-vh">The Grid:', body)
@@ -61,9 +63,10 @@ class GridMerge(unittest.TestCase):
         for p in (("gridpage.py",), ("gridpage_static", "grid.js"), ("gridpage_static", "grid.css")):
             self.assertTrue(os.path.exists(os.path.join(APP, *p)), p)
 
-    def test_no_internal_links_to_grid(self):
-        for f in ("theme.py", "apple_v1.py", "ready.py", "welcome.py", "growth.py", "menu5.py", "sitenav_ui.py", os.path.join("signal_map_static", "app.js"), os.path.join("netmap_static", "net.js")):
+    def test_no_internal_links_to_network(self):
+        for f in ("theme.py", "apple_v1.py", "ready.py", "welcome.py", "growth.py", "menu5.py", "sitenav_ui.py", "meshnet.py", "netpages.py",
+                  os.path.join("signal_map_static", "app.js"), os.path.join("netmap_static", "net.js"), os.path.join("netmap_static", "board.js"), os.path.join("static", "bn-apple.js")):
             t = _read(f)
-            self.assertIsNone(re.search(r'href=["\']/grid\b|href: "/grid"|"/grid"\)|: "/grid"', t), f)
+            self.assertIsNone(re.search(r'href=["\']/network\b|href: "/network"|"/network"\)|: "/network"|blackout\.network/network', t), f)
 
 if __name__ == "__main__": unittest.main()

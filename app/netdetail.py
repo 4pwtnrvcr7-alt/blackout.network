@@ -1,4 +1,4 @@
-"""On-site detail page for every service on the Network Status board: /network/status/<id> (Nov 23 2026, pt1785u).
+"""On-site detail page for every service on the Network Status board: /grid/status/<id> (Nov 23 2026, pt1785u).
 Matt: each item needs a scrollable history of uptime and downtime and how many users were affected, hosted on our own site,
 with the original sources kept but secondary. History is ours (netboard tables in votes.db); user counts are only ever our own
 "Down for me" reports or a number the provider itself publishes, labeled as such. Nothing is estimated or invented."""
@@ -128,11 +128,11 @@ def render(n, hist, rep, generated=None, prov_inc=()):
     if n.get("support"): links.append(f'<a href="{E(n["support"])}" target="_blank" rel="noopener">{E(nm)} support</a>')
     if n.get("page"): links.append(f'<a href="{E(n["page"])}">Full provider analysis</a>')
     if n.get("ioda"): links.append(f'<a href="{E(n["ioda"])}" target="_blank" rel="noopener">IODA</a>')
-    body = (f'<div class="sd"><p class="sd-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › {E(nm)}</p>'
+    body = (f'<div class="sd"><p class="sd-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/grid">The Grid</a> › {E(nm)}</p>'
             f'<div class="sd-h"><div><h1>{E(nm)}</h1>' + (f'<p>{E(sub(n["name"]))}</p>' if sub(n["name"]) else "") + '</div>'
             f'<span class="sd-pill" style="--c:{c}"><i></i>{E(word(n, lv))}</span></div>'
             f'<p class="sd-st">{E(n.get("status") or "")}</p><p class="sd-mu">' + (f'Checked {E(_et(generated))} · ' if generated else "") + f'{E(n.get("basis") or "")}</p>'
-            f'<div class="sd-act"><button type="button" class="sd-btn" id="sd_down" data-id="{E(n["id"])}">Down for me</button><a class="sd-btn" href="/network">All services</a></div>'
+            f'<div class="sd-act"><button type="button" class="sd-btn" id="sd_down" data-id="{E(n["id"])}">Down for me</button><a class="sd-btn" href="/grid">All services</a></div>'
             f'<div class="sd-g">{cg}</div>'
             f'<h2>Uptime, last 90 days</h2><div class="sd-bar" role="img" aria-label="Daily status for the last 90 days">{bar}</div>'
             '<div class="sd-ax"><span>90 days ago</span><span>Today</span></div>'

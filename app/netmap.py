@@ -1,4 +1,4 @@
-"""/network: The Grid (was "Network Status"), full-screen outage map (Matt pt1755u, Nov 23 2026).
+"""/grid: The Grid (was "Network Status"), full-screen outage map (Matt pt1755u, Nov 23 2026).
 Nov 24 2026 (Matt pt1795u): the old /grid page is merged in (grid operator layer, "More about the grid" sheet, its loader); /grid 302s here.
 Read-only and keyless. Everything is fetched on this node from free public feeds, cached in memory (stale-while-revalidate,
 one refresh at a time, never per request) and re-served as one compact JSON:
@@ -6,7 +6,7 @@ one refresh at a time, never per request) and re-served as one compact JSON:
   Stripe, and the cloud feeds netpages.py already reads) · PeeringDB facilities (data centers, refreshed daily, cached on disk) ·
   DOE/ORNL ODIN power outages via gridpage.py (gridstatus.db).
 Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py, config.json, the newsletter or the QA gate.
-Routes: /network (page, via netpages.py), /api/netmap/data, /api/netmap/dc, /api/netmap/<static file>."""
+Routes: /grid (page, via netpages.py), /api/netmap/data, /api/netmap/dc, /api/netmap/<static file>."""
 import os, re, json, time, math, threading, urllib.request, html as _html
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
@@ -15,10 +15,10 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
 FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
-UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
+UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
 DAYS = 30
-SATJS = ("https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js", "sha384-ks/q8WwP74/nmNCaw/3Kj9Iv2xK5DsfHUJx18wEND2nHyRN7wjPfXjJF1Ejyj1lH")   # same pinned build as /network/starlink
+SATJS = ("https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js", "sha384-ks/q8WwP74/nmNCaw/3Kj9Iv2xK5DsfHUJx18wEND2nHyRN7wjPfXjJF1Ejyj1lH")   # same pinned build as /grid/starlink
 STRONG = {"bgp", "ping-slash24"}
 MAX_EVENT_S = 72 * 3600    # IODA events longer than 3 days are baseline shifts, not outages
 
@@ -173,7 +173,7 @@ NETS = [
 GROUPS = [("bank", "Banks and brokerages"), ("cards", "Card networks"), ("isp", "Internet providers"), ("mobile", "Mobile carriers"), ("sat", "Satellite internet"), ("cloud", "Cloud and web"),
           ("pay", "Payments and money"), ("rails", "Banking rails"), ("apps", "Apps and messaging"), ("gov", "Government and public")]
 NP_PAGES = {"aws", "azure", "m365", "gcp", "workspace", "cloudflare", "akamai", "starlink"}
-def _page_off(path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py, e.g. /network/starlink) get no "full page" link on the cards
+def _page_off(path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py, e.g. /grid/starlink) get no "full page" link on the cards
     try:
         import deactivated
         return deactivated.is_off(path)
@@ -441,8 +441,8 @@ def build():
             else: r = asn_one(feed, asn.get())
         except Exception:
             r = dict(level=-1, status="Status feed unreachable right now", incidents=[], days=None, uptime=None, basis="")
-        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/network/{nid}" if nid in NP_PAGES and not _page_off(f"/network/{nid}") else None,
-                 detail=f"/network/status/{nid}")
+        r.update(id=nid, name=name, group=grp, kind=kind, status_url=page, support=support, page=f"/grid/{nid}" if nid in NP_PAGES and not _page_off(f"/grid/{nid}") else None,
+                 detail=f"/grid/status/{nid}")
         return r
     with ThreadPoolExecutor(12) as ex:
         nets = list(ex.map(one, NETS))
@@ -593,7 +593,7 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
   '<p class="nb-note">When one of these fails, the services under it usually fail too. Each link is from a past outage, and anything we infer is marked likely.</p><div class="nb-chg" id="nb_chains"></div></section>'
   '<footer class="nb-foot"><p>Verdicts combine official status pages, IODA internet measurements (Georgia Tech) and reports from people on this page. '
   '"Down for me" stores the service, the time and an optional ZIP, nothing else. Open <b>Map</b> for grid operators, data centers, power and internet outages, or <b>Sky</b> for satellites.</p>'
-  '<p><a href="/network/providers">Cloud provider pages</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a></p></footer>'
+  '<p><a href="/grid/providers">Cloud provider pages</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a></p></footer>'
   '</div></section>')
 
 SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
@@ -619,10 +619,10 @@ def page(qs=None):
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
 <title>{E(title)}</title><meta name="description" content="{E(desc)}">
-<link rel="canonical" href="https://blackout.network/network">
+<link rel="canonical" href="https://blackout.network/grid">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
-<meta property="og:url" content="https://blackout.network/network"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/network.png">
+<meta property="og:url" content="https://blackout.network/grid"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/grid.png">
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link rel="preload" href="/api/netmap/data" as="fetch" crossorigin>
@@ -660,7 +660,7 @@ def page(qs=None):
 <div class="nx-grab" aria-hidden="true"></div>
 <div class="nx-mh"><div><p class="nx-k">The Grid</p><h2>All networks</h2></div><button type="button" class="nx-x" id="nx_more_x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div class="nx-scroll" id="nx_scroll"><div id="nx_list"><p class="nx-empty">Loading…</p></div></div></section>
-<noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/network/providers">Cloud provider pages</a></p></noscript>
+<noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/grid/providers">Cloud provider pages</a></p></noscript>
 </main>
 <script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script src="/api/netmap/gridlayer.js?v={_v("gridlayer.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
 </body></html>'''
@@ -677,12 +677,12 @@ def detail_page(sid):
     nm = ND.short(n["name"])
     title = f"Is {nm} down? Live status, outage history and reports"
     desc = f"{nm} status now, 90-day uptime, incident history and Down for me reports, from " + (n.get("basis") or "official status feeds") + "."
-    return 200, site_page.page(title, desc, body, f"/network/status/{sid}", active="net", og_type="website"), "text/html"
+    return 200, site_page.page(title, desc, body, f"/grid/status/{sid}", active="net", og_type="website"), "text/html"
 
 def handle_get(path, qs=None, headers=None):
     p = path.rstrip("/") or "/"
-    if p == "/network": return 200, page(qs or {}), "text/html"
-    m = re.fullmatch(r"/network/status/([a-z0-9]+)", p)
+    if p in ("/grid", "/network"): return 200, page(qs or {}), "text/html"
+    m = re.fullmatch(r"/grid/status/([a-z0-9]+)", p)
     if m: return detail_page(m.group(1))
     if p == "/api/netmap/data":
         try:

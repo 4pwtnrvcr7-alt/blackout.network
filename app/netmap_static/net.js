@@ -1,4 +1,4 @@
-/* Network Status (/network, Nov 23 2026, pt1755u). MapLibre GL + OpenFreeMap, same brighter base style as /weather.
+/* Network Status (/grid, Nov 23 2026, pt1755u). MapLibre GL + OpenFreeMap, same brighter base style as /weather.
    Data: /api/netmap/data (networks, IODA outages, power), /api/netmap/dc (PeeringDB data centers), /api/signal/world.geojson.
    The loader builds a glowing network while the page preloads every dataset and the map tiles for the first view. */
 (function () {
@@ -472,7 +472,7 @@
       });
     });
     h += '<p class="nx-src">Bars show the last 30 days: green normal, grey minor, orange disruption, red major outage. Sources: ' + (D.sources || []).map(function (x) { return linkA(x.url, x.name); }).join(" · ") +
-      '. Updated ' + esc(ago(D.generated)) + '. Cell coverage by carrier is in the <a href="https://broadbandmap.fcc.gov/" target="_blank" rel="noopener noreferrer">FCC National Broadband Map</a>. <a href="/network/providers">Cloud provider pages</a></p>';
+      '. Updated ' + esc(ago(D.generated)) + '. Cell coverage by carrier is in the <a href="https://broadbandmap.fcc.gov/" target="_blank" rel="noopener noreferrer">FCC National Broadband Map</a>. <a href="/grid/providers">Cloud provider pages</a></p>';
     $("nx_list").innerHTML = h;
   }
 
