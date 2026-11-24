@@ -468,8 +468,28 @@ def ga_head(b, country=None, ga=True):
     except Exception: pass
     return b
 
+def _deactivated_off(path):
+    try:
+        import deactivated
+        return deactivated.is_off(path)
+    except Exception:
+        traceback.print_exc(); return False
+
 def pwa_head(b):
     try:
+        if b"<html" in b[:4000].lower() and b"href=" in b:   # Nov 24 2026: drop links to deactivated pages (deactivated.clean) from every page
+            try:
+                import deactivated
+                if deactivated.ON: b = deactivated.clean(b.decode("utf-8")).encode("utf-8")
+            except Exception:
+                traceback.print_exc()
+        if b"<html" in b[:4000].lower() and b"window.BN_OFF=" not in b[:60000]:   # Nov 24 2026: deactivated-pages list for the link guard and menus
+            try:
+                import deactivated
+                hh = b[:4000].lower().find(b"<head>")
+                if hh >= 0: b = b[:hh + 6] + deactivated.js_config().encode("utf-8") + b[hh + 6:]
+            except Exception:
+                traceback.print_exc()
         h = b[:4000].lower().find(b"<head>")
         if h >= 0 and b"<html" in b[:4000].lower() and b"bn_theme" not in b[:30000]:   # light/dark theme before first paint (t323)
             b = b[:h + 6] + THEME_HEAD + b[h + 6:]
@@ -771,6 +791,9 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
+            if _deactivated_off(u.path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py) -> temporary 302 to "/"
+                self.send_response(302); self.send_header("Location", "/"); self.send_header("Content-Length", "0")
+                self.send_header("Cache-Control", "no-store"); self.end_headers(); return
             if u.path in ("/", "/index.html"):
                 if new_home_on():   # Nov 17 2026: "/" = cinematic onboarding (theme.py); the dashboard moved to /live. BN_NEW_HOME=0 = old "/"
                     try: return self.send(200, _addon_mod("theme").home_page().encode("utf-8"), "text/html")

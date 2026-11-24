@@ -119,6 +119,12 @@ if not MESH_ON:
 # netnear (Networks near me, /network/near) is MENU3-only and is omitted there.
 HIDDEN_MENU_KEYS = frozenset({"streams", "trends", "bcast", "radio", "intel", "ranked", "@social", "@stats"})
 NAV = [(g, [it if it[0] not in HIDDEN_MENU_KEYS else (tuple(it[:5]) + (True,)) for it in its]) for g, its in NAV]
+# Nov 24 2026 (Matt): deactivated pages (deactivated.py) are hidden everywhere the tab list is used; the routes 302 to "/".
+try:
+    import deactivated as _DEACT
+    NAV = [(g, [it if not _DEACT.key_off(it[0]) else (tuple(it[:5]) + (True,)) for it in its]) for g, its in NAV]
+except Exception:
+    pass
 
 # Standalone pages: path -> (active nav key, title, meta description, visible one-line description).
 PAGES = {
