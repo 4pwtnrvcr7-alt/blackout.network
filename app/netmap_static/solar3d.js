@@ -32,7 +32,7 @@
       ".s3-lab.sc{color:#b9c6ff}.s3-lab.sel{background:#e8eaf0;color:#05060a}" +
       ".s3-info{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:min(420px,calc(100% - 20px));max-height:34%;overflow:auto;background:linear-gradient(90deg,rgba(5,6,10,.72),rgba(5,6,10,.35));border-left:2px solid rgba(255,255,255,.5);padding:6px 10px;font-size:12px}" +
       ".s3-info h3{margin:0 0 2px;font-size:15px}.s3-info p{margin:2px 0}.s3-info .s3-tag{display:inline-block;font-size:10px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:2px;opacity:.85}" +
-      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}@media (max-width:600px){.s3-ph img{max-height:110px}.s3-info{max-height:40%}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
+      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}@media (max-width:600px){.s3-ph img{max-height:72px}.s3-info{max-height:30%;font-size:11.5px}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
     d.head.appendChild(st);
   }
   function imperial() { try { return !w.BNUnits || !w.BNUnits.isImperial || w.BNUnits.isImperial(); } catch (e) { return true; } }
@@ -219,7 +219,7 @@
     [-1, 1].forEach(function (sd) { var ear = at(sm, new T.CylinderGeometry(0.05, 0.05, 0.03, 16), blk, -0.6, 1.17, Z + sd * 0.148, Math.PI / 2, 0, 0); });
     /* right arm (centre side, +z) to the wheel; left arm (door side, -z) over the door sill */
     var rS = [-0.58, 0.93, Z + 0.19], rE = [-0.32, 0.72, Z + 0.24], rH = [0.03, 0.86, Z + 0.12];
-    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.42, 0.86, Z - 0.42], lH = [-0.12, 0.87, Z - 0.52];
+    var lS = [-0.58, 0.93, Z - 0.19], lE = [-0.46, 0.82, Z - 0.34], lH = [-0.16, 0.85, Z - 0.5];
     [[rS, rE, rH], [lS, lE, lH]].forEach(function (a) {
       at(sm, new T.SphereGeometry(0.072, 16, 12), blk, a[0][0], a[0][1] + 0.02, a[0][2]);           /* shoulder panel */
       limb(sm, a[0], a[1], 0.055, suit); limb(sm, a[1], a[2], 0.05, suit);
