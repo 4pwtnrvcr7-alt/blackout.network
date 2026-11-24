@@ -97,12 +97,21 @@ sites.json
   records (public U.S. government information). Links are in each record.
   Great Red Spot position is measured on PIA07782 (Cassini, Dec 2000).
 
+
+earth_night.jpg
+  NASA Black Marble 2016 color night-lights map (Suomi NPP / VIIRS),
+  0.1-degree cylindrical composite, resized to 2048 x 1024 for this site.
+  NASA Earth Observatory / NASA Goddard. Public domain.
+  https://science.nasa.gov/earth/earth-observatory/earth-at-night/maps/
+
 auroras (Earth, Jupiter, Saturn)
   Illustrative additive ovals, not photographs and not a live
-  space-weather feed. Placed at typical auroral colatitudes: Earth near
-  67 degrees magnetic latitude, with magnetic poles near 80.7 N, 72.7 W
-  and 74.3 S, 125.6 E; Jupiter a tighter oval with the dipole tilted
+  space-weather feed. Drawn as thin translucent rings (soft gradient,
+  low opacity) at typical auroral colatitudes: Earth near 67 degrees
+  magnetic latitude, with magnetic poles near 80.7 N, 72.7 W and
+  74.3 S, 125.6 E; Jupiter a tighter oval with the dipole tilted
   about 10 degrees; Saturn a faint oval aligned with the spin axis.
-  Colors are stylized toward common visible / published appearances
-  (green for Earth, magenta for Jupiter, pale blue-violet for Saturn).
+  They are drawn as thin translucent rings so they read at the limb rather than as a solid cap. Colors
+  are stylized toward common visible / published appearances (green
+  for Earth, magenta for Jupiter, pale blue-violet for Saturn).
 

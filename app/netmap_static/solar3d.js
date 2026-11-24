@@ -479,7 +479,7 @@
   function build() {
     var root = S.root; while (root.children.length) root.remove(root.children[0]); OBJ = {}; LIST = []; S.rings = [];
     var sun = new T.Group(); sun.add(new T.Mesh(new T.SphereGeometry(3, 40, 24), new T.MeshBasicMaterial({ color: 0xfff1d0 })));
-    var gl = new T.Sprite(new T.SpriteMaterial({ map: S.glow, color: 0xffffff, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); gl.scale.set(18, 18, 1); sun.add(gl);
+    var gl = new T.Sprite(new T.SpriteMaterial({ map: S.glow, color: 0xffffff, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); gl.scale.set(12, 12, 1); sun.add(gl);
     addObj({ id: "sun", name: "Sun", kind: "sun", node: sun, size: 3, info: "Our star. Use Space weather to see the spacecraft watching it." });
     (DATA.planets || []).forEach(function (p) {
       var c = PL[p.id] || [0.5, 0x999999], gp = new T.Group(), mat = (p.id === "jupiter" || p.id === "saturn") ? new T.MeshStandardMaterial({ map: bandTex(c[1], p.id === "jupiter" ? 9 : 6), roughness: 0.9 }) : M(c[1], { roughness: 0.85 });
@@ -583,7 +583,7 @@
       if (o.model) {
         if (o.model.userData.spin) { var tt = (now - (S.spin0 || 0)) / 1000, sel = SEL === o; o.model.rotation.y = (sel ? 0.05 : 0.12) * tt + (sel ? 0 : o.model.userData.ph); o.model.rotation.x = Math.sin(tt * 0.21) * (sel ? 0.05 : 0.22); o.model.rotation.z = Math.sin(tt * 0.13) * (sel ? 0.03 : 0.12); o.model.position.y = Math.sin(tt * 0.35) * 0.012; }
         var dd = S.cam.position.distanceTo(o.node.position), dot = o.node.userData.dot;
-        if (dot) { dot.visible = dd > o.size * 8; dot.scale.setScalar(Math.max(1, dd / 30)); }
+        if (dot) { var px = 5.5, world = 2 * Math.tan((S.cam.fov * Math.PI / 180) / 2) * dd * (px / Math.max(1, S.H)); var sc = world / 0.09; if (sc * 0.09 > 0.022) sc = 0.022 / 0.09; if (sc < 0.05) sc = 0.05; dot.scale.setScalar(sc); dot.visible = dd > Math.max(o.size * 8, 0.7); }
       }
       if (o.lab) {
         o.node.getWorldPosition(tmp); tmp.project(S.cam);
@@ -614,8 +614,8 @@
     S.objs = el.querySelector("#s3_objs"); S.labs = el.querySelector("#s3_labs"); S.info = el.querySelector("#s3_info"); S.msg = el.querySelector("#s3_msg");
     S.r = new T.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true }); S.r.outputEncoding = T.sRGBEncoding; S.r.toneMapping = T.ACESFilmicToneMapping; S.r.toneMappingExposure = 1.15; S.r.setPixelRatio(Math.min(2, w.devicePixelRatio || 1)); el.insertBefore(S.r.domElement, el.firstChild);
     S.scene = new T.Scene(); S.cam = new T.PerspectiveCamera(50, 1, 0.0005, 50000); S.cam.position.set(0, 80, 110);
-    S.scene.add(new T.AmbientLight(0xffffff, 0.28)); S.scene.add(new T.PointLight(0xfff2dd, 1.6, 0, 0));
-    var cam_l = new T.DirectionalLight(0xffffff, 0.35); S.cam.add(cam_l); S.scene.add(S.cam);
+    S.scene.add(new T.AmbientLight(0xffffff, 0.045)); S.scene.add(new T.PointLight(0xfff1dc, 2.7, 0, 0));
+    var cam_l = new T.DirectionalLight(0xffffff, 0); S.cam.add(cam_l); S.scene.add(S.cam);
     var sp = [], i; for (i = 0; i < 2500; i++) { var v = new T.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize().multiplyScalar(9000 + Math.random() * 3000); sp.push(v); }
     S.scene.add(new T.Points(new T.BufferGeometry().setFromPoints(sp), new T.PointsMaterial({ color: 0xcfd6ff, size: 1.4, sizeAttenuation: false })));
     S.root = new T.Group(); S.scene.add(S.root); S.glow = glowTex();

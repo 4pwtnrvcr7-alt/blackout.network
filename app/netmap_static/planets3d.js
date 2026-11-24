@@ -38,7 +38,7 @@
     var found = null;
     o.node.traverse(function (c) {
       if (found) return;
-      if (c.isMesh && c.geometry && c.geometry.type === "SphereGeometry" && !c.userData.pin && !c.userData.cap && !c.userData.aurora) found = c;
+      if (c.isMesh && c.geometry && c.geometry.type === "SphereGeometry" && !c.userData.pin && !c.userData.cap && !c.userData.aurora && !c.userData.atmo && !c.userData.night) found = c;
     });
     return found;
   }
@@ -55,6 +55,119 @@
     loader.load(BASE + "/" + name, function (t) { TEX[name] = sRGB(t); done(TEX[name]); }, undefined, function () { done(null); });
   }
 
+  function fixLights() {
+    var S = API && API.S; if (!S || !S.scene) return;
+    S.scene.traverse(function (obj) {
+      if (obj.isAmbientLight) obj.intensity = 0.045;
+      if (obj.isPointLight) { obj.intensity = 2.7; obj.color.setHex(0xfff1dc); obj.decay = 0; obj.distance = 0; }
+      if (obj.isDirectionalLight) obj.intensity = 0;
+    });
+    if (S.r) S.r.toneMappingExposure = 1.08;
+  }
+
+  function oceanRoughness(tex, done) {
+    try {
+      var img = tex.image; if (!img) return done(null);
+      var c = document.createElement("canvas");
+      c.width = Math.min(1024, img.width || 1024);
+      c.height = Math.min(512, img.height || 512);
+      var ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      var data = ctx.getImageData(0, 0, c.width, c.height), d = data.data, i;
+      for (i = 0; i < d.length; i += 4) {
+        var r = d[i], g = d[i + 1], b = d[i + 2];
+        var ocean = b > r + 16 && b > g + 6;
+        var v = ocean ? 85 : 210;
+        d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+      }
+      ctx.putImageData(data, 0, 0);
+      var rt = new T.CanvasTexture(c);
+      rt.wrapS = T.ClampToEdgeWrapping; rt.wrapT = T.ClampToEdgeWrapping;
+      done(rt);
+    } catch (e) { done(null); }
+  }
+
+  function addNightLights(o, mesh, nightTex) {
+    mesh.children.slice().forEach(function (c) { if (c.userData && c.userData.night) mesh.remove(c); });
+    var u = { map: { value: nightTex }, sunDir: { value: new T.Vector3(0, 1, 0) } };
+    var mat = new T.ShaderMaterial({
+      uniforms: u,
+      vertexShader: [
+        "#include <common>",
+        "#include <logdepthbuf_pars_vertex>",
+        "varying vec2 vUv; varying vec3 vObjN;",
+        "void main() {",
+        "  vUv = uv;",
+        "  vObjN = normalize(normal);",
+        "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "  #include <logdepthbuf_vertex>",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "#include <common>",
+        "#include <logdepthbuf_pars_fragment>",
+        "uniform sampler2D map; uniform vec3 sunDir;",
+        "varying vec2 vUv; varying vec3 vObjN;",
+        "void main() {",
+        "  #include <logdepthbuf_fragment>",
+        "  float night = 1.0 - smoothstep(-0.08, 0.2, dot(normalize(vObjN), normalize(sunDir)));",
+        "  vec3 lights = texture2D(map, vUv).rgb;",
+        "  gl_FragColor = vec4(lights * night * 1.35, 1.0);",
+        "}"
+      ].join("\n"),
+      blending: T.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+      side: T.FrontSide
+    });
+    mat.userData.sunDirObj = u.sunDir;
+    var m = new T.Mesh(mesh.geometry, mat);
+    m.scale.setScalar(1.003);
+    m.userData.night = true;
+    m.renderOrder = 2;
+    mesh.add(m);
+  }
+
+  function addAtmosphere(o, mesh) {
+    mesh.children.slice().forEach(function (c) { if (c.userData && c.userData.atmo) mesh.remove(c); });
+    var mat = new T.ShaderMaterial({
+      uniforms: { color: { value: new T.Color(0x4f96ff) } },
+      vertexShader: [
+        "#include <common>",
+        "#include <logdepthbuf_pars_vertex>",
+        "varying vec3 vN; varying vec3 vV;",
+        "void main() {",
+        "  vN = normalize(normalMatrix * normal);",
+        "  vec4 mv = modelViewMatrix * vec4(position, 1.0);",
+        "  vV = normalize(-mv.xyz);",
+        "  gl_Position = projectionMatrix * mv;",
+        "  #include <logdepthbuf_vertex>",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "#include <common>",
+        "#include <logdepthbuf_pars_fragment>",
+        "uniform vec3 color;",
+        "varying vec3 vN; varying vec3 vV;",
+        "void main() {",
+        "  #include <logdepthbuf_fragment>",
+        "  float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.8);",
+        "  gl_FragColor = vec4(color * f * 0.62, 1.0);",
+        "}"
+      ].join("\n"),
+      blending: T.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      side: T.BackSide,
+      toneMapped: false
+    });
+    var atmo = new T.Mesh(new T.SphereGeometry(o.size * 1.055, 64, 48), mat);
+    atmo.userData.atmo = true;
+    atmo.renderOrder = 1;
+    mesh.add(atmo);
+  }
+
   function applyMap(o, file) {
     var mesh = sphereOf(o); if (!mesh) return;
     var segs = SEG[o.id] || SEG.default;
@@ -63,13 +176,34 @@
     if (old) old.dispose();
     loadTex(file, function (tex) {
       if (!tex) return;
+      var isEarth = o.id === "earth";
       var prev = mesh.material;
-      mesh.material = new T.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0, color: 0xffffff, toneMapped: false });
-      if (o.id === "earth") mesh.material.metalness = 0.05;
-      if (prev && prev !== mesh.material && prev.dispose) prev.dispose();
-      CS[o.id] = { mesh: mesh, ready: true };
+      var mat = new T.MeshStandardMaterial({
+        map: tex,
+        roughness: isEarth ? 0.62 : 0.72,
+        metalness: isEarth ? 0.14 : 0.02,
+        color: 0xffffff,
+        toneMapped: true
+      });
+      mesh.material = mat;
+      if (prev && prev !== mat && prev.dispose) prev.dispose();
+      CS[o.id] = { mesh: mesh, ready: true, mat: mat };
+      if (isEarth) {
+        oceanRoughness(tex, function (rm) {
+          if (!rm) return;
+          mat.roughnessMap = rm;
+          mat.roughness = 1;
+          mat.needsUpdate = true;
+        });
+        loadTex("earth_night.jpg", function (night) {
+          if (!night) return;
+          addNightLights(o, mesh, night);
+        });
+        addAtmosphere(o, mesh);
+      }
     });
   }
+
 
   function addHexCap(o) {
     var mesh = sphereOf(o); if (!mesh) return;
@@ -87,32 +221,58 @@
     });
   }
 
+  function auroraBandTex() {
+    if (auroraBandTex._t) return auroraBandTex._t;
+    var c = document.createElement("canvas"); c.width = 8; c.height = 128;
+    var g = c.getContext("2d"), gr = g.createLinearGradient(0, 0, 0, 128);
+    gr.addColorStop(0, "rgba(255,255,255,0)");
+    gr.addColorStop(0.36, "rgba(255,255,255,0)");
+    gr.addColorStop(0.46, "rgba(255,255,255,0.22)");
+    gr.addColorStop(0.5, "rgba(255,255,255,0.95)");
+    gr.addColorStop(0.54, "rgba(255,255,255,0.22)");
+    gr.addColorStop(0.64, "rgba(255,255,255,0)");
+    gr.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 8, 128);
+    var tex = new T.CanvasTexture(c);
+    tex.needsUpdate = true;
+    auroraBandTex._t = tex;
+    return tex;
+  }
+
+  function auroraMat(color, op, tex) {
+    return new T.MeshBasicMaterial({
+      color: color,
+      map: tex,
+      alphaMap: tex,
+      transparent: true,
+      opacity: op,
+      blending: T.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+      side: T.DoubleSide
+    });
+  }
+
   function addAurora(o, opt) {
     var mesh = sphereOf(o); if (!mesh) return;
     mesh.children.slice().forEach(function (c) { if (c.userData && c.userData.aurora) mesh.remove(c); });
+    var tex = auroraBandTex();
     function ringAt(axis) {
       var g = new T.Group();
       g.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), axis.clone().normalize());
-      var R = o.size * Math.sin(opt.oval) * 1.018;
-      var tube = Math.max(o.size * opt.width * 0.38, o.size * 0.006);
+      var y = o.size * Math.cos(opt.oval) * 1.014;
+      var R = o.size * Math.sin(opt.oval) * 1.014;
+      var w = Math.max(o.size * opt.width * 0.55, o.size * 0.01);
       var layers = [
-        { t: 0.85, op: opt.gain * 0.55 },
-        { t: 2.0, op: opt.gain * 0.22 }
+        { inn: Math.max(0.001, R - w * 0.4), out: R + w * 0.4, op: Math.min(0.30, opt.gain * 0.62) },
+        { inn: Math.max(0.001, R - w * 1.1), out: R + w * 1.1, op: Math.min(0.20, opt.gain * 0.36) }
       ];
       layers.forEach(function (L) {
-        var mat = new T.MeshBasicMaterial({
-          color: opt.color,
-          transparent: true,
-          opacity: L.op,
-          blending: T.AdditiveBlending,
-          depthWrite: false,
-          toneMapped: false,
-          side: T.DoubleSide
-        });
-        var m = new T.Mesh(new T.TorusGeometry(R, tube * L.t, 12, 96), mat);
-        m.rotation.x = Math.PI / 2;
-        m.position.y = o.size * Math.cos(opt.oval) * 1.018;
+        var m = new T.Mesh(new T.RingGeometry(L.inn, L.out, 128), auroraMat(opt.color, L.op, tex));
+        m.rotation.x = -Math.PI / 2;
+        m.position.y = y;
         m.userData.aurora = true;
+        m.renderOrder = 3;
         g.add(m);
       });
       g.userData.aurora = true;
@@ -121,6 +281,7 @@
     ringAt(latLonLocal(opt.nlat, opt.nlon, 1));
     ringAt(latLonLocal(opt.slat, opt.slon, 1));
   }
+
 
   function pinMat(color, op) {
     return new T.MeshBasicMaterial({ color: color, transparent: true, opacity: op, side: T.DoubleSide, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -201,7 +362,7 @@
       h += "<p>Orbital speed: " + API.fmtV(c.v_km_s) + "</p>";
     }
     if (o.info) h += "<p>" + esc(o.info) + "</p>";
-    if (o.id === "earth") h += "<p>A faint auroral oval sits around each magnetic pole. It is an illustrative shader, not a live space-weather map.</p>";
+    if (o.id === "earth") h += "<p>A faint auroral oval sits around each magnetic pole. It is an illustrative shader, not a live space-weather map. City lights on the night side are NASA Black Marble 2016.</p>";
     if (o.id === "jupiter") h += "<p>The Great Red Spot is marked as Cassini recorded it in December 2000. Tap the pin for details. Scroll to explore the cloud bands. A faint persistent auroral oval is drawn at each magnetic pole (illustrative shader).</p>";
     if (o.id === "saturn") h += "<p>The north-pole hexagon is marked; tap the pin or zoom in over the pole. The globe map is a natural-color stand-in graded to Cassini true-color photos; the hexagon overlay is a real Cassini image. A faint auroral oval is drawn at each pole (illustrative shader). See credits.</p>";
     if (o.id === "venus") h += "<p>The globe is a visible-light stand-in in pale cream, color-matched to how Venus looks in ordinary light, where cloud markings are very faint. It is not the Magellan radar surface map. See credits.</p>";
@@ -346,9 +507,60 @@
     for (; li < LEADS.length; li++) LEADS[li].hidden = true;
   }
 
+  var _sunLocal = new T.Vector3(), _sunWorld = new T.Vector3(), _worldPos = new T.Vector3();
+  function updateSunDirs() {
+    var S = API && API.S; if (!S) return;
+    Object.keys(CS).forEach(function (id) {
+      var rec = CS[id], mesh = rec.mesh; if (!mesh) return;
+      mesh.updateWorldMatrix(true, false);
+      mesh.getWorldPosition(_worldPos);
+      _sunWorld.copy(_worldPos).multiplyScalar(-1);
+      if (_sunWorld.lengthSq() > 1e-12) _sunWorld.normalize();
+      _sunLocal.set(0, 0, 0);
+      mesh.worldToLocal(_sunLocal);
+      if (_sunLocal.lengthSq() > 1e-12) _sunLocal.normalize();
+      mesh.traverse(function (c) {
+        var m = c.material; if (!m || !m.userData) return;
+        if (m.userData.sunDirObj) m.userData.sunDirObj.value.copy(_sunLocal);
+        if (m.userData.sunDir) m.userData.sunDir.value.copy(_sunWorld);
+        if (m.userData.planetPos) m.userData.planetPos.value.copy(_worldPos);
+      });
+    });
+  }
+
+  function fixCraftDots() {
+    var S = API && API.S; if (!S || !S.cam) return;
+    var cam = S.cam, H = Math.max(1, S.H || 900);
+    var half = (cam.fov * Math.PI / 180) / 2;
+    (API.LIST || []).forEach(function (o) {
+      if (!o || o.kind !== "craft" || !o.node) return;
+      var dot = o.node.userData.dot; if (!dot) return;
+      var dd = cam.position.distanceTo(o.node.position);
+      var world = 2 * Math.tan(half) * dd * (5.5 / H);
+      var sc = world / 0.09;
+      if (sc * 0.09 > 0.022) sc = 0.022 / 0.09;
+      if (sc < 0.05) sc = 0.05;
+      dot.scale.setScalar(sc);
+      dot.visible = dd > Math.max(o.size * 8, 0.7);
+    });
+  }
+
+  function fadeGuides() {
+    var S = API && API.S; if (!S) return;
+    var sel = API.sel && API.sel();
+    var zoomed = false;
+    if (sel && sel.node && sel.kind !== "sun") {
+      zoomed = S.cam.position.distanceTo(sel.node.position) < Math.max(10, (sel.size || 1) * 22);
+    }
+    (S.rings || []).forEach(function (r) { r.visible = !zoomed; });
+  }
+
   function tick() {
     updatePins();
     declutterLabels();
+    updateSunDirs();
+    fixCraftDots();
+    fadeGuides();
   }
 
   function css() {
@@ -362,6 +574,7 @@
   function decorate() {
     if (!API) return;
     css();
+    fixLights();
     clearPins();
     var map = { mercury: "mercury.jpg", venus: "venus.jpg", earth: "earth.jpg", mars: "mars.jpg", jupiter: "jupiter.jpg", saturn: "saturn.jpg", uranus: "uranus.jpg", neptune: "neptune.jpg", moon: "moon.jpg" };
     Object.keys(map).forEach(function (id) {
@@ -369,10 +582,10 @@
     });
     var sat = API.OBJ.saturn; if (sat) addHexCap(sat);
     var earth = API.OBJ.earth;
-    if (earth) addAurora(earth, { nlat: 80.7, nlon: -72.7, slat: -74.3, slon: 125.6, oval: 0.40, width: 0.060, gain: 0.34, night: 1, color: 0x3ae87a });
+    if (earth) addAurora(earth, { nlat: 80.7, nlon: -72.7, slat: -74.3, slon: 125.6, oval: 0.40, width: 0.060, gain: 0.32, night: 1, color: 0x3ae87a });
     var jup = API.OBJ.jupiter;
-    if (jup) addAurora(jup, { nlat: 80.0, nlon: 200.0, slat: -80.0, slon: 20.0, oval: 0.28, width: 0.042, gain: 0.30, night: 0, color: 0xd98cff });
-    if (sat) addAurora(sat, { nlat: 90, nlon: 0, slat: -90, slon: 0, oval: 0.26, width: 0.038, gain: 0.24, night: 0, color: 0x7aa8ff });
+    if (jup) addAurora(jup, { nlat: 80.0, nlon: 200.0, slat: -80.0, slon: 20.0, oval: 0.28, width: 0.042, gain: 0.28, night: 0, color: 0xd98cff });
+    if (sat) addAurora(sat, { nlat: 90, nlon: 0, slat: -90, slon: 0, oval: 0.26, width: 0.038, gain: 0.22, night: 0, color: 0x7aa8ff });
     function pinsWhenReady() {
       var moon = API.OBJ.moon, mars = API.OBJ.mars;
       if (SITES && SITES.moon && moon) SITES.moon.forEach(function (rec) { addPin(moon, rec, "landing"); });

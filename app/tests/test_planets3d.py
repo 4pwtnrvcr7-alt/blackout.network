@@ -27,6 +27,7 @@ class Planets3d(unittest.TestCase):
             ("planets/jupiter.jpg", "image/jpeg"),
             ("planets/saturn.jpg", "image/jpeg"),
             ("planets/saturn_hex.webp", "image/webp"),
+            ("planets/earth_night.jpg", "image/jpeg"),
             ("planets/sites.json", "application/json"),
             ("planets/CREDITS.txt", "text/plain"),
         ):
@@ -79,6 +80,12 @@ class Planets3d(unittest.TestCase):
         self.assertIn("addAurora", pjs)
         self.assertIn("AdditiveBlending", pjs)
         self.assertIn("illustrative shader", pjs.lower())
+        self.assertIn("addAtmosphere", pjs)
+        self.assertIn("fixLights", pjs)
+        self.assertIn("earth_night.jpg", pjs)
+        self.assertIn("fixCraftDots", pjs)
+        self.assertNotIn("TorusGeometry", pjs)
+        self.assertIn("AmbientLight(0xffffff, 0.045)", js)
         self.assertIn("BNUnits", pjs)
         self.assertIn("isImperial", pjs)
         blob = (js + pjs + open(os.path.join(STATIC, "planets", "sites.json"), encoding="utf-8").read()).lower()
@@ -95,12 +102,13 @@ class Planets3d(unittest.TestCase):
         self.assertIn("PIA07782", credits)
         self.assertIn("CGI Moon Kit", credits)
         self.assertIn("MDIM", credits)
+        self.assertIn("Black Marble", credits)
         self.assertNotIn("non-commercial", credits.lower().replace("no non-commercial sources", ""))
 
     def test_textures_are_clean_jpegs(self):
         from PIL import Image
         from io import BytesIO
-        for name, min_w in (("moon.jpg", 3000), ("mars.jpg", 3000), ("jupiter.jpg", 2000), ("earth.jpg", 2000)):
+        for name, min_w in (("moon.jpg", 3000), ("mars.jpg", 3000), ("jupiter.jpg", 2000), ("earth.jpg", 2000), ("earth_night.jpg", 2000)):
             c, b, t = netmap.handle_get("/api/netmap/planets/" + name)
             self.assertEqual(c, 200)
             im = Image.open(BytesIO(b))
