@@ -471,9 +471,24 @@ def ga_head(b, country=None, ga=True):
 def _deactivated_off(path):
     try:
         import deactivated
-        return deactivated.is_off(path)
+        return deactivated.redirects(path)   # "off" pages only; "unlisted" pages keep serving (newsletter links)
     except Exception:
         traceback.print_exc(); return False
+
+def _deactivated_page(b):
+    """Nov 24 2026: links to hidden pages removed (deactivated.clean) and window.BN_OFF set in <head> (menus, bn-apple.js, linkguard.js)."""
+    try:
+        lo = b[:4000].lower()
+        if b"<html" not in lo: return b
+        import deactivated
+        if not deactivated.ON: return b
+        if b"href=" in b: b = deactivated.clean(b.decode("utf-8")).encode("utf-8")
+        if b"window.BN_OFF=" not in b[:60000]:
+            hh = b[:4000].lower().find(b"<head>")
+            if hh >= 0: b = b[:hh + 6] + deactivated.js_config().encode("utf-8") + b[hh + 6:]
+    except Exception:
+        traceback.print_exc()
+    return b
 
 def pwa_head(b):
     try:
@@ -626,6 +641,7 @@ def error_page_html():
 
 def theme_assets(b):
     """Nov 17 push B: shared theme links for full pages that skip pwa_head (/stats, /midterms, /mesh*, /report-status via reports._send)."""
+    b = _deactivated_page(b)   # Nov 24 2026: these pages skip pwa_head, so add the deactivated-pages cleaning + window.BN_OFF here too
     if not new_home_on(): return b
     try:
         al = b[:200000].lower(); j = al.find(b"</head>")
@@ -791,7 +807,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
-            if _deactivated_off(u.path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py) -> temporary 302 to "/"
+            if _deactivated_off(u.path):   # Nov 24 2026 (Matt): deactivated pages (deactivated.py, state "off") -> temporary 302 to "/"
                 self.send_response(302); self.send_header("Location", "/"); self.send_header("Content-Length", "0")
                 self.send_header("Cache-Control", "no-store"); self.end_headers(); return
             if u.path in ("/", "/index.html"):

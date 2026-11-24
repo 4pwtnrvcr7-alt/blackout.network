@@ -393,7 +393,7 @@ provisions will remain in full force and effect. Our failure to enforce any righ
 with our <a href="/privacy">Privacy Policy</a>, are the entire agreement between you and us regarding the Site and supersede any prior
 agreements on that subject. You may not assign these Terms; we may assign them without restriction. Headings are for convenience only.</p>"""),
 ("acknowledgments", "Acknowledgments", """
-<p>The off-grid network pages (<a href="/mesh">network map</a>, <a href="/mesh/chat">network chat</a>, <a href="/mesh/guide">setup guide</a>) and the Push to Mesh
+<p>The off-grid network pages (<a href="/mesh">network map</a>, <a href="/mesh/guide">setup guide</a>) and the Push to Mesh
 button work with LoRa radios running the open-source <a href="https://meshtastic.org/" target="_blank" rel="noopener">Meshtastic®</a> firmware and apps.
 Meshtastic® is a registered trademark of Meshtastic LLC. Meshtastic software components are released under various licenses, see
 <a href="https://github.com/meshtastic" target="_blank" rel="noopener">GitHub</a> for details. No warranty is provided - use at your own risk.

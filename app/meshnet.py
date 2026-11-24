@@ -109,9 +109,15 @@ TITLES = {
     "mesh-guide": ("Off-grid setup guide: text messaging when the grid goes down | BLACKOUT.NETWORK", "How to set up an off-grid mesh radio for a grid-down emergency: hardware, the US 915 MHz band, the app, channels, solar power, etiquette and the rules for unlicensed and ham use."),
 }
 SUBNAV = [("mesh", "/mesh", "Network map"), ("mesh-chat", "/mesh/chat", "Network chat"), ("mesh-guide", "/mesh/guide", "Setup guide")]
+def _off(href):   # Nov 24 2026 (Matt): /mesh/chat is deactivated (deactivated.py) -> no links to it from /mesh, /mesh/guide or the footer
+    try:
+        import deactivated
+        return deactivated.is_off(href)
+    except Exception:
+        return False
 def _subnav(cur):
     return '<nav class="mx-sub" aria-label="Off-grid network pages">' + "".join(
-        f'<a class="mx-sl" href="{h}"' + (' aria-current="page"' if k == cur else "") + f'>{E(l)}</a>' for k, h, l in SUBNAV) + '</nav>'
+        f'<a class="mx-sl" href="{h}"' + (' aria-current="page"' if k == cur else "") + f'>{E(l)}</a>' for k, h, l in SUBNAV if k == cur or not _off(h)) + '</nav>'
 I = {
  "mesh": '<path d="M5 19l7-14 7 14M8.5 12h7"/><circle cx="12" cy="5" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/>',
  "radio": '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M8 8l8-5M8 14h3M15 13.5h.01M15 16.5h.01"/>',
@@ -131,7 +137,7 @@ def page(key, path, body, scripts=()):
             '<a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>' + _top() +
             f'<main class="mx" id="main">{body}</main>'
             '<footer class="mx-foot">BLACKOUT.NETWORK · <a href="/">The Wire</a> · <a href="/grid">The Grid</a> · <a href="/mesh">Off-grid network map</a> · '
-            '<a href="/mesh/chat">Network chat</a> · <a href="/mesh/guide">Off-grid setup guide</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/tos#acknowledgments">Credits</a><br>'
+            + ('' if _off("/mesh/chat") else '<a href="/mesh/chat">Network chat</a> · ') + '<a href="/mesh/guide">Off-grid setup guide</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a> · <a href="/tos#acknowledgments">Credits</a><br>'
             'Research only: not an official warning service.</footer>' + js + '</body></html>').encode("utf-8")
 
 # ---------------------------------------------------------------- /mesh
@@ -171,7 +177,7 @@ def map_page():
            '<li>Map tiles: <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> '
            'data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>.</li>'
            '<li>Software and data credits: <a href="/tos#acknowledgments">Credits</a>.</li></ul></section>')
-    cta = ('<section class="mx-grid2"><a class="mx-card mx-link" href="/mesh/chat">' + icon("radio") + '<b>Network chat</b><span>Connect your own radio and read or send channel messages in the browser.</span></a>'
+    cta = (('<section class="mx-grid2" style="grid-template-columns:1fr">' if _off("/mesh/chat") else '<section class="mx-grid2">') + ('' if _off("/mesh/chat") else '<a class="mx-card mx-link" href="/mesh/chat">' + icon("radio") + '<b>Network chat</b><span>Connect your own radio and read or send channel messages in the browser.</span></a>') +
            '<a class="mx-card mx-link" href="/mesh/guide">' + icon("sun") + '<b>Off-grid setup guide</b><span>Hardware, the 915 MHz band, channels, solar power and etiquette.</span></a></section>')
     return page("mesh", "/mesh", hero + mapc + focus + cta + how, ["/api/mesh/app.js?v=2"])
 
