@@ -6,7 +6,7 @@ body.wx{color:var(--wx-tx);font-family:Inter,system-ui,sans-serif;-webkit-tap-hi
 .wx .skip{position:absolute;left:-9999px}.wx .skip:focus{left:12px;top:12px;z-index:99;background:#000;color:#fff;padding:8px 12px}
 .wx-head{position:fixed;left:0;right:0;top:0;z-index:30;background:linear-gradient(180deg,rgba(5,6,10,.92),rgba(5,6,10,.55) 70%,transparent)}
 .wx-head .bn-top{position:relative!important;top:auto!important;background:transparent!important;border-bottom:0!important}
-.wx .bnr-fab{display:none!important}
+html.bna-pg body.wx .bnr-fab,html.wx-root body.wx .bnr-fab,body.wx .bnr-fab{display:none!important;visibility:hidden!important;pointer-events:none!important;position:fixed!important;left:-9999px!important}
 .wx-map{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;background:var(--wx-bg);opacity:0;transition:opacity .8s var(--wx-ease)}
 body.wx-ready .wx-map{opacity:1}
 .wx-map .maplibregl-canvas{outline:none}

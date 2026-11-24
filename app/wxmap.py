@@ -790,7 +790,7 @@ def page(qs=None):
             "NWS warnings, tornado tracks, storm reports, cyclone paths and global disaster alerts.")
     lay = lambda k, name, sub: (f'<label class="wx-lay" data-k="{k}"><input type="checkbox" data-lay="{k}"><span class="wx-sw" aria-hidden="true"></span>'
                                 f'<span class="wx-lt"><b>{E(name)}</b><small data-st="{k}">{E(sub)}</small></span></label>')
-    return f'''<!doctype html><html lang="en" class="wx-root"><head><meta charset="utf-8">
+    return f'''<!doctype html><html lang="en" class="wx-root" data-bn-noreport><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
 <title>{E(title)}</title><meta name="description" content="{E(desc)}">
 <link rel="canonical" href="https://blackout.network/weather">
