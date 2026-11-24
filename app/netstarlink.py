@@ -525,7 +525,7 @@ def render(np):
     evl = "".join(f'<li style="--c:{np.LVC[2 if e.get("ds") in STRONG else 1]}"><div class="w">{E(np.fmt_et(datetime.fromtimestamp(e["start"], timezone.utc)))} · about {max(1, round((e.get("dur") or 0) / 60))} min</div>'
                   f'<h3>{E(DS.get(e.get("ds"), e.get("ds")))} dropped</h3></li>' for e in evs)
     if outs is None: rad = f'<p class="np-mu">{E(RADAR_SNAPSHOT["outages_note"])}</p>'
-    elif outs: rad = "<ul class='np-tl'>" + "".join(f'<li style="--c:#FF7A1A"><div class="w">{E(o["start"] or "")} → {E(o["end"] or "ongoing")}</div><h3>{E(o["cause"] or "Outage")}</h3><p>{E((o["desc"] or "")[:240])}</p></li>' for o in outs[:6]) + "</ul>"
+    elif outs: rad = "<ul class='np-tl'>" + "".join(f'<li style="--c:#FF3B3B"><div class="w">{E(o["start"] or "")} → {E(o["end"] or "ongoing")}</div><h3>{E(o["cause"] or "Outage")}</h3><p>{E((o["desc"] or "")[:240])}</p></li>' for o in outs[:6]) + "</ul>"
     else: rad = '<p class="np-mu">Cloudflare Radar lists no Starlink (AS14593) outages in the last 52 weeks.</p>'
     sec_h = (f'<section class="np-sec"><h2>{ic("eye")}Network health</h2><p class="np-sub">Starlink publishes no public status feed, so we use independent measurements of its network (AS14593) by IODA at Georgia Tech. '
              'A drop means fewer Starlink addresses were reachable or announced; it does not tell us why.</p>'
@@ -728,7 +728,7 @@ def _near_build(loc, np):
                                                     "by IODA where it has data, Starlink's country status, and the global services everyone uses."))
 
 NEAR_JS = r"""<script>(function(){
-var f=document.getElementById("nm_form"),q=document.getElementById("nm_q"),out=document.getElementById("nm_out"),C={0:"#2BB673",1:"#F5A524",2:"#FF7A1A",3:"#FF4D4F","-1":"#5b6573"},L={0:"Operational",1:"Minor issue",2:"Degraded",3:"Major outage","-1":"No data"};
+var f=document.getElementById("nm_form"),q=document.getElementById("nm_q"),out=document.getElementById("nm_out"),C={0:"#2BB673",1:"#FFA040",2:"#FF3B3B",3:"#FF3B3B","-1":"#5b6573"},L={0:"Operational",1:"Minor issue",2:"Degraded",3:"Major outage","-1":"No data"};
 var PIN='<svg class="np-ic icon-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function url(u){u=String(u||"");return /^(https?:\/\/|\/)/.test(u)?u:"#"}
