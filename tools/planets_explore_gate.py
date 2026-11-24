@@ -39,6 +39,14 @@ def route_local(page):
     }
 
     def fulfill_file(route, path: Path):
+        b64 = Path(str(path) + ".b64")
+        if not path.is_file() and b64.is_file():
+            import base64
+            suffix = path.suffix.lower()
+            ctype = {".js": "application/javascript; charset=utf-8", ".json": "application/json",
+                     ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+                     ".webp": "image/webp", ".txt": "text/plain; charset=utf-8"}.get(suffix, "application/octet-stream")
+            return route.fulfill(status=200, content_type=ctype, headers={"cache-control": "no-store"}, body=base64.b64decode(b64.read_text()))
         if not path.is_file():
             return route.fallback()
         suffix = path.suffix.lower()
