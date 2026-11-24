@@ -1,3 +1,80 @@
+/* Shared metric/imperial formatter (pt1827u). Default imperial. Persists in localStorage; live switch via "bn-units". */
+(function (w) {
+  "use strict";
+  var KEY = "bn-units", KM_MI = 0.621371192, M_FT = 3.280839895, imperial = true;
+  try { var saved = w.localStorage && w.localStorage.getItem(KEY); if (saved === "metric") imperial = false; else if (saved === "imperial") imperial = true; } catch (e) {}
+  function rnd(x) { return Math.round(x).toLocaleString("en-US"); }
+  function dec(x, d) {
+    var n = Number(x).toFixed(d), sign = n.charAt(0) === "-" ? "-" : "", body = sign ? n.slice(1) : n, parts = body.split(".");
+    parts[0] = Number(parts[0]).toLocaleString("en-US");
+    return sign + parts.join(".");
+  }
+  function auto(x) { var a = Math.abs(x); return a >= 10 ? rnd(x) : a >= 1 ? dec(x, 1) : dec(x, 2); }
+  function fmtDist(km, digits) {
+    if (km == null || !isFinite(Number(km))) return "–";
+    km = Number(km);
+    if (imperial) { var mi = km * KM_MI; return (digits != null ? dec(mi, digits) : auto(mi)) + " mi"; }
+    return (digits != null ? dec(km, digits) : auto(km)) + " km";
+  }
+  function fmtAlt(km, digits) { return fmtDist(km, digits); }
+  function fmtSpeed(kmPer, per) {
+    if (kmPer == null || !isFinite(Number(kmPer))) return "–";
+    kmPer = Number(kmPer); per = per === "h" ? "h" : "s";
+    var v = imperial ? kmPer * KM_MI : kmPer;
+    if (per === "h") return (Math.abs(v) >= 100 ? rnd(v) : dec(v, 1)) + (imperial ? " mph" : " km/h");
+    return v.toFixed(2) + (imperial ? " mi/s" : " km/s");
+  }
+  function fmtLenM(m, digits) {
+    if (m == null || !isFinite(Number(m))) return "–";
+    m = Number(m);
+    if (imperial) { var ft = m * M_FT; return (digits != null ? dec(ft, digits) : rnd(ft)) + " ft"; }
+    return (digits != null ? dec(m, digits) : rnd(m)) + " m";
+  }
+  function fmtFt(ft, digits) {
+    if (ft == null || !isFinite(Number(ft))) return "–";
+    ft = Number(ft);
+    if (imperial) return (digits != null ? dec(ft, digits) : rnd(ft)) + " ft";
+    var m = ft / M_FT; return (digits != null ? dec(m, digits) : rnd(m)) + " m";
+  }
+  function fmtSizeKm(km) {
+    if (km == null || !isFinite(Number(km))) return "–";
+    km = Number(km);
+    if (km >= 1) return fmtDist(km, km >= 10 ? 0 : 1);
+    return fmtLenM(km * 1000);
+  }
+  function fmtTempC(c, digits) {
+    if (c == null || !isFinite(Number(c))) return "–";
+    c = Number(c);
+    if (imperial) return (digits != null ? dec(c * 9 / 5 + 32, digits) : rnd(c * 9 / 5 + 32)) + " °F";
+    return (digits != null ? dec(c, digits) : rnd(c)) + " °C";
+  }
+  function sync() {
+    var box = document.getElementById("nx_units"); if (!box) return;
+    var sys = imperial ? "imperial" : "metric";
+    [].forEach.call(box.querySelectorAll("button[data-u]"), function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-u") === sys ? "true" : "false"); });
+  }
+  function set(sys) {
+    var next = sys !== "metric";
+    if (next === imperial) { sync(); return; }
+    imperial = next;
+    try { if (w.localStorage) w.localStorage.setItem(KEY, imperial ? "imperial" : "metric"); } catch (e) {}
+    sync();
+    try { w.dispatchEvent(new CustomEvent("bn-units", { detail: { system: imperial ? "imperial" : "metric" } })); } catch (e) {}
+  }
+  function bind() {
+    var box = document.getElementById("nx_units"); if (!box || box.getAttribute("data-bn-bound")) return;
+    box.setAttribute("data-bn-bound", "1");
+    box.addEventListener("click", function (e) { var b = e.target.closest && e.target.closest("button[data-u]"); if (b) set(b.getAttribute("data-u")); });
+    sync();
+  }
+  w.BNUnits = {
+    key: KEY, isImperial: function () { return imperial; }, system: function () { return imperial ? "imperial" : "metric"; },
+    set: set, fmtSpeed: fmtSpeed, fmtDist: fmtDist, fmtAlt: fmtAlt, fmtLenM: fmtLenM, fmtFt: fmtFt, fmtSizeKm: fmtSizeKm, fmtTempC: fmtTempC
+  };
+  bind();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
+})(window);
+
 /* Network Status (/grid, Nov 23 2026, pt1755u). MapLibre GL + OpenFreeMap, same brighter base style as /weather.
    Data: /api/netmap/data (networks, IODA outages, power), /api/netmap/dc (PeeringDB data centers), /api/signal/world.geojson.
    The loader builds a glowing network while the page preloads every dataset and the map tiles for the first view. */
@@ -350,7 +427,7 @@
   var card = $("nx_card"), pinned = false;
   function linkA(u, t) { var h = url(u); return h ? '<a href="' + h + '"' + (/^\//.test(u) ? "" : ' target="_blank" rel="noopener noreferrer"') + '>' + esc(t) + '</a>' : ""; }
   function showCard(ft, pt, pin) {
-    LASTPT = pt;
+    LASTPT = pt; LASTFT = ft;
     var p = ft.properties, h = "", c;
     if (p.kind === "dc") {
       var ix = {}; (DC.cols || []).forEach(function (k, i) { ix[k] = i; }); var r = DC.rows[p.i];
@@ -470,7 +547,7 @@
   /* Nov 24 2026 (Matt): 230 kV+ lines coloured by the live status of the U.S. operator/BA area they sit in (no public per-line status exists).
      green normal, yellow strained/warning, red outage/emergency, grey = crosses operator areas or outside them. */
   var LCOL = { ok: "#2FD67B", strain: "#F5D547", out: "#FF3B3B", na: "#7C8190" }, LWORD = { ok: "Normal", strain: "Strained or warning", out: "Outage or emergency", na: "No live status" };
-  var OPS = null, LASTPT = null, FOPS = null, FST = {};   /* pt1815u: FOPS = synchronous areas outside the U.S. with a keyless live frequency feed */
+  var OPS = null, LASTPT = null, LASTFT = null, FOPS = null, FST = {};   /* pt1815u: FOPS = synchronous areas outside the U.S. with a keyless live frequency feed */
   function opSt(id) { return (window.__gxRegionStatus || {})[id] || FST[id] || "na"; }
   function lineCol() {
     if (!OPS || !OPS.length) return LCOL.na;
@@ -549,18 +626,18 @@
       var hw = sat && hs !== "na" ? { ok: "Near usual level (satellite)", low: "Well below usual level (satellite)", out: "Far below usual level (satellite)" }[hs] : HWORD[hs];
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Hydroelectric dam · ' + esc(hw) + '</span><h3>' + esc(lv && lv.dam ? lv.dam : hr[2]) + '</h3><dl>' +
         '<dt>Capacity</dt><dd>' + num(hr[3]) + ' MW</dd>' + (hr[4] ? '<dt>Operator</dt><dd>' + esc(hr[4]) + '</dd>' : "") + (hr[5] ? '<dt>In service</dt><dd>' + hr[5] + '</dd>' : "") + '<dt>Country</dt><dd>' + esc(hr[6]) + '</dd>' +
-        (lv && !sat && lv.ft != null ? '<dt>' + esc(lv.lake) + '</dt><dd>' + num(Math.round(lv.ft)) + ' ft, ' + num(Math.round(lv.above_min)) + ' ft above ' + esc(lv.min_name || "minimum power pool") + ' (' + num(lv.min_pool) + ' ft)</dd>' +
-          '<dt>7-day trend</dt><dd>' + (lv.chg7 == null ? "–" : (lv.chg7 >= 0 ? "+" : "") + lv.chg7.toFixed(1) + " ft") + '</dd><dt>Reading</dt><dd>' + esc(lv.date) + '</dd>' : "") +
-        (sat && lv.dev_m != null ? '<dt>Reservoir</dt><dd>' + esc(lv.lake) + ' (satellite)</dd><dt>Vs. usual level</dt><dd>' + (lv.dev_m >= 0 ? "+" : "") + lv.dev_m.toFixed(1) + ' m vs. the median for this time of year (' + lv.years + ' years since ' + lv.since + ')</dd><dt>Satellite pass</dt><dd>' + esc(lv.date) + '</dd>' : "") +
+        (lv && !sat && lv.ft != null ? '<dt>' + esc(lv.lake) + '</dt><dd>' + window.BNUnits.fmtFt(lv.ft) + ', ' + window.BNUnits.fmtFt(lv.above_min) + ' above ' + esc(lv.min_name || "minimum power pool") + ' (' + window.BNUnits.fmtFt(lv.min_pool) + ')</dd>' +
+          '<dt>7-day trend</dt><dd>' + (lv.chg7 == null ? "–" : (lv.chg7 > 0 ? "+" : "") + window.BNUnits.fmtFt(lv.chg7, 1)) + '</dd><dt>Reading</dt><dd>' + esc(lv.date) + '</dd>' : "") +
+        (sat && lv.dev_m != null ? '<dt>Reservoir</dt><dd>' + esc(lv.lake) + ' (satellite)</dd><dt>Vs. usual level</dt><dd>' + (lv.dev_m > 0 ? "+" : "") + window.BNUnits.fmtLenM(lv.dev_m, 1) + ' vs. the median for this time of year (' + lv.years + ' years since ' + lv.since + ')</dd><dt>Satellite pass</dt><dd>' + esc(lv.date) + '</dd>' : "") +
         (sat && lv.dev_m == null && lv.date ? '<dt>Last satellite pass</dt><dd>' + esc(lv.date) + '</dd>' : "") + '</dl>' +
         (!lv ? '<p class="age">No free live water-level feed for this reservoir, so no risk colour is shown.</p>'
-          : sat ? '<div class="acts">' + linkA(lv.url, "NASA G-REALM lake levels") + '</div><p class="age">Method: satellite, relative to usual level. Amber when below the 20th percentile for this time of year and 0.5 m or more under the median; red below the 5th percentile and 1 m or more under. No power-pool threshold is published for this lake.' + (hs === "na" ? " Grey: " + esc(lv.err || "no recent reading") + "." : "") + ' Source: ' + esc(lv.src) + '.</p>'
-          : '<div class="acts">' + linkA(lv.url, /Army/.test(lv.src) ? "USACE project data" : "Reclamation lake levels") + '</div><p class="age">Method: lake elevation vs. the official ' + esc(lv.min_name || "minimum power pool") + (lv.level ? ' (CWMS "' + esc(lv.level) + '")' : "") + '. Amber at or below ' + num(lv.amber) + ' ft, red at or below ' + num(lv.red) + ' ft.' + (lv.top ? ' Planned seasonal drawdown can bring this pool low.' : "") + ' Source: ' + esc(lv.src) + '.</p>') +
+          : sat ? '<div class="acts">' + linkA(lv.url, "NASA G-REALM lake levels") + '</div><p class="age">Method: satellite, relative to usual level. Amber when below the 20th percentile for this time of year and ' + window.BNUnits.fmtLenM(0.5, 1) + ' or more under the median; red below the 5th percentile and ' + window.BNUnits.fmtLenM(1, 1) + ' or more under. No power-pool threshold is published for this lake.' + (hs === "na" ? " Grey: " + esc(lv.err || "no recent reading") + "." : "") + ' Source: ' + esc(lv.src) + '.</p>'
+          : '<div class="acts">' + linkA(lv.url, /Army/.test(lv.src) ? "USACE project data" : "Reclamation lake levels") + '</div><p class="age">Method: lake elevation vs. the official ' + esc(lv.min_name || "minimum power pool") + (lv.level ? ' (CWMS "' + esc(lv.level) + '")' : "") + '. Amber at or below ' + window.BNUnits.fmtFt(lv.amber) + ', red at or below ' + window.BNUnits.fmtFt(lv.red) + '.' + (lv.top ? ' Planned seasonal drawdown can bring this pool low.' : "") + ' Source: ' + esc(lv.src) + '.</p>') +
         '<p class="age">Plant data: WRI Global Power Plant Database (2021), CC BY 4.0. Plants of 25 MW and up.</p>';
     } else if (p.kind === "tw") {
       var d = INF.towers.d, r = d.p[p.i];
       h = '<span class="st" style="color:' + TWC + '"><i style="background:' + TWC + '"></i>Registered antenna structure</span><h3>' + esc(d.owners[r[2]]) + '</h3><dl>' +
-        '<dt>Type</dt><dd>' + esc(d.tnames[d.types[r[4]]] || d.types[r[4]]) + '</dd><dt>Height</dt><dd>' + (r[3] ? num(r[3]) + " m (" + num(r[3] * 3.281) + " ft)" : "–") + '</dd></dl>' +
+        '<dt>Type</dt><dd>' + esc(d.tnames[d.types[r[4]]] || d.types[r[4]]) + '</dd><dt>Height</dt><dd>' + (r[3] ? window.BNUnits.fmtLenM(r[3]) : "–") + '</dd></dl>' +
         '<div class="acts">' + linkA("https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistration.jsp?regKey=" + r[5], "FCC registration record") + '</div>' +
         '<p class="age">FCC Antenna Structure Registration, data as of ' + esc(d.asof) + '. The owner registered the structure; the FCC file does not list which carriers use it. Shorter sites and rooftop or small cells are usually not registered.</p>';
     } else if (p.kind === "gl" || p.kind === "ss") {
@@ -713,6 +790,12 @@
     if (y < 1) return Math.max(1, Math.round(y * 12)) + " months in orbit";
     return (y < 10 ? y.toFixed(1) : String(Math.round(y))) + " years in orbit";
   }
+  function uText(s) {
+    var U = window.BNUnits; if (!U || s == null) return s || "";
+    return String(s).replace(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*km\/s\b/g, function (_, n) { return U.fmtSpeed(parseFloat(n.replace(/,/g, "")), "s"); })
+      .replace(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*km\/h\b/g, function (_, n) { return U.fmtSpeed(parseFloat(n.replace(/,/g, "")), "h"); })
+      .replace(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*km\b/g, function (_, n) { return U.fmtDist(parseFloat(n.replace(/,/g, ""))); });
+  }
   function learnHtml(gId) {
     var L = (SKY.learn || {})[gId]; if (!L) return "";
     var yrs = yearsInOrbit(L.first), h = '<div class="nx-learn">';
@@ -725,9 +808,9 @@
     if (L.operator) h += "<dt>Operator</dt><dd>" + esc(L.operator) + "</dd>";
     if (L.first_label) h += "<dt>First in orbit</dt><dd>" + esc(L.first_label) + (yrs ? " · " + esc(yrs) : "") + "</dd>";
     else if (yrs) h += "<dt>Years in orbit</dt><dd>" + esc(yrs) + "</dd>";
-    if (L.purpose) h += "<dt>Purpose</dt><dd>" + esc(L.purpose) + "</dd>";
-    if (L.depends) h += "<dt>Who depends on it</dt><dd>" + esc(L.depends) + "</dd>";
-    if (L.failure) h += "<dt>If it failed</dt><dd>" + esc(L.failure) + "</dd>";
+    if (L.purpose) h += "<dt>Purpose</dt><dd>" + esc(uText(L.purpose)) + "</dd>";
+    if (L.depends) h += "<dt>Who depends on it</dt><dd>" + esc(uText(L.depends)) + "</dd>";
+    if (L.failure) h += "<dt>If it failed</dt><dd>" + esc(uText(L.failure)) + "</dd>";
     h += "</dl>";
     if (L.sources && L.sources.length) h += '<p class="nx-learn-src">Sources: ' + L.sources.map(function (s) { return linkA(s.url, s.name); }).join(" · ") + "</p>";
     return h + "</div>";
@@ -938,7 +1021,7 @@
   }
   function orbitClass(o) { var h = o.p ? o.p[2] : null; return h == null ? "" : h < 2000 ? "Low Earth orbit" : h < 30000 ? "Medium Earth orbit" : "Geosynchronous orbit"; }
   function satFacts(o, g, age) {
-    return '<dl><dt>Altitude</dt><dd>' + (o.p ? num(o.p[2]) + ' km' : '–') + '</dd><dt>Speed</dt><dd>' + (o.p && o.p[3] ? o.p[3].toFixed(2) + ' km/s' : '–') + '</dd><dt>One orbit</dt><dd>' + (1440 / o.mm).toFixed(0) + ' min</dd>' +
+    return '<dl><dt>Altitude</dt><dd>' + (o.p ? window.BNUnits.fmtAlt(o.p[2]) : '–') + '</dd><dt>Speed</dt><dd>' + (o.p && o.p[3] ? window.BNUnits.fmtSpeed(o.p[3], "s") : '–') + '</dd><dt>One orbit</dt><dd>' + (1440 / o.mm).toFixed(0) + ' min</dd>' +
       '<dt>Inclination</dt><dd>' + o.inc.toFixed(1) + '°</dd><dt>Over</dt><dd>' + (o.p ? Math.abs(o.p[1]).toFixed(1) + '°' + (o.p[1] >= 0 ? 'N' : 'S') + ' ' + Math.abs(o.p[0]).toFixed(1) + '°' + (o.p[0] >= 0 ? 'E' : 'W') : '–') + '</dd><dt>NORAD ID</dt><dd>' + esc(o.no) + '</dd></dl>' +
       '<p class="age">' + esc(g.what || "") + '. Position computed live from CelesTrak elements ' + (age < 48 ? Math.round(age) + ' h' : Math.round(age / 24) + ' days') + ' old. The dashed line is two orbits.</p>' +
       '<div class="acts">' + linkA("https://celestrak.org/satcat/table-satcat.php?CATNR=" + o.no, "CelesTrak record") + '</div>';
@@ -989,7 +1072,7 @@
   function satCard(i, pt) {
     var o = SKY.recs[i]; if (!o) return; SKY.sel = i; skySpinPause(); track(i, false);
     var g = SKY.groups[o.gi] || {}, c = SKYC[o.g], compact = innerWidth < 768;
-    var age = (Date.now() / 1000 - o.ep) / 3600, alt = o.p ? num(o.p[2]) + " km" : "–";
+    var age = (Date.now() / 1000 - o.ep) / 3600, alt = o.p ? window.BNUnits.fmtAlt(o.p[2]) : "–";
     var facts = satFacts(o, g, age), learn = learnHtml(o.g);
     var cx = '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
     card.classList.remove("dragged", "open", "nx-sat-chip", "nx-learn-panel");
@@ -1040,7 +1123,7 @@
   function fmtAU(x) {
     if (!x || x.au == null) return "–";
     var au = x.au, km = x.km, auS = au >= 10 ? au.toFixed(1) : au.toFixed(3);
-    return (km != null ? num(km) + " km" : "") + " (" + auS + " AU)";
+    return (km != null ? window.BNUnits.fmtDist(km) : "") + " (" + auS + " AU)";
   }
   function fmtLight(min) {
     if (min == null || !isFinite(min)) return "";
@@ -1056,7 +1139,7 @@
   function fmtSize(o) {
     var km = o.diameter_km != null ? o.diameter_km : o.size_est_km, est = o.diameter_km == null && o.size_est_km != null;
     if (km == null) return o.h != null ? "H " + o.h : "size not published";
-    var s = km >= 1 ? km.toFixed(km >= 10 ? 0 : 1) + " km" : Math.round(km * 1000) + " m";
+    var s = window.BNUnits.fmtSizeKm(km);
     return (est ? "about " : "") + s + (est ? " (from H, albedo 0.14)" : "");
   }
   function ssDiagram(objs) {
@@ -1150,7 +1233,7 @@
       var rows = cad.objects.slice(0, 5);
       h += '<ul class="nx-cad">';
       rows.forEach(function (o) {
-        h += "<li>" + linkA(o.source_url, o.des || o.name) + "<span>" + esc(fmtCadDate(o.cd)) + " · " + num(o.dist_km) + " km (" + (o.dist_ld != null ? o.dist_ld.toFixed(2) + " LD" : "") + ") · " + esc(fmtSize(o)) + "</span></li>";
+        h += "<li>" + linkA(o.source_url, o.des || o.name) + "<span>" + esc(fmtCadDate(o.cd)) + " · " + window.BNUnits.fmtDist(o.dist_km) + " (" + (o.dist_ld != null ? o.dist_ld.toFixed(2) + " LD" : "") + ") · " + esc(fmtSize(o)) + "</span></li>";
       });
       h += "</ul>";
       if (cad.objects.length > 5) h += '<p class="nx-swm">' + num(cad.objects.length) + " close approaches within 0.05 AU.</p>";
@@ -1191,7 +1274,7 @@
         '<p class="nx-swm">Radio R' + w.scales.R + ' · Radiation S' + w.scales.S + ' · Geomagnetic G' + w.scales.G + (w.kp != null ? ' · Kp ' + Number(w.kp).toFixed(1) : '') + '</p>' +
         '<p class="nx-swm' + (w.gnss === "Normal" ? ' nx-imp' : '') + '">' + esc((w.impacts || [])[0] || "") + '</p><p class="nx-swm">' + linkA(w.source_url, "NOAA SWPC") + ' · ' + linkA(w.jamming.url, "GPS jamming map") + ' · Orbits ' + linkA("https://celestrak.org/", "CelesTrak") + '</p>';
     }
-    h += '<p class="nx-swm nx-scale">Drawn to scale from Earth. GPS sits about 20,200 km up; a geostationary satellite about 35,786 km. The faint ring is geostationary altitude.</p>';
+    h += '<p class="nx-swm nx-scale">Drawn to scale from Earth. GPS sits about ' + window.BNUnits.fmtAlt(20200) + ' up; a geostationary satellite about ' + window.BNUnits.fmtAlt(35786) + '. The faint ring is geostationary altitude.</p>';
     el.innerHTML = h;
   }
   function setMode(m) {
@@ -1244,6 +1327,21 @@
       else SKY.reveal[g] = !!SKY.show[g];
       prop();
     });
+  });
+
+  /* ---------- units toggle (pt1827u): re-render open cards and sky labels, no reload ---------- */
+  document.addEventListener("bn-units", function () {
+    if (SKY.on) skyLabs();
+    if (SKY.on && SKY.sel != null && card && !card.hidden) {
+      var wasOpen = card.classList.contains("open");
+      satCard(SKY.sel, LASTPT);
+      if (wasOpen) {
+        card.classList.add("open");
+        var moreBtn = card.querySelector(".nx-sat-more"), ex = card.querySelector(".nx-sat-extra");
+        if (moreBtn) moreBtn.setAttribute("aria-expanded", "true");
+        if (ex) ex.hidden = false;
+      }
+    } else if (LASTFT && card && !card.hidden) showCard(LASTFT, LASTPT, pinned);
   });
 
   /* ---------- live refresh every 5 minutes ---------- */
