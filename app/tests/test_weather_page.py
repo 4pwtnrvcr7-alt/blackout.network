@@ -24,7 +24,7 @@ class WeatherPage(unittest.TestCase):
         self.assertEqual(wxmap.handle_get("/api/wxmap/nope", {})[0], 404)
         self.assertEqual(wxmap.handle_get("/api/wxmap/wx.js", {})[0], 200)
         self.assertEqual(wxmap.handle_get("/api/wxmap/wxw.js", {})[0], 200)   # decode worker
-        for s in ('id="wx_reg"', 'data-r="world"', 'id="wx_srcs"', 'id="wx_ldcv"', 'id="wx_ldn"', 'id="wx_ldphase"', 'id="wx_abar"', 'id="wx_abar_bar"', 'id="wx_abar_panel"'):
+        for s in ('id="wx_reg"', 'data-r="world"', 'id="wx_srcs"', 'id="wx_ldcv"', 'id="wx_ldn"', 'id="wx_ldphase"', 'id="wx_abar"', 'id="wx_abar_bar"', 'id="wx_abar_panel"', "data-bn-noreport"):
             self.assertIn(s, body)
 
     def test_grid_regions_and_global_alerts(self):
@@ -94,6 +94,14 @@ class WeatherPage(unittest.TestCase):
         self.assertIn('return "warn"', js)
         self.assertIn("#E39B2A", css)                          # amber for watches / lesser alerts
         self.assertIn("#FF3B3B", css)                          # red for severe
+        self.assertIn('var wc = p.watch ? "#E39B2A" : "#FF3B3B"', js)  # expanded label dot matches severity, not flood green
+        self.assertIn('stl(wc, p.watch ? "Watch" : "Warning")', js)
+        warn = js.split('L === "warn-fill"')[1].split("} else if")[0]
+        self.assertNotIn("WC[p.g]", warn)
+        self.assertIn("#2FD67B", js)                           # flood-group green still used on the map polygons
+        self.assertNotIn("#2FD67B", warn)
+        self.assertIn("html.bna-pg body.wx .bnr-fab", css)     # beats theme display:flex !important
+        self.assertIn("data-bn-noreport", html)
         self.assertNotIn("#FFC21A", css)
         self.assertNotIn("#FFC21A", js)
         self.assertNotIn("16px", js.split("function place")[1].split("function showCard")[0])  # no top-left pin
