@@ -750,6 +750,13 @@ def handle_get(path, qs=None, headers=None):
         return netinfra.tile(STATIC, *map(int, mt.groups()))
     if p.startswith("/api/netmap/"):
         n = p[len("/api/netmap/"):]
+        if n == "learn.json" or re.fullmatch(r"learn/[a-z0-9_-]+\.(jpg|jpeg|png|webp|txt)", n):
+            path = os.path.join(STATIC, n)
+            root = os.path.abspath(STATIC) + os.sep
+            if not os.path.isfile(path) or not os.path.abspath(path).startswith(root):
+                return 404, {"error": "not found"}
+            ctype = "application/json" if n.endswith(".json") else "text/plain; charset=utf-8" if n.endswith(".txt") else "image/jpeg" if n.endswith((".jpg", ".jpeg")) else "image/png" if n.endswith(".png") else "image/webp"
+            with open(path, "rb") as fh: return 200, fh.read(), ctype
         if n not in FILES: return 404, {"error": "not found"}
         with open(os.path.join(STATIC, n), "rb") as fh: return 200, fh.read(), FILES[n]
     return 404, {"error": "not found"}
