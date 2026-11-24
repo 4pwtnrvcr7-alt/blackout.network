@@ -5,7 +5,7 @@ string the row is dropped and /grid (The Grid) shows no U.S. operators until tha
 Fix: if those rows are missing, this module fetches the same keyless EIA-930 feed here (www.eia.gov/electricity/930-api) and runs the
 same gridstatus.compute_sections() with the ODIN / NWS / SWPC rows that did sync. Cached 10 min (failures 2 min), one refresh at a time,
 no threads, no writes, no keys. Box collector, scanner, scoring and the sync itself are untouched."""
-import time, threading
+import threading, time
 
 TTL_OK, TTL_ERR = 600, 120
 _C = {"t": 0.0, "v": None, "eia_ts": None, "err": None}
@@ -15,6 +15,23 @@ def sections(G, conn=None):
     """Return (sections dict or None, eia fetch time ISO or None). G is the gridstatus module."""
     now = time.time()
     if _C["t"] and now - _C["t"] < (TTL_OK if _C["v"] else TTL_ERR): return _C["v"], _C["eia_ts"]
+    if _C["v"] and not _L.locked():      # stale but usable: serve it now and refresh in the background (no 15 s wait on first paint)
+        try:
+            threading.Thread(target=_refresh_bg, args=(G,), name="gridlive-refresh", daemon=True).start()
+        except Exception:
+            pass
+        return _C["v"], _C["eia_ts"]
+    return _build(G, conn)
+
+
+def _refresh_bg(G):
+    try:
+        _build(G, None)
+    except Exception:
+        pass
+
+
+def _build(G, conn):
     if not _L.acquire(blocking=False): return _C["v"], _C["eia_ts"]      # someone else is refreshing: serve what we have
     try:
         try:
