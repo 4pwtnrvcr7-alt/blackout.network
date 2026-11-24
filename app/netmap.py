@@ -621,8 +621,8 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
   '<p><a href="/grid/providers">Cloud provider pages</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a></p></footer>'
   '</div></section>')
 
-SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
-             ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
+SKY_CHIPS = [("iss", "ISS", "#FFFFFF"), ("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
+             ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0"), ("debris", "Debris", "#8A94A8")]
 # Nov 24 2026 (Matt): one "Power grid" chip (outages + operators + 230 kV+ lines); chips with no map items (Mobile, Satellite, Payments, Apps) live on Status only
 CHIPS = [("internet", "Internet"), ("grid", "Power grid"), ("hydro", "Hydro dams"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers")]
 
@@ -640,7 +640,7 @@ def page(qs=None):
     title = "The Grid: live status of power, internet, mobile, cloud and apps | BLACKOUT.NETWORK"
     desc = ("The Grid: live status of the power grid and the networks that run on it. Grid operators colored by status, outages by state, weather threats, "
             "plus plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, apps and government services, an incident log and a satellite globe.")
-    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="true"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
+    skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="{"false" if g == "debris" else "true"}"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="true"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
@@ -670,6 +670,7 @@ def page(qs=None):
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
+<aside class="nx-ss" id="nx_ss" hidden></aside>
 <div class="nx-side"><aside class="nx-sea" id="nx_sea" hidden aria-label="Undersea cables"></aside></div>
 <div class="nx-ctl"><button type="button" class="nx-b" id="nx_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
@@ -768,6 +769,25 @@ def handle_get(path, qs=None, headers=None):
     if p == "/api/netmap/space":
         import netsky
         return 200, netsky.space()
+    if p == "/api/netmap/debris":
+        import netsky
+        try:
+            lite = str(((qs or {}).get("lite") or [""])[0] if isinstance((qs or {}).get("lite"), list) else (qs or {}).get("lite") or "") == "1"
+            return 200, netsky.debris_cached(lite), "application/json"
+        except Exception as ex:
+            return 503, {"error": "debris data unavailable right now", "detail": type(ex).__name__}
+    if p == "/api/netmap/ss":
+        import netsky
+        try:
+            return 200, netsky.solar_system()
+        except Exception as ex:
+            return 503, {"error": "solar-system data unavailable right now", "detail": type(ex).__name__}
+    if p == "/api/netmap/cad":
+        import netsky
+        try:
+            return 200, netsky.cad()
+        except Exception as ex:
+            return 503, {"error": "close-approach data unavailable right now", "detail": type(ex).__name__}
     mt = re.fullmatch(r"/api/netmap/gridtiles/(\d{1,2})/(\d{1,4})/(\d{1,4})\.pbf", p)
     if mt:
         import netinfra
