@@ -164,7 +164,8 @@
     });
     var L = lcList()[LC.sel];
     if (!L) return;
-    var t = LC.anim ? LC.anim.t : Infinity, placed = [];
+    var t = LC.anim ? LC.anim.t : Infinity, placed = [], cur = -1;
+    L.labels.forEach(function (b, j) { if (b.t <= t) cur = j; });   /* pt1842u: only the current event, never a pile of labels at the pad */
     LC.lbl.querySelectorAll(".nx-lc-ev").forEach(function (el) {
       if (el.dataset.ev === "head") {
         var hp = LC.anim ? lcAt(L, LC.anim.t) : null;
@@ -173,8 +174,9 @@
         lcPlace(el, m, lcPos(hp.lon, hp.lat, hp.alt), cw, ch, cen, placed); return;
       }
       var b = L.labels[+el.dataset.ev];
-      el.classList.toggle("dim", b.t > t);
-      if (b.t > t) { el.style.transform = "translate(-9999px,0)"; return; }
+      var off = b.t > t || +el.dataset.ev !== cur;
+      el.classList.toggle("dim", off);
+      if (off) { el.style.transform = "translate(-9999px,0)"; return; }
       lcPlace(el, m, lcPos(b.at[0], b.at[1], b.at[2]), cw, ch, cen, placed);
     });
   }
@@ -350,11 +352,31 @@
     var live = (Date.now() - lcNetMs(L)) / 1000;
     var mid = live >= 0 && live < lcTEnd(L) ? (lcAt(L, live) || { lon: L.pad_lon, lat: L.pad_lat }) : { lon: L.pad_lon, lat: L.pad_lat };
     try { map.easeTo({ center: [mid.lon, mid.lat], zoom: mob ? 2.3 : 3, pitch: mob ? 40 : 50, duration: reduce ? 0 : 1000 }); } catch (e) {}
-    if (live >= 0 && live < lcTEnd(L) && L.status !== "Success" && L.status !== "Failure") { LC.anim = { t: live, playing: false, live: true }; }
-    else setTimeout(function () { if (LC.sel === i) lcPlay("play"); }, reduce ? 0 : 1100);
+    var flying = live >= 0 && live < lcTEnd(L) && L.status !== "Success" && L.status !== "Failure";
+    if (flying) { LC.anim = { t: live, playing: false, live: true }; }
+    if (lcChase(L, flying ? { t: live, live: true } : {})) { lcBarTime(); return; }   /* pt1842u: 3D chase camera */
+    if (!flying) setTimeout(function () { if (LC.sel === i) lcPlay("play"); }, reduce ? 0 : 1100);
     lcBarTime(); lcRepaint();
   }
+  /* ---------- pt1842u: rocket chase camera (chase3d.js, lazy-loaded with three147.js) ---------- */
+  function lcChase(L, opt) {
+    var u = window.BN_CHASE3D; if (!u || !u.length || typeof WebGLRenderingContext === "undefined") return false;
+    document.body.classList.add("nx-lc-chase");
+    var go = function () {
+      if (LC.sel < 0 || lcList()[LC.sel] !== L) return;
+      if (!window.BNChase || !window.BNChase.open(L, opt)) lcChaseFail();
+    };
+    if (window.BNChase) { go(); return true; }
+    if (!LC.chp) LC.chp = new Promise(function (ok, no) {
+      var list = u.filter(function (x) { return !(window.THREE && window.THREE.OrbitControls && /three147/.test(x)); }), k = 0;
+      (function lcNx() { if (k >= list.length) return ok(); var sc = document.createElement("script"); sc.src = list[k++]; sc.onload = lcNx; sc.onerror = no; document.head.appendChild(sc); })();
+    });
+    LC.chp.then(go, function () { LC.chp = null; lcChaseFail(); });
+    return true;
+  }
+  function lcChaseFail() { document.body.classList.remove("nx-lc-chase"); if (LC.sel >= 0 && !(LC.anim && LC.anim.live)) lcPlay("play"); }
   function lcClose() {
+    if (window.BNChase) window.BNChase.close(); document.body.classList.remove("nx-lc-chase");
     var map = window.__nxMap; LC.sel = -1; LC.anim = null; LC.follow = false; LC.open = false; window.__nxSpinHold = false;
     document.body.classList.remove("nx-lc-focus"); lcHideOthers(false); lcEvLabels(); lcBar();
     try { map.easeTo({ pitch: 0, zoom: mob ? -0.55 : -0.4, duration: reduce ? 0 : 900 }); } catch (e) {}
@@ -467,7 +489,7 @@
   }
   function lcSkyChanged() {
     var sky = document.body.classList.contains("nx-sky");
-    if (!sky && LC.sel >= 0) { LC.sel = -1; LC.anim = null; window.__nxSpinHold = false; document.body.classList.remove("nx-lc-focus"); LC.hidden = null; lcEvLabels(); lcBar(); }
+    if (!sky && LC.sel >= 0) { if (window.BNChase) window.BNChase.close(); document.body.classList.remove("nx-lc-chase"); LC.sel = -1; LC.anim = null; window.__nxSpinHold = false; document.body.classList.remove("nx-lc-focus"); LC.hidden = null; lcEvLabels(); lcBar(); }
     if (LC.lbl) LC.lbl.style.display = sky && LC.on && LC.reveal ? "" : "none";
     if (sky) { lcChip(); if (LC.on) lcLoad(); }
   }
