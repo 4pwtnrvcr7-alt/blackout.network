@@ -25,6 +25,7 @@ class ChaseTest(unittest.TestCase):
         low = re.sub(r"/\*.*?\*/", "", js.lower(), flags=re.S)
         self.assertNotIn("yellow", low); self.assertNotIn("<img", low)
         self.assertIn("OrbitControls", js); self.assertIn("ONE: T.TOUCH.ROTATE", js)
+        self.assertIn(":not(.nx-ch-tk)", js); self.assertIn("chGridFin", js); self.assertIn("chSmokeTick", js); self.assertIn("chSideSepT", js); self.assertIn("chBeam", js)
         lj = open(os.path.join(STATIC, "launches.js"), encoding="utf-8").read()
         self.assertIn("only the current event", lj); self.assertIn("lcChase(L", lj)
 
