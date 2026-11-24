@@ -219,7 +219,7 @@ body.nx-sky .nx-more-btn{display:none}
 .nx-ldmsg{margin:12px 0 0;font-size:12.5px;line-height:1.4;color:#B8BCD0}
 @media (max-width:767px){.nx-ldp{padding:16px 16px 15px;bottom:calc(16px + env(safe-area-inset-bottom))}.nx-ldn{font-size:28px}.nx-ldst{font-size:15px}.nx-lds{display:grid;grid-template-columns:1fr 1fr;gap:9px 12px;font-size:10px;letter-spacing:.1em}.nx-lds li{white-space:nowrap}}
 
-/* pt1785u Stage 2: undersea cable chokepoints */
+/* pt1785u Stage 2: undersea cable side panel (unused; status is on the cables) */
 .nx-side{position:fixed;z-index:20;left:calc(14px + env(safe-area-inset-left));top:calc(128px + env(safe-area-inset-top));width:268px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .nx-side>*{pointer-events:auto}
 body.nx-board .nx-side,body.nx-sky .nx-side{display:none}
