@@ -71,6 +71,9 @@ class Launches(unittest.TestCase):
         self.assertNotIn("<img", low)   # no imagery in the launch view
         import netpages
         self.assertIn("/api/netmap/launches.js", netpages.handle_get("/grid", {})[1])
+        self.assertIn('aria-pressed", LC.on ? "true" : "false"', js)
+        self.assertIn("window.__nxLaunchLayerIn = lcLayerIn", js)
+        self.assertIn("LC.reveal", js)
 
 if __name__ == "__main__":
     unittest.main()
