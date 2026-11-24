@@ -12,7 +12,7 @@ class NetMap(unittest.TestCase):
         self.assertEqual(addons.ROUTES["/network"], "netpages")
         code, body, ct = netpages.handle_get("/network", {})
         self.assertEqual((code, ct), (200, "text/html"))
-        for s in ('id="nx_map"', 'id="nx_ld"', 'id="nx_ldcv"', 'id="nx_more"', 'id="nx_f"', "/api/netmap/net.js", "/api/signal/maplibre-gl.js"):
+        for s in ('id="nx_map"', 'id="nx_ld"', 'id="gx_more"', 'id="nx_more"', 'id="nx_f"', "/api/netmap/net.js", "/api/signal/maplibre-gl.js"):
             self.assertIn(s, body)
         self.assertEqual(netmap.handle_get("/api/netmap/nope")[0], 404)
         self.assertEqual(netmap.handle_get("/api/netmap/net.js")[0], 200)
@@ -27,17 +27,20 @@ class NetMap(unittest.TestCase):
         self.assertIn("25000", open(os.path.join(APP, "netmap_static", "net.js")).read())
 
     def test_boot_loader(self):
-        """pt1759u: retro gaming-PC boot. boot.js is served, loads before net.js, text sits on its own panel, no yellow or red neon."""
+        """Nov 24 2026 (pt1795u): the loader is the old /grid "Energizing the grid" animation (boot.js kept in the repo, no longer loaded).
+        Progress ids net.js drives are present, reduced motion is honored, no yellow or red neon."""
         import colorsys, netmap, netpages
         self.assertEqual(netmap.handle_get("/api/netmap/boot.js")[0], 200)
         body = netpages.handle_get("/network", {})[1]
-        self.assertLess(body.index("/api/netmap/boot.js"), body.index("/api/netmap/net.js"))
-        for s in ('id="nx_ldp"', 'id="nx_ldn"', 'id="nx_ldst"', 'id="nx_ldbar"'): self.assertIn(s, body)
-        js = open(os.path.join(APP, "netmap_static", "boot.js"), encoding="utf-8").read()
-        self.assertIn("prefers-reduced-motion", js)
-        for f in ("boot.js", "net.css"):
+        self.assertNotIn("/api/netmap/boot.js", body)
+        self.assertLess(body.index('class="gx-ld" id="nx_ld"'), body.index("/api/netmap/net.js"))
+        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', "Energizing the grid", 'class="gx-ldsvg"', 'data-s="map"', 'data-s="nets"', 'data-s="out"', 'data-s="rep"'): self.assertIn(s, body)
+        css = open(os.path.join(APP, "netmap_static", "gridlayer.css"), encoding="utf-8").read()
+        self.assertIn("prefers-reduced-motion", css)
+        self.assertIn("body.nx-ready .gx-ld{opacity:0", css)
+        for f in ("gridlayer.css",):
             t = open(os.path.join(APP, "netmap_static", f), encoding="utf-8").read()
-            if f == "net.css": t = t[t.index(".nx-ld"):t.index(".nx-ld") + 4000]
+            t = t[t.index(".gx-ld"):t.index(".gx-ld") + 4000]
             for h in set(re.findall(r"#([0-9A-Fa-f]{6})\b", t)):
                 r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
                 hue, l, sat = colorsys.rgb_to_hls(r, g, b)
