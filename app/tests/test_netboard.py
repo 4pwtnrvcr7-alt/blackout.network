@@ -84,12 +84,12 @@ class Board(unittest.TestCase):
         self.assertEqual(code, 200); self.assertIn("deps", b); self.assertIn("st_pt", b); self.assertIn("NY", b["st_pt"])
         for f in ("board.js", "board.css"): self.assertEqual(netmap.handle_get("/api/netmap/" + f)[0], 200)
         import netpages
-        h = netpages.handle_get("/network", {})[1]
+        h = netpages.handle_get("/grid", {})[1]   # Nov 24 2026: canonical /grid
         for s in ('id="nb"', 'id="nb_q"', 'data-m="status"', 'data-m="map"', 'data-m="sky"', 'class="nx"', "/api/netmap/board.js", "/api/netmap/board.css", 'data-s="rep"'):
             self.assertIn(s, h)
         self.assertLess(h.index("/api/netmap/net.js"), h.index("/api/netmap/board.js"))
 
-    def test_no_yellow_and_red_only_for_major(self):
+    def test_no_yellow_and_red_only_for_disruption_or_outage(self):
         import colorsys
         for f in ("board.js", "board.css"):
             t = open(os.path.join(APP, "netmap_static", f), encoding="utf-8").read()
@@ -99,7 +99,8 @@ class Board(unittest.TestCase):
                 if sat > 0.4 and l > 0.25: self.assertFalse(0.1 < hue < 0.2, f + " #" + h)
         css = open(os.path.join(APP, "netmap_static", "board.css"), encoding="utf-8").read()
         reds = [m.group(0) for m in re.finditer(r"[^{}]*\{[^}]*(?:var\(--rd\)|#FF3B3B)[^}]*\}", css)]
-        self.assertTrue(reds and all(re.search(r"out|--rd:", r) for r in reds), reds)
+        # Nov 24 2026 (Matt): red = Disruption (deg) and Major outage (out); amber = Minor issue
+        self.assertTrue(reds and all(re.search(r"out|deg|--rd:|--dg:", r) for r in reds), reds)
 
     def test_vote_route(self):
         import votes
