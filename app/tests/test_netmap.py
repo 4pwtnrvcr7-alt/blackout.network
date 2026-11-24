@@ -47,7 +47,7 @@ class NetMap(unittest.TestCase):
         self.assertGreaterEqual(len(ops), 8)
         for o in ops: self.assertIn(o["g"]["type"], ("Polygon", "MultiPolygon"))
         # the normal internet tint must not wash the lines green while Power grid is on
-        self.assertIn('map.setPaintProperty("inet-fill", "fill-opacity", ON.grid ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"])', js)
+        self.assertIn('map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"])', js)
         self.assertIn("l: l, o: l >= 3", js)
 
     def test_boot_loader(self):
@@ -252,6 +252,16 @@ class NetSky(unittest.TestCase):
         self.assertNotIn("#FFC21A", added)
         self.assertNotIn("yellow", added.lower())
 
+    def test_map_layers_stagger_in(self):
+        # pt1833u: Map view loads default layers one at a time, ~400 ms, internet first
+        from pathlib import Path
+        js = (Path(__file__).resolve().parents[1] / "netmap_static" / "net.js").read_text()
+        self.assertIn("function mapLayerIn", js)
+        self.assertIn('MAP_ORDER = ["internet", "grid", "sea", "dc", "towers", "hydro", "cloud"]', js)
+        self.assertIn("var i = 0, gap = 400", js)
+        self.assertIn('if (location.hash !== "#sky") mapLayerIn()', js)
+        self.assertIn("mapLayerIn(); if (D) summary()", js)
+        self.assertIn("function mapOn(k)", js)
 
     def test_sky_true_scale_and_learn_panel(self):
         # pt1814u: true-altitude 3D layer, GEO zoom, learn panel with licensed images, no Sky chip status dot
