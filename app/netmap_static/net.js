@@ -239,7 +239,7 @@
         if (f && f.properties.cluster) { var cid = f.properties.cluster_id, cc0 = f.geometry.coordinates; hideCard(true);
           map.getSource("tw").getClusterExpansionZoom(cid).then(function (z) { map.easeTo({ center: cc0, zoom: Math.min(z, 12), duration: reduce ? 0 : 600 }); }, function () {}); return; }
       }
-      if (!f && ON.sea && map.getLayer("sea-line")) f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["sea-ls", "sea-line"] })[0];
+      if (!f && ON.sea && (map.getLayer("sea-line") || map.getLayer("sea-line-approx"))) f = map.queryRenderedFeatures([[e.point.x - T, e.point.y - T], [e.point.x + T, e.point.y + T]], { layers: ["sea-ls", "sea-line", "sea-line-approx"].filter(function (l) { return map.getLayer(l); }) })[0];
       if (!f) f = inetHit;
       if (f) showCard(f, e.point, true); else hideCard(true);
     });
@@ -376,15 +376,18 @@
 
 
   /* ---------- undersea cables (pt1812u): OSM + NOAA routes, coloured green / yellow / red by inferred status. No chokepoint notes. ---------- */
-  var SEA = { geo: null, st: null, busy: false }, SEA_L = ["sea-line", "sea-ls"];
+  var SEA = { geo: null, st: null, busy: false }, SEA_L = ["sea-line", "sea-line-approx", "sea-ls"];
   var CCOL = { 0: "#2FD67B", 1: "#F5D547", 2: "#FF3B3B" };
   function seaCol(lv) { return CCOL[lv] || CCOL[0]; }
   function seaLayers() {
     map.addSource("sea", { type: "geojson", data: EMPTY, tolerance: 0.6 });
     var vz = ON.sea ? "visible" : "none";
-    map.addLayer({ id: "sea-line", type: "line", source: "sea", filter: ["==", ["geometry-type"], "LineString"], layout: { visibility: vz, "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["match", ["get", "lv"], 2, CCOL[2], 1, CCOL[1], CCOL[0]], "line-opacity": ["case", [">", ["get", "lv"], 0], 0.95, 0.75],
-        "line-width": ["interpolate", ["linear"], ["zoom"], 1, ["case", [">", ["get", "lv"], 0], 1.6, 0.7], 6, ["case", [">", ["get", "lv"], 0], 3, 1.5], 10, 2.4] } }, "glow");
+    var seaPaint = { "line-color": ["match", ["get", "lv"], 2, CCOL[2], 1, CCOL[1], CCOL[0]], "line-opacity": ["case", [">", ["get", "lv"], 0], 0.95, 0.75],
+        "line-width": ["interpolate", ["linear"], ["zoom"], 1, ["case", [">", ["get", "lv"], 0], 1.6, 0.7], 6, ["case", [">", ["get", "lv"], 0], 3, 1.5], 10, 2.4] };
+    map.addLayer({ id: "sea-line", type: "line", source: "sea", filter: ["all", ["==", ["geometry-type"], "LineString"], ["!=", ["get", "s"], "approx"]], layout: { visibility: vz, "line-cap": "round", "line-join": "round" },
+      paint: seaPaint }, "glow");
+    map.addLayer({ id: "sea-line-approx", type: "line", source: "sea", filter: ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "s"], "approx"]], layout: { visibility: vz, "line-cap": "round", "line-join": "round" },
+      paint: Object.assign({ "line-dasharray": [2.4, 1.4] }, seaPaint) }, "glow");
     map.addLayer({ id: "sea-ls", type: "circle", source: "sea", filter: ["==", ["geometry-type"], "Point"], minzoom: 2.5, layout: { visibility: vz },
       paint: { "circle-color": "#05060a", "circle-stroke-color": "#E8ECF5", "circle-stroke-width": 1.2, "circle-radius": ["interpolate", ["linear"], ["zoom"], 2.5, 2, 8, 4.5] } }, "glow");
   }
@@ -432,7 +435,8 @@
       '<h3>' + esc(f.n || "Unnamed cable") + '</h3><dl>' + (f.op ? '<dt>Operator</dt><dd>' + esc(f.op) + '</dd>' : "") +
       '<dt>Status</dt><dd>' + esc(st) + '</dd><dt>Why</dt><dd>' + why + '</dd>' + src +
       (f.st ? '<dt>NOAA record</dt><dd>' + esc(f.st) + '</dd>' : "") +
-      '<dt>Route source</dt><dd>' + (f.s === "noaa" ? "NOAA cable area, U.S. waters" : "OpenStreetMap") + '</dd></dl>' +
+      (f.s === "approx" ? '<dt>Route</dt><dd>Approximate route</dd>' : "") +
+      '<dt>Route source</dt><dd>' + (f.s === "noaa" ? "NOAA cable area, U.S. waters" : f.s === "approx" ? "Official landing points, Wikidata coordinates (CC0). Not a surveyed cable path." : "OpenStreetMap") + '</dd></dl>' +
       '<p class="age">' + esc((SEA.st && SEA.st.basis) || "Status is inferred from public fault reports. Operators publish no live feed.") + '</p>';
   }
 
