@@ -5,11 +5,13 @@ sys.path.insert(0, APP)
 
 class GridPage(unittest.TestCase):
     def test_menu_links_the_grid_page(self):
+        """Nov 24 2026 (Matt pt1795u): The Grid is merged into /network; the menu's one "The Grid" item opens /network."""
         import sitenav, sitenav_ui
         rows = {k: (l, h) for _, _, _, rs in sitenav_ui.menu3_sections(sitenav) for k, l, h in rs}
-        self.assertEqual(rows["grid"], ("The Grid", "/grid"))
+        self.assertEqual(rows["net"], ("The Grid", "/network"))
+        self.assertNotIn("grid", rows)
         html = sitenav.header_html("")
-        self.assertIn('<a href="/grid">The Grid</a>', html)
+        self.assertNotIn('href="/grid"', html)
         self.assertNotIn("/live#grid", html)
 
     def test_route_and_page(self):

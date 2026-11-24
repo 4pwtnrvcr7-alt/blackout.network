@@ -8,12 +8,12 @@ ROUTES = ["/live", "/live/", "/dashboard", "/noise", "/solar", "/ai", "/crime", 
           "/politics", "/government", "/gunlaws", "/figures", "/elon", "/preppers", "/resources", "/maps", "/maps/x.pdf", "/medical",
           "/bushcraft", "/sources", "/scoring", "/about/scoring", "/spacex", "/cern", "/lhc", "/jets", "/games", "/mesh/chat", "/mesh/chat/x"]
 UNLISTED = ["/sources", "/sources/", "/scoring", "/about/scoring", "/crime", "/crime/zip/32771"]   # hidden, but still served (newsletter links)
-KEEP = ["/", "/wire", "/map", "/weather", "/grid", "/network", "/network/aws", "/markets", "/newsletter", "/privacy", "/tos", "/ready", "/api/live/summary",
+KEEP = ["/", "/wire", "/map", "/weather", "/network", "/network/aws", "/markets", "/newsletter", "/privacy", "/tos", "/ready", "/api/live/summary",
         "/api/sources/x", "/api/crime/x", "/livestream", "/sourcesx", "/mesh", "/mesh/guide", "/api/mesh/chat"]
 
 class List(unittest.TestCase):
     def test_count_and_routes(self):
-        self.assertEqual(len(D.DEACTIVATED_PAGES), 23)   # 21 names + "local resources / offline maps" split in two + mesh chat
+        self.assertEqual(len(D.DEACTIVATED_PAGES), 24)   # 21 names + "local resources / offline maps" split in two + mesh chat + old /grid (merged into /network)
         for n, k, ps, st in D.DEACTIVATED_PAGES: self.assertIn(st, ("off", "unlisted"), n)
         for p in ROUTES: self.assertTrue(D.is_off(p), p)
         for p in KEEP: self.assertFalse(D.is_off(p), p); self.assertFalse(D.redirects(p), p)
@@ -42,7 +42,7 @@ class Menus(unittest.TestCase):
     def hrefs(self, h): return set(re.findall(r'<a\b[^>]*href="([^"]+)"', h))
     def check(self, h):
         for x in self.hrefs(h): self.assertFalse(D.href_off(x), x)
-        for need in ("/wire", "/map", "/weather", "/grid", "/network", "/markets", "/newsletter", "https://x.com/BlkoutNtw", "https://www.youtube.com/@blkoutntw"):
+        for need in ("/wire", "/map", "/weather", "/network", "/markets", "/newsletter", "https://x.com/BlkoutNtw", "https://www.youtube.com/@blkoutntw"):
             self.assertIn(need, self.hrefs(h))
         self.assertIn('data-m5-act="install"', h); self.assertIn('data-m5-act="notify"', h)
         self.assertIn("prefers-reduced-motion", h)
