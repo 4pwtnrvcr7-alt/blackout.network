@@ -561,7 +561,7 @@ def render(np):
     others = " · ".join(f'<a href="/network/{s}">{E(np.P[s]["name"])}</a>' for s in np.ORDER)
     nl = ('<div class="np-nl"><div><b>Know about the next big outage first</b><div class="np-mu">The free BLACKOUT.NETWORK newsletter: major outages, threats and what to do. Follow us on YouTube and X too.</div></div>'
           '<a class="np-btn p" href="/newsletter?utm_source=site&amp;utm_medium=network_page&amp;utm_campaign=starlink">Get the free newsletter</a></div>')
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">Network Status</a> › <a href="/network/providers">Providers</a> › Starlink</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › <a href="/network/providers">Providers</a> › Starlink</p>'
             + hero + sec_glb + f'<div class="np-grid2 np-gap">{sec_st}{sec_h}</div>' + sec_sp + sec_wx + nl + sec_ck + sec_ln
             + f'<p class="np-mu">Other providers: {others}. Research only; not affiliated with SpaceX. Names identify services only.</p></div>'
             f'<style>{np.CSS}{SL_CSS}</style>{GLOBE_JS}')
@@ -769,7 +769,7 @@ var qs=new URLSearchParams(location.search),p=qs.get("where")||qs.get("zip")||qs
 
 def render_near(np):
     ic = lambda n, c="np-ic": _ic(np, n, c)
-    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">Network Status</a> › <a href="/network/providers">Providers</a> › Networks near me</p>'
+    body = (f'<div class="np"><p class="np-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › <a href="/network/providers">Providers</a> › Networks near me</p>'
             f'<section class="np-hero page-header-band"><div class="np-hrow">{np.TILE}<div style="min-width:0"><div class="np-kick"><i></i>BLACKOUT.NETWORK · NETWORK STATUS</div>'
             '<h1>Networks near me</h1><p>Type a ZIP code, city or address. We show the networks that serve that place and their status right now, '
             'active weather alerts there, and a plain note on how that weather can affect your connection.</p></div></div>'

@@ -128,7 +128,7 @@ def render(n, hist, rep, generated=None, prov_inc=()):
     if n.get("support"): links.append(f'<a href="{E(n["support"])}" target="_blank" rel="noopener">{E(nm)} support</a>')
     if n.get("page"): links.append(f'<a href="{E(n["page"])}">Full provider analysis</a>')
     if n.get("ioda"): links.append(f'<a href="{E(n["ioda"])}" target="_blank" rel="noopener">IODA</a>')
-    body = (f'<div class="sd"><p class="sd-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">Network Status</a> › {E(nm)}</p>'
+    body = (f'<div class="sd"><p class="sd-crumb"><a href="/">BLACKOUT.NETWORK</a> › <a href="/network">The Grid</a> › {E(nm)}</p>'
             f'<div class="sd-h"><div><h1>{E(nm)}</h1>' + (f'<p>{E(sub(n["name"]))}</p>' if sub(n["name"]) else "") + '</div>'
             f'<span class="sd-pill" style="--c:{c}"><i></i>{E(word(n, lv))}</span></div>'
             f'<p class="sd-st">{E(n.get("status") or "")}</p><p class="sd-mu">' + (f'Checked {E(_et(generated))} · ' if generated else "") + f'{E(n.get("basis") or "")}</p>'
