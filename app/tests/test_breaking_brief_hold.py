@@ -120,3 +120,27 @@ class RunBreaking(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class V4Layout(unittest.TestCase):
+    """Matt, Nov 21: breaking alerts use the same style as the 7 AM / 7 PM issue (layout v4)."""
+    def setUp(self):
+        for k, v in OWN.items(): NL.P[k] = os.path.join(TMP, v)
+        seed_src()
+    def test_render_breaking_v4(self):
+        S = NL.src()
+        try: r = S.execute("SELECT * FROM clusters WHERE cluster_id=?", (A,)).fetchone()
+        finally: S.close()
+        it = NL.item_of(r, "main", 1); it["rule"] = "B2"; it["breaking"] = True
+        L = {"unsubscribe": "https://blackout.network/u", "manage": "https://blackout.network/m", "categories": "https://blackout.network/m",
+             "sources": "https://blackout.network/sources", "scoring": "https://blackout.network/scoring", "site": "https://blackout.network/", "_row": None}
+        subj, h, t = NL.render_breaking([it], L, AT, NL.cfg())
+        self.assertTrue(subj.startswith("Breaking Alert, Nov 13: "), subj)
+        self.assertIn("BREAKING ALERT", h); self.assertIn("blackout.network</a>", h); self.assertIn("<!--bn-footer-->", h)
+        self.assertIn("RANK 8", h); self.assertIn("Read the full story", h); self.assertIn("/wire/" + A, h)
+        for bad in ("#FFD60A", "#FFCC00", "#F5C518", "verified"): self.assertNotIn(bad, h)
+        self.assertIn("Read the full story: https://blackout.network/wire/" + A, t)
+    def test_breaking_status(self):
+        st = NL.breaking_status()
+        for k in ("enabled", "require_story_brief", "runs", "held_now", "active_opted_out"): self.assertIn(k, st)
+        self.assertTrue(st["require_story_brief"])
