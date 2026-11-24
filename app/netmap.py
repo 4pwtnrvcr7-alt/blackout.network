@@ -1,4 +1,5 @@
-"""/network: Network Status, full-screen outage map (Matt pt1755u, Nov 23 2026).
+"""/network: The Grid (was "Network Status"), full-screen outage map (Matt pt1755u, Nov 23 2026).
+Nov 24 2026 (Matt pt1795u): the old /grid page is merged in (grid operator layer, "More about the grid" sheet, its loader); /grid 302s here.
 Read-only and keyless. Everything is fetched on this node from free public feeds, cached in memory (stale-while-revalidate,
 one refresh at a time, never per request) and re-served as one compact JSON:
   IODA (Georgia Tech) country / region / network (ASN) outage signals · official provider status APIs (Atlassian Statuspage JSON,
@@ -12,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json"}
+FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/network; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -531,12 +532,43 @@ def _dc_build():
 def dc(): return swr("dc", 6 * 3600, _dc_build)
 
 # ---------------------------------------------------------------- page
-LOADER = ('<div class="nx-ld" id="nx_ld" role="status" aria-label="Loading network status">'
-  '<canvas id="nx_ldcv" aria-hidden="true"></canvas>'
-  '<div class="nx-ldp" id="nx_ldp"><div class="nx-ldh"><div><p class="nx-ldk">System boot</p><p class="nx-ldst" id="nx_ldst">Power on</p></div>'
-  '<b class="nx-ldn" id="nx_ldn">00%</b></div><div class="nx-ldtr"><i id="nx_ldbar"></i></div>'
-  '<ol class="nx-lds" aria-hidden="true"><li data-s="nets">Networks</li><li data-s="out">Outages</li><li data-s="rep">Reports</li><li data-s="map">Map</li></ol>'
-  '<p class="nx-ldmsg" id="nx_ldmsg" hidden></p></div></div>')
+# Nov 24 2026 (Matt pt1795u): The Grid and Network Status merged into this page (now "The Grid"); its loader is the old /grid
+# "Energizing the grid" animation (current running down three feeder lines into a 3x3 grid of nodes). Progress follows net.js prog().
+LOADER = ('<div class="gx-ld" id="nx_ld" role="status" aria-label="Loading The Grid">'
+  '<svg class="gx-ldsvg" viewBox="0 0 320 200" aria-hidden="true" focusable="false">'
+  '<g class="gx-lines">'
+  '<path d="M10 40 C 70 40, 90 70, 130 70 L 160 70"/><path d="M10 160 C 70 160, 90 130, 130 130 L 160 130"/>'
+  '<path d="M10 100 L 160 100"/>'
+  '<path d="M160 70 L 220 70 L 280 70 M160 100 L 220 100 L 280 100 M160 130 L 220 130 L 280 130 M160 70 L 160 130 M220 70 L 220 130 M280 70 L 280 130"/>'
+  '</g>'
+  '<g class="gx-flow"><path d="M10 40 C 70 40, 90 70, 130 70 L 160 70"/><path d="M10 160 C 70 160, 90 130, 130 130 L 160 130"/><path d="M10 100 L 160 100"/></g>'
+  '<g class="gx-tow"><path d="M10 26 v28 M4 34 h12 M6 30 l4 -4 l4 4"/><path d="M10 86 v28 M4 94 h12 M6 90 l4 -4 l4 4"/><path d="M10 146 v28 M4 154 h12 M6 150 l4 -4 l4 4"/></g>'
+  '<g class="gx-nodes">' + "".join(f'<circle cx="{x}" cy="{y}" r="5" style="--d:{i * 0.09:.2f}s"/>' for i, (x, y) in enumerate(
+      [(160, 70), (160, 100), (160, 130), (220, 70), (220, 100), (220, 130), (280, 70), (280, 100), (280, 130)])) + '</g>'
+  '</svg>'
+  '<p class="gx-ldk"><span>Energizing the grid</span><b id="nx_ldn">00%</b></p>'
+  '<ol class="gx-lds" aria-hidden="true"><li data-s="map">Map</li><li data-s="nets">Networks</li><li data-s="out">Outages</li><li data-s="rep">Reports</li></ol>'
+  '<p class="gx-ldmsg" id="nx_ldmsg" hidden></p></div>')
+
+# The old /grid page's "More about the grid" sheet (gridpage.py), merged in: same sections, filled by gridlayer.js from /api/gridpage/*.
+def _gsec(sid, h, sub):
+    return (f'<details class="gx-sec" id="{sid}"><summary><span><b>{E(h)}</b><small>{E(sub)}</small></span><i aria-hidden="true"></i></summary>'
+            f'<div class="gx-body" data-sec="{sid}"><p class="gx-empty">Loading…</p></div></details>')
+GRID_MORE = ('<section class="gx-more" id="gx_more" aria-label="More about the grid" hidden>'
+  '<div class="gx-grab" aria-hidden="true"></div>'
+  '<div class="gx-mh"><div><p class="gx-k">The Grid</p><h2>More about the grid</h2></div><button type="button" class="gx-x" id="gx_more_x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'
+  '<div class="gx-scroll" id="gx_scroll">'
+  '<div class="gx-reg" id="gx_reg" role="group" aria-label="Show a region on the map"><span>Show on map</span><button type="button" data-r="us">U.S.</button><button type="button" data-r="eu">Europe</button><button type="button" data-r="apac">Asia-Pacific</button><button type="button" data-r="world">World</button></div>'
+  '<div class="gx-kpis" id="gx_kpis"></div>'
+  + _gsec("gx-regions", "Grid operators", "Status, demand and the last 36 hours for each operator region")
+  + _gsec("gx-world", "Worldwide", "Operators outside the U.S. and grid or blackout alerts on the Wire")
+  + _gsec("gx-outages", "Outages by state", "Utility outage counts reported to DOE / ORNL ODIN")
+  + _gsec("gx-weather", "Weather threats to power", "Ranked weather alerts with grid and infrastructure checks")
+  + _gsec("gx-threats", "Grid threats", "Physical, cyber and reliability threats to U.S. power")
+  + _gsec("gx-space", "Space weather", "NOAA geomagnetic storm scale and 3-day outlook")
+  + _gsec("gx-local", "Your state", "Utilities, outage maps, alerts and open shelters")
+  + _gsec("gx-sources", "Sources and data age", "Where every number on this page comes from")
+  + '</div></section><aside class="gx-card" id="gx_card" hidden aria-live="polite"></aside>')
 
 BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div class="nb-in">'
   '<header class="nb-hero"><p class="nb-k">Is it down?</p>'
@@ -547,17 +579,20 @@ BOARD = ('<section class="nb" id="nb" aria-label="Network status board"><div cla
   '<div class="nb-pulse" id="nb_pulse"><i></i><div><p class="nb-pt">Checking services</p><p class="nb-ps">Official status pages, IODA and reports</p></div></div>'
   '<section class="nb-now" id="nb_now" hidden aria-label="Problems now"></section>'
   '<div id="nb_groups"></div>'
+  '<section class="nb-sec nb-grid" aria-label="The power grid"><div class="nb-gh"><h2>The power grid</h2><span>Operators, outages, weather</span></div>'
+  '<p class="nb-note" id="nb_grid">Grid operators, outages by state, weather threats to power and space weather.</p>'
+  '<button type="button" class="nb-gbtn" data-more="gx-regions">More about the grid</button></section>'
   '<section class="nb-sec" aria-label="Incident timeline"><div class="nb-gh"><h2>Incident timeline</h2><span>Last 3 days</span></div><div id="nb_tl"><p class="nb-empty">Loading</p></div></section>'
   '<section class="nb-sec" aria-label="Chain reactions"><div class="nb-gh"><h2>How outages spread</h2><span>Documented dependencies</span></div>'
   '<p class="nb-note">When one of these fails, the services under it usually fail too. Each link is from a past outage, and anything we infer is marked likely.</p><div class="nb-chg" id="nb_chains"></div></section>'
   '<footer class="nb-foot"><p>Verdicts combine official status pages, IODA internet measurements (Georgia Tech) and reports from people on this page. '
-  '"Down for me" stores the service, the time and an optional ZIP, nothing else. Open <b>Map</b> for data centers, power and internet outages, or <b>Sky</b> for satellites.</p>'
+  '"Down for me" stores the service, the time and an optional ZIP, nothing else. Open <b>Map</b> for grid operators, data centers, power and internet outages, or <b>Sky</b> for satellites.</p>'
   '<p><a href="/network/providers">Cloud provider pages</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a></p></footer>'
   '</div></section>')
 
 SKY_CHIPS = [("starlink", "Starlink", "#E8ECF5"), ("gps", "GPS", "#4FC3F7"), ("glonass", "GLONASS", "#B39DFF"), ("galileo", "Galileo", "#5CE1B6"),
              ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0")]
-CHIPS = [("internet", "Internet"), ("power", "Power"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("grid", "Power grid"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
+CHIPS = [("internet", "Internet"), ("power", "Power"), ("ops", "Grid operators"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("grid", "Power grid"), ("dc", "Data centers"), ("mobile", "Mobile"), ("sat", "Satellite"), ("pay", "Payments"), ("apps", "Apps")]
 
 def page(qs=None):
     try:
@@ -570,9 +605,9 @@ def page(qs=None):
         mlv = signal_map._v("maplibre-gl.js"); mlc = signal_map._v("maplibre-gl.css")
     except Exception:
         mlv = mlc = "0"
-    title = "Is it down? Live status of internet, mobile, cloud, banking and apps | BLACKOUT.NETWORK"
-    desc = ("Is it down right now? Plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, banking, apps and government "
-            "services, from official status pages, IODA internet measurements and user reports, plus chain reactions, an incident log, a data center map and a live satellite globe.")
+    title = "The Grid: live status of power, internet, mobile, cloud and apps | BLACKOUT.NETWORK"
+    desc = ("The Grid: live status of the power grid and the networks that run on it. Grid operators colored by status, outages by state, weather threats, "
+            "plus plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, apps and government services, an incident log and a satellite globe.")
     skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="true"><i style="background:{c};border-color:{c}"></i>{E(t)}</button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="true"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
@@ -588,15 +623,15 @@ def page(qs=None):
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/netmap/net.css?v={_v("net.css")}">
 <script src="/sitenav.js" defer></script>
-<link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}">
+<link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}"><link rel="stylesheet" href="/api/netmap/gridlayer.css?v={_v("gridlayer.css")}">
 </head><body class="nx">
 <script>(function(){{if(location.hash==="#status"){{document.body.classList.add("nx-board");}}}})()</script>
 <a class="skip" href="#nb_q">Skip to the outage search</a>
 <div class="nx-head">{top}</div>
 <script>(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
 <main id="nx_main" data-bnt-skip>
-<h1 class="nx-vh">Is it down? Live status of internet, mobile, cloud, payments, apps and government services</h1>
-<div id="nx_map" class="nx-map" role="region" aria-label="Map of network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
+<h1 class="nx-vh">The Grid: live status of the power grid, internet, mobile, cloud, payments, apps and government services</h1>
+<div id="nx_map" class="nx-map" role="region" aria-label="Map of the power grid and network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
 {BOARD}
 <div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
@@ -609,16 +644,19 @@ def page(qs=None):
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>
 <button type="button" class="nx-b" id="nx_home" aria-label="Show the whole U.S."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
 <div class="nx-leg" id="nx_leg" aria-label="Legend"><ul>
-<li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li><i class="s-dc"></i>Data center</li></ul></div>
+<li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li><i class="s-dc"></i>Data center</li></ul>
+<ul class="nx-shapes" id="gx_leg"><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul></div>
 <button type="button" class="nx-more-btn" id="nx_more_btn" aria-controls="nx_more" aria-expanded="false"><span id="nx_more_lbl">All networks</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+<button type="button" class="gx-more-btn" id="gx_more_btn" aria-controls="gx_more" aria-expanded="false"><span class="gx-ml">More about the grid</span><span class="gx-ms">Grid details</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <aside class="nx-card" id="nx_card" hidden aria-live="polite"></aside>
+{GRID_MORE}
 <section class="nx-more" id="nx_more" aria-label="All networks" hidden>
 <div class="nx-grab" aria-hidden="true"></div>
-<div class="nx-mh"><div><p class="nx-k">Network Status</p><h2>All networks</h2></div><button type="button" class="nx-x" id="nx_more_x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="nx-mh"><div><p class="nx-k">The Grid</p><h2>All networks</h2></div><button type="button" class="nx-x" id="nx_more_x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 <div class="nx-scroll" id="nx_scroll"><div id="nx_list"><p class="nx-empty">Loading…</p></div></div></section>
 <noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/network/providers">Cloud provider pages</a></p></noscript>
 </main>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/boot.js?v={_v("boot.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
+<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script src="/api/netmap/gridlayer.js?v={_v("gridlayer.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};</script>
 </body></html>'''
 
 def detail_page(sid):
