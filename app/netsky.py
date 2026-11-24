@@ -400,6 +400,7 @@ S3_CRAFT = (
     ("ace", "ACE", "-92", "NASA", "1997-08-25", "Operational at Sun-Earth L1.", "Solar wind particles upstream of Earth (real-time solar wind for NOAA).", 365, 60, "4 d"),
     ("dscovr", "DSCOVR", "-78", "NOAA / NASA / USAF", "2015-02-11", "At Sun-Earth L1. NOAA's real-time solar wind monitor for geomagnetic storm warnings.", "Solar wind speed, density and magnetic field; full-disk Earth images (EPIC).", 365, 60, "4 d"),
     ("wind", "Wind", "-8", "NASA", "1994-11-01", "Operational at Sun-Earth L1.", "Solar wind plasma and magnetic field.", 365, 60, "4 d"),
+    ("aditya", "Aditya-L1", "-156", "ISRO", "2023-09-02", "Operational in a halo orbit around Sun-Earth L1 since 6 Jan 2024. India's first solar observatory.", "The Sun's corona, chromosphere and solar wind (VELC coronagraph, SUIT, ASPEX, PAPA).", 365, 60, "4 d"),
     ("jwst", "James Webb Space Telescope", "-170", "NASA / ESA / CSA", "2021-12-25", "Operational at Sun-Earth L2, about 930,000 mi from Earth (away from the Sun).", "Infrared astronomy (not a Sun monitor).", 365, 60, "4 d"),
     ("juno", "Juno", "-61", "NASA / JPL", "2011-08-05", "In orbit around Jupiter.", "Jupiter's interior, magnetic field and moons.", 1500, 180, "10 d"),
     ("lucy", "Lucy", "-49", "NASA / SwRI", "2021-10-16", "Cruising to the Jupiter Trojan asteroids.", "Trojan asteroids.", 1500, 730, "10 d"),
@@ -407,7 +408,7 @@ S3_CRAFT = (
     ("clipper", "Europa Clipper", "-159", "NASA / JPL", "2024-10-14", "Cruising to Jupiter's moon Europa.", "Europa's ice shell and ocean.", 750, 730, "6 d"),
     ("juice", "JUICE", "-28", "ESA", "2023-04-14", "Cruising to Jupiter's icy moons.", "Ganymede, Callisto and Europa.", 950, 730, "6 d"),
 )
-S3_SUNWATCH = ("parker", "solo", "soho", "stereoa", "ace", "dscovr", "wind")
+S3_SUNWATCH = ("parker", "solo", "soho", "stereoa", "ace", "dscovr", "wind", "aditya")
 
 def _hz_vec(command, start, stop, step, center="500@10"):
     import urllib.parse
@@ -471,7 +472,7 @@ def _s3_build():
                    sun_au=round(math.sqrt(sum(x * x for x in pos)), 6),
                    track=[[round(x[0] - 2440587.5, 3)] + au(x[1:4]) for x in r])  # [unix day, x, y, z AU]
         if earth: rec["earth_au"] = round(math.sqrt(sum((pos[k] - earth[k]) ** 2 for k in range(3))), 6)
-        if cid in ("soho", "ace", "dscovr", "wind", "jwst"):   # L1/L2 craft: geocentric offset so the scene can show them beside Earth
+        if cid in ("soho", "ace", "dscovr", "wind", "jwst", "aditya"):   # L1/L2 craft: geocentric offset so the scene can show them beside Earth
             try:
                 g = _interp(_hz_vec(cmd, f(nowd - timedelta(hours=12)), f(nowd + timedelta(hours=12)), "6 h", center="500@399"), jd)
                 rec["geo_km"] = [round(g[0]), round(g[1]), round(g[2])]; rec["earth_au"] = round(math.sqrt(g[0]**2 + g[1]**2 + g[2]**2) / AU_KM, 6)
