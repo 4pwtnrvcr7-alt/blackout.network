@@ -1,0 +1,39 @@
+Sky view learn-panel images (pt1814u). Stored resized JPEGs, max 900 px.
+
+starlink.jpg
+  Source: Wikimedia Commons, File:Starlink Mission (47926144123).jpg
+  Author: Official SpaceX Photos, 24 May 2019
+  License: CC0 1.0 Universal (VRT ticket #2015032410033985 on Commons)
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Change: resized and recompressed.
+
+gps.jpg
+  Source: Wikimedia Commons, File:GPS-IIR.jpg
+  Author: U.S. government
+  License: Public domain (U.S. government work)
+  Change: resized and recompressed.
+
+goes.jpg
+  Source: Wikimedia Commons, File:GOES-R Spacecraft Art Front Left (14213118418).jpg
+  Author: NOAA (NOAASatellites)
+  License: Public domain (U.S. government work, NOAA)
+  Change: resized and recompressed.
+
+galileo.jpg
+  Source: Wikimedia Commons, File:Galileo satellite in LEAF for acoustic testing ESA295941.jpg
+    originally https://www.esa.int/spaceinimages/Images/2013/08/Galileo_satellite_in_LEAF_for_acoustic_testing
+  Author: European Space Agency
+  License: CC BY-SA 3.0 IGO
+  https://creativecommons.org/licenses/by-sa/3.0/igo/
+  Change: resized and recompressed from the original. Credit must remain with the image.
+
+iridium.jpg
+  Source: Wikimedia Commons, File:Iridium Next 21-30 mission (36984625383).jpg
+  Author: Official SpaceX Photos
+  License: CC0 1.0 Universal
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Change: resized and recompressed.
+
+No photograph is included for GLONASS, BeiDou or OneWeb: a clearly licensed public-domain or Creative Commons spacecraft image was not confirmed in time. The learn panel shows sourced text only for those groups. No images were generated or fabricated.
+
+The JPEGs are stored in the repo as <name>.jpg.b64 (base64 of the resized file) and decoded when served at /api/netmap/learn/<name>.jpg.
