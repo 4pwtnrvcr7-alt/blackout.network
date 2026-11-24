@@ -235,6 +235,57 @@
   var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, hydro: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
   for (var k1 in ON) if (!document.querySelector('#nx_f [data-k="' + k1 + '"]')) ON[k1] = false;   /* a layer whose chip is gone stays off */
 
+  function bindAttrib() {   /* pt1831u: credits stay a collapsed info button; MapLibre compact starts open and re-opens on source/resize */
+    var el = document.querySelector(".nx-map .maplibregl-ctrl-attrib");
+    if (!el) return;
+    el.classList.add("maplibregl-compact", "nx-attrib");
+    var on = false;
+    function setOpen(v) {
+      on = !!v;
+      el.classList.toggle("nx-attrib-open", on);
+      el.classList.toggle("maplibregl-compact-show", on);
+      if (on) el.setAttribute("open", "");
+      else el.removeAttribute("open");
+      var sum = el.querySelector(".maplibregl-ctrl-attrib-button");
+      if (sum) sum.setAttribute("aria-expanded", on ? "true" : "false");
+    }
+    setOpen(false);
+    if (!el.querySelector(".nx-attrib-x")) {
+      var x = document.createElement("button");
+      x.type = "button";
+      x.className = "nx-attrib-x";
+      x.setAttribute("aria-label", "Close credits");
+      x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      x.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); setOpen(false); });
+      el.appendChild(x);
+    }
+    var btn = el.querySelector(".maplibregl-ctrl-attrib-button");
+    if (btn && !btn.dataset.nxAttrib) {
+      btn.dataset.nxAttrib = "1";
+      btn.setAttribute("aria-expanded", "false");
+      btn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(!on);
+      }, true);
+    }
+    if (!document.documentElement.dataset.nxAttribDoc) {
+      document.documentElement.dataset.nxAttribDoc = "1";
+      document.addEventListener("pointerdown", function (e) {
+        var a = document.querySelector(".nx-map .maplibregl-ctrl-attrib");
+        if (a && a.classList.contains("nx-attrib-open") && !a.contains(e.target)) setOpen(false);
+      }, true);
+    }
+    if (window.MutationObserver && !el._nxAttribObs) {
+      el._nxAttribObs = new MutationObserver(function () {
+        if (on) return;
+        if (el.classList.contains("maplibregl-compact-show")) el.classList.remove("maplibregl-compact-show");
+        if (el.hasAttribute("open")) el.removeAttribute("open");
+        if (!el.classList.contains("maplibregl-compact")) el.classList.add("maplibregl-compact");
+      });
+      el._nxAttribObs.observe(el, { attributes: true, attributeFilter: ["class", "open"] });
+    }
+  }
   function boot() {
     if (!window.maplibregl) { setTimeout(boot, 60); return; }
     map = new maplibregl.Map({ container: "nx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD() }, minZoom: 1, maxZoom: 13,
@@ -242,7 +293,7 @@
     map.touchZoomRotate.disableRotation();
     window.__nxMap = map; try { document.dispatchEvent(new CustomEvent("nx:map", { detail: map })); } catch (e) {}   /* gridlayer.js adds the grid operator layer to this map */
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a> · Towers: <a href="https://www.fcc.gov/antenna-structure-registration" target="_blank" rel="noopener">FCC ASR</a> · Power grid: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> (ODbL)' }), "bottom-right");
-    setTimeout(function () { var a = document.querySelector(".nx-map .maplibregl-ctrl-attrib"); if (a) a.classList.remove("maplibregl-compact-show"); }, 1500);
+    bindAttrib();
     map.on("dataloading", function () { if (!ready) step("map", Math.min(0.8, P.map + 0.04)); });
     map.on("load", function () {
       step("map", 0.5); addLayers(); seaLayers(); infLayers(); bindLayers();

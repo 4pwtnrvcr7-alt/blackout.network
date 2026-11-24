@@ -124,6 +124,30 @@ class NetMap(unittest.TestCase):
         self.assertNotIn(".nx-leg{top:calc(146px + env(safe-area-inset-top));bottom:auto;left:50%", css.replace(" ", ""))
         self.assertNotIn(".nx-leg{bottom:auto;top:calc(104px + env(safe-area-inset-top));left:50%", css.replace(" ", ""))
 
+    def test_attrib_is_collapsed(self):
+        """pt1831u: map credits stay a collapsed info button with an X; they never auto-expand or sit mid-map."""
+        from pathlib import Path
+        root = Path(__file__).resolve().parents[1] / "netmap_static"
+        css, js = (root / "net.css").read_text(), (root / "net.js").read_text()
+        credits = (
+            "OpenFreeMap", "OpenMapTiles", "OpenStreetMap contributors",
+            "IODA", "PeeringDB", "NOAA OCM", "FCC ASR", "ODbL",
+        )
+        for s in credits:
+            self.assertIn(s, js)
+        self.assertIn("function bindAttrib(", js)
+        self.assertIn("nx-attrib-x", js)
+        self.assertIn("nx-attrib-open", js)
+        self.assertIn("setOpen(!on)", js)
+        self.assertIn('el.removeAttribute("open")', js)
+        self.assertIn("MutationObserver", js)
+        self.assertNotIn('classList.remove("maplibregl-compact-show"); }, 1500)', js)
+        self.assertIn(".nx-attrib-x", css)
+        self.assertIn(".nx-attrib-open", css)
+        self.assertIn("maplibregl-compact:not(.nx-attrib-open) .maplibregl-ctrl-attrib-inner{display:none!important}", css)
+        self.assertNotIn("body.nx-sky .maplibregl-ctrl-bottom-right{bottom:196px}", css)
+        self.assertIn("body.nx-sky .maplibregl-ctrl-bottom-right{bottom:0;right:0}", css)
+
     def test_asset_version_is_content_hash(self):
         """Asset ?v= is a short content hash, not mtime, so Cloudflare never reuses a stale immutable URL."""
         import hashlib, netmap, netpages
