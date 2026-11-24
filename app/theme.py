@@ -291,7 +291,7 @@ def credits_page():
 def _ic(p): return f'<svg viewBox="0 0 24 24" aria-hidden="true">{p}</svg>'
 CHIPS = [
  ("Energy grid", '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>', "Grid load, outages and stress across North American power regions.", "/grid"),
- ("Markets & banking", '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>', "Index moves, bank stress and the money stories behind them.", "/live#finance"),
+ ("Markets & banking", '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>', "Index moves, bank stress and the money stories behind them.", "/markets"),
  ("Solar & seismic", '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>', "Solar flares, the Kp index and earthquakes worldwide.", "/live#solar"),
  ("Health & outbreaks", '<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>', "Outbreak reports from health agencies, ranked on The Wire.", "/wire"),
  ("Conflict", '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/>', "Strikes, attacks and escalations, each linked to its sources.", "/wire"),
@@ -299,6 +299,15 @@ CHIPS = [
  ("Weather", '<path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A3.5 3.5 0 0 1 17 18z"/>', "Severe weather warnings, radar and storms on one map.", "/weather"),
  ("AI threats", '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>', "Deepfakes, AI-driven attacks and the policy fights around them.", "/live#ai"),
 ]
+
+def _off(href):
+    try:
+        import deactivated
+        return deactivated.href_off(href)
+    except Exception:
+        return False
+def _live_off():
+    return _off("/live")
 
 def _menu():
     try:
@@ -327,7 +336,8 @@ INTRO_SKIP = __import__("os").environ.get("BN_INTRO_SKIP", "0") == "1"
 SKIPBOX = '<label class="h-skipbox"><input type="checkbox" id="h_skip"> Skip this intro next time</label>' if INTRO_SKIP else ""
 HEAD_JS = ("(function(){try{var h=location.hash,s=location.search;"
            "if(h==='#heatmap'||h==='#map'){location.replace('/map'+s);return}"
-           "if(h&&h!=='#'&&h!=='#bn-menu'&&!/^#(s[1-7]|intro|top)$/.test(h)){location.replace('/live'+s+h);return}"
+           + ("if(h&&h!=='#'&&h!=='#bn-menu'&&!/^#(s[1-7]|intro|top|h_foot)$/.test(h)){try{history.replaceState(null,'',location.pathname+s)}catch(e){}}"   # Nov 24 2026: /live deactivated, old tab links stay on "/"
+              if _live_off() else "if(h&&h!=='#'&&h!=='#bn-menu'&&!/^#(s[1-7]|intro|top)$/.test(h)){location.replace('/live'+s+h);return}") +
            "var app=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;"
            + ("if(!/[?&]intro=1/.test(s)&&(app||localStorage.getItem('bn_skip_intro')==='1')){location.replace('/live'+s);return}" if INTRO_SKIP else "")
            + "}catch(e){}document.documentElement.classList.add('bnt-homepage')})()")
@@ -338,7 +348,7 @@ def _home_page_raw():
     _, mv = versions()
     chips = "".join(
         f'<div class="h-chip bnt-peek" tabindex="0" aria-expanded="false"><span class="h-ct">{_ic(ic)}{E(t)}</span>'
-        f'<div class="bnt-peek-d"><div><p>{E(dsc)} <a href="{E(href)}" class="h-cl">Open &rarr;</a></p></div></div></div>' for t, ic, dsc, href in CHIPS)
+        f'<div class="bnt-peek-d"><div><p>{E(dsc)} <a href="{E(href)}" class="h-cl">Open &rarr;</a></p></div></div></div>' for t, ic, dsc, href in CHIPS if not _off(href))
     wm = '<span class="bnt-wm">blackout.network</span>'
     m4 = __import__("os").environ.get("BN_MENU_V2", "1") != "0"   # Push H: SpaceX-language full-screen menu (BN_MENU_V2=0 = side drawer)
     m4cls = " h-menu4" if m4 else ""
@@ -346,6 +356,16 @@ def _home_page_raw():
     hx = '<span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span>'
     mlead = ('<div class="h-m4lead"><a href="#s1" data-h-close>Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>' if m4
              else '<a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>')
+    m5 = None
+    try:
+        import menu5
+        if m4 and menu5.on(): m5 = menu5.html_block(None, intro_href="#s1")
+    except Exception:
+        import traceback; traceback.print_exc()
+    lv = "/wire" if _live_off() else "/live"   # Nov 24 2026: /live deactivated -> buttons open The Wire
+    lvt = "Open The Wire" if _live_off() else "Open dashboard"
+    sc_btn = "" if _off("/scoring") else '<a class="bnt-btn" href="/scoring">How we score</a>'
+    foot = "".join(f'<a href="{h}">{x}</a>' for h, x in (("/privacy", "Privacy"), ("/tos", "Terms"), ("/sources", "Sources"), ("/scoring", "How we score"), ("/bnt/credits.txt", "Footage credits")) if not _off(h))
     snap = snap_on() and home_snap_on()   # Matt 4:07 PM: the intro scrolls freely and smoothly like the Wire, no section snap
     snapattr = " data-bn-snap" if snap else ""
     snapjs = f'<script src="{url("snap.js")}" defer></script>' if snap else ""
@@ -367,9 +387,9 @@ def _home_page_raw():
 </head><body class="bnt-home" data-bn-noreport>
 <a class="h-skip" href="#s6">Skip to the free brief</a>
 <header class="h-nav" id="h_nav">
- <a class="h-wm" href="/live" aria-label="BLACKOUT.NETWORK live dashboard">{wm}</a>
+ <a class="h-wm" href="{lv}" aria-label="BLACKOUT.NETWORK {'The Wire' if lv == '/wire' else 'live dashboard'}">{wm}</a>
  <nav class="h-links" aria-label="Primary"><a href="/map">Live map</a><a href="/wire">The Wire</a><a href="#s3">How it ranks</a><a href="#s6">Free brief</a></nav>
- <div class="h-right"><a class="h-go" href="/live">Open dashboard</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{hx}{m4btn}</button></div>
+ <div class="h-right"><a class="h-go" href="{lv}">{lvt}</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{hx}{m4btn}</button></div>
 </header>
 <ol class="h-pager" id="h_pager" aria-hidden="true"></ol>
 <main id="flow"{snapattr}>
@@ -394,7 +414,7 @@ def _home_page_raw():
  <p class="h-lede">Each item is scored on impact and on how many independent sources back it up. The serious ones rise to the top. Nothing is hidden: the full feed is always one tap away.</p>
  <div class="h-scale" aria-label="Rank scale 0 to 10"><div class="h-bar" id="h_bar"></div><div class="h-nums"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
  <div class="bnt-key"><span class="c">Calm <b>0&ndash;3</b></span><span class="e">Elevated <b>4&ndash;6</b></span><span class="h">High <b>7&ndash;10</b></span></div></div>
- <a class="bnt-btn" href="/scoring">How we score</a>
+ {sc_btn}
 </div><p class="h-credit">Footage: NASA (ISS, Hurricane Dorian, 2019)</p></section>
 
 <section class="h-sec"{" data-snap" if snap else ""} id="s4" data-clip="cover"><div class="h-copy">
@@ -425,14 +445,14 @@ def _home_page_raw():
 </div><p class="h-credit">Footage: NASA (ISS, Earth from orbit, 2019)</p></section>
 
 <section class="h-sec"{" data-snap" if snap else ""} id="s7" data-clip="dash"><div class="h-copy c">
- <p class="bnt-eyebrow">The live dashboard</p>
+ <p class="bnt-eyebrow">{'The Wire' if lv == '/wire' else 'The live dashboard'}</p>
  <h2 class="h-h">Global threat monitoring</h2>
  <p class="h-lede">Everything in one place, updated around the clock.</p>
- <a class="bnt-btn y" href="/live">Enter the dashboard</a>
+ <a class="bnt-btn y" href="{lv}">{'Open The Wire' if lv == '/wire' else 'Enter the dashboard'}</a>
  {SKIPBOX}
 </div><p class="h-credit">Screen capture: BLACKOUT.NETWORK live dashboard</p>
 <footer class="h-foot" id="h_foot"><span class="bntr-foot" hidden></span>
- <a href="/privacy">Privacy</a><a href="/tos">Terms</a><a href="/sources">Sources</a><a href="/scoring">How we score</a><a href="/bnt/credits.txt">Footage credits</a>
+ {foot}
  <header class="h-lang" aria-label="Language"><span class="ctl"></span></header>
  <p class="h-legal">BLACKOUT.NETWORK &middot; Independent signals, not an official alert service.</p>
 </footer></section>
@@ -440,10 +460,9 @@ def _home_page_raw():
 <div class="h-scrim" id="h_scrim"></div>
 <aside class="h-menu{m4cls}" id="h_menu" aria-hidden="true" aria-label="Site menu">
  <button class="h-x" type="button" aria-label="Close menu">&times;</button>
- <a class="h-wm" href="/live" style="display:block;margin:0 0 18px;font-size:18px">{wm}</a>
- {mlead}
- {_menu()}
- <div class="h-mfoot"><a class="bnt-btn y" href="#s6" data-h-close>Get the free brief</a><a class="bnt-btn" href="/live">Open dashboard</a></div>
+ <a class="h-wm" href="{lv}" style="display:block;margin:0 0 18px;font-size:18px">{wm}</a>
+ {m5 if m5 else mlead + _menu()}
+ <div class="h-mfoot"><a class="bnt-btn y" href="#s6" data-h-close>Get the free brief</a><a class="bnt-btn" href="{lv}">{lvt}</a></div>
 </aside>
 <script src="{url("theme.js")}"></script><script src="{url("home.js")}" defer></script>{snapjs}
 <script src="/api/newsletter/app.js" defer></script><script src="/api/translate/app.js" defer></script>

@@ -135,6 +135,16 @@ def menu_html():
     except Exception:
         groups = [("Latest", [("The Wire", "/wire"), ("Live", "/live"), ("Map", "/map")])]
     cols = "".join(f'<div class="w2-mg"><p class="w2-mgl">{E(n)}</p><ul>' + "".join(f'<li><a href="{E(h)}">{E(l)}</a></li>' for l, h in links) + '</ul></div>' for n, links in groups)
+    try:   # Nov 24 2026 (Matt): menu v5 body (menu5.py); deactivated pages are gone from it
+        import menu5, deactivated
+        if menu5.on():
+            foot = "".join(f'<a href="{h}">{t}</a>' for h, t in (("/scoring", "How we score"), ("/sources", "Sources"), ("/privacy", "Privacy"), ("/tos", "Terms")) if not deactivated.is_off(h))
+            return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
+                    '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
+                    '<nav class="w2-mnav w2-m5" aria-label="Site">' + menu5.html_block("/wire") + '</nav>'
+                    '<div class="w2-mfoot">' + foot + '</div></div>')
+    except Exception:
+        import traceback; traceback.print_exc()
     return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
             '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
             '<nav class="w2-mnav"><div class="w2-mlead"><a href="/?intro=1">Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>'
