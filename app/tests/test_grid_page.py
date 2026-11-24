@@ -5,18 +5,18 @@ sys.path.insert(0, APP)
 
 class GridPage(unittest.TestCase):
     def test_menu_links_the_grid_page(self):
-        """Nov 24 2026 (Matt pt1795u): The Grid is merged into /network; the menu's one "The Grid" item opens /network."""
+        """Nov 24 2026 (Matt pt1795u): The Grid is merged into /grid; the menu's one "The Grid" item opens /grid."""
         import sitenav, sitenav_ui
         rows = {k: (l, h) for _, _, _, rs in sitenav_ui.menu3_sections(sitenav) for k, l, h in rs}
-        self.assertEqual(rows["net"], ("The Grid", "/network"))
+        self.assertEqual(rows["net"], ("The Grid", "/grid"))
         self.assertNotIn("grid", rows)
         html = sitenav.header_html("")
-        self.assertNotIn('href="/grid"', html)
+        self.assertNotIn('href="/network"', html)   # Nov 24 2026 8:32 AM ET: /grid is canonical
         self.assertNotIn("/live#grid", html)
 
     def test_route_and_page(self):
         import addons, gridpage
-        self.assertEqual(addons.ROUTES["/grid"], "gridpage")
+        self.assertEqual(addons.ROUTES["/grid"], "netpages")   # Nov 24 2026: /grid serves the merged page; the old page code below is kept
         code, body, ct = gridpage.handle_get("/grid", {})
         self.assertEqual((code, ct), (200, "text/html"))
         for s in ('id="gx_map"', 'id="gx_ld"', 'id="gx_more"', "/api/signal/maplibre-gl.js", "/api/gridpage/grid.js"):
