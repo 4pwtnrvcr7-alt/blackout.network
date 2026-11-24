@@ -1,7 +1,9 @@
 """Undersea cables for the /grid map (pt1785u, pt1812u).
 
 Geometry: netmap_static/cables.json, built by tools/build_cables.py from OpenStreetMap (ODbL) and NOAA Office for Coastal
-Management (U.S. waters, public domain). TeleGeography's free map data is CC BY-NC-SA (non-commercial), so it is not used.
+Management (U.S. waters, public domain). Systems OSM does not map end-to-end (SEA-ME-WE 5, AAE-1, PEACE Cable, 2Africa) use
+approximate routes that connect official landing points with Wikidata coordinates (CC0); see tools/approx_cables.py.
+TeleGeography's free map data is CC BY-NC-SA (non-commercial), so it is not used.
 
 Each drawn cable is coloured by inferred status, never official (operators publish no live feed):
   green  — working: no fault reports

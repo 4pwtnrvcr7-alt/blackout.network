@@ -10,7 +10,7 @@ class Cables(unittest.TestCase):
     def test_geometry_is_licensed_and_light(self):
         p = os.path.join(os.path.dirname(C.__file__), "netmap_static", "cables.json")
         self.assertLess(os.path.getsize(p), 450_000)
-        d = json.load(open(p)); self.assertIn("OpenStreetMap", d["credit"]); self.assertIn("NOAA", d["credit"])
+        d = json.load(open(p)); self.assertIn("OpenStreetMap", d["credit"]); self.assertIn("NOAA", d["credit"]); self.assertIn("Wikidata", d["credit"])
         self.assertNotIn("telegeography", open(p).read().lower())   # CC BY-NC-SA: not used
         self.assertGreater(sum(1 for f in d["features"] if f["geometry"]["type"] == "LineString"), 200)   # landing-to-landing routes only
         self.assertEqual(netmap.handle_get("/api/netmap/cables.json")[0], 200)
@@ -40,9 +40,11 @@ class Cables(unittest.TestCase):
         r = C.status(nw([dict(t="Red Sea subsea cable cut disrupts internet in Asia", src="X", url="https://e.com/a", at=at(3))]))
         self.assertEqual(r["cables"].get("Saudi Arabia-Sudan-1 (SAS-1)", {}).get("lv"), 1)
         self.assertEqual(r["cables"]["Saudi Arabia-Sudan-1 (SAS-1)"]["status"], "In jeopardy")
-        # Baltic cables stay working
+        # Other routes that cross the Red Sea are also in jeopardy; Baltic cables stay working
+        for nm in ("SEA-ME-WE 5", "AAE-1", "PEACE Cable", "2Africa"):
+            self.assertEqual(r["cables"].get(nm, {}).get("lv"), 1, nm)
         self.assertNotIn("C-Lion 1", r["cables"])
-        self.assertEqual(r["counts"]["degraded"], 1)
+        self.assertGreaterEqual(r["counts"]["degraded"], 5)
         self.assertEqual(r["counts"]["out"], 0)
         # stale news does not colour
         old = C.status(nw([dict(t="Red Sea subsea cable cut disrupts internet in Asia", src="X", url="https://e.com/a", at=at(24 * 20))]))
@@ -63,5 +65,39 @@ class Cables(unittest.TestCase):
         js = open(os.path.join(os.path.dirname(C.__file__), "netmap_static", "net.js")).read()
         self.assertNotIn("seaz-fill", js)
         self.assertNotIn("Chokepoint risk", js)
+
+
+    def test_major_cables_include_smw5_aae1_peace_2africa(self):
+        p = os.path.join(os.path.dirname(C.__file__), "netmap_static", "cables.json")
+        d = json.load(open(p))
+        lines = [f for f in d["features"] if f["geometry"]["type"] == "LineString"]
+        by = {}
+        for f in lines:
+            by.setdefault(f["properties"]["n"], []).append(f)
+        for nm in ("SEA-ME-WE 5", "AAE-1", "PEACE Cable", "2Africa"):
+            self.assertTrue(any(f["properties"].get("s") == "approx" for f in by[nm]), nm)
+        # AAE-1 also keeps the OSM Hong Kong approach
+        self.assertTrue(any(f["properties"].get("s") == "osm" for f in by["AAE-1"]))
+
+    def test_smw5_fault_is_yellow_and_cut_is_red(self):
+        r = C.status(nw([dict(t="SMW5 Cable Fault Threatened Pakistan's Internet Connectivity", src="Digital Pakistan", url="https://e.com/smw5", at=at(3))]))
+        c = r["cables"]["SEA-ME-WE 5"]
+        self.assertEqual(c["lv"], 1)
+        self.assertEqual(c["status"], "Service interruption")
+        r = C.status(nw([dict(t="SEA-ME-WE 5 subsea cable cut off Karachi, service out", src="X", url="https://e.com/cut", at=at(3))]))
+        self.assertEqual(r["cables"]["SEA-ME-WE 5"]["lv"], 2)
+        self.assertEqual(r["cables"]["SEA-ME-WE 5"]["status"], "Out of service")
+        # Unrelated Karachi-landing systems are not painted by an SMW5-only headline
+        self.assertNotIn("AAE-1", r["cables"])
+        self.assertNotIn("PEACE Cable", r["cables"])
+
+    def test_peace_cable_not_triggered_by_generic_peace(self):
+        r = C.status(nw([dict(t="Peace talks continue after a power outage, no submarine cable involved", src="X", url="https://e.com/p", at=at(3))]))
+        self.assertNotIn("PEACE Cable", r["cables"])
+
+    def test_approx_route_is_labelled_in_popup(self):
+        js = open(os.path.join(os.path.dirname(C.__file__), "netmap_static", "net.js")).read()
+        self.assertIn("Approximate route", js)
+        self.assertIn("sea-line-approx", js)
 
 if __name__ == "__main__": unittest.main()
