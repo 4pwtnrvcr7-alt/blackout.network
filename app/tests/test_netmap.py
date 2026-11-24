@@ -115,7 +115,9 @@ class NetSky(unittest.TestCase):
         with mock.patch.object(netsky, "_file", fake):
             full = json.loads(netsky.sky(False)); lite = json.loads(netsky.sky(True))
         g = {x["id"]: x for x in full["groups"]}
-        self.assertEqual(len(full["groups"]), 8)
+        self.assertEqual(len(full["groups"]), 9)
+        self.assertEqual(g["iss"]["shown"], 0)
+        self.assertIn("iss", g)
         self.assertEqual((g["starlink"]["total"], g["gps"]["shown"]), (9, 9))
         self.assertEqual(g["goes"]["shown"], 0); self.assertTrue(g["goes"]["error"])
         self.assertEqual(len(full["sats"]), 18); self.assertEqual(len(lite["sats"]), 3 + 9)
@@ -146,7 +148,8 @@ class NetSky(unittest.TestCase):
     def test_page_has_sky(self):
         import netpages
         b = netpages.handle_get("/grid", {})[1]
-        for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
+        for s in ('id="nx_mode"', 'data-m="sky"', 'id="nx_sf"', 'id="nx_sw"', 'id="nx_ss"', 'data-g="iss"', 'data-g="debris"', "BN_SATJS", "sha384-"): self.assertIn(s, b)
+        self.assertIn('data-g="debris" aria-pressed="false"', b)
 
     def test_sky_spin_layer_path_and_mobile_chip(self):
         # pt1813u: globe auto-rotate, constellations layer in small-to-Starlink, two-orbit path, compact mobile chip
@@ -223,6 +226,120 @@ class NetSky(unittest.TestCase):
         self.assertIn("startPulse() can keep idle from firing", js)
         self.assertIn("if (!SKY.alt3d && !SKY._3dFail) sky3dEnsure()", js)
         self.assertNotIn('map.once("idle", function () { if (SKY.on) sky3dEnsure(); })', js)
+
+    def test_iss_only_from_stations_and_learn_card(self):
+        import netsky, json, time, netmap
+        from unittest import mock
+        from pathlib import Path
+        stations = CSV + "ISS (ZARYA),1998-067A,2026-11-22T12:00:00.123456,15.49,0.0007,51.6,10.0,90.0,270.0,0,U,25544,999,100,0.0001,0,0\n" + \
+                   "CSS (TIANHE),2021-035A,2026-11-22T12:00:00.123456,15.59,0.001,41.4,10.0,90.0,270.0,0,U,48274,999,100,0.0001,0,0\n"
+        sp = os.path.join(self.d, "stations.csv"); open(sp, "w").write(stations)
+        def fake(gid, grp):
+            if gid == "iss": return (sp, time.time(), None)
+            if gid in ("starlink", "gps"): return (self.p, time.time(), None)
+            return (None, None, "HTTPError")
+        with mock.patch.object(netsky, "_file", fake):
+            payload = json.loads(netsky.sky(False))
+        g = {x["id"]: x for x in payload["groups"]}
+        self.assertEqual(g["iss"]["total"], 1)
+        self.assertEqual(g["iss"]["shown"], 1)
+        iss = [s for s in payload["sats"] if s[1] == 25544]
+        self.assertEqual(len(iss), 1)
+        self.assertTrue(any("ISS" in (s[10] or "") for s in iss))
+        self.assertFalse(any(s[1] == 48274 for s in payload["sats"]))
+        learn = json.loads((Path(APP) / "netmap_static" / "learn.json").read_text())
+        self.assertIn("iss", learn)
+        self.assertTrue(learn["iss"]["image"].endswith("iss.jpg"))
+        self.assertTrue(learn["iss"]["sources"])
+        code, img, ctype = netmap.handle_get("/api/netmap/learn/iss.jpg")
+        self.assertEqual(code, 200)
+        self.assertIn("image", ctype)
+        self.assertEqual(img[:2], b"\xff\xd8")
+
+    def test_debris_is_decimated_and_routed(self):
+        import netsky, json, time, netmap
+        from unittest import mock
+        many = CSV.split("\n")[0] + "\n" + "".join(
+            f"DEB {i},2020-001A,2026-11-22T12:00:00.000000,15.06,0.0001,53.0,10.0,90.0,270.0,0,U,{50000+i},999,100,0.0001,0,0\n" for i in range(60))
+        dp = os.path.join(self.d, "debris.csv"); open(dp, "w").write(many)
+        def fake(gid, url):
+            return (dp, time.time(), None) if "fengyun-1c-debris" in url or gid == "fengyun-1c-debris" else (None, None, "HTTPError")
+        with mock.patch.object(netsky, "_fetch", fake):
+            full = json.loads(netsky.debris(False)); lite = json.loads(netsky.debris(True))
+        self.assertEqual(full["step"], 2); self.assertEqual(lite["step"], 6)
+        fy = {g["id"]: g for g in full["groups"]}["fengyun-1c-debris"]
+        self.assertEqual(fy["total"], 60)
+        self.assertEqual(fy["shown"], 30)
+        self.assertEqual({g["id"]: g for g in lite["groups"]}["fengyun-1c-debris"]["shown"], 10)
+        with mock.patch.object(netsky, "debris_cached", lambda lite: b'{"lite":%d}' % lite):
+            self.assertEqual(netmap.handle_get("/api/netmap/debris", {"lite": ["1"]})[1], b'{"lite":1}')
+            self.assertEqual(netmap.handle_get("/api/netmap/debris", {})[1], b'{"lite":0}')
+
+    def test_solar_system_and_cad_payloads(self):
+        import netsky, netmap, json
+        from unittest import mock
+        from datetime import datetime, timezone
+        when = datetime(2026, 11, 24, 18, 0, tzinfo=timezone.utc)
+        def hz(command, center, when):
+            tables = {
+                ("-31", "500@399"): {"delta_au": 173.2, "deldot_km_s": 23.1, "light_min": 1440.5, "time": "2026-Nov-24 18:00"},
+                ("-31", "500@10"): {"delta_au": 172.4, "deldot_km_s": 16.9, "light_min": 1434.0, "time": "2026-Nov-24 18:00"},
+                ("-32", "500@399"): {"delta_au": 145.0, "deldot_km_s": 32.7, "light_min": 1206.3, "time": "2026-Nov-24 18:00"},
+                ("-32", "500@10"): {"delta_au": 144.5, "deldot_km_s": 15.0, "light_min": 1202.1, "time": "2026-Nov-24 18:00"},
+                ("-143205", "500@399"): {"delta_au": 0.856, "deldot_km_s": 8.2, "light_min": 7.12, "time": "2026-Nov-24 18:00"},
+                ("-143205", "500@10"): {"delta_au": 1.369, "deldot_km_s": -6.36, "light_min": 11.38, "time": "2026-Nov-24 18:00"},
+            }
+            return tables[(command, center)]
+        with mock.patch.object(netsky, "_horizons_observer", hz), mock.patch.object(netsky, "datetime") as dt:
+            # keep datetime class methods used at import; only now() needs a stub if we don't patch it.
+            pass
+        with mock.patch.object(netsky, "_horizons_observer", hz):
+            ss = netsky.solar_system()
+        self.assertTrue(ss["ok"])
+        by = {o["id"]: o for o in ss["objects"]}
+        self.assertEqual(set(by), {"roadster", "voyager1", "voyager2"})
+        self.assertAlmostEqual(by["voyager1"]["earth"]["au"], 173.2, places=3)
+        self.assertEqual(by["voyager1"]["launch"], "1977-09-05")
+        self.assertIn("interstellar", by["voyager1"]["status"].lower())
+        self.assertIn("nasa.gov", by["voyager1"]["source_url"])
+        self.assertTrue(by["roadster"]["ok"])
+        self.assertIn("horizons", by["roadster"]["source_url"])
+        self.assertGreater(by["voyager1"]["earth"]["km"], 20_000_000_000)
+        cad_fixture = {"fields": ["des", "cd", "dist", "h", "diameter", "fullname"],
+                       "data": [["2026 VQ5", "2026-Nov-25 21:21", "0.013432313511248", "23.915", None, "(2026 VQ5)"],
+                                ["P/2026 A1", "2026-Dec-10 04:00", "0.04", "18.0", 1.2, "Comet P/2026 A1"]]}
+        with mock.patch.object(netsky, "_j", lambda url: cad_fixture):
+            netsky._MEM.pop("cad", None)
+            cad = netsky.cad()
+        self.assertTrue(cad["ok"]); self.assertEqual(cad["count"], 2)
+        a, c = cad["objects"]
+        self.assertAlmostEqual(a["dist_ld"], a["dist_km"] / netsky.LD_KM, places=3)
+        self.assertIsNone(a["diameter_km"]); self.assertTrue(a["size_est_km"]); self.assertIn("albedo", a["size_note"])
+        self.assertEqual(c["diameter_km"], 1.2); self.assertIsNone(c["size_est_km"])
+        self.assertTrue(a["source_url"].startswith("https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html"))
+        with mock.patch.object(netsky, "solar_system", lambda: {"ok": True, "objects": []}):
+            code, body = netmap.handle_get("/api/netmap/ss")[:2]
+        self.assertEqual(code, 200); self.assertTrue(body["ok"])
+        with mock.patch.object(netsky, "cad", lambda: {"ok": True, "objects": []}):
+            self.assertEqual(netmap.handle_get("/api/netmap/cad")[0], 200)
+        self.assertAlmostEqual(netsky.size_from_h(24.7), 1329.0 * (10 ** (-24.7 / 5.0)) / (0.14 ** 0.5), places=6)
+
+    def test_sky_objects_client_hooks(self):
+        from pathlib import Path
+        root = Path(APP) / "netmap_static"
+        js = (root / "net.js").read_text()
+        css = (root / "net.css").read_text()
+        for s in ("function debrisLoad", "function ssLoad", "function ssPanel", "function ssDiagram",
+                  'SKYC = { iss: "#FFFFFF"', 'g === "debris"', "/api/netmap/ss", "/api/netmap/cad", "/api/netmap/debris"):
+            self.assertIn(s, js)
+        self.assertNotIn("function prog(", js.split("function glProg")[-1] if "function glProg" in js else "")
+        self.assertIn("function glProg", js)
+        self.assertEqual(js.count("function debrisLoad"), 1)
+        self.assertIn("nx-ss", css)
+        self.assertIn("nx-cad", css)
+        added = css.split("solar-system inset")[-1]
+        self.assertNotIn("#FFC21A", added)
+        self.assertNotIn("yellow", added.lower())
 
 class NetSkyStarlinkFallback(unittest.TestCase):
     def test_supgp_when_group_refused(self):

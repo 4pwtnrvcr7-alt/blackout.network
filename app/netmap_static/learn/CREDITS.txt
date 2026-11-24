@@ -34,6 +34,13 @@ iridium.jpg
   https://creativecommons.org/publicdomain/zero/1.0/
   Change: resized and recompressed.
 
+iss.jpg
+  Source: NASA images, id iss032e025258 (Expedition 32, 28 August 2012)
+  https://images.nasa.gov/details/iss032e025258
+  Author: NASA
+  License: Public domain (U.S. government work)
+  Change: resized and recompressed.
+
 No photograph is included for GLONASS, BeiDou or OneWeb: a clearly licensed public-domain or Creative Commons spacecraft image was not confirmed in time. The learn panel shows sourced text only for those groups. No images were generated or fabricated.
 
 The JPEGs are stored in the repo as <name>.jpg.b64 (base64 of the resized file) and decoded when served at /api/netmap/learn/<name>.jpg.

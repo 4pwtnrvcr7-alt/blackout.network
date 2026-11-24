@@ -161,5 +161,28 @@
         "url": "https://www.nesdis.noaa.gov/"
       }
     ]
+  },
+  "iss": {
+    "name": "International Space Station",
+    "operator": "NASA, Roscosmos, JAXA, ESA and the Canadian Space Agency (ISS partnership)",
+    "first": "1998-11-20",
+    "first_label": "20 November 1998 (Zarya). First crew arrived 2 November 2000.",
+    "purpose": "Crewed laboratory in low Earth orbit, typically about 400 km up.",
+    "depends": "Continuous human presence in orbit, microgravity research, Earth observation, and a test bed for exploration systems.",
+    "failure": "The station is not a navigation or communications constellation. A serious failure would end or suspend the crewed laboratory and require the crew to return to Earth.",
+    "image": "/api/netmap/learn/iss.jpg",
+    "alt": "The International Space Station seen from a Soyuz spacecraft during Expedition 32, 2012",
+    "credit": "NASA, Expedition 32 (iss032e025258), 28 August 2012. Public domain.",
+    "license": "Public domain",
+    "sources": [
+      {
+        "name": "NASA International Space Station",
+        "url": "https://www.nasa.gov/international-space-station/"
+      },
+      {
+        "name": "NASA image iss032e025258",
+        "url": "https://images.nasa.gov/details/iss032e025258"
+      }
+    ]
   }
 }
