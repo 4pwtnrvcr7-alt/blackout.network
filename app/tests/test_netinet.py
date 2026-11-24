@@ -43,6 +43,19 @@ class T(unittest.TestCase):
         r = netinet.build(jget)
         self.assertIn("S:Florida", r["places"]); self.assertIn("C:PR", r["places"]); self.assertNotIn("C:US", r["places"])
         self.assertTrue(all(p["level"] == -1 for p in r["places"].values()))
+    def test_ioda_backoff_fails_fast(self):
+        import time as _t
+        calls = []
+        orig = netmap._http
+        def boom(url, timeout=12, cap=0): calls.append(url); raise OSError("refused")
+        netmap._http = boom
+        try:
+            netmap._IB.update(n=0, until=0.0)
+            with self.assertRaises(OSError): netmap.http(netmap.IODA + "/x")
+            with self.assertRaises(OSError): netmap.http(netmap.IODA + "/y")
+            self.assertEqual(len(calls), 1); self.assertGreater(netmap.ioda_state()["backoff_s"], 50)
+        finally:
+            netmap._http = orig; netmap._IB.update(n=0, until=0.0)
     def test_static_geo_served(self):
         st, body, ct = netmap.handle_get("/api/netmap/inet.json")
         self.assertEqual((st, ct), (200, "application/json")); self.assertIn(b'"S:Florida"', body); self.assertIn(b'"C:PR"', body)
