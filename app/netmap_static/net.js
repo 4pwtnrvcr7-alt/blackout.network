@@ -169,7 +169,7 @@
   }
   function bindLayers() {
     ["pt", "dc"].forEach(function (id) {
-      map.on("mousemove", id, function (e) { if (!pinned) showCard(e.features[0], e.point, false); map.getCanvas().style.cursor = "pointer"; });
+      map.on("mousemove", id, function (e) { if (window.__gxWxHit && window.__gxWxHit(e.point)) return; if (!pinned) showCard(e.features[0], e.point, false); map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", id, function () { if (!pinned) hideCard(); map.getCanvas().style.cursor = ""; });
     });
     map.on("click", function (e) {
@@ -178,6 +178,7 @@
         sf = sf.filter(function (f) { var q = f.geometry.coordinates; return Math.sin(cc.lat * R) * Math.sin(q[1] * R) + Math.cos(cc.lat * R) * Math.cos(q[1] * R) * Math.cos((q[0] - cc.lng) * R) > 0.05; });
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
         if (sf.length) satCard(sf[0].properties.i, e.point); else { hideCard(true); SKY.sel = null; if (map.getSource("trk")) map.getSource("trk").setData(EMPTY); } return; }
+      if (window.__gxWxHit && window.__gxWxHit(e.point)) { hideCard(true); return; }   /* a grid alert diamond on top: gridlayer.js shows its card */
       var f = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ["pt", "dc"].filter(function (l) { return map.getLayoutProperty(l, "visibility") !== "none"; }) })[0];
       if (!f && (ON.towers || ON.grid)) {
         var il = []; INF_K.forEach(function (k) { if (ON[k]) il = il.concat(INF[k].Q); });

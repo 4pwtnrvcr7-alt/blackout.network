@@ -131,6 +131,11 @@
     var ls = ["pt", "dc"].filter(function (l) { return map.getLayer(l) && map.getLayoutProperty(l, "visibility") !== "none"; });
     return ls.length ? map.queryRenderedFeatures(bb, { layers: ls }).length > 0 : false;
   }
+  function wxHit(bb) {   /* Nov 24 2026: a weather / grid alert diamond wins over a network point under it (diamonds sit on top) */
+    if (!opsOn || sky() || !map.getLayer("gx-weather") || map.getLayoutProperty("gx-weather", "visibility") === "none") return null;
+    return map.queryRenderedFeatures(bb, { layers: ["gx-weather"] })[0] || null;
+  }
+  window.__gxWxHit = function (pt) { try { return !!(map && wxHit([[pt.x - 7, pt.y - 7], [pt.x + 7, pt.y + 7]])); } catch (e) { return false; } };
   function addLayers() {
     if (map.getSource("gx-pts")) return;
     var before = map.getLayer("admin-state") ? "admin-state" : undefined;
@@ -157,14 +162,16 @@
       setTimeout(function () { requestAnimationFrame(tick); }, 50); })();
     map.on("mousemove", function (e) {
       if (touch || !opsOn || sky()) return;
-      var f = map.queryRenderedFeatures(e.point, { layers: LY.filter(function (l) { return map.getLayer(l); }) })[0];
-      if (f && !nxHit(e.point)) { map.getCanvas().style.cursor = "pointer"; showCard(f.properties.k, e.point, false); } else hideCard(false);
+      var w = wxHit([[e.point.x - 7, e.point.y - 7], [e.point.x + 7, e.point.y + 7]]);
+      var f = w || map.queryRenderedFeatures(e.point, { layers: LY.filter(function (l) { return map.getLayer(l); }) })[0];
+      if (f && (w || !nxHit(e.point))) { map.getCanvas().style.cursor = "pointer"; showCard(f.properties.k, e.point, false); } else hideCard(false);
     });
     map.on("click", function (e) {
       if (!opsOn || sky()) return hideCard(true);
       var bb = [[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]];
-      if (nxHit(bb)) return hideCard(true);
-      var f = map.queryRenderedFeatures(bb, { layers: LY.filter(function (l) { return map.getLayer(l); }) })[0];
+      var w = wxHit([[e.point.x - 7, e.point.y - 7], [e.point.x + 7, e.point.y + 7]]);
+      if (!w && nxHit(bb)) return hideCard(true);
+      var f = w || map.queryRenderedFeatures(bb, { layers: LY.filter(function (l) { return map.getLayer(l); }) })[0];
       if (f) { pinned = null; showCard(f.properties.k, e.point, true); map.easeTo({ center: f.geometry.coordinates, duration: 700, easing: function (t) { return 1 - Math.pow(1 - t, 3); }, offset: (touch || innerWidth < 768) ? [0, -innerHeight * 0.18] : [0, 0] }); }
       else hideCard(true);
     });
@@ -319,7 +326,7 @@
   /* ---------- go ---------- */
   function load() {
     return fetch("/api/gridpage/data", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
-      D = d; D.regions = D.regions || []; D.states = D.states || []; D.weather = D.weather || [];
+      D = d; D.regions = (D.regions || []).filter(function (r) { return r.demand_mw != null; });   /* Nov 24 2026 (Matt): operators without live data are pulled, not shown empty (AK/HI have no EIA-930 feed) */ D.states = D.states || []; D.weather = D.weather || [];
       render(); paint();
     }).catch(function () { var nbg = $("nb_grid"); if (nbg) nbg.textContent = "Grid status is unavailable right now."; });
   }

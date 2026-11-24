@@ -289,6 +289,9 @@ def world():
                 elif any(w["rank"] >= 5 for w in near): o.update(status="watch", reason="Wire grid alert ranked 5+ in this area in the last 12 h")
                 else: o.update(status="online", reason=None)
             ops.append(o)
-        v = {"generated": _iso(_dt.now(_tz.utc)), "operators": ops, "wire": wire, "ttl_s": WORLD_TTL}
+        # Nov 24 2026 (Matt): operators without live data are pulled from the page (map points and the Worldwide list), not shown empty.
+        pulled = [{"id": o["id"], "name": o["name"], "reason": o.get("reason")} for o in ops if o.get("status") == "nodata"]
+        ops = [o for o in ops if o.get("status") != "nodata"]
+        v = {"generated": _iso(_dt.now(_tz.utc)), "operators": ops, "pulled": pulled, "wire": wire, "ttl_s": WORLD_TTL}
         _W.update(t=time.time(), v=v)
         return v
