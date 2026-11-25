@@ -12,6 +12,8 @@ from urllib.parse import quote
 SITE = "https://blackout.network"
 TCO = 23  # X counts a link as 23 characters
 MAX_TAGS = 5
+MIN_TAGS = 3
+GENERIC_TAGS = ["#News", "#WorldNews"]
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
 # --------------------------------------------------------------------------- tags
@@ -86,6 +88,8 @@ _COUNTRIES = {
     "d.r. congo": "DRC",
     "congo-kinshasa": "DRC",
     "drc": "DRC",
+    "congo's": "DRC",
+    "congos": "DRC",
     "united states of america": "US",
     "united states": "US",
     "u.s.a.": "US",
@@ -349,6 +353,9 @@ _CITIES = {
     "kampala": ("Kampala", "Uganda"),
     "kinshasa": ("Kinshasa", "DRC"),
     "goma": ("Goma", "DRC"),
+    "ituri": ("Ituri", "DRC"),
+    "north kivu": ("NorthKivu", "DRC"),
+    "south kivu": ("SouthKivu", "DRC"),
     "juba": ("Juba", "SouthSudan"),
     "taipei": ("Taipei", "Taiwan"),
     "beijing": ("Beijing", "China"),
@@ -383,17 +390,18 @@ _ABBR_RX = re.compile(
 )
 
 
-def _corpus(item):
+def _corpus(item, headline=None):
     """Location, title, brief WHERE, and brief text — the fields the generator may read."""
     loc = _norm(item.get("location") or "")
-    title = _norm(item.get("title") or item.get("headline") or item.get("h") or "")
+    title = _norm(item.get("title") or item.get("h") or "")
+    display = _norm(headline or item.get("headline") or "") or title
     brief = item.get("brief") or ""
     where = ""
     if brief:
         m = re.search(r"WHERE:\s*(.+?)(?=\s+(?:WHAT|WHERE|WHEN|CONFIDENCE|VERIFY):|$)", brief, re.S)
         if m:
             where = _norm(re.sub(r"\(approx\.[^)]*\)", "", m.group(1)))
-    parts = [loc, title, where]
+    parts = [display, title, loc, where]
     # named entities if a brief or cluster already extracted them
     ents = item.get("entities") or item.get("places") or []
     if isinstance(ents, dict):
@@ -407,7 +415,7 @@ def _corpus(item):
             n = e.get("name") or e.get("text") or e.get("label") or ""
             if n:
                 parts.append(str(n))
-    return loc, title, where, " \n ".join(p for p in parts if p)
+    return loc, title, where, " \n ".join(p for p in parts if p), display
 
 
 def _find_places(text, loc):
@@ -493,6 +501,18 @@ def _find_places(text, loc):
         add(cities, city)
         add(parents, parent)
 
+    # Bare "US" / "U.S." in a title (avoid the pronoun "us" by requiring capitals or punctuation)
+    if re.search(r"(?<![A-Za-z])U\.S\.?s?\b|(?<![A-Za-z])US\b(?![A-Za-z])", raw) and "US" not in parents:
+        # skip USGS / USA / USB etc. — USA already mapped; USGS is US + GS so need not letter after
+        if not re.search(r"\bUSGS\b|\bUSB\b|\bUSC\b|\bUSD\b|\bUSP\b", raw):
+            add(parents, "US")
+
+    # Bare "Congo" / "Congo's" as DRC when the story is clearly about the DRC, not Brazzaville
+    if re.search(r"\bcongo'?s?\b", raw, re.I) and "DRC" not in parents and "RepublicOfTheCongo" not in parents:
+        if re.search(r"\b(ebola|ituri|kinshasa|goma|kivu|bundibugyo|m23|drc)\b", raw, re.I) or re.search(
+                r"\bdemocratic republic\b|\bdr congo\b", raw, re.I):
+            add(parents, "DRC")
+
     # Drop "GeorgiaCountry" unless clearly the country
     if "GeorgiaCountry" in parents:
         parents = [p for p in parents if p != "GeorgiaCountry"]
@@ -522,14 +542,7 @@ def _first_pos(blob, label, aliases):
     return best
 
 
-def location_tags(item):
-    loc, title, where, blob = _corpus(item)
-    if loc and _SKIP_LOC.match(loc) and not title and not where:
-        return []
-    parents, cities = _find_places(blob, loc)
-    # Search title first so the subject place (DRC in an Ebola headline) leads
-    # over a shorter stored location string ("Kenya and Nigeria").
-    order_blob = " ".join(x for x in (title, loc, where, blob) if x)
+def _alias_map():
     alias_of = {}
     for a, lab in _COUNTRIES.items():
         alias_of.setdefault(lab, []).append(a)
@@ -540,24 +553,115 @@ def location_tags(item):
     for a, (city, parent) in _CITIES.items():
         alias_of.setdefault(city, []).append(a)
         alias_of.setdefault(parent, []).append(a)
-    # Prefer country/state first, then major city, each group in appearance order
-    def sort_labels(labs):
-        return sorted(labs, key=lambda lab: (_first_pos(order_blob, lab, alias_of.get(lab, [lab.lower()])), labs.index(lab)))
-    parents = sort_labels(parents)
-    cities = sort_labels(cities)
+    alias_of.setdefault("DRC", []).extend(["congo", "congo's", "congos"])
+    alias_of.setdefault("US", []).extend(["us", "u.s.", "u.s", "u.s.a."])
+    return alias_of
+
+
+def _city_parent(city):
+    for _a, (c, parent) in _CITIES.items():
+        if c == city:
+            return parent
+    return None
+
+
+def location_tags(item, headline=None):
+    """1–2 location tags: primary country/state, then a city or region.
+
+    Prefers the place named in the headline over secondary countries on the
+    cluster (e.g. DRC Ebola should not pick up Kenya/Nigeria from a WHO byline).
+    """
+    loc, title, where, blob, display = _corpus(item, headline=headline)
+    if loc and _SKIP_LOC.match(loc) and not title and not where and not display:
+        return []
+    parents, cities = _find_places(blob, loc)
+    hl_parents, hl_cities = _find_places(" ".join(x for x in (display, title) if x), "")
+    alias_of = _alias_map()
+    hl_blob = " ".join(x for x in (display, title) if x)
+
+    def pos(lab, text):
+        return _first_pos(text, lab, alias_of.get(lab, [lab.lower()]))
+
+    # If the headline/title names a country, drop cluster countries that it does not name.
+    if hl_parents:
+        parents = [p for p in parents if p in hl_parents] or hl_parents[:]
+        keep_cities = []
+        for c in hl_cities + cities:
+            parent = _city_parent(c)
+            if c in hl_cities or (parent and parent in parents):
+                if c not in keep_cities:
+                    keep_cities.append(c)
+        cities = keep_cities
+
+    # Primary country: preposition + event ("amid DR Congo outbreak"), possessive
+    # ("Congo's Ebola", "Ukraine's Kryvyi Rih"), else first country in the headline.
+    primary = None
+    ev = re.search(
+        r"\b(?:amid|in|inside|across|near|from|of)\s+(.{2,40}?\s+)?(outbreak|war|invasion|strike|conflict|epidemic)\b",
+        hl_blob, re.I)
+    if ev:
+        window = ev.group(0)
+        wp, _ = _find_places(window, "")
+        if wp:
+            primary = wp[0]
+    if not primary:
+        # "Congo's Ebola" / "Ukraine's Kryvyi Rih"
+        poss, _ = _find_places(hl_blob, "")
+        m = re.search(r"\b([A-Z][^.]{1,40}?)(?:'s|’s)\s", display or title or "")
+        if m:
+            pp, _ = _find_places(m.group(1), "")
+            if pp:
+                primary = pp[0]
+    if not primary and hl_parents:
+        # first country as it appears in the headline
+        primary = sorted(hl_parents, key=lambda lab: (pos(lab, hl_blob), hl_parents.index(lab)))[0]
+    if not primary and parents:
+        primary = parents[0]
+
+    # Trailing list after the primary ("DRC, Kenya and Nigeria") stays dropped.
+    second_countries = []
+    if primary:
+        ppos = pos(primary, hl_blob)
+        for p in hl_parents:
+            if p == primary:
+                continue
+            if pos(p, hl_blob) < ppos:
+                second_countries.append(p)  # mentioned before the primary (Uganda ... amid DRC outbreak)
+        second_countries.sort(key=lambda p: pos(p, hl_blob))
+        parents = [primary] + [p for p in second_countries if p != primary]
+    else:
+        parents = parents[:1]
+
+    # City/region of the primary, from the headline when possible
+    cities = [c for c in (hl_cities + cities) if (not primary) or _city_parent(c) in (primary, None) or c in hl_cities]
+    # De-dupe cities
+    seen_c = []
+    for c in cities:
+        if c not in seen_c:
+            seen_c.append(c)
+    cities = seen_c
+
     labels = []
-    for x in parents + cities:
-        if x and x not in labels:
-            labels.append(x)
+    if primary:
+        labels.append(primary)
+    for c in cities:
+        if c not in labels:
+            labels.append(c)
+            break  # one city/region only
+    if len(labels) < 2:
+        for p in parents:
+            if p not in labels:
+                labels.append(p)
+                break
     tags = []
-    for lab in labels:
+    for lab in labels[:2]:
         tg = to_tag(lab)
         if tg and tg not in tags:
             tags.append(tg)
     return tags
 
 
-# --------------------------------------------------------------------------- topics (rank 7–10 only)
+# --------------------------------------------------------------------------- topics (any rank)
 _DISEASES = [
     # (regex, tag label) — more specific first
     (r"\bh5n1\b", "H5N1"),
@@ -585,32 +689,37 @@ _HAZARDS = [
     (r"\btsunamis?\b", "Tsunami"),
     (r"\btornado(?:es|s)?\b", "Tornado"),
     (r"\bflash floods?\b|\bflood(?:ing|s|ed)?\b", "Flood"),
+    (r"\bhigh winds?\b|\bhigh wind warning\b", "HighWind"),
     (r"\bvolcan(?:o|ic|oes)\b|\beruption\b", "Volcano"),
     (r"\bblizzard\b|\bsnowstorm\b", "Blizzard"),
     (r"\bheat ?wave\b", "HeatWave"),
+    (r"\bsevere rain\b|\bheavy rain\b|\bstorms?\b|\brains?\b", "Storm"),
 ]
 _TEST_EVT = re.compile(r"\bTEST\b.*\b(warning|watch|advisory|issued)\b|\b(warning|watch|advisory)\b.*\bTEST\b", re.I)
 
 
-def _text_for_topic(item):
-    loc, title, where, blob = _corpus(item)
-    return f"{title}\n{blob}"
+def _text_for_topic(item, headline=None):
+    loc, title, where, blob, display = _corpus(item, headline=headline)
+    return f"{display}\n{title}\n{blob}"
 
 
-def _cat(item):
+def _cat(item, headline=None):
+    title = headline or item.get("headline") or item.get("title") or ""
     try:
         import story_display as SD
-        return (SD.display_category(item.get("title") or "", item.get("category") or "") or "").lower()
+        return (SD.display_category(title, item.get("category") or "") or "").lower()
     except Exception:
         return (item.get("category") or "").lower()
 
 
-def topic_tags(item):
-    """Specific topic tags for rank 7–10. Empty if nothing is confident."""
-    title = item.get("title") or item.get("headline") or item.get("h") or ""
-    blob = _text_for_topic(item)
+def topic_tags(item, headline=None):
+    """Specific topic tags (disease name, strike type, hazard, cyber)."""
+    title = headline or item.get("headline") or item.get("title") or item.get("h") or ""
+    blob = _text_for_topic(item, headline=headline)
+    # Prefer the title/headline for strike type so we do not invent tags from a brief
+    lead = title or blob
     low = blob.lower()
-    cat = _cat(item)
+    cat = _cat(item, headline=headline)
     tags = []
 
     def add(label):
@@ -619,18 +728,17 @@ def topic_tags(item):
             tags.append(t)
 
     if _TEST_EVT.search(title or ""):
-        return []  # official test products should not get event topic tags
+        add("Test")
+        return tags
 
     # Disease names
     if cat == "disease" or any(re.search(p, blob, re.I) for p, _ in _DISEASES):
-        # For "Quick takes" roundups, only take the first disease (the lead item)
         quick = bool(re.match(r"\s*quick takes:", title or "", re.I))
         for pat, lab in _DISEASES:
             if re.search(pat, blob, re.I):
                 add(lab)
                 if quick:
                     break
-        # A specific strain already implies bird flu; don't spend a slot on both.
         if any(x in tags for x in ("#H5N1", "#H5N9")) and "#BirdFlu" in tags:
             tags.remove("#BirdFlu")
 
@@ -648,6 +756,15 @@ def topic_tags(item):
     if conflictish:
         if re.search(r"\bukraine\b|\bkyiv\b|\bkiev\b|\bkharkiv\b|\bkryvyi\b", low):
             add("UkraineWar")
+        # Strike type next so it keeps a topic slot when the title actually says so
+        if re.search(r"\bdrone(?:\s+and\s+missile)?\s+(?:strike|attack|assault)s?\b|\buav\b", lead, re.I):
+            add("DroneStrike")
+        elif re.search(r"\b(?:ballistic\s+)?missiles?\s+(?:strike|attack|hits?|hit|launches?)\b|"
+                       r"\b(?:strike|attack)\s+[^.]{0,40}missiles?\b|"
+                       r"\bballistic missile", lead, re.I):
+            add("MissileStrike")
+        elif re.search(r"\bairstrikes?\b|\bair strikes?\b", lead, re.I):
+            add("Airstrike")
         if re.search(r"\brussia(?:n)?\b|\bkremlin\b|\bmoscow\b", low) and re.search(
                 r"\b(ukraine|kyiv|kiev|missile|strike|invasion|war)\b", low):
             add("Russia")
@@ -655,13 +772,13 @@ def topic_tags(item):
             add("Gaza")
         if re.search(r"\bisrael(?:i)?\b|\bidf\b", low) and re.search(r"\b(gaza|hamas|hezbollah|airstrike|strike)\b", low):
             add("Israel")
-        if re.search(r"\bairstrikes?\b|\bair strikes?\b", low):
-            add("Airstrike")
         if re.search(r"\bhouthi|\bansarallah\b", low):
             add("Houthis")
 
     # Cyber
     if cat == "cyber" or re.search(r"\b(data breach|ransomware|cve-\d|remote code execution|cyber ?attack)\b", low):
+        if re.search(r"\bcve-\d", low):
+            add("CVE")
         if re.search(r"\bdata breach\b|\bbreached\b", low):
             add("DataBreach")
         elif re.search(r"\bransomware\b", low):
@@ -672,12 +789,11 @@ def topic_tags(item):
     return tags
 
 
-def engagement_tags(item):
-    """1–2 high-engagement category tags for rank 7–10."""
-    cat = _cat(item)
-    title = item.get("title") or ""
-    blob = _text_for_topic(item)
-    rank = _rank(item)
+def engagement_tags(item, headline=None):
+    """One high-engagement category tag, at any rank."""
+    cat = _cat(item, headline=headline)
+    title = headline or item.get("headline") or item.get("title") or ""
+    blob = _text_for_topic(item, headline=headline)
     tags = []
 
     def add(label):
@@ -686,24 +802,26 @@ def engagement_tags(item):
             tags.append(t)
 
     if _TEST_EVT.search(title or ""):
-        return []
+        add("News")
+        return tags[:1]
     if cat == "disease" or any(re.search(p, blob, re.I) for p, _ in _DISEASES):
         add("Outbreak")
+    elif cat == "cyber" or re.search(r"\b(cve-\d|data breach|ransomware|remote code execution|cyber ?attack)\b", blob, re.I):
+        add("Cyberattack")
     elif cat in ("war/conflict", "conflict") or re.search(
-            r"\b(missile|airstrike|invasion|artillery|shelling)\b", blob, re.I):
+            r"\b(missile|airstrike|invasion|artillery|shelling|ukraine war|drone strike)\b", blob, re.I):
         add("War")
     elif re.search(
             r"\b(hurricanes?|typhoons?|cyclones?|tornado(?:es|s)?|flood(?:ing|s|ed)?|"
-            r"storms?|blizzards?|wildfires?|heat ?waves?|severe rain|heavy rain|rains?)\b",
+            r"storms?|blizzards?|wildfires?|heat ?waves?|severe rain|heavy rain|rains?|"
+            r"high winds?)\b",
             blob, re.I) or (
             cat in ("natural disaster",) and re.search(r"\b(rain|storms?|flood(?:ing|s)?|weather|wind)\b", blob, re.I)
     ):
         add("Weather")
-    if rank >= 8 and tags:
-        add("BreakingNews")
-    elif rank >= 8:
-        add("BreakingNews")
-    return tags[:2]
+    else:
+        add("BreakingNews" if _rank(item) >= 8 else "News")
+    return tags[:1]
 
 
 # --------------------------------------------------------------------------- held / false-positive
@@ -735,23 +853,32 @@ def _rank(item):
         return 0
 
 
-def hashtags(item):
-    """Ordered tags (location first, then topic, then engagement). Max 5, deduped."""
-    loc = location_tags(item)
-    if is_held(item):
-        tags = loc
-    elif _rank(item) >= 7:
-        # Two location tags first, then topic and engagement, then any leftover places
-        tags = loc[:2] + topic_tags(item) + engagement_tags(item) + loc[2:]
-    else:
-        tags = loc
+def _dedupe(tags, limit=MAX_TAGS):
     out = []
     for t in tags:
         if t and t not in out:
             out.append(t)
-        if len(out) >= MAX_TAGS:
+        if len(out) >= limit:
             break
     return out
+
+
+def hashtags(item, headline=None):
+    """1–2 location, 1–2 topic, 1 engagement. Always 3–5 tags (held: location + 2 generic)."""
+    loc = location_tags(item, headline=headline)
+    if is_held(item):
+        tags = loc[:2] + [g for g in GENERIC_TAGS]
+        return _dedupe(tags + GENERIC_TAGS, MAX_TAGS) if len(_dedupe(tags)) < MIN_TAGS else _dedupe(tags)
+    topics = topic_tags(item, headline=headline)
+    eng = engagement_tags(item, headline=headline)
+    tags = _dedupe(loc[:2] + topics[:2] + eng[:1], MAX_TAGS)
+    extras = loc[2:] + topics[2:]
+    for e in extras + GENERIC_TAGS:
+        if len(tags) >= MIN_TAGS:
+            break
+        if e not in tags:
+            tags.append(e)
+    return _dedupe(tags, MAX_TAGS)
 
 
 # --------------------------------------------------------------------------- compose / intent
@@ -793,13 +920,17 @@ def weighted_len(text, url):
 
 
 def share_text(item, url=None, headline=None):
-    """Headline + hashtags, trimmed so headline + tags + t.co link fit in 280."""
+    """Headline + hashtags, trimmed so headline + tags + t.co link fit in 280.
+
+    Drops the lowest-priority tag first when over budget, but never below MIN_TAGS;
+    the headline is shortened instead.
+    """
     url = url if url is not None else story_url(item)
     h = _headline(item, headline)
-    tags = hashtags(item)
+    tags = hashtags(item, headline=headline)
     text = _join(h, tags)
-    while tags and weighted_len(text, url) > 280:
-        tags = tags[:-1]  # drop lowest-priority (last) first
+    while len(tags) > MIN_TAGS and weighted_len(text, url) > 280:
+        tags = tags[:-1]
         text = _join(h, tags)
     if weighted_len(text, url) > 280:
         budget = 280 - (1 + TCO if url else 0)

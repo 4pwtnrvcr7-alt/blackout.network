@@ -96,18 +96,31 @@ def tweet_len(item):
     return X.weighted_len(X.share_text(item), url)
 
 
+
+
 class Tags(unittest.TestCase):
-    def test_ebola_drc_rank8(self):
+    def test_every_story_has_3_to_5_tags(self):
+        for key, it in STORIES.items():
+            tags = X.hashtags(it)
+            self.assertGreaterEqual(len(tags), 3, f"{key}: {tags}")
+            self.assertLessEqual(len(tags), 5, f"{key}: {tags}")
+
+    def test_ebola_drc_prefers_headline_primary(self):
         it = STORIES["ebola_drc"]
         tags = X.hashtags(it)
         self.assertIn("#DRC", tags)
-        self.assertIn("#Kenya", tags)
         self.assertIn("#Ebola", tags)
         self.assertIn("#Outbreak", tags)
-        self.assertIn("#BreakingNews", tags)  # rank 8
-        self.assertLessEqual(len(tags), 5)
-        # Nigeria may be dropped to keep max 5 (location after DRC/Kenya, then topic/engagement)
-        self.assertNotIn("#Bundibugyo", tags)  # too obscure / unsure
+        self.assertNotIn("#Kenya", tags)
+        self.assertNotIn("#Nigeria", tags)
+        self.assertNotIn("#Bundibugyo", tags)
+        desk = "Congo's Ebola outbreak reached 11,821 confirmed cases and 5,810 deaths as fighting traps responders in Ituri."
+        dtags = X.hashtags(it, headline=desk)
+        self.assertIn("#DRC", dtags)
+        self.assertIn("#Ebola", dtags)
+        self.assertIn("#Outbreak", dtags)
+        self.assertNotIn("#Kenya", dtags)
+        self.assertTrue("#Ituri" in dtags or len(dtags) >= 3)
 
     def test_ebola_uganda_rank7_locations_from_title(self):
         it = STORIES["ebola_uganda"]
@@ -116,55 +129,54 @@ class Tags(unittest.TestCase):
         self.assertTrue("#Uganda" in tags or "#SouthSudan" in tags)
         self.assertIn("#Ebola", tags)
         self.assertIn("#Outbreak", tags)
-        self.assertNotIn("#BreakingNews", tags)  # rank 7, already  has category tag; BreakingNews is rank 8+
         self.assertLessEqual(len(tags), 5)
+        self.assertGreaterEqual(len(tags), 3)
 
-    def test_h5n1_us_rank6_location_only(self):
+    def test_h5n1_us_rank6_has_topic_and_category(self):
         it = STORIES["h5n1_us"]
         tags = X.hashtags(it)
-        self.assertEqual(tags, ["#US"])
-        self.assertNotIn("#H5N1", tags)
-        self.assertNotIn("#Outbreak", tags)
+        self.assertIn("#US", tags)
+        self.assertIn("#H5N1", tags)
+        self.assertIn("#Outbreak", tags)
         self.assertNotIn("#BirdFlu", tags)
+        self.assertGreaterEqual(len(tags), 3)
 
-    def test_ukraine_strike_rank5_location_only(self):
+    def test_ukraine_strike_rank5_has_war_tags(self):
         it = STORIES["ukraine_kryvyi"]
         tags = X.hashtags(it)
         self.assertIn("#Ukraine", tags)
         self.assertIn("#KryvyiRih", tags)
-        self.assertNotIn("#UkraineWar", tags)
-        self.assertNotIn("#Russia", tags)
-        self.assertNotIn("#War", tags)
-        self.assertNotIn("#Airstrike", tags)
+        self.assertIn("#UkraineWar", tags)
+        self.assertIn("#MissileStrike", tags)
+        self.assertIn("#War", tags)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertLessEqual(len(tags), 5)
 
-    def test_kyiv_bridges_rank6_location_only(self):
+    def test_kyiv_bridges_rank6_has_war_tags(self):
         it = STORIES["kyiv_bridges"]
-        tags = X.hashtags(it)
-        self.assertIn("#Ukraine", tags)
-        self.assertIn("#Kyiv", tags)
-        self.assertNotIn("#UkraineWar", tags)
-        self.assertNotIn("#War", tags)
-
-    def test_kyiv_at_rank7_would_add_topic(self):
-        it = dict(STORIES["kyiv_bridges"], rank=7)
         tags = X.hashtags(it)
         self.assertIn("#Ukraine", tags)
         self.assertIn("#Kyiv", tags)
         self.assertIn("#UkraineWar", tags)
         self.assertIn("#War", tags)
+        self.assertGreaterEqual(len(tags), 3)
 
-    def test_cyber_global_rank3_no_tags(self):
+    def test_cyber_global_rank3_reaches_three(self):
         it = STORIES["cyber_drupal"]
-        self.assertEqual(X.hashtags(it), [])
-        self.assertNotIn("#Cybersecurity", X.hashtags(it))
+        tags = X.hashtags(it)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertTrue("#CVE" in tags or "#Cybersecurity" in tags)
+        self.assertIn("#Cyberattack", tags)
 
     def test_florida_rain_rank7(self):
         it = STORIES["florida_rain"]
         tags = X.hashtags(it)
         self.assertIn("#Florida", tags)
         self.assertIn("#Weather", tags)
-        self.assertNotIn("#Hurricane", tags)  # rain, not a named hurricane
-        self.assertNotIn("#Tampa", tags)  # city not in the story
+        self.assertTrue("#Storm" in tags or len(tags) >= 3)
+        self.assertNotIn("#Hurricane", tags)
+        self.assertNotIn("#Tampa", tags)
+        self.assertGreaterEqual(len(tags), 3)
 
     def test_miami_flood_rank7(self):
         it = STORIES["miami_flood"]
@@ -173,36 +185,47 @@ class Tags(unittest.TestCase):
         self.assertIn("#Miami", tags)
         self.assertIn("#Flood", tags)
         self.assertIn("#Weather", tags)
-        self.assertNotIn("#Hollywood", tags)  # ambiguous
+        self.assertNotIn("#Hollywood", tags)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertLessEqual(len(tags), 5)
 
-    def test_tornado_watch_rank5_florida_only(self):
+    def test_tornado_watch_rank5_florida_weather(self):
         it = STORIES["fl_tornado_watch"]
         tags = X.hashtags(it)
-        self.assertEqual(tags, ["#Florida"])
-        self.assertNotIn("#Tornado", tags)
-        self.assertNotIn("#Melbourne", tags)  # NWS office, and not a major-city tag we want here
+        self.assertIn("#Florida", tags)
+        self.assertIn("#Tornado", tags)
+        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Melbourne", tags)
+        self.assertGreaterEqual(len(tags), 3)
 
-    def test_held_and_false_positive_location_only(self):
+    def test_held_and_false_positive_location_plus_generic(self):
         it = dict(STORIES["ebola_drc"], hidden=True)
         tags = X.hashtags(it)
-        self.assertTrue(tags)  # locations remain
         self.assertIn("#DRC", tags)
         self.assertNotIn("#Ebola", tags)
         self.assertNotIn("#Outbreak", tags)
-        self.assertNotIn("#BreakingNews", tags)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertTrue("#News" in tags or "#WorldNews" in tags)
         wl = dict(STORIES["kyiv_bridges"], rank=7, watchlist=1)
         tags = X.hashtags(wl)
         self.assertIn("#Ukraine", tags)
         self.assertNotIn("#UkraineWar", tags)
         self.assertNotIn("#War", tags)
+        self.assertGreaterEqual(len(tags), 3)
 
-    def test_max_five_and_280(self):
+    def test_max_five_min_three_and_280(self):
+        banned = ".,;:'\"/"
         for key, it in STORIES.items():
             tags = X.hashtags(it)
+            self.assertGreaterEqual(len(tags), 3, key)
             self.assertLessEqual(len(tags), 5, key)
-            self.assertLessEqual(tweet_len(it), 280, f"{key}: {X.share_text(it)!r}")
-            for t in tags:
-                self.assertTrue(t.startswith("#") and " " not in t and not any(c in t for c in ".,;:'\"/"), t)
+            text = X.share_text(it)
+            self.assertLessEqual(tweet_len(it), 280, f"{key}: {text!r}")
+            in_text = [tg for tg in tags if tg in text]
+            self.assertGreaterEqual(len(in_text), 3, f"{key}: {text!r}")
+            for tg in tags:
+                self.assertTrue(tg.startswith("#") and " " not in tg)
+                self.assertTrue(not any(c in tg for c in banned), tg)
 
     def test_intent_url_and_button_hides_tags_from_label(self):
         it = STORIES["ebola_drc"]
@@ -214,14 +237,13 @@ class Tags(unittest.TestCase):
         self.assertTrue(url.endswith("/wire/5932fb61c94775cd"))
         self.assertIn("#Ebola", text)
         self.assertIn("#DRC", text)
-        self.assertIn("Ebola", text)
+        self.assertNotIn("#Kenya", text)
         html = X.button_html(it)
         self.assertIn("Post on X", html)
-        self.assertIn("target=\"_blank\"", html)
-        # Visible label is only "Post on X"; raw hashtags must not appear as page text
+        self.assertIn('target="_blank"', html)
         self.assertNotIn("#Ebola", html)
         self.assertNotIn("#DRC", html)
-        self.assertIn("%23Ebola", html)  # encoded inside href only
+        self.assertIn("%23Ebola", html)
         self.assertLessEqual(X.weighted_len(text, url), 280)
 
 
@@ -233,8 +255,15 @@ class ShareTextReport(unittest.TestCase):
             text = X.share_text(it)
             url = X.story_url(it)
             lines.append(f"{key} r={it['rank']} tags={X.hashtags(it)}\n  {text} {url}\n  weighted={X.weighted_len(text, url)}")
+        desk = "Congo's Ebola outbreak reached 11,821 confirmed cases and 5,810 deaths as fighting traps responders in Ituri."
+        lines.append(
+            "ebola_drc_desk r=8 tags=%s\n  %s\n  weighted=%s" % (
+                X.hashtags(STORIES["ebola_drc"], headline=desk),
+                X.share_text(STORIES["ebola_drc"], headline=desk),
+                X.weighted_len(X.share_text(STORIES["ebola_drc"], headline=desk), X.story_url(STORIES["ebola_drc"])),
+            )
+        )
         report = "\n".join(lines)
-        # Keep this test passing while still emitting the report under -v
         self.assertTrue(report)
         print("\n----- Share texts -----\n" + report + "\n-----------------------")
 
