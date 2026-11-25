@@ -1009,7 +1009,24 @@
       h = stl(oc, "SPC Day " + p.day + " outlook") + "<h3>" + esc(OLN[p.cat] || p.label) + "</h3><p class=\"age\">Valid " + esc(stamp(tms(p.valid))) + " to " + esc(stamp(tms(p.expire))) + "</p>" +
         '<div class="acts"><a href="https://www.spc.noaa.gov/products/outlook/" target="_blank" rel="noopener noreferrer">SPC outlook</a></div>';
     }
+    try { if (h && window.BNShare) h += wxShare(L, p); } catch (e) {}
     return h;
+  }
+  /* Post on X for weather map items: text crafted per item, tags from the server, per-item card at /share/weather/<id> */
+  function wxShare(L, p) {
+    var k = "weather", i, n, t, l = "", d = "";
+    if (L === "warn-fill" || L === "warn-line" || L === "watch-line") {
+      var ar = String(p.area || "").slice(0, 90); i = (p.event || "alert") + "-" + ar; n = (p.event || "Weather alert") + (ar ? " · " + ar : ""); l = ar;
+      t = (p.event || "Weather alert") + (p.watch ? " (watch)" : " (warning)") + " in effect for " + ar + (p.ends ? ", until " + stamp(tms(p.ends)) : "") + ". Live radar:"; d = ar;
+    } else if (L === "rep") {
+      var mag = p.mag != null && p.mag !== "" ? (p.k === "hail" ? p.mag + " in hail" : p.k === "wind" ? p.mag + " " + (p.unit || "mph") + " wind" : p.k === "snow" ? p.mag + " in of snow" : "") : "";
+      i = "rep-" + p.type + "-" + p.place; n = p.type + (mag ? " · " + mag : "") + " near " + p.place; l = p.place; t = "Storm report: " + p.type + (mag ? " (" + mag + ")" : "") + " near " + p.place + ". Live radar:"; d = String(p.place || "");
+    } else if (String(L).indexOf("nhc") === 0) {
+      i = "storm-" + (p.name || "tropical"); n = (p.name || "Tropical system") + (p.cls ? " (" + p.cls + ")" : ""); t = (p.name || "A tropical system") + (p.cls ? ", " + p.cls : "") + (p.wind_kt ? ", " + Math.round(p.wind_kt * 1.151) + " mph winds" : "") + ". Track it live:"; l = p.country || "";
+    } else if (L === "gd") {
+      i = "gdacs-" + p.name; n = (p.kind || "Alert") + ": " + p.name; l = p.country || ""; t = (p.alert || "") + " alert: " + (p.kind || "event") + " " + p.name + (p.country ? " in " + p.country : "") + ". Live map:";
+    } else return "";
+    return '<div class="acts">' + window.BNShare.html({ k: k, i: i, n: n, t: t, l: l, d: d }) + "</div>";
   }
   function valueHTML(lng, lat) {
     var f = FRAMES[IDX]; if (MODE === "radar" || !f) return "";
@@ -1185,6 +1202,10 @@
       var nf = s.nws_forecast && s.nws_forecast.ok && s.nws_forecast.data.periods && s.nws_forecast.data.periods[0];
       if (nf) h += "<p><b>" + esc(nf.name) + ":</b> " + esc(nf.detailedForecast || nf.shortForecast) + "</p>";
       h += '<p class="age">' + (fb ? esc(fb.label) : (nf ? "National Weather Service · " : "") + "Open-Meteo") + "</p>";
+      if (window.BNShare && om && om.current) {
+        var cu = om.current, a0 = al[0], wt = nm + ": " + fF(cu.temperature_2m) + ", " + (WMO[cu.weather_code] || "current conditions").toLowerCase() + (cu.wind_speed_10m != null ? ", wind " + MPH(cu.wind_speed_10m) : "") + (a0 ? ". " + a0.event + " in effect" : "") + ". Live radar and forecast:";
+        h += '<div class="acts">' + window.BNShare.html({ k: "weather", i: "wx-" + (nm || "spot"), n: (nm || "Weather") + " weather", t: wt, l: nm, d: (WMO[cu.weather_code] || "") + " · " + fF(cu.temperature_2m) }) + "</div>";
+      }
       showCard(h, null, true);
     }).catch(function () { showCard('<h3>' + esc(loc.name || "This spot") + '</h3><p class="age">The forecast is unavailable right now.</p>', null, true); });
   }

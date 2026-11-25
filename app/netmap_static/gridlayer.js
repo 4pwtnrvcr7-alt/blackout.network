@@ -99,11 +99,19 @@
     }
     return '<button type="button" class="gx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' + h;
   }
+  /* Post on X for a grid operator: crafted text, tags from the server, per-item card at /share/grid/<id> */
+  function gxShare(k) {
+    var S = window.BNShare, o = IDX[k]; if (!S || !o || (k[0] !== "r" && k[0] !== "i")) return "";
+    try {
+      var st = regLabel(o.status), t = o.name + " grid: " + String(st).toLowerCase() + (o.demand_mw != null ? ", demand " + num(o.demand_mw) + " MW (" + pct(o.vs_forecast_pct) + " vs forecast)" : "") + ((o.states || [])[0] ? ". Serves " + o.states.slice(0, 3).join(", ") : "") + ".";
+      return '<div class="gx-xs">' + S.html({ k: "grid", i: k + "-" + o.name, n: o.name + " power grid", t: t, d: String(st) + (o.demand_mw != null ? " · " + num(o.demand_mw) + " MW" : ""), l: (o.states || []).slice(0, 2).join(", "), p: "/grid" }) + "</div>";
+    } catch (e) { return ""; }
+  }
   var card = null;
   function showCard(k, pt, pin) {
     card = card || $("gx_card");
     if (!pin && pinned) return;
-    card.innerHTML = cardHTML(k); card.hidden = false; card.classList.toggle("pin", !!pin);
+    card.innerHTML = cardHTML(k) + gxShare(k); card.hidden = false; card.classList.toggle("pin", !!pin);
     if (pin) pinned = k;
     if (window.__bnPlace) window.__bnPlace(card, pt);   /* Nov 24 2026: next to the item, clamped inside the screen, draggable (net.js) */
     requestAnimationFrame(function () { card.classList.add("in"); });
