@@ -1,5 +1,5 @@
 """Wire timeline (/wire; /wire-next 301s here). Run: cd app && python3 -m unittest tests.test_wire_timeline -v"""
-import os, sqlite3, sys, tempfile, unittest
+import os, time, sqlite3, sys, tempfile, unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import addons, wire_timeline as W
 
@@ -148,6 +148,7 @@ class Paging(unittest.TestCase):
                   ("farawayitem00002", "A far-away later update", "political", "Tokyo", 35.68, 139.76,
                    None, "2026-11-18T07:05:10Z", "2026-12-31T23:58:00Z", 10, "High", 1, 1, '[]', '[]', 0, "", 2))
         c.commit(); c.close()
+        W.bust_meta()
         a = W.page(limit=5)
         self.assertEqual(a["items"][0]["id"], "aaaupdated000001")
         self.assertEqual(a["items"][0]["t"], "2026-12-31T23:59:00Z")
@@ -250,7 +251,33 @@ class Paging(unittest.TestCase):
 
 
 
+
+    def test_list_path_does_not_call_hashtags_and_returns_xu(self):
+        """Timeline rows keep a Post-on-X URL without running the 14–20 ms hashtags/location_tags path."""
+        import x_share
+        called = []
+        real = x_share.hashtags
+        x_share.hashtags = lambda *a, **k: called.append(1) or real(*a, **k)
+        try:
+            W.bust_meta()
+            a = W.page(limit=10)
+            self.assertTrue(a["items"])
+            for it in a["items"]:
+                self.assertTrue(it.get("xu", "").startswith("https://x.com/intent/post?"), it.get("xu"))
+            self.assertEqual(called, [])
+        finally:
+            x_share.hashtags = real
+
+    def test_page_cache_repeats_are_cheap(self):
+        W.bust_meta()
+        t0 = time.perf_counter(); a = W.page(limit=8); d1 = time.perf_counter() - t0
+        t0 = time.perf_counter(); b = W.page(limit=8); d2 = time.perf_counter() - t0
+        self.assertEqual([x["id"] for x in a["items"]], [x["id"] for x in b["items"]])
+        self.assertLess(d2, 0.05)
+        self.assertLess(d1, 0.5)
+
 class FullStoryTap(unittest.TestCase):
+
     def test_full_story_is_a_real_link_and_hover_is_fine_pointer_only(self):
         app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         def read(*parts):

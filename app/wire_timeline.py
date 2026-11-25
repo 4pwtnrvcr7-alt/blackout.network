@@ -25,6 +25,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "blackout.db"); HDB = os.path.join(BASE, "trends_history.db")
 STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css"}
 MAXL = 200
+_PC = {"t": {}, "v": {}}; _PC_TTL = 3.0; _PC_LK = threading.Lock()
 _CUR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(\|[A-Za-z0-9_.:\-]{1,80})?$")
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
@@ -255,12 +256,6 @@ def _item(r, archive, warm_budget=None):
             "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
     try:
-        import x_share
-        hid = False
-        try:
-            hid = bool(r["hidden"])
-        except Exception:
-            hid = False
         if not archive and (rk or 0) >= 5 and (warm_budget is None or warm_budget[0] > 0):
             try:
                 import share_card; share_card.warm(str(r["id"]))
@@ -268,17 +263,60 @@ def _item(r, archive, warm_budget=None):
                     warm_budget[0] -= 1
             except Exception:
                 pass
-        # Same intent_url / with_body path as the story page. `d` must stay the dek string —
-        # passing the item dict here made hashtags() throw and left xu empty.
-        d["xu"] = x_share.intent_url(x_share.with_body({
-            "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
-            "category": r["category"] or "", "brief": r["brief"] or "", "rank": rk,
-            "watchlist": r["watchlist"] or 0, "hidden": hid,
-            "links": links, "d": what or dek,
-        }))
+        # List path must not call x_share.intent_url / hashtags / location_tags:
+        # profiling a live-sized copy (4303 clusters + 27540 archive) showed that
+        # path at 14–20 ms/row (~1.5 s of 1.8 s locally; 5–8 s on Render).
+        d["xu"] = _list_xu(r["id"], h, title, loc)
     except Exception:
         d["xu"] = ""
     return d
+
+def _stored_tags(cid):
+    """Already-computed tags for this story, or []. Never runs the gazetteer/LLM extractor."""
+    if not cid:
+        return []
+    note = None
+    try:
+        import story_v3 as V3
+        note = V3.note_for(cid)
+    except Exception:
+        note = None
+    if not isinstance(note, dict):
+        try:
+            import story_writer as SW
+            note = SW.note_for(cid)
+        except Exception:
+            note = None
+    raw = (note or {}).get("tags") or (note or {}).get("hashtags") or []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw.lstrip().startswith("[") else raw.split()
+        except Exception:
+            raw = [x for x in raw.replace(",", " ").split() if x]
+    out = []
+    for t in raw:
+        t = str(t).strip()
+        if not t:
+            continue
+        if not t.startswith("#"):
+            t = "#" + t.lstrip("#")
+        if t not in out:
+            out.append(t)
+        if len(out) >= 8:
+            break
+    return out
+
+def _list_xu(cid, headline, title, loc=""):
+    """Post-on-X URL for a timeline row. Uses stored tags when we have them; never location_tags()."""
+    from urllib.parse import quote
+    page = f"https://blackout.network/wire/{cid}?s=x" if cid else "https://blackout.network/wire"
+    text = (headline or title or "").strip()
+    tags = _stored_tags(cid)
+    if tags:
+        text = (text + " " + " ".join(tags)).strip()
+    if not text:
+        return page
+    return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(page, safe='')}"
 
 # t = last activity so newly collected signals on an existing cluster rise to the tip.
 _LIVE_COLS = ("cluster_id id, COALESCE(updated, first_seen) t, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
@@ -410,6 +448,13 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
 def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
          sev=None, cats=None, regs=None, time_win=None):
     """Page matching public rows. Loops past held/non-matching rows so `end` is the true end."""
+    key = (before, after, int(limit) if limit is not None else 100, q or "", bool(bg),
+           lat, lon, r_mi, sev or "", cats or "", regs or "", time_win or "")
+    now = time.time()
+    with _PC_LK:
+        hit = _PC["v"].get(key)
+        if hit is not None and now - _PC["t"].get(key, 0) < _PC_TTL:
+            return hit
     limit = max(1, min(MAXL, int(limit)))
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -454,7 +499,16 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
         items.reverse()
     edge = (items[0] if newer else items[-1]) if items else None
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
-    return {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
+    out = {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
+    with _PC_LK:
+        _PC["v"][key] = out
+        _PC["t"][key] = time.time()
+        if len(_PC["v"]) > 64:
+            old = sorted(_PC["t"], key=_PC["t"].get)[:32]
+            for k in old:
+                _PC["v"].pop(k, None)
+                _PC["t"].pop(k, None)
+    return out
 
 def items_for(ids):
     """Wire items (same shape as /api/wire_tl) for these live cluster ids, newest first. Used by the realtime stream (realtime.py)."""
@@ -471,6 +525,8 @@ def items_for(ids):
 def bust_meta():
     """Forget the cached meta (totals) so the next read rebuilds it (realtime.py calls this at most every 2 minutes)."""
     with _LK: _M["t"] = 0
+    with _PC_LK:
+        _PC["t"].clear(); _PC["v"].clear()
 
 def count(q="", bg=False):
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
