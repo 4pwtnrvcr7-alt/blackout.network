@@ -207,6 +207,11 @@ snapchat: "~Snapchat", snap: "~Snapchat", spotify: "~Spotify", x: "~X", twitter:
   }
   function detail(n) {
     var r = rep(n.id), inc = n.incidents || [], h = "", lv = LV(n.level), m = chart24(n), ar = areas(n);
+    if (window.BNShare) {
+      var lvw = n.level >= 3 ? "major outage" : n.level === 2 ? "service disruption" : n.level === 1 ? "minor issue" : n.level === 0 ? "operating normally" : "status unknown", i0 = inc[0];
+      h += '<div class="nb-x">' + window.BNShare.html({ k: n.level >= 2 ? "outage" : "network", i: n.id, n: n.name + " status", p: n.detail || "",
+        t: n.name + " status right now: " + lvw + (i0 && i0.t ? ". " + i0.t : "") + (n.uptime != null ? " (30-day uptime " + n.uptime.toFixed(2) + "%)" : "") + ".", d: String(n.status || "").slice(0, 140), l: "United States" }) + "</div>";
+    }
     h += '<p class="nb-dst"><i></i>' + esc(n.link_only ? "Official status page only" : (n.status || word(n))) + '</p>';
     if (inc.length) {
       h += '<p class="nb-dk">Active incidents</p><ul class="nb-di">' + inc.slice(0, 5).map(function (i) {
