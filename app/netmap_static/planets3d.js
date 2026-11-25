@@ -449,6 +449,7 @@
     var sel = API.sel ? API.sel() : null;
     var tmp = new T.Vector3(), limb = new T.Vector3();
     var disc = null;
+    hideLeads();
     if (sel && (sel.kind === "planet" || sel.id === "sun") && sel.node) {
       sel.node.getWorldPosition(tmp);
       var dist = cam.position.distanceTo(tmp);
@@ -474,40 +475,56 @@
         }
       }
       if (hide) return;
-      var pri = (sel && o === sel) ? 3 : (o.kind === "planet" || o.id === "sun" ? 2 : 1);
-      items.push({ o: o, sx: sx, sy: sy, ox: sx, oy: sy, pri: pri });
+      var pri = (sel && o === sel) ? 5 : (o.id === "earth" ? 4 : (o.id === "sun" ? 3 : (o.kind === "planet" ? 2 : 1)));
+      items.push({ o: o, sx: sx, sy: sy, pri: pri });
     });
-    items.sort(function (a, b) { return b.pri - a.pri; });
-    var lw = 118, lh = 16, pad = 6, i, j, iter;
-    for (iter = 0; iter < 10; iter++) {
-      for (i = 0; i < items.length; i++) {
-        for (j = i + 1; j < items.length; j++) {
-          var a = items[i], b = items[j], dx = b.sx - a.sx, dy = b.sy - a.sy;
-          if (Math.abs(dx) < lw && Math.abs(dy) < lh + pad) {
-            var pushY = (lh + pad - Math.abs(dy || 0.1)) / 2 + 1;
-            var sign = (dy === 0 ? (b.ox >= a.ox ? 1 : -1) : (dy > 0 ? 1 : -1));
-            if (b.pri <= a.pri) { b.sy += sign * pushY; if (Math.abs(dx) < lw * 0.6) b.sx += (dx >= 0 ? 1 : -1) * 4; }
-            else { a.sy -= sign * pushY; }
-          }
-        }
-      }
+    var earth = API.OBJ && API.OBJ.earth;
+    if (earth && earth.lab) {
+      var closeE = earth.node && cam.position.distanceTo(earth.node.position) < Math.max(28, (earth.size || 1) * 45);
+      var eItem = items.filter(function (it) { return it.o === earth; })[0];
+      if (!sel && !closeE && eItem) {
+        var rad = Math.min(W, H) * 0.28, near = [];
+        items.forEach(function (it) {
+          if (it.o.kind === "craft" && Math.hypot(it.sx - eItem.sx, it.sy - eItem.sy) < rad) near.push(it);
+        });
+        if (near.length >= 2) {
+          near.forEach(function (it) { it.o.lab.style.display = "none"; });
+          items = items.filter(function (it) { return near.indexOf(it) < 0; });
+          earth.lab.textContent = "Earth + " + near.length + " craft";
+        } else earth.lab.textContent = "Earth";
+      } else earth.lab.textContent = "Earth";
     }
-    var li = 0;
+    items.sort(function (a, b) { return b.pri - a.pri; });
+    var kept = [];
     items.forEach(function (it) {
-      it.sx = Math.max(8, Math.min(W - 8, it.sx));
-      it.sy = Math.max(10, Math.min(H - 10, it.sy));
-      it.o.lab.style.display = "";
-      it.o.lab.style.transform = "translate(" + it.sx.toFixed(1) + "px," + it.sy.toFixed(1) + "px) translate(-50%,-150%)";
-      var moved = Math.hypot(it.sx - it.ox, it.sy - it.oy);
-      if (moved > 8) {
-        var el = ensureLead(li++);
-        var ang = Math.atan2(it.sy - 10 - it.oy, it.sx - it.ox);
-        el.hidden = false;
-        el.style.width = moved.toFixed(1) + "px";
-        el.style.transform = "translate(" + it.ox.toFixed(1) + "px," + it.oy.toFixed(1) + "px) rotate(" + ang + "rad)";
+      var el = it.o.lab, lw = el.offsetWidth || 90, lh = el.offsetHeight || 16;
+      var x = it.sx, y = it.sy;
+      var left = x - lw / 2, top = y - lh * 1.5;
+      if (left < 6) x += 6 - left;
+      if (x + lw / 2 > W - 6) x -= (x + lw / 2) - (W - 6);
+      if (y - lh * 1.5 < 6) y = 6 + lh * 1.5;
+      if (y > H - 8) y = H - 8;
+      left = x - lw / 2; top = y - lh * 1.5;
+      if (left < 2 || left + lw > W - 2 || top < 2 || y > H - 2) { el.style.display = "none"; return; }
+      var hit = false, i;
+      for (i = 0; i < kept.length; i++) {
+        var k = kept[i];
+        if (Math.abs(x - k.x) < (lw + k.w) / 2 + 4 && Math.abs((y - lh) - (k.y - k.h)) < (lh + k.h) / 2 + 4) { hit = true; break; }
       }
+      if (hit) {
+        if (it.o.id === "earth" || it.o.id === "sun") {
+          var k = kept[i], ox = x - k.x, oy = y - k.y, len = Math.hypot(ox, oy) || 1;
+          x += ox / len * ((lw + k.w) / 2 + 8);
+          y += oy / len * ((lh + k.h) / 2 + 6);
+          left = x - lw / 2; top = y - lh * 1.5;
+          if (left < 6) x += 6 - left;
+          if (x + lw / 2 > W - 6) x -= (x + lw / 2) - (W - 6);
+        } else { el.style.display = "none"; return; }
+      }
+      el.style.display = "";
+      el.style.transform = "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) translate(-50%,-150%)";
+      kept.push({ x: x, y: y, w: lw, h: lh });
     });
-    for (; li < LEADS.length; li++) LEADS[li].hidden = true;
   }
 
   var _sunLocal = new T.Vector3(), _sunWorld = new T.Vector3(), _worldPos = new T.Vector3();
