@@ -1174,9 +1174,15 @@ def story_png_fast(cid, budget=0.4):
         return None
 
 
+_WARM_CAP = 20   # at most this many card builds queued or running (timeline pre-warm must not flood Render)
+
+
 def warm(cid):
-    """Build a story's card ahead of the first crawl (bounded pool, deduped)."""
+    """Build a story's card ahead of the first crawl (bounded pool, deduped, cap of 20 in flight/queued)."""
     if cid in _SC:
+        return
+    live = sum(1 for f in _INFLIGHT.values() if f is not None and not f.done())
+    if live >= _WARM_CAP:
         return
     try:
         submit(cid)

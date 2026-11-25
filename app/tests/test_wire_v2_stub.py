@@ -30,9 +30,16 @@ class NoStubForHumans(unittest.TestCase):
         self.assertTrue(og.is_crawler("facebookexternalhit/1.1"))
 
     def test_human_returns_none_immediately_never_stub(self):
+        called = {"n": 0}
+        def boom():
+            called["n"] += 1
+            time.sleep(8)
+            return {}
+        __import__("theme")._srv = lambda: type("S", (), {"api_state": staticmethod(boom)})()
         t = time.time()
         r = W.handle(PATH, headers={"user-agent": IPHONE})
         self.assertIsNone(r)
+        self.assertEqual(called["n"], 0)  # must not start api_state on the human path
         self.assertLess(time.time() - t, 0.3)
 
     def test_no_ua_treated_as_human(self):
