@@ -268,6 +268,12 @@ def _wire_items():
         rows = c.execute("SELECT cluster_id, title, rank, category, updated FROM clusters WHERE watchlist=0 AND COALESCE(rank,0)>=3 "
                          "AND category='political' AND updated>=datetime('now','-14 days') ORDER BY updated DESC LIMIT 400").fetchall(); c.close()
         for cid, t, rk, cat, up in rows:
+            try:
+                import story_writer as SW
+                if not SW.allow(cid):
+                    continue
+            except Exception:
+                pass
             if WIRE_RE.search(t or "") and re.match(r"^[0-9a-f]{16}$", cid or ""):
                 out.append({"url": f"/wire/{cid}", "title": S.clean_title(t)[:140], "meta": f"Rank {int(rk or 0)}/10 · {_et(up, '%b %-d')}"})
             if len(out) >= 8: break

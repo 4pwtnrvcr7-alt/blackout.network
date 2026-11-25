@@ -64,6 +64,12 @@ def _corpus(c):
         d["links"] = [l for l in _j(d["links"]) if isinstance(l, dict)]
         d["_srcs"] = a["sources"]; d["_urls"] = a["urls"] | {norm_url(l.get("url")) for l in d["links"]}
         d["_text"] = "\n".join([d["title"] or "", d["brief"] or ""] + a["titles"])
+        try:
+            import story_writer as SW
+            if not SW.allow(d["cluster_id"]):
+                continue
+        except Exception:
+            pass
         out.append(d)
     with _LK: _C["corpus"] = (key, out)
     return key, out
