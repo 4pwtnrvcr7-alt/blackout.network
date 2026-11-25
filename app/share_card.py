@@ -24,7 +24,7 @@ import x_share
 
 SITE = "https://blackout.network"
 W, H = 1200, 675
-VERSION = "3"
+VERSION = "4"
 BASE = Path(__file__).resolve().parent
 NM = BASE / "netmap_static"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -545,9 +545,52 @@ def _strip_edges(t):
     return t
 
 
+_FONT_CMAP = None
+
+
+def _card_font_cmap():
+    """Codepoints the share-card Montserrat headline font can actually render."""
+    global _FONT_CMAP
+    if _FONT_CMAP is not None:
+        return _FONT_CMAP
+    cmap = {}
+    try:
+        from fontTools.ttLib import TTFont
+        path = og._resolve_font(og.MONT_VAR)
+        if path and Path(path).is_file():
+            cmap = TTFont(str(path)).getBestCmap() or {}
+    except Exception:
+        cmap = {}
+    _FONT_CMAP = cmap
+    return _FONT_CMAP
+
+
+def _strip_unrenderable(t):
+    """Drop characters the card font has no glyph for (they paint as tofu boxes), then squeeze space."""
+    if not t:
+        return t
+    cmap = _card_font_cmap()
+    out = []
+    for ch in t:
+        if ch.isspace():
+            out.append(" ")
+            continue
+        if cmap:
+            if ord(ch) in cmap:
+                out.append(ch)
+            continue
+        # If the font cmap could not be loaded, keep ASCII so we do not wipe a headline.
+        if ch.isascii():
+            out.append(ch)
+    return " ".join("".join(out).split())
+
+
 def _clean_head(t):
     """Light cleanup only: drop a source-name fragment cut off after a colon at the very end ('...Strait of Hormuz: Crud'); nothing is reworded.
-    Also drop a trailing ellipsis so the card can show the full headline. Leading/trailing dashes and punctuation are stripped."""
+    Also drop a trailing ellipsis so the card can show the full headline. Leading/trailing dashes and punctuation are stripped.
+    Characters the card font cannot render are removed, then leading punctuation is stripped again."""
+    t = _strip_edges(t)
+    t = _strip_unrenderable(t)
     t = _strip_edges(t)
     m = re.match(r"^(.{40,}?):\s*[A-Za-z]{1,6}$", t)
     return _strip_edges(m.group(1) if m else t)
@@ -1624,14 +1667,24 @@ def photo_status():
         rebuild = dict(story_photo.REBUILD)
     except Exception:
         rebuild = {}
+    debug = []
+    try:
+        import story_photo
+        debug = story_photo.photo_row_debug()
+    except Exception:
+        debug = []
+    deleted_cids = list(audit.get("deleted_cids") or [])
     return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "",
             "pid": os.getpid(), "photos": photos, "cards": cards, "photo_cards": photo_cards,
             "audit_checked": int(audit.get("checked") or 0),
-            "audit_downgraded": int(audit.get("downgraded") or 0),
+            "audit_deleted": int(audit.get("deleted") or 0),
+            "audit_deleted_cids": deleted_cids,
+            "audit_downgraded": int(audit.get("deleted") or audit.get("downgraded") or 0),
             "audit_typography": int(audit.get("typography") or 0),
             "audit_done": bool(audit.get("done")),
             "rebuild_done": bool(rebuild.get("done")),
-            "rebuild_ids": int(rebuild.get("ids") or 0)}
+            "rebuild_ids": int(rebuild.get("ids") or 0),
+            "photo_debug": debug}
 
 
 def _mark_prefetch(cid, note=""):
@@ -1982,48 +2035,52 @@ _AUDIT_FIRST = ("cbdfb48145e55048", "9f5bc9d66d783d25", "4c292ccdd9df73f8")
 
 
 def audit_stored_photo_cards():
-    """Walk every stored photo card. Downgrade mismatches to the designed map (allowed);
-    typography-rebuild a matching photo when the stored title hash is stale or missing.
-    Priority cids (Huang, Zelensky, Libya) run first. Logs the downgrade count."""
+    """Walk every stored photo (story_photos and photo cards). Re-check the Commons file title
+    against the headline under photo_rule_allows. DELETE non-matching rows outright (not a
+    map downgrade) so the card rebuilds as a map and the photo worker cannot put the JPEG back.
+    Log every cid deleted. Typography-rebuild a matching photo when the title hash is stale.
+    """
     import story_photo as SP
-    SP.AUDIT.update(checked=0, downgraded=0, typography=0, done=False, error="")
-    cids = SP.photo_cids()
+    SP.AUDIT.update(checked=0, deleted=0, downgraded=0, typography=0, done=False, error="", deleted_cids=[])
+    cids = list(dict.fromkeys(list(SP.stored_photo_cids()) + list(SP.photo_cids())))
     first = [c for c in _AUDIT_FIRST if c in cids]
     rest = [c for c in cids if c not in first]
-    print(f"story_photo: audit starting {len(cids)} photo cards", flush=True)
+    # Gaza meningitis (live miss) first among the rest if present.
+    extra = [c for c in SP.WATCH_CIDS if c in rest]
+    rest = extra + [c for c in rest if c not in extra]
+    print(f"story_photo: audit starting {len(cids)} stored photo rows", flush=True)
 
     def _audit_one(cid, force=False):
         invalidate_card_layers(cid)
-        match = SP.stored_photo_matches(cid)
-        if match is None and not force:
-            return "retry"
-        if match is False:
-            _story_build(cid, False)
-            # If a stale _SC / failed persist left a photo src, force a designed map into cards.db.
-            meta = SP.card_meta(cid) or {}
-            if (meta.get("src") or "").startswith("https://") and SP.stored_photo_matches(cid) is False:
-                b = generic_story_card(cid)
-                if b and b.startswith(b"\x89PNG"):
-                    th = ""
-                    try:
-                        import story
-                        r, _al = story.load(cid)
-                        if r:
-                            th = SP.card_title_key(_card_headline(r.get("title") or "") or "")
-                    except Exception:
-                        th = ""
-                    SP.put_card(cid, b, "", title_hash=th)
+        title, text = "", ""
+        try:
+            title, text, _loc = _force_title(cid)
+        except Exception:
+            title, text = "", ""
+        if title:
+            SP.SUBJECT_HINTS.setdefault(cid, (title, text or ""))
+        c = SP.db_choice(cid) or {}
+        meta = SP.card_meta(cid) or {}
+        src = (meta.get("src") or c.get("src") or "")
+        ft = SP.commons_file_title(src=src, link=c.get("link") or "", title=c.get("title") or "")
+        match = SP.stored_photo_matches(cid) if (title or src) else False
+        if not title and not force:
+            # Still try to delete if we have a photo src that is not a ShakeMap — cannot confirm a person match.
+            if src.startswith("https://") and not SP.official_event_src(cid, src):
+                match = False
+            else:
+                return "retry"
+        if match is not True:
+            ok = SP.delete_stored_photo(cid)
             invalidate_card_layers(cid)
-            SP.AUDIT["downgraded"] += 1
-            print(f"story_photo: audit downgrade {cid}", flush=True)
-            return "downgrade"
-        meta = SP.card_meta(cid)
+            SP.AUDIT["deleted"] += 1
+            SP.AUDIT["deleted_cids"].append(cid)
+            print(f"story_photo: deleted {cid} commons_title={ft!r} src={src} reason=no_match ok={ok}", flush=True)
+            return "deleted"
+        # Matching photo: typography-rebuild when the stored title hash is stale or missing.
         current_key = ""
         try:
-            import story
-            r, _al = story.load(cid)
-            if r:
-                current_key = SP.card_title_key(_card_headline(r.get("title") or "") or "")
+            current_key = SP.card_title_key(_card_headline(title or "") or "")
         except Exception:
             current_key = ""
         if meta and (SP.card_title_stale(meta, current_key) or SP.card_stale(meta) or force):
@@ -2045,7 +2102,6 @@ def audit_stored_photo_cards():
             SP.AUDIT["error"] = type(e).__name__
             print(f"story_photo: audit {cid} err={type(e).__name__}", flush=True)
             retry.append(cid)
-    # Priority ids again at the end (title/DB may not have been ready on the first pass).
     for cid in list(dict.fromkeys(list(first) + retry)):
         try:
             _audit_one(cid, force=True)
@@ -2053,8 +2109,9 @@ def audit_stored_photo_cards():
             SP.AUDIT["error"] = type(e).__name__
             print(f"story_photo: audit retry {cid} err={type(e).__name__}", flush=True)
     SP.AUDIT["done"] = True
-    print(f"story_photo: audit downgraded {SP.AUDIT['downgraded']} of {SP.AUDIT['checked']} photo cards (typography {SP.AUDIT['typography']})", flush=True)
-    return SP.AUDIT["downgraded"]
+    print(f"story_photo: audit deleted {SP.AUDIT['deleted']} of {SP.AUDIT['checked']} photo rows (typography {SP.AUDIT['typography']}): {','.join(SP.AUDIT['deleted_cids'])}", flush=True)
+    return SP.AUDIT["deleted"]
+
 
 
 # Last-known headlines for the one-shot listed-id rebuild if story.load is not ready at boot.

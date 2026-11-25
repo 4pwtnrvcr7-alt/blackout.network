@@ -1031,21 +1031,102 @@ def official_event_src(cid, src=""):
     return "shakemap" in (src or "").lower()
 
 
+def commons_file_title(src="", link="", title=""):
+    """The actual Commons file title (File: name or upload filename), not caption, credit, or the story headline."""
+    for raw in (title, link, src):
+        if not raw:
+            continue
+        m = re.search(r"(?:File:|wiki/File:)([^?#/]+)", raw, re.I)
+        if m:
+            return urllib.parse.unquote(m.group(1).replace("_", " ")).strip()
+    for raw in (src, link):
+        if not raw:
+            continue
+        name = urllib.parse.urlparse(raw).path.rsplit("/", 1)[-1]
+        name = urllib.parse.unquote(name).replace("_", " ").strip()
+        if name and "." in name:
+            return name
+    return (title or "").strip()
+
+
+def _headline_full_names(title, text=""):
+    """Full names (two or more words) of people named in the headline, including known aliases."""
+    out, seen = [], set()
+    for n in _named_people("", title or "", text or ""):
+        for v in name_variants(n):
+            if len(v.split()) >= 2 and v.lower() not in seen:
+                seen.add(v.lower())
+                out.append(v)
+    return out
+
+
+def photo_rule_allows(headline, commons_title="", src=""):
+    """Simple deterministic rule.
+
+    Allow only:
+      - a USGS ShakeMap (URL contains 'shakemap')
+      - a person portrait whose Commons *file title* contains that person's full name,
+        and that person is named in the headline (the main subject when one is known)
+      - the Riyadh PIF Tower photo, only when the file title contains the landmark's full name
+    No other place, landmark, or topic photos.
+    Returns (allowed: bool, reason: str).
+    """
+    if official_event_src("", src or ""):
+        return True, "shakemap"
+    ft = commons_file_title(src=src or "", title=commons_title or "")
+    if not ft:
+        return False, "no_commons_title"
+    names = _headline_full_names(headline or "", "")
+    subj = main_subject(headline or "", "")
+    if subj:
+        want = [v for v in name_variants(subj) if len(v.split()) >= 2] or [n for n in names if n.split()[-1].lower() == subj.split()[-1].lower()]
+    else:
+        # Ambiguous or no person subject: do not keep a person/topic photo.
+        want = []
+    for name in want:
+        if _exact_name_in(name, ft):
+            return True, "person:" + name
+    # Riyadh PIF exception: file title must contain the landmark's full name.
+    lands = list(_landmark_terms(headline or ""))
+    pif_names = []
+    for land in lands:
+        low = land.lower()
+        if "pif tower" in low or "public investment fund tower" in low:
+            pif_names.append(land)
+    if not pif_names and re.search(r"pif tower", headline or "", re.I):
+        pif_names = ["PIF Tower", "Public Investment Fund Tower"]
+    for full in ("Public Investment Fund Tower", "PIF Tower"):
+        if any(full.lower() == x.lower() or full.lower() in x.lower() or x.lower() in full.lower() for x in (pif_names or [])):
+            if _exact_name_in(full, ft):
+                return True, "landmark:" + full
+    return False, "no_match"
+
+
+def stored_commons_title(cid):
+    c = db_choice(cid) or {}
+    meta = card_meta(cid) or {}
+    src = (meta.get("src") or c.get("src") or "")
+    return commons_file_title(src=src, link=c.get("link") or "", title=c.get("title") or "")
+
+
 def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", commons_title="", categories="", kind=""):
-    """Accept a photo only for the exact named person (portrait / person category) or exact named landmark or org HQ."""
+    """Accept a photo only under photo_rule_allows (Commons file title vs headline, or USGS ShakeMap).
+
+    meta_blob and categories are ignored: a leftover caption, credit, or story title must not count as a match.
+    """
     title, text = _story_text(cid, title, text)
-    if official_event_src(cid, src):
-        return True
-    blob = " ".join(x for x in (commons_title, categories, meta_blob, src) if x)
-    if kind == "place" and not place_photo_ok(title, text):
-        return False
-    return exact_subject_in(blob, title, text, loc)
+    ft = commons_file_title(src=src or "", title=commons_title or "")
+    ok, _why = photo_rule_allows(title, commons_title=ft, src=src or "")
+    return ok
 
 
-# Running audit of stored photo cards (downgrade mismatches to the designed map).
-AUDIT = {"checked": 0, "downgraded": 0, "typography": 0, "done": False, "error": ""}
+# Running audit of stored photo cards: DELETE mismatches so they rebuild as maps.
+AUDIT = {"checked": 0, "deleted": 0, "downgraded": 0, "typography": 0, "done": False, "error": "",
+         "deleted_cids": []}
 # One-shot boot rebuild of listed problem ids (Huang, Zelensky, Libya).
 REBUILD = {"done": False, "ids": 0, "error": ""}
+# Priority + recent miss ids shown on /healthz photo_debug (no JPEG bytes).
+WATCH_CIDS = ("4c292ccdd9df73f8", "9f5bc9d66d783d25", "cbdfb48145e55048", "b06344259ebf4d01")
 
 
 def photo_cids():
@@ -1059,8 +1140,11 @@ def photo_cids():
 
 
 def stored_photo_matches(cid):
-    """Strict match for a stored photo card, using caption/credit/src already in cards.db (no network).
-    If the headline cannot be loaded, only obvious non-photos are rejected (audit skips those rows)."""
+    """Match a stored photo using only the Commons file title (or ShakeMap URL) and the story headline.
+
+    Caption, credit, and the story title itself never count. If the headline cannot be loaded,
+    return False (do not keep a photo we cannot re-check).
+    """
     title, text = _story_text(cid)
     c = db_choice(cid) or {}
     meta = card_meta(cid) or {}
@@ -1068,11 +1152,81 @@ def stored_photo_matches(cid):
     if official_event_src(cid, src):
         return True
     if not title:
-        # Unknown: audit retries later. has_photo/card_has_photo treat None as "keep".
+        # Unknown headline: has_photo treats None as keep. The boot audit deletes the row instead.
         return None
-    blob = " ".join((c.get("caption") or "", c.get("label") or "", c.get("credit") or "", c.get("alt") or "",
-                     c.get("title") or "", c.get("categories") or "", src))
-    return photo_strict_match(cid, src=src, meta_blob=blob, title=title, text=text, kind=c.get("kind") or "")
+    ft = commons_file_title(src=src, link=c.get("link") or "", title=c.get("title") or "")
+    ok, _why = photo_rule_allows(title, commons_title=ft, src=src)
+    return ok
+
+
+def stored_photo_cids():
+    """Every story id with a stored photo choice (https src, not a none-lookup). No network."""
+    try:
+        rows = _read(lambda k: k.execute(
+            "SELECT cid FROM story_photos WHERE none=0 AND src LIKE 'https://%'").fetchall())
+        return [r[0] for r in (rows or []) if r and r[0]]
+    except Exception:
+        return []
+
+
+def delete_stored_photo(cid):
+    """Delete the story_photos row and the story_cards row so the card rebuilds as a map.
+
+    A map 'downgrade' that leaves the JPEG in place is not enough: the photo worker will
+    put the same photo back (this is why Libya survived four deploys).
+    """
+    if not cid:
+        return False
+    def fn(k):
+        k.execute("DELETE FROM story_photos WHERE cid=?", (cid,))
+        k.execute("DELETE FROM story_cards WHERE cid=?", (cid,))
+    try:
+        ok = bool(_write(fn))
+    except Exception:
+        ok = False
+    try:
+        p = _choice_file(cid)
+        if p.exists():
+            p.unlink()
+    except Exception:
+        pass
+    if ok:
+        for fn_cb in list(ON_CARD_WRITE):
+            try:
+                fn_cb(cid)
+            except Exception:
+                pass
+    return ok
+
+
+def photo_row_debug(cids=None):
+    """Metadata for /healthz photo_debug: no JPEG/PNG bytes. Confirms whether a row still exists."""
+    out = []
+    for cid in (cids or WATCH_CIDS):
+        if not cid:
+            continue
+        c = db_choice(cid) or {}
+        meta = card_meta(cid) or {}
+        title, _text = _story_text(cid)
+        src = (meta.get("src") or c.get("src") or "")
+        ft = commons_file_title(src=src, link=c.get("link") or "", title=c.get("title") or "")
+        ok, why = photo_rule_allows(title or "", commons_title=ft, src=src)
+        out.append({
+            "cid": cid,
+            "headline": (title or "")[:180],
+            "photo_row": bool(c.get("src")),
+            "has_card": bool(meta.get("png")),
+            "card_src": (meta.get("src") or "")[:240],
+            "photo_src": (c.get("src") or "")[:240],
+            "commons_title": (ft or "")[:180],
+            "credit": (c.get("credit") or "")[:120],
+            "caption": (c.get("caption") or "")[:160],
+            "license": c.get("license") or "",
+            "kind": c.get("kind") or "",
+            "allowed": bool(ok),
+            "reason": why,
+        })
+    return out
 
 
 def _commons_place(loc, title, timeout=7):

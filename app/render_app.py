@@ -665,10 +665,13 @@ class RH(server.H):
                                                  "card_n": int(ps.get("cards") or 0),
                                                  "photo_cards": int(ps.get("photo_cards") or 0),
                                                  "photo_audit_checked": int(ps.get("audit_checked") or 0),
+                                                 "photo_audit_deleted": int(ps.get("audit_deleted") or 0),
+                                                 "photo_deleted_cids": list(ps.get("audit_deleted_cids") or []),
                                                  "photo_audit_downgraded": int(ps.get("audit_downgraded") or 0),
                                                  "photo_audit_done": bool(ps.get("audit_done")),
                                                  "photo_rebuild_done": bool(ps.get("rebuild_done")),
-                                                 "photo_rebuild_ids": int(ps.get("rebuild_ids") or 0)})
+                                                 "photo_rebuild_ids": int(ps.get("rebuild_ids") or 0),
+                                                 "photo_debug": ps.get("photo_debug") or []})
         if path == "/internal/sync/export":
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})
