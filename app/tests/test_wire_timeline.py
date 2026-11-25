@@ -175,6 +175,80 @@ class Paging(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(all((it["lat"] is not None and it["lon"] is not None) for it in body["items"]))
 
+    def test_sev_filter_fills_pages_and_ends_only_at_true_end(self):
+        """Rank 7-10 is applied in SQL; each page is only matching stories; end is the last match."""
+        first = W.page(limit=4, sev="hi")
+        ranks = [it["r"] for it in first["items"]]
+        self.assertTrue(ranks, first)
+        self.assertTrue(all(7 <= r <= 10 for r in ranks), ranks)
+        self.assertEqual(len(first["items"]), 4)
+        self.assertFalse(first["end"])
+        self.assertTrue(first["next"])
+        seen = [it["id"] for it in first["items"]]
+        cur = first["next"]
+        pages = 1
+        while cur:
+            nxt = W.page(before=cur, limit=4, sev="hi")
+            pages += 1
+            self.assertTrue(all(7 <= it["r"] <= 10 for it in nxt["items"]))
+            seen += [it["id"] for it in nxt["items"]]
+            cur = nxt["next"]
+            self.assertLess(pages, 12)
+        self.assertEqual(len(seen), len(set(seen)))
+        all_hi = W.page(limit=200, sev="hi")
+        self.assertTrue(all_hi["end"])
+        self.assertEqual(sorted(seen), sorted(it["id"] for it in all_hi["items"]))
+        self.assertGreaterEqual(len(all_hi["items"]), 9)  # i%11 in 7..10 for i in 0..29, plus any extras
+        code, body = W.handle_get("/api/wire_tl", {"sev": ["hi"], "limit": ["4"]})
+        self.assertEqual(code, 200)
+        self.assertTrue(all(7 <= it["r"] <= 10 for it in body["items"]))
+        self.assertFalse(body["end"])
+        # unknown sev is ignored (unfiltered), not a 400
+        code, body = W.handle_get("/api/wire_tl", {"sev": ["nope"], "limit": ["5"]})
+        self.assertEqual(code, 200)
+        self.assertEqual(len(body["items"]), 5)
+
+    def test_held_rows_do_not_end_the_feed_early(self):
+        """Public-row filtering must keep reading until a full page or the true end."""
+        real = W._public_row
+        def sparse(r, archive):
+            if not real(r, archive):
+                return False
+            try:
+                n = int(r["id"], 16)
+            except (TypeError, ValueError):
+                return True
+            return n % 5 == 0
+        W._public_row = sparse
+        try:
+            first = W.page(limit=3)
+            self.assertEqual(len(first["items"]), 3)
+            self.assertFalse(first["end"], first)
+            seen = [it["id"] for it in first["items"]]
+            cur = first["next"]
+            while cur:
+                nxt = W.page(before=cur, limit=3)
+                seen += [it["id"] for it in nxt["items"]]
+                cur = nxt["next"]
+            self.assertTrue(all(int(i, 16) % 5 == 0 for i in seen if len(i) == 16))
+            self.assertGreaterEqual(len(seen), 6)
+            self.assertEqual(len(seen), len(set(seen)))
+        finally:
+            W._public_row = real
+
+    def test_js_sends_filters_and_uses_event_time_for_stamps(self):
+        js = open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
+        self.assertIn("function seenAt", js)
+        self.assertIn("it.et||it.fs||it.t", js)
+        self.assertIn('sev="+encodeURIComponent(F.sev)', js)
+        self.assertIn('cats="+encodeURIComponent', js)
+        self.assertIn("reset();scrollToList();loadOlder()", js)
+        self.assertIn("botEnd&&(Q||active())", js)
+        self.assertIn("End of results", js)
+        # cursors still use last-activity t, not the display stamp
+        self.assertIn('j.items[0].t+"|"+j.items[0].id', js)
+
+
 
 class FullStoryTap(unittest.TestCase):
     def test_full_story_is_a_real_link_and_hover_is_fine_pointer_only(self):

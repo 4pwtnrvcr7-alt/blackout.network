@@ -4,7 +4,11 @@ GET /wire                      the live Wire timeline (indexable). BN_WIRE_TIMEL
 GET /wire-next                 301 to /wire (old preview URL). Redirects even when the flag is off.
 GET /api/wire_tl               items, newest first by last activity (COALESCE(updated, first_seen)). before=<cursor>
                                (older) or after=<cursor> (newer), limit 1..200, q=<keywords> (all words, title/place),
-                               bg=1 adds background signals, lat/lon/r=miles limits to a radius.
+                               bg=1 adds background signals, lat/lon/r=miles limits to a radius,
+                               sev=lo|mid|hi (ranks 0-3 / 4-6 / 7-10), cats= and regs= (comma keys),
+                               time=today|<days> (event_time or first_seen, America/New_York for today).
+                               The server keeps reading until it fills `limit` matches or the true end;
+                               end is true only when no older/newer matching row remains.
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
 GET /api/wire_tl/geo?q=        keyless ZIP/place geocode (US Census ZCTA table + offline gazetteer).
 GET /api/wire_tl/crime?q=      local crime headlines for a US place when BN_CRIME_NEWS is on (cached).
@@ -313,7 +317,99 @@ def _near(r, lat, lon, r_mi):
     except (TypeError, ValueError):
         return False
 
-def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None):
+_SEV = {"lo": (0, 3), "mid": (4, 6), "hi": (7, 10)}
+_CAT_KEYS = {c[0] for c in CATS}
+_REG_KEYS = {"na", "la", "eu", "me", "af", "as", "oc", "sea", "gl"}
+
+def _sev_clause(sev):
+    rng = _SEV.get((sev or "").strip().lower())
+    if not rng:
+        return "", []
+    return " AND rank IS NOT NULL AND rank BETWEEN ? AND ?", [rng[0], rng[1]]
+
+def _keys(s, allowed):
+    if not s:
+        return None
+    out = [x.strip() for x in str(s).split(",") if x.strip() in allowed]
+    return set(out) or None
+
+def _time_cut(time_win):
+    """Inclusive ISO UTC lower bound for event_time/first_seen, or None if unfiltered."""
+    w = (time_win or "").strip().lower()
+    if not w:
+        return None
+    now = datetime.now(timezone.utc)
+    if w == "today":
+        try:
+            from zoneinfo import ZoneInfo
+            et = now.astimezone(ZoneInfo("America/New_York"))
+            start = et.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+        except Exception:
+            start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+        return start.strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        days = float(w)
+    except ValueError:
+        return None
+    if not (0 < days <= 3650):
+        return None
+    from datetime import timedelta
+    return (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def _time_clause(time_win, live):
+    cut = _time_cut(time_win)
+    if not cut:
+        return "", []
+    if live:
+        return " AND COALESCE(event_time, first_seen) >= ?", [cut]
+    return " AND t >= ?", [cut]
+
+def _facet_ok(r, archive, cats, regs):
+    if not cats and not regs:
+        return True
+    title = _clean(r["title"])
+    loc = _clean(r["location"])[:90] if r["location"] else ""
+    if cats and cat_key(r["category"], title, archive) not in cats:
+        return False
+    if regs and region_key(loc, title, r["lat"], r["lon"]) not in regs:
+        return False
+    return True
+
+def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win):
+    """One over-fetch from live + archive, already sorted in page direction."""
+    op, order = (">", "ASC") if newer else ("<", "DESC")
+    geo, ga = _geo_clause(lat, lon, r_mi)
+    sv, sa = _sev_clause(sev)
+    rows = []
+    c = _ro(DB)
+    try:
+        qw, qa = _qwhere(words, ("title", "location"))
+        tw, ta = _time_clause(time_win, True)
+        sql = (f"SELECT {_LIVE_COLS} FROM clusters WHERE ({_TCOL}{op}? OR ({_TCOL}=? AND cluster_id{op}?)) "
+               f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo}{sv}{tw} "
+               f"ORDER BY {_TCOL} {order}, cluster_id {order} LIMIT ?")
+        rows += [(r, False) for r in c.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, fetch_n])]
+    finally:
+        c.close()
+    h = _hdb()
+    if h is not None:
+        try:
+            qw, qa = _qwhere(words, ("title", "location"))
+            tw, ta = _time_clause(time_win, False)
+            sql = (f"SELECT {_ARCH_COLS} FROM stories WHERE (t{op}? OR (t=? AND id{op}?)) "
+                   f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo}{sv}{tw} "
+                   f"ORDER BY t {order}, id {order} LIMIT ?")
+            rows += [(r, True) for r in h.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, fetch_n])]
+        finally:
+            h.close()
+    if geo:
+        rows = [(r, a) for r, a in rows if _near(r, lat, lon, r_mi)]
+    rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
+    return rows
+
+def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
+         sev=None, cats=None, regs=None, time_win=None):
+    """Page matching public rows. Loops past held/non-matching rows so `end` is the true end."""
     limit = max(1, min(MAXL, int(limit)))
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -323,34 +419,39 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
         ct, _, cid = cur.partition("|"); cid = cid or ("" if newer else "~")
     else:
         ct, cid = ("0000-01-01T00:00:00Z", "") if newer else ("9999-12-31T23:59:59Z", "~")
-    op, order = (">", "ASC") if newer else ("<", "DESC")
-    geo, ga = _geo_clause(lat, lon, r_mi)
-    fetch_n = min(MAXL, (limit + 1) * 4) if not geo else min(MAXL, max(limit * 8, 80))
-    rows = []
-    c = _ro(DB)
-    try:
-        qw, qa = _qwhere(words, ("title", "location"))
-        sql = (f"SELECT {_LIVE_COLS} FROM clusters WHERE ({_TCOL}{op}? OR ({_TCOL}=? AND cluster_id{op}?)) "
-               f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo} ORDER BY {_TCOL} {order}, cluster_id {order} LIMIT ?")
-        rows += [(r, False) for r in c.execute(sql, [ct, ct, cid, *lists, *qa, *ga, fetch_n])]
-    finally: c.close()
-    h = _hdb()
-    if h is not None:
-        try:
-            qw, qa = _qwhere(words, ("title", "location"))
-            sql = (f"SELECT {_ARCH_COLS} FROM stories WHERE (t{op}? OR (t=? AND id{op}?)) "
-                   f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo} ORDER BY t {order}, id {order} LIMIT ?")
-            rows += [(r, True) for r in h.execute(sql, [ct, ct, cid, *lists, *qa, *ga, fetch_n])]
-        finally: h.close()
-    if geo:
-        rows = [(r, a) for r, a in rows if _near(r, lat, lon, r_mi)]
-    rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
-    rows = [(r, a) for r, a in rows if _public_row(r, a)]
-    more = len(rows) > limit
-    rows = rows[:limit]
-    _wb = [20]
-    items = [_item(r, a, warm_budget=_wb) for r, a in rows]
-    if newer: items.reverse()   # always newest first in the payload
+    cats = _keys(cats, _CAT_KEYS)
+    regs = _keys(regs, _REG_KEYS)
+    sev = (sev or "").strip().lower()
+    if sev not in _SEV:
+        sev = None
+    # Rank is SQL-side; cats/regs/geo/public are post-filters, so over-fetch and continue.
+    post = bool(cats or regs or (lat is not None))
+    fetch_n = min(MAXL, max((limit + 1) * (8 if post else 4), 80))
+    acc, seen = [], set()
+    for _ in range(24):
+        batch = _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win)
+        if not batch:
+            break
+        edge = batch[-1][0]
+        ct, cid = edge["t"] or "", edge["id"]
+        for r, a in batch:
+            rid = r["id"]
+            if rid in seen:
+                continue
+            if not _public_row(r, a) or not _facet_ok(r, a, cats, regs):
+                continue
+            seen.add(rid)
+            acc.append((r, a))
+        if len(acc) >= limit + 1:
+            break
+        if len(batch) < fetch_n:
+            break
+    more = len(acc) > limit
+    rows = acc[:limit]
+    # Do not warm share cards on the list path: photo work was stalling each page 5–7s.
+    items = [_item(r, a, warm_budget=[0]) for r, a in rows]
+    if newer:
+        items.reverse()
     edge = (items[0] if newer else items[-1]) if items else None
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
     return {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
@@ -646,6 +747,10 @@ def handle_get(path, qs):
         if lat is not None and rmi is None: rmi = 25
         if rmi is not None and not (1 <= rmi <= 500):
             return 400, {"error": "r must be 1..500 miles"}
-        try: return 200, page(before, after, lim, q, g("bg") == "1", lat, lon, rmi)
+        sev = (g("sev", "") or "")[:8]
+        cats = (g("cats", "") or "")[:200]
+        regs = (g("regs", "") or "")[:200]
+        time_win = (g("time", "") or "")[:16]
+        try: return 200, page(before, after, lim, q, g("bg") == "1", lat, lon, rmi, sev, cats, regs, time_win)
         except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
     return 404, {"error": "not found"}
