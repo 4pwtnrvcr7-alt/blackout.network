@@ -158,17 +158,107 @@
     for (var i = 1; i <= 24; i++) { var u = i / 24; pts.push(new T.Vector2(i === 24 ? 0 : r * Math.sqrt(Math.max(0, 1 - u * u)), hCyl + u * hOg)); }
     var m = new T.Mesh(new T.LatheGeometry(pts, 48), mat); m.position.y = y; return m;
   }
-  function chPlume(r, len) {
-    var g = new T.Group(), add = T.AdditiveBlending, side = T.DoubleSide;
-    function cone(rr, h, col, op, y) {
-      var m = new T.Mesh(new T.ConeGeometry(rr, h, 24, 1, true), new T.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: add, depthWrite: false, side: side }));
-      m.rotation.x = Math.PI; m.position.y = y; g.add(m);
+  /* ---------- exhaust: animated-noise shader plume, glow, GPU smoke + ember trail (pt1867u) ---------- */
+  var CH_NOISE = "float chH(vec3 p){p=fract(p*0.3183099+.1);p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}" +
+    "float chN3(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.0-2.0*f);return mix(mix(mix(chH(i),chH(i+vec3(1,0,0)),f.x),mix(chH(i+vec3(0,1,0)),chH(i+vec3(1,1,0)),f.x),f.y),mix(mix(chH(i+vec3(0,0,1)),chH(i+vec3(1,0,1)),f.x),mix(chH(i+vec3(0,1,1)),chH(i+vec3(1,1,1)),f.x),f.y),f.z);}" +
+    "float chFbm(vec3 p){" + (mob ? "return 0.62*chN3(p)+0.38*chN3(p*2.17);" : "return 0.5*chN3(p)+0.3*chN3(p*2.07)+0.2*chN3(p*4.3);") + "}";
+  function chPlumeGeo(r, len) {
+    var rs = mob ? 22 : 30, ls = 20, pos = [], nor = [], uv = [], idx = [], i, j;
+    for (j = 0; j <= ls; j++) {
+      var v = j / ls, rad = r * (0.8 + 1.5 * Math.pow(v, 0.62)), y = -v * len;
+      for (i = 0; i <= rs; i++) {
+        var a = i / rs * Math.PI * 2, x = Math.cos(a), z = Math.sin(a), nl = Math.hypot(1, 0.35);
+        pos.push(x * rad, y, z * rad); nor.push(x / nl, 0.35 / nl, z / nl); uv.push(i / rs, v);
+      }
     }
-    cone(r * 2.4, len * 1.15, 0xff6a28, 0.45, -len * 0.55);
-    cone(r * 1.35, len * 0.75, 0xff9a48, 0.7, -len * 0.36);
-    cone(r * 0.55, len * 0.38, 0xfff4e0, 0.95, -len * 0.18);
-    var lit = new T.PointLight(0xffb060, 0, 90, 1.6); lit.position.y = -1.2; g.add(lit); g.userData.lit = lit; g.userData.len = len;
+    for (j = 0; j < ls; j++) for (i = 0; i < rs; i++) { var q = j * (rs + 1) + i; idx.push(q, q + rs + 1, q + 1, q + 1, q + rs + 1, q + rs + 2); }
+    var g = new T.BufferGeometry();
+    g.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new T.Float32BufferAttribute(nor, 3)); g.setAttribute("uv", new T.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.boundingSphere = new T.Sphere(new T.Vector3(0, -len * 0.5, 0), len + r * 3); return g;
+  }
+  function chPlumeMat(r, len, hot, gain) {
+    return new T.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide,
+      uniforms: { uT: C.uT, uR: { value: r }, uLen: { value: len }, uHot: { value: hot }, uGain: { value: gain }, uThr: { value: 1 }, uVac: { value: 0 } },
+      vertexShader: "#include <common>\n#include <logdepthbuf_pars_vertex>\nuniform float uT,uR,uLen,uThr;varying float vV;varying vec3 vN;varying vec3 vVd;varying vec3 vP;\n" + CH_NOISE +
+        "void main(){vV=uv.y;vec3 p=position;float a=atan(p.z,p.x);float w=chN3(vec3(a*1.3,vV*3.0-uT*7.0,uT*1.7));p.xz*=1.0+0.16*(w-0.5)*(0.3+vV)+0.05*sin(uT*31.0+vV*9.0)*vV;p.xz*=0.82+0.18*uThr;" +
+        "vP=p;vN=normalize(normalMatrix*normal);vec4 mv=modelViewMatrix*vec4(p,1.0);vVd=-mv.xyz;gl_Position=projectionMatrix*mv;\n#include <logdepthbuf_vertex>\n}",
+      fragmentShader: "#include <common>\n#include <logdepthbuf_pars_fragment>\nuniform float uT,uR,uLen,uHot,uGain,uThr,uVac;varying float vV;varying vec3 vN;varying vec3 vVd;varying vec3 vP;\n" + CH_NOISE +
+        "void main(){\n#include <logdepthbuf_fragment>\n" +
+        "float v=vV;float f=abs(dot(normalize(vN),normalize(vVd)));float edge=pow(f,1.35);" +
+        "vec3 q=vec3(vP.x/uR,vP.y/(uR*2.2)+uT*3.2,vP.z/uR)*1.35;float nz=chFbm(q)+0.25*chN3(q*3.1+vec3(0.0,uT*5.0,0.0))*v;" +
+        "float body=pow(max(0.0,1.0-v),mix(1.5,0.8,uVac))*smoothstep(0.0,0.05,v);" +
+        "float I=edge*body*(0.38+1.15*nz)*uThr;" +
+        "float dm=pow(abs(sin(v*uLen*1.1/uR*0.55+uT*0.0)),10.0)*(1.0-v)*(1.0-v)*edge*uHot*(1.0-uVac);I+=dm*0.55;" +
+        "float heat=I*1.55+uHot+(1.0-v)*0.3*edge;" +
+        "vec3 c=mix(vec3(0.42,0.04,0.02),vec3(1.0,0.30,0.05),smoothstep(0.10,0.42,heat));c=mix(c,vec3(1.0,0.66,0.20),smoothstep(0.42,0.80,heat));c=mix(c,vec3(1.0,0.96,0.84),smoothstep(0.85,1.35,heat));" +
+        "c=mix(c,vec3(0.78,0.84,1.0),uVac*0.35*(1.0-v));" +
+        "float al=smoothstep(0.015,0.55,I)*uGain;gl_FragColor=vec4(c*al,al);}"
+    });
+  }
+  function chGlowTex() {
+    if (C.glTex) return C.glTex;
+    var c = document.createElement("canvas"), g, grd; c.width = c.height = 64; g = c.getContext("2d"); grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, "rgba(255,244,222,0.95)"); grd.addColorStop(0.18, "rgba(255,190,110,0.55)"); grd.addColorStop(0.5, "rgba(255,110,40,0.16)"); grd.addColorStop(1, "rgba(255,70,20,0)");
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64); C.glTex = new T.CanvasTexture(c); return C.glTex;
+  }
+  function chPlume(r, len) {
+    var g = new T.Group(); C.uT = C.uT || { value: 0 };
+    var outer = new T.Mesh(chPlumeGeo(r, len), chPlumeMat(r, len, 0.0, 0.85)), core = new T.Mesh(chPlumeGeo(r * 0.5, len * 0.55), chPlumeMat(r * 0.5, len * 0.55, 0.55, 1.0));
+    outer.frustumCulled = core.frustumCulled = false; outer.renderOrder = core.renderOrder = 6; g.add(outer); g.add(core);
+    var gl = new T.Sprite(new T.SpriteMaterial({ map: chGlowTex(), transparent: true, depthWrite: false, blending: T.AdditiveBlending, opacity: 0.8 }));
+    gl.scale.set(r * 6, r * 6, 1); gl.position.y = -r * 0.9; gl.renderOrder = 7; g.add(gl);
+    var lit = new T.PointLight(0xffb060, 0, 90, 1.6); lit.position.y = -1.2; g.add(lit);
+    g.userData.lit = lit; g.userData.len = len; g.userData.r = r; g.userData.mats = [outer.material, core.material]; g.userData.glow = gl; g.userData.vis = 0;
     return g;
+  }
+  /* GPU-drawn smoke + ember trail: particles are born at the nozzle in the Earth-fixed frame, so they stay where the rocket was and drift */
+  function chFxBuild(g) {
+    var NS = mob ? 200 : 320, NE = mob ? 100 : 180, F = C.fx = { ns: NS, ne: NE, si: 0, ei: 0, last: null, sa: 0, ea: 0, pl: [] };
+    function pts(n, add, vs, fs) {
+      var geo = new T.BufferGeometry(), pos = new T.BufferAttribute(new Float32Array(n * 3), 3), aux = new T.BufferAttribute(new Float32Array(n * 4), 4);
+      for (var i = 0; i < n; i++) aux.setXYZW(i, -1e9, Math.random(), 1, 0);
+      geo.setAttribute("position", pos); geo.setAttribute("aux", aux); geo.boundingSphere = new T.Sphere(new T.Vector3(), 1e9);
+      var m = new T.ShaderMaterial({ transparent: true, depthWrite: false, blending: add ? T.AdditiveBlending : T.NormalBlending, uniforms: F.u, vertexShader: vs, fragmentShader: fs });
+      var o = new T.Points(geo, m); o.frustumCulled = false; o.renderOrder = 5; g.add(o); return { o: o, pos: pos, aux: aux };
+    }
+    F.u = { uSim: { value: 0 }, uPx: { value: 800 }, uAir: { value: 1 }, uMax: { value: mob ? 120 : 220 }, uT: C.uT || (C.uT = { value: 0 }) };
+    var vhead = "#include <common>\n#include <logdepthbuf_pars_vertex>\nuniform float uSim,uPx,uAir,uMax,uT;attribute vec4 aux;varying float vU;varying float vS;varying float vA;\n";
+    var vs = vhead + "void main(){float age=uSim-aux.x;float life=LIFE;vU=age/life;vS=aux.y;vA=uAir;vec3 up=normalize(position);vec3 e=normalize(cross(vec3(0.,1.,0.),up));vec3 nn=cross(up,e);" +
+      "vec3 dr=(e*(aux.y*2.0-1.0)+nn*(fract(aux.y*7.3)*2.0-1.0))*age*SPREAD+e*age*2.0+up*(age*RISE-age*age*GRAV);" +
+      "vec4 mv=modelViewMatrix*vec4(position+dr,1.0);gl_Position=projectionMatrix*mv;float sz=aux.z*(1.0+GROW*clamp(vU,0.0,1.0))*uPx/max(1.0,-mv.z);gl_PointSize=clamp(sz,1.0,uMax);" +
+      "if(age<0.0||age>life||uAir<0.02){gl_Position=vec4(2.0,2.0,2.0,1.0);gl_PointSize=0.0;}\n#include <logdepthbuf_vertex>\n}";
+    var fhead = "#include <common>\n#include <logdepthbuf_pars_fragment>\nvarying float vU;varying float vS;varying float vA;\n";
+    var fsSmoke = fhead + "void main(){\n#include <logdepthbuf_fragment>\nvec2 d=gl_PointCoord-0.5;float r=length(d)*2.0;if(r>1.0)discard;float a=smoothstep(1.0,0.15,r)*pow(max(0.0,1.0-vU),1.4)*0.34*vA;" +
+      "vec3 c=mix(vec3(0.95,0.55,0.25),vec3(0.80,0.80,0.83),smoothstep(0.0,0.22,vU));gl_FragColor=vec4(c,a);}";
+    var fsEmber = fhead + "void main(){\n#include <logdepthbuf_fragment>\nvec2 d=gl_PointCoord-0.5;float r=length(d)*2.0;if(r>1.0)discard;float a=smoothstep(1.0,0.0,r)*max(0.0,1.0-vU)*vA;" +
+      "vec3 c=mix(vec3(1.0,0.85,0.5),vec3(1.0,0.28,0.06),vU);gl_FragColor=vec4(c*a,a);}";
+    F.sm = pts(NS, false, vs.replace("LIFE", "18.0").replace("SPREAD", "3.2").replace("RISE", "1.4").replace("GRAV", "0.0").replace("GROW", "5.5"), fsSmoke);
+    F.em = pts(NE, true, vs.replace("LIFE", "3.2").replace("SPREAD", "9.0").replace("RISE", "0.5").replace("GRAV", "1.6").replace("GROW", "-0.6"), fsEmber);
+  }
+  function chFxReset() { var F = C.fx; if (!F) return; for (var i = 0; i < F.ns; i++) F.sm.aux.setX(i, -1e9); for (i = 0; i < F.ne; i++) F.em.aux.setX(i, -1e9); F.sm.aux.needsUpdate = F.em.aux.needsUpdate = true; F.last = null; F.pl.length = 0; }
+  var chV3 = null, chInv = null;
+  function chFxEmit(key, plume, r, on, strength, dtSim) {
+    var F = C.fx; if (!F) return; chV3 = chV3 || new T.Vector3(); chInv = chInv || new T.Matrix4();
+    var cur = F.pl[key] || (F.pl[key] = { p: null });
+    if (!on || strength < 0.05) { cur.p = null; return; }
+    plume.updateWorldMatrix(true, false); chInv.copy(C.world.matrixWorld).invert(); chV3.set(0, 0, 0).applyMatrix4(plume.matrixWorld).applyMatrix4(chInv);
+    var x = chV3.x, y = chV3.y, z = chV3.z, last = cur.p;
+    F.sa += dtSim * 13 * strength; F.ea += dtSim * (mob ? 18 : 30) * strength;
+    var ns = Math.min(8, Math.floor(F.sa)), ne = Math.min(10, Math.floor(F.ea)), k, f, i, sz = Math.max(r * 2.6, 2);
+    F.sa -= Math.floor(F.sa); F.ea -= Math.floor(F.ea);
+    for (k = 1; k <= ns; k++) {
+      f = k / ns; i = F.si; F.si = (F.si + 1) % F.ns;
+      F.sm.pos.setXYZ(i, last ? last[0] + (x - last[0]) * f : x, last ? last[1] + (y - last[1]) * f : y, last ? last[2] + (z - last[2]) * f : z);
+      F.sm.aux.setXYZW(i, C.t, Math.random(), sz * (0.8 + 0.5 * Math.random()), 0);
+    }
+    for (k = 1; k <= ne; k++) {
+      f = k / ne; i = F.ei; F.ei = (F.ei + 1) % F.ne;
+      F.em.pos.setXYZ(i, last ? last[0] + (x - last[0]) * f : x, last ? last[1] + (y - last[1]) * f : y, last ? last[2] + (z - last[2]) * f : z);
+      F.em.aux.setXYZW(i, C.t, Math.random(), Math.max(0.5, r * 0.18) * (0.6 + Math.random()), 0);
+    }
+    if (ns) { F.sm.pos.needsUpdate = F.sm.aux.needsUpdate = true; } if (ne) { F.em.pos.needsUpdate = F.em.aux.needsUpdate = true; }
+    cur.p = [x, y, z];
   }
   function chSmokeTex() {
     if (C.smTex) return C.smTex;
@@ -344,6 +434,7 @@
     var pad = chPos(L.pad_lon, L.pad_lat, 0), padN = chN(pad);
     var pm = chPad(true, C.R.h, C.R.d); chPlace(pm, pad, padN); g.add(pm);
     chSmokeBuild(g, pad, padN);
+    chFxBuild(g);
     if (C.R.hs.length) {
       [-1, 1].forEach(function (sx) {
         var lp = chPos(L.pad_lon + sx * 0.0022, L.pad_lat, 0), ln = chN(lp), lz = chPad(false, 0, 0);
@@ -532,13 +623,29 @@
     var fl = 0.88 + Math.random() * 0.22, thin = Math.min(1, Math.max(0, (s.up && chLL(s.up)[2]) / 60000));
     var bBurn = !s.staged ? C.t < sep - 3 && !s.fail : !!s.bp && landT != null && ((C.t > sep + 14 && C.t < sep + 40 && L.landing && /rtls/i.test(L.landing.type || "")) || (C.t > landT - 75 && C.t < landT - 58) || (C.t > landT - 28 && C.t < landT));
     var uBurn = s.staged && C.t > sep + 4 && C.t < (chEvT("seco") || sep + 360) && !s.fail;
-    function plume(obj, on, sx, sy, sz) {
-      if (!obj) return; obj.visible = !!on; if (on) obj.scale.set(sx, sy, sz); if (obj.userData.lit) obj.userData.lit.intensity = on ? 3.2 * fl : 0;
+    var fq = 1 + 0.03 * Math.sin(now * 0.021) + 0.02 * Math.sin(now * 0.057), air0 = 0;
+    var thrB = !s.staged ? Math.min(1, 0.4 + 0.6 * Math.max(0, C.t) / 3.5) * (C.t > 52 && C.t < 88 ? 1 - 0.28 * Math.sin(Math.PI * (C.t - 52) / 36) : 1) * Math.min(1, 0.55 + 0.45 * Math.max(0, sep - 3 - C.t) / 5) : 0.85;
+    var thrU = Math.min(1, 0.6 + 0.4 * Math.max(0, C.t - sep - 4) / 4) * Math.min(1, 0.7 + 0.3 * Math.max(0, (chEvT("seco") || sep + 360) - C.t) / 3);
+    var dSim = C.fxT == null ? 0 : C.t - C.fxT; C.fxT = C.t;
+    if (dSim < 0 || dSim > 6) { chFxReset(); dSim = 0; }
+    function plume(obj, on, sx, sy, sz, thr, key) {
+      if (!obj) return;
+      var u = obj.userData; u.vis += ((on ? 1 : 0) - u.vis) * Math.min(1, dt * 7); obj.visible = u.vis > 0.02;
+      var tv = thr * u.vis;
+      if (obj.visible) {
+        obj.scale.set(sx * (0.85 + 0.15 * thr), sy * (0.65 + 0.35 * thr), sz * (0.85 + 0.15 * thr));
+        u.mats.forEach(function (m) { m.uniforms.uThr.value = tv; m.uniforms.uVac.value = Math.min(1, thin * (s.staged ? 1 : 0.7)); });
+        u.glow.material.opacity = 0.8 * tv; u.glow.scale.setScalar(u.r * (5 + 3 * thin) * (0.9 + 0.2 * fq));
+      }
+      if (u.lit) u.lit.intensity = obj.visible ? 3.2 * fl * tv : 0;
+      chFxEmit(key, obj, u.r * obj.scale.x, on && u.vis > 0.3, tv * (1 - thin * 0.8), Math.abs(dSim));
     }
-    plume(R.plumeB, bBurn, fl * (1 + thin * (s.staged ? 0 : 2.2)), fl * 1.15, fl * (1 + thin * (s.staged ? 0 : 2.2)));
+    plume(R.plumeB, bBurn, fq * (1 + thin * (s.staged ? 0 : 2.2)), fq * 1.15 * (1 + thin * 0.35), fq * (1 + thin * (s.staged ? 0 : 2.2)), thrB, "b");
     var sBurn = R.hs.length && (C.t < tSS - 3 && !s.fail && C.t >= 0 || (C.t > tSS + 8 && C.t < tSS + 28) || (C.t > tSL - 28 && C.t < tSL));
-    if (R.plumeS) R.plumeS.forEach(function (pl) { plume(pl, sBurn, fl * (C.t < tSS ? 1 + thin * 2.2 : 1.1), fl * 1.15, fl * (C.t < tSS ? 1 + thin * 2.2 : 1.1)); });
-    plume(R.plumeU, uBurn, fl * 2.4, fl * 1.45, fl * 2.4);
+    if (R.plumeS) R.plumeS.forEach(function (pl, k) { plume(pl, sBurn, fq * (C.t < tSS ? 1 + thin * 2.2 : 1.1), fq * 1.15, fq * (C.t < tSS ? 1 + thin * 2.2 : 1.1), C.t < tSS ? thrB : 0.85, "s" + k); });
+    plume(R.plumeU, uBurn, 2.4 * fq, 1.45 * fq, 2.4 * fq, thrU, "u");
+    if (C.fx) { C.fx.u.uSim.value = C.t; C.fx.u.uPx.value = C.cam.projectionMatrix.elements[5] * C.r.domElement.height * 0.5; C.fx.u.uAir.value = Math.max(0, 1 - Math.max(0, chLL(s.up || s.bp || [ER, 0, 0])[2]) / 60000); }
+    if (C.uT) C.uT.value = now / 1000 % 1000;
     chSmokeTick(C.t);
     /* focus */
     var auto = s.staged && s.bp && !s.landed ? "booster" : s.staged && s.bp && C.t < landT + 12 ? "booster" : "upper";
@@ -620,6 +727,7 @@
       ["click", "dblclick", "wheel", "pointerdown", "touchstart", "mousedown"].forEach(function (n) { C.host.addEventListener(n, function (e) { e.stopPropagation(); }, { passive: true }); });
     }
     C.L = L; C.focus = "auto"; C.who = null; C.speed = 0; C.scrub = false; C.evTxt = null;
+    C.fxT = null;
     chBuildMission(L); chBarHtml();
     C.t = Math.max(0, Math.min(C.tEnd, opt.t || 0)); C.live = !!opt.live; C.playing = !reduce || C.live;
     /* start close on the rocket at the pad, slightly low and off to one side */
