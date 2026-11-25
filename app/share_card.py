@@ -525,7 +525,7 @@ def _r_story(cid):
 
 def _clean_head(t):
     """Light cleanup only: drop a source-name fragment cut off after a colon at the very end ('...Strait of Hormuz: Crud'); nothing is reworded."""
-    t = " ".join((t or "").split())
+    t = " ".join((t or "").split()).lstrip("-–— ").strip()
     m = re.match(r"^(.{40,}?):\s*[A-Za-z]{1,6}$", t)
     return m.group(1) if m else t
 
@@ -1045,7 +1045,7 @@ def _wrap_full(d, text, f, maxw):
     return lines + ([cur] if cur else [])
 
 
-def _story_head(d, title, maxw, max_lines=3, start=54, minsize=31):
+def _story_head(d, title, maxw, max_lines=3, start=54, minsize=28):
     """Whole headline on at most 3 lines; only at the smallest size is it cut, at a word boundary, with an ellipsis."""
     title = og._strip_emoji(title)
     size = start
@@ -1344,7 +1344,7 @@ def submit(cid, fetch=False):
     return f
 
 
-def story_png_fast(cid, budget=0.4):
+def story_png_fast(cid, budget=1.0):
     """Card bytes within `budget` seconds or None (the caller serves a quick title card instead; the real card keeps building and is cached)."""
     hit = _SC.get(cid)
     if hit:
