@@ -564,6 +564,45 @@ class EntityFirst(unittest.TestCase):
         self.assertIn("#AndyBurnham", tags, tags)
         self.assertTrue("#UK" in tags or "#Manchester" in tags, tags)
 
+    def test_related_story_titles_in_writeup_do_not_leak_topic_tags(self):
+        """Template write-ups append 'Related stories we are also tracking: …' with other
+        headlines. Those titles must not become this story's topic tags (live Riyadh
+        picked up #NuclearTestVeterans from the Burnham headline)."""
+        riyadh = _mk("Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days",
+                     location="Riyadh, Saudi Arabia", category="war/conflict", rank=2, brief="")
+        riyadh["body"] = (
+            "The PIF Tower in Riyadh was struck in an aerial attack for the second time in five days. "
+            "Related stories we are also tracking: Burnham launches inquiry into nuclear bomb test "
+            "veterans' records (UK); UK Prime Minister Andy Burnham announced the panel."
+        )
+        tags = X.hashtags(riyadh)
+        self.assertNotIn("#NuclearTestVeterans", tags, tags)
+        self.assertNotIn("#NuclearTests", tags, tags)
+        self.assertNotIn("#AndyBurnham", tags, tags)
+        self.assertTrue("#Riyadh" in tags or "#SaudiArabia" in tags or "#PIFTower" in tags, tags)
+        # The Burnham story itself still gets the veteran / person tags from its own text.
+        burnham = _mk("Burnham launches inquiry into nuclear bomb test veterans' records",
+                      location="", category="politics", rank=6, brief="")
+        burnham["body"] = "UK Prime Minister Andy Burnham opened an inquiry into nuclear bomb test veterans' records."
+        bt = X.hashtags(burnham)
+        self.assertIn("#AndyBurnham", bt, bt)
+        self.assertIn("#UK", bt, bt)
+        self.assertTrue("#NuclearTestVeterans" in bt or "#NuclearTests" in bt, bt)
+
+    def test_intent_url_when_d_is_the_item_dict(self):
+        """The timeline once passed the item dict as `d` after reusing that name; hashtags
+        then crashed and left xu empty. String fields only; the share button still builds."""
+        it = _mk("Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days",
+                 location="", category="war/conflict", rank=2, brief="")
+        it["d"] = it  # circular: the old timeline payload
+        url = X.intent_url(X.with_body(it))
+        self.assertTrue(url.startswith("https://x.com/intent/post?"), url)
+        self.assertIn("PIF", url)
+        self.assertNotIn("NuclearTestVeterans", url)
+
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

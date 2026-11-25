@@ -47,8 +47,8 @@ def _item_text(item, headline=None):
     parts = [
         headline or item.get("headline") or "",
         item.get("title") or item.get("h") or "",
-        item.get("brief") or item.get("d") or "",
-        item.get("body") or item.get("text") or "",
+        _strip_related(_as_text(item.get("brief"), item.get("d"))),
+        _strip_related(_as_text(item.get("body"), item.get("text"))),
         _location_value(item),
     ]
     for L in item.get("links") or item.get("l") or item.get("sources") or []:
@@ -71,16 +71,37 @@ def armed_conflict(item, headline=None):
     return bool(_ARMED_RX.search(text))
 
 
+def _as_text(*vals):
+    """First string value; ignore dicts (a timeline bug once passed the item itself as `d`)."""
+    for v in vals:
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+
+def _strip_related(s):
+    """Related-story titles are appended to some write-ups; they must not feed this story's tags."""
+    if not s or not isinstance(s, str):
+        return s or ""
+    return re.split(r"Related stories we are also tracking\s*:", s, maxsplit=1, flags=re.I)[0].strip()
+
+
 def _normalize_item(item):
     it = dict(item or {})
-    if not (it.get("title") or "").strip():
-        it["title"] = it.get("h") or it.get("headline") or ""
-    if not (it.get("location") or "").strip():
-        it["location"] = it.get("loc") or ""
-    if not (it.get("category") or "").strip():
-        it["category"] = it.get("k") or it.get("cat") or ""
-    if not (it.get("brief") or "").strip():
-        it["brief"] = it.get("d") or it.get("body") or it.get("text") or ""
+    if not _as_text(it.get("title")):
+        it["title"] = _as_text(it.get("h"), it.get("headline"))
+    if not _as_text(it.get("location")):
+        it["location"] = _as_text(it.get("loc"))
+    if not _as_text(it.get("category")):
+        it["category"] = _as_text(it.get("k"), it.get("cat"))
+    if not _as_text(it.get("brief")):
+        it["brief"] = _strip_related(_as_text(it.get("d"), it.get("body"), it.get("text")))
+    if isinstance(it.get("body"), str):
+        it["body"] = _strip_related(it["body"])
+    if isinstance(it.get("d"), str):
+        it["d"] = _strip_related(it["d"])
+    elif it.get("d") is not None and not isinstance(it.get("d"), str):
+        it["d"] = ""
     return it
 
 
@@ -480,9 +501,9 @@ def _corpus(item, headline=None):
     loc = _norm(_location_value(item))
     title = _norm(item.get("title") or item.get("h") or "")
     display = _norm(headline or item.get("headline") or "") or title
-    brief = " ".join(str(x) for x in (
-        item.get("brief") or "", item.get("d") or "", item.get("body") or "", item.get("text") or "",
-    ) if x)
+    brief = " ".join(_strip_related(_as_text(x)) for x in (
+        item.get("brief"), item.get("d"), item.get("body"), item.get("text"),
+    ) if _as_text(x))
     where = ""
     if brief:
         m = re.search(r"WHERE:\s*(.+?)(?=\s+(?:WHAT|WHERE|WHEN|CONFIDENCE|VERIFY):|$)", brief, re.S)
