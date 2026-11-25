@@ -246,7 +246,10 @@
         .then(function () { if (btn) { btn.disabled = false; btn.textContent = "Get the free brief"; } });
     });
   }
-  function body(h) { shell().querySelector(".bnal-body").innerHTML = emailBlock() + '<section class="bnal-push"><p class="bnal-k">Push</p>' + h + "</section>"; bindEmail(); }
+  function body(h, pushFirst) {   // pushFirst: iPhone Safari tab, where the Add to Home Screen steps must be the first thing seen (Nov 24 2026)
+    var push = '<section class="bnal-push"><p class="bnal-k">Push</p>' + h + "</section>";
+    shell().querySelector(".bnal-body").innerHTML = pushFirst ? push + emailBlock() : emailBlock() + push; bindEmail();
+  }
   function say(msg, kind) { var n = el && el.querySelector(".bnal-msg"); if (n) { n.className = "bnal-msg" + (kind ? " bnal-" + kind : ""); n.textContent = msg; } }
 
   function choices(c, s) {
@@ -287,15 +290,15 @@
     if (E.inApp) { setStatus("Open in Safari or Chrome"); return body('<p class="bnal-lead">This in-app browser can’t show alerts.</p><p class="bnal-note">Open <b>blackout.network</b> in Safari or Chrome, then tap the bell.</p>'); }
     if (E.ios && !E.standalone) {
       var old = E.ver && E.ver < 16.4;
-      setStatus(old ? "Needs iOS 16.4 or newer" : "Home Screen app");
-      return body('<p class="bnal-lead">On iPhone and iPad, alerts work from the Home Screen app.</p>'
+      setStatus(old ? "Needs iOS 16.4 or newer" : "Add to Home Screen first");
+      return body('<p class="bnal-lead">Alerts on iPhone and iPad only work from the Home Screen app. Add it first:</p>'
         + (old ? '<p class="bnal-note bnal-warn">This needs iOS 16.4 or newer. Update iOS in Settings first.</p>' : "")
         + '<ol class="bnal-steps"><li><span class="bnal-n">1</span><span>Tap <b>Share</b> <span class="bnal-ki">' + SHARE + '</span> in Safari (on iOS 26, tap <span class="bnal-ki">' + PAGEMENU + '</span> at the left of the address bar first)</span></li>'
         + '<li><span class="bnal-n">2</span><span>Tap <b>Add to Home Screen</b></span></li>'
-        + '<li><span class="bnal-n">3</span><span>Open <b>BLACKOUT</b> from your Home Screen and tap the bell ' + '<span class="bnal-ki">' + BELL + '</span></span></li></ol>'
+        + '<li><span class="bnal-n">3</span><span>Open <b>BLACKOUT</b> from your Home Screen and tap the bell ' + '<span class="bnal-ki">' + BELL + '</span>, then <b>Turn on alerts</b> and tap <b>Allow</b></span></li></ol>'
         + IOS_ART
         + (typeof BN.showInstallGuide === "function" ? '<button type="button" class="bnal-go" data-bnal="install">Show me how</button>' : "")
-        + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + msg);
+        + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + msg, true);
     }
     if (!E.api) { setStatus("Not available in this browser"); return body('<p class="bnal-lead">This browser can’t show alerts.</p><p class="bnal-note">Use a current version of Chrome, Edge, Firefox, Samsung Internet or Safari.</p>' + '<div class="bnal-group">' + linkRow("sample", "See a sample") + '</div>' + msg); }
     if (Notification.permission === "denied") {
