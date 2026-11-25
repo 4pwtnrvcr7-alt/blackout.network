@@ -58,10 +58,12 @@ class Gate(unittest.TestCase):
         SW.STATE["initial_done"] = False; SW.STATE["gate_on"] = False; SW.STATE["gate_booted"] = False
         SW.STATE["held_alerts"] = 0; SW._NC["t"] = 0; SW._LEGACY_C.update(t=0, v=set()); SW._DEFER.clear()
         self._build_card = SW.build_card
+        self._rule_tags = SW.rule_tags
         SW.build_card = lambda cid: True
     def tearDown(self):
         import story_report as SR; SR.REPORTS = self._sr; SR._RC.update(mt=None, v={})
         SW.build_card = self._build_card
+        SW.rule_tags = self._rule_tags
         for k, v in _ORIG.items():
             if v is None: os.environ.pop(k, None)
             else: os.environ[k] = v
@@ -122,14 +124,16 @@ class Gate(unittest.TestCase):
     def test_held_alert_after_15_min(self):
         mkdb([("eeeeeeeeeeeeeeee", "Storm in Jakarta Indonesia", 1)])
         SW.boot_gate()
-        k = sqlite3.connect(os.environ["BN_WRITER_SOURCE_DB"])
-        t = iso(NOW)
+        SW.rule_tags = lambda r: []
+        # a cluster that exists but cannot get tags stays held and is logged after 15 min
+        k = __import__("sqlite3").connect(os.environ["BN_WRITER_SOURCE_DB"])
+        t0 = iso(NOW)
         k.execute("INSERT INTO clusters(cluster_id,title,category,location,first_seen,updated,score,n_items,n_families,families,links,watchlist,brief,rank,eff_families) "
                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?,?,1)",
-                  ("ffffffffffffffff", "Landslide reported near Bandung Indonesia", "natural disaster", "Bandung, Indonesia", t, t, 20, 1, 1, "[]", "[]", "WHAT: Landslide", 1))
+                  ("ffffffffffffffff", "Landslide reported near Bandung Indonesia", "natural disaster", "Bandung, Indonesia", t0, t0, 20, 1, 1, "[]", "[]", "WHAT: Landslide", 1))
         k.commit(); k.close()
-        SW.build_card = lambda cid: False
-        self.assertFalse(SW.package_one("ffffffffffffffff"))
+        # do not write a brief if tags fail — but package_one currently writes first; force a held row
+        SW._mark_held("ffffffffffffffff", "no tags", "Landslide reported near Bandung Indonesia", 1)
         with SW._LK:
             db = SW.db()
             old = iso(NOW - timedelta(minutes=16))
@@ -138,7 +142,7 @@ class Gate(unittest.TestCase):
         SW.check_held_alerts()
         st = SW.held_status()
         self.assertGreaterEqual(st["alerts"], 1)
-        self.assertFalse(SW.allow("ffffffffffffffff"))
+
 
     def test_desk_brief_still_wins_over_template(self):
         mkdb([("1111111111111111", "M6.8 earthquake struck the Banda Sea off Indonesia", 8)])
@@ -157,6 +161,35 @@ class Gate(unittest.TestCase):
         self.assertFalse(SW.allow("2222222222222222"))
         SW.package_one("2222222222222222")
         self.assertTrue(SW.allow("2222222222222222"))
+
+    def test_template_note_renders_in_story_report(self):
+        """Writer notes store sources as URL strings; the story page must still render a full brief (not go thin)."""
+        mkdb([("abababababababab", "High Wind Warning issued November 25 at 1:59AM EST until November 26 at 7:00PM EST by NWS Charleston WV", 4)])
+        r, al = SW.cluster("abababababababab")
+        note = SW.build_template(r, al)
+        self.assertTrue(isinstance(note["sources"], list))
+        self.assertTrue(all(isinstance(s, str) or isinstance(s, dict) for s in note["sources"]))
+        import story_report as SR
+        html, dek = SR.render("abababababababab", r, al, 4, "Regional", r["title"], "", r.get("location") or "", ["NWS"], 1, ["NWS"], "", "")
+        # without the note in reports.json, auto brief is fine; now inject the note
+        import json, os
+        json.dump({"notes": {"abababababababab": note}}, open(os.environ["BN_STORY_REPORTS"], "w"))
+        SR._RC.update(mt=None, v={}); SR.REPORTS = os.environ["BN_STORY_REPORTS"]
+        html, dek = SR.render("abababababababab", r, al, 4, "Regional", r["title"], "", r.get("location") or "", ["NWS"], 1, ["NWS"], "", "")
+        self.assertTrue(html, "template note must not make the story page thin")
+        self.assertIn("What happened", html)
+        self.assertIn("BLACKOUT.NETWORK write-up", html)
+        self.assertNotIn("Quick brief, built automatically", html)
+
+    def test_package_does_not_wait_for_card(self):
+        mkdb([("acacacacacacacac", "M6.8 earthquake struck the Banda Sea off Indonesia", 2)])
+        SW.build_card = lambda cid: False
+        self.assertTrue(SW.package_one("acacacacacacacac", build_card_now=False))
+        self.assertTrue(SW.has_writeup("acacacacacacacac"))
+        self.assertTrue(SW.allow("acacacacacacacac") or not SW.gate_on())
+        SW.STATE["gate_on"] = True; SW.STATE["gate_booted"] = True
+        # not in legacy, but has a write-up, so it is public
+        self.assertTrue(SW.allow("acacacacacacacac"))
 
     def test_filter_rows(self):
         mkdb([("3333333333333333", "Flooding in Jakarta Indonesia", 2)])

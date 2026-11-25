@@ -919,34 +919,36 @@ def _ready_row(cid):
         finally:
             k.close()
 
-def is_packaged(cid):
-    """True when a write-up, tags and a card are stored for this cluster."""
+def has_writeup(cid):
+    """True when a desk brief or a stored writer/template write-up exists (cards may still be building)."""
     if not cid: return False
-    if desk_covered(cid):
-        row = _ready_row(cid)
-        if row and row.get("card_ok") and (row.get("tags") or "").strip() not in ("", "[]", "null"):
-            return True
-        # desk brief is a complete write-up; still need tags + card recorded
-    row = _ready_row(cid)
-    if not row or not row.get("card_ok"):
-        return False
-    tags = row.get("tags") or ""
-    if tags.strip() in ("", "[]", "null"):
-        return False
-    if desk_covered(cid):
-        return True
+    if desk_covered(cid): return True
     return note_for(cid) is not None
 
+def is_packaged(cid):
+    """True when a write-up is stored. Tags are recorded when we have them; a card may trail."""
+    if not cid: return False
+    if has_writeup(cid):
+        row = _ready_row(cid)
+        if row and (row.get("tags") or "").strip() not in ("", "[]", "null"):
+            return True
+        if desk_covered(cid):
+            return True
+        return True  # write-up is enough to render a full page; tags/card may follow
+    return False
+
 def allow(cid, archive=False):
-    """Whether a story may appear on a public listing or API. Never raises."""
+    """Whether a story may appear on a public listing or API. Never raises.
+    Once the gate is on, only items with a stored write-up (desk, template, or API) are listed.
+    Archive history is unchanged."""
     try:
         if archive or not cid:
             return True
         if not gate_on():
             return True
-        if is_packaged(cid):
+        if has_writeup(cid) or is_packaged(cid):
             return True
-        return cid in _legacy_set_cached()
+        return False
     except Exception:
         traceback.print_exc()
         return not gate_on()
@@ -985,11 +987,11 @@ def live_clusters(hours=None, limit=4000):
         if hours:
             cut = iso(now() - timedelta(hours=hours))
             rows = [dict(r) for r in k.execute(
-                "SELECT * FROM clusters WHERE watchlist IN (0,1) AND COALESCE(updated, first_seen)>=? ORDER BY first_seen DESC LIMIT ?",
+                "SELECT * FROM clusters WHERE watchlist IN (0,1) AND COALESCE(updated, first_seen)>=? ORDER BY COALESCE(updated, first_seen) DESC, cluster_id DESC LIMIT ?",
                 (cut, limit))]
         else:
             rows = [dict(r) for r in k.execute(
-                "SELECT * FROM clusters WHERE watchlist IN (0,1) ORDER BY first_seen DESC LIMIT ?", (limit,))]
+                "SELECT * FROM clusters WHERE watchlist IN (0,1) ORDER BY COALESCE(updated, first_seen) DESC, cluster_id DESC LIMIT ?", (limit,))]
     except Exception:
         rows = []
     finally:
@@ -1003,7 +1005,8 @@ def live_clusters(hours=None, limit=4000):
     return rows
 
 def boot_gate():
-    """Snapshot every live cluster id as already-public, then turn the publish gate on."""
+    """Write free templates for the live tip first (Wire last-activity order), then turn the publish gate on.
+    Cards are not built here — they trail in the worker so a write-up is never blocked on a PNG."""
     if STATE.get("gate_booted"):
         return
     rows = live_clusters(hours=None, limit=8000)
@@ -1017,17 +1020,22 @@ def boot_gate():
         finally:
             k.close()
     _LEGACY_C.update(t=0, v=set())
+    # Templates only, tip first (already in last-activity order), enough to cover the public Wire.
+    tip = live_clusters(hours=cfg()["template_backfill_h"], limit=800)
+    n_ok = n_fail = 0
+    for r in tip:
+        try:
+            if package_one(r["cluster_id"], row=r, build_card_now=False):
+                n_ok += 1
+            else:
+                n_fail += 1
+        except Exception:
+            n_fail += 1
+            traceback.print_exc()
     STATE["gate_booted"] = True
     if gate_wanted():
         STATE["gate_on"] = True
-    log(f"publish gate on, grandfathered {len(rows)} live clusters")
-    # package the newest items first so current Wire pages have full write-ups
-    newest = live_clusters(hours=cfg()["template_backfill_h"], limit=80)
-    for r in newest:
-        try:
-            package_one(r["cluster_id"], row=r)
-        except Exception:
-            traceback.print_exc()
+    log(f"publish gate on after {n_ok} tip templates ({n_fail} failed), grandfathered {len(rows)} live clusters")
 
 def _mark_held(cid, err, title="", rank=0):
     with _LK:
@@ -1065,10 +1073,11 @@ def _backoff_ok(cid):
     wait = min(300, 5 * (2 ** min(n, 6)))
     return (now() - last).total_seconds() >= wait
 
-def package_one(cid, row=None, al=None):
-    """Build (or reuse) a write-up, store rule-based tags, build the card. Returns True when the item is public-ready."""
+def package_one(cid, row=None, al=None, build_card_now=False):
+    """Build (or reuse) a write-up and store rule-based tags. Cards trail unless build_card_now is True.
+    Returns True when the write-up is stored and the item may appear on the Wire."""
     if not cid: return False
-    if is_packaged(cid):
+    if has_writeup(cid) and is_packaged(cid):
         _clear_held(cid); return True
     if not _backoff_ok(cid):
         return False
@@ -1106,17 +1115,17 @@ def package_one(cid, row=None, al=None):
             traceback.print_exc(); tags = []
         if not tags:
             _mark_held(cid, "no tags", row.get("title"), int(row.get("rank") or 0)); return False
-        try:
-            card_ok = bool(build_card(cid))
-        except Exception:
-            traceback.print_exc(); card_ok = False
-        if not card_ok:
-            _mark_held(cid, "card not ready", row.get("title"), int(row.get("rank") or 0)); return False
+        card_ok = 0
+        if build_card_now:
+            try:
+                card_ok = 1 if build_card(cid) else 0
+            except Exception:
+                traceback.print_exc(); card_ok = 0
         with _LK:
             k = db()
             try:
                 k.execute("INSERT OR REPLACE INTO ready(cid, kind, tags, card_ok, ready_at, title, rank) VALUES(?,?,?,?,?,?,?)",
-                          (cid, kind, json.dumps(tags), 1, iso(), row.get("title"), int(row.get("rank") or 0)))
+                          (cid, kind, json.dumps(tags), card_ok, iso(), row.get("title"), int(row.get("rank") or 0)))
                 k.commit()
             finally:
                 k.close()
@@ -1128,8 +1137,8 @@ def package_one(cid, row=None, al=None):
         traceback.print_exc()
         return False
 
-def package_pending(max_new=20, max_backfill=10):
-    """Package newly arrived items first, then older ones in the backfill window. Returns counts."""
+def package_pending(max_new=80, max_backfill=200):
+    """Package newly arrived items first, then the visible tip (last activity), templates only. Returns counts."""
     if not templates_on():
         return {"new": 0, "backfill": 0}
     rows = live_clusters(hours=cfg()["template_backfill_h"], limit=4000)
@@ -1138,7 +1147,9 @@ def package_pending(max_new=20, max_backfill=10):
     backfilled = 0
     for r in rows:
         cid = r["cluster_id"]
-        if is_packaged(cid):
+        if has_writeup(cid):
+            if not is_packaged(cid):
+                package_one(cid, row=r, build_card_now=False)
             continue
         is_new = cid not in legacy
         if is_new and packaged >= max_new:
@@ -1147,14 +1158,37 @@ def package_pending(max_new=20, max_backfill=10):
             continue
         if not _backoff_ok(cid):
             continue
-        ok = package_one(cid, row=r)
+        ok = package_one(cid, row=r, build_card_now=False)
         if is_new:
             packaged += 1
         else:
             backfilled += 1
         if packaged >= max_new and backfilled >= max_backfill:
             break
+    # A few trailing card builds, never blocking new write-ups
+    warm_cards(n=5)
     return {"new": packaged, "backfill": backfilled}
+
+def warm_cards(n=5):
+    """Build share cards for packaged write-ups that do not have one yet. Failures are not held."""
+    with _LK:
+        k = db()
+        try:
+            rows = [r[0] for r in k.execute("SELECT cid FROM ready WHERE COALESCE(card_ok,0)=0 ORDER BY ready_at DESC LIMIT ?", (n,))]
+        finally:
+            k.close()
+    for cid in rows:
+        try:
+            ok = bool(build_card(cid))
+        except Exception:
+            ok = False
+        if ok:
+            with _LK:
+                k = db()
+                try:
+                    k.execute("UPDATE ready SET card_ok=1 WHERE cid=?", (cid,)); k.commit()
+                finally:
+                    k.close()
 
 def check_held_alerts():
     """Log and flag any new item held more than 15 minutes."""

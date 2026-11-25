@@ -446,8 +446,13 @@ def _norm(t): return re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).strip()
 def _srclist(note, rows, anchor=None, desk=False):
     out, seen = [], set()
     for s in (note or {}).get("sources") or []:
-        u = s.get("url") or ""
-        if re.match(r"^https?://", u) and u not in seen: seen.add(u); out.append((u, s.get("domain") or "", ""))
+        if isinstance(s, str):
+            u, domain = s, ""
+        elif isinstance(s, dict):
+            u, domain = (s.get("url") or ""), (s.get("domain") or s.get("label") or "")
+        else:
+            continue
+        if re.match(r"^https?://", u) and u not in seen: seen.add(u); out.append((u, domain, ""))
     rs = [a for a in rows if _relevant(a, anchor) and _solid(a)] or [a for a in rows if _solid(a)] or list(rows)   # never leave a story without its sources
     rs = sorted(rs, key=lambda a: (0 if a.get("official") else (2 if _is_social(a) else 1)))
     extra = 0
