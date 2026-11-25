@@ -1,5 +1,6 @@
 """Share-to-X hashtag generator. Run: cd app && python3 -m unittest tests.test_x_share -v"""
 import os, re, sys, unittest
+os.environ.setdefault("BN_XTAGS", "0")
 from urllib.parse import parse_qs, urlparse, unquote
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -104,6 +105,24 @@ STORIES = {
         "location": "Riyadh",
         "title": "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days",
         "brief": "",
+        "hidden": False, "watchlist": 0,
+    },
+    "burnham_veterans": {
+        "cluster_id": "dec0cddbd508e929",
+        "rank": 6,
+        "category": "conflict",
+        "location": "",
+        "title": "Burnham launches inquiry into nuclear bomb test veterans' records",
+        "brief": "UK sets up independent panel on health effects of 1950s-60s nuclear tests on veterans and families. On Nov. 24, UK Prime Minister Andy Burnham announced a non-statutory Independent Panel into the potential health impact of British nuclear weapons testing on veterans and their families, according to the UK government.",
+        "hidden": False, "watchlist": 0,
+    },
+    "hegseth_arms": {
+        "cluster_id": "9f5bc9d66d783d25",
+        "rank": 6,
+        "category": "conflict",
+        "location": "",
+        "title": "— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine…",
+        "brief": "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles. Ukraine also expects missiles for F-16s and NASAMS systems.",
         "hidden": False, "watchlist": 0,
     },
 }
@@ -439,6 +458,68 @@ class EntityFirst(unittest.TestCase):
               "title": "Jane Doe Imposes new export controls in Washington", "brief": "", "hidden": False, "watchlist": 0}
         tags = X.hashtags(it)
         self.assertIn("#JaneDoe", tags)
+
+
+    def test_burnham_nuclear_test_veterans(self):
+        it = STORIES["burnham_veterans"]
+        tags = X.hashtags(it)
+        self.assertIn("#AndyBurnham", tags, tags)
+        self.assertTrue(any(t in tags for t in ("#NuclearTestVeterans", "#NuclearTests")), tags)
+        self.assertTrue(any(t in tags for t in ("#UK", "#Manchester")), tags)
+        self.assertNotIn("#War", tags)
+        self.assertNotIn("#Conflict", tags)
+        self.assertFalse(any("PrimeMinister" in t or t == "#News" for t in tags if t in tags and "Burnham" in t), tags)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertLessEqual(len(tags), 5)
+
+    def test_hegseth_arms_package_is_not_a_strike(self):
+        it = STORIES["hegseth_arms"]
+        tags = X.hashtags(it)
+        self.assertIn("#PeteHegseth", tags, tags)
+        self.assertIn("#Zelensky", tags, tags)
+        self.assertIn("#Ukraine", tags, tags)
+        self.assertTrue(any(t in tags for t in ("#NASAMS", "#F16")), tags)
+        self.assertNotIn("#WarPeteHegseth", tags)
+        self.assertNotIn("#SecretaryPeteHegseth", tags)
+        self.assertNotIn("#MissileStrike", tags)
+        self.assertNotIn("#War", tags)
+        self.assertNotIn("#UkraineWar", tags)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertLessEqual(len(tags), 5)
+
+    def test_role_prefix_stripped_from_person_tag(self):
+        tags = X.hashtags(_mk("Secretary of War Pete Hegseth visits Kyiv", location="Kyiv", category="politics", rank=5,
+                              brief="US Secretary of War Pete Hegseth arrived in Kyiv."))
+        self.assertIn("#PeteHegseth", tags, tags)
+        self.assertNotIn("#WarPeteHegseth", tags)
+
+    def test_llm_rejects_generic_war_conflict_for_non_armed_story(self):
+        import x_tags_llm as L
+        title = "Burnham launches inquiry into nuclear bomb test veterans' records"
+        brief = "UK Prime Minister Andy Burnham announced a panel on nuclear tests on veterans."
+        self.assertIsNone(L.validate(["#War", "#News", "#Conflict"], title, brief, "United Kingdom"))
+        got = L.validate(["#AndyBurnham", "#NuclearTestVeterans", "#UK"], title, brief, "United Kingdom")
+        self.assertEqual(got, ["#AndyBurnham", "#NuclearTestVeterans", "#UK"])
+
+    def test_xtags_only_for_rank_5_plus_and_one_call_per_story(self):
+        import tempfile, os, json
+        import x_tags_llm as L
+        tmp = tempfile.mkdtemp()
+        os.environ["BN_XTAGS_DB"] = os.path.join(tmp, "xtags.db")
+        os.environ["BN_XTAGS"] = "1"
+        os.environ["XAI_API_KEY"] = "test-key-not-used"
+        L._CACHE.clear(); L._PENDING.clear(); L._STARTED = False
+        # rank 4 must not queue
+        self.assertIsNone(L.lookup("aaaaaaaaaaaaaaaa", "Hello", "", "UK", rank=4))
+        self.assertEqual(L._Q.qsize(), 0)
+        # one call recorded => never queued again even at rank 6
+        L._store("bbbbbbbbbbbbbbbb", "ok", ["#AndyBurnham", "#UK", "#NuclearTests"], 10, 5, 0.0001, 6)
+        L._CACHE["bbbbbbbbbbbbbbbb"] = ("ok", ["#AndyBurnham", "#UK", "#NuclearTests"])
+        got = L.lookup("bbbbbbbbbbbbbbbb", "Burnham launches inquiry into nuclear tests",
+                       "Andy Burnham in the UK", "United Kingdom", rank=6)
+        self.assertEqual(got, ["#AndyBurnham", "#UK", "#NuclearTests"])
+        self.assertTrue(L.already_called("bbbbbbbbbbbbbbbb"))
+        os.environ["BN_XTAGS"] = "0"
 
 
 

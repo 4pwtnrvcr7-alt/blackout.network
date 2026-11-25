@@ -14,6 +14,85 @@ TCO = 23  # X counts a link as 23 characters
 MAX_TAGS = 5
 MIN_TAGS = 3
 GENERIC_TAGS = ["#News", "#WorldNews", "#Breaking"]
+
+# Combat wording only — "nuclear bomb test", "nuclear weapons testing", and a stored
+# conflict category are not enough. #War / #Conflict are treated as generic otherwise.
+_ARMED_RX = re.compile(
+    r"\b(missile strikes?|missile attacks?|airstrikes?|air strikes?|artillery|shelling|invasion|"
+    r"drone (?:attack|strike)s?|ballistic(?:\s+missile)?\s+(?:strikes?|attacks?|hits?)|"
+    r"combat|bombard(?:ment)?|offensive|warship|aerial attacks?|ground assault|"
+    r"ceasefire|battlefield|front lines?|troop(?:s)? (?:advance|attack)|ukraine war|"
+    r"declaration of war|invades?|invaded|struck in (?:an?\s+)?(?:aerial |air )?attack)\b",
+    re.I,
+)
+_NOT_ARMED_RX = re.compile(
+    r"\bnuclear\s+(?:bomb\s+|weapons?\s+)?tests?\b|\bbomb\s+tests?\b|"
+    r"\btest\s+veterans?\b|\bweapons?\s+testing\b",
+    re.I,
+)
+_ARMS_PACKAGE_RX = re.compile(
+    r"\b(arms package|weapons? package|military aid|weapons? aid|air[- ]defense systems?|"
+    r"anti-ballistic|interceptors?|missiles? for\b|export approval|not yet approved a new arms)\b",
+    re.I,
+)
+SOFT_GENERICS = {"#War", "#Conflict"}
+
+
+def _location_value(item):
+    return item.get("location") or item.get("loc") or ""
+
+
+def _item_text(item, headline=None):
+    """Title, brief/body, location, and source titles — what the extractor may read."""
+    parts = [
+        headline or item.get("headline") or "",
+        item.get("title") or item.get("h") or "",
+        item.get("brief") or item.get("d") or "",
+        item.get("body") or item.get("text") or "",
+        _location_value(item),
+    ]
+    for L in item.get("links") or item.get("l") or item.get("sources") or []:
+        if isinstance(L, dict):
+            parts.append(str(L.get("title") or L.get("s") or L.get("source") or L.get("name") or ""))
+        elif isinstance(L, str):
+            parts.append(L)
+    return " ".join(str(p) for p in parts if p)
+
+
+def armed_conflict(item, headline=None):
+    """True only when the story text is about armed conflict, not a stored category."""
+    text = _item_text(item, headline=headline)
+    # An arms/aid package that merely names missiles (Patriot, NASAMS, F-16) is not a strike.
+    if _ARMS_PACKAGE_RX.search(text) and not re.search(
+            r"\b(struck|were hit|was hit|missile strike|airstrike|air strike|drone strike|shelling|invasion)\b", text, re.I):
+        return False
+    if _NOT_ARMED_RX.search(text) and not _ARMED_RX.search(text):
+        return False
+    return bool(_ARMED_RX.search(text))
+
+
+def _normalize_item(item):
+    it = dict(item or {})
+    if not (it.get("title") or "").strip():
+        it["title"] = it.get("h") or it.get("headline") or ""
+    if not (it.get("location") or "").strip():
+        it["location"] = it.get("loc") or ""
+    if not (it.get("category") or "").strip():
+        it["category"] = it.get("k") or it.get("cat") or ""
+    if not (it.get("brief") or "").strip():
+        it["brief"] = it.get("d") or it.get("body") or it.get("text") or ""
+    return it
+
+
+def specific_tags(tags, item=None, headline=None):
+    """Tags that name a person, place, or topic — not generic fillers or unearned #War/#Conflict."""
+    gen = set(GENERICS) if "GENERICS" in globals() else {"#News", "#WorldNews", "#Breaking", "#BreakingNews"}
+    gen |= {"#News", "#WorldNews", "#Breaking", "#BreakingNews", "#BlackoutNetwork", "#Alerts"}
+    if item is None or not armed_conflict(item, headline=headline):
+        gen |= SOFT_GENERICS
+    return [t for t in (tags or []) if t not in gen]
+
+
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
 # --------------------------------------------------------------------------- tags
@@ -99,6 +178,9 @@ _COUNTRIES = {
     "united kingdom": "UK",
     "great britain": "UK",
     "britain": "UK",
+    "uk": "UK",
+    "u.k.": "UK",
+    "u.k": "UK",
     "south sudan": "SouthSudan",
     "south korea": "SouthKorea",
     "north korea": "NorthKorea",
@@ -335,6 +417,8 @@ _CITIES = {
     "salt lake city": ("SaltLakeCity", "Utah"),
     "honolulu": ("Honolulu", "Hawaii"),
     "london": ("London", "UK"),
+    "manchester": ("Manchester", "UK"),
+    "greater manchester": ("Manchester", "UK"),
     "paris": ("Paris", "France"),
     "berlin": ("Berlin", "Germany"),
     "moscow": ("Moscow", "Russia"),
@@ -393,16 +477,17 @@ _ABBR_RX = re.compile(
 
 def _corpus(item, headline=None):
     """Location, title, brief WHERE, and brief text — the fields the generator may read."""
-    loc = _norm(item.get("location") or "")
+    loc = _norm(_location_value(item))
     title = _norm(item.get("title") or item.get("h") or "")
     display = _norm(headline or item.get("headline") or "") or title
-    brief = item.get("brief") or ""
+    brief = item.get("brief") or item.get("d") or item.get("body") or item.get("text") or ""
     where = ""
     if brief:
         m = re.search(r"WHERE:\s*(.+?)(?=\s+(?:WHAT|WHERE|WHEN|CONFIDENCE|VERIFY):|$)", brief, re.S)
         if m:
             where = _norm(re.sub(r"\(approx\.[^)]*\)", "", m.group(1)))
-    parts = [display, title, loc, where]
+    # Include the brief/body so a missing location field can still yield a place (#UK from "UK sets up…").
+    parts = [display, title, loc, where, _norm(brief[:800]) if brief else ""]
     # named entities if a brief or cluster already extracted them
     ents = item.get("entities") or item.get("places") or []
     if isinstance(ents, dict):
@@ -452,6 +537,11 @@ def _find_places(text, loc):
         if alias == "congo" or alias == "republic of the congo":
             if re.search(r"\b(?:democratic republic|dr congo|d\.r\. congo|drc|congo-kinshasa)\b", low):
                 continue
+        if alias in ("us", "u.s.", "u.s", "usa", "u.s.a.", "america"):
+            # "US Secretary of War" / "US President" is a role, not the story's location
+            if re.search(r"\b(?:us|u\.s\.?|usa|u\.s\.a\.)\s+(secretary|president|defense|defence|officials?|military|pentagon|state department)\b", low):
+                if not re.search(r"\bin the (?:us|u\.s\.?|united states)\b|\bunited states of america\b|\bunited states\b", low):
+                    continue
         if not re.search(r"(?<![a-z])" + re.escape(alias) + r"(?![a-z])", low):
             continue
         add(parents, _COUNTRIES[alias])
@@ -505,7 +595,10 @@ def _find_places(text, loc):
     # Bare "US" / "U.S." in a title (avoid the pronoun "us" by requiring capitals or punctuation)
     if re.search(r"(?<![A-Za-z])U\.S\.?s?\b|(?<![A-Za-z])US\b(?![A-Za-z])", raw) and "US" not in parents:
         # skip USGS / USA / USB etc. — USA already mapped; USGS is US + GS so need not letter after
-        if not re.search(r"\bUSGS\b|\bUSB\b|\bUSC\b|\bUSD\b|\bUSP\b", raw):
+        # "US Secretary of War" is a role, not the story location
+        role_only = re.search(r"\b(?:US|U\.S\.?|USA)\s+(Secretary|President|Defense|Defence|officials?|military|Pentagon)\b", raw) and not re.search(
+            r"\bin the (?:US|U\.S\.?|United States)\b|\bUnited States\b", raw)
+        if not re.search(r"\bUSGS\b|\bUSB\b|\bUSC\b|\bUSD\b|\bUSP\b", raw) and not role_only:
             add(parents, "US")
 
     # Bare "Congo" / "Congo's" as DRC when the story is clearly about the DRC, not Brazzaville
@@ -751,10 +844,8 @@ def topic_tags(item, headline=None):
                 add(lab)
                 break  # one primary hazard
 
-    # Conflict
-    conflictish = cat in ("war/conflict", "conflict") or re.search(
-        r"\b(missile|airstrike|air strike|artillery|shelling|invasion|drone attack|"
-        r"ballistic|combat|bombard|offensive|warship)\b", blob, re.I)
+    # Conflict — only when the text is about armed conflict (not a stored category or a nuclear test inquiry)
+    conflictish = armed_conflict(item, headline=headline)
     if conflictish:
         _tl = ((title or "") + " " + str(item.get("location") or "")).lower()
         if re.search(r"\bukrain|\bkyiv\b|\bkiev\b|\bkharkiv\b|\bkryvyi\b|\bzaporizh|\bodesa\b|\bodessa\b|\bdnipro\b|\bdonetsk\b|\bkherson\b", _tl) or \
@@ -763,9 +854,10 @@ def topic_tags(item, headline=None):
         # Strike type next so it keeps a topic slot when the title actually says so
         if re.search(r"\bdrone(?:\s+and\s+missile)?\s+(?:strike|attack|assault)s?\b|\buav\b", lead, re.I):
             add("DroneStrike")
-        elif re.search(r"\b(?:ballistic\s+)?missiles?\s+(?:strike|attack|hits?|hit|launches?)\b|"
-                       r"\b(?:strike|attack)\s+[^.]{0,40}missiles?\b|"
-                       r"\bballistic missile", lead, re.I):
+        elif re.search(r"\banti-ballistic\b|\binterceptors?\b|\barms package\b|\bmissiles? for\b", lead, re.I):
+            pass  # defensive munitions / aid, not a strike in this story
+        elif re.search(r"\b(?:ballistic\s+)?missiles?\s+(?:strike|attack|hits?|hit)\b|"
+                       r"\b(?:strike|attack)\s+[^.]{0,40}missiles?\b", lead, re.I):
             add("MissileStrike")
         elif re.search(r"\bairstrikes?\b|\bair strikes?\b", lead, re.I):
             add("Airstrike")
@@ -793,6 +885,10 @@ def topic_tags(item, headline=None):
     if re.search(r"\bsanctions?\b", title or "", re.I):
         add("Sanctions")
 
+    # Lowercase topic noun phrases ("nuclear bomb test veterans" → #NuclearTestVeterans)
+    for lab in _topic_noun_phrases(title, _item_text(item, headline=headline)):
+        add(lab)
+
     return tags
 
 
@@ -818,8 +914,7 @@ def engagement_tags(item, headline=None):
         add("Outbreak")
     elif cat == "cyber" or re.search(r"\b(cve-\d|data breach|ransomware|remote code execution|cyber ?attack)\b", blob, re.I):
         add("Cyberattack" if re.search(r"\b(attack\w*|breach\w*|ransomware|hack\w*|exploit\w*|leak\w*|vulnerab\w*|cve-\d|malware|ddos)\b", title or "", re.I) else "Cybersecurity")
-    elif cat in ("war/conflict", "conflict") or re.search(
-            r"\b(missile|airstrike|invasion|artillery|shelling|ukraine war|drone strike)\b", blob, re.I):
+    elif armed_conflict(item, headline=headline):
         add("War")
     elif re.search(r"\b(earthquakes?|quakes?|volcan\w+|tsunamis?|wildfires?|forest fires?)\b|\bM\s*\d+\.\d+\b", title or "", re.I):
         return []   # the hazard topic tag (#Earthquake, #Wildfire) is the sector tag; never #Weather
@@ -941,7 +1036,8 @@ _PEOPLE = [   # distinctive officials: tag the person and, when the role is unam
     (r"\bAntony Blinken\b|\bAnthony Blinken\b", "AntonyBlinken", "StateDepartment"),
     (r"\bMarco Rubio\b", "MarcoRubio", None),
     (r"\bVladimir Putin\b", "VladimirPutin", "Kremlin"),
-    (r"\bVolodymyr Zelensky(?:y|i)?\b", "Zelensky", None),
+    (r"\b(?:Volodymyr\s+)?Zelensky(?:y|i)?\b", "Zelensky", None),
+    (r"\bPete Hegseth\b|\bHegseth\b", "PeteHegseth", None),
     (r"\bBenjamin Netanyahu\b|\bNetanyahu\b", "Netanyahu", None),
     (r"\bXi Jinping\b", "XiJinping", None),
     (r"\bVitali Klitschko\b", "VitaliKlitschko", None),
@@ -958,15 +1054,125 @@ _NAME_VERBS = re.compile(
     r"Calls|Called|Blames|Blamed|Accuses|Accused|Declares|Declared|Signs|Signed|Vetoes|Vetoed|"
     r"Fires|Fired|Names|Named|Taps|Tapped|Nominates|Nominated|Rejects|Rejected|Defends|Defended|"
     r"Slams|Slammed|Backs|Backed|Visits|Visited|Meets|Met|Urges|Urged|Tells|Told|Asks|Asked|"
-    r"Seeks|Sought|Blocks|Blocked|Halts|Halted|Targets|Targeted|Hits|Struck|Strikes)\b",
+    r"Seeks|Sought|Blocks|Blocked|Halts|Halted|Targets|Targeted|Hits|Struck|Strikes|"
+    r"Launches|Launched|Opens|Opened|Starts|Started|Begins|Began|Proposes|Proposed|"
+    r"Introduces|Introduced|Inquires|Inquiry)\b",
     re.I,
 )
 
 
 def _clean_title(title):
     s = _norm(title or "")
+    s = re.sub(r"^[\s\-—–−‐-]+", "", s)
     s = re.sub(r"\s+(?:By|via)\s+(?:Investing\.com|Reuters|AP|Bloomberg|Yahoo Finance|MarketWatch|Benzinga|GlobeNewswire|PR Newswire|Business Wire)\b.*$", "", s)
     s = re.sub(r"^\s*(?:Breaking News|BREAKING|Quick takes:)\s*[:\-—]?\s*", "", s, flags=re.I)
+    return s
+
+
+
+_TOPIC_STOP = {
+    "the", "a", "an", "this", "that", "these", "those", "in", "on", "at", "by", "for", "as", "with", "after",
+    "amid", "over", "into", "from", "about", "to", "of", "and", "or", "its", "their", "his", "her", "than",
+    "inquiry", "inquiries", "record", "records", "report", "reports", "panel", "announcement", "announces",
+    "announced", "launch", "launches", "launched", "said", "says", "issue", "issues", "case", "cases",
+    "plan", "plans", "bill", "question", "questions", "statement", "review",
+}
+_TOPIC_ALIASES = [
+    (re.compile(r"nuclear\s+(?:bomb\s+|weapons?\s+)?tests?\s+veterans?", re.I), "NuclearTestVeterans"),
+    (re.compile(r"nuclear\s+(?:bomb\s+|weapons?\s+)?tests?", re.I), "NuclearTests"),
+]
+
+
+_TOPIC_SKIP_WORDS = {
+    "has", "have", "had", "not", "yet", "approved", "approve", "says", "said", "say", "including",
+    "expects", "expect", "expected", "also", "new", "been", "being", "was", "were", "will", "would",
+    "could", "should", "may", "might", "can", "cannot", "no", "yes", "still", "already", "just",
+    "missile", "missiles", "strike", "strikes", "ballistic", "attack", "attacks", "aerial",
+    "injures", "injured", "killing", "killed", "hits", "hit", "package",
+}
+
+
+def _topic_noun_phrases(title, blob=""):
+    """Key lowercase (or mid-title) topic noun phrases → CamelCase labels, most specific first."""
+    text = _norm(f"{title or ''} {blob or ''}")
+    out = []
+    for rx, lab in _TOPIC_ALIASES:
+        if rx.search(text) and lab not in out:
+            out.append(lab)
+    # "inquiry into nuclear bomb test veterans' records" — noun chunk after into/on/for/about/over/amid
+    src = _norm(title or "")
+    for m in re.finditer(r"\b(?:into|on|about|amid|regarding)\s+(.+)$", src, re.I):
+        raw = re.sub(r"[’']s\b", "s", m.group(1))
+        raw = re.sub(r"[’']", "", raw)
+        words = [w for w in re.findall(r"[A-Za-z]+", raw)
+                 if w.lower() not in _TOPIC_STOP and w.lower() not in _TOPIC_SKIP_WORDS]
+        if any(w.lower() in _TOPIC_SKIP_WORDS for w in re.findall(r"[A-Za-z]+", raw)[:2]):
+            continue
+        if 2 <= len(words) <= 5:
+            lab = "".join(w[:1].upper() + w[1:].lower() for w in words)
+            if 8 <= len(lab) <= 28 and lab not in out and lab.lower() not in {"inquiryinto", "records"}:
+                out.append(lab)
+    return out[:3]
+
+
+def _resolve_surname(title, blob):
+    """If the title leads with a surname-only ('Burnham launches…'), return the full name from the body."""
+    title = _norm(title or "")
+    blob = blob or ""
+    m = re.match(r"^(" + _CAP + r")\s+(.+)$", title)
+    if not m or not _NAME_VERBS.match(m.group(2) or ""):
+        return None
+    last = m.group(1)
+    low = last.lower()
+    if (last.isupper() or low in _STOP_START or low in _MONTHS or last in _COMMON_CAPS
+            or low in _PLACE_WORDS or _is_place(last) or len(last) < 3):
+        return None
+    # Already a First Last title? handled elsewhere.
+    rx = re.compile(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})\s+" + re.escape(last) + r"\b")
+    hit = rx.search(blob) or rx.search(title)
+    if not hit:
+        return None
+    firsts = hit.group(1).strip()
+    firsts = _strip_role_prefix(firsts)
+    bits = [b for b in firsts.split() if b.lower() not in _HONORIFICS and b.lower() not in {"prime", "uk", "us", "of", "the", "united", "states"}]
+    if not bits:
+        return None
+    firsts = " ".join(bits[-2:]) if len(bits) > 2 else " ".join(bits)
+    full = firsts + " " + last
+    if _is_place(full) or full.lower() in _NOT_ENTITY:
+        return None
+    return full
+
+
+_ROLE_PREFIX_RX = re.compile(
+    r"^(?:(?:US|U\.S\.?|United States|UK|U\.K\.?)\s+)?"
+    r"(?:Secretary(?:\s+of(?:\s+(?:War|Defense|Defence|State|the\s+Treasury|Energy|Labor|Transportation|Education|Commerce|the\s+Interior|Homeland\s+Security|Veterans\s+Affairs))?)?|"
+    r"Defense\s+Secretary|Defence\s+Secretary|Press\s+Secretary|Attorney\s+General|"
+    r"President|Vice\s+President|Prime\s+Minister|Deputy\s+Prime\s+Minister|"
+    r"Minister(?:\s+of(?:\s+[A-Z][A-Za-z]+)?)?|Mayor|Governor|Senator|Ambassador|"
+    r"General|Admiral|Colonel|Chairman|Chairwoman|Chancellor|Premier)\s+",
+    re.I,
+)
+_ROLE_BEFORE_RX = re.compile(
+    r"(?:Secretary\s+of(?:\s+(?:War|Defense|Defence|State|the\s+Treasury))?|Prime\s+Minister|"
+    r"President|Minister|Mayor|Governor|Senator|Defense\s+Secretary|Defence\s+Secretary)\s+$",
+    re.I,
+)
+
+
+def _strip_role_prefix(ph, preceding=""):
+    """Drop titles/roles so 'Secretary of War Pete Hegseth' and 'War Pete Hegseth' become 'Pete Hegseth'."""
+    s = _norm(ph or "")
+    if preceding and _ROLE_BEFORE_RX.search(preceding):
+        # 'Secretary of ' was just before a capitalized phrase that started at 'War'
+        s = _ROLE_PREFIX_RX.sub("", _norm(preceding + s)).strip() or s
+    for _ in range(3):
+        nxt = _ROLE_PREFIX_RX.sub("", s).strip()
+        if nxt == s:
+            break
+        s = nxt
+    # leftover 'War Pete Hegseth' when 'War' is the office, not a name
+    s = re.sub(r"^(?:War|Defense|Defence|State|Treasury)\s+(?=[A-Z][a-z]+\s+[A-Z])", "", s)
     return s
 
 
@@ -985,11 +1191,12 @@ def entity_tags(item, headline=None):
 
     # Named people in the title, then their agency/role when it is clear (dictionary or wording in the title).
     for rx, tag, agency in _PEOPLE:
-        if re.search(rx, title):
+        if re.search(rx, title) or re.search(rx, _item_text(item, headline=headline)):
             add(tag, "#" + tag)
             if agency:
                 add(agency, "#" + agency)
-            break
+            if len(out) >= 4:
+                break
     if not any(x.lstrip("#") in {p[1] for p in _PEOPLE} for x in out):
         # "Scott Bessent Unleashes …": First Last at the start of the title, followed by a finite verb
         m = re.match(r"^(" + _CAP + r")\s+(" + _CAP + r")\s+(.+)$", title)
@@ -1004,6 +1211,12 @@ def entity_tags(item, headline=None):
                     and (first + " " + last).lower() not in _NOT_ENTITY
                     and not _is_place(first + " " + last)):
                 add(first + " " + last)
+    if not any(x.lstrip("#") in {p[1] for p in _PEOPLE} for x in out) and not any(
+            re.fullmatch(r"#[A-Z][a-z]+[A-Z][A-Za-z]+", x) for x in out):
+        # Surname-only lead ("Burnham launches…") — resolve to the full name from the brief/body
+        full = _resolve_surname(title, _item_text(item, headline=headline))
+        if full:
+            add(full)
     # Role / agency wording in the title (Treasury Secretary, Secretary of State, …)
     for rx, lab in _ROLE_AGENCY:
         if re.search(rx, title):
@@ -1061,7 +1274,11 @@ def entity_tags(item, headline=None):
         while words and words[0].lower().rstrip(".") in _HONORIFICS and len(words) > 1:
             words = words[1:]
         ph = " ".join(words)
+        ph = _strip_role_prefix(ph, title[:m.start()])
+        words = ph.split()
         low = ph.lower()
+        if not words:
+            continue
         if any(w.lower() in _PLACE_WORDS for w in words) or _is_place(ph):
             continue
         if not ph or low in _NOT_ENTITY or low in _MONTHS or ph.isupper() or len(ph) < 4:
@@ -1077,6 +1294,11 @@ def entity_tags(item, headline=None):
             add(ph)
         if len(out) >= 6:
             break
+    # Named systems / hardware in the title or brief (NASAMS, F-16)
+    blob_hw = _item_text(item, headline=headline)
+    for rx, lab in ((r"\bNASAMS\b", "NASAMS"), (r"\bF-?16s?\b", "F16")):
+        if re.search(rx, blob_hw, re.I):
+            add(lab, "#" + lab)
     # "in/of/near <Place>" for places our dictionaries do not know (e.g. 'km SE of Severo-Kuril’sk')
     for m in re.finditer(r"\b(?:of|near|in|at)\s+(" + _CAP + r")(?:,|\b)", title):
         ph = m.group(1)
@@ -1126,11 +1348,14 @@ _CAT_FILL = {"politics": "Politics", "markets": "Markets", "uap": "UAP", "hazard
 def _cat_fill(item, headline=None):
     c = (_cat(item, headline=headline) or str(item.get("category") or item.get("k") or "")).lower().strip()
     lab = _CAT_FILL.get(c)
+    if lab in ("Conflict", "War") and not armed_conflict(item, headline=headline):
+        return ["#Politics"] if c in ("war/conflict", "conflict", "politics") else []
     return ["#" + lab] if lab else []
 
 
 def _entity_first(item, headline=None):
     """Entity-first rule-based tags. Priority: entity, location, topic, entity, sector, location, topic, entity; generics only as a last resort (max 1)."""
+    item = _normalize_item(item)
     ents = entity_tags(item, headline=headline)
     loc = location_tags(item, headline=headline)
     topics = topic_tags(item, headline=headline)
@@ -1147,30 +1372,36 @@ def _entity_first(item, headline=None):
             order.append(lst[i])
     take(ents, 0); take(loc, 0); take(topics, 0); take(loc, 1); take(sector, 0); take(ents, 1); take(topics, 1); take(ents, 2)
     tags = _dedupe(order, MAX_TAGS)
-    if len(tags) < MIN_TAGS:
-        for e in ents[3:] + loc[2:] + topics[2:]:
-            if len(tags) >= MIN_TAGS:
+    if len(tags) < MAX_TAGS:
+        for e in ents + loc + topics:
+            if len(tags) >= MAX_TAGS:
                 break
             if e not in tags:
                 tags.append(e)
+    unearned = SOFT_GENERICS if not armed_conflict(item, headline=headline) else set()
     if len(tags) < MIN_TAGS:
         for g in generic + [x for x in GENERIC_TAGS if x not in GENERICS or True]:
             if len(tags) >= MIN_TAGS:
                 break
+            if g in unearned:
+                continue
             if g not in tags and (not any(x in GENERICS for x in tags)):
                 tags.append(g)   # at most ONE generic filler
     if len(tags) < MIN_TAGS:   # nothing more nameable: category word, then the site brand (never a second generic filler)
         for g in _cat_fill(item, headline) + ["#News", "#BlackoutNetwork", "#Alerts"]:
             if len(tags) >= MIN_TAGS:
                 break
+            if g in unearned:
+                continue
             if g not in tags:
                 tags.append(g)
     return _cap_one(_dedupe(tags, MAX_TAGS), SECTORS, 1)
 
 
 def hashtags(item, headline=None):
-    """Entity-first, story-specific tags. A cached xAI-generated set (x_tags_llm, validated against the story text) wins; the rule-based
-    extractor is the always-available fallback. Held / false-positive items keep location + generic only."""
+    """xAI-generated tags (validated, cached) are primary; the rule-based extractor is the fallback.
+    Held / false-positive items keep location + generic only."""
+    item = _normalize_item(item)
     if is_held(item):
         return _dedupe(location_tags(item, headline=headline)[:2] + ["#News", "#BlackoutNetwork", "#Alerts"], MAX_TAGS)
     rule = _entity_first(item, headline=headline)
@@ -1178,8 +1409,8 @@ def hashtags(item, headline=None):
         import x_tags_llm
         cid = str(item.get("cluster_id") or item.get("id") or "")
         title = headline or item.get("headline") or item.get("title") or ""
-        got = x_tags_llm.lookup(cid, item.get("title") or title, item.get("brief") or "", item.get("location") or "", rule)
-        if got:
+        got = x_tags_llm.lookup(cid, item.get("title") or title, item.get("brief") or "", item.get("location") or "", rule, rank=_rank(item))
+        if got and len(specific_tags(got, item, headline)) >= 2:
             return got
     except Exception:
         pass
