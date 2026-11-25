@@ -110,6 +110,12 @@ def clusters_out(rows):
             r = SD.apply(r)
             if not SD.visible(r):
                 continue
+        try:
+            import story_writer as SW
+            if not SW.allow(r.get("cluster_id") or r.get("id")):
+                continue
+        except Exception:
+            pass
         out.append(r)
     return out
 
@@ -117,8 +123,8 @@ def api_state():
     now = scanner.now()
     days7 = et_days.et_last_days(7, now)
     cut = scanner.iso(et_days.et_window_start(7, now))
-    main = clusters_out(q("SELECT * FROM clusters WHERE watchlist=0 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (cut,)))
-    watch = clusters_out(q("SELECT * FROM clusters WHERE watchlist=1 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (cut,)))
+    main = clusters_out(q("SELECT * FROM clusters WHERE watchlist=0 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 400", (cut,)))[:150]
+    watch = clusters_out(q("SELECT * FROM clusters WHERE watchlist=1 AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 400", (cut,)))[:150]
     nwatch = q("SELECT COUNT(*) n FROM clusters WHERE watchlist=1")[0]["n"]
     # Volume + severity trend: ET calendar days ending today, never future event_time dates
     # (the old substr(...,1,10) used the UTC date prefix and a rolling 168h window, so the
@@ -126,10 +132,15 @@ def api_state():
     raw = q("""SELECT COALESCE(event_time, first_seen) t, category, score, watchlist FROM clusters
                WHERE COALESCE(event_time, first_seen)>=?""", (cut,))
     vol, trend = et_days.bucket_volume_trend(raw, days7, scanner.HIGH)
-    geo = q("SELECT lat, lon, score, title, category, watchlist FROM clusters WHERE lat IS NOT NULL AND COALESCE(event_time, first_seen)>=?", (cut,))
+    geo = q("SELECT cluster_id, lat, lon, score, title, category, watchlist FROM clusters WHERE lat IS NOT NULL AND COALESCE(event_time, first_seen)>=?", (cut,))
     try:
         import story_display as SD
         geo = [SD.apply(r) for r in geo if SD.visible(r)]
+        try:
+            import story_writer as SW
+            geo = [r for r in geo if SW.allow(r.get("cluster_id"))]
+        except Exception:
+            pass
     except Exception:
         pass
     health = q("SELECT * FROM source_health ORDER BY ok DESC, name")
@@ -150,7 +161,18 @@ def api_state_items():
     Same cluster set as /api/state (top 150 main + top 150 watchlist, last 7 days). Newest first, capped per cluster.
     Adds a new endpoint only; /api/state is unchanged."""
     cut = scanner.iso(scanner.now() - timedelta(days=7)); out = {}
-    ids = [r["cluster_id"] for w in (0, 1) for r in q("SELECT cluster_id FROM clusters WHERE watchlist=? AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 150", (w, cut))]
+    ids = []
+    try:
+        import story_writer as SW
+        allow = SW.allow
+    except Exception:
+        allow = lambda cid, *a, **k: True
+    for w in (0, 1):
+        n = 0
+        for r in q("SELECT cluster_id FROM clusters WHERE watchlist=? AND COALESCE(event_time, first_seen)>=? ORDER BY score DESC, event_time DESC LIMIT 400", (w, cut)):
+            if allow(r["cluster_id"]):
+                ids.append(r["cluster_id"]); n += 1
+                if n >= 150: break
     for i in range(0, len(ids), 200):
         chunk = ids[i:i + 200]
         rows = q(f"SELECT cluster_id, source, family, title, source_url, event_time, first_seen, official FROM alerts WHERE cluster_id IN ({','.join('?' * len(chunk))}) ORDER BY first_seen DESC", chunk)
