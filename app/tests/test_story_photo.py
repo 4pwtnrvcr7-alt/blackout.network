@@ -365,7 +365,7 @@ class StoryPhoto(unittest.TestCase):
             place = dict(src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Iceland_ESA.jpg/1600px-Iceland_ESA.jpg", credit="European Space Agency / Wikimedia Commons",
                          license="Attribution", caption="Iceland. File photo; not taken at this event.", kind="place", label="Iceland. File photo; not taken at this event.", link="")
             P.db_put("1111111111111111", place, jpg=b"\xff\xd8" + b"j" * 3000)
-            c = P.pick("1111111111111111", "IMO: M3.5 earthquake, Iceland", "Iceland", "")
+            c = P.pick("1111111111111111", "Talks open in Iceland on a new North Atlantic trade pact", "Iceland", "")
             self.assertIsNotNone(c)
             self.assertEqual(c["kind"], "place")
             topic = dict(src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/B-2_Spirit_original.jpg/1600px-B-2_Spirit_original.jpg", credit="U.S. Air Force photo / Wikimedia Commons",
@@ -730,6 +730,62 @@ class StoryPhoto(unittest.TestCase):
         with mock.patch.object(P, "stored_choice", return_value=cand), mock.patch.object(P, "db_choice", return_value=cand):
             self.assertIsNone(P.pick(cid, "M 4.8 - 190 km N of Hicks Bay, New Zealand", "New Zealand", ""))
 
+
+
+    def test_skip_place_photo_for_hazard_stories_not_conflict(self):
+        import card_photo as CP
+        self.assertTrue(CP.skip_place_photo("M 4.8 - 190 km N of Hicks Bay, New Zealand"))
+        self.assertTrue(CP.skip_place_photo("IMO: M3.5 earthquake, Iceland"))
+        self.assertTrue(CP.skip_place_photo("Volcanic ash advisory: Telica ash cloud up to 5,000 ft"))
+        self.assertFalse(CP.skip_place_photo(
+            "On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense Yaşar Güler",
+            "", "conflict"))
+
+    def test_pick_rejects_a_stored_culture_place_photo_on_an_earthquake(self):
+        """A haka / culture place photo must not be kept on a disaster card."""
+        from unittest import mock
+        import story_photo as P
+        cid = "d9c1418515395db1"
+        title = "M 4.8 - 190 km N of Hicks Bay, New Zealand"
+        stored = {
+            "kind": "place",
+            "src": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Kapa_haka.jpg",
+            "title": "File:Kapa haka.jpg",
+            "license": "CC BY-SA 4.0",
+            "credit": "Raymonst3 / Wikimedia Commons",
+            "label": "New Zealand",
+            "link": "https://commons.wikimedia.org/wiki/File:Kapa_haka.jpg",
+        }
+        with mock.patch.object(P, "stored_choice", return_value=stored), \
+             mock.patch.object(P, "db_choice", return_value=stored), \
+             mock.patch.object(P, "license_ok", return_value=True), \
+             mock.patch.object(P, "is_non_photo_candidate", return_value=False), \
+             mock.patch.object(P, "photo_is_wrong_subject", return_value=False), \
+             mock.patch.object(P, "photo_strict_match", return_value=True), \
+             mock.patch.object(P, "place_photo_ok", return_value=True), \
+             mock.patch.object(P, "_v3_photo_allows", return_value=(True, "place:New Zealand")), \
+             mock.patch.object(P, "main_subject", return_value=None), \
+             mock.patch.object(P, "_named_people", return_value=[]):
+            self.assertIsNone(P.pick(cid, title, "190 km N of Hicks Bay, New Zealand", ""))
+
+    def test_choose_skips_place_and_uses_topic_on_earthquake(self):
+        from unittest import mock
+        import card_photo as CP
+        place = {"kind": "place", "src": "https://example.com/haka.jpg", "title": "File:Kapa haka.jpg",
+                 "label": "New Zealand", "license": "CC BY-SA 4.0"}
+        topic = {"kind": "topic", "src": "https://example.com/quake.jpg", "title": "File:1933 Long Beach earthquake damage 1.jpg",
+                 "hazard": "quake", "label": "Earthquake damage (USGS).", "license": "CC BY-SA 4.0",
+                 "path": "/tmp/quake.jpg"}
+        with mock.patch.object(CP, "person_photo", return_value=None), \
+             mock.patch.object(CP, "place_photo", return_value=place) as pp, \
+             mock.patch.object(CP, "topic_photo", return_value=topic), \
+             mock.patch.object(CP, "fetch", side_effect=lambda im: im.get("path") or "/tmp/x.jpg"):
+            got = CP.choose("d9c1418515395db1", "M 4.8 - 190 km N of Hicks Bay, New Zealand",
+                            hit={"place": "New Zealand", "cc": "NZ"}, text="", category="natural disaster")
+        self.assertIsNotNone(got)
+        self.assertEqual(got.get("kind"), "topic")
+        self.assertEqual(got.get("hazard"), "quake")
+        pp.assert_not_called()
 
     def test_huang_story_gets_portrait_or_designed_map(self):
         """Person-subject stories must not use an irrelevant place photo (the Altoona 1939 map)."""
