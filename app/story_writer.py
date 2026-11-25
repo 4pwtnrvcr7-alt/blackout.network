@@ -691,7 +691,11 @@ def write_one(job, api=None):
 _DEFER = {}
 def _requeue_deferred(k):
     """Deferred jobs (no source text yet, cap, API error) go back in the queue after a back-off."""
-    for r in k.execute("SELECT id, cid, finished, err FROM jobs WHERE status='deferred'").fetchall():
+    skip_refresh = not rewrite_allowed()
+    for r in k.execute("SELECT id, cid, finished, err, reason FROM jobs WHERE status='deferred'").fetchall():
+        if skip_refresh and (r["reason"] or "").startswith("refresh"):
+            k.execute("UPDATE jobs SET status='skipped', err='rewrites disabled' WHERE id=?", (r["id"],))
+            continue
         f = parse_t(r["finished"]); wait = 900 if "cap" in (r["err"] or "") or "limit" in (r["err"] or "") else 300
         n = _DEFER.get(r["cid"], 0)
         if f and (now() - f).total_seconds() >= wait * (1 + min(n, 6)):
@@ -714,20 +718,25 @@ def _writer_worker(ready, paused):
             STATE["paused"] = None if api_enabled() else "BN_WRITER=0, templates on"
             if not STATE.get("gate_booted") and templates_on():
                 boot_gate()
+            # Paid scan/write first. package_pending walks thousands of clusters and can run
+            # for many minutes (and every deploy restarts it), which was starving the rank 5+ writer.
+            if api_enabled():
+                mt = []
+                for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
+                    try: mt.append(os.path.getmtime(cfg()["blackout_db"] + sfx))
+                    except OSError: mt.append(None)
+                if mt != last_mt or time.time() - (parse_t(STATE["last_scan"]) or now()).timestamp() > 120 or not STATE["initial_done"]:
+                    scan(); last_mt = mt
+                with _LK:
+                    k = db(); _requeue_deferred(k); k.commit(); job = next_job(k); k.close()
+                if job:
+                    write_one(job)
+                    continue  # drain the paid queue before the slow template/card pass
             if templates_on():
                 package_pending()
                 check_held_alerts()
             if not api_enabled():
                 time.sleep(cfg()["poll_s"]); continue
-            mt = []
-            for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
-                try: mt.append(os.path.getmtime(cfg()["blackout_db"] + sfx))
-                except OSError: mt.append(None)
-            if mt != last_mt or time.time() - (parse_t(STATE["last_scan"]) or now()).timestamp() > 120 or not STATE["initial_done"]:
-                scan(); last_mt = mt
-            with _LK:
-                k = db(); _requeue_deferred(k); k.commit(); job = next_job(k); k.close()
-            if job: write_one(job); continue
         except Exception as e:
             STATE["last_error"] = f"{type(e).__name__}: {str(e)[:200]}"; traceback.print_exc()
         time.sleep(cfg()["poll_s"])
