@@ -1305,7 +1305,9 @@ def _story_refresh(cid):
 
 
 _POOL = None
+_FPOOL = None
 _INFLIGHT = {}
+_FINFLIGHT = {}
 
 
 def _pool():
@@ -1316,11 +1318,27 @@ def _pool():
     return _POOL
 
 
+def _fpool():
+    """Photo downloads (slow network) run here, never on the pool that serves crawler requests."""
+    global _FPOOL
+    if _FPOOL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _FPOOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="story-photo")
+    return _FPOOL
+
+
 def submit(cid, fetch=False):
-    """Start (or join) the build of a story's card on the bounded pool; returns a Future."""
+    """Start (or join) the build of a story's card on a bounded pool; returns a Future. fetch=True (may download the photo) uses its own pool."""
+    if fetch:
+        f = _FINFLIGHT.get(cid)
+        if f is None or f.done():
+            f = _fpool().submit(_story_build, cid, True)
+            _FINFLIGHT[cid] = f
+            f.add_done_callback(lambda _f, c=cid: _FINFLIGHT.pop(c, None))
+        return f
     f = _INFLIGHT.get(cid)
-    if f is None or (f.done() and (cid not in _SC or (fetch and cid in _NEED))):
-        f = _pool().submit(_story_build, cid, fetch)
+    if f is None or (f.done() and cid not in _SC):
+        f = _pool().submit(_story_build, cid, False)
         _INFLIGHT[cid] = f
         f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
     return f
@@ -1344,7 +1362,7 @@ def warm(cid):
     """Build a story's card ahead of the first crawl (bounded pool, deduped, cap of 20 in flight/queued)."""
     if cid in _SC and cid not in _NEED:
         return
-    live = sum(1 for f in _INFLIGHT.values() if f is not None and not f.done())
+    live = sum(1 for f in list(_INFLIGHT.values()) + list(_FINFLIGHT.values()) if f is not None and not f.done())
     if live >= _WARM_CAP:
         return
     try:
