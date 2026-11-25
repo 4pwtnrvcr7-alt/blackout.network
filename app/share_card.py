@@ -1163,7 +1163,7 @@ def submit(cid):
     return f
 
 
-def story_png_fast(cid, budget=1.6):
+def story_png_fast(cid, budget=1.0):
     """Card bytes within `budget` seconds or None (the caller serves a quick title card instead; the real card keeps building and is cached)."""
     hit = _SC.get(cid)
     if hit:
