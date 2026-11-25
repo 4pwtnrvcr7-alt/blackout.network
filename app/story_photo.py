@@ -230,14 +230,23 @@ def card_meta(cid):
 
 
 def card_stale(meta):
-    """True when the stored PNG was built under a previous og.VERSION and should be rebuilt (reusing any stored photo)."""
+    """True when the stored PNG was built under a previous og.VERSION and should be rebuilt (reusing any stored photo).
+    A stored map (no https photo src) is also stale when v3 photo cards are on, so it is not kept as the served card."""
     if not meta:
         return False
     try:
         import og
-        return str(meta.get("v") or "") != str(og.VERSION)
+        if str(meta.get("v") or "") != str(og.VERSION):
+            return True
     except Exception:
-        return False
+        pass
+    try:
+        import card_photo as CP
+        if CP.enabled() and not (meta.get("src") or "").startswith("https://"):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def card_has_photo(cid):
@@ -866,6 +875,7 @@ def photo_is_wrong_subject(cid, src, meta_blob="", title="", text=""):
 def _named_people(cid, title, text):
     """Names of people this story is about: profiles first (last name in the title is enough), then First Last in the headline."""
     out, seen = [], set()
+    trusted = set()  # profile or alias names — never dropped as junk bigrams
     blob = " ".join(x for x in (title, text) if x)
     try:
         import people as PP
@@ -884,7 +894,7 @@ def _named_people(cid, title, text):
                 hit = bool(re.search(r"\b" + re.escape(nm) + r"\b", title or "", re.I) or
                            (len(last) > 3 and re.search(r"\b" + re.escape(last) + r"\b", title or "", re.I)))
             if hit and nm.lower() not in seen:
-                seen.add(nm.lower()); out.append(nm)
+                seen.add(nm.lower()); out.append(nm); trusted.add(nm.lower())
     except Exception:
         pass
     words = re.findall(r"[A-Za-z][A-Za-z'-]+", title or "")
@@ -907,8 +917,38 @@ def _named_people(cid, title, text):
             continue
         full = _ALIASES.get(word.lower())
         if full and full.lower() not in seen and re.search(r"\b" + re.escape(word) + r"\b", blob_l):
-            seen.add(full.lower()); out.append(full)
+            seen.add(full.lower()); out.append(full); trusted.add(full.lower())
+        elif full and full.lower() in seen:
+            trusted.add(full.lower())
+    # When the PEOPLE-list extractor finds real names, drop junk capitalized bigrams
+    # ("Turkish Minister", "National Defense") so they cannot make main_subject()
+    # ambiguous and reject a real portrait (Hegseth / Pentagon story). Profile and
+    # alias names are kept even if the extractor missed one (Trump + Zelensky).
+    try:
+        import x_share
+        official = list(x_share.people_from_entities(title or "", text or "") or [])
+    except Exception:
+        official = []
+    if official:
+        lasts = {n.split()[-1].lower() for n in official if n.split()}
+        official_l = {n.lower() for n in official}
+        allow = official_l | trusted | lasts
+        # last names of trusted/official profile aliases
+        allow |= {n.split()[-1].lower() for n in out if n.lower() in trusted}
+        kept = []
+        seen_k = set()
+        for n in out:
+            last = n.split()[-1].lower() if n.split() else ""
+            if n.lower() in official_l or n.lower() in trusted or last in lasts or last in trusted:
+                if n.lower() not in seen_k:
+                    kept.append(n); seen_k.add(n.lower())
+        for n in official:
+            if n.lower() not in seen_k:
+                kept.append(n); seen_k.add(n.lower())
+        if kept:
+            return kept
     return out
+
 
 
 # Curly and straight quotes. Possessives like "Riyadh's" / "Riyadh’s" do not match (next char is lowercase).
