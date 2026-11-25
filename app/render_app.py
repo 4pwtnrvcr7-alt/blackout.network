@@ -912,6 +912,11 @@ if __name__ == "__main__":
     except Exception:
         traceback.print_exc()
         BOOT_WARM["done"] = True
+    try:   # Nov 25 2026: start the one Wire warm thread (bn-wire-warm) at boot so the first /api/wire_tl is a cache hit
+        import wire_timeline
+        wire_timeline.start_warm()
+    except Exception:
+        traceback.print_exc()
     try:   # after og=true: one-time throttled photo backfill of the top Wire items (does not block healthz)
         if BOOT_WARM.get("og"):
             threading.Thread(target=_card_backfill, name="card-backfill", daemon=True).start()

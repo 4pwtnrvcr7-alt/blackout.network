@@ -644,8 +644,8 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
     return out
 
 # ---- the one warm thread (name has no "loop": render_app's thread guard counts those)
-_STD = [dict(limit=100), dict(limit=100, sev="hi"), dict(limit=100, sev="mid"), dict(limit=100, sev="lo"),
-        dict(limit=200, sev="hi"), dict(limit=200, sev="mid"), dict(limit=200, sev="lo"), dict(limit=200)]
+_STD = [dict(limit=100), dict(limit=100, sev="hi"), dict(limit=100, sev="mid"), dict(limit=100, sev="lo")]
+_STD_KEYS = {}      # key -> args of the pages the warm thread always keeps fresh, even with no recent request
 
 def start_warm():
     if os.environ.get("BN_WIRE_WARM", "1") == "0" or _warm_alive():
@@ -671,12 +671,15 @@ def _warm_cycle():
     s = _SNAP.get("s")
     if s is None or now - s["t"] >= _SNAP_TTL:
         _snap_refresh(block=True)
-    # 1. rebuild pages that were asked for in the last 3 minutes and are older than ~2 s (standard ones always)
+    # 1. keep the standard pages fresh (every ~6 s) and rebuild pages asked for in the last 3 minutes (every ~2 s)
     for a in _STD:
         args = (None, None, a.get("limit", 100), "", False, None, None, None, a.get("sev"), None, None, None)
-        _PA.setdefault(_pkey(*args), (args, now - 120))
-    for key, (args, last) in list(_PA.items()):
-        if now - last > 180 or now - _PC["t"].get(key, 0) < 2.0:
+        _STD_KEYS[_pkey(*args)] = args
+    todo = {k: (args, 2.0) for k, (args, last) in list(_PA.items()) if now - last <= 180}
+    for k, args in _STD_KEYS.items():
+        todo.setdefault(k, (args, 6.0))
+    for key, (args, every) in todo.items():
+        if now - _PC["t"].get(key, 0) < every:
             continue
         try:
             _pstore(key, _page_build(*args))
