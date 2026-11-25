@@ -133,7 +133,7 @@ def page_html():
     return f'''<!doctype html><html lang="en" data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/markets">
 {ogmeta}<meta name="theme-color" content="#000">
-<link rel="stylesheet" href="{w2}/wire2.css?v=6"><link rel="stylesheet" href="/api/markets/app.css?v={_ver("app.css")}">
+<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/api/markets/app.css?v={_ver("app.css")}">
 <link rel="preload" as="image" href="/bnt/media/mkhero-m.jpg?v=1" media="(max-width:700px)"><link rel="preload" as="image" href="/bnt/media/mkvid-d.jpg?v=1" media="(min-width:701px)"></head>
 <body class="w2 mk"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>

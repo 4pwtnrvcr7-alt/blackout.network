@@ -36,7 +36,7 @@ class Markup(unittest.TestCase):
         html = wire_v2.shell("Wire", "desc", "<p>x</p>", "/wire")
         self.assertRegex(html, HX)
         self.assertIn('aria-label="Open menu"', html)
-        self.assertIn("wire2.css?v=6", html)
+        self.assertIn("wire2.css?v=7", html)
         self.assertIn("wire2.js?v=3", html)
 
 class StylesAndScript(unittest.TestCase):
