@@ -1,4 +1,4 @@
-import sys, unittest
+import io, sys, unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import story_photo as P
@@ -20,6 +20,30 @@ class StoryPhoto(unittest.TestCase):
         f, size, lines = S._story_head(d, t, 640)
         self.assertLessEqual(len(lines), 3)
         self.assertEqual(" ".join(lines), t)
+        self.assertFalse(any("…" in l or l.endswith("...") for l in lines))
+
+    def test_long_headlines_fit_without_ellipsis(self):
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        titles = [
+            "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz",
+            "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles",
+            "Ethiopia launches polio vaccination campaign to protect more than 11 million children: WHO deployed 28 staff",
+            "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using…",
+        ]
+        for raw in titles:
+            t = S._clean_head(raw)
+            for maxw in (640, 700):
+                f, size, lines = S._story_head(d, t, maxw)
+                joined = " ".join(lines)
+                self.assertLessEqual(len(lines), 3, raw)
+                self.assertFalse(any("…" in l or l.endswith("...") for l in lines), raw)
+                self.assertNotIn("…", joined)
+                # full text when it is the real headline (the last fixture is already truncated at source)
+                if "Strait of Hormuz" in t:
+                    self.assertIn("Strait of Hormuz", joined)
+                if "anti-ballistic" in t:
+                    self.assertIn("anti-ballistic", joined)
 
     def test_no_photo_falls_back_to_map_not_black(self):
         it = dict(kind="story", id="t1", title="Magnitude 6.5 earthquake recorded in Vanuatu region", rank=5, color=S.AMBER, kicker="NATURAL DISASTER", loc="Vanuatu region",
@@ -29,13 +53,15 @@ class StoryPhoto(unittest.TestCase):
         px = im.resize((60, 34)).getdata()
         self.assertGreater(sum(sum(p) for p in px) / (3 * len(px)), 8)
 
-
-if __name__ == "__main__":
-    unittest.main()
-
     def test_named_people_from_title_without_profiles(self):
         names = P._named_people("x", "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers", "")
         self.assertIn("Scott Bessent", names)
+
+    def test_bare_surname_headline_uses_full_name(self):
+        names = P._named_people("x", "Burnham launches inquiry into nuclear bomb test veterans’ records", "")
+        self.assertIn("Andy Burnham", names)
+        names = P._named_people("x", "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package", "")
+        self.assertIn("Volodymyr Zelensky", names)
 
     def test_quoted_landmark_not_possessive(self):
         title = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
@@ -47,7 +73,7 @@ if __name__ == "__main__":
         import os, tempfile
         from pathlib import Path
         d = tempfile.mkdtemp()
-        os.environ["BN_CARDS_DB"] = str(Path(d) / "story_writer.db")
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
         try:
             P._dir = lambda: Path(d)
             png = b"\x89PNG\r\n\x1a\n" + b"x" * 3000
@@ -56,24 +82,34 @@ if __name__ == "__main__":
                         caption="Scott Bessent, 2025. File photo; not taken at this event.", kind="person", label="lab", link="")
             P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)
             P.put_card("e2ca47e325c5b8e1", png, cand["src"])
-            # no files on disk
             self.assertTrue(P.resolved("e2ca47e325c5b8e1"))
+            self.assertTrue(P.has_photo("e2ca47e325c5b8e1"))
             got = P.pick("e2ca47e325c5b8e1", "Scott Bessent Unleashes", "Tehran", "")
             self.assertEqual(got["src"], cand["src"])
             self.assertEqual(got["license"], "Public domain")
             self.assertEqual(P.get_card("e2ca47e325c5b8e1"), png)
-            # cached restores jpeg
             path = P.cached(cand["src"])
             self.assertTrue(path and path.is_file() and path.stat().st_size > 2000)
+            self.assertIn("e2ca47e325c5b8e1", P.card_cids(10))
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 
+    def test_none_lookup_is_not_resolved(self):
+        import os, tempfile
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        try:
+            P._dir = lambda: Path(d)
+            P.db_put("deadbeefdeadbeef", None, none=True)
+            self.assertFalse(P.has_photo("deadbeefdeadbeef"))
+            self.assertFalse(P.resolved("deadbeefdeadbeef"))
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
 
     def test_multiline_credit_does_not_crash_for_live_stories(self):
         """Commons Artist metadata often has newlines; Pillow textlength raises ValueError on them (live 2:57 AM ET crash)."""
         import os, tempfile
         from PIL import Image
-        import share_card as S
         d = tempfile.mkdtemp()
         jpg = Path(d) / "p.jpg"
         Image.new("RGB", (900, 1200), (20, 30, 40)).save(jpg, "JPEG")
@@ -91,9 +127,8 @@ if __name__ == "__main__":
             ("ef132895dca18576", "Director Liability Italy: Bank Failure Guide 2026", 4, "Italy",
              "Credit\nwith\nnewlines"),
         ]
-        import story_photo as SP
-        orig = SP.cached
-        SP.cached = lambda src: jpg
+        orig = P.cached
+        P.cached = lambda src: jpg
         try:
             for cid, title, rank, loc, credit in stories:
                 col = S.RED if rank >= 7 else S.AMBER if rank >= 4 else S.GREEN
@@ -103,5 +138,14 @@ if __name__ == "__main__":
                           art=("story", None, None, ph["src"]), photo=ph, stats=[], tags=[])
                 im = S._lay_story(it)
                 self.assertEqual(im.size, (1200, 675), cid)
+                # drawn headline must not end with an ellipsis for these titles
+                # (spot-check via relayout of the title itself)
+                from PIL import ImageDraw
+                _, _, lines = S._story_head(ImageDraw.Draw(im), it["title"], 640)
+                self.assertFalse(any(l.endswith("…") or l.endswith("...") for l in lines), cid)
         finally:
-            SP.cached = orig
+            P.cached = orig
+
+
+if __name__ == "__main__":
+    unittest.main()

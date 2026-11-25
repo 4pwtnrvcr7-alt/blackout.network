@@ -86,9 +86,13 @@ class QuickFallback(unittest.TestCase):
             try:
                 a = og.png_for_story_fast("a" * 16)
                 self.assertGreater(len(a), 5000)
+                from PIL import Image
+                import io
+                im = Image.open(io.BytesIO(a))
+                self.assertEqual(im.size, (1200, 675))  # designed map card, never the 1200x630 earth fallback
                 self.assertEqual(a, og.png_for_story_fast("a" * 16))
                 code, body, ct = og.handle_get("/og/wire/" + "a" * 16 + ".png")
-                self.assertEqual(body, a)   # served the quick card, not the generic last-resort one
+                self.assertEqual(body, a)
             finally:
                 story.load = o
         finally:
