@@ -337,5 +337,42 @@ class StoryPhoto(unittest.TestCase):
             S.LOOKUP_TIMEOUT = old_t
 
 
+
+    def test_photo_worker_starts_under_render_thread_guard(self):
+        """Dockerfile CMD is `python3 render_app.py` (no gunicorn). render_app patches Thread.start
+        to silently skip targets whose name contains "loop". The #228/#229 `_floop` worker logged
+        "worker started" but never ran. The serving-process worker must start under that exact guard."""
+        import os, time, threading
+        # Load the exact guard from render_app.py without importing the module (it chdirs to /workspace/blackout).
+        src = (Path(__file__).resolve().parents[1] / "render_app.py").read_text()
+        start = src.index("BLOCK_THREAD_NAMES =")
+        end = src.index("threading.Thread.start = _guarded_start")
+        ns = {"threading": threading}
+        exec(src[start:end] + "threading.Thread.start = _guarded_start\n", ns)
+        orig = threading.Thread.start
+        try:
+            S._FWORKER = None
+            S._FWORKER_PID = None
+            S._WORKER_LOGGED = False
+            blocked = []
+            def _floop():
+                blocked.append("ran")
+            th = threading.Thread(target=_floop, name="story-photo-old", daemon=True)
+            th.start()
+            time.sleep(0.05)
+            self.assertFalse(th.is_alive(), "legacy _floop target should be blocked by the render_app guard")
+            self.assertEqual(blocked, [])
+            self.assertTrue(S._ensure_fworker())
+            st = S.photo_status()
+            self.assertTrue(st["worker"], st)
+            self.assertEqual(st.get("pid"), os.getpid())
+            self.assertTrue(S._FWORKER and S._FWORKER.is_alive())
+        finally:
+            threading.Thread.start = orig
+            if not (S._FWORKER and S._FWORKER.is_alive()):
+                S._FWORKER = None
+                S._FWORKER_PID = None
+                S._ensure_fworker()
+
 if __name__ == "__main__":
     unittest.main()

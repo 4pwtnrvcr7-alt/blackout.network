@@ -1421,14 +1421,22 @@ _FRUNNING = None
 _WORKER_LOGGED = False
 
 
+_FWORKER_PID = None
+
+
 def photo_status():
-    """Heartbeat for /healthz: queue depth, last prefetch time, whether the worker thread is alive."""
+    """Heartbeat for /healthz: queue depth, last prefetch time, whether the worker thread is alive.
+    Starts (or restarts) the worker in this process so a request/healthz path never depends on a pre-fork start."""
+    try:
+        _ensure_fworker()
+    except Exception:
+        pass
     with _FLOCK:
         depth = len(_FHIGH) + len(_FLOW)
         running = _FRUNNING
         last = _LAST_PREFETCH
-        alive = bool(_FWORKER and _FWORKER.is_alive())
-    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or ""}
+        alive = bool(_FWORKER and _FWORKER.is_alive() and _FWORKER_PID == os.getpid())
+    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "", "pid": os.getpid()}
 
 
 def _mark_prefetch(cid, note=""):
@@ -1438,15 +1446,28 @@ def _mark_prefetch(cid, note=""):
 
 
 def _ensure_fworker():
-    """Start (or restart) the photo worker. Logs once when a live thread is up."""
-    global _FWORKER, _WORKER_LOGGED
-    if _FWORKER is not None and _FWORKER.is_alive():
-        return
-    _FWORKER = threading.Thread(target=_floop, name="story-photo", daemon=True)
+    """Start (or restart) the photo worker in *this* process.
+
+    Must be lazy and PID-checked: a thread started in a parent process does not
+    survive fork, and render_app.py's web-only Thread.start guard silently
+    refuses targets whose name contains "loop" (the #228/#229 `_floop` bug:
+    "worker started" logged after start() but the target never ran).
+    """
+    global _FWORKER, _FWORKER_PID, _WORKER_LOGGED
+    pid = os.getpid()
+    if _FWORKER is not None and _FWORKER.is_alive() and _FWORKER_PID == pid:
+        return True
+    # Target name must not contain "loop"/"harvest"/"indexer" (render_app thread guard).
+    _FWORKER = threading.Thread(target=_photo_jobs, name="story-photo", daemon=True)
     _FWORKER.start()
-    if not _WORKER_LOGGED:
-        print("story_photo: worker started", flush=True)
-        _WORKER_LOGGED = True
+    _FWORKER_PID = pid
+    if _FWORKER.is_alive():
+        if not _WORKER_LOGGED:
+            print(f"story_photo: worker started pid={pid}", flush=True)
+            _WORKER_LOGGED = True
+        return True
+    print(f"story_photo: worker failed to start pid={pid} (thread guard?)", flush=True)
+    return False
 
 
 def _run_lookup(cid, fut):
@@ -1467,9 +1488,9 @@ def _run_lookup(cid, fut):
                 pass
 
 
-def _floop():
+def _photo_jobs():
     global _FRUNNING
-    print("story_photo: worker loop running", flush=True)
+    print(f"story_photo: worker running pid={os.getpid()}", flush=True)
     while True:
         cid = fut = None
         with _FLOCK:
@@ -1546,21 +1567,29 @@ def submit(cid, fetch=False, urgent=False):
 
 
 def ensure_current_card(cid):
-    """If a stored card is from a previous og.VERSION, rebuild it (reuse a stored licensed photo; never fall back to a map when one exists).
-    Returns the current PNG or None. No network when the JPEG is already in cards.db."""
+    """Request-path rebuild: typography under the current og.VERSION, reusing a stored licensed JPEG.
+    Never fall back to a map when a photo exists. Returns the current PNG or None. No network when the JPEG is in cards.db."""
+    try:
+        _ensure_fworker()
+    except Exception:
+        pass
     try:
         import story_photo, og
         meta = story_photo.card_meta(cid)
-        if not meta:
-            return None
-        if not story_photo.card_stale(meta):
+        has_jpg = False
+        try:
+            has_jpg = bool(story_photo.has_photo(cid))
+        except Exception:
+            pass
+        need = (not meta) or story_photo.card_stale(meta) or (has_jpg and not (meta.get("src") or "").startswith("https://"))
+        if meta and not need:
             return meta["png"]
-        # Rebuild typography / layout under the new VERSION, reusing the stored photo.
+        # Rebuild typography / layout under the current VERSION, reusing the stored photo.
         b = _story_build(cid, fetch=False)
         if b:
             return b
         # Rebuild failed: keep the stored card rather than inventing a map over a photo.
-        return meta["png"]
+        return meta["png"] if meta else None
     except Exception:
         try:
             import story_photo
@@ -1577,14 +1606,10 @@ def story_png_fast(cid, budget=1.0):
         cur = ensure_current_card(cid)
         if cur:
             _SC[cid] = (time.time(), cur, False)
-            if not story_photo.card_has_photo(cid) and not story_photo.has_photo(cid):
-                submit(cid, fetch=True, urgent=True)
-            elif not story_photo.card_has_photo(cid) and story_photo.has_photo(cid):
-                # JPEG exists, card is a map: rebuild now (no network) so a VERSION bump cannot drop the photo.
-                b = _story_build(cid, fetch=False)
-                if b:
-                    _SC[cid] = (time.time(), b, False)
-                    cur = b
+            if not story_photo.card_has_photo(cid):
+                # No stored JPEG: the worker refetches. If a JPEG exists, ensure_current_card already reused it.
+                if not story_photo.has_photo(cid):
+                    submit(cid, fetch=True, urgent=True)
             return cur
     except Exception:
         pass
@@ -1621,6 +1646,19 @@ def story_png_map_now(cid):
     """Build (or return) the designed 1200x675 map/photo card synchronously, with no network.
     Used on a cold Twitterbot miss so the 1200x630 earth fallback is never served for a known story.
     A photo lookup is queued in the background so the next crawl can get the photo card."""
+    try:
+        import story_photo
+        cur = ensure_current_card(cid)
+        if cur:
+            _SC[cid] = (time.time(), cur, False)
+            if not story_photo.card_has_photo(cid):
+                try:
+                    submit(cid, fetch=True, urgent=True)
+                except Exception:
+                    pass
+            return cur
+    except Exception:
+        pass
     hit = _SC.get(cid)
     if hit:
         try:
@@ -1633,19 +1671,6 @@ def story_png_map_now(cid):
             except Exception:
                 pass
         return hit[1]
-    try:
-        import story_photo
-        b = story_photo.get_card(cid)
-        if b:
-            _SC[cid] = (time.time(), b, False)
-            if not story_photo.card_has_photo(cid):
-                try:
-                    submit(cid, fetch=True, urgent=True)
-                except Exception:
-                    pass
-            return b
-    except Exception:
-        pass
     try:
         b = _story_build(cid, fetch=False)
     except Exception:
