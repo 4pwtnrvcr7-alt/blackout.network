@@ -46,6 +46,36 @@ _LIC_OK = re.compile(r"^(public domain|pd\b|cc0|cc[ -]by(?:[ -]sa)?(?:[ -]\d(?:\
 _LIC_BAD = re.compile(r"\b(nc|nd|noncommercial|no derivatives|gfdl only|fair use|all rights)\b", re.I)
 _NOT_SCENE = re.compile(r"(flag|coat[ _]of|locator|location|map|logo|seal|emblem|blank|\bsvg\b|shield|banner|wordmark)", re.I)
 
+
+# Relief / satellite / map-like views are not a ground-level place photo (Matt, Nov 25 2026 5:24 PM ET).
+# Filenames like New_Zealand_NASA.jpg often omit the word "map", so this also reads credit and description.
+_MAPLIKE = re.compile(
+    r"(shaded[ _-]?relief|relief[ _-]?(map|render|shading|image|of)|"
+    r"topograph(?:ic|y)[ _-]?(map|render|view|of)?|"
+    r"\b(srtm|gtopo|etopo|aster|modis|landsat|viirs|envisat|copernicus)\b|"
+    r"sentinel[- ]?[123]|"
+    r"satellite[ _-]?(image|imagery|view|photo|photograph|map|of)|"
+    r"(?:image|view|photo|photograph)[ _-]?from[ _-]?(?:space|orbit)|"
+    r"from[ _-]?(?:space|orbit)|as[ _-]seen[ _-]from[ _-](?:space|orbit|satellite)|"
+    r"blue[ _-]marble|visible[ _-]earth|earth[ _-]observatory|"
+    r"nasa[ /._-]*(?:jpl|nima|topography|relief|srtm)|"
+    r"\bnima\b|world[ _-]wind|"
+    r"esa[ /._-]*(?:satellite|envisat|sentinel|copernicus|earth)|"
+    r"false[ _-]colou?r|spaceborne|orbital[ _-](?:image|view|photo)|"
+    r"digital[ _-]?elevation|\bdem\b|bathymetr\w*)",
+    re.I,
+)
+
+
+def is_map_like(filename="", title="", credit="", desc="", categories="", src=""):
+    """True for relief renderings, satellite country views, and other map-like imagery."""
+    blob = " ".join(
+        str(x).replace("_", " ").replace("%20", " ").replace("/", " ")
+        for x in (filename, title, credit, desc, categories, src) if x
+    )
+    return bool(blob and _MAPLIKE.search(blob))
+
+
 # Curated Commons files per hazard (public-domain agency libraries; the generic server photo is CC).
 TOPICS = {
     "measles": ("CDC PHIL", ["File:Morbillivirus measles infection.jpg"], "Measles virus"),
@@ -181,6 +211,12 @@ def commons_image(filename, width=1600, min_w=700):
             continue
         artist = _strip((em.get("Artist") or {}).get("value")) or _strip((em.get("Credit") or {}).get("value"))
         artist = re.sub(r"\s*(Photo Credit|Content Providers?\(s\)):?", "", artist, flags=re.I).strip(" :;,")
+        desc = _strip((em.get("ImageDescription") or {}).get("value"))
+        cats = _strip((em.get("Categories") or {}).get("value"))
+        fn_title = p.get("title", fn).replace("File:", "")
+        if is_map_like(filename=fn, title=fn_title, credit=artist, desc=desc, categories=cats,
+                       src=" ".join(str(x or "") for x in (ii.get("thumburl"), ii.get("url")))):
+            continue
         if len(artist) > 60:
             artist = artist[:60].rsplit(" ", 1)[0]
         credit = (artist + " / " if artist else "") + "Wikimedia Commons"
@@ -220,7 +256,7 @@ def qid_image(qid, allow_nonscene=False):
     """First allowed real photo from the item's P18 (preferred rank first), matched by QID."""
     ent = _claims(qid)
     for fn in _p18_files(ent):
-        if not allow_nonscene and _NOT_SCENE.search(fn):
+        if not allow_nonscene and (_NOT_SCENE.search(fn) or is_map_like(filename=fn)):
             continue
         im = commons_image(fn)
         if im:

@@ -2,7 +2,7 @@
 
 Every public page's og:image and twitter:image points at /og/<page>.png (stories at
 /og/wire/<id>.png). Images are rendered with Pillow from that page's own hero still,
-darkened, with the page title, a small chrome B mark beside the "blackout.network" wordmark and
+darkened, with the page title, a small white B mark beside the "blackout.network" wordmark and
 the optional "Global threat monitoring" tagline. No yellow, no old dashboard tile,
 no image credits, no emoji. Rank is a small grey label, or red when the rank is 7+.
 
@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "25"  # bump to force social CDNs to refetch (Nov 25: v25 = chrome B mark beside the wordmark on share cards)
+VERSION = "25"  # do not bump for the white-B mark swap (card DB already wiped on the prior restart; mark only map-like cards stale)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -479,19 +479,24 @@ def _draw_tracked(draw, xy, text, font, fill, tracking=0):
     return x
 
 
-_MARK_PATH = BASE / "static" / "img" / "chrome-b.png"
+_MARK_PATH = BASE / "static" / "img" / "white-b.png"
 _MARK_IM = None
 
 def _brand_im():
-    """Cached chrome B mark (black square). Loaded once per process."""
+    """Cached white B mark (black square). Loaded once per process."""
     global _MARK_IM
     if _MARK_IM is None:
-        _MARK_IM = Image.open(_MARK_PATH).convert("RGB")
+        if _MARK_PATH.is_file():
+            _MARK_IM = Image.open(_MARK_PATH).convert("RGB")
+        else:
+            import base64, io
+            raw = base64.b64decode("".join((BASE / "static" / "brand" / "white_b_master.b64").read_text().split()))
+            _MARK_IM = Image.open(io.BytesIO(raw)).convert("RGB")
     return _MARK_IM
 
 
 def draw_wordmark(im, d, x, y, font, fill, tracking=0, mark=36, gap=10, wordmark=WORDMARK):
-    """Small chrome B to the left of the wordmark. Returns x after the lockup."""
+    """Small white B to the left of the wordmark. Returns x after the lockup."""
     size = int(mark)
     m = _brand_im().resize((size, size), Image.Resampling.LANCZOS)
     th = int(getattr(font, "size", size) or size)
