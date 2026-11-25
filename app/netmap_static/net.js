@@ -505,6 +505,37 @@
   /* ---------- detail card ---------- */
   var card = $("nx_card"), pinned = false;
   function linkA(u, t) { var h = url(u); return h ? '<a href="' + h + '"' + (/^\//.test(u) ? "" : ' target="_blank" rel="noopener noreferrer"') + '>' + esc(t) + '</a>' : ""; }
+  /* Post on X for map items: crafted text per item, tags from the server, per-item card at /share/<kind>/<id> */
+  function shareFor(p) {
+    var S = window.BNShare; if (!S) return "";
+    try {
+      var k, i, n, t, dd = "", l = "", pp = "", o;
+      if (p.kind === "cloud") {
+        var cl = D.cloud[p.i], nn = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {};
+        k = cl.level >= 2 ? "outage" : "cloud"; i = cl.p + "-" + cl.name; n = (PNAME[cl.p] || cl.p) + " " + cl.name; pp = nn.detail || (nn.page || ""); l = cl.name;
+        t = n + ": " + lvName(cl.level).toLowerCase() + (nn.status ? ". " + String(nn.status).slice(0, 110) : "") + "."; dd = String(nn.status || "").slice(0, 140);
+      } else if (p.kind === "country") {
+        o = D.outages.countries[p.i]; k = "outage"; i = "ioda-" + o.name; n = o.name + " internet outage"; l = o.name;
+        t = "Internet " + (o.cur ? (o.major ? "major outage" : "outage signal") : "outage in the last 24 h") + " in " + o.name + ", measured by IODA (Georgia Tech). Started " + ago(o.last) + ".";
+      } else if (p.kind === "region") {
+        o = D.outages.us_regions[p.i]; k = "outage"; i = "ioda-" + o.name; n = o.name + " internet outage signal"; l = o.name + ", United States";
+        t = "Internet outage signal in " + o.name + ": " + num(o.events) + " events in the last 24 h, measured by IODA (Georgia Tech).";
+      } else if (p.kind === "power") {
+        o = D.power.states[p.i]; k = "power"; i = "power-" + o.name; n = o.name + " power outages"; l = o.name + ", United States";
+        t = o.name + ": " + num(o.outages) + " utility customers without power right now" + ((o.top || [])[0] ? ", most at " + o.top[0].name : "") + ".";
+      } else if (p.kind === "dc") {
+        var ix = {}; (DC.cols || []).forEach(function (kk, j) { ix[kk] = j; }); var r = DC.rows[p.i];
+        k = "dc"; i = "dc-" + r[ix.id]; n = r[ix.name]; l = [r[ix.city], r[ix.cc]].filter(Boolean).join(", ");
+        t = n + " data center (" + r[ix.org] + ") in " + l + " hosts " + num(r[ix.nets]) + " networks across " + num(r[ix.ixs]) + " exchanges.";
+      } else {
+        var h3 = card.querySelector("h3"), st = card.querySelector(".st"), nm = h3 ? h3.textContent : "";
+        if (!nm) return "";
+        k = p.kind === "cable" || p.kind === "ls" ? "cable" : p.kind === "inet" ? "network" : "page"; i = p.kind + "-" + nm; n = nm; pp = "/grid";
+        t = nm + (st ? " (" + st.textContent.replace(/\s+/g, " ").trim().slice(0, 60) + ")" : "") + " on The Grid, live:";
+      }
+      return '<div class="nx-xs">' + S.html({ k: k, i: i, n: n, t: t, d: dd, l: l, p: pp }) + "</div>";
+    } catch (e) { return ""; }
+  }
   function showCard(ft, pt, pin) {
     LASTPT = pt; LASTFT = ft;
     var p = ft.properties, h = "", c;
@@ -533,6 +564,7 @@
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p]) + ' · ' + esc(lvName(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(n.status || "") + '</p>' +
         '<div class="acts">' + linkA(n.status_url, "Official status") + linkA(n.page, "Full analysis") + linkA(n.support, "Support") + '</div>';
     }
+    h += shareFor(p);
     card.innerHTML = h + '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
     card.hidden = false; requestAnimationFrame(function () { card.classList.add("in"); });
     pinned = !!pin; card.classList.toggle("pin", pinned);
@@ -1169,6 +1201,11 @@
     cv.addEventListener("touchstart", skySpinPause, { passive: true });
     cv.addEventListener("touchend", function () { skySpinResume(2200); }, { passive: true });
   }
+  function satShare(o, g, alt) {
+    if (!window.BNShare) return "";
+    var tot = g && g.total ? num(g.total) : "";
+    return '<div class="nx-xs">' + window.BNShare.html({ k: "sat", i: o.g || "sat", n: o.name, d: (g.name || "") + " \u00b7 " + orbitClass(o), t: o.name + " (" + (g.name || "satellite") + ") is " + alt + " above Earth right now" + (tot ? ", one of " + tot + " " + (g.name || "") + " satellites we track live" : "") + ". Watch the sky live:" }) + "</div>";
+  }
   function satCard(i, pt) {
     var o = SKY.recs[i]; if (!o) return; SKY.sel = i; skySpinPause(); track(i, false);
     var g = SKY.groups[o.gi] || {}, c = SKYC[o.g], compact = innerWidth < 768;
@@ -1181,10 +1218,10 @@
     if (compact) {
       prop();
       card.classList.add("nx-sat-chip");
-      card.innerHTML = '<button type="button" class="nx-sat-more" aria-expanded="false" aria-label="Show satellite details"><span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + '</span><h3>' + esc(o.name) + '</h3><p class="nx-sat-alt">' + alt + '</p></button><div class="nx-sat-extra" hidden>' + facts + learn + '</div>' + cx;
+      card.innerHTML = '<button type="button" class="nx-sat-more" aria-expanded="false" aria-label="Show satellite details"><span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + '</span><h3>' + esc(o.name) + '</h3><p class="nx-sat-alt">' + alt + '</p></button><div class="nx-sat-extra" hidden>' + facts + learn + satShare(o, g, alt) + '</div>' + cx;
     } else {
       card.classList.add("nx-learn-panel");
-      card.innerHTML = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + ' · ' + esc(orbitClass(o)) + '</span><h3>' + esc(o.name) + '</h3>' + facts + learn + cx;
+      card.innerHTML = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(g.name) + ' · ' + esc(orbitClass(o)) + '</span><h3>' + esc(o.name) + '</h3>' + facts + learn + satShare(o, g, alt) + cx;
     }
     card.hidden = false; requestAnimationFrame(function () { card.classList.add("in"); }); pinned = true; card.classList.add("pin");
     var moreBtn = card.querySelector(".nx-sat-more");

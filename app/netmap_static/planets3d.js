@@ -330,10 +330,10 @@
     if (API.unlockCam) API.unlockCam();
   }
 
-  function paintInfo(titleInner, bodyInner) {
+  function paintInfo(titleInner, bodyInner, shareHtml) {
     if (!API.S.info) return;
     var open = !!API.S.infoOpen;
-    var h = "<h3>" + titleInner + '<button type="button" class="s3-tog" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "Collapse" : "Expand") + "</button></h3><div class=\"s3-body\">" + bodyInner + "</div>";
+    var h = "<h3>" + titleInner + '<button type="button" class="s3-tog" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "Collapse" : "Expand") + "</button>" + (shareHtml || "") + "</h3><div class=\"s3-body\">" + bodyInner + "</div>";
     API.S.info.innerHTML = h; API.S.info.hidden = false; API.S.info.classList.toggle("open", open);
     var tg = API.S.info.querySelector(".s3-tog");
     if (tg) tg.addEventListener("click", function () {
@@ -355,7 +355,7 @@
     if (rec.width_km) h += "<p>About " + esc(fmtKm(rec.width_km)) + " across.</p>";
     if (rec.source) h += '<p class="s3-k">Source: <a href="' + esc(rec.source) + '" target="_blank" rel="noopener">' + esc(rec.source_name || rec.source) + "</a></p>";
     h += '<p class="s3-k">Surfaces: NASA / USGS public-domain maps. Positions: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a></p>';
-    paintInfo(title, h);
+    paintInfo(title, h, w.BNShare ? w.BNShare.siteHtml(o, rec, kind) : "");
   }
 
   function planetInfo(o) {
@@ -376,7 +376,7 @@
     if (o.id === "mars") h += "<p>Landing sites are marked (Viking through Perseverance and Zhurong). Tap a pin or zoom in. Scroll to see craters and canyons.</p>";
     h += '<p class="s3-k">Surface: NASA / USGS public-domain imagery · <a href="/api/netmap/planets/CREDITS.txt" target="_blank" rel="noopener">credits</a></p>';
     h += '<p class="s3-k">Positions: <a href="https://ssd.jpl.nasa.gov/horizons/" target="_blank" rel="noopener">NASA/JPL Horizons</a></p>';
-    paintInfo(esc(o.name), h);
+    paintInfo(esc(o.name), h, w.BNShare ? w.BNShare.skyHtml(o, API) : "");
     return true;
   }
 

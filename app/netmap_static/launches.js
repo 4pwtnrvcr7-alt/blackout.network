@@ -50,7 +50,7 @@
     ".nx-lc-ev.dim{opacity:0}",
     ".nx-lc-ev.left{padding:0 8px 0 0}.nx-lc-ev.left:before{left:auto;right:-3px}",
     ".nx-lc-bar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:8px;max-width:min(720px,calc(100% - 16px));width:max-content;background:rgba(8,10,16,.86);border:1px solid rgba(232,236,245,.22);border-radius:10px;padding:6px 8px;color:#E8ECF5;font-size:12.5px}",
-    ".nx-lc-bar{flex-direction:column;align-items:stretch}.nx-lc-row{display:flex;align-items:center;gap:8px;min-width:0}",
+    ".nx-lc-row .bn-x{margin:0;white-space:nowrap;flex:none}.nx-lc-x{margin:2px 0 6px}.nx-lc-bar{flex-direction:column;align-items:stretch}.nx-lc-row{display:flex;align-items:center;gap:8px;min-width:0}",
     ".nx-lc-bar .t{cursor:pointer}.nx-lc-sheet{max-height:52vh;overflow:auto;padding:4px 4px 8px;border-bottom:1px solid rgba(232,236,245,.14);margin-bottom:4px;font-size:12.5px;line-height:1.45;width:min(700px,calc(100vw - 40px))}",
     ".nx-lc-sheet h4{margin:10px 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#AEB4C4;font-weight:600}.nx-lc-sheet h3{margin:2px 0 4px;font-size:15px}",
     ".nx-lc-sheet dl{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:0}.nx-lc-sheet dt{color:#AEB4C4}.nx-lc-sheet dd{margin:0;min-width:0;overflow-wrap:anywhere}",
@@ -360,8 +360,16 @@
       '<input type="range" min="0" max="1000" value="0" aria-label="Launch timeline">' +
       '<span class="tp">T+0:00</span>' +
       '<span class="t"><b>' + lcEsc(lcMission(L)) + '</b> <span class="v">' + lcEsc(lcVehicle(L)) + " \u00b7 " + lcEsc(L.location || L.pad || "") + " \u00b7 <span data-clk2>" + lcEsc(lcClock(L)) + "</span></span></span>" +
-      '<button type="button" data-a="more" aria-expanded="false" aria-label="Launch details">Details</button><button type="button" data-a="next" aria-label="Next launch">\u203A</button><button type="button" data-a="x" aria-label="Close launch">\u00d7</button></div>';
+      (window.innerWidth > 760 ? lcShareHtml(L) : "") + '<button type="button" data-a="more" aria-expanded="false" aria-label="Launch details">Details</button><button type="button" data-a="next" aria-label="Next launch">\u203A</button><button type="button" data-a="x" aria-label="Close launch">\u00d7</button></div>';
     if (LC.open) lcSheet(true);
+  }
+  function lcShareHtml(L) {   /* Post on X: text crafted from this launch, tags from the server, per-launch card at /share/launch/<id> */
+    if (!window.BNShare) return "";
+    var veh = lcVehicle(L), mis = lcMission(L), loc = String(L.location || L.pad || ""), place = loc.split(",")[0] || loc, dt = (Date.now() - lcNetMs(L)) / 1000, ck = lcClock(L), t;
+    if (dt < 0) t = veh + " lifts off from " + place + " carrying " + mis + ". " + ck.replace(/^T-/, "T-minus ") + ".";
+    else if (/^In flight/.test(ck)) t = veh + " is in flight from " + place + " carrying " + mis + ".";
+    else t = veh + " launched " + mis + " from " + place + " (" + ck.replace(/^.*\u00b7\s*/, "").toLowerCase() + ").";
+    return window.BNShare.html({ k: "launch", i: L.id, n: veh + ": " + mis, t: t, d: loc, l: loc });
   }
   function lcBarTime() {
     var L = lcList()[LC.sel]; if (!L || !LC.bar) return;
@@ -469,7 +477,7 @@
   function lcLink(u, t) { return /^https:\/\//.test(u || "") ? '<a href="' + lcEsc(u) + '" target="_blank" rel="noopener">' + lcEsc(t || u) + "</a>" : null; }
   function lcDetailsHtml(d, L) {
     var h = "", m = d.mission || {}, r = d.rocket || {}, p = d.pad || {}, pv = d.provider || {}, st = d.status || {};
-    h += "<h3>" + lcEsc(d.name || "") + "</h3>";
+    h += "<h3>" + lcEsc(d.name || "") + "</h3>" + (L ? '<p class="nx-lc-x">' + lcShareHtml(L) + "</p>" : "");
     var ph = d.rocket_photo;   /* one Wikimedia Commons photo per rocket type (PD / CC0 / CC BY / CC BY-SA); LL2 images are not used */
     if (ph && /^\/api\/netmap\/rockets\/[a-z0-9_-]+\.jpg$/.test(ph.url || "")) h += '<figure><img src="' + lcEsc(ph.url) + '" alt="' + lcEsc(ph.pictured || r.name || "Rocket") + '" loading="lazy"' + (ph.w ? ' width="' + (+ph.w) + '" height="' + (+ph.h) + '" style="width:auto;height:auto"' : "") + '><figcaption>Pictured: ' + lcEsc(ph.pictured || r.name || "") + ' (representative photo of this rocket type, not this launch).<br>Photo: ' + lcEsc(ph.author || "see source") + " \u00b7 " + (lcLink(ph.license_url, ph.license) || lcEsc(ph.license)) + " \u00b7 " + (lcLink(ph.source_url, "Wikimedia Commons") || "") + "</figcaption></figure>";
     else h += '<p class="np">No openly licensed photo of this rocket type yet.</p>';
