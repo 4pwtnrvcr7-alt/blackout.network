@@ -24,7 +24,7 @@ import x_share
 
 SITE = "https://blackout.network"
 W, H = 1200, 675
-VERSION = "2"
+VERSION = "3"
 BASE = Path(__file__).resolve().parent
 NM = BASE / "netmap_static"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -1083,8 +1083,9 @@ HEAD_MIN = 32
 
 def _story_head(d, title, maxw, max_lines=3, start=54, minsize=HEAD_MIN):
     """Headline on at most 3 lines at a readable size. Shrink down to minsize (Bessent's 32);
-    if it still cannot fit, cut at a word boundary. Never append an ellipsis."""
-    title = og._strip_emoji(title or "")
+    if it still cannot fit, cut at a word boundary. Never append an ellipsis.
+    Leading/trailing dashes are stripped so a stale raw title cannot paint an em-dash."""
+    title = _card_headline(title or "") or og._strip_emoji(title or "")
     title = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", title).strip()
     minsize = max(int(minsize or HEAD_MIN), HEAD_MIN)
     size = start
@@ -1617,12 +1618,20 @@ def photo_status():
         audit = dict(story_photo.AUDIT)
     except Exception:
         audit = {}
+    rebuild = {}
+    try:
+        import story_photo
+        rebuild = dict(story_photo.REBUILD)
+    except Exception:
+        rebuild = {}
     return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "",
             "pid": os.getpid(), "photos": photos, "cards": cards, "photo_cards": photo_cards,
             "audit_checked": int(audit.get("checked") or 0),
             "audit_downgraded": int(audit.get("downgraded") or 0),
             "audit_typography": int(audit.get("typography") or 0),
-            "audit_done": bool(audit.get("done"))}
+            "audit_done": bool(audit.get("done")),
+            "rebuild_done": bool(rebuild.get("done")),
+            "rebuild_ids": int(rebuild.get("ids") or 0)}
 
 
 def _mark_prefetch(cid, note=""):
@@ -2046,6 +2055,113 @@ def audit_stored_photo_cards():
     SP.AUDIT["done"] = True
     print(f"story_photo: audit downgraded {SP.AUDIT['downgraded']} of {SP.AUDIT['checked']} photo cards (typography {SP.AUDIT['typography']})", flush=True)
     return SP.AUDIT["downgraded"]
+
+
+# Last-known headlines for the one-shot listed-id rebuild if story.load is not ready at boot.
+_FORCE_TITLES = {
+    "cbdfb48145e55048": ("Trump wanted Jensen Huang back as the CEO of Nvidia", "", "Pennsylvania"),
+    "9f5bc9d66d783d25": ("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine", "", "Ukraine"),
+    "4c292ccdd9df73f8": ("Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel", "", "Libya"),
+}
+
+
+def _force_title(cid):
+    """Title, body, location for a listed-id rebuild. SUBJECT_HINTS, then story.load, then the baked-in headline."""
+    try:
+        import story_photo as SP
+        if cid and cid in SP.SUBJECT_HINTS:
+            t, x = SP.SUBJECT_HINTS[cid]
+            loc = (_FORCE_TITLES.get(cid) or ("", "", ""))[2]
+            return t or "", x or "", loc
+    except Exception:
+        pass
+    try:
+        import story
+        r, _al = story.load(cid)
+        if r:
+            body = (r.get("brief") or "") + " " + (r.get("writeup") or r.get("body") or "")
+            return r.get("title") or "", body, r.get("location") or ""
+    except Exception:
+        pass
+    return _FORCE_TITLES.get(cid) or ("", "", "")
+
+
+def render_story_fresh(cid):
+    """Render this story's card now, bypassing the og mem/disk cache so typography is current."""
+    it = resolve("story", cid)
+    if not it:
+        return None
+    try:
+        return og.png_bytes(render(it))
+    except Exception:
+        return None
+
+
+def force_rebuild_listed_cards(force=False):
+    """One-shot, admin-free boot task: rewrite Huang, Zelensky and Libya under the current rules.
+
+    Does not trust stored match metadata, a current title_hash, or has_photo to skip a row.
+    Libya: rematch Commons caption/categories against the headline subject; a memorial/topic
+    photo is downgraded to the designed map. Zelensky: typography is always rebuilt from the
+    stored JPEG with the cleaned title (og cache bypassed). Huang: Commons portrait lookup
+    runs even if the stored card is already a map.
+    """
+    import story_photo as SP
+    if SP.REBUILD.get("done") and not force:
+        return SP.REBUILD
+    SP.REBUILD.update(done=False, ids=0, error="")
+    for cid in _AUDIT_FIRST:
+        try:
+            _force_rebuild_one(cid)
+            SP.REBUILD["ids"] += 1
+            print(f"story_photo: force-rebuild {cid}", flush=True)
+        except Exception as e:
+            SP.REBUILD["error"] = type(e).__name__
+            print(f"story_photo: force-rebuild {cid} err={type(e).__name__}", flush=True)
+    SP.REBUILD["done"] = True
+    print(f"story_photo: force-rebuild done {SP.REBUILD['ids']} ids", flush=True)
+    return SP.REBUILD
+
+
+def _force_rebuild_one(cid):
+    """Rewrite one listed card under current strict-match and typography rules."""
+    import story_photo as SP
+    invalidate_card_layers(cid)
+    title, text, loc = _force_title(cid)
+    if title:
+        SP.SUBJECT_HINTS.setdefault(cid, (title, text or ""))
+    match = SP.stored_photo_matches(cid) if title else None
+    # A named person without a strictly matching stored photo must get a Commons lookup.
+    # Do not skip because a leftover JPEG made has_photo True, or because the card is already a map.
+    subj = SP.main_subject(title, text) if title else None
+    need_fetch = bool(subj) and not (match is True and SP.has_photo(cid) and SP.card_has_photo(cid))
+    if need_fetch:
+        try:
+            _network_prefetch(cid)
+        except Exception:
+            pass
+        invalidate_card_layers(cid)
+        match = SP.stored_photo_matches(cid) if title else None
+    th = SP.card_title_key(_card_headline(title) or "")
+    src = ""
+    try:
+        c = SP.pick(cid, title, loc, text)
+        if c and (c.get("src") or "").startswith("https://"):
+            src = c.get("src") or ""
+    except Exception:
+        src = ""
+    if src and not SP.cached(src):
+        src = ""
+    b = None
+    if src:
+        b = render_story_fresh(cid)
+    if not b or not src:
+        # Designed map (mismatch, or person lookup found nothing).
+        src = ""
+        b = generic_story_card(cid) or render_story_fresh(cid)
+    if b and b.startswith(b"\x89PNG"):
+        SP.put_card(cid, b, src, title_hash=th, allow_downgrade=True)
+    invalidate_card_layers(cid)
 
 
 def backfill_photos(cids, pause=0.6):

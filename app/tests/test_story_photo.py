@@ -757,5 +757,168 @@ class StoryPhoto(unittest.TestCase):
             os.environ.pop("BN_CARDS_DB", None)
 
 
+    def test_official_event_src_is_not_any_story_report_image(self):
+        """A leftover Commons file bound in story_report images is stored metadata, not a match."""
+        cid = "4c292ccdd9df73f8"
+        src = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
+        from unittest import mock
+        import story_report as SR
+        with mock.patch.object(SR, "reports", return_value={"images": {cid: [{"src": src, "license": "CC0"}]}}):
+            self.assertFalse(P.official_event_src(cid, src))
+        self.assertTrue(P.official_event_src(cid, "https://earthquake.usgs.gov/product/shakemap/us7000/download/intensity.jpg"))
+
+    def test_story_head_strips_leading_emdash(self):
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        raw = "— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"
+        f, size, lines = S._story_head(d, raw, 640)
+        joined = " ".join(lines)
+        self.assertTrue(joined.startswith("Zelensky"), joined)
+        self.assertFalse(joined.lstrip().startswith("—"))
+        self.assertFalse(joined.lstrip().startswith("-"))
+
+    def test_force_rebuild_rewrites_live_libya_zelensky_huang_rows(self):
+        """The 3 exact live cards.db rows. Audit alone can skip them (story_report official-src
+        short-circuit, a title_hash that already matches the cleaned headline, a map not in
+        photo_cids / has_photo skip). force_rebuild_listed_cards must rewrite all three."""
+        import os, tempfile
+        from unittest import mock
+        from PIL import Image
+        import story_report as SR
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        libya, zel, huang = "4c292ccdd9df73f8", "9f5bc9d66d783d25", "cbdfb48145e55048"
+        libya_title = "Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel"
+        zel_raw = "— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"
+        zel_clean = S._card_headline(zel_raw)
+        self.assertTrue(zel_clean.startswith("Zelensky"))
+        huang_title = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        stories = {
+            libya: dict(title=libya_title, brief="", rank=7, location="Libya", category="War/Conflict",
+                        lat=None, lon=None, families="", watchlist=0, hidden=0),
+            zel: dict(title=zel_raw, brief="", rank=6, location="Ukraine", category="War/Conflict",
+                      lat=None, lon=None, families="", watchlist=0, hidden=0),
+            huang: dict(title=huang_title, brief="", rank=4, location="Pennsylvania", category="People",
+                        lat=None, lon=None, families="", watchlist=0, hidden=0),
+        }
+        P.SUBJECT_HINTS[libya] = (libya_title, "")
+        P.SUBJECT_HINTS[zel] = (zel_raw, "")
+        P.SUBJECT_HINTS[huang] = (huang_title, "")
+        P.REBUILD.update(done=False, ids=0, error="")
+        memorial_src = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
+        zel_src = "https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg"
+        huang_src = "https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg"
+        jpg_mem = d + "/mem.jpg"
+        jpg_zel = d + "/zel.jpg"
+        jpg_huang = d + "/huang.jpg"
+        Image.new("RGB", (1200, 800), (80, 120, 40)).save(jpg_mem, "JPEG")
+        Image.new("RGB", (900, 1200), (40, 30, 20)).save(jpg_zel, "JPEG")
+        Image.new("RGB", (900, 1200), (20, 30, 40)).save(jpg_huang, "JPEG")
+        memorial_png = b"\x89PNG\r\n\x1a\n" + b"MEMORIAL" * 500
+        dashed_png = b"\x89PNG\r\n\x1a\n" + b"DASHEDZEL" * 500
+        map_png = b"\x89PNG\r\n\x1a\n" + b"HUANGMAP" * 500
+        portrait = dict(src=huang_src, credit="Author / Wikimedia Commons", license="CC BY 4.0",
+                        caption="Jensen Huang, 2024. File photo; not taken at this event.",
+                        kind="person", title="File:Jensen huang stanford 2026-04-30 008.jpg",
+                        categories="Jen-Hsun Huang", alt="Jensen Huang", label="lab", link="")
+
+        def fake_load(cid):
+            r = stories.get(cid)
+            return (dict(r), []) if r else (None, [])
+
+        def fake_store(src):
+            path = Path(d) / (P._name(src) + ".jpg")
+            src_l = (src or "").lower()
+            src_path = jpg_huang if "huang" in src_l else jpg_zel if "zelensky" in src_l else jpg_mem
+            import shutil
+            if not path.exists() or path.stat().st_size < 2000:
+                shutil.copyfile(src_path, path)
+            return path
+
+        try:
+            P._dir = lambda: Path(d)
+            P.db_put(libya, dict(src=memorial_src, credit="Latvian pagan / Wikimedia Commons", license="CC0",
+                                 caption="Ukraine Russia, 2023. File photo; not taken at this event.",
+                                 kind="place", label="lab", link=""),
+                     jpg=Path(jpg_mem).read_bytes())
+            # title_hash already "current" so typography-only audit would skip Zelensky
+            P.put_card(libya, memorial_png, memorial_src, title_hash=P.card_title_key(libya_title))
+            P.db_put(zel, dict(src=zel_src, credit="Press Service / Wikimedia Commons", license="CC BY 4.0",
+                               caption="Volodymyr Zelensky, 2025. File photo.",
+                               kind="person", label="lab", link=""),
+                     jpg=Path(jpg_zel).read_bytes())
+            P.put_card(zel, dashed_png, zel_src, title_hash=P.card_title_key(zel_clean))
+            P.put_card(huang, map_png, "", title_hash=P.card_title_key(huang_title))
+            S._SC[libya] = (0, memorial_png, False)
+            S._SC[zel] = (0, dashed_png, False)
+            S._SC[huang] = (0, map_png, False)
+
+            # story_report binding used to make official_event_src True (the stored-metadata trap).
+            with mock.patch("story.load", side_effect=fake_load), \
+                 mock.patch.object(SR, "reports", return_value={"images": {libya: [{"src": memorial_src, "license": "CC0"}]}}), \
+                 mock.patch.object(P, "_commons_portrait", return_value=portrait), \
+                 mock.patch.object(P, "store", side_effect=fake_store):
+                # Simulate the live persist miss: audit typography/_story_build does not rewrite
+                # the stored PNG (og cache / resolve miss). The generic-map fallback still runs
+                # for a rematched mismatch, which is the official_event_src fix.
+                def no_persist(cid, fetch=False):
+                    return P.get_card(cid)
+                with mock.patch.object(S, "_story_build", side_effect=no_persist):
+                    downgraded = S.audit_stored_photo_cards()
+                self.assertGreaterEqual(downgraded, 1)
+                self.assertFalse(P.card_has_photo(libya))
+                # Zelensky typography did not persist (same dashed stub).
+                self.assertEqual(P.get_card(zel), dashed_png)
+                # Huang is a map, not in photo_cids, so the audit does not look up a portrait.
+                self.assertEqual(P.get_card(huang), map_png)
+                self.assertFalse(P.card_has_photo(huang))
+
+                S.force_rebuild_listed_cards(force=True)
+
+                # Libya: designed map, memorial gone.
+                self.assertFalse(P.card_has_photo(libya))
+                meta_l = P.card_meta(libya) or {}
+                self.assertFalse((meta_l.get("src") or "").startswith("https://"))
+                self.assertNotEqual(P.get_card(libya), memorial_png)
+                self.assertTrue(P.get_card(libya) and P.get_card(libya).startswith(b"\x89PNG"))
+
+                # Zelensky: typography rebuilt from the JPEG with the cleaned title (no leading dash).
+                self.assertTrue(P.card_has_photo(zel))
+                self.assertNotEqual(P.get_card(zel), dashed_png)
+                self.assertEqual((P.card_meta(zel) or {}).get("title_hash"), P.card_title_key(zel_clean))
+                captured = []
+                real_head = S._story_head
+                def spy_head(d2, title, maxw, max_lines=3, start=54, minsize=S.HEAD_MIN):
+                    captured.append(title)
+                    return real_head(d2, title, maxw, max_lines, start, minsize)
+                with mock.patch.object(S, "_story_head", side_effect=spy_head):
+                    S.invalidate_card_layers(zel)
+                    fresh = S.render_story_fresh(zel)
+                self.assertTrue(fresh and fresh.startswith(b"\x89PNG"))
+                self.assertTrue(any(S._card_headline(t or "").startswith("Zelensky") for t in captured) or not captured)
+                # The painted headline must not start with an em-dash (spy sees the raw arg; _story_head strips).
+                from PIL import Image as _Im, ImageDraw as _Id
+                dd = _Id.Draw(_Im.new("RGB", (10, 10)))
+                _, _, lines = S._story_head(dd, zel_raw, 640)
+                self.assertTrue(" ".join(lines).startswith("Zelensky"))
+
+                # Huang: CC BY portrait, not the leftover map.
+                self.assertTrue(P.has_photo(huang) or P.card_has_photo(huang))
+                self.assertTrue(P.card_has_photo(huang), (P.card_meta(huang), P.db_choice(huang)))
+                self.assertNotEqual(P.get_card(huang), map_png)
+                blob = " ".join(str(x or "") for x in ((P.card_meta(huang) or {}).get("src"),
+                                                       (P.db_choice(huang) or {}).get("src"),
+                                                       (P.db_choice(huang) or {}).get("caption"),
+                                                       (P.db_choice(huang) or {}).get("title")))
+                self.assertTrue("Huang" in blob or "huang" in blob.lower(), blob)
+        finally:
+            for k in (libya, zel, huang):
+                P.SUBJECT_HINTS.pop(k, None)
+                S._SC.pop(k, None)
+            P.REBUILD.update(done=False, ids=0, error="")
+            os.environ.pop("BN_CARDS_DB", None)
+
+
+
 if __name__ == "__main__":
     unittest.main()

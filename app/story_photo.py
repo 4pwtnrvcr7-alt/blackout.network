@@ -257,11 +257,12 @@ def card_has_photo(cid):
         return False
 
 
-def put_card(cid, png, src="", title_hash=""):
+def put_card(cid, png, src="", title_hash="", allow_downgrade=None):
     """Store a built card. A stored photo card always beats a map, with one exception:
     a wrong-subject photo (Trump or an Altoona map on the Huang story) may be replaced by a
     correct photo or a map. A typography rebuild may replace a photo PNG with a new photo PNG
-    (same or different src) when the current cleaned title has changed."""
+    (same or different src) when the current cleaned title has changed.
+    allow_downgrade=True (boot force-rebuild) may replace a non-matching photo with a map."""
     if not cid or not png or not png.startswith(b"\x89PNG"):
         return
     blob = sqlite3.Binary(png)
@@ -270,13 +271,14 @@ def put_card(cid, png, src="", title_hash=""):
     title_hash = title_hash or ""
     # A wrong-subject or non-matching photo may be downgraded to the designed map.
     # A correctly matched photo still cannot be replaced by a map.
-    allow_downgrade = False
-    if not src.startswith("https://"):
-        meta = card_meta(cid) or {}
-        c = db_choice(cid) or {}
-        old_src = (meta.get("src") or c.get("src") or "")
-        meta_blob = " ".join((c.get("caption") or "", c.get("credit") or "", c.get("label") or "", c.get("alt") or ""))
-        allow_downgrade = (stored_photo_matches(cid) is False) or photo_is_wrong_subject(cid, old_src, meta_blob)
+    if allow_downgrade is None:
+        allow_downgrade = False
+        if not src.startswith("https://"):
+            meta = card_meta(cid) or {}
+            c = db_choice(cid) or {}
+            old_src = (meta.get("src") or c.get("src") or "")
+            meta_blob = " ".join((c.get("caption") or "", c.get("credit") or "", c.get("label") or "", c.get("alt") or ""))
+            allow_downgrade = (stored_photo_matches(cid) is False) or photo_is_wrong_subject(cid, old_src, meta_blob)
     def fn(k):
         old = k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone()
         old_src = (old[0] if old else "") or ""
@@ -1018,17 +1020,14 @@ def exact_subject_in(blob, title="", text="", loc=""):
 
 
 def official_event_src(cid, src=""):
-    """True when this src is official event imagery already bound to this exact story id (USGS ShakeMap, etc.)."""
-    if not cid or not (src or "").startswith("https://"):
+    """True only for official event imagery identified by the URL itself (USGS ShakeMap, etc.).
+
+    A src also recorded in story_report images is not enough: that list can hold a leftover
+    Commons file (a Ukraine memorial on the Libya story) and is stored match metadata, not a
+    rematch of the Commons title/categories against this story's subject.
+    """
+    if not (src or "").startswith("https://"):
         return False
-    try:
-        import story_report as SR
-        for im in ((SR.reports() or {}).get("images") or {}).get(cid) or []:
-            if (im.get("src") or "") == src:
-                return True
-    except Exception:
-        pass
-    # USGS ShakeMap URLs are event imagery for that quake, not a loose Commons topic search.
     return "shakemap" in (src or "").lower()
 
 
@@ -1045,6 +1044,8 @@ def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", com
 
 # Running audit of stored photo cards (downgrade mismatches to the designed map).
 AUDIT = {"checked": 0, "downgraded": 0, "typography": 0, "done": False, "error": ""}
+# One-shot boot rebuild of listed problem ids (Huang, Zelensky, Libya).
+REBUILD = {"done": False, "ids": 0, "error": ""}
 
 
 def photo_cids():
