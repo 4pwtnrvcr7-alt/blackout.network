@@ -684,6 +684,11 @@ def attr(s):
 def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og_type="website"):
     """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id."""
     E = attr
+    if story_id:
+        try:   # build the story's share card now, so it is ready before the first crawler or share
+            import share_card; share_card.warm(str(story_id))
+        except Exception:
+            pass
     img = image or image_url(key or "home", story_id=story_id, title=title, rank=rank)
     t = title if title else BRAND
     d = desc or TAGLINE
