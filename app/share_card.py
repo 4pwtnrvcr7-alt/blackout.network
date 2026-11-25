@@ -518,7 +518,7 @@ def _r_story(cid):
     except Exception:
         photo = None
     have = bool(photo and not photo.get("pending"))
-    card_title = _clean_head(it.get("title") or "") or _clean_head(head) or "Story"
+    card_title = _card_headline(it.get("title") or "") or _card_headline(head) or "Story"
     return dict(title=card_title, kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
                 fact=dek or head, lines=[x for x in lines if x], tags=tags, loc=it.get("location") or "", deep=f"/wire/{cid}", share_url=f"{SITE}/wire/{cid}",
                 art=("story", it.get("lon"), it.get("lat"), photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
@@ -531,6 +531,16 @@ def _clean_head(t):
     t = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", t).strip()
     m = re.match(r"^(.{40,}?):\s*[A-Za-z]{1,6}$", t)
     return m.group(1) if m else t
+
+
+def _card_headline(raw):
+    """Headline for the share card: cleaned title, first sentence only (never two sentences squeezed in).
+    _story_head may then cut at a word boundary to keep a readable font; no ellipsis is added."""
+    t = _clean_head(raw)
+    m = re.search(r"^(.+?[.!?])\s+[A-Z“\"«]", t)
+    if m:
+        t = m.group(1).strip()
+    return t
 
 
 # ------------------------------------------------------------------ text + tags + urls
@@ -1048,11 +1058,15 @@ def _wrap_full(d, text, f, maxw):
     return lines + ([cur] if cur else [])
 
 
-def _story_head(d, title, maxw, max_lines=3, start=54, minsize=20):
-    """Whole headline on at most 3 lines. Shrink the font to fit; never append an ellipsis.
-    Only if it still cannot fit at minsize is it cut, at a word boundary, with no trailing ellipsis."""
+# Readable minimum matches Bessent's photo-card size (32). Never shrink below this.
+HEAD_MIN = 32
+
+def _story_head(d, title, maxw, max_lines=3, start=54, minsize=HEAD_MIN):
+    """Headline on at most 3 lines at a readable size. Shrink down to minsize (Bessent's 32);
+    if it still cannot fit, cut at a word boundary. Never append an ellipsis."""
     title = og._strip_emoji(title or "")
-    title = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", title).strip()  # drop a source-side trailing ellipsis only
+    title = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", title).strip()
+    minsize = max(int(minsize or HEAD_MIN), HEAD_MIN)
     size = start
     while size >= minsize:
         f = og.mont(size, 800)
@@ -1065,7 +1079,6 @@ def _story_head(d, title, maxw, max_lines=3, start=54, minsize=20):
     if len(lines) <= max_lines:
         return f, minsize, lines
     lines = lines[:max_lines]
-    # cut the last line at a word already wrapped; do not add an ellipsis
     lines[-1] = lines[-1].rstrip(" ,;:-")
     return f, minsize, lines
 
@@ -1380,12 +1393,24 @@ def story_png_fast(cid, budget=1.0):
     A PNG already stored in the persistent DB is returned at once so a deploy never serves the quick fallback for a known story."""
     hit = _SC.get(cid)
     if hit:
+        try:
+            import story_photo
+            if not story_photo.has_photo(cid) and not story_photo.card_has_photo(cid):
+                submit(cid, fetch=True)
+        except Exception:
+            pass
         return story_png(cid)
     try:
         import story_photo
         b = story_photo.get_card(cid)
         if b:
             _SC[cid] = (time.time(), b, False)
+            # A stored map must still get a background photo lookup (deduped on the card worker).
+            if not story_photo.has_photo(cid) and not story_photo.card_has_photo(cid):
+                try:
+                    submit(cid, fetch=True)
+                except Exception:
+                    pass
             return b
     except Exception:
         pass
@@ -1467,6 +1492,29 @@ def boot_warm_cards(cids, timeout=40):
             f.result(timeout=min(left, 12))
         except Exception:
             pass
+    return n
+
+
+
+def backfill_photos(cids, pause=0.6):
+    """One-time after boot (after og=true): licensed photo lookups for the top Wire items.
+    Deduped on the single card/photo worker and paused between submits so it does not starve the CPU."""
+    seen = set()
+    n = 0
+    for cid in cids or []:
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        try:
+            import story_photo
+            if story_photo.has_photo(cid) and story_photo.card_has_photo(cid):
+                continue
+            submit(cid, fetch=True)
+            n += 1
+        except Exception:
+            pass
+        time.sleep(max(0.3, float(pause or 0.6)))
+    print(f"story_photo: backfill queued {n} photo lookups", flush=True)
     return n
 
 

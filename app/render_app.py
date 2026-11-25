@@ -429,6 +429,31 @@ def _boot_warm(timeout=45):
     print(f"boot warm: wire={BOOT_WARM['wire']} og={BOOT_WARM['og']} cards={BOOT_WARM['n']} in {time.time()-t0:.1f}s {BOOT_WARM['error']}", flush=True)
     return can_serve_wire_og()
 
+def _card_backfill():
+    """Top 50 live clusters plus stored cards: queue photo lookups with a pause between each."""
+    cids = []
+    try:
+        if has_data():
+            c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=5)
+            cids = [r[0] for r in c.execute(
+                "SELECT cluster_id FROM clusters WHERE watchlist IN (0,1) "
+                "ORDER BY COALESCE(updated, first_seen) DESC LIMIT 50")]
+            c.close()
+    except Exception:
+        cids = []
+    try:
+        import story_photo
+        for cid in story_photo.card_cids(50):
+            if cid not in cids:
+                cids.append(cid)
+    except Exception:
+        pass
+    try:
+        import share_card
+        share_card.backfill_photos(cids, pause=0.6)
+    except Exception:
+        traceback.print_exc()
+
 def _sign_get(path):
     ts = str(int(time.time()))
     sig = hmac.new(SYNC_SECRET.encode(), f"{ts}\nGET\n{path}\n{hashlib.sha256(b'').hexdigest()}".encode(), hashlib.sha256).hexdigest()
@@ -806,6 +831,11 @@ if __name__ == "__main__":
     except Exception:
         traceback.print_exc()
         BOOT_WARM["done"] = True
+    try:   # after og=true: one-time throttled photo backfill of the top Wire items (does not block healthz)
+        if BOOT_WARM.get("og"):
+            threading.Thread(target=_card_backfill, name="card-backfill", daemon=True).start()
+    except Exception:
+        traceback.print_exc()
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True
     server.ThreadingHTTPServer.request_queue_size = 256   # t338: the default listen backlog (5) overflowed on page loads (~40 parallel requests) -> Render 502s
