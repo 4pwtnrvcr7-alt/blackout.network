@@ -153,7 +153,7 @@ def render(cid, since=""):
             pp = PP.strip_html(cid, " ".join([title or "", r.get("brief") or ""] + [a.get("title") or "" for a in al[:60]]))
             if pp: g_ppl = ""
         except Exception: pp = ""
-        share_url = f"{S.SITE}/wire/{cid}"
+        share_url = f"{S.SITE}/wire/{cid}?s=x"
         share_text = f"{title} (rank {rank}/10) via BLACKOUT.NETWORK"
         x_intent = None
         try:
@@ -230,13 +230,13 @@ def render(cid, since=""):
     noindex = (watch != 0 or rank < 3) and not desk_story   # t1330u: desk stories are written up in full, so they stay indexable
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
-def handle_get(path, qs):
+def handle_get(path, qs, headers=None):
     # Nov 18: the Wire timeline is /wire going forward. Hide the previous listing at /wire-classic (noindex).
     # BN_WIRE_TIMELINE=0 restores the previous listing at /wire. /wire/<cluster_id> is unchanged.
     if path in ("/wire-classic", "/wire-classic/"):
         try:
             import wire_v2
-            r = wire_v2.handle("/wire-classic", qs)
+            r = wire_v2.handle("/wire-classic", qs, headers=headers)
             if r: return r
         except Exception:
             import traceback; traceback.print_exc()
@@ -253,7 +253,7 @@ def handle_get(path, qs):
         import wire_v2
         if path.startswith(wire_v2.ST + "/"):
             return wire_v2.handle_static(path) or (404, {"error": "not found"})
-        r = wire_v2.handle(path, qs)
+        r = wire_v2.handle(path, qs, headers=headers)
         if r: return r
     except Exception:
         import traceback; traceback.print_exc()
