@@ -400,7 +400,7 @@ def _render():
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
         + sitenav.head_html("welcome")
         + '<link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/welcome.css">'
-        '<link rel="icon" href="/favicon.ico?v=3" sizes="any"></head><body>'
+        '<link rel="icon" href="/favicon.ico?v=4" sizes="any"></head><body>'
         '<a class="skip" href="#main">Skip to content</a>'
         + sitenav.header_html("welcome")
         + '<div class="wel-shell"><div class="wel-bar">'
