@@ -413,6 +413,38 @@ def _from_text(text, prefer_cc=None):
     return _pack(h["lat"], h["lon"], "country", h["place"], h["cc"])
 
 
+_CONGO_ROC = re.compile(
+    r"\bRepublic of (?:the )?Congo\b|\bCongo[- ]Brazzaville\b|\bBrazzaville\b", re.I)
+_CONGO_DRC = re.compile(
+    r"\bDemocratic Republic of (?:the )?Congo\b|\bDR Congo\b|\bD\.R\. Congo\b|\bCongo-Kinshasa\b|\bDRC\b", re.I)
+_CONGO_BARE = re.compile(r"\bCongo(?:'s)?\b", re.I)
+
+
+def _congo_ccs(text, ccs):
+    """Bare 'Congo' in the news is the Democratic Republic of the Congo (CD).
+
+    The gazetteer maps the token 'congo' to CG (Republic of the Congo). Keep CG only when
+    the story clearly names the Republic, Brazzaville, or Congo-Brazzaville.
+    """
+    raw = text or ""
+    ccs = list(ccs or [])
+    roc = bool(_CONGO_ROC.search(raw))
+    drc = bool(_CONGO_DRC.search(raw))
+    if roc and not drc:
+        return ccs
+    if drc or _CONGO_BARE.search(raw):
+        out, seen = [], set()
+        for c in ccs:
+            c2 = "CD" if c == "CG" else c
+            if c2 not in seen:
+                seen.add(c2)
+                out.append(c2)
+        if "CD" not in seen:
+            out.append("CD")
+        return out
+    return ccs
+
+
 def named_countries(text):
     """ISO2 codes the story clearly names (multi-word countries + demonyms). Empty if none."""
     raw = _OUTLET.sub(" ", text or "")
@@ -455,7 +487,7 @@ def named_countries(text):
     for word, d in _DEMONYM_PLACE.items():
         if re.search(r"\b" + word + r"\w*\b", raw, re.I) and d[0] not in seen:
             seen.add(d[0]); out.append(d[0])
-    return out
+    return _congo_ccs(raw, out)
 
 
 

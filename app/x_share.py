@@ -1064,6 +1064,7 @@ _PEOPLE = [   # distinctive officials: tag the person and, when the role is unam
     (r"\bBenjamin Netanyahu\b|\bNetanyahu\b", "Netanyahu", None),
     (r"\bXi Jinping\b", "XiJinping", None),
     (r"\bVitali Klitschko\b", "VitaliKlitschko", None),
+    (r"\bJensen Huang\b", "JensenHuang", None),
 ]
 # Full names for Commons title matching; tags stay camel-case for #PeteHegseth etc.
 _PEOPLE_FULL = {
@@ -1078,6 +1079,7 @@ _PEOPLE_FULL = {
     "Netanyahu": "Benjamin Netanyahu",
     "XiJinping": "Xi Jinping",
     "VitaliKlitschko": "Vitali Klitschko",
+    "JensenHuang": "Jensen Huang",
 }
 _ORG_TITLE_WORDS = re.compile(
     r"\b(ministr(?:y|ies)|departments?|governments?|agenc(?:y|ies)|offices?|"
