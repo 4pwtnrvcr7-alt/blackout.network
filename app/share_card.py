@@ -454,13 +454,29 @@ def _r_page(i):
 
 
 def _story_item(cid):
+    """Card data from the DB only. Never call api_state() here: on a 1-CPU Render node it can take tens of
+    seconds, peg the CPU, and drop new TLS handshakes (SSL EOF on /wire/<id> while / and /healthz stay fast)."""
     cid = (cid or "").lower()
     if not re.fullmatch(r"[0-9a-f]{16}", cid):
         return None
-    import theme, wire_v2
-    st = theme._srv().api_state()
-    items = list(wire_v2.items(st)) + list(st.get("watchlist") or [])
-    it = next((x for x in items if str(x.get("cluster_id") or "").lower() == cid), None)
+    import wire_v2, story
+    r, _al = story.load(cid)
+    if not r:
+        return None
+    fams = [f for f in (r.get("families") or "").split(",") if f]
+    it = {
+        "cluster_id": cid,
+        "title": r.get("title") or "",
+        "brief": r.get("brief") or "",
+        "rank": r.get("rank") or 0,
+        "location": r.get("location") or "",
+        "category": r.get("category") or "",
+        "lat": r.get("lat"),
+        "lon": r.get("lon"),
+        "n_families": r.get("eff_families") or len(fams) or 1,
+        "watchlist": r.get("watchlist") or 0,
+        "hidden": r.get("hidden") or 0,
+    }
     return it, wire_v2
 
 
@@ -493,14 +509,7 @@ def _r_story(cid):
     adds = what and len(what) > 30 and len(set(norm(what).split()) - set(norm(head).split())) >= max(4, len(set(norm(what).split())) // 2)
     dek = what if adds else f"Rank {rank}/10, reported by {fam} independent source famil{'y' if fam == 1 else 'ies'}."
     lines = [head, dek]
-    hero = None
-    try:
-        import story_v3
-        if it.get("lat") is None and it.get("lon") is None and story_v3.on():   # a located story gets a map crop, so skip the slow hero lookup
-            a = story_v3.assemble(story_v3.note_for(cid), it, wire_v2)
-            hero = ((a.get("hero") or {}) if isinstance(a.get("hero"), dict) else {}).get("image")
-    except Exception:
-        hero = None
+    hero = None  # do not call story_v3.assemble here: it is slow and runs on the card worker, starving HTTP accept
     return dict(title=head, kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
                 fact=dek or head, lines=[x for x in lines if x], tags=tags, loc=it.get("location") or "", deep=f"/wire/{cid}", share_url=f"{SITE}/wire/{cid}",
                 art=("story", it.get("lon"), it.get("lat"), hero), credit="", desc=dek or head, item=it)
@@ -1112,10 +1121,13 @@ _SC = {}   # cid -> (built_at, png, refreshing)
 
 
 def _story_build(cid):
-    b = png_for("story", cid)
-    if b:
-        _SC[cid] = (time.time(), b, False)
-    return b
+    try:
+        b = png_for("story", cid)
+        if b:
+            _SC[cid] = (time.time(), b, False)
+        return b
+    finally:
+        time.sleep(0.2)  # yield the only CPU so new TLS/HTTP connections can be accepted
 
 
 def story_png(cid):
@@ -1149,7 +1161,7 @@ def _pool():
     global _POOL
     if _POOL is None:
         from concurrent.futures import ThreadPoolExecutor
-        _POOL = ThreadPoolExecutor(max_workers=3, thread_name_prefix="story-card")
+        _POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="story-card")
     return _POOL
 
 

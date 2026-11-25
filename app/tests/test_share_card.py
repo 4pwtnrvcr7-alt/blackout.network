@@ -93,3 +93,24 @@ class QuickFallback(unittest.TestCase):
                 story.load = o
         finally:
             share_card.story_png_fast = old
+
+
+    def test_story_item_does_not_call_api_state(self):
+        called = {"n": 0}
+        import theme, story
+        old_srv, old_load = theme._srv, story.load
+        theme._srv = lambda: type("S", (), {"api_state": staticmethod(lambda: called.__setitem__("n", called["n"] + 1) or {})})()
+        story.load = lambda cid: ({"title": "Scott Bessent Unleashes Fresh Iran Sanctions", "brief": "WHAT: sanctions",
+                                   "rank": 2, "location": "Iran", "category": "politics", "lat": None, "lon": None,
+                                   "families": "a,b", "watchlist": 0, "hidden": 0}, [])
+        try:
+            got = S._story_item("e2ca47e325c5b8e1")
+            self.assertIsNotNone(got)
+            self.assertEqual(called["n"], 0)
+            self.assertIn("Bessent", got[0]["title"])
+            card = S._r_story("e2ca47e325c5b8e1")
+            self.assertIsNotNone(card)
+            self.assertEqual(called["n"], 0)
+        finally:
+            theme._srv = old_srv
+            story.load = old_load
