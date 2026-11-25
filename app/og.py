@@ -648,7 +648,7 @@ def png_for_story_fast(cid):
     spec = _db_spec(cid) or {}
     t = spec.get("title") or "The Wire"
     bg_im = _open_bg("wire", "iss070e062746.webp")
-    return _cached(_cache_key("quick", cid, t, spec.get("rank")), lambda: png_bytes(render(t, bg_im=bg_im, tagline=True, rank=spec.get("rank"))))
+    return _cached(_cache_key("quick", cid, t, spec.get("rank"), "wire:iss070e062746.webp"), lambda: png_bytes(render(t, bg_im=bg_im, tagline=True, rank=spec.get("rank"))))
 
 
 def png_for_story(cid, title=None, rank=None, hero=None):

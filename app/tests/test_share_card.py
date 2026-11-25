@@ -72,3 +72,24 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QuickFallback(unittest.TestCase):
+    def test_png_for_story_fast_fallback_does_not_raise_and_is_unique(self):
+        import og, share_card
+        old = share_card.story_png_fast
+        share_card.story_png_fast = lambda cid, budget=1.0: None
+        try:
+            import story
+            o = story.load
+            story.load = lambda cid: ({"title": "Theriva Biologics halted on NYSE American", "rank": 7}, [])
+            try:
+                a = og.png_for_story_fast("a" * 16)
+                self.assertGreater(len(a), 5000)
+                self.assertEqual(a, og.png_for_story_fast("a" * 16))
+                code, body, ct = og.handle_get("/og/wire/" + "a" * 16 + ".png")
+                self.assertEqual(body, a)   # served the quick card, not the generic last-resort one
+            finally:
+                story.load = o
+        finally:
+            share_card.story_png_fast = old
