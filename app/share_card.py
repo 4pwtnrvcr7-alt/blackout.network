@@ -343,6 +343,8 @@ def _r_launch(i):
     veh = L.get("vehicle") or (L.get("name") or "").split("|")[0].strip()
     mis = L.get("mission") or (L.get("name") or "").split("|")[-1].strip()
     pad = L.get("pad") or ""
+    if pad.lower().startswith("unknown"):
+        pad = ""
     loc = (L.get("location") or "").replace(", People's Republic of China", ", China").replace(", United States of America", ", USA")
     place = loc.split(",")[0].strip() if loc else pad
     d, when = _et(L.get("net") or "")
@@ -359,7 +361,8 @@ def _r_launch(i):
         first += f", bound for {orb}"
     lines = [first + ".", f"Pad: {pad}." if pad else "", "Watch the launch chase in 3D."]
     big = cd or (d.strftime("%b ").upper() + str(d.day) if d else "")
-    stats = [(when.replace(" ET", ""), "NET (ET)") if when else ("", ""), (veh[:18], "vehicle"), ((L.get("orbit") or "")[:12] if (L.get("orbit") or "").upper() not in ("N/A", "UNKNOWN") else "", "orbit")]
+    wd, _, wt = when.replace(" ET", "").partition(", ")
+    stats = [(wd, f"NET {wt} ET".strip()) if when else ("", ""), (veh[:18], "vehicle"), ((L.get("orbit") or "")[:12] if (L.get("orbit") or "").upper() not in ("N/A", "UNKNOWN") else "", "orbit")]
     stats = [s for s in stats if s[0]]
     return dict(title=veh if junk else mis, kicker=f"LAUNCH · {veh}".upper()[:44], color=LAUNCH_C, stats=stats[:3], big=("T- " + cd if cd else (st or "").upper()), fact=first, lines=[x for x in lines if x],
                 tags=[x_share.to_tag(veh).lstrip("#"), "RocketLaunch", "Spaceflight", x_share.to_tag(L.get("provider", "").split()[0] if L.get("provider") else "Space").lstrip("#") or "Space"],
