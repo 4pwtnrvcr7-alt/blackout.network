@@ -1281,6 +1281,14 @@ _NEED = set()   # stories whose card was built before their photo was stored (re
 def _story_build(cid, fetch=False):
     """fetch=True (background warm, refresh, write-up gate) may download the story's photo; the crawler path (fetch=False) never touches the network."""
     try:
+        try:
+            # Rehydrate a stored JPEG onto disk so a VERSION rebuild can reuse it (no network).
+            import story_photo
+            c = story_photo.db_choice(cid)
+            if c and not c.get("none") and c.get("src"):
+                story_photo.cached(c["src"])
+        except Exception:
+            pass
         if fetch:
             try:
                 import story_photo
@@ -1304,9 +1312,19 @@ def _story_build(cid, fetch=False):
                 src = ""
                 if it and it.get("photo"):
                     src = (it["photo"] or {}).get("src") or ""
-                if fetch and not (it and it.get("photo_pending")):
+                if not src:
+                    try:
+                        if story_photo.has_photo(cid):
+                            # A stored JPEG must be on the card; do not persist a map over it.
+                            src = (story_photo.db_choice(cid) or {}).get("src") or ""
+                    except Exception:
+                        pass
+                pending = bool(it and it.get("photo_pending"))
+                if src.startswith("https://") and not pending:
                     story_photo.put_card(cid, b, src)
-                if not fetch:
+                elif fetch and not pending:
+                    story_photo.put_card(cid, b, src)
+                if not fetch and not src.startswith("https://"):
                     if _r_story_pending(cid):
                         _NEED.add(cid)
             except Exception:
@@ -1397,14 +1415,61 @@ def _entity_story(cid, title=None):
     return False
 
 
+LOOKUP_TIMEOUT = 15  # one stuck Commons/HTTP fetch must not block the photo queue
+_LAST_PREFETCH = ""
+_FRUNNING = None
+_WORKER_LOGGED = False
+
+
+def photo_status():
+    """Heartbeat for /healthz: queue depth, last prefetch time, whether the worker thread is alive."""
+    with _FLOCK:
+        depth = len(_FHIGH) + len(_FLOW)
+        running = _FRUNNING
+        last = _LAST_PREFETCH
+        alive = bool(_FWORKER and _FWORKER.is_alive())
+    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or ""}
+
+
+def _mark_prefetch(cid, note=""):
+    global _LAST_PREFETCH
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    _LAST_PREFETCH = f"{ts} {cid}" + (f" {note}" if note else "")
+
+
 def _ensure_fworker():
-    global _FWORKER
-    if _FWORKER is None or not _FWORKER.is_alive():
-        _FWORKER = threading.Thread(target=_floop, name="story-photo", daemon=True)
-        _FWORKER.start()
+    """Start (or restart) the photo worker. Logs once when a live thread is up."""
+    global _FWORKER, _WORKER_LOGGED
+    if _FWORKER is not None and _FWORKER.is_alive():
+        return
+    _FWORKER = threading.Thread(target=_floop, name="story-photo", daemon=True)
+    _FWORKER.start()
+    if not _WORKER_LOGGED:
+        print("story_photo: worker started", flush=True)
+        _WORKER_LOGGED = True
+
+
+def _run_lookup(cid, fut):
+    """Run one fetch=True build; always record a last-prefetch heartbeat."""
+    try:
+        print(f"story_photo: lookup start {cid}", flush=True)
+        b = _story_build(cid, True)
+        _mark_prefetch(cid, "ok")
+        if not fut.done():
+            fut.set_result(b)
+    except Exception as e:
+        _mark_prefetch(cid, type(e).__name__)
+        print(f"story_photo: lookup {cid} err={type(e).__name__}", flush=True)
+        if not fut.done():
+            try:
+                fut.set_exception(e)
+            except Exception:
+                pass
 
 
 def _floop():
+    global _FRUNNING
+    print("story_photo: worker loop running", flush=True)
     while True:
         cid = fut = None
         with _FLOCK:
@@ -1419,15 +1484,23 @@ def _floop():
             _FWAKE.clear()
             continue
         _FINFLIGHT[cid] = fut
+        _FRUNNING = cid
         try:
-            fut.set_result(_story_build(cid, True))
-        except Exception as e:
-            try:
-                fut.set_exception(e)
-            except Exception:
-                pass
+            th = threading.Thread(target=_run_lookup, args=(cid, fut), daemon=True, name=f"photo-{cid[:8]}")
+            th.start()
+            th.join(LOOKUP_TIMEOUT)
+            if th.is_alive():
+                _mark_prefetch(cid, "timeout")
+                print(f"story_photo: prefetch {cid} photo=0 err=timeout {LOOKUP_TIMEOUT}s", flush=True)
+                if not fut.done():
+                    try:
+                        fut.set_exception(TimeoutError(f"photo lookup {cid} exceeded {LOOKUP_TIMEOUT}s"))
+                    except Exception:
+                        pass
+                # The lookup thread may still finish and put_card a photo later; the queue moves on.
         finally:
             _FINFLIGHT.pop(cid, None)
+            _FRUNNING = None
 
 
 def submit(cid, fetch=False, urgent=False):
@@ -1471,9 +1544,50 @@ def submit(cid, fetch=False, urgent=False):
         return fut
 
 
+
+def ensure_current_card(cid):
+    """If a stored card is from a previous og.VERSION, rebuild it (reuse a stored licensed photo; never fall back to a map when one exists).
+    Returns the current PNG or None. No network when the JPEG is already in cards.db."""
+    try:
+        import story_photo, og
+        meta = story_photo.card_meta(cid)
+        if not meta:
+            return None
+        if not story_photo.card_stale(meta):
+            return meta["png"]
+        # Rebuild typography / layout under the new VERSION, reusing the stored photo.
+        b = _story_build(cid, fetch=False)
+        if b:
+            return b
+        # Rebuild failed: keep the stored card rather than inventing a map over a photo.
+        return meta["png"]
+    except Exception:
+        try:
+            import story_photo
+            return story_photo.get_card(cid)
+        except Exception:
+            return None
+
+
 def story_png_fast(cid, budget=1.0):
     """Card bytes within `budget` seconds or None (the caller serves a quick title card instead; the real card keeps building and is cached).
     A PNG already stored in the persistent DB is returned at once so a deploy never serves the quick fallback for a known story."""
+    try:
+        import story_photo
+        cur = ensure_current_card(cid)
+        if cur:
+            _SC[cid] = (time.time(), cur, False)
+            if not story_photo.card_has_photo(cid) and not story_photo.has_photo(cid):
+                submit(cid, fetch=True, urgent=True)
+            elif not story_photo.card_has_photo(cid) and story_photo.has_photo(cid):
+                # JPEG exists, card is a map: rebuild now (no network) so a VERSION bump cannot drop the photo.
+                b = _story_build(cid, fetch=False)
+                if b:
+                    _SC[cid] = (time.time(), b, False)
+                    cur = b
+            return cur
+    except Exception:
+        pass
     hit = _SC.get(cid)
     if hit:
         try:
@@ -1488,7 +1602,6 @@ def story_png_fast(cid, budget=1.0):
         b = story_photo.get_card(cid)
         if b:
             _SC[cid] = (time.time(), b, False)
-            # A stored map must still get a background photo lookup (deduped; jumps the backfill).
             if not story_photo.card_has_photo(cid):
                 try:
                     submit(cid, fetch=True, urgent=True)
