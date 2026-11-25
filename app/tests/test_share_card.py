@@ -285,3 +285,55 @@ class CardPhotoV3(unittest.TestCase):
                 os.environ.pop("BN_CARD_PHOTO", None)
             else:
                 os.environ["BN_CARD_PHOTO"] = old
+
+
+    def test_rebuild_skips_network_when_jpeg_already_stored(self):
+        """A leftover map with a stored JPEG must re-render without apply_card_photo (network)."""
+        import share_card as S
+        from unittest import mock
+        fake = b"\x89PNG" + b"x" * 4000
+        calls = []
+
+        def fake_apply(*a, **k):
+            calls.append("net")
+            return {"src": "https://example.test/x.jpg"}
+
+        with mock.patch.object(S, "card_photo_on", return_value=True), \
+             mock.patch.object(S, "apply_card_photo", side_effect=fake_apply), \
+             mock.patch.object(S, "render_story_fresh", return_value=fake), \
+             mock.patch.object(S, "generic_story_card", return_value=None), \
+             mock.patch.object(S, "_force_title", return_value=("Title", "", "")), \
+             mock.patch.object(S, "invalidate_card_layers"), \
+             mock.patch("story_photo.has_photo", return_value=True), \
+             mock.patch("story_photo.put_card") as put, \
+             mock.patch("story_photo.pick", return_value={"src": "https://example.test/x.jpg"}), \
+             mock.patch("story_photo.db_choice", return_value={"src": "https://example.test/x.jpg"}):
+            out = S.rebuild_card_photos(["abcdabcdabcdabcd"], pause=0)
+        self.assertEqual(out["ids"], 1)
+        self.assertEqual(calls, [])
+        self.assertTrue(put.called)
+
+    def test_convert_one_stale_uses_stored_jpeg_without_network(self):
+        import share_card as S
+        from unittest import mock
+        fake = b"\x89PNG" + b"y" * 4000
+        calls = []
+
+        def fake_apply(*a, **k):
+            calls.append("net")
+            return None
+
+        with mock.patch.object(S, "card_photo_on", return_value=True), \
+             mock.patch.object(S, "apply_card_photo", side_effect=fake_apply), \
+             mock.patch.object(S, "render_story_fresh", return_value=fake), \
+             mock.patch.object(S, "generic_story_card", return_value=None), \
+             mock.patch.object(S, "_force_title", return_value=("Yaşar Güler at the Pentagon", "", "")), \
+             mock.patch.object(S, "invalidate_card_layers"), \
+             mock.patch("story_photo.has_photo", return_value=True), \
+             mock.patch("story_photo.put_card") as put, \
+             mock.patch("story_photo.db_choice", return_value={"src": "https://example.test/yasar.jpg"}):
+            ok = S._convert_one_stale("e9a491a27092837f")
+        self.assertTrue(ok)
+        self.assertEqual(calls, [])
+        self.assertTrue(put.called)
+        self.assertNotIn("e9a491a27092837f", S._SC)
