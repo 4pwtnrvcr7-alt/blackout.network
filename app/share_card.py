@@ -524,14 +524,24 @@ def _r_story(cid):
                 art=("story", it.get("lon"), it.get("lat"), photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
 
 
-_EDGE = r"[\s\ufeff\u200b-\u200d\u2060\-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D\"“”„«»‘’‛′″'`.,;:|/\\·•]+"
+_EDGE = r"[\s\ufeff\u200b-\u200d\u2060\xa0\-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D\"“”„«»‘’‛′″'`.,;:|/\\·•]+"
+_EDGE_CHARS = (
+    " \t\r\n\ufeff\u200b\u200c\u200d\u2060\xa0"
+    "-–—―−‐‒\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFE58\uFE63\uFF0D"
+    "\"“”„«»‘’‛′″'`.,;:|/\\·•"
+)
 
 def _strip_edges(t):
-    """Strip leading and trailing dashes and punctuation (BOM, typographic dashes/quotes, ellipses)."""
+    """Strip leading and trailing dashes and punctuation (BOM, typographic dashes/quotes, ellipses).
+    Repeat until stable so a dash+ellipsis mix at either end is fully removed."""
     t = " ".join((t or "").split())
-    t = re.sub(r"^" + _EDGE, "", t)
-    t = re.sub(_EDGE + r"$", "", t)
-    t = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", t).strip()
+    prev = None
+    while t and t != prev:
+        prev = t
+        t = t.strip(_EDGE_CHARS)
+        t = re.sub(r"^" + _EDGE, "", t)
+        t = re.sub(_EDGE + r"$", "", t)
+        t = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", t).strip(_EDGE_CHARS)
     return t
 
 
