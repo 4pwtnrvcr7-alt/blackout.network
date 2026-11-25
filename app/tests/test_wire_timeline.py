@@ -1,5 +1,5 @@
 """Wire timeline (/wire; /wire-next 301s here). Run: cd app && python3 -m unittest tests.test_wire_timeline -v"""
-import os, sqlite3, sys, tempfile, unittest
+import os, time, sqlite3, sys, tempfile, unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import addons, wire_timeline as W
 
@@ -148,6 +148,7 @@ class Paging(unittest.TestCase):
                   ("farawayitem00002", "A far-away later update", "political", "Tokyo", 35.68, 139.76,
                    None, "2026-11-18T07:05:10Z", "2026-12-31T23:58:00Z", 10, "High", 1, 1, '[]', '[]', 0, "", 2))
         c.commit(); c.close()
+        W.bust_meta()
         a = W.page(limit=5)
         self.assertEqual(a["items"][0]["id"], "aaaupdated000001")
         self.assertEqual(a["items"][0]["t"], "2026-12-31T23:59:00Z")
@@ -250,7 +251,119 @@ class Paging(unittest.TestCase):
 
 
 
+
+    def test_list_path_does_not_call_hashtags_and_returns_xu(self):
+        """Timeline rows keep a Post-on-X URL without running the 14–20 ms hashtags/location_tags path."""
+        import x_share
+        called = []
+        real = x_share.hashtags
+        x_share.hashtags = lambda *a, **k: called.append(1) or real(*a, **k)
+        try:
+            W.bust_meta()
+            a = W.page(limit=10)
+            self.assertTrue(a["items"])
+            for it in a["items"]:
+                self.assertTrue(it.get("xu", "").startswith("https://x.com/intent/post?"), it.get("xu"))
+            self.assertEqual(called, [])
+        finally:
+            x_share.hashtags = real
+
+    def test_page_cache_repeats_are_cheap(self):
+        W.bust_meta()
+        t0 = time.perf_counter(); a = W.page(limit=8); d1 = time.perf_counter() - t0
+        t0 = time.perf_counter(); b = W.page(limit=8); d2 = time.perf_counter() - t0
+        self.assertEqual([x["id"] for x in a["items"]], [x["id"] for x in b["items"]])
+        self.assertLess(d2, 0.05)
+        self.assertLess(d1, 0.5)
+
+
+class ListXTags(unittest.TestCase):
+    """Post-on-X list tags are 3–5 specific entities, never generic filler, and match the story-page rule path."""
+
+    def setUp(self):
+        with W._TC_LK:
+            W._TC.clear()
+        self._ready = {}
+        self._rr, self._nt, self._persist = W._ready_tags, W._note_tags, W._persist_ready_tags
+        W._ready_tags = lambda cid: W._norm_tag_list(self._ready.get(cid))
+        W._note_tags = lambda cid: []
+        W._persist_ready_tags = lambda cid, tags: self._ready.__setitem__(cid, list(tags))
+
+    def tearDown(self):
+        W._ready_tags, W._note_tags, W._persist_ready_tags = self._rr, self._nt, self._persist
+        with W._TC_LK:
+            W._TC.clear()
+
+    def test_no_stored_tags_computes_specific_not_generic(self):
+        cid = "aa" * 8
+        title = "Ebola outbreak confirmed in Uganda and South Sudan"
+        xu = W._list_xu(cid, title, title, loc="Uganda",
+                        brief="Health officials confirmed an Ebola outbreak in Uganda and South Sudan.",
+                        category="disease / health", rank=7)
+        self.assertTrue(xu.startswith("https://x.com/intent/post?"), xu)
+        from urllib.parse import parse_qs, urlparse
+        text = parse_qs(urlparse(xu).query).get("text", [""])[0]
+        tags = [w for w in text.split() if w.startswith("#")]
+        self.assertGreaterEqual(len(tags), 3, text)
+        self.assertLessEqual(len(tags), 5, text)
+        for g in ("#News", "#WorldNews", "#Breaking", "#BreakingNews", "#BlackoutNetwork", "#Alerts"):
+            self.assertNotIn(g, tags, text)
+        blob = " ".join(tags).lower()
+        self.assertTrue(any(x in blob for x in ("uganda", "sudan", "ebola")), tags)
+        import x_share
+        called = []
+        real = x_share.location_tags
+        x_share.location_tags = lambda *a, **k: called.append(1) or real(*a, **k)
+        try:
+            xu2 = W._list_xu(cid, title, title, loc="Uganda")
+            self.assertEqual(xu, xu2)
+            self.assertEqual(called, [])
+        finally:
+            x_share.location_tags = real
+
+    def test_stored_specific_used_without_location_tags(self):
+        cid = "bb" * 8
+        self._ready[cid] = ["#Uganda", "#Ebola", "#SouthSudan", "#WHO"]
+        import x_share
+        called = []
+        real = x_share.location_tags
+        x_share.location_tags = lambda *a, **k: called.append(1) or real(*a, **k)
+        try:
+            tags = W._list_tags(cid, headline="Ebola outbreak in Uganda", title="Ebola outbreak in Uganda", loc="Uganda")
+            self.assertEqual(tags, ["#Uganda", "#Ebola", "#SouthSudan", "#WHO"])
+            self.assertEqual(called, [])
+        finally:
+            x_share.location_tags = real
+
+    def test_stored_generics_are_dropped_and_filled_with_specific(self):
+        cid = "cc" * 8
+        self._ready[cid] = ["#News", "#WorldNews", "#Breaking"]
+        tags = W._list_tags(cid, headline="Ebola outbreak confirmed in Uganda and South Sudan",
+                            title="Ebola outbreak confirmed in Uganda and South Sudan", loc="Uganda",
+                            brief="Health officials confirmed an Ebola outbreak in Uganda and South Sudan.",
+                            category="disease / health", rank=7)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertLessEqual(len(tags), 5, tags)
+        for g in ("#News", "#WorldNews", "#Breaking", "#BreakingNews"):
+            self.assertNotIn(g, tags)
+        blob = " ".join(tags).lower()
+        self.assertTrue(any(x in blob for x in ("uganda", "sudan", "ebola")), tags)
+
+    def test_fewer_than_three_stored_are_filled_without_generics(self):
+        cid = "dd" * 8
+        self._ready[cid] = ["#Uganda"]
+        tags = W._list_tags(cid, headline="Ebola outbreak confirmed in Uganda and South Sudan",
+                            title="Ebola outbreak confirmed in Uganda and South Sudan",
+                            loc="Uganda", brief="Health officials confirmed an Ebola outbreak in Uganda.",
+                            category="disease", rank=7)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertIn("#Uganda", tags)
+        for g in ("#News", "#WorldNews", "#Breaking"):
+            self.assertNotIn(g, tags)
+
+
 class FullStoryTap(unittest.TestCase):
+
     def test_full_story_is_a_real_link_and_hover_is_fine_pointer_only(self):
         app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         def read(*parts):
