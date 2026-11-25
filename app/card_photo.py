@@ -59,9 +59,25 @@ TOPICS = {
     "wildfire": ("USFS", ["File:Frog Fire with Mt Shasta USFS 2015 08 04.jpeg"], "Wildfire"),
     "flood": ("FEMA", ["File:FEMA - 34508 - Flooded street in Missouri.jpg"], "Flooding"),
     "cyber": ("Server racks", ["File:BalticServers data center.jpg"], "Server racks"),
+    # Category / subject fallbacks (Nov 25 2026, 4:47 PM ET): every story gets a real licensed photo, never a map.
+    "military": ("U.S. Air Force", ["File:B-2 Spirit original.jpg", "File:F-35A flight (cropped).jpg"], "Military aircraft"),
+    "aviation": ("NASA", ["File:B747 with Space Shuttle on it from above.jpg"], "Aircraft in flight"),
+    "grid": ("Power lines", ["File:Transmission Lines at Sunset.jpg"], "Power transmission lines"),
+    "economy": ("U.S. Treasury Building", ["File:US Treasury Building.jpg"], "U.S. Treasury Building"),
+    "spaceweather": ("NASA/SDO", ["File:The Sun by the Atmospheric Imaging Assembly of NASA's Solar Dynamics Observatory - 20100819.jpg"], "The Sun"),
+    "government": ("U.S. Capitol", ["File:United States Capitol - west front.jpg"], "U.S. Capitol"),
+    "general": ("NASA", ["File:The Earth seen from Apollo 17.jpg"], "Earth from space"),
 }
+# Fallback keys: a curated file for one of these is allowed on any story the chooser sent it to.
+FALLBACK_KEYS = frozenset({"military", "aviation", "grid", "economy", "spaceweather", "government", "general"})
+# Story category (Wire "k") -> fallback key when the headline names no hazard or place.
+# Wire keys (conflict, quake, ...) and story categories ("war/conflict", "natural disaster", ...) both match by substring.
+CATEGORY_KEY = (("conflict", "military"), ("war", "military"), ("cyber", "cyber"), ("weather", "storm"), ("storm", "storm"),
+                ("disease", "outbreak"), ("health", "outbreak"), ("outbreak", "outbreak"), ("quake", "quake"), ("seismic", "quake"),
+                ("politic", "government"), ("government", "government"), ("market", "economy"), ("econom", "economy"), ("financ", "economy"))
+_US_POLITICS = re.compile(r"\b(congress|senate|senator|house (?:speaker|republicans?|democrats?)|white house|capitol|u\.?s\.?|trump|biden|vance|republican|democrat|washington|pentagon|supreme court)\b", re.I)
 _HAZARDS = [
-    ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit)"),
+    ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|(?:security|cisa|vendor) advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit)"),
     ("quake", r"\b(earthquake|quake|tremor|aftershock|seismic|magnitude|\bM ?\d\.\d)"),
     ("volcano", r"\b(volcano|volcanic|eruption|erupts?)\b"),
     ("wildfire", r"\b(wildfires?|forest fires?|bush ?fires?|brush fire|fire weather|burn(?:ing)? acres)"),
@@ -72,6 +88,11 @@ _HAZARDS = [
     ("measles", r"\bmeasles"),
     ("flu", r"\b(influenza|flu|h5n1|bird flu|avian)\b"),
     ("outbreak", r"\b(outbreak|epidemic|meningitis|cholera|disease|virus|mpox|dengue|polio|pandemic)"),
+    ("spaceweather", r"\b(solar flare|geomagnetic|solar storm|coronal mass|sunspot|aurora|space weather|solar wind)"),
+    ("grid", r"\b(power outage|power grid|electric grid|transmission line|substation|grid operator|load shedding|blackouts?)\b"),
+    ("aviation", r"\b(airlines?|airports?|flights?|aircraft|airliner|airspace|air traffic|FAA|jetliner)\b"),
+    ("military", r"\b(missiles?|military|army|navy|air force|troops?|airstrikes?|drones?|ceasefire|offensive|artillery|nato|soldiers?|warship|fighter jets?)\b"),
+    ("economy", r"\b(stocks?|stock market|inflation|tariffs?|federal reserve|treasury|nasdaq|gdp|jobs report|oil prices?|wall street)\b"),
 ]
 
 
@@ -332,9 +353,24 @@ def hazard_for(text):
     return None
 
 
-def topic_photo(text, seed=""):
-    key = hazard_for(text)
-    if not key:
+_NO_AGENCY = frozenset({"Server racks", "Power lines", "U.S. Treasury Building", "U.S. Capitol"})
+
+
+def fallback_key(title, text="", category=""):
+    """Curated topic key for a story with no matched person or place: its hazard, else its category, else general."""
+    k = hazard_for((title or "") + " " + (text or ""))
+    if k:
+        return k
+    cat = (category or "").strip().lower()
+    k = next((v for sub, v in CATEGORY_KEY if sub in cat), None)
+    if k == "government" and not _US_POLITICS.search((title or "") + " " + (text or "")):
+        k = "general"
+    return k or "general"
+
+
+def topic_photo(text, seed="", key=None):
+    key = key or hazard_for(text)
+    if not key or key not in TOPICS:
         return None
     agency, files, noun = TOPICS[key]
     order = list(files)
@@ -345,7 +381,7 @@ def topic_photo(text, seed=""):
         im = commons_image(fn)
         if im:
             im.update(kind="topic", tier=3, subject=noun, hazard=key,
-                      label=f"{noun} ({agency}). {LABEL_TAIL}" if agency != "Server racks" else f"{noun}. {LABEL_TAIL}")
+                      label=f"{noun} ({agency}). {LABEL_TAIL}" if agency not in _NO_AGENCY else f"{noun}. {LABEL_TAIL}")
             return im
     return None
 
@@ -376,14 +412,16 @@ def topic_file_titles():
     return out
 
 
-def choose(cid, title, hit=None, text=""):
-    """Person, then topic-or-place per choose_order. Returns a photo dict ready for share_card._lay_story, or None."""
+def choose(cid, title, hit=None, text="", category=""):
+    """Person, then topic-or-place per choose_order, then a curated category photo so no story is left with a map.
+    Returns a photo dict ready for share_card._lay_story, or None only if Commons cannot be reached."""
     steps = {
         "person": lambda: person_photo(title, text),
         "place": lambda: place_photo(hit),
         "topic": lambda: topic_photo(title + " " + (text or ""), cid),
+        "category": lambda: topic_photo("", cid, key=fallback_key(title, text, category)),
     }
-    for tier in choose_order(title, text):
+    for tier in choose_order(title, text) + ("category",):
         try:
             im = steps[tier]()
         except Exception as e:  # noqa: BLE001

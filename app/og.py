@@ -725,6 +725,13 @@ def image_url(key="home", story_id=None, title=None, rank=None):
         h = VERSION
         if title is not None or rank is not None:
             h = VERSION + "-" + hashlib.sha1(f"{title}|{rank}".encode("utf-8", "replace")).hexdigest()[:8]
+        try:   # X caches og:image by URL: tie it to the stored card (version, photo, headline hash) so it refetches when the card changes
+            import story_photo
+            t = story_photo.card_tag(story_id)
+            if t:
+                h += "-" + t
+        except Exception:
+            pass
         return f"{path}?v={h}"
     key = ALIASES.get((key or "home").lower(), (key or "home").lower())
     if key not in PAGES:
