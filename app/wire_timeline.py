@@ -25,7 +25,6 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "blackout.db"); HDB = os.path.join(BASE, "trends_history.db")
 STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css"}
 MAXL = 200
-_PC = {"t": {}, "v": {}}; _PC_TTL = 3.0; _PC_LK = threading.Lock()
 _CUR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(\|[A-Za-z0-9_.:\-]{1,80})?$")
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
@@ -256,6 +255,12 @@ def _item(r, archive, warm_budget=None):
             "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
     try:
+        import x_share
+        hid = False
+        try:
+            hid = bool(r["hidden"])
+        except Exception:
+            hid = False
         if not archive and (rk or 0) >= 5 and (warm_budget is None or warm_budget[0] > 0):
             try:
                 import share_card; share_card.warm(str(r["id"]))
@@ -263,174 +268,17 @@ def _item(r, archive, warm_budget=None):
                     warm_budget[0] -= 1
             except Exception:
                 pass
-        # List path must not call x_share.intent_url / hashtags / location_tags on every row:
-        # profiling a live-sized copy (4303 clusters + 27540 archive) showed that
-        # path at 14–20 ms/row (~1.5 s of 1.8 s locally; 5–8 s on Render).
-        # Tags come from stored ready/notes, or a one-time lazy compute cached per cid.
-        d["xu"] = _list_xu(r["id"], h, title, loc, brief=r["brief"] if "brief" in r.keys() else "",
-                           category=r["category"], rank=rk, links=links)
+        # Same intent_url / with_body path as the story page. `d` must stay the dek string —
+        # passing the item dict here made hashtags() throw and left xu empty.
+        d["xu"] = x_share.intent_url(x_share.with_body({
+            "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
+            "category": r["category"] or "", "brief": r["brief"] or "", "rank": rk,
+            "watchlist": r["watchlist"] or 0, "hidden": hid,
+            "links": links, "d": what or dek,
+        }))
     except Exception:
         d["xu"] = ""
     return d
-
-# Per-row cache of 3–5 specific entity tags for the list-path Post-on-X URL.
-# Survives page-cache busts; cleared only when this process restarts.
-_TC = {}; _TC_LK = threading.Lock()
-_GENERIC_FILLER = {"#News", "#WorldNews", "#Breaking", "#BreakingNews",
-                   "#BlackoutNetwork", "#Alerts"}
-
-def _norm_tag_list(raw):
-    """Parse a stored tag list (JSON, string, or list) into unique #Tags, max 8, no filtering."""
-    if not raw:
-        return []
-    if isinstance(raw, str):
-        try:
-            raw = json.loads(raw) if raw.lstrip().startswith("[") else raw.split()
-        except Exception:
-            raw = [x for x in raw.replace(",", " ").split() if x]
-    out = []
-    for t in raw:
-        t = str(t).strip()
-        if not t:
-            continue
-        if not t.startswith("#"):
-            t = "#" + t.lstrip("#")
-        if t not in out:
-            out.append(t)
-        if len(out) >= 8:
-            break
-    return out
-
-def _specific(tags, item=None, headline=None):
-    """Keep 3–5 specific entity tags. Never #News / #WorldNews / #Breaking or other fillers."""
-    tags = list(tags or [])
-    try:
-        import x_share
-        tags = x_share.specific_tags(tags, item=item, headline=headline)
-    except Exception:
-        tags = [t for t in tags if t not in _GENERIC_FILLER]
-    return [t for t in tags if t not in _GENERIC_FILLER][:5]
-
-def _note_tags(cid):
-    """Tags stored on a v3 / desk / writer brief, if any. Briefs usually have no such field."""
-    if not cid:
-        return []
-    note = None
-    try:
-        import story_v3 as V3
-        note = V3.note_for(cid)
-    except Exception:
-        note = None
-    if not isinstance(note, dict):
-        try:
-            import story_writer as SW
-            note = SW.note_for(cid)
-        except Exception:
-            note = None
-    if not isinstance(note, dict):
-        return []
-    return _norm_tag_list(note.get("tags") or note.get("hashtags") or [])
-
-def _ready_tags(cid):
-    """Bake-time tags from story_writer.ready (package_one / rule_tags). Cheap SQLite read."""
-    if not cid:
-        return []
-    try:
-        import story_writer as SW
-        row = SW._ready_row(cid)
-        return _norm_tag_list((row or {}).get("tags"))
-    except Exception:
-        return []
-
-def _persist_ready_tags(cid, tags):
-    """Fill ready.tags only when that row exists and tags are still empty. Never changes card_ok."""
-    if not cid or not tags:
-        return
-    try:
-        import story_writer as SW
-        row = SW._ready_row(cid)
-        if not row:
-            return
-        raw = (row.get("tags") or "").strip() if isinstance(row.get("tags"), str) else (row.get("tags") or "")
-        if isinstance(raw, list):
-            if raw:
-                return
-            raw = ""
-        if raw not in ("", "[]", "null"):
-            return
-        payload = json.dumps(list(tags)[:5], ensure_ascii=False)
-        with SW._LK:
-            k = SW.db()
-            try:
-                k.execute(
-                    "UPDATE ready SET tags=? WHERE cid=? AND (tags IS NULL OR tags='' OR tags='[]' OR tags='null')",
-                    (payload, cid),
-                )
-                k.commit()
-            finally:
-                k.close()
-    except Exception:
-        pass
-
-def _compute_specific(item, headline=None):
-    """Same entity/place/topic selection as the story page's rule path, then drop generic fillers.
-
-    Does not call x_share.hashtags() or x_tags_llm.lookup (those can queue the paid tag model).
-    """
-    try:
-        import x_share
-        it = x_share.with_body(item)
-        rule = x_share._entity_first(it, headline=headline)
-        people = x_share.person_tags(it, headline=headline)
-        places = x_share.location_tags(it, headline=headline)
-        merged = x_share._dedupe(people + places[:2] + [t for t in rule if t not in people], x_share.MAX_TAGS)
-        return _specific(merged, it, headline)
-    except Exception:
-        return []
-
-def _list_tags(cid, headline="", title="", loc="", brief="", category="", rank=None, links=None):
-    """3–5 specific entity tags for a list row, or fewer if nothing nameable exists. Never generic filler."""
-    item = {"id": cid, "cluster_id": cid, "title": title or headline, "headline": headline or title,
-            "location": loc or "", "brief": brief or "", "category": category or "",
-            "rank": rank, "links": links or []}
-    stored = _specific(_ready_tags(cid) or _note_tags(cid), item, headline or title)
-    if len(stored) >= 3:
-        return stored[:5]
-    with _TC_LK:
-        cached = list(_TC.get(cid) or [])
-    if len(cached) >= 3:
-        return cached[:5]
-    got = _compute_specific(item, headline or title)
-    out = []
-    for t in stored + got + cached:
-        if t not in out:
-            out.append(t)
-        if len(out) >= 5:
-            break
-    out = _specific(out, item, headline or title)
-    if out:
-        with _TC_LK:
-            _TC[cid] = list(out)
-        if len(out) >= 3:
-            _persist_ready_tags(cid, out)
-    return out
-
-def _stored_tags(cid):
-    """Already-computed tags for this story (ready, then brief), or []. Never runs the gazetteer/LLM extractor."""
-    return _ready_tags(cid) or _note_tags(cid)
-
-def _list_xu(cid, headline, title, loc="", brief="", category="", rank=None, links=None):
-    """Post-on-X URL for a timeline row. Stored specific tags first; lazy compute+cache if fewer than 3."""
-    from urllib.parse import quote
-    page = f"https://blackout.network/wire/{cid}?s=x" if cid else "https://blackout.network/wire"
-    text = (headline or title or "").strip()
-    tags = _list_tags(cid, headline=headline, title=title, loc=loc, brief=brief,
-                      category=category, rank=rank, links=links)
-    if tags:
-        text = (text + " " + " ".join(tags)).strip()
-    if not text:
-        return page
-    return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(page, safe='')}"
 
 # t = last activity so newly collected signals on an existing cluster rise to the tip.
 _LIVE_COLS = ("cluster_id id, COALESCE(updated, first_seen) t, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
@@ -562,13 +410,6 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
 def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
          sev=None, cats=None, regs=None, time_win=None):
     """Page matching public rows. Loops past held/non-matching rows so `end` is the true end."""
-    key = (before, after, int(limit) if limit is not None else 100, q or "", bool(bg),
-           lat, lon, r_mi, sev or "", cats or "", regs or "", time_win or "")
-    now = time.time()
-    with _PC_LK:
-        hit = _PC["v"].get(key)
-        if hit is not None and now - _PC["t"].get(key, 0) < _PC_TTL:
-            return hit
     limit = max(1, min(MAXL, int(limit)))
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -613,16 +454,7 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
         items.reverse()
     edge = (items[0] if newer else items[-1]) if items else None
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
-    out = {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
-    with _PC_LK:
-        _PC["v"][key] = out
-        _PC["t"][key] = time.time()
-        if len(_PC["v"]) > 64:
-            old = sorted(_PC["t"], key=_PC["t"].get)[:32]
-            for k in old:
-                _PC["v"].pop(k, None)
-                _PC["t"].pop(k, None)
-    return out
+    return {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
 
 def items_for(ids):
     """Wire items (same shape as /api/wire_tl) for these live cluster ids, newest first. Used by the realtime stream (realtime.py)."""
@@ -639,8 +471,6 @@ def items_for(ids):
 def bust_meta():
     """Forget the cached meta (totals) so the next read rebuilds it (realtime.py calls this at most every 2 minutes)."""
     with _LK: _M["t"] = 0
-    with _PC_LK:
-        _PC["t"].clear(); _PC["v"].clear()
 
 def count(q="", bg=False):
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
