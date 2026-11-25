@@ -109,13 +109,15 @@ class Gate(unittest.TestCase):
     def test_start_runs_when_paid_writer_is_off(self):
         self.assertFalse(SW.api_enabled())
         self.assertTrue(SW.templates_on())
-        # start() must not refuse just because BN_WRITER=0
-        # do not actually leave a thread running: call the same predicate
         self.assertTrue(SW.templates_on() or SW.api_enabled())
-        # the start() early-return is only when BOTH are off
+        # worker must still boot the gate and package templates when the paid writer is off
+        self.assertFalse((not SW.templates_on()) and (not SW.api_enabled()))
         os.environ["BN_TEMPLATES"] = "0"; os.environ["BN_WRITER"] = "0"
-        # emulate the predicate
-        self.assertTrue(os.environ.get("BN_TEMPLATES") == "0" and os.environ.get("BN_WRITER") == "0")
+        # only when BOTH are off should the worker idle
+        import story_writer as SW2
+        # re-read env through helpers
+        self.assertFalse(SW.templates_on())
+        self.assertTrue((not SW.templates_on()) and (not SW.api_enabled()))
 
     def test_held_alert_after_15_min(self):
         mkdb([("eeeeeeeeeeeeeeee", "Storm in Jakarta Indonesia", 1)])
