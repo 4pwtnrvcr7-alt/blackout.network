@@ -67,7 +67,7 @@ def load(cid):
     r = None
     try:
         try:
-            r = c.execute("SELECT * FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
+            r = c.execute("SELECT cluster_id, title, brief, rank, location, category, watchlist, hidden, confidence, families, n_items, first_seen, updated, event_time, lat, lon, links FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
         except Exception:
             r = None
         if not r:
@@ -83,7 +83,7 @@ def load(cid):
             return _desk(cid)
         al = []
         try:
-            al = c.execute("SELECT source,family,title,source_url,first_seen,official,location FROM alerts WHERE cluster_id=? ORDER BY first_seen, official DESC LIMIT 400", (cid,)).fetchall()
+            al = c.execute("SELECT source,family,title,source_url,first_seen,official,location FROM alerts WHERE cluster_id=? ORDER BY first_seen, official DESC LIMIT 80", (cid,)).fetchall()
         except Exception:
             al = []
         cl, items = dict(r), [dict(a) for a in al]
@@ -191,12 +191,12 @@ def render(cid, since=""):
         x_intent = None
         try:
             import x_share
-            x_intent = x_share.intent_url({
+            x_intent = x_share.intent_url(x_share.with_body({
                 "cluster_id": cid, "title": title, "headline": title,
                 "location": r.get("location") or "", "category": r.get("category") or "",
                 "brief": r.get("brief") or "", "rank": rank,
                 "watchlist": watch, "hidden": r.get("hidden") or 0,
-            })
+            }, alerts=rows or al, extra=what))
         except Exception:
             x_intent = None
         g_share = G.share_html(share_url, share_text, "story", intent=x_intent)
@@ -278,12 +278,12 @@ def brief_page(cid):
     share = ""
     try:
         import x_share
-        share = x_share.button_html({
+        share = x_share.button_html(x_share.with_body({
             "cluster_id": cid, "title": title, "headline": title,
             "location": loc, "category": r.get("category") or "",
             "brief": r.get("brief") or "", "rank": rank,
             "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0,
-        })
+        }, alerts=al, extra=what))
     except Exception:
         share = ""
     src = ""
