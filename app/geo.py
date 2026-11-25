@@ -1600,6 +1600,9 @@ def place_contradicts_headline(title, place, precision=None, a1=None, texts=()):
     prec = (precision or "").lower()
     if subj and city and key_of(city) != key_of(subj):
         if prec not in ("county", "state", "country", "region"):
+            # "LA County declares a state of emergency at Castaic's landfill": the county declares, the city it names is where it is.
+            if re.search(r"\b(?:county|parish|borough)$", subj, re.I) and re.search(r"(?<![A-Za-z])" + re.escape(city) + r"(?![A-Za-z])", title or "", re.I):
+                return False
             return True
     named = named_admin1_codes([title] + list(texts or []))
     if a1 and named:

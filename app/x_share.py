@@ -1001,18 +1001,17 @@ def _hashtags_base(item, headline=None):
     """1–2 location, 1–2 topic, 1 engagement. Always 3–5 tags (held: location + 2 generic)."""
     loc = location_tags(item, headline=headline)
     if is_held(item):
-        tags = loc[:2] + [g for g in GENERIC_TAGS]
-        return _dedupe(tags + GENERIC_TAGS, MAX_TAGS) if len(_dedupe(tags)) < MIN_TAGS else _dedupe(tags)
+        return finalize_tags(loc[:2], item, headline, topics=False)
     topics = topic_tags(item, headline=headline)
     eng = engagement_tags(item, headline=headline)
     tags = _dedupe(loc[:2] + topics[:2] + eng[:1], MAX_TAGS)
     extras = loc[2:] + topics[2:]
-    for e in extras + GENERIC_TAGS:
+    for e in extras:
         if len(tags) >= MIN_TAGS:
             break
         if e not in tags:
             tags.append(e)
-    return _dedupe(tags, MAX_TAGS)
+    return finalize_tags(_dedupe(tags, MAX_TAGS), item, headline)
 
 
 
@@ -1492,7 +1491,7 @@ def _entity_first(item, headline=None):
                 continue
             if g not in tags:
                 tags.append(g)
-    return _cap_one(_dedupe(tags, MAX_TAGS), SECTORS, 1)
+    return finalize_tags(_cap_one(_dedupe(tags, MAX_TAGS), SECTORS, 1), item, headline)
 
 
 
@@ -1590,12 +1589,227 @@ def with_body(item, alerts=None, extra=""):
     return it
 
 
+# --------------------------------------------------------------------------- final tag rule (Nov 25 2026, Matt: 3-5 specific entity tags on every row)
+# Never #News, #BlackoutNetwork, #Health, #Alerts, #Weather, #War ... or any category word. Drop those, then fill with
+# entities (people, orgs, companies, tickers, places, diseases) from the headline and text.
+FILLER = {t.lower() for t in (
+    "News", "WorldNews", "Breaking", "BreakingNews", "BlackoutNetwork", "Alerts", "Alert", "Wire", "Live", "Update", "Updates", "Latest",
+    "Headlines", "Trending", "World", "Global", "Today", "Now", "Urgent", "Watch", "Warning", "Advisory", "Report", "Reports",
+    "Health", "Weather", "War", "Conflict", "Politics", "Markets", "Market", "Stocks", "Economy", "Energy", "Tech", "Technology", "Science",
+    "Crime", "Disaster", "Hazard", "Infrastructure", "Aviation", "Transport", "Space", "Storm", "Security", "Safety", "Government",
+    "Military", "Defense", "Business", "Finance", "Environment", "Climate", "Emergency", "Incident", "Event", "Story", "Signal", "Signals",
+    "Intel", "Monitor", "Monitoring", "Threat", "Threats", "Risk", "Crisis", "Cybersecurity", "Social", "Media", "Video", "Photo",
+    "Orange", "Red", "Yellow", "Green", "Level", "Research", "Releases", "Full", "Guests", "Footage", "Forces", "Affairs",
+    "EST", "EDT", "CST", "CDT", "MST", "MDT", "PST", "PDT", "AKST", "AKDT", "HST", "ET", "PT", "PM", "AM", "UTC", "GMT", "IP", "MMI", "AV", "ID",
+    "WHAT", "WHY", "WHERE", "WHEN", "WHO", "HOW", "Sources", "Source", "Some", "Several", "Many", "Another", "Other")}
+_ID_RX = re.compile(r"\b([A-Z]{2,5}\d{0,2}-\d{2,4}(?:-\d{2,5})?)\b")
+_FILL_STOP = {w for w in (
+    "the a an this that these those in on at by for as with after amid over into from about to of and or its their his her than is are was were "
+    "has have had be been will would could should may might can says said say new more most less very just also not but if then so such "
+    "now today tonight monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october "
+    "declares announces issues warns launches opens releases adds leaves suspects signals unleashes convicted indicted november december officials official authorities reports report media sources source first last next latest top big major minor "
+    "news live update updates breaking watch warning alert advisory guide minutes meeting meetings board urgent action needed bizarre "
+    "mockup special general national international local regional state states city county".split())}
+_TINY_STOP = set("the and for with from that this into over after amid about than are was were its their his her has have not but".split())
+_FILL_BADWORDS = {"stop", "it", "special", "october", "november", "december", "january", "february", "march", "april", "june", "july", "august", "september"}
+
+
+_JUNK_WORDS = {"category", "media", "reports", "report", "victims", "guide", "women", "men", "youth", "safeguard", "internet", "army", "concerns",
+               "toward", "predicted", "effectiveness", "central", "minutes", "liability", "director", "update", "updates", "latest", "breaking", "says", "amid", "watch", "warning"}
+
+
+def _is_filler(tag):
+    t = (tag or "").lstrip("#").lower()
+    if not t or t in FILLER:
+        return True
+    words = re.findall(r"[a-z0-9]+", re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", (tag or "").lstrip("#")).lower())
+    if len(words) == 2 and words[0] == words[1]:
+        return True      # #OctoberOctober
+    if len(t) < 2 or t.isdigit():
+        return True
+    if re.match(r"^(?i:some|several|many|another|other|the|this|these)[A-Z]", (tag or "").lstrip("#")):
+        return True      # #SomeCentralFlorida, #TheWhite...
+    if any(w in words for w in _JUNK_WORDS):
+        return True      # #MediaReports #GeomagneticStormCategory #DefraudVictims
+    if re.match(r"^(?:AM|PM)?[ECMPHA][KS]?[SD]?T$", (tag or "").lstrip("#")):
+        return True      # time zones: #EST #AMET #AKST
+    return False
+
+
+def _source_orgs(item):
+    out = []
+    for L in item.get("links") or item.get("l") or []:
+        nm = (L.get("s") or L.get("source") or L.get("name") or "") if isinstance(L, dict) else str(L)
+        nm = re.sub(r"^(?:Google News|Bing News)\s*:\s*", "", nm).strip()
+        if not nm or re.search(r"@|youtube|telegram|bluesky|reddit|twitter|facebook|rss|http|\.", nm, re.I):
+            continue
+        m = re.match(r"^([A-Z]{3,8})(?:\b|\s)", nm)
+        if m and m.group(1) not in out:
+            out.append(m.group(1))
+    return out
+
+
+def _proper_noun_fill(item, headline=None):
+    """Capitalised names from the headline, then the body: acronyms, 1-3 word proper-noun runs. Order of appearance."""
+    title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
+    body = _strip_related(_as_text(item.get("brief"), item.get("d"), item.get("body")))[:900]
+    out, seen = [], set()
+
+    def add(label):
+        label = (label or "").strip(" -&")
+        tg = to_tag(label)
+        if not tg or _is_filler(tg):
+            return
+        words = [w for w in re.split(r"\s+", label) if w]
+        low = [w.lower().strip(".,:;!?") for w in words]
+        if low and (low[0] in _FILL_STOP and len(words) == 1):
+            return
+        if len(words) == 1 and (low[0] in _FILL_STOP or low[0] in _FILL_BADWORDS or label in _COMMON_CAPS or re.search(r"(?:ed|ing|ly)$", low[0])):
+            return
+        if all(w in _FILL_STOP or w in _FILL_BADWORDS for w in low):
+            return
+        k = tg.lower()
+        if k in seen or any((k in x or x in k) and min(len(k), len(x)) >= 4 for x in seen):
+            return
+        seen.add(k); out.append(tg)
+
+    for src, first_is_sentence_start in ((title, True), (body, True)):
+        for m in re.finditer(r"\b[A-Z]{2,6}\b", src):          # acronyms: WHO, USGS, NASDAQ, DRC
+            a = m.group(0)
+            if a in ("LIVE", "WATCH", "NEWS", "BREAKING", "UPDATE", "ALERT", "URGENT", "VIDEO", "THE", "AND", "FOR", "NOT", "NEW", "US", "OK"):
+                continue
+            add(a)
+        for m in _PHRASE_RX.finditer(src):
+            ph = m.group(1)
+            words = ph.split()
+            while words and words[0].lower() in _FILL_STOP:    # sentence-start words ("The", "After")
+                words = words[1:]
+            while words and words[-1].lower() in _FILL_STOP:
+                words = words[:-1]
+            if not words:
+                continue
+            if len(words) == 1 and (words[0].isupper() or len(words[0]) < 4):
+                continue
+            add(" ".join(words[:3]))
+    return out
+
+
+def _word_fill(item, headline=None):
+    """Last resort: distinctive long words from the headline as CamelCase topic tags (#Assassination, #BankFailure)."""
+    title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z\-]{5,}", title) if w.lower() not in _FILL_STOP and w.lower() not in FILLER]
+    out = []
+    for w in words:
+        tg = to_tag(w)
+        if tg and not _is_filler(tg) and tg not in out:
+            out.append(tg)
+    return out
+
+
+def _bigram_fill(item, headline=None):
+    """Very last resort: advisory/report ids, then adjacent content-word pairs from the headline (#DiscountRate)."""
+    title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
+    out = []
+    for m in _ID_RX.finditer(title):
+        tg = to_tag(m.group(1).replace("-", ""))
+        if tg and tg not in out:
+            out.append(tg)
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z']{3,}", title) if w.lower().strip("'s") not in _FILL_STOP]
+    for a, b in zip(words, words[1:]):
+        tg = to_tag(a + " " + b)
+        if tg and not _is_filler(tg) and tg not in out:
+            out.append(tg)
+    for w in words:
+        tg = to_tag(w)
+        if tg and not _is_filler(tg) and tg not in out:
+            out.append(tg)
+    return out
+
+
+def entity_fill(item, headline=None, topics=True):
+    """Entity candidates in priority order for padding a short tag list. No category words, no brand."""
+    item = _normalize_item(item)
+    out = []
+    for fn in (person_tags, entity_tags, location_tags):
+        try:
+            out += fn(item, headline=headline)
+        except Exception:
+            pass
+    out += _source_orgs(item) and ["#" + o for o in _source_orgs(item)][:2] or []
+    try:
+        out += ["#" + t.lstrip("#") for t in _proper_noun_fill(item, headline=headline)]
+    except Exception:
+        pass
+    if not topics:                      # held rows may be false positives: names and places only, never the topic
+        try:
+            ban = {t.lower() for t in topic_tags(item, headline=headline)} | {"#ebola", "#outbreak", "#measles", "#cholera", "#h5n1", "#birdflu"}
+        except Exception:
+            ban = {"#ebola", "#outbreak"}
+        return [t for t in out if t.lower() not in ban]
+    try:
+        out += topic_tags(item, headline=headline)
+    except Exception:
+        pass
+    for m in re.finditer(r"\b((?:severe|heavy|extreme|flash|record|winter|coastal|freezing|tropical|major|strong)\s+)?"
+                         r"(rain(?:fall)?|flood(?:ing)?|snow(?:fall)?|ice storm|wind|heat ?wave|tornado|hurricane|cyclone|typhoon|wildfire|drought|blizzard|hail|dust storm|storm surge)\b",
+                         _item_text(item, headline=headline), re.I):
+        tg = to_tag(m.group(0))
+        if tg:
+            out.append(tg)
+    out += ["#" + t.lstrip("#") for t in _word_fill(item, headline=headline)]
+    out += ["#" + t.lstrip("#") for t in _bigram_fill(item, headline=headline)]
+    txt = _item_text(item, headline=headline)
+    if re.search(r"vulnerab|security advisory|\bCVE-\d", txt, re.I):
+        out.append("#Vulnerability")
+    if re.search(r"\bpatch(?:es|ed)?\b|\bzero[- ]day\b", txt, re.I):
+        out.append("#Patch")
+    return out
+
+
+def finalize_tags(tags, item=None, headline=None, topics=True):
+    """The one rule for every row, every rank: 3-5 specific tags, no filler, no unearned #War/#Conflict."""
+    item = _normalize_item(item or {})
+    unearned = SOFT_GENERICS if not armed_conflict(item, headline=headline) else set()
+    keep = []
+    for t in tags or []:
+        if not t:
+            continue
+        t = "#" + str(t).lstrip("#")
+        if _is_filler(t) or t in unearned or any(t.lower() == k.lower() for k in keep):
+            continue
+        if t == "#Outbreak" and not re.search(r"outbreak|epidemic|pandemic|infect|cases|deaths|virus|disease|fever|flu\b|measles|cholera|ebola", _item_text(item, headline=headline), re.I):
+            continue
+        keep.append(t)
+    keep = _cap_one(keep, SECTORS, 1)
+    if len(keep) < MIN_TAGS:
+        for t in entity_fill(item, headline=headline, topics=topics):
+            if len(keep) >= MAX_TAGS:
+                break
+            if _is_filler(t) or t in unearned:
+                continue
+            tl = t.lower()
+            if any(tl == k.lower() or (len(tl) >= 5 and (tl in k.lower() or k.lower() in tl) and min(len(tl), len(k)) >= 5) for k in keep):
+                continue
+            keep.append(t)
+            if len(keep) >= MIN_TAGS:
+                break
+    if len(keep) < MIN_TAGS:          # nothing distinctive left: allow overlapping pieces (#Iceberg next to #IcebergD33B)
+        title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
+        for w in re.findall(r"[A-Za-z0-9][A-Za-z0-9\-]{2,}", title):
+            tg = to_tag(w)
+            if tg and not _is_filler(tg) and w.lower() not in _TINY_STOP and all(tg.lower() != k.lower() for k in keep):
+                keep.append(tg)
+            if len(keep) >= MIN_TAGS:
+                break
+    return keep[:MAX_TAGS]
+
+
 def hashtags(item, headline=None):
     """xAI-generated tags (validated, cached) are primary; the rule-based extractor is the fallback.
     Held / false-positive items keep location + generic only."""
     item = _normalize_item(item)
     if is_held(item):
-        return _dedupe(location_tags(item, headline=headline)[:2] + ["#News", "#BlackoutNetwork", "#Alerts"], MAX_TAGS)
+        return finalize_tags(location_tags(item, headline=headline)[:2], item, headline, topics=False)
     rule = _entity_first(item, headline=headline)
     chosen = rule
     try:
@@ -1610,7 +1824,7 @@ def hashtags(item, headline=None):
     # Person and place tags from the full extractor always appear, even when the xAI set is used.
     people = person_tags(item, headline=headline)
     places = location_tags(item, headline=headline)
-    return _dedupe(people + places[:2] + [t for t in chosen if t not in people], MAX_TAGS)
+    return finalize_tags(_dedupe(people + places[:2] + [t for t in chosen if t not in people], MAX_TAGS + 3), item, headline)
 
 
 # --------------------------------------------------------------------------- compose / intent
@@ -1654,7 +1868,7 @@ def weighted_len(text, url):
     return n
 
 
-def share_text(item, url=None, headline=None):
+def share_text(item, url=None, headline=None, tags=None):
     """Headline + hashtags, trimmed so headline + tags + t.co link fit in 280.
 
     Drops the lowest-priority tag first when over budget, but never below MIN_TAGS;
@@ -1662,7 +1876,7 @@ def share_text(item, url=None, headline=None):
     """
     url = url if url is not None else story_url(item)
     h = _headline(item, headline)
-    tags = hashtags(item, headline=headline)
+    tags = list(tags) if tags else hashtags(item, headline=headline)
     text = _join(h, tags)
     while len(tags) > MIN_TAGS and weighted_len(text, url) > 280:
         tags = tags[:-1]
@@ -1681,9 +1895,9 @@ def share_text(item, url=None, headline=None):
     return text
 
 
-def intent_url(item, url=None, headline=None):
+def intent_url(item, url=None, headline=None, tags=None):
     page = url if url is not None else story_url(item)
-    text = share_text(item, url=page, headline=headline)
+    text = share_text(item, url=page, headline=headline, tags=tags)
     return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(page, safe='')}"
 
 
