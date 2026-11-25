@@ -9,6 +9,7 @@ GET /api/wire_tl               items, newest first by last activity (COALESCE(up
                                time=today|<days> (event_time or first_seen, America/New_York for today).
                                The server keeps reading until it fills `limit` matches or the true end;
                                end is true only when no older/newer matching row remains.
+GET /api/wire_tl/xu?id=         Post-on-X URL (3-5 entity tags) for one live row the warm thread has not reached yet.
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
 GET /api/wire_tl/geo?q=        keyless ZIP/place geocode (US Census ZCTA table + offline gazetteer).
 GET /api/wire_tl/crime?q=      local crime headlines for a US place when BN_CRIME_NEWS is on (cached).
@@ -209,18 +210,166 @@ def _links(js):
         if len(out) >= 5: break
     return out
 
+# ------------------------------------------------------------------ speed layer (Nov 25 2026, Matt: Wire list under 1 s)
+# The request path never opens a story_writer connection, takes SW._LK, or computes hashtags. One daemon thread
+# ("bn-wire-warm") reads story_writer's tables with ONE read-only connection every few seconds (briefs, needs_paid,
+# ready.tags), keeps the public gate and the per-row Post-on-X URL in memory, and rebuilds the pages people ask for.
+# #243 did that work per row under the global lock and the list hung on "database is locked".
+_TL = threading.local()
+_SNAP = {}; _SNAP_LK = threading.Lock(); _SNAP_TTL = 4.0
+_XC = {}; _XC_MAX = 4000; _XC_TTL = 900.0      # cid -> (sig, xu, built_at); rows with fewer than 3 tags are cached too
+_PC = {"t": {}, "v": {}}; _PC_TTL = 3.0; _PC_LK = threading.Lock()
+_PA = {}                                         # page key -> (args, last_requested)
+_PC_STALE = 20.0                                 # a cached page may be served this long while the warmer rebuilds it
+_WARM = {"thread": None, "rows_at": 0.0, "cursor": 0, "baked": {}, "err": ""}
+_WARM_LK = threading.Lock()
+
+def _sw():
+    try:
+        import story_writer as SW
+        return SW
+    except Exception:
+        return None
+
+def _warm_alive():
+    t = _WARM["thread"]
+    return bool(t and t.is_alive())
+
+_BRIEF_SQL = ("SELECT cid, alias_of, "
+              "CASE WHEN json_valid(note) AND json_type(note)='object' THEN 1 ELSE 0 END, "
+              "CASE WHEN json_valid(note) AND json_type(note)='object' THEN json_extract(note,'$.file') END, "
+              "CASE WHEN json_valid(note) AND json_type(note)='object' THEN json_extract(note,'$.writer.model') END FROM briefs")
+
+def _snap_load():
+    """One read-only connection, three SELECTs. Raises on a busy database; the caller keeps the previous snapshot."""
+    SW = _sw()
+    if SW is None:
+        return None
+    p = SW.cfg()["db"]
+    brief, np, ready = {}, set(), {}
+    if os.path.exists(p):
+        k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=4)
+        try:
+            for cid, alias, isd, f, m in k.execute(_BRIEF_SQL):
+                brief[cid] = (alias, isd, f, m)
+            for q, sink in (("SELECT cid FROM needs_paid", "np"), ("SELECT cid, tags FROM ready", "ready")):
+                try:
+                    rows = k.execute(q).fetchall()
+                except sqlite3.OperationalError as ex:
+                    if "no such table" in str(ex):
+                        continue
+                    raise
+                if sink == "np":
+                    np = {r[0] for r in rows}
+                else:
+                    ready = {r[0]: r[1] for r in rows}
+        finally:
+            k.close()
+    return {"t": time.time(), "gate_on": bool(SW.gate_on()), "np": np, "brief": brief, "ready": ready, "maps": SW._desk_maps()}
+
+def _snap_refresh(block):
+    if not _SNAP_LK.acquire(blocking=block):
+        return _SNAP.get("s")
+    try:
+        try:
+            s = _snap_load()
+        except Exception as ex:
+            s = None
+            _SNAP["err"] = str(ex)[:120]
+        if s is not None:
+            _SNAP["s"] = s
+        return _SNAP.get("s")
+    finally:
+        _SNAP_LK.release()
+
+def _snap():
+    s = _SNAP.get("s")
+    if s is not None:
+        age = time.time() - s["t"]
+        if age < _SNAP_TTL or (_warm_alive() and age < 60):
+            return s
+    return _snap_refresh(block=s is None)
+
+def _is_template(f, m):
+    return f == "story_writer_template" or m == "template"
+
+def _gate_ok(cid):
+    """story_writer.allow(cid, archive=False) evaluated against the in-memory snapshot (tests compare the two)."""
+    s = _snap()
+    if s is None:
+        SW = _sw()
+        try:
+            return bool(SW.allow(cid, archive=False)) if SW else True
+        except Exception:
+            return True
+    if not s["gate_on"]:
+        return True
+    notes_, alias, v3 = s["maps"]
+    desk = bool(cid in v3 or cid in notes_ or (alias.get(cid) and alias.get(cid) in notes_))
+    b = s["brief"].get(cid)
+    note = None                                   # (is_template,) of the note story_writer.note_for would return
+    if b is not None:
+        a, isd, f, m = b
+        if a:
+            d = v3.get(a) or notes_.get(a) or notes_.get(alias.get(a) or "")
+            if isinstance(d, dict):
+                note = (_is_template(d.get("file"), (d.get("writer") or {}).get("model")),)
+            else:
+                b2 = s["brief"].get(a)
+                if b2 and not b2[0] and b2[1]:
+                    note = (_is_template(b2[2], b2[3]),)
+        elif isd:
+            note = (_is_template(f, m),)
+    paid = desk or (note is not None and not note[0])
+    if cid in s["np"] and not paid:
+        return False
+    return bool(desk or note is not None)
+
 def _public_row(r, archive):
     """Live clusters are held until story_writer has a write-up, tags and card. Archive items stay visible."""
     if archive:
         return True
     try:
-        import story_writer as SW
-        cid = r["id"] if "id" in r.keys() else r["cluster_id"]
-        return SW.allow(cid, archive=False)
+        return _gate_ok(r["id"] if "id" in r.keys() else r["cluster_id"])
     except Exception:
         return True
 
-def _item(r, archive, warm_budget=None):
+def _stored_tags(cid):
+    raw = ((_SNAP.get("s") or {}).get("ready") or {}).get(cid)
+    if not raw or raw in ("[]", "null"):
+        return []
+    try:
+        v = json.loads(raw) if isinstance(raw, str) else raw
+        return [("#" + str(t).lstrip("#")) for t in v if t] if isinstance(v, list) else []
+    except Exception:
+        return []
+
+def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
+    import x_share
+    item = {"cluster_id": r["id"], "title": title, "headline": h, "location": loc,
+            "category": r["category"] or "", "brief": r["brief"] or "", "rank": rk,
+            "watchlist": r["watchlist"] or 0, "hidden": hid, "links": links, "d": what or dek}
+    stored = [t for t in _stored_tags(r["id"]) if not x_share._is_filler(t)]
+    if len(stored) >= 3 and not hid:
+        return x_share.intent_url(x_share.with_body(item), tags=stored[:5])
+    return x_share.intent_url(x_share.with_body(item))
+
+def _xu_for(r, rk, h, title, loc, links, what, dek, hid, compute):
+    cid = r["id"]
+    sig = hash((title, rk, loc, (r["brief"] or "")[:400], bool(hid)))
+    e = _XC.get(cid)
+    if e is not None and e[0] == sig:
+        return e[1]
+    if not compute:
+        return ""
+    xu = _xu_build(r, rk, h, title, loc, links, what, dek, hid)
+    if len(_XC) >= _XC_MAX:
+        for k in sorted(_XC, key=lambda k: _XC[k][2])[:_XC_MAX // 4]:
+            _XC.pop(k, None)
+    _XC[cid] = (sig, xu, time.time())
+    return xu
+
+def _item(r, archive, warm_budget=None, compute=None):
     title = _clean(r["title"]); h = headline(title)
     loc = _clean(r["location"])[:90] if r["location"] else ""
     links = _links(r["links"])
@@ -254,28 +403,23 @@ def _item(r, archive, warm_budget=None):
             "w": r["watchlist"] or 0, "et": r["event_time"] if not archive else None,
             "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
+    if archive:
+        d["xu"] = ""          # the timeline shows no Post on X for archive rows
+        return d
     try:
-        import x_share
         hid = False
         try:
             hid = bool(r["hidden"])
         except Exception:
             hid = False
-        if not archive and (rk or 0) >= 5 and (warm_budget is None or warm_budget[0] > 0):
+        if (rk or 0) >= 5 and warm_budget is not None and warm_budget[0] > 0:
             try:
                 import share_card; share_card.warm(str(r["id"]))
-                if warm_budget is not None:
-                    warm_budget[0] -= 1
+                warm_budget[0] -= 1
             except Exception:
                 pass
-        # Same intent_url / with_body path as the story page. `d` must stay the dek string —
-        # passing the item dict here made hashtags() throw and left xu empty.
-        d["xu"] = x_share.intent_url(x_share.with_body({
-            "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
-            "category": r["category"] or "", "brief": r["brief"] or "", "rank": rk,
-            "watchlist": r["watchlist"] or 0, "hidden": hid,
-            "links": links, "d": what or dek,
-        }))
+        go = _warming() if compute is None else compute
+        d["xu"] = _xu_for(r, rk, h, title, loc, links, what, dek, hid, go)
     except Exception:
         d["xu"] = ""
     return d
@@ -407,8 +551,8 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
     rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
     return rows
 
-def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
-         sev=None, cats=None, regs=None, time_win=None):
+def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
+                sev=None, cats=None, regs=None, time_win=None):
     """Page matching public rows. Loops past held/non-matching rows so `end` is the true end."""
     limit = max(1, min(MAXL, int(limit)))
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
@@ -455,6 +599,156 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
     edge = (items[0] if newer else items[-1]) if items else None
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
     return {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
+
+def _reset_caches():
+    """Forget cached pages, row tags and the gate snapshot (tests; also handy after a manual DB change)."""
+    with _PC_LK:
+        _PC["v"].clear(); _PC["t"].clear()
+    _PA.clear(); _XC.clear(); _SNAP.clear()
+
+def _warming():
+    return bool(getattr(_TL, "warm", False))
+
+def _pkey(before, after, limit, q, bg, lat, lon, r_mi, sev, cats, regs, time_win):
+    return (before, after, int(limit) if limit is not None else 100, q or "", bool(bg),
+            lat, lon, r_mi, sev or "", cats or "", regs or "", time_win or "")
+
+def _pstore(key, out):
+    with _PC_LK:
+        _PC["v"][key] = out
+        _PC["t"][key] = time.time()
+        if len(_PC["v"]) > 64:
+            for k in sorted(_PC["t"], key=_PC["t"].get)[:32]:
+                _PC["v"].pop(k, None); _PC["t"].pop(k, None); _PA.pop(k, None)
+
+def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
+         sev=None, cats=None, regs=None, time_win=None):
+    """Page matching public rows. Cached 3 s; a stale copy (up to 20 s) is served while the warm thread rebuilds
+    it, so a request rarely builds. Row tags and the public gate come from memory (see the speed layer above)."""
+    args = (before, after, limit, q, bg, lat, lon, r_mi, sev, cats, regs, time_win)
+    key = _pkey(*args)
+    now = time.time()
+    hit = _PC["v"].get(key)
+    age = now - _PC["t"].get(key, 0)
+    if len(_PA) > 96:
+        _PA.clear()
+    _PA[key] = (args, now)
+    if hit is not None:
+        if age < _PC_TTL:
+            return hit
+        if age < _PC_STALE and _warm_alive():
+            return hit
+    start_warm()
+    out = _page_build(*args)
+    _pstore(key, out)
+    return out
+
+# ---- the one warm thread (name has no "loop": render_app's thread guard counts those)
+_STD = [dict(limit=100), dict(limit=100, sev="hi"), dict(limit=100, sev="mid"), dict(limit=100, sev="lo"),
+        dict(limit=200, sev="hi"), dict(limit=200, sev="mid"), dict(limit=200, sev="lo"), dict(limit=200)]
+
+def start_warm():
+    if os.environ.get("BN_WIRE_WARM", "1") == "0" or _warm_alive():
+        return
+    with _WARM_LK:
+        if _warm_alive():
+            return
+        t = threading.Thread(target=_warm_main, name="bn-wire-warm", daemon=True)
+        _WARM["thread"] = t
+        t.start()
+
+def _warm_main():
+    _TL.warm = True
+    while True:
+        try:
+            _warm_cycle()
+        except Exception as ex:
+            _WARM["err"] = f"{type(ex).__name__}: {ex}"[:160]
+        time.sleep(1.0)
+
+def _warm_cycle():
+    now = time.time()
+    s = _SNAP.get("s")
+    if s is None or now - s["t"] >= _SNAP_TTL:
+        _snap_refresh(block=True)
+    # 1. rebuild pages that were asked for in the last 3 minutes and are older than ~2 s (standard ones always)
+    for a in _STD:
+        args = (None, None, a.get("limit", 100), "", False, None, None, None, a.get("sev"), None, None, None)
+        _PA.setdefault(_pkey(*args), (args, now - 120))
+    for key, (args, last) in list(_PA.items()):
+        if now - last > 180 or now - _PC["t"].get(key, 0) < 2.0:
+            continue
+        try:
+            _pstore(key, _page_build(*args))
+        except sqlite3.Error as ex:
+            _WARM["err"] = "page: " + str(ex)[:120]
+        time.sleep(0.01)
+    # 2. fill the per-row tag cache a slice at a time (newest public live rows, then every rank 7+ row)
+    _warm_rows(25)
+
+def _warm_rows(n):
+    c = _ro(DB)
+    try:
+        newest = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) ORDER BY {_TCOL} DESC, cluster_id DESC LIMIT 700"))
+        hi = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) AND rank>=7 ORDER BY {_TCOL} DESC LIMIT 400"))
+    finally:
+        c.close()
+    seen, rows = set(), []
+    for r in newest + hi:
+        if r["id"] not in seen:
+            seen.add(r["id"]); rows.append(r)
+    done = 0
+    now = time.time()
+    for r in rows:
+        if done >= n:
+            break
+        e = _XC.get(r["id"])
+        if e is not None and now - e[2] < _XC_TTL:
+            continue
+        if not _public_row(r, False):
+            continue
+        try:
+            _item(r, False, compute=True)            # fills _XC (rows with fewer than 3 tags too)
+            if e is not None:
+                pass
+        except Exception:
+            pass
+        done += 1
+        time.sleep(0.01)
+    _warm_bake(rows[:150])
+
+def _warm_bake(rows):
+    """Queue card bakes the way story_writer.allow() used to on every list call, once per story per 10 minutes."""
+    now = time.time()
+    try:
+        import share_card
+    except Exception:
+        return
+    for r in rows:
+        cid = r["id"]
+        if now - _WARM["baked"].get(cid, 0) < 600 or not _public_row(r, False):
+            continue
+        _WARM["baked"][cid] = now
+        try:
+            if not share_card.card_baked(cid):
+                share_card.bake_card(cid)
+        except Exception:
+            pass
+    if len(_WARM["baked"]) > 2000:
+        _WARM["baked"].clear()
+
+def xu_for_id(cid):
+    """Post-on-X URL for one live row (the timeline asks when a row was not pre-warmed). Computed once, then cached."""
+    if not re.match(r"^[A-Za-z0-9_.:\-]{1,80}$", cid or ""):
+        return ""
+    c = _ro(DB)
+    try:
+        rows = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) AND cluster_id=?", (cid,)))
+    finally:
+        c.close()
+    if not rows or not _public_row(rows[0], False):
+        return ""
+    return _item(rows[0], False, compute=True).get("xu", "")
 
 def items_for(ids):
     """Wire items (same shape as /api/wire_tl) for these live cluster ids, newest first. Used by the realtime stream (realtime.py)."""
@@ -568,6 +862,7 @@ def _rt_ver():
     except OSError: return "0"
 
 def page_html():
+    start_warm()
     try:
         import wire_v2; menu = wire_v2.menu_html(); w2 = wire_v2.ST
     except Exception:
@@ -718,6 +1013,9 @@ def handle_get(path, qs):
         if n == "count":
             q = (g("q", "") or "")[:80]
             try: return 200, count(q, g("bg") == "1")
+            except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
+        if n == "xu":
+            try: return 200, {"xu": xu_for_id((g("id", "") or "")[:80])}
             except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
         if n == "geo":
             return 200, geocode_q((g("q", "") or "")[:80])

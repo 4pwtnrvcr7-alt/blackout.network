@@ -57,12 +57,18 @@ function itemHTML(it,open){
   if(open)h+=drawerHTML(it);
   return h;
 }
+function lazyXu(it){
+  /* rows the server has not pre-warmed arrive with no xu: fetch the 3-5 tag Post-on-X URL once, then fix the link */
+  if(!it._xp){it._xp=1;fetch("/api/wire_tl/xu?id="+encodeURIComponent(it.id),{credentials:"same-origin"}).then(function(r){return r.ok?r.json():null}).then(function(j){
+    if(!j||!j.xu)return;it.xu=j.xu;var a=document.querySelectorAll('a[data-xid="'+it.id+'"]');for(var i=0;i<a.length;i++)a[i].href=j.xu}).catch(function(){it._xp=0})}
+  return""}
 function drawerHTML(it){
   var r=it.r,cnt={},src=(it.l||[]).map(function(l){var nm=l.s||l.u.replace(/^https?:\/\/(www\.)?/,"").split("/")[0];cnt[nm]=(cnt[nm]||0)+1;if(cnt[nm]>1)nm+=" ("+cnt[nm]+")";return'<li><a href="'+esc(l.u)+'" target="_blank" rel="noopener nofollow">'+esc(nm)+'<span aria-hidden="true"> &#8599;</span></a></li>'}).join("");
   var when=it["do"]?fU.format(dt(seenAt(it)))+" (date only)":fF.format(dt(seenAt(it)))+" ET";
   var go=!it.a?'<a class="w2-btn tl-go" href="/wire/'+esc(it.id)+'">Full story <span aria-hidden="true">&rarr;</span></a>':
         ((it.l&&it.l[0])?'<a class="w2-btn tl-go" href="'+esc(it.l[0].u)+'" target="_blank" rel="noopener nofollow">Original report <span aria-hidden="true">&#8599;</span></a>':"");
-  var xshare=(!it.a&&it.xu)?'<a class="w2-btn tl-go" href="'+esc(it.xu)+'" target="_blank" rel="noopener">Post on X</a>':"";
+  var xshare=(!it.a&&it.xu)?'<a class="w2-btn tl-go" href="'+esc(it.xu)+'" target="_blank" rel="noopener">Post on X</a>':
+    (!it.a?'<a class="w2-btn tl-go" data-xid="'+esc(it.id)+'" href="/wire/'+esc(it.id)+'?s=x" target="_blank" rel="noopener">Post on X</a>'+lazyXu(it):"");
   return'<div class="tl-dr"><div class="tl-dri">'+(it.d?'<p class="tl-d">'+hl(it.d)+"</p>":"")+
     '<dl class="tl-facts"><div><dt>'+(it.a?"Archive rank":"Rank")+'</dt><dd class="tl-rkf '+rkc(r)+'">'+ticks(r)+"<b>"+(r==null?"&ndash;":r)+"</b><span>"+(r==null?"":esc(RN[r]||""))+"</span></dd></div>"+
     (it.c?"<div><dt>Confidence</dt><dd>"+esc(it.c)+"</dd></div>":"")+

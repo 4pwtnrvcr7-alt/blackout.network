@@ -110,6 +110,16 @@ class LocationGuard(unittest.TestCase):
             "A MASSIVE PIPELINE EXPLOSION lit up the night sky near Ward, Alabama, last night",
             "Sumter County, Alabama", "US", "US.AL"))
 
+    def test_county_declares_emergency_at_a_named_city_is_not_a_contradiction(self):
+        """Nov 25 live false positive: 'LA County declares state of emergency at Castaic's Chiquita Canyon Landfill' pinned to Castaic, CA is right."""
+        h = "LA County declares state of emergency at Castaic\u2019s Chiquita Canyon Landfill"
+        self.assertFalse(G.pin_contradicts_headline(h, "Castaic", "US", "", ""))
+        self.assertFalse(G.pin_contradicts_headline(h, "Castaic", "US", "", "city"))
+        # still a contradiction when the pin is a city the headline never names, or the declarer is a town
+        self.assertTrue(G.pin_contradicts_headline(h, "Santa Clarita", "US", "", ""))
+        self.assertTrue(G.pin_contradicts_headline("Campton declares state of emergency amid lake water concerns", "Springfield", "US", "", ""))
+
+
     def test_live_share_when_configured(self):
         if not os.environ.get("LOCATION_GUARD_LIVE"):
             self.skipTest("LOCATION_GUARD_LIVE not set; run: python3 -m location_guard --live")
