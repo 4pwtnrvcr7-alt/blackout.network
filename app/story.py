@@ -339,6 +339,12 @@ def handle_get(path, qs, headers=None):
     try:   # t1276u: a new story_reports.json (box push) refreshes cached pages too
         import story_report as SR; mt = (mt, SR.reports_mtime())
     except Exception: pass
+    try:   # template / API write-ups land in story_writer.db; include its mtime so a new brief is not stuck behind the 120s page cache
+        import story_writer as SW
+        wp = SW.cfg()["db"]
+        mt = (mt, os.path.getmtime(wp) if os.path.exists(wp) else 0)
+    except Exception:
+        pass
     hit = _C.get(key)
     if hit and hit[0] == mt and time.time() - hit[1] < 120: return hit[2], hit[3], "text/html"
     try:
