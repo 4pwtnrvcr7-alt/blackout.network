@@ -58,7 +58,7 @@ class Base(unittest.TestCase):
             if os.path.exists(p): os.unlink(p)
         import story_report as SR; self._sr_reports = SR.REPORTS; SR.REPORTS = PATHS["BN_STORY_REPORTS"]; SR._RC.update(mt=None, v={})
         import story_v3 as V3; V3._BR.update(mt=None, v={})
-        SW.STATE["initial_done"] = False; SW._NC["t"] = 0; SW._DEFER.clear()
+        SW.STATE["initial_done"] = False; SW._NC["t"] = 0; SW._NP_C.update(t=0, v=set()); SW._DEFER.clear()
         self.calls = []
         SW.fetch_all = lambda urls: ([{"url": U1, "final": U1, "ok": True, "text": TEXT1, "label": "USGS", "err": ""},
                                       {"url": U2, "final": U2, "ok": True, "text": TEXT2, "label": "Example News", "err": ""}], [])
@@ -183,6 +183,64 @@ class Writer(Base):
     def test_thread_name_passes_web_node_guard(self):
         n = SW._writer_worker.__name__.lower()
         self.assertFalse(any(w in n for w in ("loop", "harvest", "indexer")))
+
+    def test_defaults_are_cheap_no_rewrite(self):
+        c = SW.cfg()
+        self.assertEqual(c["model"], "grok-4.20-0309-non-reasoning")
+        self.assertEqual(c["daily_usd"], 0.25)
+        self.assertEqual(c["min_rank"], 5)
+        self.assertFalse(SW.rewrite_allowed())
+
+    def test_old_spend_does_not_eat_new_cap(self):
+        k = SW.db()
+        k.execute("INSERT INTO spend(day, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,?)", (SW.et_day(), 1.0, 100, 100, 10))
+        k.commit()
+        self.assertGreaterEqual(SW.spent_all_today(k)["usd"], 1.0)
+        self.assertEqual(SW.spent_today(k)["usd"], 0.0)
+        self.assertIsNone(SW.blocked_reason(k))
+        k.close()
+
+    def test_no_rewrite_when_new_sources_arrive(self):
+        mkdb([("abababababababab", "M6.8 earthquake struck the Banda Sea off Indonesia", 7)])
+        SW.scan(); self.run_all(self.api(good()))
+        self.assertIsNotNone(SW.note_for("abababababababab"))
+        # pretend two new sources and a later update
+        k = SW.db()
+        k.execute("UPDATE briefs SET written_at=?, src_urls=? WHERE cid=?",
+                  (SW.iso(NOW - timedelta(hours=3)), "[]", "abababababababab"))
+        k.commit(); k.close()
+        src = sqlite3.connect(os.environ["BN_WRITER_SOURCE_DB"])
+        src.execute("UPDATE clusters SET updated=? WHERE cluster_id=?", (SW.iso(NOW), "abababababababab"))
+        src.commit(); src.close()
+        SW.STATE["initial_done"] = True
+        SW.scan()
+        k = SW.db()
+        n = k.execute("SELECT COUNT(*) FROM jobs WHERE reason LIKE 'refresh%'").fetchone()[0]
+        k.close()
+        self.assertEqual(n, 0)
+
+    def test_template_is_upgraded_once_not_rewritten(self):
+        mkdb([("acacacacacacacac", "M6.8 earthquake struck the Banda Sea off Indonesia", 7)])
+        r, al = SW.cluster("acacacacacacacac")
+        note = SW.build_template(r, al)
+        k = SW.db()
+        k.execute("INSERT OR REPLACE INTO briefs(cid, note, written_at, model, src_urls, alias_of, tokens_in, tokens_out, usd, rank, title) VALUES(?,?,?,?,?,NULL,0,0,0,?,?)",
+                  ("acacacacacacacac", __import__("json").dumps(note), SW.iso(), "template", "[]", 7, r["title"]))
+        k.commit(); k.close(); SW._NC["t"] = 0
+        SW.scan()
+        k = SW.db(); job = k.execute("SELECT reason FROM jobs WHERE cid=?", ("acacacacacacacac",)).fetchone(); k.close()
+        self.assertIsNotNone(job); self.assertEqual(job["reason"], "upgrade")
+        self.run_all(self.api(good()))
+        n = SW.note_for("acacacacacacacac")
+        self.assertIsNotNone(n)
+        self.assertNotEqual(n.get("file"), "story_writer_template")
+        self.assertTrue(SW.has_paid_article("acacacacacacacac"))
+        # a second scan must not queue a rewrite
+        SW.scan()
+        k = SW.db()
+        q = k.execute("SELECT COUNT(*) FROM jobs WHERE cid=? AND status='queued'", ("acacacacacacacac",)).fetchone()[0]
+        k.close()
+        self.assertEqual(q, 0)
 
 if __name__ == "__main__":
     unittest.main()

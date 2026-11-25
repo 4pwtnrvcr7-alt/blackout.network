@@ -13,18 +13,23 @@ exists. Near-duplicates of a covered story alias to its brief instead of a new A
 
 No images are generated: the page keeps the existing licensed / place-matched Wire images.
 
+One write-up per story: no automatic rewrites when new sources arrive. Desk / Story v3 briefs always win.
+New rank 5+ items stay off the Wire until the paid article is stored (a free template is still written in the
+background). Existing visible items keep their template until the paid article is swapped in.
+
 Env (all optional except the key):
   XAI_API_KEY               required; the writer stays idle without it (never logged or printed)
   BN_WRITER=0               kill switch
-  BN_WRITER_MODEL           default grok-4.3
+  BN_WRITER_MODEL           default grok-4.20-0309-non-reasoning
   BN_WRITER_API             default https://api.x.ai/v1
   BN_WRITER_MIN_RANK        default 5
   BN_WRITER_MAX_PER_HOUR    default 30 API write-ups per rolling hour
-  BN_WRITER_DAILY_USD       default 1.00 (ET day); the writer pauses when the day's spend reaches it
-  BN_WRITER_PRICE_IN/_OUT   USD per million tokens (default 1.25 / 2.50, grok-4.3 list price)
-  BN_WRITER_BACKFILL_H      default 24
+  BN_WRITER_DAILY_USD       default 0.25 (ET day, current model only); the writer pauses when the day's spend reaches it
+  BN_WRITER_PRICE_IN/_OUT   USD per million tokens (default 1.25 / 2.50)
+  BN_WRITER_BACKFILL_H      default 48
   BN_WRITER_POLL_S          default 10
-  BN_WRITER_REFRESH_MIN     default 60 (a story is rewritten at most this often, and only when 2+ new source links arrived)
+  BN_WRITER_REWRITE=1       opt-in rewrites (off by default)
+  BN_WRITER_REFRESH_MIN     only used if rewrites are on; default 0
   BN_WRITER_DB              default <app>/story_writer.db (a Render-owned DB: handed to the next instance on every deploy)
 """
 from __future__ import annotations
@@ -47,11 +52,11 @@ def _f(k, d):
     try: return float(_env(k, str(d)))
     except Exception: return float(d)
 def cfg():
-    return {"model": _env("BN_WRITER_MODEL", "grok-4.3"), "api": _env("BN_WRITER_API", "https://api.x.ai/v1").rstrip("/"),
+    return {"model": _env("BN_WRITER_MODEL", "grok-4.20-0309-non-reasoning"), "api": _env("BN_WRITER_API", "https://api.x.ai/v1").rstrip("/"),
             "min_rank": int(_f("BN_WRITER_MIN_RANK", 5)), "max_per_hour": int(_f("BN_WRITER_MAX_PER_HOUR", 30)),
-            "daily_usd": _f("BN_WRITER_DAILY_USD", 1.0), "price_in": _f("BN_WRITER_PRICE_IN", 1.25), "price_out": _f("BN_WRITER_PRICE_OUT", 2.50),
-            "backfill_h": _f("BN_WRITER_BACKFILL_H", 24), "poll_s": max(1.0, _f("BN_WRITER_POLL_S", 2)),
-            "refresh_min": _f("BN_WRITER_REFRESH_MIN", 60), "db": _env("BN_WRITER_DB", os.path.join(HERE, DB_REL)),
+            "daily_usd": _f("BN_WRITER_DAILY_USD", 0.25), "price_in": _f("BN_WRITER_PRICE_IN", 1.25), "price_out": _f("BN_WRITER_PRICE_OUT", 2.50),
+            "backfill_h": _f("BN_WRITER_BACKFILL_H", 48), "poll_s": max(1.0, _f("BN_WRITER_POLL_S", 2)),
+            "refresh_min": _f("BN_WRITER_REFRESH_MIN", 0), "db": _env("BN_WRITER_DB", os.path.join(HERE, DB_REL)),
             "blackout_db": _env("BN_WRITER_SOURCE_DB", os.path.join(HERE, "blackout.db")),
             "template_backfill_h": _f("BN_TEMPLATE_BACKFILL_H", 48)}
 def key_set(): return bool((os.environ.get("XAI_API_KEY") or "").strip())
@@ -59,6 +64,7 @@ def enabled(): return _env("BN_WRITER", "1") != "0" and key_set()
 def templates_on(): return _env("BN_TEMPLATES", "1") != "0"
 def gate_wanted(): return templates_on() and _env("BN_PUBLISH_GATE", "1") != "0"
 def api_enabled(): return enabled()
+def rewrite_allowed(): return _env("BN_WRITER_REWRITE", "0") == "1"
 
 def now(): return datetime.now(UTC)
 def iso(d=None): return (d or now()).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -85,11 +91,17 @@ CREATE TABLE IF NOT EXISTS legacy(cid TEXT PRIMARY KEY, at TEXT);
 CREATE TABLE IF NOT EXISTS held(cid TEXT PRIMARY KEY, since TEXT, last_try TEXT, tries INTEGER DEFAULT 0, alerted INTEGER DEFAULT 0, err TEXT, title TEXT, rank INTEGER);
 CREATE TABLE IF NOT EXISTS story_photos(cid TEXT PRIMARY KEY, src TEXT, credit TEXT, license TEXT, caption TEXT, kind TEXT, label TEXT, link TEXT, jpg BLOB, none INTEGER DEFAULT 0, stored_at TEXT);
 CREATE TABLE IF NOT EXISTS story_cards(cid TEXT PRIMARY KEY, png BLOB, v TEXT, src TEXT, built_at TEXT);
+CREATE TABLE IF NOT EXISTS spend_model(day TEXT, model TEXT, usd REAL DEFAULT 0, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, calls INTEGER DEFAULT 0, PRIMARY KEY(day, model));
+CREATE TABLE IF NOT EXISTS needs_paid(cid TEXT PRIMARY KEY, since TEXT, rank INTEGER, title TEXT);
 """
 def db():
     k = sqlite3.connect(cfg()["db"], timeout=20)
     k.row_factory = sqlite3.Row
     k.executescript(SCHEMA)
+    cols = {r[1] for r in k.execute("PRAGMA table_info(jobs)")}
+    if "model" not in cols:
+        k.execute("ALTER TABLE jobs ADD COLUMN model TEXT")
+    k.commit()
     return k
 
 _NC = {"t": 0.0, "v": {}}
@@ -492,10 +504,20 @@ def _parse_json(s):
     return None
 
 # ---------------------------------------------------------------- spend / rate limits
-def spent_today(k=None):
+def spent_all_today(k=None):
+    """All-model spend for the ET day (includes the retired grok-4.3 writer). Not used for the cap."""
     own = k is None; k = k or db()
     try:
         r = k.execute("SELECT usd, tokens_in, tokens_out, calls FROM spend WHERE day=?", (et_day(),)).fetchone()
+        return dict(r) if r else {"usd": 0.0, "tokens_in": 0, "tokens_out": 0, "calls": 0}
+    finally:
+        if own: k.close()
+def spent_today(k=None):
+    """Spend under the current model only. The $0.25 cap does not include earlier models' spend the same day."""
+    own = k is None; k = k or db()
+    try:
+        r = k.execute("SELECT usd, tokens_in, tokens_out, calls FROM spend_model WHERE day=? AND model=?",
+                      (et_day(), cfg()["model"])).fetchone()
         return dict(r) if r else {"usd": 0.0, "tokens_in": 0, "tokens_out": 0, "calls": 0}
     finally:
         if own: k.close()
@@ -503,8 +525,12 @@ def _add_spend(k, tin, tout, usd):
     k.execute("INSERT INTO spend(day, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,1) ON CONFLICT(day) DO UPDATE SET "
               "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+1",
               (et_day(), usd, tin, tout))
+    k.execute("INSERT INTO spend_model(day, model, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,?,1) ON CONFLICT(day, model) DO UPDATE SET "
+              "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+1",
+              (et_day(), cfg()["model"], usd, tin, tout))
 def written_last_hour(k):
-    return k.execute("SELECT COUNT(*) FROM jobs WHERE status='done' AND calls>0 AND finished>=?", (iso(now() - timedelta(hours=1)),)).fetchone()[0]
+    return k.execute("SELECT COUNT(*) FROM jobs WHERE status='done' AND calls>0 AND finished>=? AND COALESCE(model,'')=?",
+                     (iso(now() - timedelta(hours=1)), cfg()["model"])).fetchone()[0]
 def blocked_reason(k):
     c = cfg(); sp = spent_today(k)
     if sp["usd"] >= c["daily_usd"]: return f"daily cap reached (${sp['usd']:.4f} of ${c['daily_usd']:.2f})"
@@ -529,20 +555,26 @@ def enqueue(k, cid, reason, arrived_at, rank, title):
               (cid, reason, "queued", iso(), arrived_at, rank, (title or "")[:200]))
     return True
 
+def _is_template_brief(h):
+    m = (h or {}).get("model") or ""
+    return m == "template" or m.startswith("template")
+
 def scan():
-    """Queue new / risen / under-sourced rank 5+ clusters. Cheap: one read-only query + a few dict lookups."""
+    """Queue new rank 5+ clusters and one-time upgrades of template-only briefs. No automatic rewrites."""
     c = cfg(); maps = _desk_maps(); notes_, alias, v3 = maps
     rows = candidates(max(c["backfill_h"], 2) + 0.0)
     first = not STATE["initial_done"]
     with _LK:
         k = db()
         try:
-            have = {r["cid"]: dict(r) for r in k.execute("SELECT cid, written_at, src_urls, alias_of FROM briefs")}
+            if not rewrite_allowed():
+                k.execute("UPDATE jobs SET status='skipped', err='rewrites disabled' WHERE status IN ('queued','deferred') AND reason LIKE 'refresh%'")
+            have = {r["cid"]: dict(r) for r in k.execute("SELECT cid, written_at, src_urls, alias_of, model FROM briefs")}
             seen = {r["cid"]: dict(r) for r in k.execute("SELECT cid, first_seen, backfill FROM seen")}
             covered_rows = [r for r in rows if desk_covered(r["cluster_id"], maps)]
             queued = {x[0] for x in k.execute("SELECT cid FROM jobs WHERE status IN ('queued','running')")}
             deferred = {x[0] for x in k.execute("SELECT cid FROM jobs WHERE status='deferred'")}
-            claimed = [r for r in rows if (r["cluster_id"] in have and not have[r["cluster_id"]].get("alias_of")) or r["cluster_id"] in queued]
+            claimed = [r for r in rows if (r["cluster_id"] in have and not have[r["cluster_id"]].get("alias_of") and not _is_template_brief(have[r["cluster_id"]])) or r["cluster_id"] in queued]
             for r in rows:
                 cid = r["cluster_id"]; rank = int(r.get("rank") or 0)
                 if cid not in seen:
@@ -552,11 +584,16 @@ def scan():
                 if cid in have:
                     h = have[cid]
                     if h.get("alias_of"): continue
-                    wt = parse_t(h.get("written_at"))
-                    if wt and (now() - wt).total_seconds() >= c["refresh_min"] * 60 and (parse_t(r.get("updated")) or wt) > wt:
-                        _, al = cluster(cid)
-                        new = set(source_urls(r, al)) - set(json.loads(h.get("src_urls") or "[]"))
-                        if len(new) >= 2: enqueue(k, cid, "refresh: new sources", seen[cid]["first_seen"], rank, r.get("title"))
+                    if _is_template_brief(h) and rank >= c["min_rank"] and cid not in queued:
+                        if enqueue(k, cid, "upgrade", seen[cid]["first_seen"], rank, r.get("title")):
+                            queued.add(cid); claimed.append(r)
+                        continue
+                    if rewrite_allowed() and c["refresh_min"] > 0:
+                        wt = parse_t(h.get("written_at"))
+                        if wt and (now() - wt).total_seconds() >= c["refresh_min"] * 60 and (parse_t(r.get("updated")) or wt) > wt:
+                            _, al = cluster(cid)
+                            newsrc = set(source_urls(r, al)) - set(json.loads(h.get("src_urls") or "[]"))
+                            if len(newsrc) >= 2: enqueue(k, cid, "refresh: new sources", seen[cid]["first_seen"], rank, r.get("title"))
                     continue
                 if cid in queued: continue
                 dup = next((x for x in covered_rows if x["cluster_id"] != cid and near_dup(r, x)), None)
@@ -577,7 +614,7 @@ def scan():
     STATE["initial_done"] = True; STATE["last_scan"] = iso(); STATE["scans"] += 1
 
 def next_job(k):
-    r = k.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY CASE reason WHEN 'new' THEN 0 WHEN 'refresh: new sources' THEN 2 ELSE 1 END, rank DESC, id LIMIT 1").fetchone()
+    r = k.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY CASE reason WHEN 'new' THEN 0 WHEN 'upgrade' THEN 1 WHEN 'refresh: new sources' THEN 3 ELSE 2 END, rank DESC, id LIMIT 1").fetchone()
     return dict(r) if r else None
 
 def write_one(job, api=None):
@@ -591,6 +628,7 @@ def write_one(job, api=None):
         r, al = cluster(cid)
         if not r: raise RuntimeError("cluster gone")
         if desk_covered(cid): status = "skipped"; err = "desk brief arrived"; raise StopIteration
+        if has_paid_article(cid): status = "skipped"; err = "already has a paid write-up"; raise StopIteration
         with _LK:
             k = db(); al_row = k.execute("SELECT alias_of FROM briefs WHERE cid=?", (cid,)).fetchone(); k.close()
         if al_row and al_row[0]: status = "skipped"; err = f"near-duplicate of {al_row[0]}"; raise StopIteration
@@ -630,6 +668,12 @@ def write_one(job, api=None):
                 status = "done"
             k.commit(); k.close()
         _invalidate(cid)
+        if status == "done":
+            _clear_needs_paid(cid)
+            try:
+                package_one(cid, row=r, al=al, build_card_now=False)
+            except Exception:
+                traceback.print_exc()
     except StopIteration: pass
     except APIError as e: status = "deferred"; err = f"API: {e}"
     except Exception as e: err = f"{type(e).__name__}: {str(e)[:200]}"; traceback.print_exc()
@@ -638,8 +682,8 @@ def write_one(job, api=None):
     if status == "done" and a: lat = round((now() - a).total_seconds(), 1)
     with _LK:
         k = db()
-        k.execute("UPDATE jobs SET status=?, finished=?, err=?, tokens_in=?, tokens_out=?, usd=?, latency_s=?, calls=? WHERE id=?",
-                  (status, fin, err, tin_t, tout_t, usd_t, lat, calls, job["id"]))
+        k.execute("UPDATE jobs SET status=?, finished=?, err=?, tokens_in=?, tokens_out=?, usd=?, latency_s=?, calls=?, model=? WHERE id=?",
+                  (status, fin, err, tin_t, tout_t, usd_t, lat, calls, cfg()["model"] if calls else None, job["id"]))
         k.commit(); k.close()
     log(f"{cid} {job['reason']} -> {status} in {time.time() - t0:.1f}s tokens {tin_t}/{tout_t} ${usd_t:.4f}" + (f" ({err[:160]})" if err else ""))
     return status
@@ -697,20 +741,15 @@ def _writer_worker(ready, paused):
 def gate_on():
     return bool(STATE.get("gate_on")) and gate_wanted()
 
-def _item_for_tags(r, al=None, note=None):
-    """Full extractor input: scanner brief, location, write-up and source titles (surname / place)."""
-    import x_share
-    it = {"cluster_id": r.get("cluster_id") or r.get("id"), "title": r.get("title") or "", "headline": r.get("title") or "",
-          "brief": r.get("brief") or "", "location": r.get("location") or r.get("place") or "",
-          "category": r.get("category") or "", "rank": r.get("rank") or 0,
-          "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0}
-    extra = x_share._note_text(note) if note else ""
-    return x_share.with_body(it, alerts=al, extra=extra)
+def _item_for_tags(r):
+    return {"cluster_id": r.get("cluster_id") or r.get("id"), "title": r.get("title") or "", "headline": r.get("title") or "",
+            "brief": r.get("brief") or "", "location": r.get("location") or "", "category": r.get("category") or "",
+            "rank": r.get("rank") or 0, "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0}
 
-def rule_tags(r, al=None, note=None):
+def rule_tags(r):
     """Rule-based hashtags only. Does not call x_share.hashtags() (that queues the paid tag model)."""
     import x_share
-    return list(x_share._entity_first(_item_for_tags(r, al=al, note=note)) or [])
+    return list(x_share._entity_first(_item_for_tags(r)) or [])
 
 def build_card(cid):
     """Render and cache the share card. Returns True when bytes were produced."""
@@ -909,6 +948,42 @@ def build_template(r, al):
     }
     return note
 
+_NP_C = {"t": 0.0, "v": set()}
+def _needs_paid_set():
+    if time.time() - _NP_C["t"] < 3:
+        return _NP_C["v"]
+    with _LK:
+        k = db()
+        try:
+            v = {r[0] for r in k.execute("SELECT cid FROM needs_paid")}
+        finally:
+            k.close()
+    _NP_C.update(t=time.time(), v=v)
+    return v
+
+def _is_needs_paid(cid):
+    return bool(cid) and cid in _needs_paid_set()
+
+def _mark_needs_paid(cid, rank=0, title=""):
+    with _LK:
+        k = db()
+        try:
+            k.execute("INSERT OR REPLACE INTO needs_paid(cid, since, rank, title) VALUES(?,?,?,?)",
+                      (cid, iso(), int(rank or 0), (title or "")[:200]))
+            k.commit()
+        finally:
+            k.close()
+    _NP_C["t"] = 0.0
+
+def _clear_needs_paid(cid):
+    with _LK:
+        k = db()
+        try:
+            k.execute("DELETE FROM needs_paid WHERE cid=?", (cid,)); k.commit()
+        finally:
+            k.close()
+    _NP_C["t"] = 0.0
+
 def _legacy_set():
     with _LK:
         k = db()
@@ -925,6 +1000,16 @@ def _ready_row(cid):
             return dict(r) if r else None
         finally:
             k.close()
+
+def has_paid_article(cid):
+    """True when a desk brief or a paid API article (not a free template) is stored."""
+    if not cid: return False
+    if desk_covered(cid): return True
+    n = note_for(cid)
+    if not isinstance(n, dict): return False
+    if n.get("file") == "story_writer_template": return False
+    if (n.get("writer") or {}).get("model") == "template": return False
+    return True
 
 def has_writeup(cid):
     """True when a desk brief or a stored writer/template write-up exists (cards may still be building)."""
@@ -946,14 +1031,17 @@ def is_packaged(cid):
 
 def allow(cid, archive=False):
     """Whether a story may appear on a public listing or API. Never raises.
-    Once the gate is on, only items with a stored write-up (desk, template, or API) are listed.
-    Archive history is unchanged."""
+    Once the gate is on, items need a stored write-up. New rank 5+ items (needs_paid)
+    stay off the Wire until the paid article is stored. Items that later rise to 5+
+    keep their template until the paid article is swapped in. Archive is unchanged."""
     try:
         if archive or not cid:
             return True
         if not gate_on():
             return True
-        if has_writeup(cid) or is_packaged(cid):
+        if _is_needs_paid(cid) and not has_paid_article(cid):
+            return False
+        if has_writeup(cid) or is_packaged(cid) or has_paid_article(cid):
             return True
         return False
     except Exception:
@@ -1085,6 +1173,8 @@ def package_one(cid, row=None, al=None, build_card_now=False):
     Returns True when the write-up is stored and the item may appear on the Wire."""
     if not cid: return False
     if has_writeup(cid) and is_packaged(cid):
+        if has_paid_article(cid):
+            _clear_needs_paid(cid)
         _clear_held(cid); return True
     if not _backoff_ok(cid):
         return False
@@ -1095,22 +1185,14 @@ def package_one(cid, row=None, al=None, build_card_now=False):
         if not row:
             _mark_held(cid, "cluster gone"); return False
         kind = "template"
-        note = None
         if desk_covered(cid):
             kind = "desk"
-            try:
-                import story_v3 as V3
-                note = V3.note_for(cid)
-            except Exception:
-                note = note_for(cid)
         else:
             existing = note_for(cid)
             if existing and existing.get("file") != "story_writer_template":
                 kind = "writer"
-                note = existing
             elif existing and existing.get("file") == "story_writer_template":
                 kind = "template"
-                note = existing
             else:
                 note = build_template(row, al or [])
                 with _LK:
@@ -1125,11 +1207,17 @@ def package_one(cid, row=None, al=None, build_card_now=False):
                 _invalidate(cid)
                 kind = "template"
         try:
-            tags = rule_tags(row, al, note)
+            tags = rule_tags(row)
         except Exception:
             traceback.print_exc(); tags = []
         if not tags:
             _mark_held(cid, "no tags", row.get("title"), int(row.get("rank") or 0)); return False
+        was_ready = _ready_row(cid) is not None
+        if kind in ("desk", "writer") or has_paid_article(cid):
+            _clear_needs_paid(cid)
+        elif (kind == "template" and int(row.get("rank") or 0) >= cfg()["min_rank"]
+              and cid not in _legacy_set_cached() and not was_ready):
+            _mark_needs_paid(cid, int(row.get("rank") or 0), row.get("title"))
         card_ok = 0
         if build_card_now:
             try:
@@ -1258,6 +1346,10 @@ def status(n=20):
             k = db()
             try:
                 out["spend_today"] = spent_today(k); out["spend_today"]["day_et"] = et_day()
+                out["spend_today_all_models"] = spent_all_today(k); out["spend_today_all_models"]["day_et"] = et_day()
+                out["rewrites"] = rewrite_allowed()
+                try: out["needs_paid"] = k.execute("SELECT COUNT(*) FROM needs_paid").fetchone()[0]
+                except Exception: out["needs_paid"] = 0
                 out["queue"] = [dict(r) for r in k.execute("SELECT id, cid, reason, status, enq_at, arrived_at, rank, title, err FROM jobs WHERE status IN ('queued','running','deferred') ORDER BY id")]
                 out["recent"] = [dict(r) for r in k.execute("SELECT id, cid, reason, status, arrived_at, finished, latency_s, tokens_in, tokens_out, usd, calls, rank, title, err FROM jobs WHERE status NOT IN ('queued','running') ORDER BY id DESC LIMIT ?", (n,))]
                 out["written_last_hour"] = written_last_hour(k)
