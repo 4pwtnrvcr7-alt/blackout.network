@@ -375,7 +375,9 @@ def _boot_warm(timeout=45):
     if cids:
         try:
             import story
-            st, html = story.handle_get("/wire/" + cids[0], {})
+            res = story.handle_get("/wire/" + cids[0], {})
+            st = res[0] if isinstance(res, (tuple, list)) else res
+            html = res[1] if isinstance(res, (tuple, list)) and len(res) > 1 else ""
             html = html if isinstance(html, str) else (html.decode("utf-8", "replace") if isinstance(html, (bytes, bytearray)) else "")
             BOOT_WARM["wire"] = st == 200 and "Loading the full story" not in html
         except Exception as ex:
