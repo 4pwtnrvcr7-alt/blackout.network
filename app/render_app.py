@@ -348,13 +348,54 @@ BOOT_WARM = {"wire": False, "og": False, "n": 0, "done": False, "error": ""}
 def can_serve_wire_og():
     return bool(BOOT_WARM["wire"] and BOOT_WARM["og"])
 
+_WIRE_RETRY = {"t": 0.0, "ok": False}
+
+def _reprobe_wire():
+    """If boot_warm left wire=false (a slow first /wire page, or the 'Loading the full story' stub),
+    retry a cheap in-process story page at most every 8 s so /healthz can recover without a new deploy."""
+    if BOOT_WARM["wire"]:
+        return True
+    now = time.time()
+    if now - _WIRE_RETRY["t"] < 8:
+        return _WIRE_RETRY["ok"]
+    _WIRE_RETRY["t"] = now
+    try:
+        import story
+        cid = ""
+        try:
+            c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=2)
+            row = c.execute("SELECT cluster_id FROM clusters WHERE watchlist IN (0,1) ORDER BY COALESCE(updated, first_seen) DESC LIMIT 1").fetchone()
+            c.close()
+            cid = (row or [""])[0] or ""
+        except Exception:
+            cid = ""
+        if not cid:
+            _WIRE_RETRY["ok"] = bool(has_data())
+        else:
+            res = story.handle_get("/wire/" + cid, {})
+            st = res[0] if isinstance(res, (tuple, list)) else res
+            html = res[1] if isinstance(res, (tuple, list)) and len(res) > 1 else ""
+            html = html if isinstance(html, str) else (html.decode("utf-8", "replace") if isinstance(html, (bytes, bytearray)) else "")
+            ok = st == 200 and "Loading the full story" not in html
+            if ok:
+                BOOT_WARM["wire"] = True
+            _WIRE_RETRY["ok"] = ok
+    except Exception:
+        _WIRE_RETRY["ok"] = bool(has_data())
+    return _WIRE_RETRY["ok"]
+
+
 def public_ready():
     """True only when Render should send public traffic here."""
     if not ready():
         return False
     if not has_data():
         return HANDOFF["state"] in ("gave_up", "off", "")  # cold start: do not block the box sync
-    return can_serve_wire_og()
+    if can_serve_wire_og():
+        return True
+    # boot_warm is one-shot; a false wire flag after a slow first page must not 503 forever
+    # (Render would keep the instance unhealthy and can replace it).
+    return bool(BOOT_WARM["og"] and _reprobe_wire())
 
 def _boot_warm(timeout=45):
     """In-process: prove /wire and /og work, and pre-warm a few story cards so the first Twitterbot hit has a PNG."""

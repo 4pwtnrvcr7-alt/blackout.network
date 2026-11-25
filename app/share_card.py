@@ -1488,6 +1488,7 @@ def story_map_place(title="", location="", brief="", cid=""):
 _BAKED = set()
 _BAKING = set()
 _BAKE_LOCK = threading.Lock()
+_BAKE_Q = None  # lazy queue.Queue; a single worker bakes cards one at a time (never one thread per story)
 
 
 def card_baked(cid):
@@ -1506,42 +1507,55 @@ def card_baked(cid):
     return False
 
 
+def _bake_one(cid):
+    """Render and store one designed card (~0.3 s, no network). The photo upgrade is a later, paced worker job."""
+    try:
+        import story_photo
+        if not story_photo.get_card(cid):
+            b = generic_story_card(cid)
+            if b and b.startswith(b"\x89PNG"):
+                title = ""
+                try:
+                    import story
+                    r, _al = story.load(cid)
+                    title = (r or {}).get("title") or ""
+                except Exception:
+                    pass
+                story_photo.put_card(cid, b, "", title_hash=story_photo.card_title_key(_card_headline(title) or ""))
+        _BAKED.add(cid)
+        # Do not submit(fetch=True) here: a flood of Commons downloads is what OOM-killed the 2Gi box
+        # after #242 (10:40:19 AM ET). The existing paced photo backfill upgrades the map later.
+    except Exception as e:
+        print(f"share_card: bake {cid} err={type(e).__name__}", flush=True)
+    finally:
+        with _BAKE_LOCK:
+            _BAKING.discard(cid)
+
+
+def _bake_worker():
+    while True:
+        cid = _BAKE_Q.get()
+        try:
+            if cid:
+                _bake_one(cid)
+        finally:
+            _BAKE_Q.task_done()
+
+
 def bake_card(cid):
-    """Queue a designed card for this story on a daemon thread (map render, ~0.3 s, no network), store it, then queue
-    the licensed-photo upgrade. Deduped; returns at once."""
+    """Queue a designed card on the single bake worker. Deduped; returns at once. Never starts a new thread per story."""
+    global _BAKE_Q
     if not cid or cid in _BAKED:
         return
     with _BAKE_LOCK:
         if cid in _BAKING:
             return
         _BAKING.add(cid)
-
-    def _run():
-        try:
-            import story_photo
-            if not story_photo.get_card(cid):
-                b = generic_story_card(cid)
-                if b and b.startswith(b"\x89PNG"):
-                    title = ""
-                    try:
-                        import story
-                        r, _al = story.load(cid)
-                        title = (r or {}).get("title") or ""
-                    except Exception:
-                        pass
-                    story_photo.put_card(cid, b, "", title_hash=story_photo.card_title_key(_card_headline(title) or ""))
-            _BAKED.add(cid)
-            try:
-                submit(cid, fetch=True, urgent=False)
-            except Exception:
-                pass
-        except Exception as e:
-            print(f"share_card: bake {cid} err={type(e).__name__}", flush=True)
-        finally:
-            with _BAKE_LOCK:
-                _BAKING.discard(cid)
-
-    threading.Thread(target=_run, name="card-bake", daemon=True).start()
+        if _BAKE_Q is None:
+            import queue
+            _BAKE_Q = queue.Queue()
+            threading.Thread(target=_bake_worker, name="card-bake", daemon=True).start()
+        _BAKE_Q.put(cid)
 
 
 def generic_story_card(cid):
