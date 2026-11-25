@@ -1582,8 +1582,8 @@ FH = "Inter,Arial,Helvetica,sans-serif"
 FACE = FB
 LOGO_ALT = "BLACKOUT.NETWORK"
 def logo_url(theme="dark", c=None):
-    """Hosted master logo: logo V2-final tile (dark version; light version on a bordered white tile), solid background, built by tools/logo_v2_assets.py. New filename busts mail-client image caches. Served by social.py /social/thumb/."""
-    return f'{(c or cfg())["base_url"].rstrip("/")}/social/thumb/brand_tile_v2_{theme}_168.png'
+    """Hosted chrome B mark (Matt, Nov 25 2026). New filename busts mail-client image caches. Served by social.py /social/thumb/."""
+    return f'{(c or cfg())["base_url"].rstrip("/")}/social/thumb/chrome_b_168.png'
 def _logo_html(c, size=48):
     """Masthead / footer mark: the BLACKOUT text wordmark only (no tile image), like the site's top bar. size>=44: masthead; smaller: footer
     lockup with BLACKOUT.NETWORK and the tagline."""
@@ -3371,7 +3371,7 @@ def follows_of(sid):
 def page(title, body, robots="noindex"):
     return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<meta name="robots" content="{robots}">' + sitenav.head_html("newsletter") +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=3" sizes="any"><link rel="stylesheet" href="/api/newsletter/app.css">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=4" sizes="any"><link rel="stylesheet" href="/api/newsletter/app.css">'
             '<link rel="stylesheet" href="/api/translate/app.css"></head><body class="nl-page"><a class="skip" href="#main">Skip to content</a>'
             + sitenav.site_top("newsletter") +
             f'<div class="nl-wrap" id="main" role="main">{body}</div>'

@@ -10,7 +10,7 @@ import base64, html, json, math, os, struct, zlib
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 WORLD = os.path.join(BASE, "signal_map_static", "world.geojson")
-LOGO = os.path.join(BASE, "static", "social", "brand_tile_v2_dark_168.png")
+LOGO = os.path.join(BASE, "static", "social", "chrome_b_168.png")
 
 BG = (11, 13, 16)
 LAND = (22, 28, 36)
