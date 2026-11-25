@@ -756,7 +756,9 @@ def topic_tags(item, headline=None):
         r"\b(missile|airstrike|air strike|artillery|shelling|invasion|drone attack|"
         r"ballistic|combat|bombard|offensive|warship)\b", blob, re.I)
     if conflictish:
-        if re.search(r"\bukraine\b|\bkyiv\b|\bkiev\b|\bkharkiv\b|\bkryvyi\b", low):
+        _tl = ((title or "") + " " + str(item.get("location") or "")).lower()
+        if re.search(r"\bukrain|\bkyiv\b|\bkiev\b|\bkharkiv\b|\bkryvyi\b|\bzaporizh|\bodesa\b|\bodessa\b|\bdnipro\b|\bdonetsk\b|\bkherson\b", _tl) or \
+                len(re.findall(r"\bukrain", low)) >= 3:
             add("UkraineWar")
         # Strike type next so it keeps a topic slot when the title actually says so
         if re.search(r"\bdrone(?:\s+and\s+missile)?\s+(?:strike|attack|assault)s?\b|\buav\b", lead, re.I):
@@ -767,8 +769,7 @@ def topic_tags(item, headline=None):
             add("MissileStrike")
         elif re.search(r"\bairstrikes?\b|\bair strikes?\b", lead, re.I):
             add("Airstrike")
-        if re.search(r"\brussia(?:n)?\b|\bkremlin\b|\bmoscow\b", low) and re.search(
-                r"\b(ukraine|kyiv|kiev|missile|strike|invasion|war)\b", low):
+        if re.search(r"\brussia(?:n)?\b|\bkremlin\b|\bmoscow\b", (title or "").lower()):
             add("Russia")
         if re.search(r"\bgaza\b|\bhamas\b", low):
             add("Gaza")
@@ -781,7 +782,7 @@ def topic_tags(item, headline=None):
     if cat == "cyber" or re.search(r"\b(data breach|ransomware|cve-\d|remote code execution|cyber ?attack)\b", low):
         if re.search(r"\bcve-\d", low):
             add("CVE")
-        if re.search(r"\bdata breach\b|\bbreached\b", low):
+        if re.search(r"\bdata breach\b|\bbreach(?:ed|es)?\b|\bleak(?:ed|s)?\b", low):
             add("DataBreach")
         elif re.search(r"\bransomware\b", low):
             add("Ransomware")
@@ -789,6 +790,9 @@ def topic_tags(item, headline=None):
             add("Cybersecurity")
 
     return tags
+
+
+_STOCK_RX = re.compile(r"\b(shares?|stocks?|trading (?:halt\w*|halted)|halts? trading|penny stock|nasdaq|nyse|delist\w*|ipo|earnings|equities|sec filing)\b", re.I)
 
 
 def engagement_tags(item, headline=None):
@@ -809,10 +813,18 @@ def engagement_tags(item, headline=None):
     if cat == "disease" or any(re.search(p, blob, re.I) for p, _ in _DISEASES):
         add("Outbreak")
     elif cat == "cyber" or re.search(r"\b(cve-\d|data breach|ransomware|remote code execution|cyber ?attack)\b", blob, re.I):
-        add("Cyberattack")
+        add("Cyberattack" if re.search(r"\b(attack\w*|breach\w*|ransomware|hack\w*|exploit\w*|leak\w*|vulnerab\w*|cve-\d|malware|ddos)\b", title or "", re.I) else "Cybersecurity")
     elif cat in ("war/conflict", "conflict") or re.search(
             r"\b(missile|airstrike|invasion|artillery|shelling|ukraine war|drone strike)\b", blob, re.I):
         add("War")
+    elif re.search(r"\b(earthquakes?|quakes?|volcan\w+|tsunamis?|wildfires?|forest fires?)\b|\bM\s*\d+\.\d+\b", title or "", re.I):
+        return []   # the hazard topic tag (#Earthquake, #Wildfire) is the sector tag; never #Weather
+    elif _STOCK_RX.search(title or "") or _STOCK_RX.search(blob if cat in ("markets", "business", "economy") else ""):
+        add("Stocks")
+    elif cat in ("markets", "economy", "business") or re.search(r"\b(federal reserve|inflation|interest rates?|treasury yields?)\b", title or "", re.I):
+        add("Markets")
+    elif re.search(r"\b(biotech|pharma\w*|therapeutics|biologics|clinical trial|fda approv\w*)\b", title or "", re.I):
+        add("Biotech")
     elif cat in ("weather", "natural disaster") or re.search(
             r"\b(hurricanes?|typhoons?|cyclones?|tornado(?:es|s)?|flood(?:ing|s|ed)?|"
             r"storms?|blizzards?|wildfires?|heat ?waves?|severe rain|heavy rain|rains?|"
@@ -863,7 +875,7 @@ def _dedupe(tags, limit=MAX_TAGS):
     return out
 
 
-def hashtags(item, headline=None):
+def _hashtags_base(item, headline=None):
     """1–2 location, 1–2 topic, 1 engagement. Always 3–5 tags (held: location + 2 generic)."""
     loc = location_tags(item, headline=headline)
     if is_held(item):
@@ -879,6 +891,233 @@ def hashtags(item, headline=None):
         if e not in tags:
             tags.append(e)
     return _dedupe(tags, MAX_TAGS)
+
+
+
+# --------------------------------------------------------------------------- entity-first layer (Nov 25 2026, Matt pt1873u)
+GENERICS = {"#News", "#WorldNews", "#Breaking", "#BreakingNews"}
+SECTORS = {"#Biotech", "#Stocks", "#Markets", "#Cybersecurity", "#Cyberattack", "#War", "#Outbreak", "#Weather", "#Economy", "#Energy"}
+_EXCHANGES = [
+    (r"\bNYSE American\b", "NYSEAmerican"), (r"\bNYSE Arca\b", "NYSEArca"), (r"\bNew York Stock Exchange\b|\bNYSE\b", "NYSE"),
+    (r"\bNasdaq\b|\bNASDAQ\b", "Nasdaq"), (r"\bLondon Stock Exchange\b|\bLSE\b", "LSE"), (r"\bTokyo Stock Exchange\b", "TSE"),
+    (r"\bCboe\b|\bCBOE\b", "Cboe"), (r"\bTSX\b", "TSX"), (r"\bHang Seng\b", "HangSeng"),
+]
+_AGENCIES = [
+    "CDC", "WHO", "FAA", "FBI", "CIA", "NSA", "CISA", "FEMA", "NOAA", "NWS", "USGS", "NASA", "NATO", "OPEC", "IMF", "SEC", "FDA", "EPA",
+    "DHS", "DOJ", "FCC", "FTC", "TSA", "NTSB", "NRC", "DOE", "IDF", "IAEA", "UN", "EU", "Pentagon", "Kremlin", "Hamas", "Hezbollah",
+    "Houthis", "SpaceX", "NHC", "UNICEF", "Interpol", "Europol", "Treasury",
+]
+_AGENCY_RX = re.compile(r"(?<![A-Za-z0-9])(" + "|".join(sorted(map(re.escape, _AGENCIES), key=len, reverse=True)) + r")(?![A-Za-z0-9])")
+_TICKERS = {"TherivaBiologics": "TOVX", "Tesla": "TSLA", "Nvidia": "NVDA", "Apple": "AAPL", "Microsoft": "MSFT", "Boeing": "BA", "Intel": "INTC",
+            "Pfizer": "PFE", "Moderna": "MRNA", "Rakuten": "4755"}
+_TICKER_TEXT = re.compile(r"\b(?:NYSE(?: American)?|Nasdaq|NASDAQ|OTC|TSX)\s*[:\-]\s*([A-Z]{1,5})\b|\(\s*([A-Z]{2,5})\s*\)|\bticker\s+([A-Z]{2,5})\b")
+_CO_SUFFIX = r"(?:Inc|Corp|Corporation|Co|Ltd|LLC|PLC|Group|Holdings|Bank|Airlines|Air Lines|Biologics|Therapeutics|Pharma|Pharmaceuticals|Biosciences|Bio|Technologies|Energy|Motors|Systems|Networks|Labs|Capital|Securities|Insurance|Foods|Brands|Entertainment|Communications|Software)"
+_NOT_ENTITY = {
+    "breaking news", "quick takes", "high wind", "high wind warning", "flood watch", "flood warning", "flash flood", "tornado watch", "tornado warning",
+    "heat advisory", "winter storm", "winter weather", "severe thunderstorm", "red flag", "dense fog", "special weather", "the wire", "red alert",
+    "orange alert", "green alert", "yellow alert", "state of emergency", "known exploited", "security advisory", "read more", "live updates",
+    "united states", "new york", "los angeles", "san francisco", "las vegas", "new orleans", "south africa", "north korea", "south korea",
+    "south sudan", "new zealand", "saudi arabia", "sri lanka", "costa rica", "puerto rico", "hong kong", "west bank", "gaza strip", "central florida",
+    "south florida", "north florida", "west coast", "east coast", "middle east", "south china sea", "black sea", "red sea", "persian gulf",
+}
+_STOP_START = {"the", "a", "an", "this", "that", "these", "those", "in", "on", "at", "by", "for", "as", "with", "after", "amid", "over", "new", "why", "how",
+               "what", "when", "where", "who", "update", "alert", "report", "reports", "breaking", "watch", "warning", "advisory", "some", "more", "days",
+               "overnight", "heavy", "severe", "major", "small", "large", "russian", "ukrainian", "chinese", "israeli", "american", "iranian", "syrian",
+               "turkish", "indian", "european", "african", "asian", "british", "french", "german", "japanese", "korean", "libyan", "congolese"}
+_MONTHS = {"january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+           "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "est", "edt", "pst", "pdt", "cst", "cdt", "utc", "gmt"}
+_CAP = r"[A-Z][A-Za-z0-9&\-]*"
+_PHRASE_RX = re.compile(r"(?<![A-Za-z0-9’'])(" + _CAP + r"(?:\s+" + _CAP + r"){0,3})(?![’'A-Za-z0-9])")
+
+
+def _clean_title(title):
+    s = _norm(title or "")
+    s = re.sub(r"\s+(?:By|via)\s+(?:Investing\.com|Reuters|AP|Bloomberg|Yahoo Finance|MarketWatch|Benzinga|GlobeNewswire|PR Newswire|Business Wire)\b.*$", "", s)
+    s = re.sub(r"^\s*(?:Breaking News|BREAKING|Quick takes:)\s*[:\-—]?\s*", "", s, flags=re.I)
+    return s
+
+
+def entity_tags(item, headline=None):
+    """Specific named things in the story: company, ticker, exchange, agency/org, person-like proper-noun phrases, plus 'in/of <Place>' places.
+    Returns (tags_in_priority_order). Place names found here are only used when the place dictionaries missed them."""
+    title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
+    blob = " ".join([title, str(item.get("title") or ""), str(item.get("brief") or "")[:600]])
+    out, seen = [], set()
+    known_loc = {x.lower() for x in location_tags(item, headline=headline)}
+
+    def add(label, tag=None):
+        tg = tag or to_tag(label)
+        if tg and len(tg) > 2 and tg.lower() not in seen and tg.lower() not in known_loc:
+            seen.add(tg.lower()); out.append(tg)
+
+    # companies first: capitalized phrase ending in a company suffix, or followed by an exchange mention
+    for m in re.finditer(r"(" + _CAP + r"(?:\s+" + _CAP + r"){0,3}\s+" + _CO_SUFFIX + r")\b\.?", title):
+        ph = m.group(1)
+        if ph.split()[0].lower() in _STOP_START:
+            ph = " ".join(ph.split()[1:])
+        ws = ph.split()
+        while len(ws) > 1 and ws[-1].rstrip(".").lower() in {"inc", "corp", "corporation", "co", "ltd", "llc", "plc", "group", "holdings"}:
+            ws = ws[:-1]
+        ph = " ".join(ws)
+        if ph and ph.lower() not in _NOT_ENTITY and not _is_place(ph):
+            add(ph)
+    company = out[0] if out else None
+    # exchange / market
+    for rx, lab in _EXCHANGES:
+        if re.search(rx, blob):
+            add(lab, "#" + lab)
+            break
+    # ticker, only when stated in the text or well known for the company
+    tk = None
+    mt = _TICKER_TEXT.search(blob)
+    if mt:
+        tk = next((g for g in mt.groups() if g), None)
+        if tk and tk.upper() in {"US", "UK", "EU", "UN", "AI", "CEO", "CFO", "FAQ", "II", "IV", "TV"}:
+            tk = None
+    if not tk and company:
+        tk = _TICKERS.get(company.lstrip("#"))
+    if tk:
+        add(tk, "#" + tk.upper())
+    # agencies / organizations (all-caps dictionary)
+    for m in _AGENCY_RX.finditer(blob):
+        add(m.group(1))
+        if len(out) >= 6:
+            break
+    # proper-noun phrases from the title that are not places we already know, months, or generic event words
+    first_pos = 0
+    for m in _PHRASE_RX.finditer(title):
+        ph = m.group(1).strip()
+        words = ph.replace("&", " ").split()
+        if m.start() == first_pos and words and words[0].lower() in _STOP_START:
+            words = words[1:]
+        while words and (words[0].lower() in _STOP_START and len(words) > 1):
+            words = words[1:]
+        while words and words[0].lower().rstrip(".") in _HONORIFICS and len(words) > 1:
+            words = words[1:]
+        ph = " ".join(words)
+        low = ph.lower()
+        if any(w.lower() in _PLACE_WORDS for w in words) or _is_place(ph):
+            continue
+        if not ph or low in _NOT_ENTITY or low in _MONTHS or ph.isupper() or len(ph) < 4:
+            continue
+        if any(w.lower() in _MONTHS for w in words) or re.search(r"\d", ph):
+            continue
+        if len(words) < 2 or any(w.isupper() and len(w) > 1 for w in words):
+            continue   # single words and acronym-bearing phrases are handled by the dictionaries
+        if m.start() == 0 and low not in _KNOWN_ORGS:
+            continue   # a sentence-initial capital phrase is ambiguous ("Satellites Have"); only the known-org list or a company suffix counts there
+        tg = to_tag(ph)
+        if tg and len(tg) <= 22 and len(words) <= 3 and tg.lower() not in known_loc:
+            add(ph)
+        if len(out) >= 6:
+            break
+    # "in/of/near <Place>" for places our dictionaries do not know (e.g. 'km SE of Severo-Kuril’sk')
+    for m in re.finditer(r"\b(?:of|near|in|at)\s+(" + _CAP + r")(?:,|\b)", title):
+        ph = m.group(1)
+        if len(ph) >= 5 and ph.lower() not in _MONTHS and ph.lower() not in {x.lower() for x in _COMMON_CAPS} and ph.lower() not in _NOT_ENTITY and ph.lower() not in _PLACE_WORDS and not _is_place(ph):
+            add(ph)
+    return out[:6]
+
+
+_HONORIFICS = {"mayor", "president", "prime", "minister", "gen", "general", "sen", "senator", "rep", "dr", "gov", "governor", "king", "queen", "pope", "chief", "sheikh", "judge", "secretary", "ceo", "chairman", "mr", "mrs", "ms"}
+_PLACE_WORDS = {"republic", "states", "america", "kingdom", "river", "mountains", "islands", "island", "sea", "ocean", "bay", "county", "city", "lake", "gulf", "strait", "peninsula", "valley", "coast", "desert"}
+
+
+def _is_place(ph):
+    try:
+        a, b = _find_places(ph, "")
+        return bool(a or b)
+    except Exception:
+        return False
+
+
+_KNOWN_ORGS = {"federal reserve", "white house", "supreme court", "red cross", "european union", "world bank", "european central bank", "bank of england",
+               "bank of japan", "red crescent", "state department", "national guard", "coast guard", "air force", "space force", "national weather service"}
+_COMMON_CAPS = {"Friday", "Monday", "Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday", "Israel", "Russia", "Ukraine", "Iran", "China", "Africa",
+                "Europe", "Asia", "Congo", "Kenya", "Nigeria", "Uganda", "India", "Turkey", "Brazil", "Florida", "Texas", "Oregon", "Hollywood", "Kuril",
+                "Breaking", "Officials", "President", "Police", "Government", "Minister", "Reuters", "Investing", "Yahoo", "Update", "Report", "Earthquake",
+                "Tornado", "Hurricane", "Wildfire", "Flood", "Storm", "Warning", "Watch", "Advisory", "Alert", "Fire", "Forest", "Satellites", "Aliens",
+                "Federal", "Society", "Data", "Minutes", "Days", "Overnight", "Central", "South", "North", "East", "West"}
+
+
+def _cap_one(tags, group, limit=1):
+    """Keep at most `limit` tags from `group` (a set), preserving order."""
+    out, n = [], 0
+    for t in tags:
+        if t in group:
+            if n >= limit:
+                continue
+            n += 1
+        out.append(t)
+    return out
+
+
+_CAT_FILL = {"politics": "Politics", "markets": "Markets", "uap": "UAP", "hazard": "Hazard", "space": "Space", "cyber": "Cybersecurity", "conflict": "Conflict",
+             "weather": "Weather", "disease": "Health", "crime": "Crime", "health": "Health", "science": "Science", "energy": "Energy", "tech": "Tech",
+             "natural disaster": "Disaster", "war/conflict": "Conflict", "infrastructure": "Infrastructure", "aviation": "Aviation", "transport": "Transport"}
+
+
+def _cat_fill(item, headline=None):
+    c = (_cat(item, headline=headline) or str(item.get("category") or item.get("k") or "")).lower().strip()
+    lab = _CAT_FILL.get(c)
+    return ["#" + lab] if lab else []
+
+
+def _entity_first(item, headline=None):
+    """Entity-first rule-based tags. Priority: entity, location, topic, entity, sector, location, topic, entity; generics only as a last resort (max 1)."""
+    ents = entity_tags(item, headline=headline)
+    loc = location_tags(item, headline=headline)
+    topics = topic_tags(item, headline=headline)
+    sec = [t for t in engagement_tags(item, headline=headline)]
+    sector = [t for t in sec if t not in GENERICS]
+    generic = [t for t in sec if t in GENERICS]
+    topics = [t for t in topics if t not in SECTORS]
+    # a topic that is itself a cyber/sector word should not double up with the sector tag
+    if sector and "#Cybersecurity" in topics and sector[0] in ("#Cyberattack",):
+        sector = []
+    order = []
+    def take(lst, i):
+        if i < len(lst):
+            order.append(lst[i])
+    take(ents, 0); take(loc, 0); take(topics, 0); take(loc, 1); take(sector, 0); take(ents, 1); take(topics, 1); take(ents, 2)
+    tags = _dedupe(order, MAX_TAGS)
+    if len(tags) < MIN_TAGS:
+        for e in ents[3:] + loc[2:] + topics[2:]:
+            if len(tags) >= MIN_TAGS:
+                break
+            if e not in tags:
+                tags.append(e)
+    if len(tags) < MIN_TAGS:
+        for g in generic + [x for x in GENERIC_TAGS if x not in GENERICS or True]:
+            if len(tags) >= MIN_TAGS:
+                break
+            if g not in tags and (not any(x in GENERICS for x in tags)):
+                tags.append(g)   # at most ONE generic filler
+    if len(tags) < MIN_TAGS:   # nothing more nameable: category word, then the site brand (never a second generic filler)
+        for g in _cat_fill(item, headline) + ["#News", "#BlackoutNetwork", "#Alerts"]:
+            if len(tags) >= MIN_TAGS:
+                break
+            if g not in tags:
+                tags.append(g)
+    return _cap_one(_dedupe(tags, MAX_TAGS), SECTORS, 1)
+
+
+def hashtags(item, headline=None):
+    """Entity-first, story-specific tags. A cached xAI-generated set (x_tags_llm, validated against the story text) wins; the rule-based
+    extractor is the always-available fallback. Held / false-positive items keep location + generic only."""
+    if is_held(item):
+        return _dedupe(location_tags(item, headline=headline)[:2] + ["#News", "#BlackoutNetwork", "#Alerts"], MAX_TAGS)
+    rule = _entity_first(item, headline=headline)
+    try:
+        import x_tags_llm
+        cid = str(item.get("cluster_id") or item.get("id") or "")
+        title = headline or item.get("headline") or item.get("title") or ""
+        got = x_tags_llm.lookup(cid, item.get("title") or title, item.get("brief") or "", item.get("location") or "", rule)
+        if got:
+            return got
+    except Exception:
+        pass
+    return rule
 
 
 # --------------------------------------------------------------------------- compose / intent

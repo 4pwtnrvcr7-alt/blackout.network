@@ -623,6 +623,34 @@ def _bg_from_src(src):
     return None, ""
 
 
+def _db_spec(cid):
+    """Title/rank straight from blackout.db (a quick read, no board build) for stories that are not on the live board or while the board is rebuilding."""
+    try:
+        import story, wire_v2
+        r, _al = story.load(cid)
+        if r:
+            return dict(title=wire_v2.headline(r.get("title") or "") or r.get("title") or "The Wire", rank=int(r.get("rank") or 0), hero="")
+    except Exception:
+        pass
+    return None
+
+
+def png_for_story_fast(cid):
+    """/og/wire/<id>.png in under ~2 s: the finished card, else a quick title+rank card from the DB (never the generic 'The Wire' card);
+    the full card keeps building in the background so the next request (and the next crawl) gets it."""
+    try:
+        import share_card
+        b = share_card.story_png_fast(cid, budget=1.6)
+        if b:
+            return b
+    except Exception:
+        pass
+    spec = _db_spec(cid) or {}
+    t = spec.get("title") or "The Wire"
+    bg_im = _open_bg("wire", "iss070e062746.webp")
+    return png_bytes(render(t, bg_im=bg_im, tagline=True, rank=spec.get("rank")))
+
+
 def png_for_story(cid, title=None, rank=None, hero=None):
     if title is None and rank is None and hero is None:
         try:   # Nov 25 2026: unique per-story card (rank, location map or licensed hero, summary); the old card below is the fallback
@@ -632,7 +660,7 @@ def png_for_story(cid, title=None, rank=None, hero=None):
                 return b
         except Exception:
             pass
-    spec = _story_spec(cid) or {}
+    spec = _story_spec(cid) or _db_spec(cid) or {}
     title = title or spec.get("title") or "The Wire"
     if rank is None:
         rank = spec.get("rank")
@@ -744,7 +772,7 @@ def handle_get(path, qs=None):
         p = (path or "").split("?")[0].rstrip("/")
         m = re.fullmatch(r"/og/wire/([0-9a-f]{16})(?:\.png)?", p, re.I)
         if m:
-            return 200, png_for_story(m.group(1).lower()), "image/png"
+            return 200, png_for_story_fast(m.group(1).lower()), "image/png"
         m = re.fullmatch(r"/og/([a-z0-9-]{1,40})(?:\.png)?", p)
         if m:
             key = m.group(1).lower()
