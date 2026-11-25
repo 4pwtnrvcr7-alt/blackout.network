@@ -86,7 +86,7 @@ class CardAndShare(unittest.TestCase):
         self.assertIn("twitter:image", html)
         self.assertIn("og:image", html)
         self.assertIn("/og/wire/%s.png?v=" % cid, html)
-        self.assertIn("?v=13", html)
+        self.assertIn("?v=14", html)
         self.assertNotIn("?v=5-", html)
 
     def test_share_url_has_s_param(self):
