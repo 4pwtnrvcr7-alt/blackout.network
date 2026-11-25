@@ -1261,13 +1261,23 @@ def _story_build(cid, fetch=False):
         b = png_for("story", cid)
         if b:
             _SC[cid] = (time.time(), b, False)
-            if not fetch:
+            try:
+                import story_photo
+                it = None
                 try:
-                    import story_photo
+                    it = resolve("story", cid)
+                except Exception:
+                    it = None
+                src = ""
+                if it and it.get("photo"):
+                    src = (it["photo"] or {}).get("src") or ""
+                if not (it and it.get("photo_pending")):
+                    story_photo.put_card(cid, b, src)
+                if not fetch:
                     if _r_story_pending(cid):
                         _NEED.add(cid)
-                except Exception:
-                    pass
+            except Exception:
+                pass
         return b
     finally:
         time.sleep(0.2)  # yield the only CPU so new TLS/HTTP connections can be accepted
@@ -1292,6 +1302,17 @@ def story_png(cid):
             import threading
             threading.Thread(target=lambda: _story_refresh(cid), name="story-card", daemon=True).start()
         return hit[1]
+    try:
+        import story_photo
+        b = story_photo.get_card(cid)
+        if b:
+            _SC[cid] = (time.time(), b, False)
+            if not story_photo.resolved(cid):
+                import threading
+                threading.Thread(target=lambda: _story_refresh(cid), name="story-card", daemon=True).start()
+            return b
+    except Exception:
+        pass
     return _story_build(cid, fetch=True)
 
 
@@ -1345,10 +1366,19 @@ def submit(cid, fetch=False):
 
 
 def story_png_fast(cid, budget=1.0):
-    """Card bytes within `budget` seconds or None (the caller serves a quick title card instead; the real card keeps building and is cached)."""
+    """Card bytes within `budget` seconds or None (the caller serves a quick title card instead; the real card keeps building and is cached).
+    A PNG already stored in the persistent DB is returned at once so a deploy never serves the quick fallback for a known story."""
     hit = _SC.get(cid)
     if hit:
         return story_png(cid)
+    try:
+        import story_photo
+        b = story_photo.get_card(cid)
+        if b:
+            _SC[cid] = (time.time(), b, False)
+            return b
+    except Exception:
+        pass
     try:
         return submit(cid).result(timeout=budget)
     except Exception:
@@ -1359,9 +1389,19 @@ _WARM_CAP = 20   # at most this many card builds queued or running (timeline pre
 
 
 def warm(cid):
-    """Build a story's card ahead of the first crawl (bounded pool, deduped, cap of 20 in flight/queued)."""
-    if cid in _SC and cid not in _NEED:
-        return
+    """Build a story's card ahead of the first crawl (bounded pool, deduped, cap of 20 in flight/queued).
+    After a deploy the in-memory cache is empty: hydrate the stored PNG, and only skip a photo lookup when one already ran."""
+    try:
+        import story_photo
+        if cid not in _SC:
+            b = story_photo.get_card(cid)
+            if b:
+                _SC[cid] = (time.time(), b, False)
+        if cid in _SC and cid not in _NEED and story_photo.resolved(cid):
+            return
+    except Exception:
+        if cid in _SC and cid not in _NEED:
+            return
     live = sum(1 for f in list(_INFLIGHT.values()) + list(_FINFLIGHT.values()) if f is not None and not f.done())
     if live >= _WARM_CAP:
         return

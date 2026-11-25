@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS spend(day TEXT PRIMARY KEY, usd REAL DEFAULT 0, token
 CREATE TABLE IF NOT EXISTS ready(cid TEXT PRIMARY KEY, kind TEXT, tags TEXT, card_ok INTEGER DEFAULT 0, ready_at TEXT, title TEXT, rank INTEGER);
 CREATE TABLE IF NOT EXISTS legacy(cid TEXT PRIMARY KEY, at TEXT);
 CREATE TABLE IF NOT EXISTS held(cid TEXT PRIMARY KEY, since TEXT, last_try TEXT, tries INTEGER DEFAULT 0, alerted INTEGER DEFAULT 0, err TEXT, title TEXT, rank INTEGER);
+CREATE TABLE IF NOT EXISTS story_photos(cid TEXT PRIMARY KEY, src TEXT, credit TEXT, license TEXT, caption TEXT, kind TEXT, label TEXT, link TEXT, jpg BLOB, none INTEGER DEFAULT 0, stored_at TEXT);
+CREATE TABLE IF NOT EXISTS story_cards(cid TEXT PRIMARY KEY, png BLOB, v TEXT, src TEXT, built_at TEXT);
 """
 def db():
     k = sqlite3.connect(cfg()["db"], timeout=20)
@@ -1134,6 +1136,8 @@ def package_one(cid, row=None, al=None, build_card_now=False):
                 card_ok = 1 if build_card(cid) else 0
             except Exception:
                 traceback.print_exc(); card_ok = 0
+            if not card_ok:
+                _mark_held(cid, "card not ready", row.get("title"), int(row.get("rank") or 0)); return False
         with _LK:
             k = db()
             try:
@@ -1162,7 +1166,7 @@ def package_pending(max_new=80, max_backfill=200):
         cid = r["cluster_id"]
         if has_writeup(cid):
             if not is_packaged(cid):
-                package_one(cid, row=r, build_card_now=False)
+                package_one(cid, row=r, build_card_now=cid not in legacy)
             continue
         is_new = cid not in legacy
         if is_new and packaged >= max_new:
@@ -1171,7 +1175,7 @@ def package_pending(max_new=80, max_backfill=200):
             continue
         if not _backoff_ok(cid):
             continue
-        ok = package_one(cid, row=r, build_card_now=False)
+        ok = package_one(cid, row=r, build_card_now=is_new)
         if is_new:
             packaged += 1
         else:

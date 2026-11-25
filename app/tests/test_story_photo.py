@@ -32,3 +32,38 @@ class StoryPhoto(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_named_people_from_title_without_profiles(self):
+        names = P._named_people("x", "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers", "")
+        self.assertIn("Scott Bessent", names)
+
+    def test_quoted_landmark_not_possessive(self):
+        title = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
+        import re
+        m = re.search(r"[\"“”']([A-Z0-9][^\"“”']{1,60})[\"“”']", title)
+        self.assertEqual(m.group(1), "PIF Tower")
+
+    def test_persist_choice_and_card_across_empty_disk(self, tmp=None):
+        import os, tempfile
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_WRITER_DB"] = str(Path(d) / "story_writer.db")
+        try:
+            P._dir = lambda: Path(d)
+            png = b"\x89PNG\r\n\x1a\n" + b"x" * 3000
+            jpg = b"\xff\xd8" + b"j" * 3000
+            cand = dict(src="https://upload.wikimedia.org/x.jpg", credit="US Treasury", license="Public domain",
+                        caption="Scott Bessent, 2025. File photo; not taken at this event.", kind="person", label="lab", link="")
+            P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)
+            P.put_card("e2ca47e325c5b8e1", png, cand["src"])
+            # no files on disk
+            self.assertTrue(P.resolved("e2ca47e325c5b8e1"))
+            got = P.pick("e2ca47e325c5b8e1", "Scott Bessent Unleashes", "Tehran", "")
+            self.assertEqual(got["src"], cand["src"])
+            self.assertEqual(got["license"], "Public domain")
+            self.assertEqual(P.get_card("e2ca47e325c5b8e1"), png)
+            # cached restores jpeg
+            path = P.cached(cand["src"])
+            self.assertTrue(path and path.is_file() and path.stat().st_size > 2000)
+        finally:
+            os.environ.pop("BN_WRITER_DB", None)
