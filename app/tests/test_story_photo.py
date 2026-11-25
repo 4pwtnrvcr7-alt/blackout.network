@@ -356,6 +356,28 @@ class StoryPhoto(unittest.TestCase):
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 
+    def test_pick_keeps_v3_place_and_topic_photos_so_prefetch_does_not_wipe_them(self):
+        import os, tempfile
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        try:
+            P._dir = lambda: Path(d)
+            place = dict(src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Iceland_ESA.jpg/1600px-Iceland_ESA.jpg", credit="European Space Agency / Wikimedia Commons",
+                         license="Attribution", caption="Iceland. File photo; not taken at this event.", kind="place", label="Iceland. File photo; not taken at this event.", link="")
+            P.db_put("1111111111111111", place, jpg=b"\xff\xd8" + b"j" * 3000)
+            c = P.pick("1111111111111111", "IMO: M3.5 earthquake, Iceland", "Iceland", "")
+            self.assertIsNotNone(c)
+            self.assertEqual(c["kind"], "place")
+            topic = dict(src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/B-2_Spirit_original.jpg/1600px-B-2_Spirit_original.jpg", credit="U.S. Air Force photo / Wikimedia Commons",
+                         license="Public domain", caption="Military aircraft (U.S. Air Force). File photo; not taken at this event.", kind="topic",
+                         label="Military aircraft (U.S. Air Force). File photo; not taken at this event.", link="")
+            P.db_put("2222222222222222", topic, jpg=b"\xff\xd8" + b"j" * 3000)
+            c = P.pick("2222222222222222", "Reports of 70 missiles prepared for launch in Russia", "", "")
+            self.assertIsNotNone(c)
+            self.assertEqual(c["kind"], "topic")
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
+
     def test_urgent_lookups_jump_backfill(self):
         # Record the worker's pull order: a later urgent cid must run before a queued backfill cid.
         import time
