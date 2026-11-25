@@ -1138,12 +1138,47 @@ def _story_refresh(cid):
             _SC[cid] = (time.time() - 300, h[1], False)
 
 
+_POOL = None
+_INFLIGHT = {}
+
+
+def _pool():
+    global _POOL
+    if _POOL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _POOL = ThreadPoolExecutor(max_workers=3, thread_name_prefix="story-card")
+    return _POOL
+
+
+def submit(cid):
+    """Start (or join) the build of a story's card on the bounded pool; returns a Future."""
+    f = _INFLIGHT.get(cid)
+    if f is None or (f.done() and cid not in _SC):
+        f = _pool().submit(_story_build, cid)
+        _INFLIGHT[cid] = f
+        f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
+    return f
+
+
+def story_png_fast(cid, budget=1.6):
+    """Card bytes within `budget` seconds or None (the caller serves a quick title card instead; the real card keeps building and is cached)."""
+    hit = _SC.get(cid)
+    if hit:
+        return story_png(cid)
+    try:
+        return submit(cid).result(timeout=budget)
+    except Exception:
+        return None
+
+
 def warm(cid):
-    """Build a story's card in the background (called when its page is rendered, so the card is ready before anyone shares it)."""
+    """Build a story's card ahead of the first crawl (bounded pool, deduped)."""
     if cid in _SC:
         return
-    import threading
-    threading.Thread(target=lambda: _story_refresh(cid), name="story-card", daemon=True).start()
+    try:
+        submit(cid)
+    except Exception:
+        pass
 
 
 def handle_get(path, qs=None, headers=None):
