@@ -557,15 +557,26 @@ def _strip_edges(t):
 _FONT_CMAP = None
 
 
+def _is_latin_char(ch):
+    """ASCII or a Latin-script letter (ş, ü, ñ, …). Used only when the font cmap cannot be loaded."""
+    if ch.isascii():
+        return True
+    try:
+        import unicodedata as ud
+        return "LATIN" in ud.name(ch, "")
+    except Exception:
+        return False
+
+
 def _card_font_cmap():
-    """Codepoints the share-card Montserrat headline font can actually render."""
+    """Codepoints the share-card Latin-Extended headline font can actually render."""
     global _FONT_CMAP
     if _FONT_CMAP is not None:
         return _FONT_CMAP
     cmap = {}
     try:
         from fontTools.ttLib import TTFont
-        path = og._resolve_font(og.MONT_VAR)
+        path = og.card_face_path()
         if path and Path(path).is_file():
             cmap = TTFont(str(path)).getBestCmap() or {}
     except Exception:
@@ -588,8 +599,8 @@ def _strip_unrenderable(t):
             if ord(ch) in cmap:
                 out.append(ch)
             continue
-        # If the font cmap could not be loaded, keep ASCII so we do not wipe a headline.
-        if ch.isascii():
+        # Cmap missing: keep Latin Extended (Yaşar) but still drop Arabic etc.
+        if _is_latin_char(ch):
             out.append(ch)
     return " ".join("".join(out).split())
 
@@ -1142,12 +1153,12 @@ def _story_head(d, title, maxw, max_lines=3, start=54, minsize=HEAD_MIN):
     minsize = max(int(minsize or HEAD_MIN), HEAD_MIN)
     size = start
     while size >= minsize:
-        f = og.mont(size, 800)
+        f = og.card_face(size)
         lines = _wrap_full(d, title, f, maxw)
         if len(lines) <= max_lines and all(og._text_w(d, l, f, 0) <= maxw for l in lines):
             return f, size, lines
         size -= 2
-    f = og.mont(minsize, 800)
+    f = og.card_face(minsize)
     lines = _wrap_full(d, title, f, maxw)
     if len(lines) <= max_lines:
         return f, minsize, lines
@@ -1928,6 +1939,10 @@ def _ensure_fworker():
         if not _WORKER_LOGGED:
             print(f"story_photo: worker started pid={pid}", flush=True)
             _WORKER_LOGGED = True
+        try:
+            _ensure_convert()
+        except Exception:
+            pass
         return True
     print(f"story_photo: worker failed to start pid={pid} (thread guard?)", flush=True)
     return False
@@ -2083,6 +2098,17 @@ def _queue_card_work(cid):
         stale = bool(meta and story_photo.card_stale(meta))
         if meta and story_photo.card_title_stale(meta, current_key):
             stale = True
+        if meta and current_key:
+            try:
+                raw_title = ""
+                import story as _st
+                r, _al = _st.load(cid)
+                if r:
+                    raw_title = r.get("title") or ""
+                if story_photo.card_font_stale(meta, _card_headline(raw_title) or raw_title):
+                    stale = True
+            except Exception:
+                pass
         if not meta:
             stale = False
         if stale or (has_jpg and not has_pcard):
@@ -2426,6 +2452,149 @@ _REBUILD_LOCK = threading.Lock()
 # Encoded v3 photo cards are 0.6–1.2 MB. Anything larger is not stored or kept in RAM.
 _REBUILD_PNG_CAP = 2 * 1024 * 1024
 
+# Persistent one-at-a-time convert of leftover map cards + Latin-ext typography.
+# Survives a boot pass that finished before blackout.db / cards.db arrived.
+# Target name must not contain "loop" (render_app thread guard).
+CONVERT = {"done": False, "ids": 0, "error": "", "queued": 0, "left": 0}
+_CONVERT = None
+_CONVERT_PID = None
+_CONVERT_SLEEP = 0.2
+
+
+def _ensure_convert():
+    """Start (or restart) the stale-map convert worker in this process."""
+    global _CONVERT, _CONVERT_PID
+    pid = os.getpid()
+    if _CONVERT is not None and _CONVERT.is_alive() and _CONVERT_PID == pid:
+        return True
+    _CONVERT = threading.Thread(target=_stale_map_jobs, name="card-convert", daemon=True)
+    _CONVERT.start()
+    _CONVERT_PID = pid
+    if _CONVERT.is_alive():
+        print(f"share_card: convert worker started pid={pid}", flush=True)
+        return True
+    print(f"share_card: convert worker failed to start pid={pid} (thread guard?)", flush=True)
+    return False
+
+
+def _pending_convert_cids(limit=400):
+    """Leftover maps, previous-VERSION cards, and non-ASCII headlines still on the old font.
+    Uses card_heads() so a scan never loads PNG bytes into RAM."""
+    import story_photo as SP
+    seen, order = set(), []
+    try:
+        rows = SP.card_heads(limit) or []
+    except Exception:
+        rows = []
+    for row in rows:
+        cid = row.get("cid") or ""
+        if not cid or cid in seen:
+            continue
+        if SP.card_stale(row):
+            seen.add(cid)
+            order.append(cid)
+            continue
+        title = ""
+        try:
+            title, _text, _loc = _force_title(cid)
+            title = _card_headline(title or "") or title
+        except Exception:
+            title = ""
+        if SP.card_font_stale(row, title):
+            seen.add(cid)
+            order.append(cid)
+    return order
+
+
+def _convert_one_stale(cid):
+    """Re-render one stale card. Uses a stored JPEG when present (no network)."""
+    import gc
+    import story_photo as SP
+    b = None
+    try:
+        title, text, loc = _force_title(cid)
+        lat = lon = None
+        try:
+            import story
+            r, _al = story.load(cid)
+            if r:
+                title = r.get("title") or title
+                loc = r.get("location") or loc
+                text = r.get("brief") or text
+                lat, lon = r.get("lat"), r.get("lon")
+        except Exception:
+            pass
+        has_jpg = False
+        try:
+            has_jpg = bool(SP.has_photo(cid))
+        except Exception:
+            has_jpg = False
+        if not has_jpg and card_photo_on():
+            apply_card_photo(cid, title or "", loc or "", text or "", lat, lon)
+        invalidate_card_layers(cid)
+        th = SP.card_title_key(_card_headline(title or "") or "")
+        b = render_story_fresh(cid) or generic_story_card(cid)
+        src = ""
+        try:
+            if SP.has_photo(cid):
+                src = (SP.db_choice(cid) or {}).get("src") or ""
+        except Exception:
+            src = ""
+        if not src.startswith("https://"):
+            try:
+                c = SP.pick(cid, title or "", loc or "", text or "")
+                if c and (c.get("src") or "").startswith("https://"):
+                    src = c.get("src") or ""
+            except Exception:
+                pass
+        if b and len(b) > _REBUILD_PNG_CAP:
+            print(f"share_card: convert {cid} skip oversized png {len(b)}", flush=True)
+            b = None
+        if b and b.startswith(b"\x89PNG"):
+            SP.put_card(cid, b, src, title_hash=th, allow_downgrade=True)
+            return True
+        return False
+    except Exception as e:
+        CONVERT["error"] = type(e).__name__
+        print(f"share_card: convert {cid} err={type(e).__name__}", flush=True)
+        return False
+    finally:
+        b = None
+        _SC.pop(cid, None)
+        try:
+            invalidate_card_layers(cid)
+        except Exception:
+            pass
+        gc.collect()
+
+
+def _stale_map_jobs():
+    """Drain leftover map cards and Latin-ext typography, one at a time, after data arrives."""
+    print(f"share_card: convert worker running pid={os.getpid()}", flush=True)
+    idle = 0
+    while True:
+        try:
+            cids = _pending_convert_cids()
+            CONVERT["queued"] = len(cids)
+            CONVERT["left"] = len(cids)
+            if not cids:
+                CONVERT["done"] = True
+                idle += 1
+                # Data often arrives after handoff gives up; keep scanning, then back off.
+                time.sleep(15 if idle < 8 else 45)
+                continue
+            CONVERT["done"] = False
+            idle = 0
+            ok = _convert_one_stale(cids[0])
+            if ok:
+                CONVERT["ids"] += 1
+            CONVERT["left"] = max(0, len(cids) - 1)
+            time.sleep(float(_CONVERT_SLEEP))
+        except Exception as e:
+            CONVERT["error"] = type(e).__name__
+            print(f"share_card: convert worker err={type(e).__name__}", flush=True)
+            time.sleep(2.0)
+
 
 def rebuild_card_photos(cids=None, pause=0.4, budget=0):
     """Single paced background worker, newest first: licensed v3 photo cards.
@@ -2470,7 +2639,13 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
                         lat, lon = r.get("lat"), r.get("lon")
                 except Exception:
                     pass
-                apply_card_photo(cid, title or "", loc or "", text or "", lat, lon)
+                has_jpg = False
+                try:
+                    has_jpg = bool(SP.has_photo(cid))
+                except Exception:
+                    has_jpg = False
+                if not has_jpg:
+                    apply_card_photo(cid, title or "", loc or "", text or "", lat, lon)
                 invalidate_card_layers(cid)
                 th = SP.card_title_key(_card_headline(title or "") or "")
                 b = render_story_fresh(cid) or generic_story_card(cid)

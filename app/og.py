@@ -315,6 +315,29 @@ def inter(size, bold=False):
     return mont(size, 600 if not bold else 800)
 
 
+# Inter-Bold (OFL, already vendored) covers Latin Extended (ş, ü, ñ, …).
+# System DejaVu is a fallback if the bundled file is missing. Not Montserrat:
+# a missing cmap on that face dropped ş and printed "Yaar" for "Yaşar".
+_DEJAVU_B = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+
+
+def card_face_path():
+    """Static TTF with Latin Extended glyphs, used for share-card headlines."""
+    p = _resolve_font(INTER_BOLD)
+    if Path(p).is_file():
+        return Path(p)
+    if _DEJAVU_B.is_file():
+        return _DEJAVU_B
+    return _resolve_font(MONT_VAR)
+
+
+def card_face(size):
+    path = card_face_path()
+    if Path(path).is_file():
+        return _font(path, size)
+    return inter(size, bold=True)
+
+
 def _cover(im, w=W, h=H):
     im = im.convert("RGB")
     iw, ih = im.size

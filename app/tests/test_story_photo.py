@@ -337,7 +337,7 @@ class StoryPhoto(unittest.TestCase):
             self.assertEqual(P.get_card(cid), newer)
             self.assertTrue(P.card_has_photo(cid))
             self.assertEqual(P.card_meta(cid)["src"], cand["src"])
-            self.assertEqual(P.card_meta(cid)["v"], "99")
+            self.assertEqual(P.card_meta(cid)["v"], "99L")
             self.assertTrue(S._card_headline("— Zelensky says hello").startswith("Zelensky"))
         finally:
             og.VERSION = prev
@@ -1006,7 +1006,7 @@ class StoryPhoto(unittest.TestCase):
         self.assertTrue(place4 and "gaza" in place4.lower(), place4)
 
     def test_card_headline_strips_unrenderable_glyphs_then_leading_punct(self):
-        """Zelensky tofu: drop characters the Montserrat card font cannot paint, then leading punctuation."""
+        """Zelensky tofu: drop characters the card font cannot paint, then leading punctuation."""
         raw = "".join(chr(c) for c in (0x0648, 0x0642, 0x0627, 0x0644)) + " " + chr(0x2014) + " Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package"
         h = S._card_headline(raw)
         self.assertTrue(h.startswith("Zelensky"), h)
@@ -1018,9 +1018,34 @@ class StoryPhoto(unittest.TestCase):
         joined = " ".join(lines)
         self.assertTrue(joined.startswith("Zelensky"), joined)
         cmap = S._card_font_cmap()
-        self.assertTrue(cmap, "Montserrat cmap should load")
+        self.assertTrue(cmap, "Latin-ext card font cmap should load")
         self.assertNotIn(0x0648, cmap)
         self.assertIn(ord("Z"), cmap)
+        self.assertIn(ord("ş"), cmap)
+
+    def test_card_headline_keeps_turkish_s_cedilla(self):
+        """Yaşar must keep ş; the old Montserrat/ASCII fallback printed 'Yaar'."""
+        raw = "On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense Yaşar Güler at the Pentagon."
+        h = S._card_headline(raw)
+        self.assertIn("Yaşar", h, h)
+        self.assertNotIn("Yaar", h)
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        _, _, lines = S._story_head(d, raw, 700)
+        joined = " ".join(lines)
+        self.assertIn("Yaşar", joined, joined)
+
+    def test_non_ascii_photo_card_is_font_stale_until_latin_mark(self):
+        """Photo cards with Yaşar etc. rebuild once onto the Latin-ext font; ASCII cards do not."""
+        import og
+        title = "Turkish Minister of National Defense Yaşar Güler at the Pentagon"
+        meta_old = {"v": og.VERSION, "src": "https://example.test/x.jpg"}
+        meta_new = {"v": og.VERSION + "L", "src": "https://example.test/x.jpg"}
+        self.assertTrue(P.card_font_stale(meta_old, title))
+        self.assertFalse(P.card_font_stale(meta_new, title))
+        self.assertFalse(P.card_font_stale(meta_old, "Pete Hegseth at the Pentagon"))
+        self.assertFalse(P.card_stale(meta_old))
+        self.assertFalse(P.card_stale(meta_new))
 
     def test_audit_deletes_libya_and_gaza_rows_keeps_matching_zelensky(self):
         """Boot audit deletes non-matching photo rows outright; a matching Zelensky portrait is kept."""

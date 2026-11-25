@@ -229,6 +229,27 @@ def card_meta(cid):
         return None
 
 
+# Suffix stored on every new card: typography used a Latin-Extended face (Inter / DejaVu).
+# Compared as a suffix so og.VERSION itself does not have to bump for every ASCII card.
+FONT_MARK = "L"
+
+
+def card_ver_base(v):
+    """og.VERSION part of a stored card version, ignoring the Latin-ext font mark."""
+    s = str(v or "")
+    if s.endswith(FONT_MARK) and len(s) > 1:
+        return s[:-len(FONT_MARK)]
+    return s
+
+
+def card_ver_current():
+    try:
+        import og
+        return str(og.VERSION) + FONT_MARK
+    except Exception:
+        return "11" + FONT_MARK
+
+
 def card_stale(meta):
     """True when the stored PNG was built under a previous og.VERSION and should be rebuilt (reusing any stored photo).
     A stored map (no https photo src) is also stale when v3 photo cards are on, so it is not kept as the served card."""
@@ -236,7 +257,7 @@ def card_stale(meta):
         return False
     try:
         import og
-        if str(meta.get("v") or "") != str(og.VERSION):
+        if card_ver_base(meta.get("v")) != str(og.VERSION):
             return True
     except Exception:
         pass
@@ -247,6 +268,15 @@ def card_stale(meta):
     except Exception:
         pass
     return False
+
+
+def card_font_stale(meta, title=""):
+    """True when the headline has non-ASCII characters and the stored card predates the Latin-ext font."""
+    if not meta or not title:
+        return False
+    if not any(ord(ch) > 127 for ch in title):
+        return False
+    return not str(meta.get("v") or "").endswith(FONT_MARK)
 
 
 def card_has_photo(cid):
@@ -301,12 +331,7 @@ def put_card(cid, png, src="", title_hash="", allow_downgrade=None):
             if ph and not ph[1] and (ph[0] or "").startswith("https://") and ph[2]:
                 if not allow_downgrade:
                     return
-        ver = "11"
-        try:
-            import og
-            ver = str(og.VERSION)
-        except Exception:
-            pass
+        ver = card_ver_current()
         k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at, title_hash) VALUES(?,?,?,?,?,?)",
                   (cid, blob, ver, src, ts, title_hash))
     wrote = False
@@ -351,6 +376,36 @@ def card_cids(limit=40):
         return [r[0] for r in (rows or []) if r and r[0]]
     except Exception:
         return []
+
+
+def card_heads(limit=400):
+    """cid, v, src, title_hash for the newest stored cards. Never loads PNG bytes."""
+    try:
+        rows = _read(lambda k: k.execute(
+            "SELECT cid, v, src, title_hash FROM story_cards ORDER BY built_at DESC LIMIT ?", (int(limit),)
+        ).fetchall())
+        out = []
+        for r in rows or []:
+            if not r or not r[0]:
+                continue
+            out.append({
+                "cid": r[0],
+                "v": (r[1] or "") if len(r) > 1 else "",
+                "src": (r[2] or "") if len(r) > 2 else "",
+                "title_hash": (r[3] or "") if len(r) > 3 else "",
+            })
+        return out
+    except Exception:
+        return []
+
+
+def stale_map_cids(limit=400):
+    """Newest stored leftover maps (or previous og.VERSION cards). No network, no PNG bytes loaded."""
+    out = []
+    for row in card_heads(limit):
+        if card_stale(row):
+            out.append(row["cid"])
+    return out
 
 
 def store_counts():
