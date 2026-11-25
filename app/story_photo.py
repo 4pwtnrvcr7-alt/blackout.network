@@ -579,8 +579,11 @@ def pick(cid, title="", loc="", text=""):
             return None
         if is_non_photo_candidate(c):
             return None
+        lab = c.get("label") or c.get("caption") or ""
         if (c.get("kind") or "") == "place":
-            if not place_photo_ok(title, text):
+            # A v3 place photo (Wikidata P18 of this story's own place, labelled with it) is allowed; loose text matches are not.
+            ft0 = commons_file_title(src=c.get("src") or "", link=c.get("link") or "", title=c.get("title") or "")
+            if not (place_photo_ok(title, text) or _v3_photo_allows(title, ft0, src=c.get("src") or "", kind="place", label=lab, text=text)[0]):
                 return None
         if photo_is_wrong_subject(cid, c.get("src") or "", _photo_blob(c), title, text):
             return None
@@ -590,7 +593,7 @@ def pick(cid, title="", loc="", text=""):
         blob = " ".join((c.get("title") or "", c.get("categories") or "", _photo_blob(c), c.get("src") or ""))
         if not photo_strict_match(cid, src=c.get("src") or "", meta_blob=blob, title=title, text=text,
                                   commons_title=c.get("title") or "", categories=c.get("categories") or "",
-                                  kind=c.get("kind") or ""):
+                                  kind=c.get("kind") or "", label=lab):
             return None
         return c
     try:
@@ -1235,7 +1238,7 @@ def _v3_photo_allows(headline, commons_title="", src="", kind="", label="", text
             return False, "v3_off"
     except Exception:
         return False, "v3_off"
-    ft = (commons_title or "").replace("File:", "").replace("_", " ").strip().lower()
+    ft = re.sub(r"^\d+px-", "", (commons_title or "").replace("File:", "").replace("_", " ").strip().lower())   # thumb URLs name the file "1600px-<name>"
     if not ft:
         return False, "no_commons_title"
     titles = CP.topic_file_titles()
@@ -1267,7 +1270,7 @@ def stored_commons_title(cid):
     return commons_file_title(src=src, link=c.get("link") or "", title=c.get("title") or "")
 
 
-def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", commons_title="", categories="", kind=""):
+def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", commons_title="", categories="", kind="", label=""):
     """Accept a photo only under photo_rule_allows (Commons file title vs headline, or USGS ShakeMap).
 
     meta_blob and categories are ignored: a leftover caption, credit, or story title must not count as a match.
@@ -1277,7 +1280,7 @@ def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", com
     ok, _why = photo_rule_allows(title, commons_title=ft, src=src or "")
     if ok:
         return True
-    ok, _why = _v3_photo_allows(title, ft, src=src or "", kind=kind or "", label="", text=text or "")
+    ok, _why = _v3_photo_allows(title, ft, src=src or "", kind=kind or "", label=label or "", text=text or "")
     return ok
 
 
