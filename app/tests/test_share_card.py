@@ -269,3 +269,19 @@ class CardPhotoV3(unittest.TestCase):
             self.assertEqual(out2["ids"], 12)  # not reset or re-run
         finally:
             S._REBUILD_LOCK.release()
+
+    def test_stored_map_is_stale_when_photo_cards_are_on(self):
+        """A leftover map (no https src) must be rebuilt as a v3 photo card, even at the current VERSION."""
+        import story_photo as P
+        import os
+        old = os.environ.get("BN_CARD_PHOTO")
+        os.environ.pop("BN_CARD_PHOTO", None)
+        try:
+            self.assertTrue(P.card_stale({"v": __import__("og").VERSION, "src": ""}))
+            self.assertTrue(P.card_stale({"v": "23", "src": "https://example.test/x.jpg"}))
+            self.assertFalse(P.card_stale({"v": __import__("og").VERSION, "src": "https://example.test/x.jpg"}))
+        finally:
+            if old is None:
+                os.environ.pop("BN_CARD_PHOTO", None)
+            else:
+                os.environ["BN_CARD_PHOTO"] = old

@@ -63,6 +63,15 @@ class StoryPhoto(unittest.TestCase):
         names = P._named_people("x", "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package", "")
         self.assertIn("Volodymyr Zelensky", names)
 
+    def test_hegseth_pentagon_headline_is_not_ambiguous(self):
+        """Junk bigrams must not hide Pete Hegseth as the subject (live map-card regression)."""
+        title = "On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense Yaşar Güler at the Pentagon."
+        names = P._named_people("e9a491a27092837f", title, "")
+        self.assertEqual(names, ["Pete Hegseth"])
+        self.assertEqual(P.main_subject(title, ""), "Pete Hegseth")
+        self.assertNotIn("Turkish Minister", names)
+        self.assertNotIn("National Defense", names)
+
     def test_quoted_landmark_not_possessive(self):
         title = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
         terms = P._landmark_terms(title)
@@ -153,6 +162,18 @@ class StoryPhoto(unittest.TestCase):
         self.assertNotIn("NASAMS", h)
         self.assertNotIn("F-16s", h)
         self.assertIn("new arms package", h)
+
+    def test_card_headline_does_not_cut_at_us_abbreviation(self):
+        """'U.S.' / 'U.K.' is not the end of the sentence (Hegseth Pentagon card was cut to 'On Monday, U.S')."""
+        h = S._card_headline(
+            "On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense Yaşar Güler at the Pentagon. @IntelSlava"
+        )
+        self.assertTrue(h.startswith("On Monday, U.S. Secretary of War Pete Hegseth"), h)
+        self.assertIn("Pentagon", h)
+        self.assertNotEqual(h, "On Monday, U.S")
+        self.assertNotIn("@IntelSlava", h)
+        two = S._card_headline("The U.K. Prime Minister arrived in Paris. France issued a statement.")
+        self.assertEqual(two, "The U.K. Prime Minister arrived in Paris")
 
     def test_card_headline_strips_leading_trailing_dashes(self):
         cases = [
