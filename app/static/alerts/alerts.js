@@ -469,9 +469,9 @@
     var url = it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/wire", cat = catLabel(it.category), r = Math.max(0, Math.min(10, it.rank | 0));
     var head = cleanT(it.title);
     return '<div class="bnal-sh"><span class="bnal-tagS">SAMPLE</span><span>' + (it.example ? "Illustrative example (not a real event)" : "Based on a real alert from " + esc(etTime(it.high_at).replace(/,? \d+:\d\d [AP]M ET$/, ""))) + '</span></div>'
-      + '<div class="bnal-notif" aria-label="How the notification looks on your lock screen"><img src="/icons/icon-192.png?v=4" alt="" width="38" height="38">'
+      + '<div class="bnal-notif" aria-label="How the notification looks on your lock screen"><img src="/icons/icon-192.png?v=5" alt="" width="38" height="38">'
       + '<div><div class="bnal-nt"><b>BLACKOUT</b><span>now</span></div><div class="bnal-nh">' + r + '/10 · ' + esc(cat.toUpperCase()) + '</div><div class="bnal-nb">' + esc(head) + '</div></div></div>'
-      + '<article class="bnal-card2"><div class="bnal-cb"><img class="bnal-logo" src="/icons/icon-192.png?v=4" alt="BLACKOUT.NETWORK" width="28" height="28">'
+      + '<article class="bnal-card2"><div class="bnal-cb"><img class="bnal-logo" src="/icons/icon-192.png?v=5" alt="BLACKOUT.NETWORK" width="28" height="28">'
       + '<span class="bnal-brand">blackout.network</span><span class="bnal-rk bnal-rk' + (r >= 7 ? "h" : "m") + '">RANK ' + r + '</span></div>'
       + '<div class="bnal-mt">' + meter(r) + '<span class="bnal-ct">' + esc(cat) + '</span></div>'
       + '<h3 class="bnal-t">' + esc(head) + '</h3><p class="bnal-p">' + esc(brief(it)) + '</p>'
@@ -497,7 +497,7 @@
       if (E.api && Notification.permission === "granted" && !(E.ios && !E.standalone)) {
         getReg().then(function (r) {
           return r.showNotification("SAMPLE · " + (it.rank | 0) + "/10 · " + catLabel(it.category).toUpperCase(), { body: cleanT(it.title).slice(0, 180),
-            icon: "/icons/icon-192.png?v=4", badge: "/alerts/badge.png", tag: "bn-sample",
+            icon: "/icons/icon-192.png?v=5", badge: "/alerts/badge.png", tag: "bn-sample",
             data: { url: location.origin + (it.cluster_id ? "/wire/" + encodeURIComponent(it.cluster_id) : "/wire") } });
         }).then(function () { say("Sample shown below and sent to your notifications.", "ok"); }, function () { say("Sample shown below.", "ok"); });
       } else say("Sample shown below.", "ok");

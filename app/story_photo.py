@@ -265,8 +265,21 @@ def card_stale(meta):
         pass
     try:
         import card_photo as CP
-        if CP.enabled() and not (meta.get("src") or "").startswith("https://"):
-            return True
+        if CP.enabled():
+            src = meta.get("src") or ""
+            if not src.startswith("https://"):
+                return True
+            if CP.is_map_like(src=src, title=src):
+                return True
+            # Credit often names NASA/JPL/NIMA or ESA satellite even when the URL does not.
+            try:
+                cid = meta.get("cid") or ""
+                if cid:
+                    ch = db_choice(cid) or {}
+                    if ch and is_non_photo_candidate(ch):
+                        return True
+            except Exception:
+                pass
     except Exception:
         pass
     return False
@@ -466,7 +479,15 @@ def is_non_photo(title="", desc="", categories="", mime=""):
     if mime and _BAD_MIME.search((mime or "").split(";")[0].strip().lower()):
         return True
     blob = " ".join(x for x in (title, desc, (categories or "").replace("|", " ").replace("/", " ")) if x)
-    return bool(blob and _NONPHOTO.search(blob))
+    if blob and _NONPHOTO.search(blob):
+        return True
+    try:
+        import card_photo as CP
+        if CP.is_map_like(title=title, desc=desc, categories=categories):
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def is_non_photo_candidate(c):

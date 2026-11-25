@@ -1,15 +1,17 @@
-"""Materialize chrome-B raster icons from the committed base64 master (text-safe in git).
+"""Materialize white-B raster icons from the committed base64 master (text-safe in git).
 Run at Docker build (see Dockerfile). Pillow is already in requirements.txt.
+Matt, Nov 25 2026 5:24 PM ET: plain white serif B on black (no slash, no chrome).
 """
 from __future__ import annotations
 
-import base64, struct, sys
+import base64
+from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageFilter
 
 BASE = Path(__file__).resolve().parent
-B64 = BASE / "static" / "brand" / "chrome_b_master.b64"
+B64 = BASE / "static" / "brand" / "white_b_master.b64"
 IMG = BASE / "static" / "img"
 PWA = BASE / "static" / "pwa"
 SOC = BASE / "static" / "social"
@@ -17,7 +19,6 @@ SOC = BASE / "static" / "social"
 
 def _master() -> Image.Image:
     raw = base64.b64decode("".join(B64.read_text().split()))
-    from io import BytesIO
     im = Image.open(BytesIO(raw)).convert("RGB")
     if im.size != (512, 512):
         im = im.resize((512, 512), Image.Resampling.LANCZOS)
@@ -49,9 +50,8 @@ def install() -> None:
     if not B64.is_file():
         raise SystemExit(f"missing {B64}")
     master = _master()
-    _save(master, IMG / "chrome-b.png")
+    _save(master, IMG / "white-b.png")
     _save(_resize(master, 32, True), IMG / "favicon-32.png")
-    # favicon.ico 16/32/48
     _resize(master, 256, False).save(IMG / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
     rasters = {
         PWA / "icon-16.png": (16, True),
@@ -70,8 +70,8 @@ def install() -> None:
     for path, (size, sharp) in rasters.items():
         _save(_resize(master, size, sharp), path)
     _save(_maskable(master), PWA / "icon-maskable-512.png")
-    _save(_resize(master, 168, False), SOC / "chrome_b_168.png")
-    print(f"install_chrome_b_icons: wrote mark and icons under {IMG} and {PWA}", flush=True)
+    _save(_resize(master, 168, False), SOC / "white_b_168.png")
+    print(f"install_white_b_icons: wrote mark and icons under {IMG} and {PWA}", flush=True)
 
 
 if __name__ == "__main__":

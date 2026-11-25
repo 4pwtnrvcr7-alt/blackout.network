@@ -711,7 +711,7 @@ def full_page():
           "image": SITE + "/api/cern/img/lhc-tunnel-2009.jpg", "mainEntityOfPage": SITE + "/cern"}
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + _head() +
             '<meta name="robots" content="index,follow,max-image-preview:large"><link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/api/cern/app.css">'
-            '<link rel="icon" href="/favicon.ico?v=4" sizes="any"><link rel="preload" as="image" href="/api/cern/img/lhc-tunnel-2009.jpg">'
+            '<link rel="icon" href="/favicon.ico?v=5" sizes="any"><link rel="preload" as="image" href="/api/cern/img/lhc-tunnel-2009.jpg">'
             f'<script type="application/ld+json">{json.dumps(ld)}</script>'
             '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}</style></head><body class="cx-page">'
             '<a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>' + _top() +

@@ -684,6 +684,53 @@ class StoryPhoto(unittest.TestCase):
         self.assertTrue(P.is_non_photo("Press collage of several portraits", "", "Collages", "image/jpeg"))
         self.assertFalse(P.is_non_photo("Jensen huang stanford 2026-04-09 033.jpg", "Portrait of Jensen Huang", "Jen-Hsun Huang in 2026", "image/jpeg"))
 
+
+    def test_is_map_like_rejects_relief_and_satellite_place_photos(self):
+        """NASA relief renderings and ESA satellite country views are not ground-level place photos."""
+        import card_photo as CP
+        self.assertTrue(CP.is_map_like(
+            filename="File:New Zealand, NASA.jpg",
+            credit="NASA/JPL/NIMA",
+            desc="Shaded relief rendering of New Zealand, 2000",
+        ))
+        self.assertTrue(CP.is_map_like(
+            filename="File:Iceland from space.jpg",
+            credit="ESA/Envisat",
+            desc="Satellite view of Iceland",
+        ))
+        self.assertTrue(P.is_non_photo(
+            "New Zealand, NASA.jpg", "NASA/JPL/NIMA. File photo of New Zealand (2000).", "NASA images", "image/jpeg"))
+        self.assertTrue(P.is_non_photo(
+            "Iceland Envisat.jpg", "ESA satellite image of Iceland", "Satellite pictures of Iceland", "image/jpeg"))
+        self.assertFalse(CP.is_map_like(
+            filename="File:Pete Hegseth official portrait.jpg",
+            credit="U.S. Department of Defense",
+            desc="Official portrait of Pete Hegseth, 2025",
+        ))
+        self.assertFalse(P.is_non_photo(
+            "Jensen huang stanford 2026-04-09 033.jpg", "Portrait of Jensen Huang", "Jen-Hsun Huang in 2026", "image/jpeg"))
+        self.assertFalse(CP.is_map_like(desc="Aid workers deliver disaster relief in Auckland"))
+
+    def test_pick_rejects_a_stored_satellite_place_photo(self):
+        """A stored v3 place photo that is a satellite/relief view is not kept."""
+        import card_photo as CP
+        cid = "d9c1418515395db1"
+        cand = {
+            "src": "https://upload.wikimedia.org/wikipedia/commons/8/8a/New_Zealand_NASA.jpg",
+            "credit": "NASA/JPL/NIMA / Wikimedia Commons",
+            "license": "Public domain",
+            "kind": "place",
+            "label": "New Zealand. File photo; not taken at this event.",
+            "title": "New Zealand, NASA.jpg",
+            "caption": "Shaded relief rendering of New Zealand",
+        }
+        self.assertTrue(CP.is_map_like(filename=cand["title"], credit=cand["credit"], desc=cand["caption"], src=cand["src"]))
+        self.assertTrue(P.is_non_photo_candidate(cand))
+        from unittest import mock
+        with mock.patch.object(P, "stored_choice", return_value=cand), mock.patch.object(P, "db_choice", return_value=cand):
+            self.assertIsNone(P.pick(cid, "M 4.8 - 190 km N of Hicks Bay, New Zealand", "New Zealand", ""))
+
+
     def test_huang_story_gets_portrait_or_designed_map(self):
         """Person-subject stories must not use an irrelevant place photo (the Altoona 1939 map)."""
         import os, tempfile
