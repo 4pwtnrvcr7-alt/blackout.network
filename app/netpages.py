@@ -618,6 +618,18 @@ def inc_card(i, active=False):
             + (f'<div class="np-tags">{tags}' + (f'<span class="np-tag">+{more} more services</span>' if more > 0 else "") + '</div>' if tags else "")
             + (f'<p>{E(i["summary"][:420])}{"…" if len(i["summary"]) > 420 else ""}</p>' if i.get("summary") else "") + '</div>')
 
+def _x_button(slug, p, lv, act, d):
+    """Post on X for a provider page: crafted text + 3-5 tags + per-provider card (share_cards.py)."""
+    try:
+        import share_cards
+        word = {0: "operating normally", 1: "reporting a minor issue", 2: "reporting a service disruption", 3: "in a major outage"}.get(lv, "status unknown")
+        t = f"{p['name']} status right now: {word}. " + (f"{len(act)} active incident{'s' if len(act) != 1 else ''} in the official feed." if act else "No active incidents in the official feed.")
+        if act and act[0].get("title"):
+            t += " Latest: " + str(act[0]["title"])[:90]
+        return share_cards.button_html("network" if lv < 2 else "outage", slug, t, name=f"{p['name']} status", detail=t[:140], loc="United States", path=f"/grid/{slug}", cls="np-btn")
+    except Exception:
+        return ""
+
 def render(slug):
     p = P[slug]; d = data(slug); mon = monitor(p["src"]); lv = level_of(d, mon)
     act = d.get("active", []); hist = d.get("history", []); allinc = act + hist; now = datetime.now(timezone.utc)
@@ -630,7 +642,7 @@ def render(slug):
             + (f'<span>Our check: {E((mon.get("latest") or {}).get("status", ""))}</span>' if (mon.get("latest") or {}).get("level") else "") + '</div>'
             f'<div class="np-kpi"><b>{len(act)}</b><span>active incidents now</span></div><div class="np-kpi"><b>{n90}</b><span>incidents in the last 90 days (official feed)</span></div>'
             f'<div class="np-kpi"><b>{k_mon}</b><span>of our 5-minute checks with no degraded or major status, last 7 days</span></div></div>'
-            f'<div class="np-btns"><a class="np-btn p" href="{E(p["status"][1])}" target="_blank" rel="noopener">{ic("link", "np-ic sm")}Official status page</a>'
+            f'<div class="np-btns"><a class="np-btn p" href="{E(p["status"][1])}" target="_blank" rel="noopener">{ic("link", "np-ic sm")}Official status page</a>{_x_button(slug, p, lv, act, d)}'
             f'<a class="np-btn" href="{E(p["console"][0][1])}" target="_blank" rel="noopener">{ic("eye", "np-ic sm")}{E(p["console"][0][0])}</a><a class="np-btn" href="#checklist">{ic("check", "np-ic sm")}If your business runs on {E(p["name"])}</a></div>'
             + (f'<p class="np-note">The official feed could not be reached just now ({E(d["error"])}); figures below use our stored checks.</p>' if d.get("error") else "")
             + (f'<p class="np-note">Showing the last good copy of the official feed (refresh failed: {E(d["stale"])}).</p>' if d.get("stale") else "") + '</section>')

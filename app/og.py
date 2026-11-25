@@ -728,6 +728,9 @@ def handle_get(path, qs=None):
     """Addon entry: /og/<page>.png and /og/wire/<id>.png. Never raises a 5xx of its own."""
     try:
         p = (path or "").split("?")[0].rstrip("/")
+        if p.startswith("/og/share/"):
+            import share_cards
+            return share_cards.handle_get(p, qs)
         m = re.fullmatch(r"/og/wire/([0-9a-f]{16})(?:\.png)?", p, re.I)
         if m:
             return 200, png_for_story(m.group(1).lower()), "image/png"
