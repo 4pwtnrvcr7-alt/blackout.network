@@ -207,7 +207,7 @@ list.addEventListener("click",function(e){if(e.target.closest("a,.tl-src,.tl-act
 function api(qs){return fetch("/api/wire_tl?"+qs+(qs?"&":"")+"_="+Date.now(),{credentials:"same-origin",cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
 function qp(){var p=[];if(Q)p.push("q="+encodeURIComponent(Q));if(F.loc){p.push("lat="+F.loc.lat);p.push("lon="+F.loc.lon);p.push("r="+F.loc.r)}if(F.sev)p.push("sev="+encodeURIComponent(F.sev));if(F.cats.size)p.push("cats="+encodeURIComponent(Array.from(F.cats).join(",")));if(F.regs.size)p.push("regs="+encodeURIComponent(Array.from(F.regs).join(",")));if(F.time)p.push("time="+encodeURIComponent(F.time));return p.join("&")}
 function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){seen[it.id]=1;fresh.push(it)}});measure(fresh,false);
-  if(where==="top")items=fresh.concat(items);else items=items.concat(fresh);return fresh.length}
+  if(where==="top"){items=fresh.concat(items);items.sort(function(a,b){return a.t<b.t?1:a.t>b.t?-1:a.id<b.id?1:a.id>b.id?-1:0})}else items=items.concat(fresh);return fresh.length}
 function lim(){return condensed&&active()?200:100}
 function loadOlder(){
   if(loading.o||botEnd)return Promise.resolve();loading.o=1;var g=gen;footState();

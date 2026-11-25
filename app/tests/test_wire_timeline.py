@@ -309,6 +309,7 @@ class Paging(unittest.TestCase):
         js = open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
         self.assertIn("function seenAt", js)
         self.assertIn("function seenAt(it){return it.t}", js)
+        self.assertIn("items.sort(function(a,b){return a.t<b.t?1", js)   # live arrivals keep the one display-time order
         self.assertIn('sev="+encodeURIComponent(F.sev)', js)
         self.assertIn('cats="+encodeURIComponent', js)
         self.assertIn("reset();scrollToList();loadOlder()", js)
