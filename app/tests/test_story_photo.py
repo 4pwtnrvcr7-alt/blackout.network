@@ -902,15 +902,11 @@ class StoryPhoto(unittest.TestCase):
                 _, _, lines = S._story_head(dd, zel_raw, 640)
                 self.assertTrue(" ".join(lines).startswith("Zelensky"))
 
-                # Huang: CC BY portrait, not the leftover map.
-                self.assertTrue(P.has_photo(huang) or P.card_has_photo(huang))
-                self.assertTrue(P.card_has_photo(huang), (P.card_meta(huang), P.db_choice(huang)))
-                self.assertNotEqual(P.get_card(huang), map_png)
-                blob = " ".join(str(x or "") for x in ((P.card_meta(huang) or {}).get("src"),
-                                                       (P.db_choice(huang) or {}).get("src"),
-                                                       (P.db_choice(huang) or {}).get("caption"),
-                                                       (P.db_choice(huang) or {}).get("title")))
-                self.assertTrue("Huang" in blob or "huang" in blob.lower(), blob)
+                # Huang is not in the hashtag PEOPLE list; mid-headline names are not invented. Map is correct.
+                self.assertFalse(P.card_has_photo(huang))
+                self.assertTrue(P.get_card(huang) and P.get_card(huang).startswith(b"\x89PNG"))
+                place, _, _ = S.story_map_place(huang_title, location="Pennsylvania", brief="")
+                self.assertTrue(not place or "pennsylvania" not in place.lower(), place)
         finally:
             for k in (libya, zel, huang):
                 P.SUBJECT_HINTS.pop(k, None)
@@ -939,16 +935,52 @@ class StoryPhoto(unittest.TestCase):
         self.assertFalse(P.photo_rule_allows(zel, commons_title="zelensky.jpg",
                                              src="https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg")[0])
         huang = "Trump wanted Jensen Huang back as the CEO of Nvidia"
-        self.assertTrue(P.photo_rule_allows(huang, commons_title="Jensen huang stanford 2026-04-30 008.jpg",
-                                            src="https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg")[0])
-        # Trump is named but is not the main subject.
+        # Jensen Huang is not in the hashtag PEOPLE list; mid-headline names are not invented.
+        self.assertFalse(P.photo_rule_allows(huang, commons_title="Jensen huang stanford 2026-04-30 008.jpg",
+                                             src="https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg")[0])
         self.assertFalse(P.photo_rule_allows(huang, commons_title="Donald Trump 2025.jpg",
                                              src="https://upload.wikimedia.org/wikipedia/commons/trump.jpg")[0])
+        # Org/title words are not people, even when the Commons file title contains the same phrase.
+        self.assertFalse(P.photo_rule_allows(
+            gaza, commons_title="Gaza Health Ministry briefing 24 November 2025.jpg",
+            src="https://upload.wikimedia.org/wikipedia/commons/Health_Ministry.jpg")[0])
         pif = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
         self.assertTrue(P.photo_rule_allows(pif, commons_title="Public Investment Fund Tower, Riyadh.jpg")[0])
         self.assertTrue(P.photo_rule_allows(pif, commons_title="PIF Tower at night.jpg")[0])
         self.assertFalse(P.photo_rule_allows(pif, commons_title="Riyadh skyline 2023.jpg")[0])
         self.assertTrue(P.photo_rule_allows(libya, src="https://earthquake.usgs.gov/product/shakemap/us7000/download/intensity.jpg")[0])
+
+    def test_people_from_entities_not_capitalized_bigrams(self):
+        """Person names come from the hashtag PEOPLE extractor; org/title words are rejected."""
+        import x_share
+        gaza = "Gaza's Health Ministry has declared an epidemic alert across the territory over a rapid rise in meningitis"
+        self.assertEqual(x_share.people_from_entities(gaza), [])
+        self.assertTrue(x_share.is_org_title_name("Health Ministry"))
+        self.assertTrue(x_share.is_org_title_name("Defense Department"))
+        zel = "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"
+        names = x_share.people_from_entities(zel)
+        self.assertIn("Volodymyr Zelensky", names)
+        self.assertIn("Pete Hegseth", names)
+        self.assertTrue(P.photo_rule_allows(zel, commons_title="Volodymyr Zelenskyy 2025.jpg")[0])
+        bessent = "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers"
+        self.assertIn("Scott Bessent", x_share.people_from_entities(bessent))
+
+    def test_story_map_place_ignores_leftover_location(self):
+        """Card badge/map use the Wire-map place, not a leftover Ukraine/Pennsylvania location."""
+        libya = "Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel"
+        place, lat, lon = S.story_map_place(libya, location="Ukraine", brief="not party to the Russian invasion of Ukraine")
+        self.assertTrue(place and "libya" in place.lower() and "ukraine" not in place.lower(), place)
+        self.assertIsNotNone(lat)
+        self.assertIsNotNone(lon)
+        # Empty leftover-free result is Libya too
+        place2, _, _ = S.story_map_place(libya, location="", brief="")
+        self.assertTrue(place2 and "libya" in place2.lower(), place2)
+        huang = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        place3, _, _ = S.story_map_place(huang, location="Pennsylvania", brief="Pennsylvania assassination attempt")
+        self.assertTrue(not place3 or "pennsylvania" not in place3.lower(), place3)
+        gaza = "Gaza's Health Ministry has declared an epidemic alert across the territory over a rapid rise in meningitis"
+        place4, _, _ = S.story_map_place(gaza, location="", brief="")
+        self.assertTrue(place4 and "gaza" in place4.lower(), place4)
 
     def test_card_headline_strips_unrenderable_glyphs_then_leading_punct(self):
         """Zelensky tofu: drop characters the Montserrat card font cannot paint, then leading punctuation."""

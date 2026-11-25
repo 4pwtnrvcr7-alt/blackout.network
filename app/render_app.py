@@ -456,6 +456,7 @@ def _card_backfill():
         import share_card
         share_card.audit_stored_photo_cards()
         share_card.force_rebuild_listed_cards()
+        share_card.rebuild_card_places()
         share_card.backfill_photos(cids, pause=0.6)
     except Exception:
         traceback.print_exc()

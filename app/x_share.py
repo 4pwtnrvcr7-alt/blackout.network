@@ -1065,6 +1065,30 @@ _PEOPLE = [   # distinctive officials: tag the person and, when the role is unam
     (r"\bXi Jinping\b", "XiJinping", None),
     (r"\bVitali Klitschko\b", "VitaliKlitschko", None),
 ]
+# Full names for Commons title matching; tags stay camel-case for #PeteHegseth etc.
+_PEOPLE_FULL = {
+    "ScottBessent": "Scott Bessent",
+    "JeromePowell": "Jerome Powell",
+    "JanetYellen": "Janet Yellen",
+    "AntonyBlinken": "Antony Blinken",
+    "MarcoRubio": "Marco Rubio",
+    "VladimirPutin": "Vladimir Putin",
+    "Zelensky": "Volodymyr Zelensky",
+    "PeteHegseth": "Pete Hegseth",
+    "Netanyahu": "Benjamin Netanyahu",
+    "XiJinping": "Xi Jinping",
+    "VitaliKlitschko": "Vitali Klitschko",
+}
+_ORG_TITLE_WORDS = re.compile(
+    r"\b(ministr(?:y|ies)|departments?|governments?|agenc(?:y|ies)|offices?|"
+    r"councils?|health|police|arm(?:y|ies)|authorit(?:y|ies)|commissions?|"
+    r"bureaus?|administrations?|forces?|commands?|services?|institutes?|"
+    r"universit(?:y|ies)|hospitals?|secretariats?|parliaments?|congress|"
+    r"senate|cabinets?|tribunals?|courts?|federations?|committees?|"
+    r"organi[sz]ations?|corps|navy|navies|marines?|guards?|customs|"
+    r"intelligence|security)\b",
+    re.I,
+)
 _ROLE_AGENCY = [
     (r"\b(?:U\.?S\.?\s+)?Treasury Secretary\b|\bSecretary of (?:the )?Treasury\b|\bU\.?S\.? Treasury\b", "Treasury"),
     (r"\bSecretary of State\b|\bState Department\b", "StateDepartment"),
@@ -1328,6 +1352,54 @@ def entity_tags(item, headline=None):
         if len(ph) >= 5 and ph.lower() not in _MONTHS and ph.lower() not in {x.lower() for x in _COMMON_CAPS} and ph.lower() not in _NOT_ENTITY and ph.lower() not in _PLACE_WORDS and not _is_place(ph):
             add(ph)
     return out[:6]
+
+
+def is_org_title_name(name):
+    """True if a putative person name contains an org/title word (Ministry, Health, Police, …)."""
+    return bool(name and _ORG_TITLE_WORDS.search(name))
+
+
+def people_from_entities(title, text=""):
+    """People named in the headline, from the same PEOPLE list/extractor that produces #PeteHegseth.
+
+    Does not invent names from capitalized bigrams. Rejects any name containing org/title
+    words (Ministry, Department, Government, Agency, Office, Council, Health, Police, Army, …).
+    """
+    title = _clean_title(title or "")
+    out, seen = [], set()
+
+    def add(name):
+        name = " ".join((name or "").split())
+        if not name or is_org_title_name(name):
+            return
+        key = name.lower()
+        if key in seen:
+            return
+        seen.add(key)
+        out.append(name)
+
+    for rx, tag, _agency in _PEOPLE:
+        if title and re.search(rx, title):
+            full = _PEOPLE_FULL.get(tag) or re.sub(r"([a-z])([A-Z])", r"\1 \2", tag)
+            add(full)
+    if not out:
+        m = re.match(r"^(" + _CAP + r")\s+(" + _CAP + r")\s+(.+)$", title)
+        if m and _NAME_VERBS.match(m.group(3) or ""):
+            first, last = m.group(1), m.group(2)
+            low_f, low_l = first.lower(), last.lower()
+            if (not first.isupper() and not last.isupper()
+                    and low_f not in _STOP_START and low_l not in _STOP_START
+                    and low_f not in _MONTHS and low_l not in _MONTHS
+                    and first not in _COMMON_CAPS and last not in _COMMON_CAPS
+                    and low_f not in _PLACE_WORDS and low_l not in _PLACE_WORDS
+                    and (first + " " + last).lower() not in _NOT_ENTITY
+                    and not _is_place(first + " " + last)):
+                add(first + " " + last)
+    if not out:
+        full = _resolve_surname(title, text or title)
+        if full:
+            add(full)
+    return out
 
 
 _HONORIFICS = {"mayor", "president", "prime", "minister", "gen", "general", "sen", "senator", "rep", "dr", "gov", "governor", "king", "queen", "pope", "chief", "sheikh", "judge", "secretary", "ceo", "chairman", "mr", "mrs", "ms"}
