@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "18"  # bump to force social CDNs to refetch (Nov 25: v17 = strict exact-name photos; audit downgrades; typography hash)
+VERSION = "19"  # bump to force social CDNs to refetch (Nov 25: v17 = strict exact-name photos; audit downgrades; typography hash)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -513,6 +513,12 @@ def png_bytes(im):
 def _cache_key(kind, ident, title, rank, bg_id):
     raw = f"{VERSION}|{kind}|{ident}|{title}|{rank}|{bg_id}".encode("utf-8", "replace")
     return hashlib.sha1(raw).hexdigest()
+
+
+def drop_mem():
+    """Drop the in-process PNG memo so a rebuilt card is not hidden by a stale render."""
+    with _LOCK:
+        _MEM.clear()
 
 
 def _cached(key, builder):
