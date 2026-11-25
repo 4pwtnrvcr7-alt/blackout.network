@@ -24,7 +24,7 @@ import x_share
 
 SITE = "https://blackout.network"
 W, H = 1200, 675
-VERSION = "5"
+VERSION = "6"
 BASE = Path(__file__).resolve().parent
 NM = BASE / "netmap_static"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -519,7 +519,7 @@ def _r_story(cid):
         photo = None
     have = bool(photo and not photo.get("pending"))
     card_title = _card_headline(it.get("title") or "") or _card_headline(head) or "Story"
-    place, plat, plon = story_map_place(it.get("title") or "", it.get("location") or "", it.get("brief") or "", cid)
+    place, plat, plon = story_map_place(it.get("title") or "", it.get("location") or "", it.get("brief") or "", cid, it.get("lat"), it.get("lon"))
     loc = place or ""
     lon = plon if plon is not None else it.get("lon")
     lat = plat if plat is not None else it.get("lat")
@@ -1208,6 +1208,22 @@ def _story_bg(it):
         return _base(it["id"]), False, "", ""
 
 
+def _fit_chip(d, text, maxw):
+    """Chip text that fits maxw: shrink the font (13 -> 9 px) and tracking first; if it still cannot fit,
+    drop whole trailing comma parts. Words are never cut mid-word."""
+    text = " ".join((text or "").split())
+    parts = [t.strip() for t in text.split(",") if t.strip()] or [text]
+    while True:
+        cand = ", ".join(parts)
+        for size, trk in ((13, 2.4), (12, 2.0), (11, 1.6), (10, 1.2), (9, 0.8)):
+            f = og.inter(size, bold=True)
+            wd = og._text_w(d, cand, f, trk)
+            if wd <= maxw:
+                return f, trk, cand, wd
+        if len(parts) <= 1:
+            return f, trk, cand, wd
+        parts = parts[:-1]
+
 def _lay_story(it):
     """News card: photo (or dark location map) full bleed, dark gradient on the left, rank badge, whole headline, category + place chips."""
     col = it["color"]
@@ -1237,12 +1253,11 @@ def _lay_story(it):
     chips = [((it.get("kicker") or "THE WIRE").upper(), col)]
     ph = it.get("photo")
     if it.get("loc") and not (ph and ph.get("kind") == "person"):   # a person's portrait is not a picture of the story's place
-        chips.append((og._strip_emoji(it["loc"]).upper()[:22], (214, 218, 226)))
+        chips.append((og._strip_emoji(it["loc"]).upper(), (214, 218, 226)))
     for text, c in chips:
-        f = og.inter(13, bold=True)
-        wd = og._text_w(d, text, f, 2.4)
+        f, trk, text, wd = _fit_chip(d, text, W - 56 - x - 24 - 24)
         d.rounded_rectangle([x, 34, x + wd + 24, 64], radius=15, fill=(8, 10, 14), outline=c, width=2)
-        _tx(d, (x + 12, 41), text, f, c, 2.4)
+        _tx(d, (x + 12, 41 + (13 - getattr(f, "size", 13)) // 2), text, f, c, trk)
         x += wd + 34
     rank = it.get("rank") or 0
     rf = og.mont(26, 800)
@@ -1433,14 +1448,14 @@ def _kick_generic_bg():
 _kick_generic_bg()
 
 
-def story_map_place(title="", location="", brief="", cid=""):
-    """Badge label and map coordinates: the same place the Wire map uses.
+def story_map_hit(title="", location="", brief="", cid="", lat=None, lon=None):
+    """{place, lat, lon, cc, precision}: the place the Wire map uses for this story (empty place when none).
 
-    A leftover location field (photo metadata, body mentions) is ignored unless
-    that place is actually named in the headline.
-    """
+    A leftover location field is ignored unless the headline names that place. Stored coordinates (lat/lon)
+    are only a hint for the Wikidata QID check; the label always comes from the story text."""
     title = title or ""
     loc = (location or "").strip()
+    empty = {"place": "", "lat": None, "lon": None, "cc": None, "precision": None}
     try:
         import signal_place as SP
         if loc:
@@ -1454,7 +1469,14 @@ def story_map_place(title="", location="", brief="", cid=""):
                 if not (title_ccs and loc_ccs and (title_ccs & loc_ccs)):
                     loc = ""
         story = SP.story_text(title, loc, brief or "")
-        title_ccs = SP.named_countries(title) or []
+        title_ccs = list(SP.named_countries(title) or [])
+        # "Congo" in outbreak/aid headlines is the DR Congo unless Brazzaville / "Republic of the Congo" is named.
+        if "CG" in title_ccs and re.search(r"\bCongo\b", title) and not re.search(r"Republic of (?:the )?Congo|Brazzaville|Congo[- ]Brazzaville", title + " " + (brief or "")):
+            title_ccs = ["CD" if c == "CG" else c for c in title_ccs]
+            if "CD" in title_ccs:
+                cap = SP.capital_of("CD")
+                if cap:
+                    return {"place": "Democratic Republic of the Congo", "lat": cap.get("lat"), "lon": cap.get("lon"), "cc": "CD", "precision": "country"}
         prefer = title_ccs[0] if len(title_ccs) == 1 else None
         hit = SP.infer(story, prefer_cc=prefer)
         if hit and (hit.get("place") or "").strip():
@@ -1463,26 +1485,38 @@ def story_map_place(title="", location="", brief="", cid=""):
                 cap = SP.capital_of(title_ccs[0])
                 if cap and cap.get("place"):
                     hit = cap
-            place = (hit.get("place") or "").strip()
-            if (hit.get("precision") == "country" or hit.get("approximate")) and "," in place:
-                place = place.split(",")[-1].strip()
-            return place, hit.get("lat"), hit.get("lon")
-        if title_ccs:
-            cap = SP.capital_of(title_ccs[0])
-            if cap and cap.get("place"):
-                place = (cap.get("place") or "").strip()
-                if "," in place:
-                    place = place.split(",")[-1].strip()
-                return place, cap.get("lat"), cap.get("lon")
-        # infer can still place a city/territory the country list missed (e.g. Gaza)
-        hit2 = SP.infer(title)
-        if hit2 and (hit2.get("place") or "").strip():
-            return (hit2.get("place") or "").strip(), hit2.get("lat"), hit2.get("lon")
+        elif title_ccs:
+            hit = SP.capital_of(title_ccs[0])
+        else:
+            hit = SP.infer(title)
+        if not hit or not (hit.get("place") or "").strip():
+            return empty
+        place = (hit.get("place") or "").strip()
+        prec = hit.get("precision")
+        if (prec == "country" or hit.get("approximate")) and "," in place:
+            place = place.split(",")[-1].strip()
+        hlat, hlon = hit.get("lat"), hit.get("lon")
+        # The story's own stored coordinate (feed/EONET/USGS) wins when the text-inferred city/region is a
+        # same-named place on another continent ("Highland, Virginia" -> Virginia, South Africa).
+        cc_out = hit.get("cc")
+        if lat is not None and lon is not None and prec != "country" and hlat is not None:
+            try:
+                import card_photo as _cp
+                if _cp._km(float(lat), float(lon), float(hlat), float(hlon)) > 1500:
+                    hlat, hlon, cc_out, prec = float(lat), float(lon), None, "region"
+            except Exception:
+                pass
+        return {"place": place, "lat": hlat, "lon": hlon, "cc": cc_out, "precision": prec}
     except Exception:
         pass
     if loc and loc.lower() in title.lower():
-        return loc[:40], None, None
-    return "", None, None
+        return {"place": loc, "lat": None, "lon": None, "cc": None, "precision": None}
+    return empty
+
+def story_map_place(title="", location="", brief="", cid="", lat=None, lon=None):
+    """(place label, lat, lon) for the card badge and map; see story_map_hit."""
+    h = story_map_hit(title, location, brief, cid, lat, lon)
+    return h["place"], h["lat"], h["lon"]
 
 
 _BAKED = set()
@@ -1611,6 +1645,45 @@ def generic_story_card(cid):
             return None
 
 
+def card_photo_on():
+    """Licensed person/place/topic photo cards (Matt 10:27 AM ET). BN_CARD_PHOTO=0 turns them off."""
+    try:
+        import card_photo as CP
+        return CP.enabled()
+    except Exception:
+        return False
+
+
+def apply_card_photo(cid, title="", loc="", brief="", lat=None, lon=None):
+    """Network: choose a v3 licensed photo, store it, return the photo dict (or None). No-op when the flag is off."""
+    if not cid or not card_photo_on():
+        return None
+    try:
+        import card_photo as CP, story_photo as SP
+        hit = story_map_hit(title or "", loc or "", brief or "", cid, lat, lon)
+        im = CP.choose(cid, title or "", hit, brief or "")
+        if not im:
+            return None
+        jpg = None
+        try:
+            path = im.get("path")
+            if path:
+                sz = Path(path).stat().st_size
+                # v3 source thumbs are well under this; never hold a huge file in RAM
+                if 4000 <= sz <= 6 * 1024 * 1024:
+                    jpg = Path(path).read_bytes()
+        except Exception:
+            jpg = None
+        try:
+            SP.db_put(cid, im, jpg=jpg)
+        finally:
+            jpg = None
+        return im
+    except Exception as e:
+        print(f"share_card: apply_card_photo {cid} err={type(e).__name__}", flush=True)
+        return None
+
+
 def _network_prefetch(cid):
     """Commons / HTTP lookup only (no card render). Used by the photo worker so a 10s
     network timeout cannot fire after a successful photo=1 while typography is still being laid out."""
@@ -1618,7 +1691,14 @@ def _network_prefetch(cid):
     it = _story_item(cid)
     if it and it[0]:
         r = it[0]
-        story_photo.prefetch(cid, r.get("title") or "", r.get("location") or "", r.get("brief") or "")
+        title = r.get("title") or ""
+        loc = r.get("location") or ""
+        brief = r.get("brief") or ""
+        if card_photo_on():
+            apply_card_photo(cid, title, loc, brief, r.get("lat"), r.get("lon"))
+        # Always run the existing Commons prefetch too: it is how a PEOPLE-list
+        # portrait lands when the v3 chooser misses, and tests mock _commons_portrait.
+        story_photo.prefetch(cid, title, loc, brief)
 
 
 def _story_build(cid, fetch=False):
@@ -2315,6 +2395,96 @@ def rebuild_card_places(budget=25):
             print(f"story_photo: place-rebuild {cid} err={type(e).__name__}", flush=True)
     print(f"story_photo: place-rebuild {n} map cards in {time.time()-t0:.1f}s", flush=True)
     return n
+
+
+PHOTO_REBUILD = {"done": False, "ids": 0, "error": "", "queued": 0}
+_REBUILD_LOCK = threading.Lock()
+# Encoded v3 photo cards are 0.6–1.2 MB. Anything larger is not stored or kept in RAM.
+_REBUILD_PNG_CAP = 2 * 1024 * 1024
+
+
+def rebuild_card_photos(cids=None, pause=0.4, budget=0):
+    """Single paced background worker, newest first: licensed v3 photo cards.
+
+    One story at a time on this thread — never one thread per story. After each
+    card the PNG bytes (0.6–1.2 MB) are written to cards.db and then dropped,
+    and the in-process `_SC` entry is evicted, so a 400–800 card run cannot
+    accumulate enough RAM to OOM the 2 Gi instance. Does not block healthz.
+    pause spaces lookups so the 1-CPU box stays responsive. budget=0 means
+    no time cap (the boot thread runs this after og=true). A second caller
+    is a no-op while a rebuild is already running.
+    """
+    import gc
+    import story_photo as SP
+    if not _REBUILD_LOCK.acquire(blocking=False):
+        return PHOTO_REBUILD
+    try:
+        PHOTO_REBUILD.update(done=False, ids=0, error="", queued=0)
+        if not card_photo_on():
+            PHOTO_REBUILD["done"] = True
+            return PHOTO_REBUILD
+        seen, order = set(), []
+        for cid in cids or []:
+            if cid and cid not in seen:
+                seen.add(cid); order.append(cid)
+        t0 = time.time()
+        PHOTO_REBUILD["queued"] = len(order)
+        for cid in order:
+            if budget and time.time() - t0 > float(budget):
+                break
+            b = None
+            try:
+                title, text, loc = _force_title(cid)
+                lat = lon = None
+                try:
+                    import story
+                    r, _al = story.load(cid)
+                    if r:
+                        title = r.get("title") or title
+                        loc = r.get("location") or loc
+                        text = r.get("brief") or text
+                        lat, lon = r.get("lat"), r.get("lon")
+                except Exception:
+                    pass
+                apply_card_photo(cid, title or "", loc or "", text or "", lat, lon)
+                invalidate_card_layers(cid)
+                th = SP.card_title_key(_card_headline(title or "") or "")
+                b = render_story_fresh(cid) or generic_story_card(cid)
+                src = ""
+                try:
+                    c = SP.pick(cid, title or "", loc or "", text or "")
+                    if c and (c.get("src") or "").startswith("https://"):
+                        src = c.get("src") or ""
+                except Exception:
+                    src = ""
+                if b and len(b) > _REBUILD_PNG_CAP:
+                    print(f"share_card: photo-rebuild {cid} skip oversized png {len(b)}", flush=True)
+                    b = None
+                if b and b.startswith(b"\x89PNG"):
+                    SP.put_card(cid, b, src, title_hash=th, allow_downgrade=True)
+                    PHOTO_REBUILD["ids"] += 1
+            except Exception as e:
+                PHOTO_REBUILD["error"] = type(e).__name__
+                print(f"share_card: photo-rebuild {cid} err={type(e).__name__}", flush=True)
+            finally:
+                b = None
+                # Evict the in-process PNG cache for this cid so a long run
+                # cannot hold hundreds of 0.6–1.2 MB cards in RAM.
+                _SC.pop(cid, None)
+                try:
+                    invalidate_card_layers(cid)
+                except Exception:
+                    pass
+            if PHOTO_REBUILD["ids"] and PHOTO_REBUILD["ids"] % 8 == 0:
+                gc.collect()
+            if pause:
+                time.sleep(float(pause))
+        PHOTO_REBUILD["done"] = True
+        gc.collect()
+        print(f"share_card: photo-rebuild {PHOTO_REBUILD['ids']}/{PHOTO_REBUILD['queued']} in {time.time()-t0:.1f}s", flush=True)
+        return PHOTO_REBUILD
+    finally:
+        _REBUILD_LOCK.release()
 
 
 def force_rebuild_listed_cards(force=False):
