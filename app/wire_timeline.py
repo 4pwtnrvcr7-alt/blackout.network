@@ -205,7 +205,7 @@ def _links(js):
         if len(out) >= 5: break
     return out
 
-def _item(r, archive):
+def _item(r, archive, warm_budget=None):
     title = _clean(r["title"]); h = headline(title)
     loc = _clean(r["location"])[:90] if r["location"] else ""
     links = _links(r["links"])
@@ -247,9 +247,11 @@ def _item(r, archive):
                 hid = bool(r["hidden"])
             except Exception:
                 hid = False
-            if (rk or 0) >= 5:   # build the share card now so X's crawler never waits on a cold render
+            if (rk or 0) >= 5 and (warm_budget is None or warm_budget[0] > 0):
                 try:
                     import share_card; share_card.warm(str(r["id"]))
+                    if warm_budget is not None:
+                        warm_budget[0] -= 1
                 except Exception:
                     pass
             d["xu"] = x_share.intent_url({
@@ -332,7 +334,8 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
     rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
     more = len(rows) > limit
     rows = rows[:limit]
-    items = [_item(r, a) for r, a in rows]
+    _wb = [20]
+    items = [_item(r, a, warm_budget=_wb) for r, a in rows]
     if newer: items.reverse()   # always newest first in the payload
     edge = (items[0] if newer else items[-1]) if items else None
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
@@ -346,7 +349,8 @@ def items_for(ids):
     try: rows = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) AND cluster_id IN ({','.join('?' * len(ids))})", ids))
     finally: c.close()
     rows.sort(key=lambda r: (r["t"] or "", r["id"]), reverse=True)
-    return [_item(r, False) for r in rows]
+    _wb = [20]
+    return [_item(r, False, warm_budget=_wb) for r in rows]
 
 def bust_meta():
     """Forget the cached meta (totals) so the next read rebuilds it (realtime.py calls this at most every 2 minutes)."""

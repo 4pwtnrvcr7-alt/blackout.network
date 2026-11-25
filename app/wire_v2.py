@@ -406,10 +406,6 @@ def handle(path, qs=None, headers=None):
             _INFL[key] = _pool().submit(_build, key, list_path, noindex)
         if now - hit[0] < 1800:   # serve stale up to 30 min while it refreshes
             return 200, hit[1], "text/html"
-    if _NEG.get(key) and now - _NEG[key] < 60: return None
-    fut = _INFL.get(key)
-    if fut is None:
-        fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
     story_page = key not in ("/wire", "/wire-classic")
     crawler = False
     if story_page:
@@ -419,7 +415,11 @@ def handle(path, qs=None, headers=None):
         except Exception:
             crawler = False
         if not crawler:
-            return None   # human: do not block on api_state; caller renders the full story from the DB
+            return None   # human: do not start api_state (it can lock the DB); caller renders from the DB
+    if _NEG.get(key) and now - _NEG[key] < 60: return None
+    fut = _INFL.get(key)
+    if fut is None:
+        fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
     try:
         body = fut.result(timeout=_BUDGET)
     except Exception:

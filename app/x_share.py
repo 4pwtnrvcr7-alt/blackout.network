@@ -789,6 +789,10 @@ def topic_tags(item, headline=None):
         else:
             add("Cybersecurity")
 
+    # Policy / finance topics named in the title
+    if re.search(r"\bsanctions?\b", title or "", re.I):
+        add("Sanctions")
+
     return tags
 
 
@@ -930,6 +934,35 @@ _CAP = r"[A-Z][A-Za-z0-9&\-]*"
 _PHRASE_RX = re.compile(r"(?<![A-Za-z0-9’'])(" + _CAP + r"(?:\s+" + _CAP + r"){0,3})(?![’'A-Za-z0-9])")
 
 
+_PEOPLE = [   # distinctive officials: tag the person and, when the role is unambiguous, their agency
+    (r"\bScott Bessent\b|\bBessent\b", "ScottBessent", "Treasury"),
+    (r"\bJerome Powell\b", "JeromePowell", "FederalReserve"),
+    (r"\bJanet Yellen\b", "JanetYellen", "Treasury"),
+    (r"\bAntony Blinken\b|\bAnthony Blinken\b", "AntonyBlinken", "StateDepartment"),
+    (r"\bMarco Rubio\b", "MarcoRubio", None),
+    (r"\bVladimir Putin\b", "VladimirPutin", "Kremlin"),
+    (r"\bVolodymyr Zelensky(?:y|i)?\b", "Zelensky", None),
+    (r"\bBenjamin Netanyahu\b|\bNetanyahu\b", "Netanyahu", None),
+    (r"\bXi Jinping\b", "XiJinping", None),
+    (r"\bVitali Klitschko\b", "VitaliKlitschko", None),
+]
+_ROLE_AGENCY = [
+    (r"\b(?:U\.?S\.?\s+)?Treasury Secretary\b|\bSecretary of (?:the )?Treasury\b|\bU\.?S\.? Treasury\b", "Treasury"),
+    (r"\bSecretary of State\b|\bState Department\b", "StateDepartment"),
+    (r"\b(?:Defense Secretary|Secretary of Defense)\b", "Pentagon"),
+    (r"\bAttorney General\b|\bJustice Department\b", "DOJ"),
+    (r"\bFederal Reserve\b|\bFed Chair\b", "FederalReserve"),
+]
+_NAME_VERBS = re.compile(
+    r"^(?:Unleashes|Says|Said|Warns|Warned|Imposes|Imposed|Announces|Announced|Orders|Ordered|"
+    r"Calls|Called|Blames|Blamed|Accuses|Accused|Declares|Declared|Signs|Signed|Vetoes|Vetoed|"
+    r"Fires|Fired|Names|Named|Taps|Tapped|Nominates|Nominated|Rejects|Rejected|Defends|Defended|"
+    r"Slams|Slammed|Backs|Backed|Visits|Visited|Meets|Met|Urges|Urged|Tells|Told|Asks|Asked|"
+    r"Seeks|Sought|Blocks|Blocked|Halts|Halted|Targets|Targeted|Hits|Struck|Strikes)\b",
+    re.I,
+)
+
+
 def _clean_title(title):
     s = _norm(title or "")
     s = re.sub(r"\s+(?:By|via)\s+(?:Investing\.com|Reuters|AP|Bloomberg|Yahoo Finance|MarketWatch|Benzinga|GlobeNewswire|PR Newswire|Business Wire)\b.*$", "", s)
@@ -949,6 +982,39 @@ def entity_tags(item, headline=None):
         tg = tag or to_tag(label)
         if tg and len(tg) > 2 and tg.lower() not in seen and tg.lower() not in known_loc:
             seen.add(tg.lower()); out.append(tg)
+
+    # Named people in the title, then their agency/role when it is clear (dictionary or wording in the title).
+    for rx, tag, agency in _PEOPLE:
+        if re.search(rx, title):
+            add(tag, "#" + tag)
+            if agency:
+                add(agency, "#" + agency)
+            break
+    if not any(x.lstrip("#") in {p[1] for p in _PEOPLE} for x in out):
+        # "Scott Bessent Unleashes …": First Last at the start of the title, followed by a finite verb
+        m = re.match(r"^(" + _CAP + r")\s+(" + _CAP + r")\s+(.+)$", title)
+        if m and _NAME_VERBS.match(m.group(3) or ""):
+            first, last = m.group(1), m.group(2)
+            low_f, low_l = first.lower(), last.lower()
+            if (not first.isupper() and not last.isupper()
+                    and low_f not in _STOP_START and low_l not in _STOP_START
+                    and low_f not in _MONTHS and low_l not in _MONTHS
+                    and first not in _COMMON_CAPS and last not in _COMMON_CAPS
+                    and low_f not in _PLACE_WORDS and low_l not in _PLACE_WORDS
+                    and (first + " " + last).lower() not in _NOT_ENTITY
+                    and not _is_place(first + " " + last)):
+                add(first + " " + last)
+    # Role / agency wording in the title (Treasury Secretary, Secretary of State, …)
+    for rx, lab in _ROLE_AGENCY:
+        if re.search(rx, title):
+            add(lab, "#" + lab)
+            break
+
+    # Quoted proper names in the title (e.g. 'PIF Tower')
+    for m in re.finditer(r"[\'‘’\"“”]([A-Z][^\'‘’\"“”]{1,40})[\'‘’\"“”]", title):
+        ph = m.group(1).strip()
+        if ph and ph.lower() not in _NOT_ENTITY and not _is_place(ph):
+            add(ph)
 
     # companies first: capitalized phrase ending in a company suffix, or followed by an exchange mention
     for m in re.finditer(r"(" + _CAP + r"(?:\s+" + _CAP + r"){0,3}\s+" + _CO_SUFFIX + r")\b\.?", title):

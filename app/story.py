@@ -36,8 +36,9 @@ def et(iso):
     except Exception: return iso or ""
     return d.astimezone(ET).strftime("%b %-d, %Y, %-I:%M %p ") + ("EDT" if d.astimezone(ET).dst() else "EST")
 
-def _ro():
-    c = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=10); c.row_factory = sqlite3.Row; return c
+def _ro(timeout=1.0):
+    """Read-only. timeout is seconds (≤1) so a locked DB cannot stall a story page."""
+    c = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=min(1.0, float(timeout))); c.row_factory = sqlite3.Row; return c
 
 def _what(brief, title):
     m = re.search(r"WHAT:\s*(.*?)\s*(?:WHERE:|WHEN:|CONFIDENCE:|$)", brief or "", re.S)
@@ -60,12 +61,31 @@ def _desk(cid):
         return None, []
 
 def load(cid):
+    """Cluster + alerts from the DB. Never waits more than 1 s on a lock; if the alerts query fails, still returns the title and brief."""
     try: c = _ro()
     except Exception: return _desk(cid)   # no readable blackout.db: desk stories still render
+    r = None
     try:
-        r = c.execute("SELECT * FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
-        if not r: return _desk(cid)
-        al = c.execute("SELECT source,family,title,source_url,first_seen,official,location FROM alerts WHERE cluster_id=? ORDER BY first_seen, official DESC LIMIT 400", (cid,)).fetchall()
+        try:
+            r = c.execute("SELECT * FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
+        except Exception:
+            r = None
+        if not r:
+            try:
+                c2 = _ro(timeout=0.5)
+                try:
+                    r = c2.execute("SELECT cluster_id, title, brief, rank, location, category, watchlist, hidden, confidence, families, n_items, first_seen, updated FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
+                finally:
+                    c2.close()
+            except Exception:
+                r = None
+        if not r:
+            return _desk(cid)
+        al = []
+        try:
+            al = c.execute("SELECT source,family,title,source_url,first_seen,official,location FROM alerts WHERE cluster_id=? ORDER BY first_seen, official DESC LIMIT 400", (cid,)).fetchall()
+        except Exception:
+            al = []
         cl, items = dict(r), [dict(a) for a in al]
         try:
             import story_display as SD
@@ -73,7 +93,9 @@ def load(cid):
         except Exception:
             pass
         return cl, items
-    finally: c.close()
+    finally:
+        try: c.close()
+        except Exception: pass
 
 def _tt(t):
     """Report headline as shown in the timeline: hype prefix and emoji removed (SVG-only rule)."""
@@ -230,6 +252,43 @@ def render(cid, since=""):
     noindex = (watch != 0 or rank < 3) and not desk_story   # t1330u: desk stories are written up in full, so they stay indexable
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
 
+
+def brief_page(cid):
+    """Title + brief + share button from the DB only (no growth/people/report extras). Used when the full render fails."""
+    r, al = load(cid)
+    if not r:
+        body = ('<p class="crumb"><a href="/wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
+                '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/wire">The Wire</a>.</p>')
+        return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
+    title = S.clean_title(r.get("title") or "Story")
+    what = _what(r.get("brief"), r.get("title"))
+    rank = int(r.get("rank") or 0)
+    loc = r.get("location") or ""
+    share = ""
+    try:
+        import x_share
+        share = x_share.button_html({
+            "cluster_id": cid, "title": title, "headline": title,
+            "location": loc, "category": r.get("category") or "",
+            "brief": r.get("brief") or "", "rank": rank,
+            "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0,
+        })
+    except Exception:
+        share = ""
+    src = ""
+    for a in (al or [])[:12]:
+        url = a.get("source_url") or ""
+        lab = a.get("source") or "Source"
+        if str(url).startswith("http"):
+            src += f'<li><a href="{S.E(url)}" rel="noopener nofollow" target="_blank">{S.E(lab)}</a></li>'
+    body = (f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>{_h1(title, what)}'
+            + (f'<p class="dek">{S.E(what)}</p>' if what and what != title else "")
+            + (f'<p class="meta">{S.E(loc)} · Rank {rank} of 10</p>' if True else "")
+            + (f'<section class="card"><h2>Sources</h2><ul>{src}</ul></section>' if src else "")
+            + (f'<p class="share">{share}</p>' if share else ""))
+    return 200, S.page(_short(title), what or title, body, f"/wire/{cid}", "threat")
+
+
 def handle_get(path, qs, headers=None):
     # Nov 18: the Wire timeline is /wire going forward. Hide the previous listing at /wire-classic (noindex).
     # BN_WIRE_TIMELINE=0 restores the previous listing at /wire. /wire/<cluster_id> is unchanged.
@@ -271,7 +330,11 @@ def handle_get(path, qs, headers=None):
     except Exception: pass
     hit = _C.get(key)
     if hit and hit[0] == mt and time.time() - hit[1] < 120: return hit[2], hit[3], "text/html"
-    code, body = render(m.group(1), since)
+    try:
+        code, body = render(m.group(1), since)
+    except Exception:
+        import traceback; traceback.print_exc()
+        code, body = brief_page(m.group(1))
     if len(_C) > 500: _C.clear()
     _C[key] = (mt, time.time(), code, body)
     return code, body, "text/html"
