@@ -902,8 +902,9 @@ class StoryPhoto(unittest.TestCase):
                 _, _, lines = S._story_head(dd, zel_raw, 640)
                 self.assertTrue(" ".join(lines).startswith("Zelensky"))
 
-                # Huang is not in the hashtag PEOPLE list; mid-headline names are not invented. Map is correct.
-                self.assertFalse(P.card_has_photo(huang))
+                # Jensen Huang is in the PEOPLE list; force-rebuild lands the licensed portrait, not a map.
+                self.assertTrue(P.card_has_photo(huang))
+                self.assertNotEqual(P.get_card(huang), map_png)
                 self.assertTrue(P.get_card(huang) and P.get_card(huang).startswith(b"\x89PNG"))
                 place, _, _ = S.story_map_place(huang_title, location="Pennsylvania", brief="")
                 self.assertTrue(not place or "pennsylvania" not in place.lower(), place)
@@ -935,9 +936,10 @@ class StoryPhoto(unittest.TestCase):
         self.assertFalse(P.photo_rule_allows(zel, commons_title="zelensky.jpg",
                                              src="https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg")[0])
         huang = "Trump wanted Jensen Huang back as the CEO of Nvidia"
-        # Jensen Huang is not in the hashtag PEOPLE list; mid-headline names are not invented.
-        self.assertFalse(P.photo_rule_allows(huang, commons_title="Jensen huang stanford 2026-04-30 008.jpg",
-                                             src="https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg")[0])
+        # Jensen Huang is in the hashtag PEOPLE list, so a portrait whose file title has the full name is allowed.
+        self.assertTrue(P.photo_rule_allows(huang, commons_title="Jensen huang stanford 2026-04-30 008.jpg",
+                                            src="https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg")[0])
+        # A different person's photo on the Huang story is still rejected.
         self.assertFalse(P.photo_rule_allows(huang, commons_title="Donald Trump 2025.jpg",
                                              src="https://upload.wikimedia.org/wikipedia/commons/trump.jpg")[0])
         # Org/title words are not people, even when the Commons file title contains the same phrase.
