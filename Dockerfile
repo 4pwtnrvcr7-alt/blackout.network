@@ -8,6 +8,8 @@ WORKDIR /workspace/blackout
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 COPY app/ /workspace/blackout/
+# Chrome B mark (Matt, Nov 25 2026): raster favicon/PWA icons are built from a text base64 master.
+RUN cd /workspace/blackout && python3 install_chrome_b_icons.py
 # Global Sources directory: build the SQLite/FTS index from the committed gzipped NDJSON shards (no network needed at build time)
 RUN cd /workspace/blackout && python3 sources_directory.py --build
 RUN mkdir -p logs snapshots static/vsubs video_subs newsletter_outbox && chown -R bn:bn /workspace
