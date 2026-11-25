@@ -24,7 +24,7 @@ import x_share
 
 SITE = "https://blackout.network"
 W, H = 1200, 675
-VERSION = "1"
+VERSION = "2"
 BASE = Path(__file__).resolve().parent
 NM = BASE / "netmap_static"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -509,10 +509,25 @@ def _r_story(cid):
     adds = what and len(what) > 30 and len(set(norm(what).split()) - set(norm(head).split())) >= max(4, len(set(norm(what).split())) // 2)
     dek = what if adds else f"Rank {rank}/10, reported by {fam} independent source famil{'y' if fam == 1 else 'ies'}."
     lines = [head, dek]
-    hero = None  # do not call story_v3.assemble here: it is slow and runs on the card worker, starving HTTP accept
-    return dict(title=head, kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
+    photo = None
+    try:   # data already on the box only (no network): the licensed photo for this story's entity or place
+        import story_photo
+        photo = story_photo.pick(it["cluster_id"], it.get("title") or "", it.get("location") or "", it.get("brief") or "")
+        if photo and not story_photo.cached(photo["src"]):
+            photo = dict(photo, pending=True)
+    except Exception:
+        photo = None
+    have = bool(photo and not photo.get("pending"))
+    return dict(title=_clean_head(head), kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
                 fact=dek or head, lines=[x for x in lines if x], tags=tags, loc=it.get("location") or "", deep=f"/wire/{cid}", share_url=f"{SITE}/wire/{cid}",
-                art=("story", it.get("lon"), it.get("lat"), hero), credit="", desc=dek or head, item=it)
+                art=("story", it.get("lon"), it.get("lat"), photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
+
+
+def _clean_head(t):
+    """Light cleanup only: drop a source-name fragment cut off after a colon at the very end ('...Strait of Hormuz: Crud'); nothing is reworded."""
+    t = " ".join((t or "").split())
+    m = re.match(r"^(.{40,}?):\s*[A-Za-z]{1,6}$", t)
+    return m.group(1) if m else t
 
 
 # ------------------------------------------------------------------ text + tags + urls
@@ -700,7 +715,7 @@ def _rings_of(geom):
     return []
 
 
-def _map(w, h, lon, lat, span, color=WHITE, marks=None, seed="", fx=0.5, track=None):
+def _map(w, h, lon, lat, span, color=WHITE, marks=None, seed="", fx=0.5, track=None, marker=True):
     """Dark vector map crop (equirectangular, cos-lat corrected) with a pulsing marker at (lon, lat). span = degrees of latitude shown."""
     S = 2
     im = Image.new("RGB", (w * S, h * S), (7, 9, 15))
@@ -739,7 +754,7 @@ def _map(w, h, lon, lat, span, color=WHITE, marks=None, seed="", fx=0.5, track=N
     od = ImageDraw.Draw(ov)
     if track and len(track) > 1:
         od.line([P(a_, b_) for a_, b_ in track], fill=color + (230,), width=5, joint="curve")
-    for (mlo, mla, mc) in ([(lon, lat, color)] + list(marks or [])):
+    for (mlo, mla, mc) in (([(lon, lat, color)] if marker else []) + list(marks or [])):
         mx, my = P(mlo, mla)
         for r_, a_ in ((70, 40), (46, 70), (26, 120)):
             od.ellipse([mx - r_, my - r_, mx + r_, my + r_], outline=mc + (a_,), width=3)
@@ -1018,39 +1033,146 @@ def _lay_hero(it):
     return im
 
 
-def _lay_story(it):
-    art = it["art"]
-    lon, lat, hero = art[1], art[2], art[3]
-    im = _base(it["id"])
-    d = ImageDraw.Draw(im)
+def _wrap_full(d, text, f, maxw):
+    lines, cur = [], ""
+    for w in text.split():
+        t = (cur + " " + w).strip()
+        if og._text_w(d, t, f, 0) <= maxw or not cur:
+            cur = t
+        else:
+            lines.append(cur)
+            cur = w
+    return lines + ([cur] if cur else [])
+
+
+def _story_head(d, title, maxw, max_lines=3, start=54, minsize=31):
+    """Whole headline on at most 3 lines; only at the smallest size is it cut, at a word boundary, with an ellipsis."""
+    title = og._strip_emoji(title)
+    size = start
+    while size >= minsize:
+        f = og.mont(size, 800)
+        lines = _wrap_full(d, title, f, maxw)
+        if len(lines) <= max_lines and all(og._text_w(d, l, f, 0) <= maxw for l in lines):
+            return f, size, lines
+        size -= 2
+    f = og.mont(minsize, 800)
+    lines = _wrap_full(d, title, f, maxw)[:max_lines]
+    while og._text_w(d, lines[-1] + "\u2026", f, 0) > maxw and " " in lines[-1]:
+        lines[-1] = lines[-1].rsplit(" ", 1)[0]
+    lines[-1] = lines[-1].rstrip(" ,;:-") + "\u2026"
+    return f, minsize, lines
+
+
+def _story_bg(it):
+    """(background RGB image, subject RGBA or None, credit text, label text). Photo if one is stored, else a dark location map; never plain black."""
+    ph = it.get("photo")
     col = it["color"]
-    have_xy = lon is not None and lat is not None
-    src, _ = og._bg_from_src(hero) if (hero and not have_xy) else (None, "")   # stock stills repeat across stories: a located story gets its own map crop instead
-    right = 470
-    if src is not None:
-        p = _cover(src, right + 120, H)
-        p = ImageEnhance.Brightness(ImageEnhance.Color(p).enhance(0.8)).enhance(0.8)
-        im.paste(p, (W - right - 120, 0), _fade_edge(p, "left", 0.5))
-    elif have_xy:
+    if ph:
         try:
-            m = _map(right + 200, H, float(lon), float(lat), 70 if abs(float(lat)) < 60 else 40, col, fx=0.6)
-            im.paste(m, (W - right - 200, 0), _fade_edge(m, "left", 0.4))
+            import story_photo
+            p = story_photo.cached(ph["src"])
+            src = Image.open(p).convert("RGB")
+            sw, sh = src.size
+            cred = "Image: " + (ph.get("credit") or "").rstrip(". ") + (". " + ph["license"] if ph.get("license") else "") + "."
+            label = ph.get("label") or ""
+            if sh >= sw * 1.05:   # portrait: sharp subject on the right over a soft field taken from the photo's own background
+                band = src.crop((0, 0, sw, max(8, int(sh * 0.36))))
+                field = og._cover(band, W, H).filter(ImageFilter.GaussianBlur(36))
+                field = ImageEnhance.Brightness(ImageEnhance.Color(field).enhance(0.55)).enhance(0.22)
+                c = src.crop((int(sw * 0.06), int(sh * 0.04), int(sw * 0.94), int(sh * 0.80)))
+                scale = H / c.size[1]
+                sub = c.resize((max(1, int(c.size[0] * scale)), H), Image.Resampling.LANCZOS)
+                if sub.size[0] > 540:
+                    k = 540 / sub.size[0]
+                    cx0 = int(c.size[0] * (1 - k) / 2)
+                    c = c.crop((cx0, 0, cx0 + int(c.size[0] * k), c.size[1]))
+                    sub = c.resize((max(1, int(c.size[0] * H / c.size[1])), H), Image.Resampling.LANCZOS)
+                sub = ImageEnhance.Contrast(sub).enhance(1.05).convert("RGBA")
+                fade = min(100, sub.size[0] // 3)
+                m = Image.new("L", sub.size, 255)
+                md = ImageDraw.Draw(m)
+                for x in range(fade):
+                    md.line([(x, 0), (x, H)], fill=int(255 * (x / fade) ** 1.15))
+                sub.putalpha(m)
+                field = field.convert("RGBA")
+                field.paste(sub, (W - sub.size[0], 0), sub)
+                return field.convert("RGB"), True, cred, label
+            bgim = ImageEnhance.Brightness(og._cover(src, W, H)).enhance(0.72)   # landscape: full bleed
+            return bgim, False, cred, label
         except Exception:
             pass
+    lon, lat = it["art"][1], it["art"][2]
+    try:
+        if lon is not None and lat is not None:
+            m = _map(W, H, float(lon), float(lat), 70 if abs(float(lat)) < 60 else 40, col, fx=0.74)
+        else:
+            m = _map(W, H, 10.0, 22.0, 150, col, fx=0.5, marker=False)
+        return m, False, "", ""
+    except Exception:
+        return _base(it["id"]), False, "", ""
+
+
+def _lay_story(it):
+    """News card: photo (or dark location map) full bleed, dark gradient on the left, rank badge, whole headline, category + place chips."""
+    col = it["color"]
+    im, portrait, credit, label = _story_bg(it)
+    ov = Image.new("L", (W, H), 0)
+    od = ImageDraw.Draw(ov)
+    edge = 0.58 if portrait else 0.74
+    for x in range(W):
+        t = min(1.0, max(0.0, x / (edge * W)))
+        t = t * t * (3 - 2 * t)
+        od.line([(x, 0), (x, H)], fill=int(205 * (1 - t) + (18 if portrait else 70) * t))
+    im = Image.composite(Image.new("RGB", (W, H), (5, 6, 10)), im, ov)
+    bot = Image.new("L", (W, 120), 0)
+    bd = ImageDraw.Draw(bot)
+    for y in range(120):
+        bd.line([(0, y), (W, y)], fill=int(170 * (y / 120) ** 1.4))
+    im.paste(Image.new("RGB", (W, 120), (5, 6, 10)), (0, H - 120), bot)
+    top = Image.new("L", (W, 90), 0)
+    td = ImageDraw.Draw(top)
+    for y in range(90):
+        td.line([(0, y), (W, y)], fill=int(110 * (1 - y / 90)))
+    im.paste(Image.new("RGB", (W, 90), (5, 6, 10)), (0, 0), top)
     d = ImageDraw.Draw(im)
+    wm = og.inter(20, bold=True)
+    _tx(d, (56, 34), "blackout.network", wm, (232, 234, 238), 2.6)
+    x = 56 + og._text_w(d, "blackout.network", wm, 2.6) + 22
+    chips = [((it.get("kicker") or "THE WIRE").upper(), col)]
+    ph = it.get("photo")
+    if it.get("loc") and not (ph and ph.get("kind") == "person"):   # a person's portrait is not a picture of the story's place
+        chips.append((og._strip_emoji(it["loc"]).upper()[:22], (214, 218, 226)))
+    for text, c in chips:
+        f = og.inter(13, bold=True)
+        wd = og._text_w(d, text, f, 2.4)
+        d.rounded_rectangle([x, 34, x + wd + 24, 64], radius=15, fill=(8, 10, 14), outline=c, width=2)
+        _tx(d, (x + 12, 41), text, f, c, 2.4)
+        x += wd + 34
     rank = it.get("rank") or 0
-    f = og.mont(150, 800)
-    _tx(d, (64, 100), str(rank), f, col, 0)
-    wd = og._text_w(d, str(rank), f, 0)
-    _tx(d, (64 + wd + 18, 150), "/10", og.mont(34, 700), (150, 156, 168), 0)
-    _tx(d, (64 + wd + 18, 200), "RANK", og.inter(14, bold=True), col, 4.0)
-    y = _title_block(im, it["title"], 64, 280, 700, 3, base=52, minsize=34)
-    if it.get("desc") and it["desc"].lower() != it["title"].lower():
-        _para(im, it["desc"], 64, y + 8, 640, 21, fill=(190, 196, 208), max_lines=2)
-    if it.get("loc"):
-        _tx(d, (64, 548), og._strip_emoji(it["loc"]).upper()[:40], og.inter(15, bold=True), (214, 218, 226), 3.0)
-    _tx(d, (64, 580), f"{it['stats'][0][0]} SOURCE FAMILIES" if it.get("stats") else "", og.inter(13, bold=True), DIM, 2.5)
-    _chrome(im, it)
+    rf = og.mont(26, 800)
+    label_r = f"{rank} / 10"
+    wd = og._text_w(d, label_r, rf, 0)
+    d.rounded_rectangle([56, 196, 56 + wd + 28, 236], radius=8, fill=(8, 10, 14), outline=col, width=2)
+    d.rectangle([56, 203, 60, 229], fill=col)
+    _tx(d, (72, 202), label_r, rf, col, 0)
+    f, size, lines = _story_head(d, it["title"], 640 if portrait else 700)
+    y = 252
+    for i, l in enumerate(lines):
+        _tx(d, (56, y + i * int(size * 1.08)), l, f, WHITE, 0)
+    y += len(lines) * int(size * 1.08)
+    if label:
+        for i, l in enumerate(_wrap_full(d, label, og.inter(15), 620)[:2]):
+            _tx(d, (56, y + 14 + i * 20), l, og.inter(15), (186, 192, 202), 0)
+    elif not ph and it.get("loc"):
+        _tx(d, (56, y + 16), og._strip_emoji(it["loc"]).upper()[:40], og.inter(14, bold=True), (200, 205, 214), 2.6)
+    if credit:
+        cf = og.inter(12)
+        t = credit
+        while og._text_w(d, t, cf, 0) > W - 112 and len(t) > 24:
+            t = t[:-2]
+        im.paste(Image.new("RGB", (W, 38), (5, 6, 10)), (0, H - 38), Image.new("L", (W, 38), 190))
+        d = ImageDraw.Draw(im)
+        _tx(d, (56, H - 28), t, cf, (156, 162, 172), 0)
     return im
 
 
@@ -1120,14 +1242,43 @@ def card_url(it):
 _SC = {}   # cid -> (built_at, png, refreshing)
 
 
-def _story_build(cid):
+_NEED = set()   # stories whose card was built before their photo was stored (rebuilt once the photo is in)
+
+
+def _story_build(cid, fetch=False):
+    """fetch=True (background warm, refresh, write-up gate) may download the story's photo; the crawler path (fetch=False) never touches the network."""
     try:
+        if fetch:
+            try:
+                import story_photo
+                it = _story_item(cid)
+                if it and it[0]:
+                    r = it[0]
+                    story_photo.prefetch(cid, r.get("title") or "", r.get("location") or "", r.get("brief") or "")
+            except Exception:
+                pass
+            _NEED.discard(cid)
         b = png_for("story", cid)
         if b:
             _SC[cid] = (time.time(), b, False)
+            if not fetch:
+                try:
+                    import story_photo
+                    if _r_story_pending(cid):
+                        _NEED.add(cid)
+                except Exception:
+                    pass
         return b
     finally:
         time.sleep(0.2)  # yield the only CPU so new TLS/HTTP connections can be accepted
+
+
+def _r_story_pending(cid):
+    try:
+        it = resolve("story", cid)
+        return bool(it and it.get("photo_pending"))
+    except Exception:
+        return False
 
 
 def story_png(cid):
@@ -1141,12 +1292,12 @@ def story_png(cid):
             import threading
             threading.Thread(target=lambda: _story_refresh(cid), name="story-card", daemon=True).start()
         return hit[1]
-    return _story_build(cid)
+    return _story_build(cid, fetch=True)
 
 
 def _story_refresh(cid):
     try:
-        _story_build(cid)
+        _story_build(cid, fetch=True)
     except Exception:
         h = _SC.get(cid)
         if h:
@@ -1165,11 +1316,11 @@ def _pool():
     return _POOL
 
 
-def submit(cid):
+def submit(cid, fetch=False):
     """Start (or join) the build of a story's card on the bounded pool; returns a Future."""
     f = _INFLIGHT.get(cid)
-    if f is None or (f.done() and cid not in _SC):
-        f = _pool().submit(_story_build, cid)
+    if f is None or (f.done() and (cid not in _SC or (fetch and cid in _NEED))):
+        f = _pool().submit(_story_build, cid, fetch)
         _INFLIGHT[cid] = f
         f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
     return f
@@ -1191,13 +1342,13 @@ _WARM_CAP = 20   # at most this many card builds queued or running (timeline pre
 
 def warm(cid):
     """Build a story's card ahead of the first crawl (bounded pool, deduped, cap of 20 in flight/queued)."""
-    if cid in _SC:
+    if cid in _SC and cid not in _NEED:
         return
     live = sum(1 for f in _INFLIGHT.values() if f is not None and not f.done())
     if live >= _WARM_CAP:
         return
     try:
-        submit(cid)
+        submit(cid, fetch=True)
     except Exception:
         pass
 
