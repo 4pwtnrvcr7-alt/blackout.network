@@ -56,7 +56,7 @@ class Gate(unittest.TestCase):
         self._sr = SR.REPORTS; SR.REPORTS = os.environ["BN_STORY_REPORTS"]; SR._RC.update(mt=None, v={})
         import story_v3 as V3; V3._BR.update(mt=None, v={})
         SW.STATE["initial_done"] = False; SW.STATE["gate_on"] = False; SW.STATE["gate_booted"] = False
-        SW.STATE["held_alerts"] = 0; SW._NC["t"] = 0; SW._LEGACY_C.update(t=0, v=set()); SW._DEFER.clear()
+        SW.STATE["held_alerts"] = 0; SW._NC["t"] = 0; SW._LEGACY_C.update(t=0, v=set()); SW._NP_C.update(t=0, v=set()); SW._DEFER.clear()
         self._build_card = SW.build_card
         self._rule_tags = SW.rule_tags
         SW.build_card = lambda cid: True
@@ -199,6 +199,49 @@ class Gate(unittest.TestCase):
         SW.package_one("3333333333333333")
         got = SW.filter_rows(rows)
         self.assertEqual([r["cluster_id"] for r in got], ["3333333333333333"])
+
+
+    def test_new_rank5_held_until_paid_article(self):
+        mkdb([("aaaaaaaaaaaaaaaa", "Forest fire in Brazil (green alert)", 2)])
+        SW.boot_gate()
+        SW.STATE["gate_on"] = True; SW.STATE["gate_booted"] = True
+        # a new rank 5+ arrival is packaged (template) but stays off the Wire until the paid article exists
+        k = sqlite3.connect(os.environ["BN_WRITER_SOURCE_DB"])
+        t0 = iso(NOW)
+        k.execute("INSERT INTO clusters(cluster_id,title,category,location,first_seen,updated,score,n_items,n_families,families,links,watchlist,brief,rank,eff_families) "
+                  "VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?,?,2)",
+                  ("bbbbbbbbbbbbbbbb", "M6.8 earthquake struck the Banda Sea off Indonesia", "natural disaster", "Indonesia", t0, t0, 80, 2, 2, "[]", "[]", "WHAT: quake", 7))
+        k.execute("INSERT INTO alerts VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("bbbbbbbbbbbbbbbba", "USGS", "USGS", "M6.8 earthquake struck the Banda Sea off Indonesia", "natural disaster",
+                   "https://earthquake.usgs.gov/earthquakes/eventpage/us6000test", t0, 0, 0, "Indonesia", 0, 1, "", t0, t0, "bbbbbbbbbbbbbbbb"))
+        k.commit(); k.close()
+        self.assertTrue(SW.package_one("bbbbbbbbbbbbbbbb", build_card_now=False))
+        self.assertTrue(SW.has_writeup("bbbbbbbbbbbbbbbb"))
+        self.assertFalse(SW.has_paid_article("bbbbbbbbbbbbbbbb"))
+        self.assertFalse(SW.allow("bbbbbbbbbbbbbbbb"))
+        # after a paid brief is stored, it is listed
+        note = SW.note_for("bbbbbbbbbbbbbbbb")
+        note = dict(note); note["file"] = "story_writer"; note.setdefault("writer", {})["model"] = SW.cfg()["model"]
+        k = SW.db()
+        k.execute("UPDATE briefs SET note=?, model=? WHERE cid=?", (__import__("json").dumps(note), SW.cfg()["model"], "bbbbbbbbbbbbbbbb"))
+        k.commit(); k.close(); SW._NC["t"] = 0; SW._NP_C["t"] = 0
+        SW._clear_needs_paid("bbbbbbbbbbbbbbbb")
+        self.assertTrue(SW.has_paid_article("bbbbbbbbbbbbbbbb"))
+        self.assertTrue(SW.allow("bbbbbbbbbbbbbbbb"))
+
+    def test_rank_rise_keeps_template_visible(self):
+        mkdb([("cccccccccccccc11", "Forest fire in Ghana (green alert)", 2)])
+        SW.boot_gate()
+        SW.STATE["gate_on"] = True; SW.STATE["gate_booted"] = True
+        self.assertTrue(SW.allow("cccccccccccccc11") or SW.has_writeup("cccccccccccccc11"))
+        self.assertTrue(SW.allow("cccccccccccccc11"))
+        k = sqlite3.connect(os.environ["BN_WRITER_SOURCE_DB"])
+        k.execute("UPDATE clusters SET rank=7 WHERE cluster_id=?", ("cccccccccccccc11",))
+        k.commit(); k.close()
+        # still listed with the template; not held for the paid article
+        self.assertTrue(SW.has_writeup("cccccccccccccc11"))
+        self.assertFalse(SW.has_paid_article("cccccccccccccc11"))
+        self.assertTrue(SW.allow("cccccccccccccc11"))
 
 if __name__ == "__main__":
     unittest.main()
