@@ -609,7 +609,7 @@ def _card_headline(raw):
     """Headline for the share card: cleaned title, first sentence only (never two sentences squeezed in).
     _story_head may then cut at a word boundary to keep a readable font; no ellipsis is added."""
     t = _clean_head(raw)
-    m = re.search(r"^(.+?[.!?])\s+[A-Z“\"«]", t)
+    m = re.search(r"^(.+?(?<![A-Z])[.!?])\s+[@A-Z“\"«]", t)
     if m:
         t = m.group(1)
     return _strip_edges(t)
@@ -2097,20 +2097,44 @@ def _queue_card_work(cid):
 def ensure_current_card(cid):
     """Return the best stored card immediately. Always re-reads cards.db so an audit/downgrade
     is not hidden by a stale in-memory _SC (or a leftover #221 writer-db row we no longer serve).
-    Typography/VERSION or photo rebuilds are queued in the background. Never blocks the request path."""
+    Typography/VERSION or photo rebuilds are queued in the background. Never blocks the request path.
+    When photo cards are on and a licensed JPEG is already stored, a leftover map is re-rendered
+    into the v3 photo card now (no network) instead of being served."""
     stored = None
+    meta = None
     try:
         import story_photo
-        b = story_photo.get_card(cid)
-        if b:
-            _SC[cid] = (time.time(), b, False)
-            stored = b
+        meta = story_photo.card_meta(cid)
+        if meta and meta.get("png"):
+            stored = meta["png"]
+            _SC[cid] = (time.time(), stored, False)
     except Exception:
         stored = None
+        meta = None
     if stored is None:
         hit = _SC.get(cid)
         if hit and hit[1]:
             stored = hit[1]
+    try:
+        import story_photo
+        is_map = not (meta and (meta.get("src") or "").startswith("https://"))
+        if stored and is_map and card_photo_on() and story_photo.has_photo(cid):
+            b = render_story_fresh(cid)
+            if b and b.startswith(b"\x89PNG") and len(b) > 2000:
+                src = ((story_photo.db_choice(cid) or {}).get("src") or "")
+                if src.startswith("https://"):
+                    th = ""
+                    try:
+                        it = resolve("story", cid)
+                        th = story_photo.card_title_key((it or {}).get("title") or "")
+                    except Exception:
+                        th = ""
+                    story_photo.put_card(cid, b, src, title_hash=th)
+                    invalidate_card_layers(cid)
+                    _SC[cid] = (time.time(), b, False)
+                    stored = b
+    except Exception:
+        pass
     try:
         _queue_card_work(cid)
     except Exception:
@@ -2457,6 +2481,13 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
                         src = c.get("src") or ""
                 except Exception:
                     src = ""
+                if not src.startswith("https://"):
+                    try:
+                        d = SP.db_choice(cid) or {}
+                        if (d.get("src") or "").startswith("https://") and not d.get("none"):
+                            src = d.get("src") or ""
+                    except Exception:
+                        pass
                 if b and len(b) > _REBUILD_PNG_CAP:
                     print(f"share_card: photo-rebuild {cid} skip oversized png {len(b)}", flush=True)
                     b = None
