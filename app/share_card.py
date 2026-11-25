@@ -882,7 +882,7 @@ def _tx(d, xy, text, font, fill, tracking=0):
 
 def _chrome(im, it, credit=True):
     d = ImageDraw.Draw(im)
-    _tx(d, (64, 44), "blackout.network", og.inter(22, bold=True), (220, 223, 230), 3.2)
+    og.draw_wordmark(im, d, 64, 44, og.inter(22, bold=True), (220, 223, 230), tracking=3.2, mark=36, gap=10)
     col = it.get("color") or WHITE
     k = (it.get("kicker") or "").upper()
     if k:
@@ -1382,8 +1382,7 @@ def _lay_story(it):
     im.paste(Image.new("RGB", (W, 90), (5, 6, 10)), (0, 0), top)
     d = ImageDraw.Draw(im)
     wm = og.inter(20, bold=True)
-    _tx(d, (56, 34), "blackout.network", wm, (232, 234, 238), 2.6)
-    x = 56 + og._text_w(d, "blackout.network", wm, 2.6) + 22
+    x = og.draw_wordmark(im, d, 56, 34, wm, (232, 234, 238), tracking=2.6, mark=36, gap=10) + 22
     chips = [((it.get("kicker") or "THE WIRE").upper(), col)]
     ph = it.get("photo")
     if it.get("loc") and not (ph and ph.get("kind") == "person"):   # a person's portrait is not a picture of the story's place

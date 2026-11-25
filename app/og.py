@@ -2,7 +2,7 @@
 
 Every public page's og:image and twitter:image points at /og/<page>.png (stories at
 /og/wire/<id>.png). Images are rendered with Pillow from that page's own hero still,
-darkened, with the page title, a small plain-text "blackout.network" wordmark and
+darkened, with the page title, a small chrome B mark beside the "blackout.network" wordmark and
 the optional "Global threat monitoring" tagline. No yellow, no old dashboard tile,
 no image credits, no emoji. Rank is a small grey label, or red when the rank is 7+.
 
@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "24"  # bump to force social CDNs to refetch (Nov 25: v24 = serve v3 photo cards; no stale map cards; U.S. headlines)
+VERSION = "25"  # bump to force social CDNs to refetch (Nov 25: v25 = chrome B mark beside the wordmark on share cards)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -479,6 +479,29 @@ def _draw_tracked(draw, xy, text, font, fill, tracking=0):
     return x
 
 
+_MARK_PATH = BASE / "static" / "img" / "chrome-b.png"
+_MARK_IM = None
+
+def _brand_im():
+    """Cached chrome B mark (black square). Loaded once per process."""
+    global _MARK_IM
+    if _MARK_IM is None:
+        _MARK_IM = Image.open(_MARK_PATH).convert("RGB")
+    return _MARK_IM
+
+
+def draw_wordmark(im, d, x, y, font, fill, tracking=0, mark=36, gap=10, wordmark=WORDMARK):
+    """Small chrome B to the left of the wordmark. Returns x after the lockup."""
+    size = int(mark)
+    m = _brand_im().resize((size, size), Image.Resampling.LANCZOS)
+    th = int(getattr(font, "size", size) or size)
+    my = int(round(y + (th - size) / 2.0))
+    im.paste(m, (int(x), my))
+    tx = int(x) + size + int(gap)
+    _draw_tracked(d, (tx, y), wordmark, font, fill, tracking=tracking)
+    return tx + _text_w(d, wordmark, font, tracking)
+
+
 def render(title, bg_im=None, tagline=True, rank=None, wordmark=WORDMARK):
     """Return a 1200x630 RGB image. title is the large on-card line; rank is 0–10 or None."""
     title = _strip_emoji(title or TAGLINE)
@@ -488,11 +511,12 @@ def render(title, bg_im=None, tagline=True, rank=None, wordmark=WORDMARK):
     max_w = right - left
 
     wm_font = inter(22, bold=True)
-    _draw_tracked(d, (left, 56), wordmark, wm_font, WORD, tracking=3.2)
+    mark, gap = 36, 10
+    draw_wordmark(im, d, left, 56, wm_font, WORD, tracking=3.2, mark=mark, gap=gap, wordmark=wordmark)
 
     if tagline:
         tg_font = inter(13, bold=False)
-        _draw_tracked(d, (left, 92), TAGLINE.upper(), tg_font, TAG, tracking=3.8)
+        _draw_tracked(d, (left + mark + gap, 92), TAGLINE.upper(), tg_font, TAG, tracking=3.8)
 
     # Title: letterspaced Montserrat, white, up to 3 lines in the lower half
     size = 64
