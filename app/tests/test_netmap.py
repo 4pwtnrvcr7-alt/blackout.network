@@ -283,6 +283,27 @@ class NetSky(unittest.TestCase):
         self.assertIn("mapLayerIn(); if (D) summary()", js)
         self.assertIn("function mapOn(k)", js)
 
+    def test_map_cloud_visible_and_flat_mercator(self):
+        # Nov 24 6:52 PM ET: Cloud chip on but no markers after leaving Sky; map looked slanted (globe / residual pitch)
+        from pathlib import Path
+        js = (Path(__file__).resolve().parents[1] / "netmap_static" / "net.js").read_text()
+        self.assertIn('["glow", "pulse", "pt", "pt-lbl"].forEach', js)
+        self.assertIn('setLayoutProperty(l, "visibility", "visible")', js)
+        self.assertIn('projection: { type: "mercator" }', js)
+        self.assertIn("map.setPitch(0); map.setBearing(0)", js)
+        self.assertIn('try { map.setProjection({ type: "mercator" }); map.setPitch(0); map.setBearing(0); } catch (e) {}', js)
+        self.assertIn("pitch: 0, bearing: 0", js)
+        self.assertIn('["any", ["==", ["get", "hot"], true], ["==", ["get", "kind"], "cloud"]]', js)
+        self.assertIn("r: 6.5", js)
+        self.assertIn('layer: "cloud"', js)
+
+    def test_sky_chip_show_initialized_from_pressed(self):
+        from pathlib import Path
+        js = (Path(__file__).resolve().parents[1] / "netmap_static" / "net.js").read_text()
+        self.assertIn("SKY.show[g0] === undefined", js)
+        self.assertIn("if (SKY.show[g.id] === undefined)", js)
+        self.assertIn("if (SKY.show.ss === undefined)", js)
+
     def test_sky_true_scale_and_learn_panel(self):
         # pt1814u: true-altitude 3D layer, GEO zoom, learn panel with licensed images, no Sky chip status dot
         from pathlib import Path
