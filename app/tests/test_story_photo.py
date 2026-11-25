@@ -443,5 +443,87 @@ class StoryPhoto(unittest.TestCase):
                 S._FWORKER_PID = None
                 S._ensure_fworker()
 
+
+    def test_main_subject_huang_not_trump(self):
+        """'X wanted Huang back as CEO of Nvidia' is about Huang, not the first named person."""
+        title = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        self.assertEqual(P.main_subject(title), "Jensen Huang")
+        self.assertFalse(P.is_politician("Jensen Huang"))
+        self.assertTrue(P.is_politician("Donald Trump"))
+        # Even if the body mentions Trump more, the object-of-wanted role still wins.
+        body = "Donald Trump said he would decide later. " + ("Trump " * 4) + "Huang has led Nvidia since 1993."
+        self.assertEqual(P.main_subject(title, body), "Jensen Huang")
+
+    def test_main_subject_real_headlines(self):
+        self.assertEqual(
+            P.main_subject("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"),
+            "Volodymyr Zelensky",
+        )
+        self.assertEqual(
+            P.main_subject("Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz"),
+            "Scott Bessent",
+        )
+        self.assertEqual(
+            P.main_subject("Burnham launches inquiry into nuclear bomb test veterans’ records"),
+            "Andy Burnham",
+        )
+        self.assertEqual(
+            P.main_subject("Biden nominates Jane Smith as ambassador to France"),
+            "Jane Smith",
+        )
+        # Two principals, no clear role: a coin-flip photo would be likely wrong — use the map.
+        self.assertIsNone(P.main_subject("Trump and Zelensky meet in Paris after talks stall"))
+
+    def test_wrong_subject_photo_may_be_replaced(self):
+        """The one allowed exception to 'never replace a photo with a map': a wrong-subject photo."""
+        import os, tempfile
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        cid = "cbdfb48145e55048"
+        title = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        P.SUBJECT_HINTS[cid] = (title, "")
+        try:
+            P._dir = lambda: Path(d)
+            trump = b"\x89PNG\r\n\x1a\n" + b"T" * 4000
+            huang = b"\x89PNG\r\n\x1a\n" + b"H" * 4000
+            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            trump_src = "https://upload.wikimedia.org/wikipedia/commons/trump.jpg"
+            huang_src = "https://upload.wikimedia.org/wikipedia/commons/jensen_huang.jpg"
+            P.put_card(cid, trump, trump_src)
+            self.assertTrue(P.photo_is_wrong_subject(cid, trump_src, "Donald Trump, 2025"))
+            self.assertFalse(P.card_has_photo(cid), "a Trump photo must not count as a usable card for the Huang story")
+            # Correct photo may replace the wrong one.
+            P.put_card(cid, huang, huang_src)
+            self.assertEqual(P.get_card(cid), huang)
+            self.assertFalse(P.photo_is_wrong_subject(cid, huang_src, "Jensen Huang, 2025. File photo"))
+            # Reset to the wrong photo and allow a map to replace it.
+            P.put_card(cid, trump, trump_src)
+            P.put_card(cid, mapp, "map")
+            self.assertEqual(P.get_card(cid), mapp)
+        finally:
+            P.SUBJECT_HINTS.pop(cid, None)
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_correct_photo_still_not_replaced_by_map(self):
+        import os, tempfile
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        cid = "e2ca47e325c5b8e1"
+        title = "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz"
+        P.SUBJECT_HINTS[cid] = (title, "")
+        try:
+            P._dir = lambda: Path(d)
+            photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            src = "https://upload.wikimedia.org/wikipedia/commons/bessent.jpg"
+            P.put_card(cid, photo, src)
+            P.put_card(cid, mapp, "map")
+            self.assertEqual(P.get_card(cid), photo)
+        finally:
+            P.SUBJECT_HINTS.pop(cid, None)
+            os.environ.pop("BN_CARDS_DB", None)
+
 if __name__ == "__main__":
     unittest.main()

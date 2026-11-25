@@ -232,19 +232,22 @@ def card_stale(meta):
 
 
 def card_has_photo(cid):
-    """True when the stored PNG was built from a licensed photo (story_cards.src is a URL). No network."""
+    """True when the stored PNG was built from a licensed photo of this story's main subject.
+    A wrong-subject photo (Trump on the Huang story) does not count: the worker must look again."""
     if not cid:
         return False
     try:
-        r = _read(lambda k: k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone())
-        return bool(r and (r[0] or "").startswith("https://"))
+        r = _read(lambda k: k.execute("SELECT src, png FROM story_cards WHERE cid=?", (cid,)).fetchone())
+        if not (r and (r[0] or "").startswith("https://")):
+            return False
+        return not photo_is_wrong_subject(cid, r[0], "")
     except Exception:
         return False
 
 
 def put_card(cid, png, src=""):
-    """Store a built card. A stored photo card always beats a map: never replace a photo PNG with a map PNG
-    (live Zelensky photo was lost when a fetch=True rebuild without a photo overwrote it)."""
+    """Store a built card. A stored photo card always beats a map, with one exception:
+    a wrong-subject photo (Trump on the Huang story) may be replaced by a correct photo or a map."""
     if not cid or not png or not png.startswith(b"\x89PNG"):
         return
     blob = sqlite3.Binary(png)
@@ -254,12 +257,15 @@ def put_card(cid, png, src=""):
         old = k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone()
         old_src = (old[0] if old else "") or ""
         if old_src.startswith("https://") and not src.startswith("https://"):
-            return
-        # Also refuse a map when this story already has a licensed JPEG in story_photos.
-        if not src.startswith("https://"):
-            ph = k.execute("SELECT src, none, jpg FROM story_photos WHERE cid=?", (cid,)).fetchone()
-            if ph and not ph[1] and (ph[0] or "").startswith("https://") and ph[2]:
+            if not photo_is_wrong_subject(cid, old_src, ""):
                 return
+        # Also refuse a map when this story already has a licensed JPEG, unless that JPEG is the wrong subject.
+        if not src.startswith("https://"):
+            ph = k.execute("SELECT src, none, jpg, credit, caption, label FROM story_photos WHERE cid=?", (cid,)).fetchone()
+            if ph and not ph[1] and (ph[0] or "").startswith("https://") and ph[2]:
+                blob_meta = " ".join(x or "" for x in (ph[3], ph[4], ph[5]))
+                if not photo_is_wrong_subject(cid, ph[0], blob_meta):
+                    return
         ver = "11"
         try:
             import og
@@ -275,9 +281,11 @@ def put_card(cid, png, src=""):
 
 
 def has_photo(cid):
-    """True when a licensed photo and its JPEG bytes are on hand (DB or disk). No network."""
+    """True when a licensed photo of this story's main subject and its JPEG bytes are on hand. No network."""
     c = db_choice(cid)
     if not c or c.get("none") or not c.get("src") or not license_ok(c.get("license") or ""):
+        return False
+    if photo_is_wrong_subject(cid, c.get("src") or "", " ".join((c.get("credit") or "", c.get("caption") or "", c.get("label") or "", c.get("alt") or ""))):
         return False
     if cached(c["src"]):
         return True
@@ -389,11 +397,23 @@ def stored_choice(cid):
 
 
 def pick(cid, title="", loc="", text=""):
-    """Best licensed candidate from data already on the box (no network); falls back to a stored Commons lookup."""
+    """Best licensed candidate from data already on the box (no network); falls back to a stored Commons lookup.
+    A person photo is used only when it is this story's main subject; if that is ambiguous, return None (the card uses a map)."""
+    def _ok(c):
+        if not c or not c.get("src") or not license_ok(c.get("license") or ""):
+            return None
+        if (c.get("kind") or "") == "place":
+            return c
+        if photo_is_wrong_subject(cid, c.get("src") or "", _photo_blob(c), title, text):
+            return None
+        # An ambiguous person story must not keep a leftover person photo.
+        if (c.get("kind") or "person") == "person" and main_subject(title, text) is None and _named_people(cid, title, text):
+            return None
+        return c
     try:
         import story_report as SR
         for im in ((SR.reports() or {}).get("images") or {}).get(cid) or []:
-            c = _cand(im)
+            c = _ok(_cand(im))
             if c:
                 c["label"] = ""
                 return c
@@ -402,17 +422,17 @@ def pick(cid, title="", loc="", text=""):
     try:
         import people as PP
         v = PP.lead_for(cid, title, loc, text)
-        c = _cand(v) if v else None
+        c = _ok(_cand(v) if v else None)
         if c:
             c["label"] = c["caption"] if "file photo" in c["caption"].lower() else (c["caption"] + " File photo; not taken at this event.").strip()
             return c
     except Exception:
         pass
-    s = stored_choice(cid)
-    if s and s.get("src") and license_ok(s.get("license")):
+    s = _ok(stored_choice(cid))
+    if s:
         return s
-    s = db_choice(cid)
-    if s and s.get("src") and license_ok(s.get("license")):
+    s = _ok(db_choice(cid))
+    if s:
         return s
     return None
 
@@ -503,6 +523,9 @@ _ALIASES = {
     "zelenskyy": "Volodymyr Zelensky",
     "zelenskiy": "Volodymyr Zelensky",
     "hegseth": "Pete Hegseth",
+    "huang": "Jensen Huang",
+    "trump": "Donald Trump",
+    "biden": "Joe Biden",
 }
 
 _STOP = set("the a an of in on at to for and or with by from as near after into its new says said "
@@ -510,6 +533,173 @@ _STOP = set("the a an of in on at to for and or with by from as near after into 
             "second time five days secretary war yet approved wanted back ceo director official "
             "update updates live report reports more than us united states iran tehran sanctions "
             "tankers strait hormuz nuclear bomb test veterans records aerial attack".split())
+
+# Tests (and a caller that already has the title) can set SUBJECT_HINTS[cid] = (title, text).
+SUBJECT_HINTS = {}
+
+_OBJECT_VERBS = re.compile(
+    r"\b(wanted|wants|want|asked|asks|nominated|nominates|tapped|named|appointed|appoints|"
+    r"picked|picks|chose|chooses|urged|urges|invited|invites)\b", re.I)
+_SPEAKER_VERBS = re.compile(
+    r"\b(says|said|announces|announced|launches|launched|unleashes|unleashed|"
+    r"warns|warned|declares|declared|tells|told|claims|claimed)\b", re.I)
+
+# Last names of people who usually appear as political principals. Short/common surnames are omitted.
+_POLITICIAN_LAST = {
+    "trump", "biden", "harris", "obama", "clinton", "putin", "zelensky", "zelenskyy", "zelenskiy",
+    "hegseth", "netanyahu", "starmer", "macron", "scholz", "sanders", "pelosi", "mcconnell",
+    "orban", "erdogan", "modi", "lavrov", "blinken", "rubio", "vance", "newsom", "trudeau",
+    "meloni", "sunak", "merkel", "hollande", "sarkozy", "khamenei", "raisi", "xi",
+}
+
+
+def _story_text(cid, title="", text=""):
+    """Title and write-up body for subject scoring. SUBJECT_HINTS wins (tests); else the args, else the story row."""
+    if cid and cid in SUBJECT_HINTS:
+        return SUBJECT_HINTS[cid]
+    if title or text:
+        return title or "", text or ""
+    if not cid:
+        return "", ""
+    try:
+        import story
+        r, _al = story.load(cid)
+        if r:
+            return r.get("title") or "", (r.get("brief") or "") + " " + (r.get("writeup") or r.get("body") or "")
+    except Exception:
+        pass
+    return "", ""
+
+
+def is_politician(name):
+    """True when this name is a political principal (last-name list, or a people-profile office)."""
+    if not name:
+        return False
+    last = name.split()[-1].lower()
+    if last in _POLITICIAN_LAST:
+        return True
+    try:
+        import people as PP
+        for p in (PP.block().get("profiles") or {}).values():
+            if (p.get("name") or "").lower() != name.lower():
+                continue
+            blob = " ".join(str(p.get(k) or "") for k in ("office", "role", "occupation", "title", "kind", "category")).lower()
+            if re.search(r"\b(president|senator|congress|minister|secretary of|prime minister|chancellor|governor|politician)\b", blob):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def main_subject(title, text=""):
+    """The person the headline is about, or None if that is ambiguous (the card should then use a map).
+
+    The topical subject is often the object ('X wanted Huang back as CEO of Nvidia' → Huang), not the first
+    name in the headline. Candidates are scored by mentions in the write-up body, with a small tiebreak
+    for non-politicians and a strong bump from the headline's speaker/object role.
+    """
+    title = title or ""
+    text = text or ""
+    cands = _named_people("", title, text)
+    # Dedup last-name aliases against a fuller name already in the list.
+    slim, seen_last = [], {}
+    for n in cands:
+        last = n.split()[-1].lower()
+        if last in seen_last and len(n.split()) < len(seen_last[last].split()):
+            continue
+        if last in seen_last and len(n.split()) > len(seen_last[last].split()):
+            slim = [x for x in slim if x.split()[-1].lower() != last]
+        slim.append(n)
+        seen_last[last] = n
+    cands = slim
+    if not cands:
+        return None
+    if len(cands) == 1:
+        return cands[0]
+
+    def _pos(name, blob):
+        m = re.search(r"\b" + re.escape(name) + r"\b", blob, re.I)
+        if m:
+            return m.start()
+        last = name.split()[-1]
+        if len(last) > 3:
+            m = re.search(r"\b" + re.escape(last) + r"\b", blob, re.I)
+            if m:
+                return m.start()
+        return None
+
+    role = {n: 0.0 for n in cands}
+    obj = _OBJECT_VERBS.search(title)
+    spk = _SPEAKER_VERBS.search(title)
+    verb = obj or (spk if not obj else None)
+    if verb:
+        vpos = verb.start()
+        for n in cands:
+            p = _pos(n, title)
+            if p is None:
+                continue
+            after = p >= vpos
+            if obj:
+                role[n] += 5.0 if after else 1.0
+            else:
+                role[n] += 5.0 if not after else 1.0
+
+    blob = (title + " " + text).lower()
+    mention = {}
+    for n in cands:
+        full = n.lower()
+        last = n.split()[-1].lower()
+        nfull = len(re.findall(r"\b" + re.escape(full) + r"\b", blob))
+        nlast = len(re.findall(r"\b" + re.escape(last) + r"\b", blob)) if len(last) > 3 else 0
+        mention[n] = nfull + 0.5 * max(0, nlast - nfull)
+
+    scores = {}
+    for n in cands:
+        scores[n] = role[n] + mention[n]
+        if not is_politician(n):
+            scores[n] += 0.25  # tiebreak only
+
+    ranked = sorted(cands, key=lambda n: (-scores[n], n))
+    top, second = ranked[0], ranked[1]
+    gap = scores[top] - scores[second]
+    role_clear = role[top] >= 5.0 and role[top] > role[second] + 2.0
+    if gap < 1.0 and not role_clear:
+        return None
+    return top
+
+
+def _photo_blob(c):
+    if not c:
+        return ""
+    return " ".join(str(c.get(k) or "") for k in ("alt", "caption", "label", "credit", "src", "person"))
+
+
+def _name_in_blob(name, blob):
+    if not name or not blob:
+        return False
+    b = blob.lower()
+    last = name.split()[-1].lower()
+    if len(last) > 2 and re.search(r"\b" + re.escape(last) + r"\b", b):
+        return True
+    # Commons file URLs often use underscores: Jensen_Huang
+    if len(last) > 2 and last in b.replace("_", " "):
+        return True
+    return False
+
+
+def photo_is_wrong_subject(cid, src, meta_blob="", title="", text=""):
+    """True when this person photo is not the story's main subject (or the subject is too ambiguous to pick a person)."""
+    title, text = _story_text(cid, title, text)
+    people = _named_people(cid, title, text)
+    if not people:
+        return False  # no person in the headline: a place/event photo is fine
+    subj = main_subject(title, text)
+    blob = " ".join((src or "", meta_blob or ""))
+    if not subj:
+        # Ambiguous: any stored person photo is likely wrong.
+        return True
+    return not _name_in_blob(subj, blob)
+
 
 def _named_people(cid, title, text):
     """Names of people this story is about: profiles first (last name in the title is enough), then First Last in the headline."""
@@ -667,7 +857,14 @@ def prefetch(cid, title="", loc="", text=""):
             err = "stored pick was not downloadable"
             c = None
         if not c:
-            for nm in _named_people(cid, title, text)[:2]:
+            names = []
+            subj = main_subject(title, text)
+            if subj:
+                names = [subj]
+            elif not _named_people(cid, title, text):
+                names = []
+            # Ambiguous (two+ people, no clear subject): do not guess a portrait; fall through to a place photo or a map.
+            for nm in names:
                 try:
                     c = _commons_portrait(nm)
                 except Exception as e:
