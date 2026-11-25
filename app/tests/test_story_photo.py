@@ -378,6 +378,14 @@ class StoryPhoto(unittest.TestCase):
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 
+    def test_topic_and_place_photos_are_never_wrong_subject_even_when_the_headline_names_a_bigram(self):
+        t = "BREAKING: Hackers breach 1Password's backend systems after compromising an employee's GitHub account"
+        src = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/BalticServers_data_center.jpg/1600px-BalticServers_data_center.jpg"
+        self.assertFalse(P.photo_is_wrong_subject("3333333333333333", src, "Server racks", t, "", kind="topic"))
+        self.assertFalse(P.photo_is_wrong_subject("3333333333333333", src, "Iceland", "Scott Bessent and Jerome Powell meet", "", kind="place"))
+        # a person photo on an ambiguous two-person headline is still wrong
+        self.assertTrue(P.photo_is_wrong_subject("3333333333333333", "https://x/Scott_Bessent.jpg", "", "Scott Bessent and Jerome Powell meet", "", kind="person"))
+
     def test_urgent_lookups_jump_backfill(self):
         # Record the worker's pull order: a later urgent cid must run before a queued backfill cid.
         import time

@@ -585,7 +585,7 @@ def pick(cid, title="", loc="", text=""):
             ft0 = commons_file_title(src=c.get("src") or "", link=c.get("link") or "", title=c.get("title") or "")
             if not (place_photo_ok(title, text) or _v3_photo_allows(title, ft0, src=c.get("src") or "", kind="place", label=lab, text=text)[0]):
                 return None
-        if photo_is_wrong_subject(cid, c.get("src") or "", _photo_blob(c), title, text):
+        if photo_is_wrong_subject(cid, c.get("src") or "", _photo_blob(c), title, text, kind=c.get("kind") or ""):
             return None
         # An ambiguous person story must not keep a leftover person photo.
         if (c.get("kind") or "person") == "person" and main_subject(title, text) is None and _named_people(cid, title, text):
@@ -935,8 +935,15 @@ def _name_in_blob(name, blob):
     return False
 
 
-def photo_is_wrong_subject(cid, src, meta_blob="", title="", text=""):
-    """True when this person photo is not the story's main subject (or the subject is too ambiguous to pick a person)."""
+def photo_is_wrong_subject(cid, src, meta_blob="", title="", text="", kind=""):
+    """True when this person photo is not the story's main subject (or the subject is too ambiguous to pick a person).
+    A topic or place photo (curated agency file, Wikidata image of the story's place) is not a person photo: never wrong-subject."""
+    try:
+        k = (kind or (db_choice(cid) or {}).get("kind") or "").strip().lower()
+    except Exception:
+        k = (kind or "").strip().lower()
+    if k in ("topic", "place"):
+        return False
     title, text = _story_text(cid, title, text)
     people = _named_people(cid, title, text)
     if not people:
