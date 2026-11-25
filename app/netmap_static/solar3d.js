@@ -535,7 +535,7 @@
   function info(o) {
     if (!o) { S.info.hidden = true; return; }
     if (w.BNPlanets && w.BNPlanets.info && w.BNPlanets.info(o, S.info)) return;
-    var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + '<button type="button" class="s3-tog" aria-expanded="' + (S.infoOpen ? "true" : "false") + '">' + (S.infoOpen ? "Collapse" : "Expand") + "</button></h3><div class=\"s3-body\">", c = o.d;
+    var h = "<h3>" + esc(o.id === "roadster" ? "Tesla Roadster / Starman" : o.name) + (o.kind === "craft" ? '<span class="s3-tag">illustrative model</span>' : "") + '<button type="button" class="s3-tog" aria-expanded="' + (S.infoOpen ? "true" : "false") + '">' + (S.infoOpen ? "Collapse" : "Expand") + "</button>" + (w.BNShare ? w.BNShare.skyHtml(o, hookApi()) : "") + "</h3><div class=\"s3-body\">", c = o.d;
     var earth = OBJ.earth && OBJ.earth.d;
     if (o.kind === "sun") h += "<p>" + esc(o.info) + "</p>" + (earth ? "<p>From Earth: " + fmtAU(Math.hypot.apply(null, earth.pos)) + "</p>" : "");
     else if (o.kind === "planet") {
