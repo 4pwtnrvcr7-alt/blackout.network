@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "23"  # bump to force social CDNs to refetch (Nov 25: v23 = licensed person/place/topic photo cards)
+VERSION = "24"  # bump to force social CDNs to refetch (Nov 25: v24 = serve v3 photo cards; no stale map cards; U.S. headlines)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
