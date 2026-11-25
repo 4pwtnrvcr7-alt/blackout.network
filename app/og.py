@@ -690,6 +690,7 @@ def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og
         except Exception:
             pass
     img = image or image_url(key or "home", story_id=story_id, title=title, rank=rank)
+    img_h = 675 if (story_id or "/og/share/" in (image or "")) else 630   # story and share cards are 1200x675
     t = title if title else BRAND
     d = desc or TAGLINE
     return (
@@ -700,7 +701,7 @@ def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og
         f'<meta property="og:url" content="{E(url)}">'
         f'<meta property="og:image" content="{E(img)}">'
         f'<meta property="og:image:width" content="1200">'
-        f'<meta property="og:image:height" content="{675 if story_id else 630}">'
+        f'<meta property="og:image:height" content="{img_h}">'
         f'<meta property="og:image:alt" content="{E(t)}">'
         f'<meta name="twitter:card" content="summary_large_image">'
         f'<meta name="twitter:image" content="{E(img)}">'
