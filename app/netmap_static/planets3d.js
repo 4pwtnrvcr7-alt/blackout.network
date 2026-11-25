@@ -687,6 +687,10 @@
       var p = PINS.filter(function (x) { return x.o === o && x.rec.id === id; })[0];
       if (p) openSite(p.o, p.rec, p.kind);
     },
+    clearSite: function () {
+      SITE = null; SITE_O = null;
+      PINS.forEach(function (p) { if (p.lab) { p.lab.classList.remove("sel"); p.lab.style.display = "none"; } });
+    },
     _state: function () {
       var au = [];
       ["earth", "jupiter", "saturn"].forEach(function (id) {

@@ -530,7 +530,7 @@
     var h = "";
     LIST.forEach(function (o) { h += '<button type="button" data-id="' + esc(o.id) + '">' + esc(o.id === "roadster" ? "Starman" : o.name) + "</button>"; });
     S.objs.innerHTML = h;
-    S.objs.querySelectorAll("button").forEach(function (b) { b.addEventListener("click", function () { focus(b.dataset.id); }); });
+    S.objs.querySelectorAll("button").forEach(function (b) { b.addEventListener("click", function () { if (SEL && SEL.id === b.dataset.id) deselect(); else focus(b.dataset.id); }); });
   }
   function info(o) {
     if (!o) { S.info.hidden = true; return; }
@@ -555,6 +555,22 @@
     S.info.innerHTML = h + "</div>"; S.info.hidden = false; S.info.classList.toggle("open", !!S.infoOpen);
     var tg = S.info.querySelector(".s3-tog"); if (tg) tg.addEventListener("click", function () { S.infoOpen = !S.infoOpen; S.info.classList.toggle("open", S.infoOpen); tg.textContent = S.infoOpen ? "Collapse" : "Expand"; tg.setAttribute("aria-expanded", S.infoOpen ? "true" : "false"); });
   }
+  function syncFreeBtn() {
+    var b = S.el && S.el.querySelector("#s3_free");
+    if (!b) return;
+    var site = w.BNPlanets && w.BNPlanets._state && w.BNPlanets._state().site;
+    b.hidden = !(SEL || site);
+  }
+  function deselect() {
+    FLY = null; SEL = null; S._trk = null; tracks(null);
+    LIST.forEach(function (x) { if (x.lab) x.lab.classList.remove("sel"); });
+    if (S.objs) S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+    if (w.BNPlanets && w.BNPlanets.clearSite) w.BNPlanets.clearSite();
+    info(null);
+    if (S.info) { S.info.hidden = true; S.info.classList.remove("open"); }
+    syncFreeBtn();
+    unlockCam();
+  }
   function focus(id, vdir, vmul) {
     var o = OBJ[id]; if (!o) return; SEL = o;
     LIST.forEach(function (x) { if (x.lab) x.lab.classList.toggle("sel", x === o); });
@@ -570,12 +586,13 @@
     FLY = { t0: performance.now(), dur: 1300, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: tgt, toP: tgt.clone().add(dir.multiplyScalar(dist)) };
     unlockCam();
     info(o);
+    syncFreeBtn();
   }
   function tracks(sel) {   /* fade every trajectory, highlight the selected one */
     LIST.forEach(function (x) { (x.node.userData.lines || []).forEach(function (l) { l.material.opacity = !sel ? l.userData.base : x === sel ? Math.min(1, l.userData.base * 3.2) : 0.06; }); });
     (S.rings || []).forEach(function (r) { r.material.opacity = sel ? 0.18 : 0.35; });
   }
-  function overview() { SEL = null; S._trk = null; tracks(null); if (S.objs) S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", "false"); }); var far = compressed ? 110 : 160; FLY = { t0: performance.now(), dur: 1000, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: new T.Vector3(), toP: new T.Vector3(0, far * 0.75, far) }; info(null); }
+  function overview() { SEL = null; S._trk = null; tracks(null); if (S.objs) S.objs.querySelectorAll("button").forEach(function (b) { b.setAttribute("aria-pressed", "false"); }); if (w.BNPlanets && w.BNPlanets.clearSite) w.BNPlanets.clearSite(); var far = compressed ? 110 : 160; FLY = { t0: performance.now(), dur: 1000, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: new T.Vector3(), toP: new T.Vector3(0, far * 0.75, far) }; info(null); syncFreeBtn(); }
   var tmp = new T.Vector3();
   function frame(now) {
     raf = w.requestAnimationFrame(frame); if (d.hidden) return;
@@ -617,7 +634,7 @@
   function init() {
     css();
     var el = S.el = d.createElement("div"); el.className = "s3"; el.id = "bn_s3"; el.setAttribute("role", "region"); el.setAttribute("aria-label", "Solar system explorer. Drag to rotate, pinch or scroll to zoom.");
-    el.innerHTML = '<div class="s3-top"><button type="button" id="s3_back">Back to Earth</button><button type="button" id="s3_all">Overview</button><button type="button" id="s3_sun">Sun</button><span class="s3-sp"></span><button type="button" id="s3_scale" aria-pressed="false" title="Compressed or true-scale distances">True scale</button></div>' +
+    el.innerHTML = '<div class="s3-top"><button type="button" id="s3_back">Back to Earth</button><button type="button" id="s3_all">Overview</button><button type="button" id="s3_sun">Sun</button><button type="button" id="s3_free" hidden>Deselect</button><span class="s3-sp"></span><button type="button" id="s3_scale" aria-pressed="false" title="Compressed or true-scale distances">True scale</button></div>' +
       '<div class="s3-objs" id="s3_objs" aria-label="Objects"></div><div class="s3-labs" id="s3_labs"></div><div class="s3-info" id="s3_info" hidden aria-live="polite"></div><p class="s3-msg" id="s3_msg">Loading positions from NASA/JPL Horizons…</p>';
     d.body.appendChild(el);
     S.objs = el.querySelector("#s3_objs"); S.labs = el.querySelector("#s3_labs"); S.info = el.querySelector("#s3_info"); S.msg = el.querySelector("#s3_msg");
@@ -638,6 +655,7 @@
         else gest = 1;
       });
       function endPtr(e) {
+        S._tapLab = 0;
         if (nptr > 0) nptr--;
         if (gest) { if (nptr === 0) gest = 0; return; }
         if (e.pointerId !== pid) return;
@@ -650,7 +668,10 @@
           d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
           if (d < bestD) { bestD = d; best = labs[i]; }
         }
-        if (best && best.dataset.id && !(SEL && SEL.id === best.dataset.id)) focus(best.dataset.id);
+        if (best && best.dataset.id) {
+          if (SEL && SEL.id === best.dataset.id) deselect(); else focus(best.dataset.id);
+          S._tapLab = 1;
+        }
       }
       S.r.domElement.addEventListener("pointerup", endPtr);
       S.r.domElement.addEventListener("pointercancel", endPtr);
@@ -679,15 +700,20 @@
     S.r.domElement.addEventListener("wheel", function () { FLY = null; }, { passive: true });
     el.querySelector("#s3_back").addEventListener("click", close);
     el.querySelector("#s3_all").addEventListener("click", overview);
-    el.querySelector("#s3_sun").addEventListener("click", function () { focus("sun"); });
+    el.querySelector("#s3_sun").addEventListener("click", function () { if (SEL && SEL.id === "sun") deselect(); else focus("sun"); });
+    el.querySelector("#s3_free").addEventListener("click", function (e) { e.stopPropagation(); deselect(); });
     el.querySelector("#s3_scale").addEventListener("click", function () { compressed = !compressed; this.setAttribute("aria-pressed", compressed ? "false" : "true"); var id = SEL && SEL.id; if (DATA) build(); if (id) focus(id); else overview(); });
     var ray = new T.Raycaster(), dn = null;
     S.r.domElement.addEventListener("pointerdown", function (e) { dn = [e.clientX, e.clientY]; });
     S.r.domElement.addEventListener("pointerup", function (e) {
       if (!dn || Math.hypot(e.clientX - dn[0], e.clientY - dn[1]) > 8) return;
+      if (S._tapLab) return;
       var rc = S.r.domElement.getBoundingClientRect(); ray.setFromCamera(new T.Vector2((e.clientX - rc.left) / rc.width * 2 - 1, -(e.clientY - rc.top) / rc.height * 2 + 1), S.cam);
       var hit = ray.intersectObjects(S.root.children, true).filter(function (h) { return h.object.type === "Mesh"; })[0];
-      if (!hit) return; var n = hit.object; while (n && n.parent !== S.root) n = n.parent; var o = LIST.filter(function (x) { return x.node === n; })[0]; if (o && o !== SEL) focus(o.id);
+      var o = null;
+      if (hit) { var n = hit.object; while (n && n.parent !== S.root) n = n.parent; o = LIST.filter(function (x) { return x.node === n; })[0]; }
+      if (o && o !== SEL) focus(o.id);
+      else if (SEL || (w.BNPlanets && w.BNPlanets._state && w.BNPlanets._state().site)) deselect();
     });
     w.addEventListener("resize", function () { if (S.el && !S.el.hidden) resize(); });
     w.addEventListener("bn-units", function () { if (SEL) info(SEL); });
@@ -704,7 +730,7 @@
     if (!S.el) return; S.el.hidden = true; d.documentElement.style.overflow = ""; if (raf) { w.cancelAnimationFrame(raf); raf = 0; }
     try { d.dispatchEvent(new CustomEvent("bn:solar-close")); } catch (e) {}
   }
-  w.BNSolar = { open: open, close: close, focus: function (id, vdir, vmul) { focus(id, vdir, vmul); }, _state: function () {
+  w.BNSolar = { open: open, close: close, focus: function (id, vdir, vmul) { focus(id, vdir, vmul); }, deselect: deselect, _state: function () {
       var ctl = S.ctl, cam = S.cam, dist = (cam && ctl) ? cam.position.distanceTo(ctl.target) : 0;
       return { data: !!DATA, objects: LIST.map(function (o) { return o.id; }), sel: SEL && SEL.id, open: !!(S.el && !S.el.hidden),
         cam: cam && cam.position.toArray(), tgt: ctl && ctl.target.toArray(), dist: dist,
