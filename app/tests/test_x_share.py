@@ -1,5 +1,5 @@
 """Share-to-X hashtag generator. Run: cd app && python3 -m unittest tests.test_x_share -v"""
-import os, sys, unittest
+import os, re, sys, unittest
 from urllib.parse import parse_qs, urlparse, unquote
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -384,6 +384,14 @@ class EntityFirst(unittest.TestCase):
             tags = X.hashtags(it)
             self.assertLessEqual(len(set(tags) & GENERICS), 1, (key, tags))
             self.assertLessEqual(len(set(tags) & X.SECTORS), 1, (key, tags))
+
+    def test_headline_hashtags_stripped_and_agency_from_title_only(self):
+        it = _mk("#Iran #Lebanon Iran's Islamic Revolutionary Guard Corps has evacuated its command", location="Lebanon", category="war/conflict", rank=2)
+        txt = X.share_text(it)
+        self.assertNotIn("#Iran #Lebanon Iran", txt)
+        self.assertLessEqual(len(set(re.findall(r"#\w+", txt))), 5)
+        g = _mk("GEOFON: M5.4 earthquake Near Coast of Chiapas, Mexico", brief="USGS lists a similar event", category="natural disaster", rank=3)
+        self.assertNotIn("#USGS", X.hashtags(g))
 
     def test_llm_validation_rejects_invented_names(self):
         import x_tags_llm as L

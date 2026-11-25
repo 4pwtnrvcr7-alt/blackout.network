@@ -979,7 +979,7 @@ def entity_tags(item, headline=None):
     if tk:
         add(tk, "#" + tk.upper())
     # agencies / organizations (all-caps dictionary)
-    for m in _AGENCY_RX.finditer(blob):
+    for m in _AGENCY_RX.finditer(title):   # title only: a brief that name-drops USGS must not tag a GEOFON story #USGS
         add(m.group(1))
         if len(out) >= 6:
             break
@@ -1131,6 +1131,8 @@ def _headline(item, headline=None):
         except Exception:
             h = raw
     h = _norm(h or item.get("title") or "")
+    h = re.sub(r"(?:^|\s)#\w+", " ", h)   # scanner titles can carry their own hashtags; the generator owns the tags
+    h = re.sub(r"\s{2,}", " ", h).strip()
     # drop leading emoji / decorative symbols so the composer starts on words
     h = re.sub(r"^[\W_\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D\-—–]+", "", h, flags=re.U).strip()
     return h
