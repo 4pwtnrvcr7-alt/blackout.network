@@ -104,8 +104,8 @@ class OgImages(unittest.TestCase):
         self.assertEqual(_red_count(lo), 0)
         self.assertGreater(_red_count(hi), 0)
 
-    def test_chrome_b_mark_sits_left_of_the_wordmark(self):
-        """Share cards place the chrome B mark to the left of blackout.network (Matt, Nov 25)."""
+    def test_white_b_mark_sits_left_of_the_wordmark(self):
+        """Share cards place the white B mark to the left of blackout.network (Matt, Nov 25)."""
         im = og.render("A share-card headline for the lockup test", tagline=True)
         self.assertEqual(im.size, (1200, 630))
         left, y, mark, gap = 72, 56, 36, 10
@@ -113,11 +113,11 @@ class OgImages(unittest.TestCase):
         end = og.draw_wordmark(im.copy(), __import__("PIL").ImageDraw.Draw(im.copy()),
                                left, y, font, og.WORD, tracking=3.2, mark=mark, gap=gap)
         self.assertGreater(end, left + mark + gap + 80)
-        # The mark box is not a flat black square: chrome highlights are bright.
+        # The mark box is not a flat black square: the white serif B is bright.
         box = im.crop((left, 49, left + mark, 49 + mark))
         px = list(box.getdata())
         bright = sum(1 for r, g, b in px if max(r, g, b) > 80)
-        self.assertGreater(bright, 40, "chrome B mark should be visible in the top-left lockup")
+        self.assertGreater(bright, 40, "white B mark should be visible in the top-left lockup")
         # Wordmark text starts to the right of the mark (light pixels in the text band).
         text = im.crop((left + mark + gap, 54, left + mark + gap + 180, 82))
         tbright = sum(1 for r, g, b in text.getdata() if max(r, g, b) > 160)
