@@ -460,20 +460,70 @@ def _named_people(cid, title, text):
     return out
 
 
+# Curly and straight quotes. Possessives like "Riyadh's" / "Riyadh’s" do not match (next char is lowercase).
+_QCHARS = "\"“”„«»'‘’‛′″"
+_PLACE_EXPAND = {
+    "pif tower": "Public Investment Fund Tower",
+}
+
+
+def landmark_in(title):
+    """Quoted or aliased landmark in a headline (for queue priority). No network."""
+    return bool(_landmark_terms(title))
+
+
+def _landmark_terms(title):
+    """Search terms for a named landmark in the headline. Unquoted: a quoted Commons search for
+    'PIF Tower' only returned CC BY-SA files and missed the CC BY 4.0 'Public Investment Fund Tower' photo."""
+    title = title or ""
+    terms = []
+    m = re.search(r"[\"“”„«»'‘’‛′″]([A-Z0-9][^\"“”„«»'‘’‛′″]{1,60})[\"“”„«»'‘’‛′″]", title)
+    if m:
+        land = m.group(1).strip()
+        if land:
+            terms.append(land)
+            exp = _PLACE_EXPAND.get(land.lower())
+            if exp and exp.lower() != land.lower():
+                terms.append(exp)
+    else:
+        low = title.lower()
+        for short, exp in _PLACE_EXPAND.items():
+            if short in low or exp.lower() in low:
+                terms.append(exp)
+                if short.title() not in terms:
+                    terms.append(short.title())
+    # unique, keep order
+    out, seen = [], set()
+    for x in terms:
+        k = x.lower()
+        if k not in seen:
+            seen.add(k); out.append(x)
+    return out
+
+
 def _commons_place(loc, title, timeout=7):
     """Licensed photo of a named landmark (quoted in the headline) or the story's location. Never a logo or map."""
     loc = " ".join((loc or "").split())
-    m = re.search(r"[\"“”']([A-Z0-9][^\"“”']{1,60})[\"“”']", title or "")
-    # Possessives like "Riyadh's" must not count; the capture has to start with a capital.
-    q = (m.group(1).strip() + (" " + loc if loc else "")).strip() if m else loc
+    terms = _landmark_terms(title)
+    landmark = terms[0] if terms else ""
+    q = (landmark + (" " + loc if loc and not landmark else "")).strip() if landmark else loc
     if not q or len(q) < 3:
         return None
-    term = f'"{m.group(1).strip()}"' if m else q
-    qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
-                                 "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
-    raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + qs, "application/json", timeout=timeout)
-    pages = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
-    landmark = (m.group(1).strip() if m else "")
+    pages = {}
+    # Unquoted terms: quoted "PIF Tower" missed the licensed Public Investment Fund Tower file (CC BY 4.0).
+    for term in (terms or [q]):
+        qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
+                                     "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
+        try:
+            raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + qs, "application/json", timeout=timeout)
+            more = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
+            pages.update(more)
+        except Exception:
+            continue
+        # Stop early if a licensed landmark file is already in the set.
+        if any("investment fund tower" in ((p.get("title") or "").lower()) or (landmark and landmark.lower() in (p.get("title") or "").lower()) for p in more.values()):
+            # still keep going only if no licensed candidate yet — checked below after filters
+            pass
     toks = [t.lower() for t in re.findall(r"[A-Za-z0-9]+", landmark or q) if len(t) > 2]
     best = None
     for p in pages.values():

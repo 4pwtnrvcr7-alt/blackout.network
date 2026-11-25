@@ -13,7 +13,7 @@ Hashtags come from x_share (PR #192 generator, reused not forked); non-story kin
 """
 from __future__ import annotations
 
-import base64, hashlib, html, io, json, math, os, re, time
+import base64, hashlib, html, io, json, math, os, re, time, threading
 from pathlib import Path
 from urllib.parse import quote
 
@@ -524,13 +524,23 @@ def _r_story(cid):
                 art=("story", it.get("lon"), it.get("lat"), photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
 
 
+_EDGE = r"[\s\ufeff\u200b-\u200d\u2060\-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D\"“”„«»‘’‛′″'`.,;:|/\\·•]+"
+
+def _strip_edges(t):
+    """Strip leading and trailing dashes and punctuation (BOM, typographic dashes/quotes, ellipses)."""
+    t = " ".join((t or "").split())
+    t = re.sub(r"^" + _EDGE, "", t)
+    t = re.sub(_EDGE + r"$", "", t)
+    t = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", t).strip()
+    return t
+
+
 def _clean_head(t):
     """Light cleanup only: drop a source-name fragment cut off after a colon at the very end ('...Strait of Hormuz: Crud'); nothing is reworded.
-    Also drop a trailing ellipsis so the card can show the full headline."""
-    t = " ".join((t or "").split()).lstrip("-–— ").strip()
-    t = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", t).strip()
+    Also drop a trailing ellipsis so the card can show the full headline. Leading/trailing dashes and punctuation are stripped."""
+    t = _strip_edges(t)
     m = re.match(r"^(.{40,}?):\s*[A-Za-z]{1,6}$", t)
-    return m.group(1) if m else t
+    return _strip_edges(m.group(1) if m else t)
 
 
 def _card_headline(raw):
@@ -539,8 +549,8 @@ def _card_headline(raw):
     t = _clean_head(raw)
     m = re.search(r"^(.+?[.!?])\s+[A-Z“\"«]", t)
     if m:
-        t = m.group(1).strip()
-    return t
+        t = m.group(1)
+    return _strip_edges(t)
 
 
 # ------------------------------------------------------------------ text + tags + urls
@@ -1349,9 +1359,15 @@ def _story_refresh(cid):
 
 
 _POOL = None
-_FPOOL = None
 _INFLIGHT = {}
 _FINFLIGHT = {}
+_FLOCK = threading.Lock()
+_FHIGH = []          # urgent cids, index 0 is next (newest first: insert at 0)
+_FLOW = []           # backfill cids, FIFO
+_FWAIT = {}          # cid -> Future
+_FWAKE = threading.Event()
+_FWORKER = None
+_FSEQ = 0
 
 
 def _pool():
@@ -1362,30 +1378,97 @@ def _pool():
     return _POOL
 
 
-def _fpool():
-    """Photo downloads (slow network) run here, never on the pool that serves crawler requests."""
-    global _FPOOL
-    if _FPOOL is None:
-        from concurrent.futures import ThreadPoolExecutor
-        _FPOOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="story-photo")
-    return _FPOOL
+def _entity_story(cid, title=None):
+    """True when the headline names a person or a quoted/aliased landmark. Cheap (DB/title only, no network)."""
+    if not title:
+        try:
+            got = _story_item(cid)
+            title = ((got[0] if got else {}) or {}).get("title") or ""
+        except Exception:
+            title = ""
+    try:
+        import story_photo
+        if story_photo._named_people(cid, title, ""):
+            return True
+        if story_photo.landmark_in(title):
+            return True
+    except Exception:
+        pass
+    return False
 
 
-def submit(cid, fetch=False):
-    """Start (or join) the build of a story's card on a bounded pool; returns a Future. fetch=True (may download the photo) uses its own pool."""
-    if fetch:
-        f = _FINFLIGHT.get(cid)
-        if f is None or f.done():
-            f = _fpool().submit(_story_build, cid, True)
-            _FINFLIGHT[cid] = f
-            f.add_done_callback(lambda _f, c=cid: _FINFLIGHT.pop(c, None))
+def _ensure_fworker():
+    global _FWORKER
+    if _FWORKER is None or not _FWORKER.is_alive():
+        _FWORKER = threading.Thread(target=_floop, name="story-photo", daemon=True)
+        _FWORKER.start()
+
+
+def _floop():
+    while True:
+        cid = fut = None
+        with _FLOCK:
+            if _FHIGH:
+                cid = _FHIGH.pop(0)
+            elif _FLOW:
+                cid = _FLOW.pop(0)
+            if cid:
+                fut = _FWAIT.pop(cid, None)
+        if not cid or fut is None:
+            _FWAKE.wait(timeout=0.4)
+            _FWAKE.clear()
+            continue
+        _FINFLIGHT[cid] = fut
+        try:
+            fut.set_result(_story_build(cid, True))
+        except Exception as e:
+            try:
+                fut.set_exception(e)
+            except Exception:
+                pass
+        finally:
+            _FINFLIGHT.pop(cid, None)
+
+
+def submit(cid, fetch=False, urgent=False):
+    """Start (or join) the build of a story's card. fetch=True (may download the photo) uses the photo worker.
+    urgent=True (hit-triggered, new publish, people/landmark) jumps the backfill and is newest-first."""
+    if not fetch:
+        f = _INFLIGHT.get(cid)
+        if f is None or (f.done() and cid not in _SC):
+            f = _pool().submit(_story_build, cid, False)
+            _INFLIGHT[cid] = f
+            f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
         return f
-    f = _INFLIGHT.get(cid)
-    if f is None or (f.done() and cid not in _SC):
-        f = _pool().submit(_story_build, cid, False)
-        _INFLIGHT[cid] = f
-        f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
-    return f
+    if not urgent:
+        try:
+            if _entity_story(cid):
+                urgent = True
+        except Exception:
+            pass
+    from concurrent.futures import Future
+    _ensure_fworker()
+    with _FLOCK:
+        run = _FINFLIGHT.get(cid)
+        if run is not None and not run.done():
+            return run
+        wait = _FWAIT.get(cid)
+        if wait is not None and not wait.done():
+            if urgent:
+                if cid in _FLOW:
+                    _FLOW.remove(cid)
+                if cid in _FHIGH:
+                    _FHIGH.remove(cid)
+                _FHIGH.insert(0, cid)
+            return wait
+        fut = Future()
+        _FWAIT[cid] = fut
+        if urgent:
+            _FHIGH.insert(0, cid)
+        else:
+            _FLOW.append(cid)
+        _FWAKE.set()
+        return fut
 
 
 def story_png_fast(cid, budget=1.0):
@@ -1395,8 +1478,8 @@ def story_png_fast(cid, budget=1.0):
     if hit:
         try:
             import story_photo
-            if not story_photo.has_photo(cid) and not story_photo.card_has_photo(cid):
-                submit(cid, fetch=True)
+            if not story_photo.card_has_photo(cid):
+                submit(cid, fetch=True, urgent=True)
         except Exception:
             pass
         return story_png(cid)
@@ -1405,10 +1488,10 @@ def story_png_fast(cid, budget=1.0):
         b = story_photo.get_card(cid)
         if b:
             _SC[cid] = (time.time(), b, False)
-            # A stored map must still get a background photo lookup (deduped on the card worker).
-            if not story_photo.has_photo(cid) and not story_photo.card_has_photo(cid):
+            # A stored map must still get a background photo lookup (deduped; jumps the backfill).
+            if not story_photo.card_has_photo(cid):
                 try:
-                    submit(cid, fetch=True)
+                    submit(cid, fetch=True, urgent=True)
                 except Exception:
                     pass
             return b
@@ -1428,18 +1511,23 @@ def story_png_map_now(cid):
     hit = _SC.get(cid)
     if hit:
         try:
-            submit(cid, fetch=True)
+            import story_photo
+            if not story_photo.card_has_photo(cid):
+                submit(cid, fetch=True, urgent=True)
         except Exception:
-            pass
+            try:
+                submit(cid, fetch=True, urgent=True)
+            except Exception:
+                pass
         return hit[1]
     try:
         import story_photo
         b = story_photo.get_card(cid)
         if b:
             _SC[cid] = (time.time(), b, False)
-            if not story_photo.has_photo(cid):
+            if not story_photo.card_has_photo(cid):
                 try:
-                    submit(cid, fetch=True)
+                    submit(cid, fetch=True, urgent=True)
                 except Exception:
                     pass
             return b
@@ -1450,10 +1538,45 @@ def story_png_map_now(cid):
     except Exception:
         b = None
     try:
-        submit(cid, fetch=True)
+        submit(cid, fetch=True, urgent=True)
     except Exception:
         pass
     return b
+
+
+
+def story_png_publish(cid, wait=12):
+    """High-priority photo lookup for a new story, waited so the photo card can exist before the write-up publishes.
+    If the lookup does not finish in `wait` seconds, return the designed map card (never the earth fallback)."""
+    try:
+        import story_photo
+        if story_photo.card_has_photo(cid):
+            b = story_photo.get_card(cid)
+            if b:
+                _SC[cid] = (time.time(), b, False)
+                return b
+    except Exception:
+        pass
+    try:
+        fut = submit(cid, fetch=True, urgent=True)
+        try:
+            fut.result(timeout=max(1.0, float(wait)))
+        except Exception:
+            pass
+    except Exception:
+        pass
+    hit = _SC.get(cid)
+    if hit and hit[1]:
+        return hit[1]
+    try:
+        import story_photo
+        b = story_photo.get_card(cid)
+        if b:
+            _SC[cid] = (time.time(), b, False)
+            return b
+    except Exception:
+        pass
+    return story_png_map_now(cid)
 
 
 def boot_warm_cards(cids, timeout=40):
@@ -1480,7 +1603,7 @@ def boot_warm_cards(cids, timeout=40):
         if time.time() - t0 > timeout:
             break
         try:
-            futs.append(submit(cid, fetch=True))
+            futs.append(submit(cid, fetch=True, urgent=True))
         except Exception:
             pass
     remain = timeout - (time.time() - t0)
@@ -1507,9 +1630,9 @@ def backfill_photos(cids, pause=0.6):
         seen.add(cid)
         try:
             import story_photo
-            if story_photo.has_photo(cid) and story_photo.card_has_photo(cid):
+            if story_photo.card_has_photo(cid):
                 continue
-            submit(cid, fetch=True)
+            submit(cid, fetch=True, urgent=False)
             n += 1
         except Exception:
             pass
@@ -1530,16 +1653,17 @@ def warm(cid):
             b = story_photo.get_card(cid)
             if b:
                 _SC[cid] = (time.time(), b, False)
-        if cid in _SC and cid not in _NEED and story_photo.has_photo(cid):
+        if cid in _SC and cid not in _NEED and story_photo.card_has_photo(cid):
             return
     except Exception:
         if cid in _SC and cid not in _NEED:
             return
     live = sum(1 for f in list(_INFLIGHT.values()) + list(_FINFLIGHT.values()) if f is not None and not f.done())
+    live += sum(1 for f in list(_FWAIT.values()) if f is not None and not f.done())
     if live >= _WARM_CAP:
         return
     try:
-        submit(cid, fetch=True)
+        submit(cid, fetch=True, urgent=True)
     except Exception:
         pass
 
