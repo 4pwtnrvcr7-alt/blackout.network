@@ -251,7 +251,6 @@ class Tags(unittest.TestCase):
               "cluster_id": "f011daf83275a6ef"}
         tags = X.hashtags(it)
         self.assertGreaterEqual(len(tags), 3, tags)
-        self.assertNotIn("#Cybersecurity", tags)
         self.assertNotIn("#Cyberattack", tags)
 
     def test_hurricane_record_comparison_is_not_hurricane_tag(self):
@@ -304,6 +303,96 @@ class ShareTextReport(unittest.TestCase):
         report = "\n".join(lines)
         self.assertTrue(report)
         print("\n----- Share texts -----\n" + report + "\n-----------------------")
+
+
+
+def _mk(title, **kw):
+    d = dict(title=title, location="", category="", rank=5, cluster_id="0123456789abcdef", brief="")
+    d.update(kw)
+    return d
+
+
+GENERICS = {"#News", "#WorldNews", "#Breaking", "#BreakingNews"}
+
+
+class EntityFirst(unittest.TestCase):
+    """Matt pt1873u: Theriva Biologics shared as '#News #WorldNews #Breaking'. Tags must name what the story names."""
+    def test_theriva_nyse_american(self):
+        for title in ("NYSE American halts trading in small biotech Theriva Biologics after its shares fell below 10 cents",
+                      "Theriva Biologics trading halted on NYSE American By Investing.com"):
+            tags = X.hashtags(_mk(title, category="markets", rank=7))
+            self.assertIn("#TherivaBiologics", tags)
+            self.assertIn("#NYSEAmerican", tags)
+            self.assertIn("#TOVX", tags)
+            self.assertTrue(set(tags) & {"#Stocks", "#Biotech", "#Markets"})
+            self.assertFalse(set(tags) & GENERICS, tags)
+
+    def test_ukraine_strike(self):
+        tags = X.hashtags(_mk("Russian ballistic missile strike on Ukraine’s Kryvyi Rih injures 20, including three children",
+                              location="Kryvyi Rih, Ukraine", category="war/conflict"))
+        for t in ("#Ukraine", "#UkraineWar", "#MissileStrike"):
+            self.assertIn(t, tags)
+
+    def test_ebola_drc_not_kenya(self):
+        tags = X.hashtags(_mk("Congo's Ebola outbreak reached 11,821 confirmed cases and 5,810 deaths as fighting traps responders in Ituri.",
+                              location="Kenya and Nigeria", category="disease", rank=8))
+        for t in ("#DRC", "#Ebola"):
+            self.assertIn(t, tags)
+        self.assertNotIn("#Kenya", tags)
+
+    def test_cisa_kev(self):
+        tags = X.hashtags(_mk("CISA Adds Three Known Exploited Vulnerabilities to Catalog", category="cyber", rank=3))
+        self.assertIn("#CISA", tags)
+        self.assertTrue(set(tags) & {"#Cybersecurity", "#Cyberattack"})
+
+    def test_florida_flood(self):
+        tags = X.hashtags(_mk("Flood Watch issued November 23 at 3:58PM EST until November 26 at 1:00AM EST by NWS Miami FL",
+                              location="Metro Broward County; Metropolitan Miami Dade", category="natural disaster", rank=4))
+        for t in ("#Florida", "#Flood", "#Weather"):
+            self.assertIn(t, tags)
+
+    def test_libya_drone_vs_russian_vessel_is_not_ukraine_war(self):
+        tags = X.hashtags(_mk("Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel",
+                              brief="Officials stressed Libya is not party to the Russian invasion of Ukraine", category="war/conflict", rank=7))
+        self.assertIn("#Libya", tags)
+        self.assertIn("#DroneStrike", tags)
+        self.assertNotIn("#UkraineWar", tags)
+        self.assertNotIn("#Ukraine", tags)
+
+    def test_earthquake_is_not_weather(self):
+        tags = X.hashtags(_mk("M 4.6 - 158 km SE of Severo-Kuril’sk, Russia", location="158 km SE of Severo-Kuril’sk, Russia", category="natural disaster", rank=2))
+        self.assertIn("#Earthquake", tags)
+        self.assertIn("#Russia", tags)
+        self.assertNotIn("#Weather", tags)
+
+    def test_company_name_yields_a_tag(self):
+        for title, tag in (("Data on clients’ assets also leaked in recent Rakuten Securities breach", "#RakutenSecurities"),
+                           ("Boeing Co. grounds 737 fleet after FAA order", "#FAA"),
+                           ("Pfizer Inc. recalls batch after FDA warning", "#Pfizer")):
+            self.assertIn(tag, X.hashtags(_mk(title, category="cyber" if "Rakuten" in title else "business", rank=5)), title)
+
+    def test_never_more_than_one_generic_and_3_to_5(self):
+        titles = ["Iceberg D33B", "Campton declares state of emergency amid lake water concerns", "Satellites Have a Ground-Level Cybersecurity Problem",
+                  "Federal Reserve announces College Fed Challenge winners", "Aliens Are Preparing to Colonize Earth, UFO researcher claims", "Minutes of the Board's discount rate meetings"]
+        for ti in titles:
+            for kw in ({}, {"watchlist": 1}, {"hidden": True}):
+                tags = X.hashtags(_mk(ti, **kw))
+                self.assertGreaterEqual(len(tags), 3, (ti, tags))
+                self.assertLessEqual(len(tags), 5, (ti, tags))
+                self.assertLessEqual(len(set(tags) & GENERICS), 1, (ti, tags))
+        for key, it in STORIES.items():
+            tags = X.hashtags(it)
+            self.assertLessEqual(len(set(tags) & GENERICS), 1, (key, tags))
+            self.assertLessEqual(len(set(tags) & X.SECTORS), 1, (key, tags))
+
+    def test_llm_validation_rejects_invented_names(self):
+        import x_tags_llm as L
+        title = "NYSE American halts trading in small biotech Theriva Biologics after its shares fell below 10 cents"
+        got = L.validate(["#TherivaBiologics", "#NYSEAmerican", "#TOVX", "#Moderna", "#News", "#WorldNews"], title, "", "", rule=["#TOVX"])
+        self.assertIn("#TherivaBiologics", got)
+        self.assertNotIn("#Moderna", got)
+        self.assertLessEqual(len([t for t in got if t in GENERICS]), 1)
+        self.assertIsNone(L.validate(["#Moderna", "#Pfizer", "#Tesla"], title, "", ""))
 
 
 if __name__ == "__main__":

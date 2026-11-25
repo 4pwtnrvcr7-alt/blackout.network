@@ -247,6 +247,11 @@ def _item(r, archive):
                 hid = bool(r["hidden"])
             except Exception:
                 hid = False
+            if (rk or 0) >= 5:   # build the share card now so X's crawler never waits on a cold render
+                try:
+                    import share_card; share_card.warm(str(r["id"]))
+                except Exception:
+                    pass
             d["xu"] = x_share.intent_url({
                 "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
                 "category": r["category"], "brief": r["brief"] or "", "rank": rk,
