@@ -233,12 +233,28 @@ def _item(r, archive):
         except (TypeError, ValueError):
             return None
     fs = r["fs"] if "fs" in r.keys() else None
-    return {"id": r["id"], "t": t, "h": h, "s": s, "d": d, "k": cat_key(r["category"], title, archive),
+    d = {"id": r["id"], "t": t, "h": h, "s": s, "d": d, "k": cat_key(r["category"], title, archive),
             "g": region_key(loc, title, r["lat"], r["lon"]), "r": rk, "c": r["confidence"] or "", "loc": loc,
             "n": int(r["n_items"] or 0), "f": len(fams), "src": srcs, "l": links, "a": 1 if archive else 0,
             "w": r["watchlist"] or 0, "et": r["event_time"] if not archive else None,
             "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
+    if not archive:
+        try:
+            import x_share
+            hid = False
+            try:
+                hid = bool(r["hidden"])
+            except Exception:
+                hid = False
+            d["xu"] = x_share.intent_url({
+                "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
+                "category": r["category"], "brief": r["brief"] or "", "rank": rk,
+                "watchlist": r["watchlist"] or 0, "hidden": hid,
+            })
+        except Exception:
+            d["xu"] = ""
+    return d
 
 # t = last activity so newly collected signals on an existing cluster rise to the tip.
 _LIVE_COLS = ("cluster_id id, COALESCE(updated, first_seen) t, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "

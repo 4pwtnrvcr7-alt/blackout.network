@@ -320,7 +320,7 @@ def render(state, cid):
         '<details class="sv3-acc"><summary>How we rank</summary>'
         '<p>Ranks run from 0 to 10 and follow published scoring rules, including how widely a story reaches and how many independent sources report it. A high rank is not the same as a high risk to you. <a href="/scoring">How we score →</a></p>'
         '</details>'
-        f'<div class="sv3-share">{W.btn(f"https://x.com/intent/post?text={E(a["headline"])}&url=https://blackout.network/wire/{E(cid)}", "Post on X", "w2-btn-s")}'
+        f'<div class="sv3-share">{W._x_btn(it, a["headline"])}'
         '<button type="button" class="w2-btn w2-btn-s" data-copy>Copy link</button></div>'
         '<p class="sv3-cred"><a href="/credits#stories">Image credits</a></p>'
         '</div></section>'

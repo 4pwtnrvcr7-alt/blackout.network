@@ -61,6 +61,7 @@ function drawerHTML(it){
   var when=it["do"]?fU.format(dt(it.t))+" (date only)":fF.format(dt(it.t))+" ET";
   var go=!it.a?'<a class="w2-btn tl-go" href="/wire/'+esc(it.id)+'">Full story <span aria-hidden="true">&rarr;</span></a>':
         ((it.l&&it.l[0])?'<a class="w2-btn tl-go" href="'+esc(it.l[0].u)+'" target="_blank" rel="noopener nofollow">Original report <span aria-hidden="true">&#8599;</span></a>':"");
+  var xshare=(!it.a&&it.xu)?'<a class="w2-btn tl-go" href="'+esc(it.xu)+'" target="_blank" rel="noopener">Post on X</a>':"";
   return'<div class="tl-dr"><div class="tl-dri">'+(it.d?'<p class="tl-d">'+hl(it.d)+"</p>":"")+
     '<dl class="tl-facts"><div><dt>'+(it.a?"Archive rank":"Rank")+'</dt><dd class="tl-rkf '+rkc(r)+'">'+ticks(r)+"<b>"+(r==null?"&ndash;":r)+"</b><span>"+(r==null?"":esc(RN[r]||""))+"</span></dd></div>"+
     (it.c?"<div><dt>Confidence</dt><dd>"+esc(it.c)+"</dd></div>":"")+
@@ -68,7 +69,7 @@ function drawerHTML(it){
     (it.loc?"<div><dt>Where</dt><dd>"+esc(it.loc)+"</dd></div>":"<div><dt>Region</dt><dd>"+esc((REG[it.g]||{}).label||"")+"</dd></div>")+
     "<div><dt>Reports</dt><dd>"+(it.n||1)+" report"+((it.n||1)===1?"":"s")+(it.f?" &middot; "+it.f+" source famil"+(it.f===1?"y":"ies"):"")+"</dd></div></dl>"+
     (src?'<p class="tl-sl">Sources</p><ul class="tl-src">'+src+"</ul>":"")+
-    '<div class="tl-act">'+go+(it.a?'<span class="tl-arch">From the archive backfill</span>':"")+"</div></div></div>";
+    '<div class="tl-act">'+go+xshare+(it.a?'<span class="tl-arch">From the archive backfill</span>':"")+"</div></div></div>";
 }
 /* ---------- rows model */
 function rebuild(){

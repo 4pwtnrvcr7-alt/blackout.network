@@ -189,6 +189,11 @@ def hero(img_key, eyebrow, title, line, btn=None, cls="", h1=True, credit=True):
 def btn(href, label, cls=""):
     return f'<a class="w2-btn {cls}" href="{E(href)}">{E(label)}<svg viewBox="0 0 20 10" aria-hidden="true"><path d="M0 5h18M14 1l4 4-4 4" fill="none" stroke="currentColor"/></svg></a>'
 
+def _x_btn(it, headline=None):
+    """Post on X with hashtags in the composer text only (x_share.py)."""
+    import x_share
+    return x_share.button_html(it, headline=headline, cls="w2-btn-s")
+
 def items(state):
     m = [x for x in (state.get("main") or []) if not x.get("hidden")]
     m.sort(key=lambda x: str(x.get("updated") or ""), reverse=True)
@@ -282,7 +287,7 @@ def render_story(state, cid):
              + (f'<details class="w2-acc w2-rv"><summary>SOURCES<i></i></summary><ul class="w2-src">{links}</ul></details>' if links else "")
              + (f'<details class="w2-acc w2-rv"><summary>FULL REPORT<i></i></summary><p>{E(p.get("what") or "")}</p>' + (f'<p class="w2-meta">{E(p.get("confidence"))}</p>' if p.get("confidence") else "") + '</details>')
              + '<details class="w2-acc w2-rv"><summary>HOW WE RANK<i></i></summary><p>Ranks run 0 to 10. They are set by published scoring rules and confirmed by counting independent sources.</p><p><a href="/scoring">How we score →</a></p></details>'
-             + f'<div class="w2-share w2-rv"><a class="w2-btn w2-btn-s" href="https://x.com/intent/post?text={E(h)}&amp;url=https://blackout.network/wire/{E(cid)}" target="_blank" rel="noopener">Post on X</a>'
+             + f'<div class="w2-share w2-rv">{_x_btn(it, h)}'
                '<button type="button" class="w2-btn w2-btn-s" data-copy>Copy link</button></div></div></section>')
     nxt = [x for x in m if x.get("cluster_id") != cid][:3]
     if nxt:
