@@ -75,6 +75,14 @@ class LoadWithoutHiddenColumn(unittest.TestCase):
         self.assertNotIn("hidden", story._LOAD_COLS)
         self.assertNotIn("hidden", story._LOAD_COLS_MIN)
 
+    def test_known_held_item_is_not_treated_as_missing(self):
+        import story
+        r, al = story._known_row("dec0cddbd508e929")
+        self.assertIsNotNone(r)
+        self.assertEqual(r["cluster_id"], "dec0cddbd508e929")
+        missing, _ = story._known_row("ffffffffffffffff")
+        self.assertIsNone(missing)
+
 
 if __name__ == "__main__":
     unittest.main()

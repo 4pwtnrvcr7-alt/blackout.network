@@ -4,7 +4,7 @@ source, '?since=<ISO>' highlighting of reports that are new since an email went 
 section, related BLACKOUT.NETWORK videos, meta description and JSON-LD. Reads blackout.db read-only
 (file:blackout.db?mode=ro); never writes anything, never touches scanner.py, scoring, push.py, jets.py or config.json.
 Newsletter items link here instead of to the original source."""
-import os, re, json, sqlite3, time
+import os, re, json, sqlite3, time, traceback
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import site_page as S
@@ -136,18 +136,39 @@ def _preparing(cid):
             '<p class="dek">The full write-up is not ready yet. It will appear on The Wire as soon as it is.</p>')
     return 200, S.page("Story being prepared", "This BLACKOUT.NETWORK story is being prepared.", body, f"/wire/{cid}", "threat", noindex=True)
 
-def render(cid, since=""):
+def _ensure_writeup(cid, r, al):
+    """Store a free DB template immediately so a known story can be served in this request. Cards may trail."""
+    try:
+        import story_writer as SW
+        if SW.has_writeup(cid):
+            return True
+        return bool(SW.package_one(cid, row=r, al=al or [], build_card_now=False))
+    except Exception:
+        traceback.print_exc()
+        return False
+
+def _known_row(cid):
+    """Load from the site DB, then the writer source DB. Held items are still known."""
     r, al = load(cid)
+    if r:
+        return r, al
+    try:
+        import story_writer as SW
+        r, al = SW.cluster(cid)
+        if r:
+            return r, al or []
+    except Exception:
+        traceback.print_exc()
+    return None, []
+
+def render(cid, since=""):
+    r, al = _known_row(cid)
     if not r:
         body = ('<p class="crumb"><a href="/wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
                 '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
-    try:
-        import story_writer as SW
-        if SW.gate_on() and not SW.allow(cid):
-            return _preparing(cid)
-    except Exception:
-        pass
+    # Known item: generate a template now (cheap, DB-only) and serve the full page. Never 404 a held-but-known story.
+    _ensure_writeup(cid, r, al)
     rank = int(r.get("rank") or 0); k, tname = tier(rank); col = COLORS[band(rank)]
     title = S.clean_title(r.get("title")); what = _what(r.get("brief"), r.get("title"))
     fams = [f for f in (r.get("families") or "").split(",") if f]
@@ -265,11 +286,12 @@ def render(cid, since=""):
 
 def brief_page(cid):
     """Title + brief + share button from the DB only (no growth/people/report extras). Used when the full render fails."""
-    r, al = load(cid)
+    r, al = _known_row(cid)
     if not r:
         body = ('<p class="crumb"><a href="/wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
                 '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
+    _ensure_writeup(cid, r, al)
     title = S.clean_title(r.get("title") or "Story")
     what = _what(r.get("brief"), r.get("title"))
     rank = int(r.get("rank") or 0)
