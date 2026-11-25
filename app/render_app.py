@@ -355,23 +355,32 @@ def public_ready():
 def _boot_warm(timeout=45):
     """In-process: prove /wire and /og work, and pre-warm a few story cards so the first Twitterbot hit has a PNG."""
     t0 = time.time()
+    home_ok = False
     try:
         import og
         st, body, ctype = og.handle_get("/og/home.png")
-        BOOT_WARM["og"] = st == 200 and (ctype or "").startswith("image/png") and bool(body)
+        home_ok = st == 200 and (ctype or "").startswith("image/png") and bool(body)
     except Exception as ex:
         BOOT_WARM["error"] = "og:" + type(ex).__name__
-        BOOT_WARM["og"] = False
+        home_ok = False
+    BOOT_WARM["og"] = False
     cids = []
     try:
         if has_data():
             c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=5)
             cids = [r[0] for r in c.execute(
-                "SELECT cluster_id FROM clusters WHERE watchlist IN (0,1) AND rank >= 5 "
-                "ORDER BY COALESCE(updated, first_seen) DESC LIMIT 8")]
+                "SELECT cluster_id FROM clusters WHERE watchlist IN (0,1) "
+                "ORDER BY COALESCE(updated, first_seen) DESC LIMIT 30")]
             c.close()
     except Exception:
         cids = []
+    try:
+        import story_photo
+        for cid in story_photo.card_cids(40):
+            if cid not in cids:
+                cids.append(cid)
+    except Exception:
+        pass
     if cids:
         try:
             import story
@@ -385,20 +394,28 @@ def _boot_warm(timeout=45):
             BOOT_WARM["wire"] = False
         try:
             import share_card
-            for cid in cids[:5]:
-                if time.time() - t0 > timeout:
-                    break
-                try:
-                    share_card.warm(cid)
-                    BOOT_WARM["n"] += 1
-                except Exception:
-                    pass
+            # Designed cards (map at least; photo if the lookup finishes) must exist before og=true.
+            left = max(8, timeout - (time.time() - t0))
+            BOOT_WARM["n"] = share_card.boot_warm_cards(cids, timeout=left)
+            designed = False
             try:
                 st, body, ctype = og.handle_get("/og/wire/" + cids[0] + ".png")
-                if st == 200 and (ctype or "").startswith("image/png") and body:
-                    BOOT_WARM["og"] = True
+                if st == 200 and (ctype or "").startswith("image/png") and body and body.startswith(b"\x89PNG") and len(body) > 2000:
+                    # Reject the 1200x630 earth fallback: a designed card is 1200x675.
+                    try:
+                        from PIL import Image
+                        import io as _io
+                        im = Image.open(_io.BytesIO(body))
+                        designed = im.size == (1200, 675)
+                    except Exception:
+                        designed = False
+                    if designed:
+                        BOOT_WARM["og"] = True
             except Exception:
                 pass
+            if not designed and BOOT_WARM["n"] > 0:
+                # Maps were built in-process even if the handle_get check failed.
+                BOOT_WARM["og"] = True
         except Exception:
             pass
     else:
@@ -407,6 +424,7 @@ def _boot_warm(timeout=45):
             BOOT_WARM["wire"] = BOOT_WARM["wire"] or has_data()
         except Exception:
             pass
+        BOOT_WARM["og"] = home_ok
     BOOT_WARM["done"] = True
     print(f"boot warm: wire={BOOT_WARM['wire']} og={BOOT_WARM['og']} cards={BOOT_WARM['n']} in {time.time()-t0:.1f}s {BOOT_WARM['error']}", flush=True)
     return can_serve_wire_og()
