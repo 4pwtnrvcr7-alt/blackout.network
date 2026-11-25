@@ -1073,8 +1073,11 @@ def _story_bg(it):
             p = story_photo.cached(ph["src"])
             src = Image.open(p).convert("RGB")
             sw, sh = src.size
-            cred = "Image: " + (ph.get("credit") or "").rstrip(". ") + (". " + ph["license"] if ph.get("license") else "") + "."
-            label = ph.get("label") or ""
+            cred = "Image: " + " ".join((ph.get("credit") or "").split()).rstrip(". ")
+            if ph.get("license"):
+                cred += ". " + " ".join(str(ph.get("license")).split())
+            cred += "."
+            label = " ".join((ph.get("label") or "").split())
             if sh >= sw * 1.05:   # portrait: sharp subject on the right over a soft field taken from the photo's own background
                 band = src.crop((0, 0, sw, max(8, int(sh * 0.36))))
                 field = og._cover(band, W, H).filter(ImageFilter.GaussianBlur(36))
@@ -1167,8 +1170,8 @@ def _lay_story(it):
         _tx(d, (56, y + 16), og._strip_emoji(it["loc"]).upper()[:40], og.inter(14, bold=True), (200, 205, 214), 2.6)
     if credit:
         cf = og.inter(12)
-        t = credit
-        while og._text_w(d, t, cf, 0) > W - 112 and len(t) > 24:
+        t = " ".join(str(credit).split())
+        while t and og._text_w(d, t, cf, 0) > W - 112 and len(t) > 24:
             t = t[:-2]
         im.paste(Image.new("RGB", (W, 38), (5, 6, 10)), (0, H - 38), Image.new("L", (W, 38), 190))
         d = ImageDraw.Draw(im)
@@ -1271,7 +1274,7 @@ def _story_build(cid, fetch=False):
                 src = ""
                 if it and it.get("photo"):
                     src = (it["photo"] or {}).get("src") or ""
-                if not (it and it.get("photo_pending")):
+                if fetch and not (it and it.get("photo_pending")):
                     story_photo.put_card(cid, b, src)
                 if not fetch:
                     if _r_story_pending(cid):

@@ -5,14 +5,14 @@ Selection (never on the crawler request path):
   2. the box's pick for the story ("lead": the named person's portrait, or a photo of the story's own country)
   3. the first named person's Commons portrait, looked up in the background (Commons API, license read from the file page)
 Only public domain, CC0, CC BY and the UK Open Government Licence are used. Share-alike, non-commercial and no-derivative
-licenses are refused. The chosen image is downloaded once, shrunk, and kept in story_writer.db (handed to the next Render instance on every deploy) and also on disk when a disk exists.
+licenses are refused. The chosen image is downloaded once, shrunk, and kept in cards.db (Render-owned, handed to the next instance the same way as story_writer.db) and also on disk when a disk exists.
 
 pick(cid, ...)     no network: the credited candidate (or None), from data already on the box
 cached(src)        no network: the stored image file, or None
 prefetch(cid, ...) network, bounded: pick + download + store (background warm and the write-up publish gate only)
 """
 from __future__ import annotations
-import hashlib
+import hashlib, queue
 import re, io, json, os, re, sqlite3, threading, time, urllib.parse, urllib.request
 from pathlib import Path
 
@@ -22,7 +22,7 @@ BAD = re.compile(r"(\bsa\b|-sa|share ?alike|\bnc\b|-nc|non ?commercial|\bnd\b|-n
 MAX_BYTES = 6_000_000
 _LOCK = threading.Lock()
 _MEM = {}
-_DB_REL = "story_writer.db"
+_DB_REL = "cards.db"
 _PHOTO_SCHEMA = """
 CREATE TABLE IF NOT EXISTS story_photos(
   cid TEXT PRIMARY KEY, src TEXT, credit TEXT, license TEXT, caption TEXT, kind TEXT, label TEXT, link TEXT,
@@ -30,26 +30,73 @@ CREATE TABLE IF NOT EXISTS story_photos(
 CREATE TABLE IF NOT EXISTS story_cards(
   cid TEXT PRIMARY KEY, png BLOB, v TEXT, src TEXT, built_at TEXT);
 """
+_WQ = queue.Queue()
+_WSTARTED = False
+_WLOCK = threading.Lock()
+
 
 def _db_path():
-    return (os.environ.get("BN_WRITER_DB") or "").strip() or str(Path(__file__).resolve().parent / _DB_REL)
+    return (os.environ.get("BN_CARDS_DB") or "").strip() or str(Path(__file__).resolve().parent / _DB_REL)
 
-def _db():
-    k = sqlite3.connect(_db_path(), timeout=20)
+
+def _write_loop():
+    """The only thread that writes cards.db (WAL + busy_timeout)."""
+    k = sqlite3.connect(_db_path(), timeout=30, check_same_thread=False)
     k.execute("PRAGMA journal_mode=WAL")
+    k.execute("PRAGMA busy_timeout=8000")
     k.executescript(_PHOTO_SCHEMA)
-    return k
+    while True:
+        job = _WQ.get()
+        if job is None:
+            break
+        fn, ev, err = job
+        try:
+            fn(k)
+            k.commit()
+        except Exception as e:
+            err.append(e)
+            try:
+                k.rollback()
+            except Exception:
+                pass
+        ev.set()
+
+
+def _ensure_writer():
+    global _WSTARTED
+    if _WSTARTED:
+        return
+    with _WLOCK:
+        if _WSTARTED:
+            return
+        threading.Thread(target=_write_loop, name="cards-db", daemon=True).start()
+        _WSTARTED = True
+
+
+def _write(fn, timeout=8):
+    """Run fn(conn) on the single writer thread and wait for it to commit."""
+    _ensure_writer()
+    ev, err = threading.Event(), []
+    _WQ.put((fn, ev, err))
+    ev.wait(timeout)
+
+
+def _read(fn):
+    """Read-only, short timeout, never writes."""
+    k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=2)
+    try:
+        k.execute("PRAGMA busy_timeout=1000")
+        return fn(k)
+    finally:
+        k.close()
+
 
 def db_choice(cid):
     """Persisted photo choice (and none=1 when a lookup already found no licensed photo). No network."""
     if not cid:
         return None
     try:
-        k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=5)
-        try:
-            r = k.execute("SELECT src, credit, license, caption, kind, label, link, none FROM story_photos WHERE cid=?", (cid,)).fetchone()
-        finally:
-            k.close()
+        r = _read(lambda k: k.execute("SELECT src, credit, license, caption, kind, label, link, none FROM story_photos WHERE cid=?", (cid,)).fetchone())
         if not r:
             return None
         if r[8]:
@@ -60,68 +107,61 @@ def db_choice(cid):
         pass
     return None
 
+
 def db_put(cid, cand, jpg=None, none=False):
     """Store the choice (or a negative lookup) and optional JPEG bytes so a deploy does not have to refetch."""
     if not cid:
         return
+    c = cand or {}
+    blob = sqlite3.Binary(jpg) if jpg else None
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    def fn(k):
+        k.execute(
+            "INSERT OR REPLACE INTO story_photos(cid, src, credit, license, caption, kind, label, link, jpg, none, stored_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (cid, c.get("src") or "", " ".join((c.get("credit") or "").split()), c.get("license") or "",
+             " ".join((c.get("caption") or c.get("label") or "").split()),
+             c.get("kind") or "", " ".join((c.get("label") or "").split()), c.get("link") or "", blob, 1 if none else 0, ts))
     try:
-        with _LOCK:
-            k = _db()
-            try:
-                c = cand or {}
-                k.execute(
-                    "INSERT OR REPLACE INTO story_photos(cid, src, credit, license, caption, kind, label, link, jpg, none, stored_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    (cid, c.get("src") or "", c.get("credit") or "", c.get("license") or "", c.get("caption") or c.get("label") or "",
-                     c.get("kind") or "", c.get("label") or "", c.get("link") or "", sqlite3.Binary(jpg) if jpg else None, 1 if none else 0,
-                     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
-                k.commit()
-            finally:
-                k.close()
+        _write(fn)
     except Exception:
         pass
+
 
 def _db_jpg(src):
     if not src:
         return None
     try:
-        k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=5)
-        try:
-            r = k.execute("SELECT jpg FROM story_photos WHERE src=? AND jpg IS NOT NULL LIMIT 1", (src,)).fetchone()
-        finally:
-            k.close()
+        r = _read(lambda k: k.execute("SELECT jpg FROM story_photos WHERE src=? AND jpg IS NOT NULL LIMIT 1", (src,)).fetchone())
         return bytes(r[0]) if r and r[0] else None
     except Exception:
         return None
+
 
 def get_card(cid):
     """Built share-card PNG for this story, or None. No network."""
     if not cid:
         return None
     try:
-        k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=5)
-        try:
-            r = k.execute("SELECT png FROM story_cards WHERE cid=?", (cid,)).fetchone()
-        finally:
-            k.close()
+        r = _read(lambda k: k.execute("SELECT png FROM story_cards WHERE cid=?", (cid,)).fetchone())
         b = bytes(r[0]) if r and r[0] else None
         return b if b and b.startswith(b"\x89PNG") and len(b) > 2000 else None
     except Exception:
         return None
 
+
 def put_card(cid, png, src=""):
     if not cid or not png or not png.startswith(b"\x89PNG"):
         return
+    blob = sqlite3.Binary(png)
+    ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    def fn(k):
+        k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at) VALUES(?,?,?,?,?)",
+                  (cid, blob, "2", src or "", ts))
     try:
-        with _LOCK:
-            k = _db()
-            try:
-                k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at) VALUES(?,?,?,?,?)",
-                          (cid, sqlite3.Binary(png), "2", src or "", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
-                k.commit()
-            finally:
-                k.close()
+        _write(fn)
     except Exception:
         pass
+
 
 def resolved(cid):
     """True when a lookup has already run for this story (photo stored, or confirmed none)."""
