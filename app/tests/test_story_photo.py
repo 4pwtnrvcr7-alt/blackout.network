@@ -27,13 +27,11 @@ class StoryPhoto(unittest.TestCase):
         d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
         titles = [
             "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz",
-            "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles. Ukraine also expects missiles for F-16s and NASAMS systems.",
             "Ethiopia launches polio vaccination campaign to protect more than 11 million children: WHO deployed 28 staff",
             "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using…",
         ]
         for raw in titles:
             t = S._card_headline(raw)
-            self.assertNotIn("NASAMS", t)
             for maxw in (640, 700):
                 f, size, lines = S._story_head(d, t, maxw)
                 joined = " ".join(lines)
@@ -41,7 +39,6 @@ class StoryPhoto(unittest.TestCase):
                 self.assertGreaterEqual(size, S.HEAD_MIN, (raw, size))
                 self.assertFalse(any("…" in l or l.endswith("...") for l in lines), raw)
                 self.assertNotIn("…", joined)
-                self.assertNotIn("NASAMS", joined)
                 if "Strait of Hormuz" in S._clean_head(raw):
                     self.assertIn("Strait of Hormuz", joined)
 
@@ -337,7 +334,7 @@ class StoryPhoto(unittest.TestCase):
             self.assertEqual(P.get_card(cid), newer)
             self.assertTrue(P.card_has_photo(cid))
             self.assertEqual(P.card_meta(cid)["src"], cand["src"])
-            self.assertEqual(P.card_meta(cid)["v"], "99L")
+            self.assertEqual(P.card_meta(cid)["v"], "99M")
             self.assertTrue(S._card_headline("— Zelensky says hello").startswith("Zelensky"))
         finally:
             og.VERSION = prev
@@ -1046,6 +1043,64 @@ class StoryPhoto(unittest.TestCase):
         self.assertFalse(P.card_font_stale(meta_old, "Pete Hegseth at the Pentagon"))
         self.assertFalse(P.card_stale(meta_old))
         self.assertFalse(P.card_stale(meta_new))
+
+    def test_story_head_hegseth_does_not_dangle_at_the(self):
+        """Full first sentence if it fits; otherwise a clause cut with an ellipsis, never 'at the'."""
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        raw = "On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense Yaşar Güler at the Pentagon."
+        self.assertIn("U.S. Secretary of War Pete Hegseth", S._card_headline(raw))
+        self.assertIn("Pentagon", S._card_headline(raw))
+        for maxw in (640, 700):
+            f, size, lines = S._story_head(d, raw, maxw)
+            joined = " ".join(lines)
+            self.assertLessEqual(len(lines), 3, joined)
+            self.assertGreaterEqual(size, S.HEAD_MIN)
+            self.assertIn("Yaşar", joined, joined)
+            self.assertIn("U.S.", joined, joined)
+            self.assertFalse(joined.rstrip("…").rstrip().endswith("at the"), joined)
+            self.assertFalse(joined.rstrip("…").rstrip().endswith(" at"), joined)
+            last = joined.rstrip("…").split()[-1].lower().strip(".,;:")
+            self.assertNotIn(last, ("the", "a", "an", "of", "and", "at", "in", "on", "to", "for"), joined)
+            if "…" in joined:
+                self.assertTrue(joined.endswith("…"), joined)
+                self.assertNotIn(" at the…", joined)
+            else:
+                self.assertIn("Pentagon", joined)
+
+    def test_story_head_long_cuts_at_clause_with_ellipsis(self):
+        """Zelensky / Doughty-length headlines must not end mid-phrase; an ellipsis is required if they are cut."""
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        cases = [
+            "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles. Ukraine also expects missiles for F-16s and NASAMS systems.",
+            "UK Middle East Minister Stephen Doughty says children in Gaza have endured unimaginable suffering as a second group of hostages is expected to be released.",
+        ]
+        for raw in cases:
+            head = S._card_headline(raw)
+            self.assertNotIn("NASAMS", head)
+            for maxw in (640, 700):
+                f, size, lines = S._story_head(d, head, maxw)
+                joined = " ".join(lines)
+                self.assertLessEqual(len(lines), 3, (raw, joined))
+                self.assertGreaterEqual(size, S.HEAD_MIN)
+                last = joined.rstrip("…").split()[-1].lower().strip(".,;:")
+                self.assertNotIn(last, ("the", "a", "an", "of", "and", "at", "in", "on", "to", "for", "as", "including", "48"), joined)
+                if joined.rstrip("…").strip() != head.rstrip("."):
+                    self.assertTrue(joined.endswith("…"), joined)
+
+    def test_clipped_headlines_are_typo_stale_until_24M(self):
+        """Long clipped headlines rebuild onto 24M; short headlines and already-24M cards do not."""
+        import og
+        long_h = "On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense Yaşar Güler at the Pentagon."
+        short_h = "IMO: M3.5 earthquake, Iceland"
+        old = {"v": og.VERSION + "L", "src": "https://example.test/x.jpg"}
+        new = {"v": og.VERSION + "M", "src": "https://example.test/x.jpg"}
+        self.assertTrue(S.card_needs_headline_refit(old, long_h))
+        self.assertFalse(S.card_needs_headline_refit(new, long_h))
+        self.assertFalse(S.card_needs_headline_refit(old, short_h))
+        self.assertFalse(P.card_stale(old))
+        self.assertFalse(P.card_stale(new))
 
     def test_audit_deletes_libya_and_gaza_rows_keeps_matching_zelensky(self):
         """Boot audit deletes non-matching photo rows outright; a matching Zelensky portrait is kept."""

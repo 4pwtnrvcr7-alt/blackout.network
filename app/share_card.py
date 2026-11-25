@@ -618,7 +618,7 @@ def _clean_head(t):
 
 def _card_headline(raw):
     """Headline for the share card: cleaned title, first sentence only (never two sentences squeezed in).
-    _story_head may then cut at a word boundary to keep a readable font; no ellipsis is added."""
+    _story_head may then shrink the font or cut at a clause boundary with an ellipsis."""
     t = _clean_head(raw)
     m = re.search(r"^(.+?(?<![A-Z])[.!?])\s+[@A-Z“\"«]", t)
     if m:
@@ -1144,27 +1144,157 @@ def _wrap_full(d, text, f, maxw):
 # Readable minimum matches Bessent's photo-card size (32). Never shrink below this.
 HEAD_MIN = 32
 
+# Words a clipped headline must not end on (dangling preposition / article / conjunction).
+_DANGLING = frozenset({
+    "a", "an", "the", "and", "or", "but", "nor", "so",
+    "at", "in", "on", "of", "to", "for", "from", "with", "by", "as",
+    "into", "onto", "over", "under", "about", "after", "before",
+    "against", "between", "through", "during", "without", "within",
+    "upon", "via", "per", "plus", "including", "amid", "than",
+})
+# Opening of a prepositional / clausal phrase; cutting just before one is a natural boundary.
+_PHRASE_START = _DANGLING
+
+
+def _word_key(w):
+    return re.sub(r"[^A-Za-z0-9]+", "", w or "").lower()
+
+
+def _ends_dangling(words):
+    if not words:
+        return True
+    last = _word_key(words[-1])
+    if last in _DANGLING or not last:
+        return True
+    # "including 48" is not a complete phrase — the noun is missing.
+    if last.isdigit() and len(words) >= 2 and _word_key(words[-2]) in _PHRASE_START:
+        return True
+    return False
+
+
+def _trim_dangling(words):
+    w = list(words)
+    while w and _ends_dangling(w):
+        w.pop()
+    # Incomplete "as a second…" / "including 48 anti-ballistic…" — cut before the phrase
+    # unless at least three words follow (as + article/modifier + noun).
+    for i in range(len(w) - 1, 0, -1):
+        if _word_key(w[i]) in ("as", "including") and len(w) - i - 1 < 3:
+            w = w[:i]
+            while w and _ends_dangling(w):
+                w.pop()
+            break
+    return w
+
+
+def _head_lines_fit(d, text, f, maxw, max_lines):
+    lines = _wrap_full(d, text, f, maxw)
+    if len(lines) <= max_lines and all(og._text_w(d, l, f, 0) <= maxw for l in lines):
+        return lines
+    return None
+
+
+def _clause_prefixes(words):
+    """Prefixes from longest to shortest, preferring a comma or a cut before an at/in/on phrase."""
+    seen = set()
+    cands = []
+
+    def emit(chunk):
+        w = _trim_dangling(chunk)
+        key = tuple(w)
+        if not w or key in seen:
+            return
+        seen.add(key)
+        cands.append(w)
+
+    for n in range(len(words), 0, -1):
+        chunk = words[:n]
+        emit(chunk)
+        for i in range(len(chunk) - 1, -1, -1):
+            if chunk[i].endswith((",", ";", ":")):
+                emit(chunk[: i + 1])
+                break
+        for i in range(len(chunk) - 1, 0, -1):
+            if _word_key(chunk[i]) in _PHRASE_START:
+                emit(chunk[:i])
+                break
+    cands.sort(key=len, reverse=True)
+    return cands
+
+
+def _cut_head_lines(d, title, f, maxw, max_lines):
+    """Longest first-sentence prefix that fits in the box, ending at a clause boundary, with an ellipsis."""
+    words = (title or "").split()
+    for prefix in _clause_prefixes(words):
+        text = " ".join(prefix).rstrip(" ,;:-") + "…"
+        lines = _head_lines_fit(d, text, f, maxw, max_lines)
+        if lines:
+            return lines
+    # Last resort: first words plus ellipsis, still not dangling.
+    for n in range(min(len(words), 12), 0, -1):
+        prefix = _trim_dangling(words[:n])
+        if not prefix:
+            continue
+        text = " ".join(prefix).rstrip(" ,;:-") + "…"
+        lines = _head_lines_fit(d, text, f, maxw, max_lines)
+        if lines:
+            return lines
+    lines = _wrap_full(d, title, f, maxw)[:max_lines]
+    if lines:
+        last = _trim_dangling(lines[-1].split())
+        lines[-1] = ((" ".join(last).rstrip(" ,;:-") + "…") if last else "…")
+    return lines
+
+
+def _headline_would_clip(title, maxw=640, max_lines=3):
+    """True when the first sentence does not fit in the 3-line box at HEAD_MIN (old typography would cut mid-phrase)."""
+    if not title:
+        return False
+    try:
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        head = _card_headline(title) or title
+        head = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", head).strip()
+        f = og.card_face(HEAD_MIN)
+        # The tighter photo-card width (640) is the one that clips Hegseth; also check 700.
+        for w in (maxw, 700, 640):
+            if _head_lines_fit(d, head, f, w, max_lines) is None:
+                return True
+        return False
+    except Exception:
+        # If we cannot measure, treat a long first sentence as possibly clipped.
+        return len((title or "").split()) >= 16
+
+
+def card_needs_headline_refit(meta, title=""):
+    """True when a stored card predates the mid-phrase typography fix (24M) and the headline would have been clipped."""
+    if not meta:
+        return False
+    if str(meta.get("v") or "").endswith("M"):
+        return False
+    return _headline_would_clip(title or "")
+
+
 def _story_head(d, title, maxw, max_lines=3, start=54, minsize=HEAD_MIN):
-    """Headline on at most 3 lines at a readable size. Shrink down to minsize (Bessent's 32);
-    if it still cannot fit, cut at a word boundary. Never append an ellipsis.
-    Leading/trailing dashes are stripped so a stale raw title cannot paint an em-dash."""
+    """Headline on at most 3 lines at a readable size. Prefer the full first sentence;
+    shrink down to minsize (Bessent's 32) if needed. If it still cannot fit, cut at a
+    comma or before an at/in/on phrase and append an ellipsis. Never end on a dangling
+    preposition or article ('at the', 'of', 'and')."""
     title = _card_headline(title or "") or og._strip_emoji(title or "")
     title = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", title).strip()
     minsize = max(int(minsize or HEAD_MIN), HEAD_MIN)
     size = start
     while size >= minsize:
         f = og.card_face(size)
-        lines = _wrap_full(d, title, f, maxw)
-        if len(lines) <= max_lines and all(og._text_w(d, l, f, 0) <= maxw for l in lines):
+        lines = _head_lines_fit(d, title, f, maxw, max_lines)
+        if lines:
             return f, size, lines
         size -= 2
     f = og.card_face(minsize)
-    lines = _wrap_full(d, title, f, maxw)
-    if len(lines) <= max_lines:
+    lines = _head_lines_fit(d, title, f, maxw, max_lines)
+    if lines:
         return f, minsize, lines
-    lines = lines[:max_lines]
-    lines[-1] = lines[-1].rstrip(" ,;:-")
-    return f, minsize, lines
+    return f, minsize, _cut_head_lines(d, title, f, maxw, max_lines)
 
 
 def _story_bg(it):
@@ -2105,7 +2235,8 @@ def _queue_card_work(cid):
                 r, _al = _st.load(cid)
                 if r:
                     raw_title = r.get("title") or ""
-                if story_photo.card_font_stale(meta, _card_headline(raw_title) or raw_title):
+                head = _card_headline(raw_title) or raw_title
+                if story_photo.card_font_stale(meta, head) or card_needs_headline_refit(meta, head):
                     stale = True
             except Exception:
                 pass
@@ -2500,7 +2631,7 @@ def _pending_convert_cids(limit=400):
             title = _card_headline(title or "") or title
         except Exception:
             title = ""
-        if SP.card_font_stale(row, title):
+        if SP.card_font_stale(row, title) or card_needs_headline_refit(row, title):
             seen.add(cid)
             order.append(cid)
     return order
