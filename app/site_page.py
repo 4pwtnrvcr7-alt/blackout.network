@@ -88,7 +88,7 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
     if not top:
         top = '<header class="bn-hd"><h1><a href="/" style="color:inherit;text-decoration:none">BLACKOUT.<b style="color:#c8102e">NETWORK</b></a></h1></header>'
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=4" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=5" sizes="any">'
             f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>{top}<main class="wrap" id="main">{body}</main>'
             '<footer class="ft">Research only: BLACKOUT.NETWORK is not an official warning service. Always follow official instructions from local authorities. · '
             '<a href="/wire">The Wire</a> · <a href="/newsletter">Newsletter</a> · <a href="/scoring">How we score</a> · '

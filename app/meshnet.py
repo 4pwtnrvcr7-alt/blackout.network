@@ -132,7 +132,7 @@ def page(key, path, body, scripts=()):
     head = _head(key, path) + '<meta name="robots" content="index,follow,max-image-preview:large"><link rel="stylesheet" href="/api/mesh/app.css?v=1">'
     js = "".join(f'<script src="{s}" defer></script>' for s in scripts)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
-            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=4" sizes="any">'
+            '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=5" sizes="any">'
             '<style>body{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}</style></head><body>'
             '<a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>' + _top() +
             f'<main class="mx" id="main">{body}</main>'
