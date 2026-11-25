@@ -173,6 +173,8 @@ def _launch_by_id(lid):
     try:
         import netlaunch
         d = netlaunch.launches_cached() or {}
+        if isinstance(d, (bytes, bytearray, str)):   # launches_cached() returns the JSON bytes
+            d = json.loads(d)
         for L in d.get("launches") or []:
             if L.get("id") == lid:
                 return L
