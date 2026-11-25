@@ -170,6 +170,12 @@ def db_search(q, limit=DB_LIMIT, seed=False):
     for r in rows:
         d = json.loads(r["data"]); d["relevance"] = round(-r["b"], 3)
         if d["watchlist"] == 2: hidden += 1; continue
+        try:
+            import story_writer as SW
+            if not SW.allow(d.get("cluster_id")):
+                continue
+        except Exception:
+            pass
         d["_sort"] = d["relevance"] * (1 + 0.08 * (d["rank"] or 0)) * (0.5 + _recency(d))
         out.append(d)
     out.sort(key=lambda d: -d["_sort"])

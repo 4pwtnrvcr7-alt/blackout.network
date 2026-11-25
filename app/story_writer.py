@@ -50,11 +50,15 @@ def cfg():
     return {"model": _env("BN_WRITER_MODEL", "grok-4.3"), "api": _env("BN_WRITER_API", "https://api.x.ai/v1").rstrip("/"),
             "min_rank": int(_f("BN_WRITER_MIN_RANK", 5)), "max_per_hour": int(_f("BN_WRITER_MAX_PER_HOUR", 30)),
             "daily_usd": _f("BN_WRITER_DAILY_USD", 1.0), "price_in": _f("BN_WRITER_PRICE_IN", 1.25), "price_out": _f("BN_WRITER_PRICE_OUT", 2.50),
-            "backfill_h": _f("BN_WRITER_BACKFILL_H", 24), "poll_s": max(2.0, _f("BN_WRITER_POLL_S", 10)),
+            "backfill_h": _f("BN_WRITER_BACKFILL_H", 24), "poll_s": max(1.0, _f("BN_WRITER_POLL_S", 2)),
             "refresh_min": _f("BN_WRITER_REFRESH_MIN", 60), "db": _env("BN_WRITER_DB", os.path.join(HERE, DB_REL)),
-            "blackout_db": _env("BN_WRITER_SOURCE_DB", os.path.join(HERE, "blackout.db"))}
+            "blackout_db": _env("BN_WRITER_SOURCE_DB", os.path.join(HERE, "blackout.db")),
+            "template_backfill_h": _f("BN_TEMPLATE_BACKFILL_H", 48)}
 def key_set(): return bool((os.environ.get("XAI_API_KEY") or "").strip())
 def enabled(): return _env("BN_WRITER", "1") != "0" and key_set()
+def templates_on(): return _env("BN_TEMPLATES", "1") != "0"
+def gate_wanted(): return templates_on() and _env("BN_PUBLISH_GATE", "1") != "0"
+def api_enabled(): return enabled()
 
 def now(): return datetime.now(UTC)
 def iso(d=None): return (d or now()).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -76,6 +80,9 @@ CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY AUTOINCREMENT, cid TEXT, 
 CREATE INDEX IF NOT EXISTS ix_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS ix_jobs_cid ON jobs(cid);
 CREATE TABLE IF NOT EXISTS spend(day TEXT PRIMARY KEY, usd REAL DEFAULT 0, tokens_in INTEGER DEFAULT 0, tokens_out INTEGER DEFAULT 0, calls INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS ready(cid TEXT PRIMARY KEY, kind TEXT, tags TEXT, card_ok INTEGER DEFAULT 0, ready_at TEXT, title TEXT, rank INTEGER);
+CREATE TABLE IF NOT EXISTS legacy(cid TEXT PRIMARY KEY, at TEXT);
+CREATE TABLE IF NOT EXISTS held(cid TEXT PRIMARY KEY, since TEXT, last_try TEXT, tries INTEGER DEFAULT 0, alerted INTEGER DEFAULT 0, err TEXT, title TEXT, rank INTEGER);
 """
 def db():
     k = sqlite3.connect(cfg()["db"], timeout=20)
@@ -658,6 +665,13 @@ def _writer_worker(ready, paused):
             if paused(): STATE["paused"] = "deploy handoff"; time.sleep(5); continue
             if not enabled(): STATE["paused"] = "no API key" if not key_set() else "BN_WRITER=0"; time.sleep(30); continue
             STATE["paused"] = None
+            if not STATE.get("gate_booted") and templates_on():
+                boot_gate()
+            if templates_on():
+                package_pending()
+                check_held_alerts()
+            if not api_enabled():
+                time.sleep(cfg()["poll_s"]); continue
             mt = []
             for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
                 try: mt.append(os.path.getmtime(cfg()["blackout_db"] + sfx))
@@ -671,8 +685,511 @@ def _writer_worker(ready, paused):
             STATE["last_error"] = f"{type(e).__name__}: {str(e)[:200]}"; traceback.print_exc()
         time.sleep(cfg()["poll_s"])
 
+# ---------------------------------------------------------------- template write-ups + publish gate (Nov 25 2026, PR 1)
+# Every live Wire item gets a free write-up built only from scanner data (no API). Tags are the rule-based
+# x_share extractor (never the paid x_tags_llm path). Cards are built through share_card.story_png / warm.
+# The public gate stays off until boot_gate() snapshots current cluster ids (they stay visible) and then
+# turns on: any cluster first seen after that snapshot is held until its write-up, tags and card are stored.
+
+def gate_on():
+    return bool(STATE.get("gate_on")) and gate_wanted()
+
+def _item_for_tags(r):
+    return {"cluster_id": r.get("cluster_id") or r.get("id"), "title": r.get("title") or "", "headline": r.get("title") or "",
+            "brief": r.get("brief") or "", "location": r.get("location") or "", "category": r.get("category") or "",
+            "rank": r.get("rank") or 0, "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0}
+
+def rule_tags(r):
+    """Rule-based hashtags only. Does not call x_share.hashtags() (that queues the paid tag model)."""
+    import x_share
+    return list(x_share._entity_first(_item_for_tags(r)) or [])
+
+def build_card(cid):
+    """Render and cache the share card. Returns True when bytes were produced."""
+    try:
+        import share_card
+        if cid in getattr(share_card, "_SC", {}) and share_card._SC.get(cid) and share_card._SC[cid][1]:
+            return True
+        b = share_card.story_png(cid)
+        return bool(b)
+    except Exception:
+        traceback.print_exc()
+        return False
+
+def brief_fields(brief):
+    out = {}
+    for key in ("WHAT", "WHERE", "WHEN", "CONFIDENCE"):
+        m = re.search(rf"{key}:\s*(.*?)(?=(?:WHAT|WHERE|WHEN|CONFIDENCE):|$)", brief or "", re.S | re.I)
+        if m:
+            out[key.lower()] = " ".join(m.group(1).split()).strip()
+    return out
+
+def _plain(s, n=0):
+    s = " ".join((s or "").split())
+    s = re.sub(r"\s*\[[^\[\]]{2,200}\]", "", s).strip()
+    return s[:n] if n else s
+
+def _source_links(r, al):
+    links = []
+    try:
+        raw = json.loads(r.get("links") or "[]") if isinstance(r.get("links"), str) else (r.get("links") or [])
+    except Exception:
+        raw = []
+    for l in raw:
+        if not isinstance(l, dict):
+            continue
+        u = str(l.get("url") or "").strip(); s = str(l.get("source") or l.get("s") or "Source").strip()
+        if u.startswith(("http://", "https://")) and u not in {x["url"] for x in links}:
+            links.append({"url": u, "label": s})
+    for a in al or []:
+        u = (a.get("source_url") or "").strip(); s = (a.get("source") or a.get("family") or "Source").strip()
+        if u.startswith(("http://", "https://")) and u not in {x["url"] for x in links}:
+            links.append({"url": u, "label": s})
+    return links[:8]
+
+def _related(r, limit=5):
+    k = _src()
+    if k is None: return []
+    cid = r.get("cluster_id"); cat = r.get("category") or ""; loc = (r.get("location") or "").strip()
+    out = []
+    try:
+        q = "SELECT cluster_id, title, location, rank, first_seen FROM clusters WHERE watchlist IN (0,1) AND cluster_id!=?"
+        args = [cid]
+        if cat:
+            q += " AND category=?"; args.append(cat)
+        q += " ORDER BY updated DESC LIMIT 40"
+        for row in k.execute(q, args):
+            d = dict(row)
+            if loc and (d.get("location") or "") and loc.split(",")[0].lower() not in (d.get("location") or "").lower():
+                if not (_toks(r.get("title")) & _toks(d.get("title"))):
+                    continue
+            out.append(d)
+            if len(out) >= limit: break
+    except Exception:
+        pass
+    finally:
+        k.close()
+    return out
+
+def build_template(r, al):
+    """Neutral wire write-up from scanner data only. No invented facts, quotes or numbers."""
+    title = _plain(r.get("title") or "Story", 140)
+    bf = brief_fields(r.get("brief") or "")
+    what = _plain(bf.get("what") or "", 500)
+    where = _plain(bf.get("where") or r.get("location") or place_of(r) or "", 200)
+    when = _plain(bf.get("when") or "", 200)
+    conf = _plain(bf.get("confidence") or r.get("confidence") or "", 80)
+    loc = where or (r.get("location") or "").strip()
+    rank = int(r.get("rank") or 0)
+    lab = _band(rank)
+    links = _source_links(r, al)
+    officials = [a for a in (al or []) if a.get("official")]
+    fams = []
+    try:
+        fams = json.loads(r.get("families") or "[]") if isinstance(r.get("families"), str) else (r.get("families") or [])
+        if isinstance(fams, str): fams = [f for f in fams.split(",") if f]
+    except Exception:
+        fams = []
+    n_fam = int(r.get("eff_families") or r.get("n_families") or len(fams) or 0)
+    n_items = int(r.get("n_items") or len(al or []) or 0)
+    first = _et(r.get("first_seen")); ev = _et(r.get("event_time")); upd = _et(r.get("updated"))
+    # headlines from the sources we track (their words, attributed)
+    heads = []
+    seen = set()
+    for a in (al or [])[:25]:
+        ht = _plain(a.get("title") or "", 220)
+        if not ht: continue
+        k = _norm(ht)
+        if k in seen: continue
+        seen.add(k)
+        src = _plain(a.get("source") or a.get("family") or "One source", 80)
+        off = " (official)" if a.get("official") else ""
+        tm = _et(a.get("event_time") or a.get("first_seen"))
+        heads.append((src + off, tm, ht))
+
+    headline = title if len(title) <= 110 else (title[:109].rsplit(" ", 1)[0] + "…")
+    where_bit = f" in {loc}" if loc else ""
+    when_bit = f", {when or ev or first}" if (when or ev or first) else ""
+    lead = what or title
+    if lead and not lead.endswith("."): lead += "."
+    attrib = ""
+    if n_fam:
+        attrib = f" {n_fam} independent source{'s' if n_fam != 1 else ''} in our record {'are' if n_fam != 1 else 'is'} reporting this"
+        if officials:
+            names = []
+            for a in officials[:3]:
+                s = _plain(a.get("source") or "", 40)
+                if s and s not in names: names.append(s)
+            if names:
+                attrib += ", including " + ", ".join(names)
+        attrib += "."
+    elif links:
+        attrib = f" The reports we have come from {links[0]['label']}."
+    else:
+        attrib = " So far we have the scanner record only; a news outlet or official source has not been logged yet."
+
+    what_happened = f"{lead}{(' The record places this' + where_bit + when_bit + '.') if (loc or when_bit) else ''}{attrib}"
+    what_happened = " ".join(what_happened.split())
+
+    know, dont = [], []
+    if what: know.append(lead)
+    if loc: know.append(f"The location in the record is {loc}.")
+    if officials: know.append("At least one official source is among the reports we have logged.")
+    if n_fam >= 2: know.append(f"{n_fam} independent sources are in the record.")
+    elif n_fam == 1: dont.append("This has been reported by a single independent source so far and is not independently confirmed in our record.")
+    else: dont.append("We do not yet have a second independent source.")
+    if not officials: dont.append("No official source has been logged for this story yet.")
+    if conf: know.append(f"The record marks confidence as {conf}.")
+    dont.append("Later reports may add or revise details that are not in the record yet.")
+
+    # timeline paragraphs
+    paras = [what_happened]
+    if heads:
+        lines = []
+        for src, tm, ht in heads[:8]:
+            q = ht if ht.endswith((".", "?", "!", "…")) else ht + "."
+            when_s = f" at {tm}" if tm else ""
+            lines.append(f"{src} reported{when_s}: \"{q}\"")
+        paras.append(" ".join(lines))
+    if know:
+        paras.append("What we know from the record: " + " ".join(know))
+    if dont:
+        paras.append("What we do not know yet: " + " ".join(dont))
+    rel = _related(r)
+    if rel:
+        bits = []
+        for d in rel:
+            bits.append(_plain(d.get("title") or "", 90) + (f" ({_plain(d.get('location') or '', 40)})" if d.get("location") else ""))
+        paras.append("Related stories we are also tracking: " + "; ".join(bits) + ".")
+    if links:
+        paras.append("Sources: " + "; ".join(f"{l['label']} ({l['url']})" for l in links) + ".")
+    else:
+        paras.append("We have not yet logged a source URL for this story.")
+
+    body = "\n\n".join(paras)
+    dek = (what[:180] if what and _norm(what) != _norm(title) else (f"A {lab.lower()}-risk story{where_bit}, from the reports we track." + (f" Logged {first}." if first else "")))
+    dek = _plain(dek, 240)
+    why = dek
+    analysis = (" ".join(know[:2]) + " " + " ".join(dont[:2])).strip() or "We are working only from the reports logged for this story."
+    rank_why = f"This is in the {lab.lower()} band on our 0–10 scale, based on the reach and confirmation of the reports we have."
+    if n_fam < 2:
+        rank_why += " It is waiting on a second independent source."
+    risk_why = "Rank band for this story, from the reports we have; not a forecast."
+    if_true = "If the reporting holds, later official or on-the-ground accounts should match the core facts above."
+    if_false = "If the reporting is overstated or wrong, later official accounts or corrections will not match these early reports."
+    what_to_do = "No action is needed." if rank <= 4 else ("Monitor official local guidance if you are in the affected area." if loc else "Monitor official guidance as more reports arrive.")
+    confidence = "High" if (n_fam >= 3 and officials) else ("Medium" if n_fam >= 2 or officials else "Low")
+    confidence_why = (("Official sources in the record include " + ", ".join(_plain(a.get("source") or "", 40) for a in officials[:3]) + ".") if officials
+                      else "The reports we have are not from an official source yet.")
+    if n_fam < 2:
+        confidence_why += " This is not independently confirmed in our record."
+    src_urls = [l["url"] for l in links]
+    w = iso()
+    note = {
+        "headline": headline, "why_it_matters": why, "what_happened": what_happened, "analysis": _plain(analysis, 600),
+        "rank_why": rank_why, "risk": lab, "risk_why": risk_why, "if_true": if_true, "if_false": if_false,
+        "what_to_do": what_to_do, "confidence": confidence, "confidence_why": confidence_why,
+        "sources": src_urls, "story": {
+            "headline": title, "dek": dek,
+            "sections": {"happened": body, "background": "", "analysis": _plain(analysis, 800),
+                         "watch": what_to_do + " " + if_true},
+            "sources": links, "written_at": w,
+        },
+        "written_at": w, "generated_at": w, "edition": "BLACKOUT.NETWORK write-up", "desk": True,
+        "file": "story_writer_template", "writer": {"model": "template", "sources_read": 0},
+        "place": loc,
+    }
+    return note
+
+def _legacy_set():
+    with _LK:
+        k = db()
+        try:
+            return {r[0] for r in k.execute("SELECT cid FROM legacy")}
+        finally:
+            k.close()
+
+def _ready_row(cid):
+    with _LK:
+        k = db()
+        try:
+            r = k.execute("SELECT cid, kind, tags, card_ok FROM ready WHERE cid=?", (cid,)).fetchone()
+            return dict(r) if r else None
+        finally:
+            k.close()
+
+def is_packaged(cid):
+    """True when a write-up, tags and a card are stored for this cluster."""
+    if not cid: return False
+    if desk_covered(cid):
+        row = _ready_row(cid)
+        if row and row.get("card_ok") and (row.get("tags") or "").strip() not in ("", "[]", "null"):
+            return True
+        # desk brief is a complete write-up; still need tags + card recorded
+    row = _ready_row(cid)
+    if not row or not row.get("card_ok"):
+        return False
+    tags = row.get("tags") or ""
+    if tags.strip() in ("", "[]", "null"):
+        return False
+    if desk_covered(cid):
+        return True
+    return note_for(cid) is not None
+
+def allow(cid, archive=False):
+    """Whether a story may appear on a public listing or API. Never raises."""
+    try:
+        if archive or not cid:
+            return True
+        if not gate_on():
+            return True
+        if is_packaged(cid):
+            return True
+        return cid in _legacy_set_cached()
+    except Exception:
+        traceback.print_exc()
+        return not gate_on()
+
+_LEGACY_C = {"t": 0.0, "v": set()}
+def _legacy_set_cached():
+    if time.time() - _LEGACY_C["t"] < 5:
+        return _LEGACY_C["v"]
+    v = _legacy_set()
+    _LEGACY_C.update(t=time.time(), v=v)
+    return v
+
+def filter_rows(rows, key="cluster_id", archive_key=None):
+    out = []
+    for r in rows or []:
+        if isinstance(r, dict):
+            cid = r.get(key) or r.get("id") or r.get("cluster_id")
+            arch = bool(r.get(archive_key)) if archive_key else False
+        else:
+            try:
+                cid = r[key] if key in r.keys() else (r["id"] if "id" in r.keys() else None)
+            except Exception:
+                cid = None
+            arch = False
+            if archive_key:
+                try: arch = bool(r[archive_key])
+                except Exception: arch = False
+        if allow(cid, archive=arch):
+            out.append(r)
+    return out
+
+def live_clusters(hours=None, limit=4000):
+    k = _src()
+    if k is None: return []
+    try:
+        if hours:
+            cut = iso(now() - timedelta(hours=hours))
+            rows = [dict(r) for r in k.execute(
+                "SELECT * FROM clusters WHERE watchlist IN (0,1) AND COALESCE(updated, first_seen)>=? ORDER BY first_seen DESC LIMIT ?",
+                (cut, limit))]
+        else:
+            rows = [dict(r) for r in k.execute(
+                "SELECT * FROM clusters WHERE watchlist IN (0,1) ORDER BY first_seen DESC LIMIT ?", (limit,))]
+    except Exception:
+        rows = []
+    finally:
+        k.close()
+    try:
+        import story_display as SD
+        rows = [SD.apply(r) for r in rows]
+        rows = [r for r in rows if SD.visible(r)]
+    except Exception:
+        pass
+    return rows
+
+def boot_gate():
+    """Snapshot every live cluster id as already-public, then turn the publish gate on."""
+    if STATE.get("gate_booted"):
+        return
+    rows = live_clusters(hours=None, limit=8000)
+    at = iso()
+    with _LK:
+        k = db()
+        try:
+            for r in rows:
+                k.execute("INSERT OR IGNORE INTO legacy(cid, at) VALUES(?,?)", (r["cluster_id"], at))
+            k.commit()
+        finally:
+            k.close()
+    _LEGACY_C.update(t=0, v=set())
+    STATE["gate_booted"] = True
+    if gate_wanted():
+        STATE["gate_on"] = True
+    log(f"publish gate on, grandfathered {len(rows)} live clusters")
+    # package the newest items first so current Wire pages have full write-ups
+    newest = live_clusters(hours=cfg()["template_backfill_h"], limit=80)
+    for r in newest:
+        try:
+            package_one(r["cluster_id"], row=r)
+        except Exception:
+            traceback.print_exc()
+
+def _mark_held(cid, err, title="", rank=0):
+    with _LK:
+        k = db()
+        try:
+            r = k.execute("SELECT since, tries FROM held WHERE cid=?", (cid,)).fetchone()
+            if r:
+                k.execute("UPDATE held SET last_try=?, tries=?, err=?, title=?, rank=? WHERE cid=?",
+                          (iso(), int(r["tries"] or 0) + 1, (err or "")[:400], title, rank, cid))
+            else:
+                k.execute("INSERT INTO held(cid, since, last_try, tries, alerted, err, title, rank) VALUES(?,?,?,?,0,?,?,?)",
+                          (cid, iso(), iso(), 1, (err or "")[:400], title, rank))
+            k.commit()
+        finally:
+            k.close()
+
+def _clear_held(cid):
+    with _LK:
+        k = db()
+        try:
+            k.execute("DELETE FROM held WHERE cid=?", (cid,)); k.commit()
+        finally:
+            k.close()
+
+def _backoff_ok(cid):
+    with _LK:
+        k = db()
+        try:
+            r = k.execute("SELECT last_try, tries FROM held WHERE cid=?", (cid,)).fetchone()
+        finally:
+            k.close()
+    if not r: return True
+    last = parse_t(r["last_try"]); n = int(r["tries"] or 0)
+    if not last: return True
+    wait = min(300, 5 * (2 ** min(n, 6)))
+    return (now() - last).total_seconds() >= wait
+
+def package_one(cid, row=None, al=None):
+    """Build (or reuse) a write-up, store rule-based tags, build the card. Returns True when the item is public-ready."""
+    if not cid: return False
+    if is_packaged(cid):
+        _clear_held(cid); return True
+    if not _backoff_ok(cid):
+        return False
+    try:
+        if row is None or al is None:
+            r, al2 = cluster(cid)
+            row = row or r; al = al if al is not None else al2
+        if not row:
+            _mark_held(cid, "cluster gone"); return False
+        kind = "template"
+        if desk_covered(cid):
+            kind = "desk"
+        else:
+            existing = note_for(cid)
+            if existing and existing.get("file") != "story_writer_template":
+                kind = "writer"
+            elif existing and existing.get("file") == "story_writer_template":
+                kind = "template"
+            else:
+                note = build_template(row, al or [])
+                with _LK:
+                    k = db()
+                    try:
+                        k.execute("INSERT OR REPLACE INTO briefs(cid, note, written_at, model, src_urls, alias_of, tokens_in, tokens_out, usd, rank, title) VALUES(?,?,?,?,?,NULL,0,0,0,?,?)",
+                                  (cid, json.dumps(note, ensure_ascii=False), note["written_at"], "template",
+                                   json.dumps(note.get("sources") or []), int(row.get("rank") or 0), row.get("title")))
+                        k.commit()
+                    finally:
+                        k.close()
+                _invalidate(cid)
+                kind = "template"
+        try:
+            tags = rule_tags(row)
+        except Exception:
+            traceback.print_exc(); tags = []
+        if not tags:
+            _mark_held(cid, "no tags", row.get("title"), int(row.get("rank") or 0)); return False
+        try:
+            card_ok = bool(build_card(cid))
+        except Exception:
+            traceback.print_exc(); card_ok = False
+        if not card_ok:
+            _mark_held(cid, "card not ready", row.get("title"), int(row.get("rank") or 0)); return False
+        with _LK:
+            k = db()
+            try:
+                k.execute("INSERT OR REPLACE INTO ready(cid, kind, tags, card_ok, ready_at, title, rank) VALUES(?,?,?,?,?,?,?)",
+                          (cid, kind, json.dumps(tags), 1, iso(), row.get("title"), int(row.get("rank") or 0)))
+                k.commit()
+            finally:
+                k.close()
+        _clear_held(cid)
+        _invalidate(cid)
+        return True
+    except Exception as e:
+        _mark_held(cid, f"{type(e).__name__}: {str(e)[:200]}", (row or {}).get("title"), int((row or {}).get("rank") or 0))
+        traceback.print_exc()
+        return False
+
+def package_pending(max_new=20, max_backfill=10):
+    """Package newly arrived items first, then older ones in the backfill window. Returns counts."""
+    if not templates_on():
+        return {"new": 0, "backfill": 0}
+    rows = live_clusters(hours=cfg()["template_backfill_h"], limit=4000)
+    legacy = _legacy_set_cached()
+    packaged = 0
+    backfilled = 0
+    for r in rows:
+        cid = r["cluster_id"]
+        if is_packaged(cid):
+            continue
+        is_new = cid not in legacy
+        if is_new and packaged >= max_new:
+            continue
+        if not is_new and backfilled >= max_backfill:
+            continue
+        if not _backoff_ok(cid):
+            continue
+        ok = package_one(cid, row=r)
+        if is_new:
+            packaged += 1
+        else:
+            backfilled += 1
+        if packaged >= max_new and backfilled >= max_backfill:
+            break
+    return {"new": packaged, "backfill": backfilled}
+
+def check_held_alerts():
+    """Log and flag any new item held more than 15 minutes."""
+    cut = iso(now() - timedelta(minutes=15))
+    with _LK:
+        k = db()
+        try:
+            rows = list(k.execute("SELECT cid, since, tries, err, title, rank FROM held WHERE alerted=0 AND since<=? AND cid NOT IN (SELECT cid FROM legacy)", (cut,)))
+            for r in rows:
+                log(f"HELD 15m {r['cid']} rank={r['rank']} tries={r['tries']} {(r['title'] or '')[:80]} ({r['err'] or ''})")
+                k.execute("UPDATE held SET alerted=1 WHERE cid=?", (r["cid"],))
+            if rows:
+                k.commit()
+                STATE["held_alerts"] = int(STATE.get("held_alerts") or 0) + len(rows)
+        finally:
+            k.close()
+
+def held_status():
+    with _LK:
+        k = db()
+        try:
+            rows = [dict(r) for r in k.execute("SELECT cid, since, last_try, tries, alerted, err, title, rank FROM held ORDER BY since")]
+            n_ready = k.execute("SELECT COUNT(*) FROM ready WHERE card_ok=1").fetchone()[0]
+            n_legacy = k.execute("SELECT COUNT(*) FROM legacy").fetchone()[0]
+            n_tmpl = k.execute("SELECT COUNT(*) FROM briefs WHERE model='template'").fetchone()[0]
+            return {"held": rows, "ready": n_ready, "legacy": n_legacy, "templates_written": n_tmpl,
+                    "alerts": int(STATE.get("held_alerts") or 0)}
+        finally:
+            k.close()
+
+
+
 def start(ready=lambda: True, paused=lambda: False):
-    if STATE["thread"] is not None or _env("BN_WRITER", "1") == "0": return False
+    """Start the background thread. Templates and the publish gate run even when BN_WRITER=0 (the paid writer is off)."""
+    if STATE["thread"] is not None: return False
+    if _env("BN_TEMPLATES", "1") == "0" and _env("BN_WRITER", "1") == "0": return False
     t = threading.Thread(target=_writer_worker, args=(ready, paused), name="story-writer", daemon=True)
     t.start(); STATE["thread"] = t
     return True
@@ -697,5 +1214,8 @@ def status(n=20):
                 lat = [r[0] for r in k.execute("SELECT latency_s FROM jobs WHERE status='done' AND reason='new' AND latency_s IS NOT NULL ORDER BY id DESC LIMIT 50")]
                 out["latency_new_s"] = {"n": len(lat), "median": sorted(lat)[len(lat) // 2] if lat else None, "max": max(lat) if lat else None}
             finally: k.close()
+        out["gate_on"] = gate_on(); out["templates_on"] = templates_on(); out["api_enabled"] = api_enabled()
+        try: out.update(held_status())
+        except Exception: pass
     except Exception as e: out["db_error"] = f"{type(e).__name__}: {str(e)[:200]}"
     return out

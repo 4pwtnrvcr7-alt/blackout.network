@@ -205,6 +205,17 @@ def _links(js):
         if len(out) >= 5: break
     return out
 
+def _public_row(r, archive):
+    """Live clusters are held until story_writer has a write-up, tags and card. Archive items stay visible."""
+    if archive:
+        return True
+    try:
+        import story_writer as SW
+        cid = r["id"] if "id" in r.keys() else r["cluster_id"]
+        return SW.allow(cid, archive=False)
+    except Exception:
+        return True
+
 def _item(r, archive, warm_budget=None):
     title = _clean(r["title"]); h = headline(title)
     loc = _clean(r["location"])[:90] if r["location"] else ""
@@ -312,7 +323,7 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
         ct, cid = ("0000-01-01T00:00:00Z", "") if newer else ("9999-12-31T23:59:59Z", "~")
     op, order = (">", "ASC") if newer else ("<", "DESC")
     geo, ga = _geo_clause(lat, lon, r_mi)
-    fetch_n = (limit + 1) if not geo else min(MAXL, max(limit * 8, 80))
+    fetch_n = min(MAXL, (limit + 1) * 4) if not geo else min(MAXL, max(limit * 8, 80))
     rows = []
     c = _ro(DB)
     try:
@@ -332,6 +343,7 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
     if geo:
         rows = [(r, a) for r, a in rows if _near(r, lat, lon, r_mi)]
     rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
+    rows = [(r, a) for r, a in rows if _public_row(r, a)]
     more = len(rows) > limit
     rows = rows[:limit]
     _wb = [20]
@@ -349,6 +361,7 @@ def items_for(ids):
     try: rows = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) AND cluster_id IN ({','.join('?' * len(ids))})", ids))
     finally: c.close()
     rows.sort(key=lambda r: (r["t"] or "", r["id"]), reverse=True)
+    rows = [r for r in rows if _public_row(r, False)]
     _wb = [20]
     return [_item(r, False, warm_budget=_wb) for r in rows]
 
