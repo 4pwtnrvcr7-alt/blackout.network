@@ -229,25 +229,27 @@ def card_meta(cid):
         return None
 
 
-# Suffix stored on every new card: typography used a Latin-Extended face (Inter / DejaVu).
+# Suffix stored on every new card. "L" = Latin-Extended face; "M" = mid-phrase headline cut fix.
 # Compared as a suffix so og.VERSION itself does not have to bump for every ASCII card.
 FONT_MARK = "L"
+TYPO_MARK = "M"
+_TYPO_MARKS = "LM"
 
 
 def card_ver_base(v):
-    """og.VERSION part of a stored card version, ignoring the Latin-ext font mark."""
+    """og.VERSION part of a stored card version, ignoring typography marks (L, M)."""
     s = str(v or "")
-    if s.endswith(FONT_MARK) and len(s) > 1:
-        return s[:-len(FONT_MARK)]
+    while len(s) > 1 and s[-1] in _TYPO_MARKS:
+        s = s[:-1]
     return s
 
 
 def card_ver_current():
     try:
         import og
-        return str(og.VERSION) + FONT_MARK
+        return str(og.VERSION) + TYPO_MARK
     except Exception:
-        return "11" + FONT_MARK
+        return "11" + TYPO_MARK
 
 
 def card_stale(meta):
@@ -274,9 +276,12 @@ def card_font_stale(meta, title=""):
     """True when the headline has non-ASCII characters and the stored card predates the Latin-ext font."""
     if not meta or not title:
         return False
+    v = str(meta.get("v") or "")
+    if v.endswith(TYPO_MARK) or v.endswith(FONT_MARK):
+        return False
     if not any(ord(ch) > 127 for ch in title):
         return False
-    return not str(meta.get("v") or "").endswith(FONT_MARK)
+    return True
 
 
 def card_has_photo(cid):
