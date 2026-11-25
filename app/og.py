@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "6"  # bump to force social CDNs to refetch (Nov 25: broken generic card was cached as v=5)
+VERSION = "7"  # bump to force social CDNs to refetch (Nov 25: v7 = photo story cards; v6 was the generic-card fix)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
