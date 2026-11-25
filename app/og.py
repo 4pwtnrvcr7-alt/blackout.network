@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "7"  # bump to force social CDNs to refetch (Nov 25: v7 = photo story cards; v6 was the generic-card fix)
+VERSION = "8"  # bump to force social CDNs to refetch (Nov 25: v8 = full headlines, no earth fallback; v7 = photo story cards)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -636,11 +636,15 @@ def _db_spec(cid):
 
 
 def png_for_story_fast(cid):
-    """/og/wire/<id>.png in under ~2 s: the finished card, else a quick title+rank card from the DB (never the generic 'The Wire' card);
-    the full card keeps building in the background so the next request (and the next crawl) gets it."""
+    """/og/wire/<id>.png in under ~2 s: the finished photo or map card. On a cold miss, render the designed
+    map card synchronously (fast, no network) instead of the 1200x630 earth fallback. The earth card is
+    only used when the story itself cannot be loaded."""
     try:
         import share_card
         b = share_card.story_png_fast(cid, budget=1.0)
+        if b:
+            return b
+        b = share_card.story_png_map_now(cid)
         if b:
             return b
     except Exception:

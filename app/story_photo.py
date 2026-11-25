@@ -16,7 +16,7 @@ import hashlib, queue
 import re, io, json, os, re, sqlite3, threading, time, urllib.parse, urllib.request
 from pathlib import Path
 
-UA = "BLACKOUT.NETWORK-cards/1.0 (https://blackout.network; hello@blackout.network)"
+UA = "BLACKOUTNETWORK-cards/1.2 (https://blackout.network/; hello@blackout.network)"
 OK = re.compile(r"^(public domain|cc0|cc by(?! ?-?(sa|nc|nd))|cc-by(?!-(sa|nc|nd))|ogl|open government|u\.?s\.? (government|federal)|attribution$)", re.I)
 BAD = re.compile(r"(\bsa\b|-sa|share ?alike|\bnc\b|-nc|non ?commercial|\bnd\b|-nd|no ?deriv)", re.I)
 MAX_BYTES = 6_000_000
@@ -39,16 +39,30 @@ def _db_path():
     return (os.environ.get("BN_CARDS_DB") or "").strip() or str(Path(__file__).resolve().parent / _DB_REL)
 
 
-def _write_loop():
-    """The only thread that writes cards.db (WAL + busy_timeout)."""
-    k = sqlite3.connect(_db_path(), timeout=30, check_same_thread=False)
+def _connect_writer(path):
+    k = sqlite3.connect(path, timeout=30, check_same_thread=False)
     k.execute("PRAGMA journal_mode=WAL")
     k.execute("PRAGMA busy_timeout=8000")
     k.executescript(_PHOTO_SCHEMA)
+    return k
+
+
+def _write_loop():
+    """The only thread that writes cards.db (WAL + busy_timeout). Reconnects if the path changes."""
+    path = _db_path()
+    k = _connect_writer(path)
     while True:
         job = _WQ.get()
         if job is None:
             break
+        cur = _db_path()
+        if cur != path:
+            try:
+                k.close()
+            except Exception:
+                pass
+            path = cur
+            k = _connect_writer(path)
         fn, ev, err = job
         try:
             fn(k)
@@ -99,7 +113,8 @@ def db_choice(cid):
         r = _read(lambda k: k.execute("SELECT src, credit, license, caption, kind, label, link, none FROM story_photos WHERE cid=?", (cid,)).fetchone())
         if not r:
             return None
-        if r[8]:
+        # columns: 0 src, 1 credit, 2 license, 3 caption, 4 kind, 5 label, 6 link, 7 none
+        if r[7]:
             return {"none": True}
         if r[0] and license_ok(r[2]):
             return dict(src=r[0], credit=r[1] or "", license=r[2] or "", caption=r[3] or "", kind=r[4] or "", label=r[5] or "", link=r[6] or "")
@@ -163,10 +178,27 @@ def put_card(cid, png, src=""):
         pass
 
 
-def resolved(cid):
-    """True when a lookup has already run for this story (photo stored, or confirmed none)."""
+def has_photo(cid):
+    """True when a licensed photo and its JPEG bytes are on hand (DB or disk). No network."""
     c = db_choice(cid)
-    return bool(c)
+    if not c or c.get("none") or not c.get("src") or not license_ok(c.get("license") or ""):
+        return False
+    return bool(cached(c["src"]))
+
+
+def resolved(cid):
+    """True only when a licensed photo is actually stored. A previous miss or a map-only card is not final
+    (live Bessent/Riyadh were skipped after a failed or never-run lookup)."""
+    return has_photo(cid)
+
+
+def card_cids(limit=40):
+    """Story ids that already have a built card in cards.db (newest first). No network."""
+    try:
+        rows = _read(lambda k: k.execute("SELECT cid FROM story_cards ORDER BY built_at DESC LIMIT ?", (int(limit),)).fetchall())
+        return [r[0] for r in (rows or []) if r and r[0]]
+    except Exception:
+        return []
 
 
 def license_ok(lic):
@@ -268,15 +300,29 @@ def pick(cid, title="", loc="", text=""):
     return None
 
 
-def _fetch(src, timeout=7):
+def _http(url, accept, timeout=12, retries=1):
+    """GET with the Wikimedia-required UA; one retry on timeout or HTTP 403/429/5xx."""
+    last = None
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Api-User-Agent": UA, "Accept": accept, "Accept-Language": "en"})
+    for _ in range(1 + retries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read(MAX_BYTES + 1), r.headers
+        except Exception as e:
+            last = e
+            time.sleep(0.4)
+    if last:
+        raise last
+    return None, {}
+
+
+def _fetch(src, timeout=10):
     sp = urllib.parse.urlsplit(src)
     if sp.scheme != "https" or not sp.hostname or not sp.hostname.endswith(("wikimedia.org", "wikipedia.org", "usgs.gov", "nasa.gov", "noaa.gov", "fema.gov", "defense.gov", "dvidshub.net", "whitehouse.gov", "treasury.gov", "gov.uk", "state.gov", "si.edu", "loc.gov", "flickr.com", "staticflickr.com")):
         return None
-    req = urllib.request.Request(src, headers={"User-Agent": UA, "Accept": "image/jpeg,image/png,image/webp,image/*;q=0.8"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        ct = (r.headers.get("Content-Type") or "").split(";")[0].lower()
-        b = r.read(MAX_BYTES + 1)
-    if len(b) > MAX_BYTES or not ct.startswith("image/") or "svg" in ct:
+    b, hdrs = _http(src, "image/jpeg,image/png,image/webp,image/*;q=0.8", timeout=timeout)
+    ct = ((hdrs.get("Content-Type") if hdrs else "") or "").split(";")[0].lower()
+    if not b or len(b) > MAX_BYTES or not ct.startswith("image/") or "svg" in ct:
         return None
     return b
 
@@ -305,9 +351,8 @@ def _commons_portrait(name, timeout=7):
     """Newest-looking licensed Commons portrait whose file name or description carries the person's full name."""
     q = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": f'"{name}" portrait', "gsrnamespace": 6, "gsrlimit": 12,
                                 "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
-    req = urllib.request.Request("https://commons.wikimedia.org/w/api.php?" + q, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        pages = (json.loads(r.read().decode()).get("query") or {}).get("pages") or {}
+    raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=timeout)
+    pages = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
     toks = [t.lower() for t in re.findall(r"[A-Za-z]+", name) if len(t) > 1]
     best = None
     for p in pages.values():
@@ -332,6 +377,16 @@ def _commons_portrait(name, timeout=7):
         return best[1]
     return None
 
+
+# Full names for people who often appear as a bare surname in a headline. Commons is still license-gated.
+_ALIASES = {
+    "burnham": "Andy Burnham",
+    "bessent": "Scott Bessent",
+    "zelensky": "Volodymyr Zelensky",
+    "zelenskyy": "Volodymyr Zelensky",
+    "zelenskiy": "Volodymyr Zelensky",
+    "hegseth": "Pete Hegseth",
+}
 
 _STOP = set("the a an of in on at to for and or with by from as near after into its new says said "
             "unleashes fresh warns against using struck inquiry launches recorded magnitude landmark "
@@ -375,6 +430,15 @@ def _named_people(cid, title, text):
             i += 2
             continue
         i += 1
+    # Last-name-only headlines ("Burnham launches…", "Zelensky says…") need the full name for Commons;
+    # a bare-surname search returns the wrong person (sculptor A. E. Zelensky).
+    blob_l = (title or "")
+    for word in words:
+        if not word or not word[0].isupper():
+            continue
+        full = _ALIASES.get(word.lower())
+        if full and full.lower() not in seen and re.search(r"\b" + re.escape(word) + r"\b", blob_l):
+            seen.add(full.lower()); out.append(full)
     return out
 
 
@@ -386,11 +450,11 @@ def _commons_place(loc, title, timeout=7):
     q = (m.group(1).strip() + (" " + loc if loc else "")).strip() if m else loc
     if not q or len(q) < 3:
         return None
-    qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": q, "gsrnamespace": 6, "gsrlimit": 12,
+    term = f'"{m.group(1).strip()}"' if m else q
+    qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
                                  "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
-    req = urllib.request.Request("https://commons.wikimedia.org/w/api.php?" + qs, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        pages = (json.loads(r.read().decode()).get("query") or {}).get("pages") or {}
+    raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + qs, "application/json", timeout=timeout)
+    pages = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
     landmark = (m.group(1).strip() if m else "")
     toks = [t.lower() for t in re.findall(r"[A-Za-z0-9]+", landmark or q) if len(t) > 2]
     best = None
@@ -426,35 +490,54 @@ def _commons_place(loc, title, timeout=7):
 
 
 def prefetch(cid, title="", loc="", text=""):
-    """Network, bounded (7 s per request): pick, look up a Commons portrait or place photo if the box has none, store the image (disk + persistent DB)."""
+    """Network, bounded: pick, look up a Commons portrait or place photo if the box has none, store the image (disk + persistent DB).
+    If a stored or box pick cannot be downloaded, fall through to Commons instead of locking in a dead choice."""
     with _LOCK:
+        err = ""
         c = pick(cid, title, loc, text)
+        path = store(c["src"]) if c and c.get("src") else None
+        if c and not path:
+            err = "stored pick was not downloadable"
+            c = None
         if not c:
             for nm in _named_people(cid, title, text)[:2]:
                 try:
                     c = _commons_portrait(nm)
-                except Exception:
+                except Exception as e:
+                    err = type(e).__name__
                     c = None
                 if c:
-                    break
+                    path = store(c["src"])
+                    if path:
+                        break
+                    err = "commons portrait not downloadable"
+                    c = None
         if not c:
             try:
                 c = _commons_place(loc, title)
-            except Exception:
+            except Exception as e:
+                err = type(e).__name__
                 c = None
-        if c:
+            if c:
+                path = store(c["src"])
+                if not path:
+                    err = "commons place not downloadable"
+                    c = None
+        if c and path:
             try:
                 _choice_file(cid).write_text(json.dumps(c))
             except Exception:
                 pass
-            path = store(c["src"])
             jpg = None
-            if path:
-                try:
-                    jpg = Path(path).read_bytes()
-                except Exception:
-                    jpg = None
+            try:
+                jpg = Path(path).read_bytes()
+            except Exception:
+                jpg = None
             db_put(cid, c, jpg=jpg, none=False)
-            return c if path else None
-        db_put(cid, None, none=True)
+            print(f"story_photo: prefetch {cid} photo=1 license={c.get('license') or ''} kind={c.get('kind') or ''}", flush=True)
+            return c
+        # Do not persist a negative lookup after an error or a failed download: the next warm may succeed.
+        if not err:
+            db_put(cid, None, none=True)
+        print(f"story_photo: prefetch {cid} photo=0 err={err or 'no licensed photo'}", flush=True)
         return None

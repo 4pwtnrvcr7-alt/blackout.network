@@ -518,14 +518,17 @@ def _r_story(cid):
     except Exception:
         photo = None
     have = bool(photo and not photo.get("pending"))
-    return dict(title=_clean_head(head), kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
+    card_title = _clean_head(it.get("title") or "") or _clean_head(head) or "Story"
+    return dict(title=card_title, kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
                 fact=dek or head, lines=[x for x in lines if x], tags=tags, loc=it.get("location") or "", deep=f"/wire/{cid}", share_url=f"{SITE}/wire/{cid}",
                 art=("story", it.get("lon"), it.get("lat"), photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
 
 
 def _clean_head(t):
-    """Light cleanup only: drop a source-name fragment cut off after a colon at the very end ('...Strait of Hormuz: Crud'); nothing is reworded."""
+    """Light cleanup only: drop a source-name fragment cut off after a colon at the very end ('...Strait of Hormuz: Crud'); nothing is reworded.
+    Also drop a trailing ellipsis so the card can show the full headline."""
     t = " ".join((t or "").split()).lstrip("-–— ").strip()
+    t = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", t).strip()
     m = re.match(r"^(.{40,}?):\s*[A-Za-z]{1,6}$", t)
     return m.group(1) if m else t
 
@@ -1045,9 +1048,11 @@ def _wrap_full(d, text, f, maxw):
     return lines + ([cur] if cur else [])
 
 
-def _story_head(d, title, maxw, max_lines=3, start=54, minsize=28):
-    """Whole headline on at most 3 lines; only at the smallest size is it cut, at a word boundary, with an ellipsis."""
-    title = og._strip_emoji(title)
+def _story_head(d, title, maxw, max_lines=3, start=54, minsize=20):
+    """Whole headline on at most 3 lines. Shrink the font to fit; never append an ellipsis.
+    Only if it still cannot fit at minsize is it cut, at a word boundary, with no trailing ellipsis."""
+    title = og._strip_emoji(title or "")
+    title = re.sub(r"(?:\s*[\u2026…]|\s*\.{3,})\s*$", "", title).strip()  # drop a source-side trailing ellipsis only
     size = start
     while size >= minsize:
         f = og.mont(size, 800)
@@ -1056,10 +1061,12 @@ def _story_head(d, title, maxw, max_lines=3, start=54, minsize=28):
             return f, size, lines
         size -= 2
     f = og.mont(minsize, 800)
-    lines = _wrap_full(d, title, f, maxw)[:max_lines]
-    while og._text_w(d, lines[-1] + "\u2026", f, 0) > maxw and " " in lines[-1]:
-        lines[-1] = lines[-1].rsplit(" ", 1)[0]
-    lines[-1] = lines[-1].rstrip(" ,;:-") + "\u2026"
+    lines = _wrap_full(d, title, f, maxw)
+    if len(lines) <= max_lines:
+        return f, minsize, lines
+    lines = lines[:max_lines]
+    # cut the last line at a word already wrapped; do not add an ellipsis
+    lines[-1] = lines[-1].rstrip(" ,;:-")
     return f, minsize, lines
 
 
@@ -1388,6 +1395,81 @@ def story_png_fast(cid, budget=1.0):
         return None
 
 
+
+def story_png_map_now(cid):
+    """Build (or return) the designed 1200x675 map/photo card synchronously, with no network.
+    Used on a cold Twitterbot miss so the 1200x630 earth fallback is never served for a known story.
+    A photo lookup is queued in the background so the next crawl can get the photo card."""
+    hit = _SC.get(cid)
+    if hit:
+        try:
+            submit(cid, fetch=True)
+        except Exception:
+            pass
+        return hit[1]
+    try:
+        import story_photo
+        b = story_photo.get_card(cid)
+        if b:
+            _SC[cid] = (time.time(), b, False)
+            if not story_photo.has_photo(cid):
+                try:
+                    submit(cid, fetch=True)
+                except Exception:
+                    pass
+            return b
+    except Exception:
+        pass
+    try:
+        b = _story_build(cid, fetch=False)
+    except Exception:
+        b = None
+    try:
+        submit(cid, fetch=True)
+    except Exception:
+        pass
+    return b
+
+
+def boot_warm_cards(cids, timeout=40):
+    """Synchronously build designed (map) cards for cids, then run photo lookups until timeout.
+    Called from render_app._boot_warm before healthz reports og=true."""
+    t0 = time.time()
+    n = 0
+    seen = []
+    for cid in cids or []:
+        if not cid or cid in seen:
+            continue
+        seen.append(cid)
+        if time.time() - t0 > max(8, timeout - 12):
+            break
+        try:
+            if story_png_map_now(cid):
+                n += 1
+        except Exception:
+            pass
+    # Photo pass: fetch=True on the photo pool; wait out the remaining budget so people/landmark
+    # stories can land a photo card before the instance takes public traffic.
+    futs = []
+    for cid in seen:
+        if time.time() - t0 > timeout:
+            break
+        try:
+            futs.append(submit(cid, fetch=True))
+        except Exception:
+            pass
+    remain = timeout - (time.time() - t0)
+    for f in futs:
+        left = timeout - (time.time() - t0)
+        if left <= 0:
+            break
+        try:
+            f.result(timeout=min(left, 12))
+        except Exception:
+            pass
+    return n
+
+
 _WARM_CAP = 20   # at most this many card builds queued or running (timeline pre-warm must not flood Render)
 
 
@@ -1400,7 +1482,7 @@ def warm(cid):
             b = story_photo.get_card(cid)
             if b:
                 _SC[cid] = (time.time(), b, False)
-        if cid in _SC and cid not in _NEED and story_photo.resolved(cid):
+        if cid in _SC and cid not in _NEED and story_photo.has_photo(cid):
             return
     except Exception:
         if cid in _SC and cid not in _NEED:
