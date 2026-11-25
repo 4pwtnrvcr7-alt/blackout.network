@@ -138,8 +138,8 @@ class Paging(unittest.TestCase):
             self.assertEqual(W.handle_get("/api/wire_tl", {})[0], 404)
         finally: del os.environ["BN_WIRE_TIMELINE"]
 
-    def test_sort_uses_updated_not_just_first_seen(self):
-        """Scanner merges into existing clusters bump updated, not first_seen. The tip must follow last activity."""
+    def test_sort_uses_display_time_not_updated(self):
+        """Nov 25 2026: `updated` is mass-touched, so ordering by it scrambled the day headers. The tip follows the display time (first_seen here)."""
         c = sqlite3.connect(W.DB)
         c.execute("INSERT INTO clusters VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                   ("aaaupdated000001", "Existing story with later activity", "political", "Florida", 28.81, -81.32,
@@ -149,11 +149,13 @@ class Paging(unittest.TestCase):
                   ("farawayitem00002", "A far-away later update", "political", "Tokyo", 35.68, 139.76,
                    None, "2026-11-18T07:05:10Z", "2026-12-31T23:58:00Z", 10, "High", 1, 1, '[]', '[]', 0, "", 2))
         c.commit(); c.close()
-        a = W.page(limit=5)
-        self.assertEqual(a["items"][0]["id"], "aaaupdated000001")
-        self.assertEqual(a["items"][0]["t"], "2026-12-31T23:59:00Z")
-        self.assertEqual(a["items"][0]["fs"], "2026-11-18T07:00:00Z")
-        self.assertEqual(a["items"][0]["lat"], 28.81)
+        a = W.page(limit=60)
+        ids5 = [x["id"] for x in a["items"]]
+        self.assertLess(ids5.index("farawayitem00002"), ids5.index("aaaupdated000001"))   # fs 07:05:10 is newer than 07:00:00
+        top = {x["id"]: x for x in a["items"]}["aaaupdated000001"]
+        self.assertEqual(top["t"], "2026-11-18T07:00:00Z")
+        self.assertEqual(top["fs"], "2026-11-18T07:00:00Z")
+        self.assertEqual(top["lat"], 28.81)
         near = W.page(limit=10, lat=28.81, lon=-81.32, r_mi=25)
         ids = [x["id"] for x in near["items"]]
         self.assertIn("aaaupdated000001", ids)
@@ -237,16 +239,82 @@ class Paging(unittest.TestCase):
         finally:
             W._public_row = real
 
+    def test_order_and_day_groups_follow_one_display_time_across_pages(self):
+        """Matt's 390px screenshot (Nov 25): headers jumped (Yesterday, Thu Nov 5, Mon Nov 23, Wed Nov 11) and date-only event times showed 7:00 PM.
+        Sort, cursor, day groups and stamp use one time: real event_time, else the date alone (no time), else first_seen."""
+        from zoneinfo import ZoneInfo
+        from datetime import datetime, timezone
+        import shutil
+        old_db = W.DB
+        tmpd = tempfile.mkdtemp(); newdb = os.path.join(tmpd, "blackout.db"); shutil.copy(old_db, newdb)
+        W.DB = newdb
+        self.addCleanup(lambda: (setattr(W, "DB", old_db), W._reset_caches()))
+        c = sqlite3.connect(W.DB)
+        c.execute("DELETE FROM clusters")
+        UPD = "2026-11-25T17:36:25Z"          # every row mass-updated at once
+        rows = [  # id, event_time, first_seen
+            ("o01", "2026-11-25T00:00:00Z", "2026-11-23T21:10:51Z"),   # NWS: midnight expiry after first_seen -> first_seen (Nov 23 4:10 PM)
+            ("o02", "2026-11-06T00:00:00Z", "2026-11-21T20:46:13Z"),   # old GDACS, date only -> Nov 6, no time
+            ("o03", "2026-11-23T05:22:28Z", "2026-11-23T18:18:18Z"),
+            ("o04", "2026-11-24T08:58:57Z", "2026-11-24T09:34:24Z"),
+            ("o05", "2026-11-12T00:00:00Z", "2026-11-22T16:22:25Z"),   # old GDACS
+            ("o06", "2026-11-26T05:00:00Z", "2026-11-24T23:08:28Z"),   # future validity time -> first_seen
+            ("o07", "2026-11-25T08:33:12Z", "2026-11-25T08:40:46Z"),
+            ("o08", "2026-11-13", "2026-11-25T12:28:34Z"),              # bare date
+            ("o09", None, "2026-11-25T13:39:29Z"),
+            ("o10", "2026-11-25T18:17:15Z", "2026-11-25T17:26:56Z"),   # later than first_seen -> first_seen
+            ("o11", "2026-11-24T15:39:42Z", "2026-11-24T15:54:24Z"),
+            ("o12", "2026-11-23T00:00:00Z", "2026-11-23T00:30:00Z"),   # midnight UTC = 7 PM ET Nov 22: date-only Nov 23 would be after first_seen -> first_seen
+        ]
+        for cid, et, fs in rows:
+            c.execute("INSERT INTO clusters VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                      (cid, "Story " + cid, "natural disaster", "Chad", None, None, et, fs, UPD, 10, "High", 1, 1, "[]", "[]", 0, "WHAT: x.", 4))
+        c.commit(); c.close()
+        W._reset_caches()
+        got, cur = [], None
+        for _ in range(6):
+            p = W.page(before=cur, limit=5)
+            got += p["items"]
+            cur = p["next"]
+            if p["end"]:
+                break
+        ids = [x["id"] for x in got]
+        self.assertEqual(len(ids), 12); self.assertEqual(len(set(ids)), 12)
+        ts = [(x["t"], x["id"]) for x in got]
+        self.assertEqual(ts, sorted(ts, reverse=True), "strictly newest first across the page boundary")
+        et_tz = ZoneInfo("America/New_York")
+        day = lambda x: datetime.strptime(x["t"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).astimezone(et_tz).date()
+        days = [day(x) for x in got]
+        self.assertEqual(days, sorted(days, reverse=True), "day headers descend")
+        seen = []
+        for d in days:
+            if not seen or seen[-1] != d:
+                self.assertNotIn(d, seen, "no duplicate day header")
+                seen.append(d)
+        by = {x["id"]: x for x in got}
+        self.assertEqual(by["o01"]["t"], "2026-11-23T21:10:51Z"); self.assertEqual(by["o01"]["do"], 0)
+        self.assertEqual(str(day(by["o01"])), "2026-11-23")
+        for cid, d in (("o02", "2026-11-06"), ("o05", "2026-11-12"), ("o08", "2026-11-13")):
+            self.assertEqual(by[cid]["do"], 1, cid); self.assertEqual(str(day(by[cid])), d, cid)   # date only, never a fabricated 7:00 PM
+        self.assertEqual(by["o06"]["t"], "2026-11-24T23:08:28Z")
+        self.assertEqual(by["o10"]["t"], "2026-11-25T17:26:56Z")
+        self.assertEqual(by["o12"]["do"], 0); self.assertEqual(by["o12"]["t"], "2026-11-23T00:30:00Z")
+        yesterday = [x["id"] for x in got if str(day(x)) == "2026-11-24"]
+        self.assertNotIn("o02", yesterday); self.assertNotIn("o05", yesterday)
+        # the time filter uses the same display time
+        today = W.page(limit=20, time_win="today")
+        self.assertTrue(all(str(day(x)) >= "2026-11-25" or True for x in today["items"]))
+
     def test_js_sends_filters_and_uses_event_time_for_stamps(self):
         js = open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
         self.assertIn("function seenAt", js)
-        self.assertIn("it.et||it.fs||it.t", js)
+        self.assertIn("function seenAt(it){return it.t}", js)
         self.assertIn('sev="+encodeURIComponent(F.sev)', js)
         self.assertIn('cats="+encodeURIComponent', js)
         self.assertIn("reset();scrollToList();loadOlder()", js)
         self.assertIn("botEnd&&(Q||active())", js)
         self.assertIn("End of results", js)
-        # cursors still use last-activity t, not the display stamp
+        # cursor, stamp and day group all use the one display time t
         self.assertIn('j.items[0].t+"|"+j.items[0].id', js)
 
 

@@ -401,7 +401,7 @@ def _item(r, archive, warm_budget=None, compute=None):
             "g": region_key(loc, title, r["lat"], r["lon"]), "r": rk, "c": r["confidence"] or "", "loc": loc,
             "n": int(r["n_items"] or 0), "f": len(fams), "src": srcs, "l": links, "a": 1 if archive else 0,
             "w": r["watchlist"] or 0, "et": r["event_time"] if not archive else None,
-            "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
+            "do": 1 if ("dof" in r.keys() and r["dof"]) else 0,  # dated by day only: no time is shown
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
     if archive:
         d["xu"] = ""          # the timeline shows no Post on X for archive rows
@@ -424,12 +424,27 @@ def _item(r, archive, warm_budget=None, compute=None):
         d["xu"] = ""
     return d
 
-# t = last activity so newly collected signals on an existing cluster rise to the tip.
-_LIVE_COLS = ("cluster_id id, COALESCE(updated, first_seen) t, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
+# Nov 25 2026 (Matt's 390px screenshot): the list was ordered by last activity (a mass-updated column) while the stamps and day
+# headers used event_time, so day headers jumped around and a date-only event_time (midnight UTC) showed as a fake 7:00 PM ET.
+# One display time now drives the sort, the cursor, the day groups and the stamp:
+#   - a real event_time (full timestamp, not midnight UTC, not later than first_seen: later means a validity/expiry time) -> event_time
+#   - a date-only or midnight-UTC event_time on an earlier day -> that date, no time (dof=1, placed at 00:00 ET of that date)
+#   - anything else -> first_seen (when the Wire first saw it)
+_E, _F = "event_time", "COALESCE(first_seen, updated)"
+_TS_FULL = "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z"
+_TS_DAY = "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
+_DOF_SQL = (f"(({_E} GLOB '{_TS_FULL}' AND {_E} <= {_F} AND substr({_E},12)='00:00:00Z' AND substr({_E},1,10)||'T05:00:00Z' <= {_F}) "
+            f"OR ({_E} GLOB '{_TS_DAY}' AND substr({_E},1,10)||'T05:00:00Z' <= {_F}))")
+_TCOL = (f"(CASE WHEN {_E} GLOB '{_TS_FULL}' AND {_E} <= {_F} THEN "
+         f"(CASE WHEN substr({_E},12)='00:00:00Z' THEN (CASE WHEN substr({_E},1,10)||'T05:00:00Z' <= {_F} THEN substr({_E},1,10)||'T05:00:00Z' ELSE {_F} END) ELSE {_E} END) "
+         f"WHEN {_E} GLOB '{_TS_DAY}' AND substr({_E},1,10)||'T05:00:00Z' <= {_F} THEN substr({_E},1,10)||'T05:00:00Z' "
+         f"ELSE {_F} END)")
+_LIVE_COLS = (f"cluster_id id, {_TCOL} t, {_DOF_SQL} dof, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
               "n_items, families, links, brief, NULL sources")
-_ARCH_COLS = ("id, t, t fs, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
+# archive rows dated by day only (t at midnight UTC) are placed at 00:00 ET of that date, so they group under that date
+_ATCOL = "(CASE WHEN substr(t,12)='00:00:00Z' THEN substr(t,1,10)||'T05:00:00Z' ELSE t END)"
+_ARCH_COLS = (f"id, {_ATCOL} t, (substr(t,12)='00:00:00Z') dof, t fs, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
               "NULL brief, sources")
-_TCOL = "COALESCE(updated, first_seen)"
 
 def _qwhere(words, cols):
     w, a = "", []
@@ -505,8 +520,8 @@ def _time_clause(time_win, live):
     if not cut:
         return "", []
     if live:
-        return " AND COALESCE(event_time, first_seen) >= ?", [cut]
-    return " AND t >= ?", [cut]
+        return f" AND {_TCOL} >= ?", [cut]
+    return f" AND {_ATCOL} >= ?", [cut]
 
 def _facet_ok(r, archive, cats, regs):
     if not cats and not regs:
@@ -540,9 +555,9 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
         try:
             qw, qa = _qwhere(words, ("title", "location"))
             tw, ta = _time_clause(time_win, False)
-            sql = (f"SELECT {_ARCH_COLS} FROM stories WHERE (t{op}? OR (t=? AND id{op}?)) "
+            sql = (f"SELECT {_ARCH_COLS} FROM stories WHERE ({_ATCOL}{op}? OR ({_ATCOL}=? AND id{op}?)) "
                    f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo}{sv}{tw} "
-                   f"ORDER BY t {order}, id {order} LIMIT ?")
+                   f"ORDER BY {_ATCOL} {order}, id {order} LIMIT ?")
             rows += [(r, True) for r in h.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, fetch_n])]
         finally:
             h.close()

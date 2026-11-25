@@ -29,7 +29,7 @@ var todayK=dayKey(new Date().toISOString()),yK=dayKey(new Date(Date.now()-864e5)
 function dayLabel(k,s){return k===todayK?"Today":k===yK?"Yesterday":fL.format(dt(s))}
 var fU=new Intl.DateTimeFormat("en-US",{timeZone:"UTC",weekday:"long",month:"long",day:"numeric",year:"numeric"}),fUs=new Intl.DateTimeFormat("en-US",{timeZone:"UTC",weekday:"short",month:"short",day:"numeric",year:"numeric"});
 function tm(s){return fT.format(dt(s))}
-function seenAt(it){return it.et||it.fs||it.t}
+function seenAt(it){return it.t}
 /* ---------- helpers */
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 var qRx=null;
