@@ -38,6 +38,10 @@ def _v(name):
     try: return str(int(os.path.getmtime(os.path.join(STATIC, name))))
     except OSError: return "0"
 
+def _nv(name):   # bnshare.js lives in netmap_static (shared Post on X button)
+    try: return str(int(os.path.getmtime(os.path.join(os.path.dirname(STATIC), "netmap_static", name))))
+    except OSError: return "0"
+
 def get(url, accept="application/json", timeout=15, limit=20_000_000):
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": accept})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -858,7 +862,7 @@ def page(qs=None):
 </div></div>
 <noscript><p class="wx-nojs">The weather map needs JavaScript. <a href="/live#weather">Text forecast</a></p></noscript>
 </main>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/wxmap/wx.js?v={_v("wx.js")}" defer></script>
+<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/bnshare.js?v={_nv("bnshare.js")}" defer></script><script src="/api/wxmap/wx.js?v={_v("wx.js")}" defer></script>
 </body></html>'''
 
 _WARMED = [False]
