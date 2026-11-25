@@ -31,6 +31,7 @@ RENDER_OWNED = [x for x in os.environ.get("BN_RENDER_OWNED", "votes.db,newslette
 if "story_writer.db" not in RENDER_OWNED: RENDER_OWNED.append("story_writer.db")   # Nov 21 2026: instant write-ups (story_writer.py) survive deploys via the handoff
 if "story_places.db" not in RENDER_OWNED: RENDER_OWNED.append("story_places.db")   # Nov 23 2026: stored map places (story_places.py) survive deploys via the handoff
 if "xtags.db" not in RENDER_OWNED: RENDER_OWNED.append("xtags.db")   # Nov 25 2026: xAI story tags (x_tags_llm.py) survive deploys via the handoff
+if "cards.db" not in RENDER_OWNED: RENDER_OWNED.append("cards.db")   # Nov 25 2026: story photo cards (story_photo.py) survive deploys via the handoff
 
 # Box -> Render live data. Top-level *.db (snapshotted read-only), selected JSON state and generated media dirs.
 SYNC_DIRS = ["snapshots", "static/vsubs", "video_subs", "static/social", "data"]   # static/social: story thumbnails (t303); data: design v3 Wire band files (top_of_mind.json, whats_coming.json)

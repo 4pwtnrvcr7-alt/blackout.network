@@ -1225,7 +1225,21 @@ def package_one(cid, row=None, al=None, build_card_now=False):
             except Exception:
                 traceback.print_exc(); card_ok = 0
             if not card_ok:
-                _mark_held(cid, "card not ready", row.get("title"), int(row.get("rank") or 0)); return False
+                tries = 0
+                try:
+                    with _LK:
+                        k = db()
+                        try:
+                            r = k.execute("SELECT tries FROM held WHERE cid=?", (cid,)).fetchone()
+                            tries = int((r["tries"] if r else 0) or 0)
+                        finally:
+                            k.close()
+                except Exception:
+                    tries = 0
+                _mark_held(cid, "card not ready", row.get("title"), int(row.get("rank") or 0))
+                if tries < 1:   # first failure: hold and retry. Second failure: publish anyway (map card / warm will follow).
+                    return False
+                log(f"card failed twice for {cid}, publishing without a stored card (map fallback; never the earth fallback)")
         with _LK:
             k = db()
             try:

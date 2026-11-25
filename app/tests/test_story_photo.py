@@ -47,7 +47,7 @@ if __name__ == "__main__":
         import os, tempfile
         from pathlib import Path
         d = tempfile.mkdtemp()
-        os.environ["BN_WRITER_DB"] = str(Path(d) / "story_writer.db")
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "story_writer.db")
         try:
             P._dir = lambda: Path(d)
             png = b"\x89PNG\r\n\x1a\n" + b"x" * 3000
@@ -66,4 +66,42 @@ if __name__ == "__main__":
             path = P.cached(cand["src"])
             self.assertTrue(path and path.is_file() and path.stat().st_size > 2000)
         finally:
-            os.environ.pop("BN_WRITER_DB", None)
+            os.environ.pop("BN_CARDS_DB", None)
+
+
+    def test_multiline_credit_does_not_crash_for_live_stories(self):
+        """Commons Artist metadata often has newlines; Pillow textlength raises ValueError on them (live 2:57 AM ET crash)."""
+        import os, tempfile
+        from PIL import Image
+        import share_card as S
+        d = tempfile.mkdtemp()
+        jpg = Path(d) / "p.jpg"
+        Image.new("RGB", (900, 1200), (20, 30, 40)).save(jpg, "JPEG")
+        stories = [
+            ("e2ca47e325c5b8e1", "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz", 2, "Tehran",
+             "United States Department of the Treasury\nWikimedia Commons"),
+            ("6b27e568eb9f503f", "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days", 2, "Riyadh",
+             "Kolaiel\nWikimedia Commons"),
+            ("dec0cddbd508e929", "Burnham launches inquiry into nuclear bomb test veterans’ records", 6, "United Kingdom",
+             "Alecsandra Dragoi\nNo 10 Downing Street\n(Official portrait)"),
+            ("9f5bc9d66d783d25", "— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package", 6, "Ukraine",
+             "Press Service of the President of Ukraine\nWikimedia Commons"),
+            ("e1e85cc0c198878d", "Ethiopia launches polio vaccination campaign to protect more than 11 million children: WHO deployed 28 staff…", 1, "Africa",
+             "Author\nline two"),
+            ("ef132895dca18576", "Director Liability Italy: Bank Failure Guide 2026", 4, "Italy",
+             "Credit\nwith\nnewlines"),
+        ]
+        import story_photo as SP
+        orig = SP.cached
+        SP.cached = lambda src: jpg
+        try:
+            for cid, title, rank, loc, credit in stories:
+                col = S.RED if rank >= 7 else S.AMBER if rank >= 4 else S.GREEN
+                ph = dict(src="https://upload.wikimedia.org/x.jpg", credit=credit, license="Public domain", kind="person",
+                          label="File photo; not taken at this event.")
+                it = dict(kind="story", id=cid, title=S._clean_head(title), rank=rank, color=col, kicker="NEWS", loc=loc,
+                          art=("story", None, None, ph["src"]), photo=ph, stats=[], tags=[])
+                im = S._lay_story(it)
+                self.assertEqual(im.size, (1200, 675), cid)
+        finally:
+            SP.cached = orig
