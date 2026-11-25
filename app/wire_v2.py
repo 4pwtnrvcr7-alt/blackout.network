@@ -359,18 +359,36 @@ def _light_story(cid):
         brief = r.get("brief") or ""
         desc = first_sentence(brief or full, 160)
         meta = og.tags(title=f"{h} | BLACKOUT.NETWORK", desc=desc, url=f"{og.SITE}/wire/{cid}", story_id=cid, rank=rank, og_type="article")
+        fall = f"/wire/{cid}?full=1"
         return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
                 f"<title>{E(h)} | BLACKOUT.NETWORK</title><link rel=\"canonical\" href=\"{E(og.SITE)}/wire/{E(cid)}\">{meta}"
-                "<meta http-equiv=\"refresh\" content=\"3\"></head><body style=\"background:#05060a;color:#ECEEF5;font:16px/1.5 Inter,system-ui,sans-serif;padding:48px 24px\">"
-                f"<h1 style=\"font-size:22px\">{E(h)}</h1><p style=\"color:#9aa0aa\">Loading the full story…</p></body></html>")
+                f"<meta http-equiv=\"refresh\" content=\"3;url={E(fall)}\"></head>"
+                f"<body style=\"background:#05060a;color:#ECEEF5;font:16px/1.5 Inter,system-ui,sans-serif;padding:48px 24px\">"
+                f"<h1 style=\"font-size:22px\">{E(h)}</h1><p style=\"color:#9aa0aa\">Loading the full story…</p>"
+                f"<p><a href=\"{E(fall)}\" style=\"color:#ECEEF5\">Open the full story</a></p>"
+                f"<script>setTimeout(function(){{location.replace({json.dumps(fall)});}},3000);</script></body></html>")
     except Exception:
         return None
 
 
-def handle(path, qs=None):
-    """(code, body, ctype) for /wire, /wire-classic, /wire/<id> when ON, else None (caller falls back to the old pages).
-    Stale-while-revalidate: a cached page is always served at once (refreshed in the background after 60 s); a cold story page that is
-    not ready within _BUDGET seconds returns an OG-complete stub, so X / link-preview crawlers never wait on a stale board."""
+def _ua(headers):
+    if not headers: return ""
+    return headers.get("user-agent") or headers.get("User-Agent") or ""
+
+
+def _qs_flag(qs, name):
+    v = (qs or {}).get(name)
+    if isinstance(v, (list, tuple)):
+        v = v[0] if v else ""
+    return str(v or "").strip().lower() in ("1", "true", "yes")
+
+
+def handle(path, qs=None, headers=None):
+    """(code, body, ctype) for /wire, /wire-classic, /wire/<id> when ON, else None (caller falls back to the DB story page).
+    A cached board page is served at once (refreshed in the background after 60 s). Humans never wait on api_state and
+    never see the 'Loading the full story…' stub — handle returns None and story.py renders title, brief, sources and
+    the share button from the DB. The OG stub is only for crawler UAs (Twitterbot, facebookexternalhit, …) and its
+    auto-refresh hard-falls back to /wire/<id>?full=1 (the DB page). There is no second, 20-second wait."""
     if not ON: return None
     list_path, noindex = "/wire", False
     if path in ("/wire-classic", "/wire-classic/"):
@@ -379,7 +397,7 @@ def handle(path, qs=None):
         key = "/wire"
     else:
         m = re.match(r"^/wire/([0-9a-f]{16})/?$", path)
-        if not m or (qs or {}).get("since"): return None
+        if not m or (qs or {}).get("since") or _qs_flag(qs, "full"): return None
         key = m.group(1)
     now = time.time()
     hit = _C.get(key)
@@ -392,15 +410,22 @@ def handle(path, qs=None):
     fut = _INFL.get(key)
     if fut is None:
         fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
+    story_page = key not in ("/wire", "/wire-classic")
+    crawler = False
+    if story_page:
+        try:
+            import og
+            crawler = og.is_crawler(_ua(headers))
+        except Exception:
+            crawler = False
+        if not crawler:
+            return None   # human: do not block on api_state; caller renders the full story from the DB
     try:
         body = fut.result(timeout=_BUDGET)
     except Exception:
-        if key not in ("/wire", "/wire-classic"):
+        if story_page and crawler:
             light = _light_story(key)
             if light: return 200, light, "text/html"
-        try:
-            body = fut.result(timeout=20)
-        except Exception:
-            return None
+        return None
     if not body: return None   # story no longer on the board: old story page (DB history) handles it
     return 200, body, "text/html"

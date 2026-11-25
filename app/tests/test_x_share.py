@@ -271,7 +271,7 @@ class Tags(unittest.TestCase):
         q = parse_qs(urlparse(href).query)
         text = q["text"][0]
         url = q["url"][0]
-        self.assertTrue(url.endswith("/wire/5932fb61c94775cd"))
+        self.assertTrue(url.endswith("/wire/5932fb61c94775cd?s=x"))
         self.assertIn("#Ebola", text)
         self.assertIn("#DRC", text)
         self.assertNotIn("#Kenya", text)

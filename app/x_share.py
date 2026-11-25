@@ -1139,10 +1139,11 @@ def _headline(item, headline=None):
 
 
 def story_url(item):
+    """Permalink used in the Post on X button. ?s=x is a new URL for X's card cache, so a fresh share is recrawled (the image itself is also busted with og.image_url ?v=)."""
     cid = item.get("cluster_id") or item.get("id") or ""
     if not cid:
         return SITE + "/wire"
-    return f"{SITE}/wire/{cid}"
+    return f"{SITE}/wire/{cid}?s=x"
 
 
 def _join(headline, tags):

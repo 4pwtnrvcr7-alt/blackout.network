@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "5"  # bump to force social CDNs to refetch
+VERSION = "6"  # bump to force social CDNs to refetch (Nov 25: broken generic card was cached as v=5)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -640,7 +640,7 @@ def png_for_story_fast(cid):
     the full card keeps building in the background so the next request (and the next crawl) gets it."""
     try:
         import share_card
-        b = share_card.story_png_fast(cid, budget=1.0)
+        b = share_card.story_png_fast(cid, budget=0.4)
         if b:
             return b
     except Exception:
@@ -766,13 +766,38 @@ def share_page(seg):
     ).encode("utf-8")
 
 
+_SAFE = None
+
+
+def _safe_png():
+    """In-memory last-resort 1200x630 PNG so a crawler never gets HTML, a redirect, or an empty body."""
+    global _SAFE
+    if _SAFE and len(_SAFE) > 1000:
+        return _SAFE
+    try:
+        _SAFE = png_bytes(render(TAGLINE, bg_im=None, tagline=True))
+    except Exception:
+        im = Image.new("RGB", (W, H), BG)
+        buf = io.BytesIO(); im.save(buf, format="PNG", compress_level=3)
+        _SAFE = buf.getvalue()
+    return _SAFE
+
+
+def _valid_png(b):
+    return isinstance(b, (bytes, bytearray)) and len(b) > 1000 and b[:8] == b"\x89PNG\r\n\x1a\n"
+
+
 def handle_get(path, qs=None):
-    """Addon entry: /og/<page>.png and /og/wire/<id>.png. Never raises a 5xx of its own."""
+    """Addon entry: /og/<page>.png and /og/wire/<id>.png. Always a 200 image/png for those paths (never a redirect, HTML, or 5xx)."""
     try:
         p = (path or "").split("?")[0].rstrip("/")
         m = re.fullmatch(r"/og/wire/([0-9a-f]{16})(?:\.png)?", p, re.I)
         if m:
-            return 200, png_for_story_fast(m.group(1).lower()), "image/png"
+            try:
+                b = png_for_story_fast(m.group(1).lower())
+            except Exception:
+                b = None
+            return 200, b if _valid_png(b) else _safe_png(), "image/png"
         m = re.fullmatch(r"/og/([a-z0-9-]{1,40})(?:\.png)?", p)
         if m:
             key = m.group(1).lower()
@@ -782,17 +807,14 @@ def handle_get(path, qs=None):
                 key = "map"
             if key == "tv" or key == "tv-radio" or key == "live-tv":
                 key = "streams"
-            if key not in PAGES and key not in ("home",):
-                # unknown key: still a valid card so a typo share is not a 404 dead preview
-                return 200, png_for(key if key in PAGES else "home"), "image/png"
-            return 200, png_for(key), "image/png"
+            try:
+                b = png_for(key if key in PAGES or key == "home" else "home")
+            except Exception:
+                b = None
+            return 200, b if _valid_png(b) else _safe_png(), "image/png"
         return 404, {"error": "not found"}
     except Exception:
-        # last-resort plain card; never 5xx a share-image request
-        try:
-            return 200, png_bytes(render(TAGLINE, bg_im=None, tagline=True)), "image/png"
-        except Exception:
-            return 404, {"error": "not found"}
+        return 200, _safe_png(), "image/png"
 
 
 def write_legacy_static():
