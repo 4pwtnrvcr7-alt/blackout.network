@@ -110,6 +110,7 @@ _HAZARDS = [
     ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|(?:security|cisa|vendor) advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit)"),
     ("quake", r"\b(earthquake|quake|tremor|aftershock|seismic|magnitude|\bM ?\d\.\d)"),
     ("volcano", r"\b(volcano|volcanic|eruption|erupts?)\b"),
+    ("tsunami", r"\btsunamis?\b"),
     ("wildfire", r"\b(wildfires?|forest fires?|bush ?fires?|brush fire|fire weather|burn(?:ing)? acres)"),
     ("flood", r"\b(flood(?:s|ing|ed)?|flash flood|inundat)"),
     ("freeze", r"\b(freeze|freezing|frost|blizzard|winter storm|snow|ice storm|cold wave|wind chill)"),
@@ -392,11 +393,15 @@ def hazard_for(text):
 _NO_AGENCY = frozenset({"Server racks", "Power lines", "U.S. Treasury Building", "U.S. Capitol"})
 
 
+# tsunami uses the curated flood photo (no separate Commons file).
+_TOPIC_ALIAS = {"tsunami": "flood"}
+
+
 def fallback_key(title, text="", category=""):
     """Curated topic key for a story with no matched person or place: its hazard, else its category, else general."""
     k = hazard_for((title or "") + " " + (text or ""))
     if k:
-        return k
+        return _TOPIC_ALIAS.get(k, k)
     cat = (category or "").strip().lower()
     k = next((v for sub, v in CATEGORY_KEY if sub in cat), None)
     if k == "government" and not _US_POLITICS.search((title or "") + " " + (text or "")):
@@ -406,6 +411,7 @@ def fallback_key(title, text="", category=""):
 
 def topic_photo(text, seed="", key=None):
     key = key or hazard_for(text)
+    key = _TOPIC_ALIAS.get(key, key)
     if not key or key not in TOPICS:
         return None
     agency, files, noun = TOPICS[key]
@@ -422,9 +428,30 @@ def topic_photo(text, seed="", key=None):
     return None
 
 
-# Disease, wildfire, storm/freeze and flood: the agency topic photo comes before the place
-# (no war ruins on a meningitis story, no ISS view for a wildfire).
+# Disease/wildfire/storm topic files may stand in for each other in photo_rule.
 TOPIC_BEFORE_PLACE = frozenset({"measles", "ebola", "flu", "outbreak", "wildfire", "storm", "freeze", "flood"})
+# Natural-disaster and outbreak stories skip place photos (people, culture, country scenery)
+# and use the curated agency topic / category hazard photo instead (Matt, Nov 25 2026 5:46 PM ET).
+HAZARD_SKIP_PLACE = TOPIC_BEFORE_PLACE | {"quake", "volcano", "tsunami", "spaceweather"}
+_HAZARD_CAT = re.compile(
+    r"(natural\s*disaster|earthquake|\bquake\b|volcano|storm|hurricane|flood|wildfire|"
+    r"tsunami|space\s*weather|outbreak|\bdisease\b|seismic)",
+    re.I,
+)
+
+
+def skip_place_photo(title="", text="", category=""):
+    """True for hazard / outbreak stories: do not use a generic place or country photo."""
+    blob = " ".join(x for x in (title, text) if x)
+    k = hazard_for(blob)
+    if k in HAZARD_SKIP_PLACE:
+        return True
+    cat = (category or "").strip()
+    if cat.lower() in HAZARD_SKIP_PLACE or cat.lower() in ("quake", "seismic"):
+        return True
+    if cat and _HAZARD_CAT.search(cat):
+        return True
+    return False
 
 
 def enabled():
@@ -432,10 +459,10 @@ def enabled():
     return os.environ.get("BN_CARD_PHOTO", "1") != "0"
 
 
-def choose_order(title, text=""):
-    """('person', 'topic', 'place') for disease/wildfire/storm/flood; else person, place, topic."""
-    if hazard_for((title or "") + " " + (text or "")) in TOPIC_BEFORE_PLACE:
-        return ("person", "topic", "place")
+def choose_order(title, text="", category=""):
+    """('person', 'topic') for hazard/outbreak stories (no place photo); else person, place, topic."""
+    if skip_place_photo(title, text, category):
+        return ("person", "topic")
     return ("person", "place", "topic")
 
 
@@ -457,7 +484,7 @@ def choose(cid, title, hit=None, text="", category=""):
         "topic": lambda: topic_photo(title + " " + (text or ""), cid),
         "category": lambda: topic_photo("", cid, key=fallback_key(title, text, category)),
     }
-    for tier in choose_order(title, text) + ("category",):
+    for tier in choose_order(title, text, category) + ("category",):
         try:
             im = steps[tier]()
         except Exception as e:  # noqa: BLE001

@@ -278,6 +278,19 @@ def card_stale(meta):
                     ch = db_choice(cid) or {}
                     if ch and is_non_photo_candidate(ch):
                         return True
+                    # Hazard / outbreak stories must not keep a generic place/country photo.
+                    if ch and (ch.get("kind") or "") == "place":
+                        t, x = _story_text(cid, "", "")
+                        cat = ""
+                        try:
+                            import story
+                            r, _al = story.load(cid)
+                            if r:
+                                cat = r.get("category") or ""
+                        except Exception:
+                            pass
+                        if CP.skip_place_photo(t, x, cat):
+                            return True
             except Exception:
                 pass
     except Exception:
@@ -602,6 +615,13 @@ def pick(cid, title="", loc="", text=""):
             return None
         lab = c.get("label") or c.get("caption") or ""
         if (c.get("kind") or "") == "place":
+            # Hazard / outbreak stories skip place photos (people, culture, country scenery).
+            try:
+                import card_photo as CP
+                if CP.skip_place_photo(title, text):
+                    return None
+            except Exception:
+                pass
             # A v3 place photo (Wikidata P18 of this story's own place, labelled with it) is allowed; loose text matches are not.
             ft0 = commons_file_title(src=c.get("src") or "", link=c.get("link") or "", title=c.get("title") or "")
             if not (place_photo_ok(title, text) or _v3_photo_allows(title, ft0, src=c.get("src") or "", kind="place", label=lab, text=text)[0]):
