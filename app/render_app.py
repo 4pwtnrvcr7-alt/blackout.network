@@ -42,7 +42,9 @@ _mlock = threading.Lock()
 BLOCK_THREAD_NAMES = {"bn-search-index", "politics_hist", "politics_markets", "netstatus", "heatmap_geocoder", "solar_seismic_logger",
                       "video-subs-bg", "streams-live", "bcast-text", "bcast-audio"}
 BLOCK_TARGETS = {"_loop", "loop", "_warm_loop", "_indexer", "_text_loop", "_audio_loop", "harvest", "scheduler", "jet_loop", "_harvest"}
-ALLOW_TARGETS = {"_watch", "bg", "process_request_thread", "_render_bg"}
+# Photo worker targets must be allowed: the guard also blocks any name containing "loop"
+# (the #228/#229 `_floop` thread was started in logs but never ran).
+ALLOW_TARGETS = {"_watch", "bg", "process_request_thread", "_render_bg", "_photo_jobs", "_run_lookup"}
 BLOCKED = []
 _orig_start = threading.Thread.start
 def _guarded_start(self):
