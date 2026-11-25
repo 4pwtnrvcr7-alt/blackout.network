@@ -263,31 +263,26 @@ def _item(r, archive, warm_budget=None):
                     warm_budget[0] -= 1
             except Exception:
                 pass
-        # List path must not call x_share.intent_url / hashtags / location_tags:
+        # List path must not call x_share.intent_url / hashtags / location_tags on every row:
         # profiling a live-sized copy (4303 clusters + 27540 archive) showed that
         # path at 14–20 ms/row (~1.5 s of 1.8 s locally; 5–8 s on Render).
-        d["xu"] = _list_xu(r["id"], h, title, loc)
+        # Tags come from stored ready/notes, or a one-time lazy compute cached per cid.
+        d["xu"] = _list_xu(r["id"], h, title, loc, brief=r["brief"] if "brief" in r.keys() else "",
+                           category=r["category"], rank=rk, links=links)
     except Exception:
         d["xu"] = ""
     return d
 
-def _stored_tags(cid):
-    """Already-computed tags for this story, or []. Never runs the gazetteer/LLM extractor."""
-    if not cid:
+# Per-row cache of 3–5 specific entity tags for the list-path Post-on-X URL.
+# Survives page-cache busts; cleared only when this process restarts.
+_TC = {}; _TC_LK = threading.Lock()
+_GENERIC_FILLER = {"#News", "#WorldNews", "#Breaking", "#BreakingNews",
+                   "#BlackoutNetwork", "#Alerts"}
+
+def _norm_tag_list(raw):
+    """Parse a stored tag list (JSON, string, or list) into unique #Tags, max 8, no filtering."""
+    if not raw:
         return []
-    note = None
-    try:
-        import story_v3 as V3
-        note = V3.note_for(cid)
-    except Exception:
-        note = None
-    if not isinstance(note, dict):
-        try:
-            import story_writer as SW
-            note = SW.note_for(cid)
-        except Exception:
-            note = None
-    raw = (note or {}).get("tags") or (note or {}).get("hashtags") or []
     if isinstance(raw, str):
         try:
             raw = json.loads(raw) if raw.lstrip().startswith("[") else raw.split()
@@ -306,12 +301,131 @@ def _stored_tags(cid):
             break
     return out
 
-def _list_xu(cid, headline, title, loc=""):
-    """Post-on-X URL for a timeline row. Uses stored tags when we have them; never location_tags()."""
+def _specific(tags, item=None, headline=None):
+    """Keep 3–5 specific entity tags. Never #News / #WorldNews / #Breaking or other fillers."""
+    tags = list(tags or [])
+    try:
+        import x_share
+        tags = x_share.specific_tags(tags, item=item, headline=headline)
+    except Exception:
+        tags = [t for t in tags if t not in _GENERIC_FILLER]
+    return [t for t in tags if t not in _GENERIC_FILLER][:5]
+
+def _note_tags(cid):
+    """Tags stored on a v3 / desk / writer brief, if any. Briefs usually have no such field."""
+    if not cid:
+        return []
+    note = None
+    try:
+        import story_v3 as V3
+        note = V3.note_for(cid)
+    except Exception:
+        note = None
+    if not isinstance(note, dict):
+        try:
+            import story_writer as SW
+            note = SW.note_for(cid)
+        except Exception:
+            note = None
+    if not isinstance(note, dict):
+        return []
+    return _norm_tag_list(note.get("tags") or note.get("hashtags") or [])
+
+def _ready_tags(cid):
+    """Bake-time tags from story_writer.ready (package_one / rule_tags). Cheap SQLite read."""
+    if not cid:
+        return []
+    try:
+        import story_writer as SW
+        row = SW._ready_row(cid)
+        return _norm_tag_list((row or {}).get("tags"))
+    except Exception:
+        return []
+
+def _persist_ready_tags(cid, tags):
+    """Fill ready.tags only when that row exists and tags are still empty. Never changes card_ok."""
+    if not cid or not tags:
+        return
+    try:
+        import story_writer as SW
+        row = SW._ready_row(cid)
+        if not row:
+            return
+        raw = (row.get("tags") or "").strip() if isinstance(row.get("tags"), str) else (row.get("tags") or "")
+        if isinstance(raw, list):
+            if raw:
+                return
+            raw = ""
+        if raw not in ("", "[]", "null"):
+            return
+        payload = json.dumps(list(tags)[:5], ensure_ascii=False)
+        with SW._LK:
+            k = SW.db()
+            try:
+                k.execute(
+                    "UPDATE ready SET tags=? WHERE cid=? AND (tags IS NULL OR tags='' OR tags='[]' OR tags='null')",
+                    (payload, cid),
+                )
+                k.commit()
+            finally:
+                k.close()
+    except Exception:
+        pass
+
+def _compute_specific(item, headline=None):
+    """Same entity/place/topic selection as the story page's rule path, then drop generic fillers.
+
+    Does not call x_share.hashtags() or x_tags_llm.lookup (those can queue the paid tag model).
+    """
+    try:
+        import x_share
+        it = x_share.with_body(item)
+        rule = x_share._entity_first(it, headline=headline)
+        people = x_share.person_tags(it, headline=headline)
+        places = x_share.location_tags(it, headline=headline)
+        merged = x_share._dedupe(people + places[:2] + [t for t in rule if t not in people], x_share.MAX_TAGS)
+        return _specific(merged, it, headline)
+    except Exception:
+        return []
+
+def _list_tags(cid, headline="", title="", loc="", brief="", category="", rank=None, links=None):
+    """3–5 specific entity tags for a list row, or fewer if nothing nameable exists. Never generic filler."""
+    item = {"id": cid, "cluster_id": cid, "title": title or headline, "headline": headline or title,
+            "location": loc or "", "brief": brief or "", "category": category or "",
+            "rank": rank, "links": links or []}
+    stored = _specific(_ready_tags(cid) or _note_tags(cid), item, headline or title)
+    if len(stored) >= 3:
+        return stored[:5]
+    with _TC_LK:
+        cached = list(_TC.get(cid) or [])
+    if len(cached) >= 3:
+        return cached[:5]
+    got = _compute_specific(item, headline or title)
+    out = []
+    for t in stored + got + cached:
+        if t not in out:
+            out.append(t)
+        if len(out) >= 5:
+            break
+    out = _specific(out, item, headline or title)
+    if out:
+        with _TC_LK:
+            _TC[cid] = list(out)
+        if len(out) >= 3:
+            _persist_ready_tags(cid, out)
+    return out
+
+def _stored_tags(cid):
+    """Already-computed tags for this story (ready, then brief), or []. Never runs the gazetteer/LLM extractor."""
+    return _ready_tags(cid) or _note_tags(cid)
+
+def _list_xu(cid, headline, title, loc="", brief="", category="", rank=None, links=None):
+    """Post-on-X URL for a timeline row. Stored specific tags first; lazy compute+cache if fewer than 3."""
     from urllib.parse import quote
     page = f"https://blackout.network/wire/{cid}?s=x" if cid else "https://blackout.network/wire"
     text = (headline or title or "").strip()
-    tags = _stored_tags(cid)
+    tags = _list_tags(cid, headline=headline, title=title, loc=loc, brief=brief,
+                      category=category, rank=rank, links=links)
     if tags:
         text = (text + " " + " ".join(tags)).strip()
     if not text:
