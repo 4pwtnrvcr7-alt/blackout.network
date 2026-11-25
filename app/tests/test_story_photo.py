@@ -78,7 +78,7 @@ class StoryPhoto(unittest.TestCase):
             P._dir = lambda: Path(d)
             png = b"\x89PNG\r\n\x1a\n" + b"x" * 3000
             jpg = b"\xff\xd8" + b"j" * 3000
-            cand = dict(src="https://upload.wikimedia.org/x.jpg", credit="US Treasury", license="Public domain",
+            cand = dict(src="https://upload.wikimedia.org/wikipedia/commons/Scott_Bessent.jpg", credit="US Treasury", license="Public domain",
                         caption="Scott Bessent, 2025. File photo; not taken at this event.", kind="person", label="lab", link="")
             P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)
             P.put_card("e2ca47e325c5b8e1", png, cand["src"])
@@ -187,7 +187,7 @@ class StoryPhoto(unittest.TestCase):
             photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
             mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
             newer = b"\x89PNG\r\n\x1a\n" + b"N" * 4000
-            src = "https://upload.wikimedia.org/zelensky.jpg"
+            src = "https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg"
             P.put_card("9f5bc9d66d783d25", photo, src)
             self.assertTrue(P.card_has_photo("9f5bc9d66d783d25"))
             self.assertEqual(P.get_card("9f5bc9d66d783d25"), photo)
@@ -212,7 +212,7 @@ class StoryPhoto(unittest.TestCase):
             P._dir = lambda: Path(d)
             png = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
             jpg = b"\xff\xd8" + b"j" * 3000
-            cand = dict(src="https://upload.wikimedia.org/x.jpg", credit="US Treasury", license="Public domain",
+            cand = dict(src="https://upload.wikimedia.org/wikipedia/commons/Scott_Bessent.jpg", credit="US Treasury", license="Public domain",
                         caption="Scott Bessent, 2025.", kind="person", label="lab", link="")
             P.put_card("e2ca47e325c5b8e1", png, "")  # map card first
             P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)  # JPEG arrives later; put_card would refuse a map over it
@@ -289,7 +289,7 @@ class StoryPhoto(unittest.TestCase):
             photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
             mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
             newer = b"\x89PNG\r\n\x1a\n" + b"N" * 4000
-            cand = dict(src="https://upload.wikimedia.org/zelensky.jpg", credit="Press Service", license="CC BY 4.0",
+            cand = dict(src="https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg", credit="Press Service", license="CC BY 4.0",
                         caption="Volodymyr Zelenskyy, 2025. File photo; not taken at this event.", kind="person", label="lab", link="")
             cid = "9f5bc9d66d783d25"
             P.db_put(cid, cand, jpg=jpg)
@@ -387,7 +387,7 @@ class StoryPhoto(unittest.TestCase):
         try:
             P._dir = lambda: Path(d)
             photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
-            cand = dict(src="https://upload.wikimedia.org/zelensky.jpg", credit="Press Service", license="CC BY 4.0",
+            cand = dict(src="https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg", credit="Press Service", license="CC BY 4.0",
                         caption="Volodymyr Zelenskyy, 2025.", kind="person", label="lab", link="")
             cid = "9f5bc9d66d783d25"
             P.db_put(cid, cand, jpg=b"\xff\xd8" + b"j" * 3000)
@@ -517,7 +517,7 @@ class StoryPhoto(unittest.TestCase):
             P._dir = lambda: Path(d)
             photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
             mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
-            src = "https://upload.wikimedia.org/wikipedia/commons/bessent.jpg"
+            src = "https://upload.wikimedia.org/wikipedia/commons/Scott_Bessent.jpg"
             cand = dict(src=src, credit="Example / Wikimedia Commons", license="Public domain",
                         caption="Scott Bessent, 2025. File photo; not taken at this event.",
                         kind="person", label="lab", link="")
@@ -603,7 +603,7 @@ class StoryPhoto(unittest.TestCase):
             P._dir = lambda: Path(d)
             old = b"\x89PNG\r\n\x1a\n" + b"O" * 4000
             new = b"\x89PNG\r\n\x1a\n" + b"N" * 4000
-            src = "https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg"
+            src = "https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg"
             P.put_card(cid, old, src, title_hash=stale_key)
             meta = P.card_meta(cid)
             self.assertTrue(P.card_title_stale(meta, fresh_key))
@@ -644,7 +644,7 @@ class StoryPhoto(unittest.TestCase):
         self.assertIn('deepcategory:"Jen-Hsun Huang"', qs)
         self.assertIn('incategory:"Jensen Huang"', qs)
 
-    def test_audit_downgrades_mismatch_to_map(self):
+    def test_audit_deletes_mismatch_photo_row(self):
         import os, tempfile
         from pathlib import Path
         d = tempfile.mkdtemp()
@@ -652,10 +652,10 @@ class StoryPhoto(unittest.TestCase):
         cid = "4c292ccdd9df73f8"
         title = "Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel"
         P.SUBJECT_HINTS[cid] = (title, "")
+        P.AUDIT.update(checked=0, deleted=0, downgraded=0, typography=0, done=False, error="", deleted_cids=[])
         try:
             P._dir = lambda: Path(d)
             photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
-            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
             src = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
             cand = dict(src=src, credit="Latvian pagan / Wikimedia Commons", license="CC0",
                         caption="Ukraine Russia, 2023. File photo; not taken at this event.",
@@ -663,11 +663,11 @@ class StoryPhoto(unittest.TestCase):
             P.db_put(cid, cand, jpg=b"\xff\xd8" + b"j" * 3000)
             P.put_card(cid, photo, src, title_hash="old")
             self.assertFalse(P.stored_photo_matches(cid))
-            self.assertFalse(P.card_has_photo(cid))
-            # A map downgrade of a wrong photo is allowed.
-            P.put_card(cid, mapp, "", title_hash="new")
-            self.assertEqual(P.get_card(cid), mapp)
-            self.assertFalse(P.card_has_photo(cid))
+            # Deleting the photo AND the card is required; a map downgrade leaves the JPEG for the worker.
+            self.assertTrue(P.delete_stored_photo(cid))
+            self.assertIsNone(P.db_choice(cid))
+            self.assertIsNone(P.get_card(cid))
+            self.assertIsNone(P.card_meta(cid))
         finally:
             P.SUBJECT_HINTS.pop(cid, None)
             os.environ.pop("BN_CARDS_DB", None)
@@ -698,7 +698,7 @@ class StoryPhoto(unittest.TestCase):
             dashed = b"\x89PNG\r\n\x1a\n" + b"D" * 4000
             cleaned = b"\x89PNG\r\n\x1a\n" + b"C" * 4000
             src_l = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
-            src_z = "https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg"
+            src_z = "https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg"
             P.db_put(libya, dict(src=src_l, credit="Latvian pagan / Wikimedia Commons", license="CC0",
                                  caption="Ukraine Russia, 2023. File photo.", kind="place", label="lab", link=""),
                      jpg=b"\xff\xd8" + b"j" * 3000)
@@ -806,7 +806,7 @@ class StoryPhoto(unittest.TestCase):
         P.SUBJECT_HINTS[huang] = (huang_title, "")
         P.REBUILD.update(done=False, ids=0, error="")
         memorial_src = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
-        zel_src = "https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg"
+        zel_src = "https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg"
         huang_src = "https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg"
         jpg_mem = d + "/mem.jpg"
         jpg_zel = d + "/zel.jpg"
@@ -916,6 +916,105 @@ class StoryPhoto(unittest.TestCase):
                 P.SUBJECT_HINTS.pop(k, None)
                 S._SC.pop(k, None)
             P.REBUILD.update(done=False, ids=0, error="")
+            os.environ.pop("BN_CARDS_DB", None)
+
+
+    def test_photo_rule_allows_only_named_person_or_shakemap_or_pif(self):
+        """Commons file title must contain the person's full name; topic/place photos are maps."""
+        libya = "Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel"
+        self.assertEqual(P.photo_rule_allows(libya, commons_title="The Goddess Themis stands with Ukraine.jpg",
+                                             src="https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg")[0], False)
+        # Caption or story title leaked into metadata must not count.
+        self.assertFalse(P.photo_strict_match("4c292ccdd9df73f8",
+                                              src="https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg",
+                                              meta_blob=libya + " Ukraine Russia, 2023",
+                                              title=libya, commons_title="themis ukraine.jpg"))
+        gaza = "Gaza's Health Ministry has declared an epidemic alert across the territory over a rapid rise in meningitis"
+        self.assertEqual(P.photo_rule_allows(gaza, commons_title="Ilan Meiri 1980 portrait.jpg",
+                                             src="https://upload.wikimedia.org/wikipedia/commons/Ilan_Meiri_1980.jpg")[0], False)
+        zel = "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"
+        self.assertTrue(P.photo_rule_allows(zel, commons_title="Volodymyr Zelenskyy 2025.jpg",
+                                            src="https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg")[0])
+        # Surname-only file title is not enough.
+        self.assertFalse(P.photo_rule_allows(zel, commons_title="zelensky.jpg",
+                                             src="https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg")[0])
+        huang = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        self.assertTrue(P.photo_rule_allows(huang, commons_title="Jensen huang stanford 2026-04-30 008.jpg",
+                                            src="https://upload.wikimedia.org/wikipedia/commons/Jensen_Huang.jpg")[0])
+        # Trump is named but is not the main subject.
+        self.assertFalse(P.photo_rule_allows(huang, commons_title="Donald Trump 2025.jpg",
+                                             src="https://upload.wikimedia.org/wikipedia/commons/trump.jpg")[0])
+        pif = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
+        self.assertTrue(P.photo_rule_allows(pif, commons_title="Public Investment Fund Tower, Riyadh.jpg")[0])
+        self.assertTrue(P.photo_rule_allows(pif, commons_title="PIF Tower at night.jpg")[0])
+        self.assertFalse(P.photo_rule_allows(pif, commons_title="Riyadh skyline 2023.jpg")[0])
+        self.assertTrue(P.photo_rule_allows(libya, src="https://earthquake.usgs.gov/product/shakemap/us7000/download/intensity.jpg")[0])
+
+    def test_card_headline_strips_unrenderable_glyphs_then_leading_punct(self):
+        """Zelensky tofu: drop characters the Montserrat card font cannot paint, then leading punctuation."""
+        raw = "".join(chr(c) for c in (0x0648, 0x0642, 0x0627, 0x0644)) + " " + chr(0x2014) + " Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package"
+        h = S._card_headline(raw)
+        self.assertTrue(h.startswith("Zelensky"), h)
+        self.assertNotIn(chr(0x0648), h)
+        self.assertFalse(h.lstrip()[:1] in (chr(0x2014), "-", chr(0x2013)))
+        from PIL import Image, ImageDraw
+        d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
+        _, _, lines = S._story_head(d, raw, 640)
+        joined = " ".join(lines)
+        self.assertTrue(joined.startswith("Zelensky"), joined)
+        cmap = S._card_font_cmap()
+        self.assertTrue(cmap, "Montserrat cmap should load")
+        self.assertNotIn(0x0648, cmap)
+        self.assertIn(ord("Z"), cmap)
+
+    def test_audit_deletes_libya_and_gaza_rows_keeps_matching_zelensky(self):
+        """Boot audit deletes non-matching photo rows outright; a matching Zelensky portrait is kept."""
+        import os, tempfile
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        libya, gaza, zel = "4c292ccdd9df73f8", "b06344259ebf4d01", "9f5bc9d66d783d25"
+        P.SUBJECT_HINTS[libya] = ("Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel", "")
+        P.SUBJECT_HINTS[gaza] = ("Gaza's Health Ministry has declared an epidemic alert across the territory over a rapid rise in meningitis", "")
+        P.SUBJECT_HINTS[zel] = ("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine", "")
+        P.AUDIT.update(checked=0, deleted=0, typography=0, done=False, error="", deleted_cids=[])
+        try:
+            P._dir = lambda: Path(d)
+            png = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+            P.db_put(libya, dict(src="https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg",
+                                 credit="Latvian pagan", license="CC0", caption="Ukraine Russia, 2023.", kind="place"),
+                     jpg=b"\xff\xd8" + b"j" * 3000)
+            P.put_card(libya, png, "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg")
+            P.db_put(gaza, dict(src="https://upload.wikimedia.org/wikipedia/commons/Ilan_Meiri_1980.jpg",
+                                credit="Ilan Meiri / Wikimedia Commons", license="CC BY 4.0",
+                                caption="Health Ministry. File photo.", kind="person"),
+                     jpg=b"\xff\xd8" + b"g" * 3000)
+            P.put_card(gaza, png, "https://upload.wikimedia.org/wikipedia/commons/Ilan_Meiri_1980.jpg")
+            zsrc = "https://upload.wikimedia.org/wikipedia/commons/Volodymyr_Zelenskyy.jpg"
+            P.db_put(zel, dict(src=zsrc, credit="Press Service", license="CC BY 4.0",
+                               caption="Volodymyr Zelenskyy, 2025. File photo.", kind="person"),
+                     jpg=b"\xff\xd8" + b"z" * 3000)
+            P.put_card(zel, png, zsrc, title_hash=P.card_title_key("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"))
+            n = S.audit_stored_photo_cards()
+            self.assertGreaterEqual(n, 2)
+            self.assertIn(libya, P.AUDIT["deleted_cids"])
+            self.assertIn(gaza, P.AUDIT["deleted_cids"])
+            self.assertIsNone(P.db_choice(libya))
+            self.assertIsNone(P.get_card(libya))
+            self.assertIsNone(P.db_choice(gaza))
+            self.assertIsNone(P.get_card(gaza))
+            # Zelensky portrait kept (file title has the full name).
+            self.assertTrue(P.stored_photo_matches(zel))
+            self.assertIsNotNone(P.db_choice(zel))
+            self.assertNotIn(zel, P.AUDIT["deleted_cids"])
+            dbg = {r["cid"]: r for r in P.photo_row_debug((libya, gaza, zel))}
+            self.assertFalse(dbg[libya]["photo_row"])
+            self.assertFalse(dbg[libya]["has_card"])
+            self.assertFalse(dbg[gaza]["photo_row"])
+            self.assertTrue(dbg[zel]["photo_row"])
+        finally:
+            for k in (libya, gaza, zel):
+                P.SUBJECT_HINTS.pop(k, None)
             os.environ.pop("BN_CARDS_DB", None)
 
 
