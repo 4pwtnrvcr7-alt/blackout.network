@@ -123,11 +123,15 @@ class Launches(unittest.TestCase):
         d = self.N.launches(); lid = self.by(d, "USSF-266")["id"]
         self.assertEqual(netmap.handle_get("/api/netmap/launches/" + lid)[1]["rocket_photo"]["key"], "falcon9")
 
-    def test_chip_frame_then_hide(self):
+    def test_chip_single_tap_on_off(self):
         tr = open(os.path.join(APP, "netmap_static", "skytrack.js"), encoding="utf-8").read()
         js = open(os.path.join(APP, "netmap_static", "launches.js"), encoding="utf-8").read()
-        self.assertIn("Tap again to hide", tr); self.assertIn("}, true);", tr)   # capture listener runs before net.js toggles
-        self.assertIn('T.framed() !== "launches"', js)
+        self.assertNotIn("Tap again to hide", tr)
+        self.assertNotIn("e.stopPropagation(); e.preventDefault(); ST.framed", tr)  # no capture intercept of the first tap
+        self.assertNotIn("}, true);", tr)
+        self.assertIn("Turning off is a single tap", tr)
+        self.assertNotIn('T.framed() !== "launches"', js)  # Launches chip no longer needs a second tap
+        self.assertIn("single tap on, single tap off", js)
         self.assertIn("selecting a launch turns the Launches chip back on", js)
 
 if __name__ == "__main__":

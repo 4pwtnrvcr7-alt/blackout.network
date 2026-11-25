@@ -477,8 +477,7 @@
     b.innerHTML = '<i style="background:#E8ECF5;border-color:#E8ECF5"></i>Launches';
     b.addEventListener("click", function (e) {
       e.stopPropagation(); var T = window.__nxTrack;
-      /* first tap on an ON chip frames the launches; a second tap while framed turns it off (Matt's request) */
-      if (LC.on && LC.reveal && T && T.framed() !== "launches") { lcFrame(); T.setFramed("launches"); T.hint(b); return; }
+      /* single tap on, single tap off; turning on also frames the next pad */
       LC.on = !LC.on; b.setAttribute("aria-pressed", LC.on ? "true" : "false");
       if (T) T.setFramed(LC.on ? "launches" : null);
       if (!LC.on) { LC.reveal = false; if (LC.sel >= 0) lcClose(); lcRepaint(); return; }

@@ -313,14 +313,16 @@
   }
   function boot() {
     if (!window.maplibregl) { setTimeout(boot, 60); return; }
-    map = new maplibregl.Map({ container: "nx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD() }, minZoom: 1, maxZoom: 13,
-      attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: reduce ? 0 : 300, renderWorldCopies: true });
+    map = new maplibregl.Map({ container: "nx_map", style: style(), bounds: US, fitBoundsOptions: { padding: PAD(), pitch: 0, bearing: 0 }, minZoom: 1, maxZoom: 13,
+      attributionControl: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, fadeDuration: reduce ? 0 : 300, renderWorldCopies: true,
+      projection: { type: "mercator" }, pitch: 0, bearing: 0 });
     map.touchZoomRotate.disableRotation();
     window.__nxMap = map; try { document.dispatchEvent(new CustomEvent("nx:map", { detail: map })); } catch (e) {}   /* gridlayer.js adds the grid operator layer to this map */
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> Data from <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · <a href="https://ioda.inetintel.cc.gatech.edu/" target="_blank" rel="noopener">IODA</a> · <a href="https://www.peeringdb.com/" target="_blank" rel="noopener">PeeringDB</a> · Cables: OpenStreetMap (ODbL), <a href="https://marinecadastre.gov/" target="_blank" rel="noopener">NOAA OCM</a> · Towers: <a href="https://www.fcc.gov/antenna-structure-registration" target="_blank" rel="noopener">FCC ASR</a> · Power grid: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> (ODbL)' }), "bottom-right");
     bindAttrib();
     map.on("dataloading", function () { if (!ready) step("map", Math.min(0.8, P.map + 0.04)); });
     map.on("load", function () {
+      try { map.setProjection({ type: "mercator" }); map.setPitch(0); map.setBearing(0); } catch (e) {}
       step("map", 0.5); addLayers(); seaLayers(); infLayers(); bindLayers(); if (location.hash !== "#sky") mapLayerIn();
       Promise.allSettled([pData, pWorld]).then(function (r) {
         if (r[0].status === "fulfilled") { D = r[0].value; applyData(); }
@@ -361,7 +363,7 @@
     map.addLayer({ id: "pulse", type: "circle", source: "pts", filter: ["==", ["get", "hot"], true], paint: { "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": ["get", "c"], "circle-stroke-width": 1.3, "circle-radius": 10, "circle-stroke-opacity": 0.6 } });
     map.addLayer({ id: "pt", type: "circle", source: "pts", paint: { "circle-color": ["get", "fill"], "circle-stroke-color": ["get", "c"], "circle-stroke-width": ["get", "sw"],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["*", 0.55, ["get", "r"]], 8, ["get", "r"]] } });
-    map.addLayer({ id: "pt-lbl", type: "symbol", source: "pts", filter: ["==", ["get", "hot"], true], minzoom: 2, layout: { "text-field": ["get", "label"], "text-font": FB, "text-size": 10, "text-letter-spacing": 0.14, "text-transform": "uppercase", "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true },
+    map.addLayer({ id: "pt-lbl", type: "symbol", source: "pts", filter: ["any", ["==", ["get", "hot"], true], ["==", ["get", "kind"], "cloud"]], minzoom: 2, layout: { "text-field": ["get", "label"], "text-font": FB, "text-size": 10, "text-letter-spacing": 0.14, "text-transform": "uppercase", "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true },
       paint: { "text-color": "rgba(240,240,250,.82)", "text-halo-color": "rgba(5,6,10,.9)", "text-halo-width": 1.2 } });
   }
   function startPulse() {
@@ -454,7 +456,7 @@
     });
     (D.cloud || []).forEach(function (c, i) {
       var l = c.level, ring = l >= 2 ? lvCol(l) : PROV[c.p] || COL.minor;
-      f.push(feat(c.lon, c.lat, { kind: "cloud", i: i, c: ring, fill: PROV[c.p] || COL.minor, sw: l >= 2 ? 3 : 1.5, r: 4.5, hot: l >= 2, label: c.name, layer: "cloud" }));
+      f.push(feat(c.lon, c.lat, { kind: "cloud", i: i, c: ring, fill: PROV[c.p] || COL.minor, sw: l >= 2 ? 3 : 1.6, r: 6.5, hot: l >= 2, label: (PNAME[c.p] ? PNAME[c.p] + " · " : "") + c.name, layer: "cloud" }));
     });
     PTS = f; vis(); summary(); list(); if (WORLD) applyWorld();
   }
@@ -474,6 +476,7 @@
     if (!map || !map.getSource("pts")) return;
     if (SKY.on) return;
     ON.power = ON.ops = !!ON.grid;   /* Nov 24 2026 (Matt): one "Power grid" chip runs outages, operators and the 230 kV+ lines */
+    ["glow", "pulse", "pt", "pt-lbl"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "visible"); });   /* setMode hides these when leaving Map; turn them back on so Cloud and other point markers show */
     map.getSource("pts").setData({ type: "FeatureCollection", features: PTS.filter(function (x) { return mapOn(x.properties.layer); }) });
     ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("internet") && !INET ? "visible" : "none"); });
     ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("internet") ? "visible" : "none"); });
@@ -744,8 +747,8 @@
   vis();
   $("nx_zin").onclick = function () { map && map.zoomIn(); };
   $("nx_zout").onclick = function () { map && map.zoomOut(); };
-  $("nx_home").onclick = function () { map && map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900 }); };
-  $("nx_world").onclick = function () { map && map.easeTo({ center: [-30, 25], zoom: innerWidth < 768 ? 0.6 : 1.4, duration: reduce ? 0 : 1100 }); };
+  $("nx_home").onclick = function () { map && map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900, pitch: 0, bearing: 0 }); };
+  $("nx_world").onclick = function () { map && map.easeTo({ center: [-30, 25], zoom: innerWidth < 768 ? 0.6 : 1.4, pitch: 0, bearing: 0, duration: reduce ? 0 : 1100 }); };
 
   /* ---------- All networks panel ---------- */
   function more(on) {
@@ -793,8 +796,9 @@
     var sj = window.BN_SATJS || [];
     SKY.loading = Promise.all([loadScript(sj[0], sj[1]), getJSON("/api/netmap/sky" + (mob ? "?lite=1" : "")), getJSON("/api/netmap/space").catch(function () { return null; }), getJSON("/api/netmap/learn.json").catch(function () { return {}; })]).then(function (r) {
       var D2 = r[1], sat = window.satellite; SKY.SW = r[2]; SKY.learn = r[3] || {}; SKY.groups = D2.groups || [];
-      SKY.groups.forEach(function (g) { SKY.show[g.id] = g.id !== "debris"; });
-      SKY.show.ss = false; SKY.show.sw = false;
+      SKY.groups.forEach(function (g) { if (SKY.show[g.id] === undefined) SKY.show[g.id] = g.id !== "debris"; });
+      if (SKY.show.ss === undefined) SKY.show.ss = false;
+      if (SKY.show.sw === undefined) SKY.show.sw = false;
       document.querySelectorAll("#nx_sf button[data-g]").forEach(function (b) {
         var g = b.dataset.g; if (SKY.show[g] !== undefined) b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
       });
@@ -1399,7 +1403,8 @@
       ["sat", "sat-glow", "trk", "sat-sel"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", "none"); });
       try { map.setMinZoom(1); } catch (e) {}
       try { map.setProjection({ type: "mercator" }); } catch (e) {}
-      mapLayerIn(); if (D) summary(); map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900 }); return;
+      try { map.setPitch(0); map.setBearing(0); } catch (e) {}   /* globe leaves a tilted camera; Map must be flat, north-up */
+      mapLayerIn(); if (D) summary(); map.fitBounds(US, { padding: PAD(), duration: reduce ? 0 : 900, pitch: 0, bearing: 0 }); return;
     }
     try { map.setProjection({ type: "globe" }); } catch (e) {}
     try { map.setMinZoom(-2); } catch (e) {}
@@ -1426,8 +1431,9 @@
   var m0 = document.body.classList.contains("nx-board") ? "status" : location.hash === "#sky" ? "sky" : "map";   /* pt1787u: Map is the default view */
   document.querySelectorAll("#nx_mode button").forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.m === m0 ? "true" : "false"); });
   document.querySelectorAll("#nx_sf button").forEach(function (b) {
+    var g0 = b.dataset.g; if (g0 && SKY.show[g0] === undefined) SKY.show[g0] = b.getAttribute("aria-pressed") === "true";   /* start from the chip so a tap before skyLoad is not a no-op */
     b.addEventListener("click", function () {
-      var g = b.dataset.g; SKY.show[g] = !SKY.show[g];   /* ss/sw are not in SKY.groups: undefined used to flip to false, so the first tap did nothing */ b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
+      var g = b.dataset.g; SKY.show[g] = !SKY.show[g]; b.setAttribute("aria-pressed", SKY.show[g] ? "true" : "false");
       if (g === "debris") { SKY.reveal.debris = !!SKY.show.debris; if (SKY.show.debris) debrisLoad(); }
       else if (g === "ss") { if (SKY.show.ss) { ssLoad(); solarOpen(); } skyLabs(); return; }
       else if (g === "sw") { if (SKY.show.sw) solarOpen("sw"); skyLabs(); return; }
