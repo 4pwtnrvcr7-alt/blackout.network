@@ -1443,7 +1443,16 @@ def photo_status():
         running = _FRUNNING
         last = _LAST_PREFETCH
         alive = bool(_FWORKER and _FWORKER.is_alive() and _FWORKER_PID == os.getpid())
-    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "", "pid": os.getpid()}
+    photos = cards = photo_cards = 0
+    try:
+        import story_photo
+        got = story_photo.store_counts()
+        if got:
+            photos, cards, photo_cards = got
+    except Exception:
+        pass
+    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "",
+            "pid": os.getpid(), "photos": photos, "cards": cards, "photo_cards": photo_cards}
 
 
 def _mark_prefetch(cid, note=""):

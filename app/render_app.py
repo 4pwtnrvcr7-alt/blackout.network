@@ -658,7 +658,10 @@ class RH(server.H):
             return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"],
                                                  "wire": BOOT_WARM["wire"], "og": BOOT_WARM["og"],
                                                  "photo_q": int(ps.get("depth") or 0), "photo_last": ps.get("last") or "",
-                                                 "photo_worker": bool(ps.get("worker"))})
+                                                 "photo_worker": bool(ps.get("worker")),
+                                                 "photo_n": int(ps.get("photos") or 0),
+                                                 "card_n": int(ps.get("cards") or 0),
+                                                 "photo_cards": int(ps.get("photo_cards") or 0)})
         if path == "/internal/sync/export":
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})

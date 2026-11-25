@@ -299,6 +299,25 @@ def card_cids(limit=40):
         return []
 
 
+def store_counts():
+    """Row counts from the persistent cards.db (no network). photos = licensed JPEGs stored;
+    cards = built PNGs; photo_cards = PNGs whose src is a licensed photo URL.
+    Used by /healthz to prove the writer is actually committing, not just serving from memory."""
+    try:
+        def fn(k):
+            photos = k.execute(
+                "SELECT COUNT(*) FROM story_photos WHERE none=0 AND jpg IS NOT NULL AND length(jpg)>2000"
+            ).fetchone()[0]
+            cards = k.execute("SELECT COUNT(*) FROM story_cards").fetchone()[0]
+            photo_cards = k.execute(
+                "SELECT COUNT(*) FROM story_cards WHERE src LIKE 'https://%'"
+            ).fetchone()[0]
+            return int(photos or 0), int(cards or 0), int(photo_cards or 0)
+        return _read(fn)
+    except Exception:
+        return (0, 0, 0)
+
+
 def license_ok(lic):
     lic = (lic or "").strip()
     return bool(lic) and bool(OK.search(lic)) and not BAD.search(lic.replace("Public domain", ""))
