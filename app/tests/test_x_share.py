@@ -227,6 +227,44 @@ class Tags(unittest.TestCase):
                 self.assertTrue(tg.startswith("#") and " " not in tg)
                 self.assertTrue(not any(c in tg for c in banned), tg)
 
+
+    def test_global_no_location_still_reaches_three(self):
+        it = {"title": "Federal Reserve announces College Fed Challenge winners",
+              "location": "", "category": "markets", "rank": 1, "cluster_id": "deadbeefdeadbeef"}
+        tags = X.hashtags(it)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertLessEqual(len(tags), 5, tags)
+
+    def test_czechia_snow_ice_gets_location_and_weather(self):
+        it = {"title": "Czechia: Orange snow-ice warning, 3 areas (Kraj Vysocina)",
+              "location": "Czechia: Kraj Vysocina", "category": "weather", "rank": 4,
+              "cluster_id": "c0ffeedc0ffeed00"}
+        tags = X.hashtags(it)
+        self.assertIn("#Czechia", tags)
+        self.assertIn("#Weather", tags)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertNotIn("#Kenya", tags)
+
+    def test_held_without_location_still_reaches_three(self):
+        it = {"title": "Satellites Have a Ground-Level Cybersecurity Problem",
+              "location": "", "category": "cyber", "rank": 3, "watchlist": 1,
+              "cluster_id": "f011daf83275a6ef"}
+        tags = X.hashtags(it)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertNotIn("#Cybersecurity", tags)
+        self.assertNotIn("#Cyberattack", tags)
+
+    def test_hurricane_record_comparison_is_not_hurricane_tag(self):
+        it = {"title": "Days of rain flood Central and South Florida, and the St. Johns River is forecast to pass its Hurricane Ian record",
+              "location": "Florida", "category": "natural disaster", "rank": 7,
+              "cluster_id": "4e4851abef3c18a8"}
+        tags = X.hashtags(it)
+        self.assertIn("#Florida", tags)
+        self.assertIn("#Flood", tags)
+        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Hurricane", tags)
+        self.assertGreaterEqual(len(tags), 3)
+
     def test_intent_url_and_button_hides_tags_from_label(self):
         it = STORIES["ebola_drc"]
         href = X.intent_url(it)

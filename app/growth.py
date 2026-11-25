@@ -185,10 +185,11 @@ def locator_html(lat, lon, label=""):
     return (f'<figure class="bng-loc bng-loc-lg" style="--fx:{x:.4f};--fy:{y:.4f}" role="img" aria-label="Locator map: {E(label or "event location")}">'
             f'<span class="bng-map"></span><span class="bng-dot"></span><figcaption>{E(label)}<small>Map: Natural Earth (public domain)</small></figcaption></figure>')
 
-def share_html(url, text, campaign="story"):
+def share_html(url, text, campaign="story", intent=None):
     from urllib.parse import quote
     u = utm(url, "x", "social", campaign)
-    intent = f"https://x.com/intent/post?text={quote(text[:200])}&url={quote(u)}&via=BlkoutNtw"
+    if not intent:
+        intent = f"https://x.com/intent/post?text={quote(text[:200])}&url={quote(u)}&via=BlkoutNtw"
     return (f'<div class="bng-share" data-url="{E(url)}" data-text="{E(text[:200])}"><span class="bng-share-l">Share</span>'
             f'<a class="bng-sb" href="{E(intent)}" target="_blank" rel="noopener">Post on X</a>'
             f'<button type="button" class="bng-sb bng-copy">Copy link</button><button type="button" class="bng-sb bng-native" hidden>Share…</button>'

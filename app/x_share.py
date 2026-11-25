@@ -13,7 +13,7 @@ SITE = "https://blackout.network"
 TCO = 23  # X counts a link as 23 characters
 MAX_TAGS = 5
 MIN_TAGS = 3
-GENERIC_TAGS = ["#News", "#WorldNews"]
+GENERIC_TAGS = ["#News", "#WorldNews", "#Breaking"]
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
 # --------------------------------------------------------------------------- tags
@@ -110,6 +110,7 @@ _COUNTRIES = {
     "el salvador": "ElSalvador",
     "costa rica": "CostaRica",
     "czech republic": "Czechia",
+    "czechia": "Czechia",
     "united arab emirates": "UAE",
     "burkina faso": "BurkinaFaso",
     "sierra leone": "SierraLeone",
@@ -681,7 +682,8 @@ _DISEASES = [
     (r"\btuberculosis\b|\b\btb treatment\b", "Tuberculosis"),
 ]
 _HAZARDS = [
-    (r"\bhurricanes?\b", "Hurricane"),
+    # "Hurricane Ian record" is a historical comparison, not the current event
+    (r"(?<!record )\bhurricanes?\b(?!\s+[A-Z][a-z]+(?:\s+record)?)", "Hurricane"),
     (r"\btyphoons?\b", "Typhoon"),
     (r"\b(tropical )?cyclones?\b", "Cyclone"),
     (r"\bwildfires?\b|\bforest fires?\b", "Wildfire"),
@@ -691,7 +693,7 @@ _HAZARDS = [
     (r"\bflash floods?\b|\bflood(?:ing|s|ed)?\b", "Flood"),
     (r"\bhigh winds?\b|\bhigh wind warning\b", "HighWind"),
     (r"\bvolcan(?:o|ic|oes)\b|\beruption\b", "Volcano"),
-    (r"\bblizzard\b|\bsnowstorm\b", "Blizzard"),
+    (r"\bblizzard\b|\bsnowstorm\b|\bsnow[\s-]?ice\b|\bice warning\b|\bheavy snow\b|\bsnowfall\b|\bwintry\b", "WinterStorm"),
     (r"\bheat ?wave\b", "HeatWave"),
     (r"\bsevere rain\b|\bheavy rain\b|\bstorms?\b|\brains?\b", "Storm"),
 ]
@@ -811,13 +813,11 @@ def engagement_tags(item, headline=None):
     elif cat in ("war/conflict", "conflict") or re.search(
             r"\b(missile|airstrike|invasion|artillery|shelling|ukraine war|drone strike)\b", blob, re.I):
         add("War")
-    elif re.search(
+    elif cat in ("weather", "natural disaster") or re.search(
             r"\b(hurricanes?|typhoons?|cyclones?|tornado(?:es|s)?|flood(?:ing|s|ed)?|"
             r"storms?|blizzards?|wildfires?|heat ?waves?|severe rain|heavy rain|rains?|"
-            r"high winds?)\b",
-            blob, re.I) or (
-            cat in ("natural disaster",) and re.search(r"\b(rain|storms?|flood(?:ing|s)?|weather|wind)\b", blob, re.I)
-    ):
+            r"high winds?|snow[\s-]?ice|ice warning|snowfall|wintry)\b",
+            blob, re.I):
         add("Weather")
     else:
         add("BreakingNews" if _rank(item) >= 8 else "News")
