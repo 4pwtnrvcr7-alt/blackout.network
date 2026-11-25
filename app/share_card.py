@@ -1443,7 +1443,16 @@ def photo_status():
         running = _FRUNNING
         last = _LAST_PREFETCH
         alive = bool(_FWORKER and _FWORKER.is_alive() and _FWORKER_PID == os.getpid())
-    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "", "pid": os.getpid()}
+    photos = cards = photo_cards = 0
+    try:
+        import story_photo
+        got = story_photo.store_counts()
+        if got:
+            photos, cards, photo_cards = got
+    except Exception:
+        pass
+    return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "",
+            "pid": os.getpid(), "photos": photos, "cards": cards, "photo_cards": photo_cards}
 
 
 def _mark_prefetch(cid, note=""):
@@ -1561,7 +1570,9 @@ def _photo_jobs():
 
 def submit(cid, fetch=False, urgent=False):
     """Start (or join) the build of a story's card. fetch=True (may download the photo) uses the photo worker.
-    urgent=True (hit-triggered, new publish, people/landmark) jumps the backfill and is newest-first."""
+    urgent=True (hit-triggered, new publish) jumps the backfill and is newest-first.
+    Backfill must pass urgent=False and is never auto-promoted onto the request queue
+    (entity backfill used to insert(0) and keep bumping requested ids behind a 50-item queue)."""
     if not fetch:
         f = _INFLIGHT.get(cid)
         if f is None or (f.done() and cid not in _SC):
@@ -1569,12 +1580,6 @@ def submit(cid, fetch=False, urgent=False):
             _INFLIGHT[cid] = f
             f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
         return f
-    if not urgent:
-        try:
-            if _entity_story(cid):
-                urgent = True
-        except Exception:
-            pass
     from concurrent.futures import Future
     _ensure_fworker()
     with _FLOCK:

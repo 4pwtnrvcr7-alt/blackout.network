@@ -141,13 +141,9 @@ def _sha(path):
         for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
     return h.hexdigest()
 def _db_snapshot(src_rel):
-    """Consistent copy of a Render-owned sqlite DB (backup API), returned as a temp file path."""
-    src = os.path.join(BASE, src_rel)
-    fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".db"); os.close(fd)
-    s = sqlite3.connect(f"file:{src}?mode=ro", uri=True, timeout=20); d = sqlite3.connect(tmp)
-    try: s.backup(d); d.execute("PRAGMA journal_mode=DELETE"); d.commit()
-    finally: d.close(); s.close()
-    return tmp
+    """Consistent copy of a Render-owned sqlite DB (backup API, WAL inclusive), returned as a temp file path."""
+    import handoff_db
+    return handoff_db.snapshot_sqlite(os.path.join(BASE, src_rel), STATE)
 
 def has_data(): return os.path.exists(os.path.join(BASE, "blackout.db"))
 
@@ -175,6 +171,12 @@ def _install(rel, tmp_path, kind):
         for suf in ("-wal", "-shm"):
             try: os.unlink(dest + suf)       # stale WAL/SHM from the previous file must never be applied to the new one
             except FileNotFoundError: pass
+        if rel == "cards.db":
+            try:
+                import handoff_db
+                handoff_db.reopen_cards(dest)
+            except Exception:
+                pass
 
 PUSHED_SINCE_BOOT = set()     # files the box pushed to THIS instance; a deploy handoff never overwrites them (box data is newer)
 def _apply_tar(tmp, source="push"):
@@ -656,7 +658,10 @@ class RH(server.H):
             return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"],
                                                  "wire": BOOT_WARM["wire"], "og": BOOT_WARM["og"],
                                                  "photo_q": int(ps.get("depth") or 0), "photo_last": ps.get("last") or "",
-                                                 "photo_worker": bool(ps.get("worker"))})
+                                                 "photo_worker": bool(ps.get("worker")),
+                                                 "photo_n": int(ps.get("photos") or 0),
+                                                 "card_n": int(ps.get("cards") or 0),
+                                                 "photo_cards": int(ps.get("photo_cards") or 0)})
         if path == "/internal/sync/export":
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})

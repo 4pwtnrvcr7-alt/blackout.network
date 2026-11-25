@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS story_cards(
 _WQ = queue.Queue()
 _WSTARTED = False
 _WLOCK = threading.Lock()
+_WTHREAD = None
+_WPID = None
+_REOPEN = object()
 
 
 def _db_path():
@@ -47,14 +50,32 @@ def _connect_writer(path):
     return k
 
 
-def _write_loop():
-    """The only thread that writes cards.db (WAL + busy_timeout). Reconnects if the path changes."""
+def _card_writes():
+    """The only thread that writes cards.db (WAL + busy_timeout). Reconnects if the path
+    changes or after a deploy handoff replaces the file. The target name must not contain
+    "loop" — render_app.py's thread guard silently refuses those targets (the #228 `_floop`
+    and the `_write_loop` bug: photos were served from memory and vanished on the next instance).
+    """
     path = _db_path()
     k = _connect_writer(path)
     while True:
         job = _WQ.get()
         if job is None:
+            try:
+                k.close()
+            except Exception:
+                pass
             break
+        fn, ev, err = job
+        if fn is _REOPEN:
+            try:
+                k.close()
+            except Exception:
+                pass
+            path = _db_path()
+            k = _connect_writer(path)
+            ev.set()
+            continue
         cur = _db_path()
         if cur != path:
             try:
@@ -63,10 +84,13 @@ def _write_loop():
                 pass
             path = cur
             k = _connect_writer(path)
-        fn, ev, err = job
         try:
             fn(k)
             k.commit()
+            try:
+                k.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except Exception:
+                pass
         except Exception as e:
             err.append(e)
             try:
@@ -77,22 +101,44 @@ def _write_loop():
 
 
 def _ensure_writer():
-    global _WSTARTED
-    if _WSTARTED:
-        return
+    """Start (or restart) the cards.db writer in this process. PID-checked and only
+    marked started if the thread is actually alive (the thread guard can swallow start()).
+    """
+    global _WSTARTED, _WTHREAD, _WPID
+    pid = os.getpid()
+    if _WTHREAD is not None and _WTHREAD.is_alive() and _WPID == pid:
+        return True
     with _WLOCK:
-        if _WSTARTED:
-            return
-        threading.Thread(target=_write_loop, name="cards-db", daemon=True).start()
-        _WSTARTED = True
+        if _WTHREAD is not None and _WTHREAD.is_alive() and _WPID == pid:
+            return True
+        t = threading.Thread(target=_card_writes, name="cards-db", daemon=True)
+        t.start()
+        _WTHREAD = t
+        _WPID = pid
+        _WSTARTED = t.is_alive()
+        if not _WSTARTED:
+            print("story_photo: cards writer failed to start (thread guard?)", flush=True)
+        return _WSTARTED
 
 
-def _write(fn, timeout=8):
-    """Run fn(conn) on the single writer thread and wait for it to commit."""
-    _ensure_writer()
+def _write(fn, timeout=15):
+    """Run fn(conn) on the single writer thread and wait for it to commit. Returns False if the write did not finish."""
+    if not _ensure_writer():
+        return False
     ev, err = threading.Event(), []
     _WQ.put((fn, ev, err))
-    ev.wait(timeout)
+    if not ev.wait(timeout):
+        return False
+    return not err
+
+
+def reopen():
+    """Reopen the writer on the file currently at _db_path() after a deploy handoff replaces cards.db."""
+    if _WTHREAD is None or not _WTHREAD.is_alive():
+        return
+    ev, err = threading.Event(), []
+    _WQ.put((_REOPEN, ev, err))
+    ev.wait(5)
 
 
 def _read(fn):
@@ -251,6 +297,25 @@ def card_cids(limit=40):
         return [r[0] for r in (rows or []) if r and r[0]]
     except Exception:
         return []
+
+
+def store_counts():
+    """Row counts from the persistent cards.db (no network). photos = licensed JPEGs stored;
+    cards = built PNGs; photo_cards = PNGs whose src is a licensed photo URL.
+    Used by /healthz to prove the writer is actually committing, not just serving from memory."""
+    try:
+        def fn(k):
+            photos = k.execute(
+                "SELECT COUNT(*) FROM story_photos WHERE none=0 AND jpg IS NOT NULL AND length(jpg)>2000"
+            ).fetchone()[0]
+            cards = k.execute("SELECT COUNT(*) FROM story_cards").fetchone()[0]
+            photo_cards = k.execute(
+                "SELECT COUNT(*) FROM story_cards WHERE src LIKE 'https://%'"
+            ).fetchone()[0]
+            return int(photos or 0), int(cards or 0), int(photo_cards or 0)
+        return _read(fn)
+    except Exception:
+        return (0, 0, 0)
 
 
 def license_ok(lic):
