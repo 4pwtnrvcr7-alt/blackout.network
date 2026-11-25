@@ -454,6 +454,7 @@ def _card_backfill():
         pass
     try:
         import share_card
+        share_card.audit_stored_photo_cards()
         share_card.backfill_photos(cids, pause=0.6)
     except Exception:
         traceback.print_exc()
@@ -661,7 +662,10 @@ class RH(server.H):
                                                  "photo_worker": bool(ps.get("worker")),
                                                  "photo_n": int(ps.get("photos") or 0),
                                                  "card_n": int(ps.get("cards") or 0),
-                                                 "photo_cards": int(ps.get("photo_cards") or 0)})
+                                                 "photo_cards": int(ps.get("photo_cards") or 0),
+                                                 "photo_audit_checked": int(ps.get("audit_checked") or 0),
+                                                 "photo_audit_downgraded": int(ps.get("audit_downgraded") or 0),
+                                                 "photo_audit_done": bool(ps.get("audit_done"))})
         if path == "/internal/sync/export":
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})

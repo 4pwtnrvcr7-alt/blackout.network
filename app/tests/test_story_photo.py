@@ -518,7 +518,12 @@ class StoryPhoto(unittest.TestCase):
             photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
             mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
             src = "https://upload.wikimedia.org/wikipedia/commons/bessent.jpg"
+            cand = dict(src=src, credit="Example / Wikimedia Commons", license="Public domain",
+                        caption="Scott Bessent, 2025. File photo; not taken at this event.",
+                        kind="person", label="lab", link="")
+            P.db_put(cid, cand, jpg=b"\xff\xd8" + b"j" * 3000)
             P.put_card(cid, photo, src)
+            self.assertTrue(P.stored_photo_matches(cid))
             P.put_card(cid, mapp, "map")
             self.assertEqual(P.get_card(cid), photo)
         finally:
@@ -610,6 +615,69 @@ class StoryPhoto(unittest.TestCase):
             self.assertFalse(P.card_title_stale(P.card_meta(cid), fresh_key))
         finally:
             os.environ.pop("BN_CARDS_DB", None)
+
+
+    def test_strict_match_requires_exact_name_not_topic_words(self):
+        """A memorial/drone/vessel photo must not attach to a Libya vessel story."""
+        title = "Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel"
+        blob = "Ukraine Russia, 2023. File photo. The Goddess Themis stands with Ukraine. memorial candles"
+        self.assertFalse(P.exact_subject_in(blob, title, ""))
+        memorial = dict(src="https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg",
+                        credit="Latvian pagan / Wikimedia Commons", license="CC0",
+                        caption="Ukraine Russia, 2023. File photo; not taken at this event.",
+                        kind="place", alt="Ukraine", label="lab", link="")
+        self.assertFalse(P.photo_strict_match("4c292ccdd9df73f8", src=memorial["src"], meta_blob=" ".join((memorial["caption"], memorial["credit"])),
+                                             title=title, kind="place"))
+        # Exact landmark still matches.
+        pif = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
+        self.assertTrue(P.exact_subject_in("File:Public Investment Fund Tower, Riyadh.jpg | Categories: PIF Tower", pif, ""))
+        # Exact person in Commons title/categories.
+        huang_title = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        self.assertTrue(P.exact_subject_in("File:Jensen huang stanford 2026-04-30 008.jpg | Jen-Hsun Huang in 2026", huang_title, ""))
+        self.assertFalse(P.exact_subject_in("File:Map of Altoona Pennsylvania 1939.jpg | Old maps of Pennsylvania", huang_title, ""))
+
+    def test_commons_portrait_queries_use_full_name_and_category(self):
+        qs = P.commons_portrait_queries("Jensen Huang")
+        self.assertIn('"Jensen Huang"', qs)
+        self.assertIn('deepcategory:"Jensen Huang"', qs)
+        self.assertIn('deepcategory:"Jen-Hsun Huang"', qs)
+        self.assertIn('incategory:"Jensen Huang"', qs)
+
+    def test_audit_downgrades_mismatch_to_map(self):
+        import os, tempfile
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        cid = "4c292ccdd9df73f8"
+        title = "Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel"
+        P.SUBJECT_HINTS[cid] = (title, "")
+        try:
+            P._dir = lambda: Path(d)
+            photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            src = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
+            cand = dict(src=src, credit="Latvian pagan / Wikimedia Commons", license="CC0",
+                        caption="Ukraine Russia, 2023. File photo; not taken at this event.",
+                        kind="place", label="lab", link="")
+            P.db_put(cid, cand, jpg=b"\xff\xd8" + b"j" * 3000)
+            P.put_card(cid, photo, src, title_hash="old")
+            self.assertFalse(P.stored_photo_matches(cid))
+            self.assertFalse(P.card_has_photo(cid))
+            # A map downgrade of a wrong photo is allowed.
+            P.put_card(cid, mapp, "", title_hash="new")
+            self.assertEqual(P.get_card(cid), mapp)
+            self.assertFalse(P.card_has_photo(cid))
+        finally:
+            P.SUBJECT_HINTS.pop(cid, None)
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_empty_title_hash_is_stale(self):
+        meta = {"png": b"x", "v": "17", "src": "https://example.com/z.jpg", "title_hash": ""}
+        self.assertTrue(P.card_title_stale(meta, "abc123"))
+        self.assertTrue(P.card_title_stale(meta, ""))
+        meta["title_hash"] = "abc123"
+        self.assertFalse(P.card_title_stale(meta, "abc123"))
+        self.assertTrue(P.card_title_stale(meta, "fff999"))
 
 
 if __name__ == "__main__":
