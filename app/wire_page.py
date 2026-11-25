@@ -63,7 +63,7 @@ def _shell():
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         + head +
         "<link rel=\"stylesheet\" href=\"/theme.css\">"
-        "<link rel=\"icon\" href=\"/favicon.ico?v=4\" sizes=\"any\">"
+        "<link rel=\"icon\" href=\"/favicon.ico?v=5\" sizes=\"any\">"
         "<link rel=\"stylesheet\" href=\"/api/wire_page/app.css\">"
         "<link rel=\"preload\" href=\"/api/state\" as=\"fetch\" crossorigin>"
         "</head><body>"
