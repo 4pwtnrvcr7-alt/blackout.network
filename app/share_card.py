@@ -2673,10 +2673,17 @@ def _convert_one_stale(cid):
             has_jpg = bool(SP.has_photo(cid))
         except Exception:
             has_jpg = False
-        # Relief / satellite place photos must be dropped and re-chosen (ground-level or category).
+        # Relief / satellite place photos, and place photos on hazard/outbreak stories, must be dropped and re-chosen.
         try:
             ch = SP.db_choice(cid) or {}
-            if ch and SP.is_non_photo_candidate(ch):
+            drop = bool(ch and SP.is_non_photo_candidate(ch))
+            if not drop and ch and (ch.get("kind") or "") == "place":
+                try:
+                    import card_photo as CP
+                    drop = CP.skip_place_photo(title, text, cat)
+                except Exception:
+                    drop = False
+            if drop:
                 SP.delete_stored_photo(cid)
                 has_jpg = False
         except Exception:
@@ -2852,6 +2859,11 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
 MAPLIKE_PLACE_CARDS = ("d9c1418515395db1", "dcd0416e4a66964e")
 MAPLIKE_REBUILD = {"done": False, "ids": 0, "error": ""}
 
+# Hazard stories that previously stored a generic place/culture photo (NZ haka, Iceland city, Telica).
+# Do not bump og.VERSION; only these cards are rebuilt at boot.
+HAZARD_PLACE_CARDS = ("d9c1418515395db1", "dcd0416e4a66964e", "a03826e8db39746e")
+HAZARD_PLACE_REBUILD = {"done": False, "ids": 0, "error": ""}
+
 
 def rebuild_maplike_place_cards(force=False):
     """One-shot: drop relief/satellite place photos for the two listed cards and re-choose a ground-level or category photo.
@@ -2904,6 +2916,60 @@ def rebuild_maplike_place_cards(force=False):
     MAPLIKE_REBUILD["done"] = True
     print(f"share_card: maplike-rebuild done {MAPLIKE_REBUILD['ids']} ids", flush=True)
     return MAPLIKE_REBUILD
+
+
+def rebuild_hazard_place_cards(force=False):
+    """One-shot: drop stored place photos on listed hazard cards and re-choose the category hazard photo.
+    Does not bump og.VERSION; other cards (including Hegseth) are left alone."""
+    import story_photo as SP
+    if HAZARD_PLACE_REBUILD.get("done") and not force:
+        return HAZARD_PLACE_REBUILD
+    HAZARD_PLACE_REBUILD.update(done=False, ids=0, error="")
+    for cid in HAZARD_PLACE_CARDS:
+        try:
+            try:
+                SP.delete_stored_photo(cid)
+            except Exception:
+                pass
+            invalidate_card_layers(cid)
+            title, text, loc = _force_title(cid)
+            lat = lon = None
+            cat = ""
+            try:
+                import story
+                r, _al = story.load(cid)
+                if r:
+                    title = r.get("title") or title
+                    loc = r.get("location") or loc
+                    text = r.get("brief") or text
+                    lat, lon = r.get("lat"), r.get("lon")
+                    cat = r.get("category") or ""
+            except Exception:
+                pass
+            if card_photo_on():
+                apply_card_photo(cid, title or "", loc or "", text or "", lat, lon, cat)
+            invalidate_card_layers(cid)
+            th = SP.card_title_key(_card_headline(title or "") or "")
+            b = render_story_fresh(cid)
+            src = ""
+            try:
+                ch = SP.db_choice(cid) or {}
+                if ch and (ch.get("src") or "").startswith("https://") and not SP.is_non_photo_candidate(ch) and (ch.get("kind") or "") != "place":
+                    src = ch.get("src") or ""
+            except Exception:
+                src = ""
+            if b and b.startswith(b"\x89PNG"):
+                SP.put_card(cid, b, src, title_hash=th, allow_downgrade=True)
+            invalidate_card_layers(cid)
+            HAZARD_PLACE_REBUILD["ids"] += 1
+            print(f"share_card: hazard-place-rebuild {cid} src={bool(src)}", flush=True)
+        except Exception as e:
+            HAZARD_PLACE_REBUILD["error"] = type(e).__name__
+            print(f"share_card: hazard-place-rebuild {cid} err={type(e).__name__}", flush=True)
+    HAZARD_PLACE_REBUILD["done"] = True
+    print(f"share_card: hazard-place-rebuild done {HAZARD_PLACE_REBUILD['ids']} ids", flush=True)
+    return HAZARD_PLACE_REBUILD
+
 
 
 def force_rebuild_listed_cards(force=False):

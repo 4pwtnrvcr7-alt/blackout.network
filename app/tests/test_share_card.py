@@ -192,14 +192,25 @@ class CardPhotoV3(unittest.TestCase):
 
     def test_topic_comes_before_place_for_disease_wildfire_storm_flood(self):
         import card_photo as CP
-        self.assertEqual(CP.choose_order("Gaza Health Ministry epidemic alert over meningitis"), ("person", "topic", "place"))
-        self.assertEqual(CP.choose_order("Forest fire burns acres in Virginia"), ("person", "topic", "place"))
-        self.assertEqual(CP.choose_order("NWS Freeze Watch for Lake Charles"), ("person", "topic", "place"))
-        self.assertEqual(CP.choose_order("Coastal Flood Warning issued by NWS Seattle"), ("person", "topic", "place"))
-        self.assertEqual(CP.choose_order("Measles outbreak in Wisconsin"), ("person", "topic", "place"))
-        # Quake and cyber keep place before topic.
-        self.assertEqual(CP.choose_order("Magnitude 6.0 earthquake near Guam"), ("person", "place", "topic"))
+        skip = ("person", "topic")
+        self.assertEqual(CP.choose_order("Gaza Health Ministry epidemic alert over meningitis"), skip)
+        self.assertEqual(CP.choose_order("Forest fire burns acres in Virginia"), skip)
+        self.assertEqual(CP.choose_order("NWS Freeze Watch for Lake Charles"), skip)
+        self.assertEqual(CP.choose_order("Coastal Flood Warning issued by NWS Seattle"), skip)
+        self.assertEqual(CP.choose_order("Measles outbreak in Wisconsin"), skip)
+        # Quake, volcano, tsunami and space weather also skip place (use the category hazard photo).
+        self.assertEqual(CP.choose_order("Magnitude 6.0 earthquake near Guam"), skip)
+        self.assertEqual(CP.choose_order("M 4.8 - 190 km N of Hicks Bay, New Zealand"), skip)
+        self.assertEqual(CP.choose_order("Volcanic ash advisory: Telica ash cloud up to 5,000 ft"), skip)
+        self.assertEqual(CP.choose_order("Tsunami warning issued for the Japanese coast"), skip)
+        self.assertEqual(CP.choose_order("Strong geomagnetic storm, G3 space weather watch"), skip)
+        self.assertTrue(CP.skip_place_photo("", "", "natural disaster"))
+        self.assertTrue(CP.skip_place_photo("", "", "quake"))
+        self.assertTrue(CP.skip_place_photo("", "", "outbreaks/disease"))
+        # Cyber and conflict still use a place photo when no person matches.
         self.assertEqual(CP.choose_order("Cisco security advisory on a VPN vulnerability"), ("person", "place", "topic"))
+        self.assertEqual(CP.choose_order("On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense"), ("person", "place", "topic"))
+        self.assertFalse(CP.skip_place_photo("On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense", "", "conflict"))
 
     def test_bare_congo_is_dr_congo_unless_brazzaville_is_named(self):
         import signal_place as SP

@@ -498,6 +498,7 @@ def _card_backfill():
         share_card.audit_stored_photo_cards()
         share_card.force_rebuild_listed_cards()
         share_card.rebuild_maplike_place_cards()
+        share_card.rebuild_hazard_place_cards()
         share_card.rebuild_card_places()
         if share_card.card_photo_on():
             # Newest stories first (cids already DESC), then any other stored cards.
