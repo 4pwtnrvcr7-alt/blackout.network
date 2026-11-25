@@ -194,7 +194,7 @@ function toggle(key){
       else if(n){dr2&&dr2.remove();n.classList.remove("open")}},key);
   }
 }
-list.addEventListener("click",function(e){var hd=e.target.closest(".tl-hd");if(!hd)return;var n=hd.parentNode;if(n&&n._k)toggle(n._k)});
+list.addEventListener("click",function(e){if(e.target.closest("a,.tl-src,.tl-act,.tl-dr"))return;var hd=e.target.closest(".tl-hd");if(!hd)return;var n=hd.parentNode;if(n&&n._k)toggle(n._k)});
 /* ---------- data */
 function api(qs){return fetch("/api/wire_tl?"+qs+(qs?"&":"")+"_="+Date.now(),{credentials:"same-origin",cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
 function qp(){var p=[];if(Q)p.push("q="+encodeURIComponent(Q));if(F.loc){p.push("lat="+F.loc.lat);p.push("lon="+F.loc.lon);p.push("r="+F.loc.r)}return p.join("&")}
