@@ -24,7 +24,7 @@ import x_share
 
 SITE = "https://blackout.network"
 W, H = 1200, 675
-VERSION = "4"
+VERSION = "5"
 BASE = Path(__file__).resolve().parent
 NM = BASE / "netmap_static"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -519,9 +519,18 @@ def _r_story(cid):
         photo = None
     have = bool(photo and not photo.get("pending"))
     card_title = _card_headline(it.get("title") or "") or _card_headline(head) or "Story"
-    return dict(title=card_title, kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(it.get("location"))[:20], "location")] if it.get("location") else []),
-                fact=dek or head, lines=[x for x in lines if x], tags=tags, loc=it.get("location") or "", deep=f"/wire/{cid}", share_url=f"{SITE}/wire/{cid}",
-                art=("story", it.get("lon"), it.get("lat"), photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
+    place, plat, plon = story_map_place(it.get("title") or "", it.get("location") or "", it.get("brief") or "", cid)
+    loc = place or ""
+    lon = plon if plon is not None else it.get("lon")
+    lat = plat if plat is not None else it.get("lat")
+    # Do not keep leftover stored coords when the Wire-map place has none or a different label.
+    if place and plat is not None:
+        lat, lon = plat, plon
+    elif not place:
+        lat, lon = None, None
+    return dict(title=card_title, kicker=(cat or "THE WIRE")[:36], color=col, rank=rank, stats=[(f"{fam}", "source families")] + ([(str(loc)[:20], "location")] if loc else []),
+                fact=dek or head, lines=[x for x in lines if x], tags=tags, loc=loc, deep=f"/wire/{cid}", share_url=f"{SITE}/wire/{cid}",
+                art=("story", lon, lat, photo["src"] if have else None), credit="", desc=dek or head, item=it, photo=photo if have else None, photo_pending=bool(photo and photo.get("pending")))
 
 
 _EDGE = r"[\s\ufeff\u200b-\u200d\u2060\xa0\-\u2010-\u2015\u2212\uFE58\uFE63\uFF0D\"“”„«»‘’‛′″'`.,;:|/\\·•]+"
@@ -1424,6 +1433,58 @@ def _kick_generic_bg():
 _kick_generic_bg()
 
 
+def story_map_place(title="", location="", brief="", cid=""):
+    """Badge label and map coordinates: the same place the Wire map uses.
+
+    A leftover location field (photo metadata, body mentions) is ignored unless
+    that place is actually named in the headline.
+    """
+    title = title or ""
+    loc = (location or "").strip()
+    try:
+        import signal_place as SP
+        if loc:
+            in_title = loc.lower() in title.lower()
+            if not in_title:
+                words = [w for w in re.split(r"[^\w]+", loc) if len(w) > 2]
+                in_title = any(re.search(r"\b" + re.escape(w) + r"\b", title, re.I) for w in words)
+            if not in_title:
+                title_ccs = set(SP.named_countries(title) or [])
+                loc_ccs = set(SP.named_countries(loc) or [])
+                if not (title_ccs and loc_ccs and (title_ccs & loc_ccs)):
+                    loc = ""
+        story = SP.story_text(title, loc, brief or "")
+        title_ccs = SP.named_countries(title) or []
+        prefer = title_ccs[0] if len(title_ccs) == 1 else None
+        hit = SP.infer(story, prefer_cc=prefer)
+        if hit and (hit.get("place") or "").strip():
+            hit_cc = (hit.get("cc") or "").upper()
+            if title_ccs and hit_cc and hit_cc not in {c.upper() for c in title_ccs}:
+                cap = SP.capital_of(title_ccs[0])
+                if cap and cap.get("place"):
+                    hit = cap
+            place = (hit.get("place") or "").strip()
+            if (hit.get("precision") == "country" or hit.get("approximate")) and "," in place:
+                place = place.split(",")[-1].strip()
+            return place, hit.get("lat"), hit.get("lon")
+        if title_ccs:
+            cap = SP.capital_of(title_ccs[0])
+            if cap and cap.get("place"):
+                place = (cap.get("place") or "").strip()
+                if "," in place:
+                    place = place.split(",")[-1].strip()
+                return place, cap.get("lat"), cap.get("lon")
+        # infer can still place a city/territory the country list missed (e.g. Gaza)
+        hit2 = SP.infer(title)
+        if hit2 and (hit2.get("place") or "").strip():
+            return (hit2.get("place") or "").strip(), hit2.get("lat"), hit2.get("lon")
+    except Exception:
+        pass
+    if loc and loc.lower() in title.lower():
+        return loc[:40], None, None
+    return "", None, None
+
+
 def generic_story_card(cid):
     """A designed 1200x675 card (generic world map + this story's cleaned title). No geocoding, no board rebuild, no network.
     Used on a true cache miss so the Twitterbot path stays under 1s; a unique locator/photo rebuilds in the background."""
@@ -1444,7 +1505,8 @@ def generic_story_card(cid):
         r, _al = story.load(cid)
         if r:
             title = _card_headline(r.get("title") or "") or title
-            loc = (r.get("location") or "")[:40]
+            place, _, _ = story_map_place(r.get("title") or "", r.get("location") or "", r.get("brief") or "", cid)
+            loc = (place or "")[:40]
             cat = ((r.get("category") or "") or cat).upper()[:36]
             try:
                 rank = int(r.get("rank") or rank or 0)
@@ -2119,6 +2181,7 @@ _FORCE_TITLES = {
     "cbdfb48145e55048": ("Trump wanted Jensen Huang back as the CEO of Nvidia", "", "Pennsylvania"),
     "9f5bc9d66d783d25": ("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine", "", "Ukraine"),
     "4c292ccdd9df73f8": ("Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel", "", "Libya"),
+    "b06344259ebf4d01": ("Gaza's Health Ministry has declared an epidemic alert across the territory over a rapid rise in meningitis", "", "Gaza"),
 }
 
 
@@ -2152,6 +2215,33 @@ def render_story_fresh(cid):
         return og.png_bytes(render(it))
     except Exception:
         return None
+
+def rebuild_card_places(budget=25):
+    """Re-render stored map cards so the badge and map use the Wire-map location, not leftover loc."""
+    import story_photo as SP
+    t0 = time.time()
+    n = 0
+    cids = list(dict.fromkeys(list(SP.WATCH_CIDS) + list(SP.card_cids(400))))
+    watch = set(SP.WATCH_CIDS)
+    for cid in cids:
+        if time.time() - t0 > float(budget) and cid not in watch and n >= 4:
+            break
+        try:
+            # Keep a matching portrait; everything else is a map that may have a stale badge.
+            if SP.card_has_photo(cid) and SP.stored_photo_matches(cid) is True:
+                continue
+            invalidate_card_layers(cid)
+            title, _text, _loc = _force_title(cid)
+            th = SP.card_title_key(_card_headline(title or "") or "")
+            b = generic_story_card(cid) or render_story_fresh(cid)
+            if b and b.startswith(b"\x89PNG"):
+                SP.put_card(cid, b, "", title_hash=th, allow_downgrade=True)
+                invalidate_card_layers(cid)
+                n += 1
+        except Exception as e:
+            print(f"story_photo: place-rebuild {cid} err={type(e).__name__}", flush=True)
+    print(f"story_photo: place-rebuild {n} map cards in {time.time()-t0:.1f}s", flush=True)
+    return n
 
 
 def force_rebuild_listed_cards(force=False):
@@ -2188,10 +2278,15 @@ def _force_rebuild_one(cid):
     if title:
         SP.SUBJECT_HINTS.setdefault(cid, (title, text or ""))
     match = SP.stored_photo_matches(cid) if title else None
-    # A named person without a strictly matching stored photo must get a Commons lookup.
-    # Do not skip because a leftover JPEG made has_photo True, or because the card is already a map.
-    subj = SP.main_subject(title, text) if title else None
-    need_fetch = bool(subj) and not (match is True and SP.has_photo(cid) and SP.card_has_photo(cid))
+    # A PEOPLE-list person without a strictly matching stored photo may get a Commons lookup.
+    # Do not invent mid-headline names (Jensen Huang) or org titles (Health Ministry).
+    people = []
+    try:
+        import x_share
+        people = list(x_share.people_from_entities(title, "") or []) if title else []
+    except Exception:
+        people = []
+    need_fetch = bool(people) and not (match is True and SP.has_photo(cid) and SP.card_has_photo(cid))
     if need_fetch:
         try:
             _network_prefetch(cid)

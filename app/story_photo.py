@@ -1066,7 +1066,7 @@ def photo_rule_allows(headline, commons_title="", src=""):
     Allow only:
       - a USGS ShakeMap (URL contains 'shakemap')
       - a person portrait whose Commons *file title* contains that person's full name,
-        and that person is named in the headline (the main subject when one is known)
+        and that person is in the headline via the hashtag PEOPLE extractor (not capitalized bigrams)
       - the Riyadh PIF Tower photo, only when the file title contains the landmark's full name
     No other place, landmark, or topic photos.
     Returns (allowed: bool, reason: str).
@@ -1076,13 +1076,21 @@ def photo_rule_allows(headline, commons_title="", src=""):
     ft = commons_file_title(src=src or "", title=commons_title or "")
     if not ft:
         return False, "no_commons_title"
-    names = _headline_full_names(headline or "", "")
-    subj = main_subject(headline or "", "")
-    if subj:
-        want = [v for v in name_variants(subj) if len(v.split()) >= 2] or [n for n in names if n.split()[-1].lower() == subj.split()[-1].lower()]
-    else:
-        # Ambiguous or no person subject: do not keep a person/topic photo.
-        want = []
+    # Person names come only from the hashtag entity extractor's PEOPLE list
+    # (the same one that produces #PeteHegseth), never capitalized bigrams.
+    names = []
+    try:
+        import x_share
+        names = list(x_share.people_from_entities(headline or "", "") or [])
+    except Exception:
+        names = []
+    want, seen = [], set()
+    for n in names:
+        for v in name_variants(n):
+            key = v.lower()
+            if len(v.split()) >= 2 and key not in seen:
+                seen.add(key)
+                want.append(v)
     for name in want:
         if _exact_name_in(name, ft):
             return True, "person:" + name
