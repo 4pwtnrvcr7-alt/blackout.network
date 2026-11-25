@@ -5,8 +5,7 @@ Selection (never on the crawler request path):
   2. the box's pick for the story ("lead": the named person's portrait, or a photo of the story's own country)
   3. the first named person's Commons portrait, looked up in the background (Commons API, license read from the file page)
 Only public domain, CC0, CC BY and the UK Open Government Licence are used. Share-alike, non-commercial and no-derivative
-licenses are refused. The chosen image is downloaded once, shrunk, and kept on disk (BN_PERSIST_DIR or /var/data if the
-host has a disk, else logs/story_photos), with the chosen credit in a small JSON next to it.
+licenses are refused. The chosen image is downloaded once, shrunk, and kept in story_writer.db (handed to the next Render instance on every deploy) and also on disk when a disk exists.
 
 pick(cid, ...)     no network: the credited candidate (or None), from data already on the box
 cached(src)        no network: the stored image file, or None
@@ -14,7 +13,7 @@ prefetch(cid, ...) network, bounded: pick + download + store (background warm an
 """
 from __future__ import annotations
 import hashlib
-import re, io, json, os, re, threading, time, urllib.parse, urllib.request
+import re, io, json, os, re, sqlite3, threading, time, urllib.parse, urllib.request
 from pathlib import Path
 
 UA = "BLACKOUT.NETWORK-cards/1.0 (https://blackout.network; hello@blackout.network)"
@@ -23,6 +22,111 @@ BAD = re.compile(r"(\bsa\b|-sa|share ?alike|\bnc\b|-nc|non ?commercial|\bnd\b|-n
 MAX_BYTES = 6_000_000
 _LOCK = threading.Lock()
 _MEM = {}
+_DB_REL = "story_writer.db"
+_PHOTO_SCHEMA = """
+CREATE TABLE IF NOT EXISTS story_photos(
+  cid TEXT PRIMARY KEY, src TEXT, credit TEXT, license TEXT, caption TEXT, kind TEXT, label TEXT, link TEXT,
+  jpg BLOB, none INTEGER DEFAULT 0, stored_at TEXT);
+CREATE TABLE IF NOT EXISTS story_cards(
+  cid TEXT PRIMARY KEY, png BLOB, v TEXT, src TEXT, built_at TEXT);
+"""
+
+def _db_path():
+    return (os.environ.get("BN_WRITER_DB") or "").strip() or str(Path(__file__).resolve().parent / _DB_REL)
+
+def _db():
+    k = sqlite3.connect(_db_path(), timeout=20)
+    k.execute("PRAGMA journal_mode=WAL")
+    k.executescript(_PHOTO_SCHEMA)
+    return k
+
+def db_choice(cid):
+    """Persisted photo choice (and none=1 when a lookup already found no licensed photo). No network."""
+    if not cid:
+        return None
+    try:
+        k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=5)
+        try:
+            r = k.execute("SELECT src, credit, license, caption, kind, label, link, none FROM story_photos WHERE cid=?", (cid,)).fetchone()
+        finally:
+            k.close()
+        if not r:
+            return None
+        if r[8]:
+            return {"none": True}
+        if r[0] and license_ok(r[2]):
+            return dict(src=r[0], credit=r[1] or "", license=r[2] or "", caption=r[3] or "", kind=r[4] or "", label=r[5] or "", link=r[6] or "")
+    except Exception:
+        pass
+    return None
+
+def db_put(cid, cand, jpg=None, none=False):
+    """Store the choice (or a negative lookup) and optional JPEG bytes so a deploy does not have to refetch."""
+    if not cid:
+        return
+    try:
+        with _LOCK:
+            k = _db()
+            try:
+                c = cand or {}
+                k.execute(
+                    "INSERT OR REPLACE INTO story_photos(cid, src, credit, license, caption, kind, label, link, jpg, none, stored_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (cid, c.get("src") or "", c.get("credit") or "", c.get("license") or "", c.get("caption") or c.get("label") or "",
+                     c.get("kind") or "", c.get("label") or "", c.get("link") or "", sqlite3.Binary(jpg) if jpg else None, 1 if none else 0,
+                     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
+                k.commit()
+            finally:
+                k.close()
+    except Exception:
+        pass
+
+def _db_jpg(src):
+    if not src:
+        return None
+    try:
+        k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=5)
+        try:
+            r = k.execute("SELECT jpg FROM story_photos WHERE src=? AND jpg IS NOT NULL LIMIT 1", (src,)).fetchone()
+        finally:
+            k.close()
+        return bytes(r[0]) if r and r[0] else None
+    except Exception:
+        return None
+
+def get_card(cid):
+    """Built share-card PNG for this story, or None. No network."""
+    if not cid:
+        return None
+    try:
+        k = sqlite3.connect(f"file:{_db_path()}?mode=ro", uri=True, timeout=5)
+        try:
+            r = k.execute("SELECT png FROM story_cards WHERE cid=?", (cid,)).fetchone()
+        finally:
+            k.close()
+        b = bytes(r[0]) if r and r[0] else None
+        return b if b and b.startswith(b"\x89PNG") and len(b) > 2000 else None
+    except Exception:
+        return None
+
+def put_card(cid, png, src=""):
+    if not cid or not png or not png.startswith(b"\x89PNG"):
+        return
+    try:
+        with _LOCK:
+            k = _db()
+            try:
+                k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at) VALUES(?,?,?,?,?)",
+                          (cid, sqlite3.Binary(png), "2", src or "", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())))
+                k.commit()
+            finally:
+                k.close()
+    except Exception:
+        pass
+
+def resolved(cid):
+    """True when a lookup has already run for this story (photo stored, or confirmed none)."""
+    c = db_choice(cid)
+    return bool(c)
 
 
 def license_ok(lic):
@@ -51,14 +155,26 @@ def _name(src):
 
 
 def cached(src):
-    """Path of the stored image for this source URL, or None. No network."""
+    """Path of the stored image for this source URL, or None. No network. Restores JPEG bytes from the persistent DB onto disk."""
     if not src:
         return None
     p = _dir() / (_name(src) + ".jpg")
     try:
-        return p if p.is_file() and p.stat().st_size > 2000 else None
+        if p.is_file() and p.stat().st_size > 2000:
+            return p
     except Exception:
-        return None
+        pass
+    b = _db_jpg(src)
+    if b and len(b) > 2000:
+        try:
+            tmp = str(p) + ".tmp"
+            with open(tmp, "wb") as f:
+                f.write(b)
+            os.replace(tmp, p)
+            return p
+        except Exception:
+            return None
+    return None
 
 
 def _cand(d, kind=""):
@@ -104,6 +220,9 @@ def pick(cid, title="", loc="", text=""):
     except Exception:
         pass
     s = stored_choice(cid)
+    if s and s.get("src") and license_ok(s.get("license")):
+        return s
+    s = db_choice(cid)
     if s and s.get("src") and license_ok(s.get("license")):
         return s
     return None
@@ -174,35 +293,128 @@ def _commons_portrait(name, timeout=7):
     return None
 
 
+_STOP = set("the a an of in on at to for and or with by from as near after into its new says said "
+            "unleashes fresh warns against using struck inquiry launches recorded magnitude landmark "
+            "second time five days secretary war yet approved wanted back ceo director official "
+            "update updates live report reports more than us united states iran tehran sanctions "
+            "tankers strait hormuz nuclear bomb test veterans records aerial attack".split())
+
 def _named_people(cid, title, text):
+    """Names of people this story is about: profiles first (last name in the title is enough), then First Last in the headline."""
+    out, seen = [], set()
+    blob = " ".join(x for x in (title, text) if x)
     try:
         import people as PP
-        out = []
-        for p in PP.people_for(cid, " ".join([title, text])):
+        for p in PP.people_for(cid, blob):
             nm = p.get("name") or ""
-            m = re.search(re.escape(nm), title or "") if nm else None
-            if m:
-                out.append((m.start(), nm))
-        return [n for _, n in sorted(out)]
+            if not nm:
+                continue
+            last = nm.split()[-1]
+            rx = p.get("rx")
+            hit = False
+            try:
+                hit = bool(rx and re.search(rx, title or ""))
+            except Exception:
+                hit = False
+            if not hit:
+                hit = bool(re.search(r"\b" + re.escape(nm) + r"\b", title or "", re.I) or
+                           (len(last) > 3 and re.search(r"\b" + re.escape(last) + r"\b", title or "", re.I)))
+            if hit and nm.lower() not in seen:
+                seen.add(nm.lower()); out.append(nm)
     except Exception:
-        return []
+        pass
+    words = re.findall(r"[A-Za-z][A-Za-z'-]+", title or "")
+    i = 0
+    while i < len(words) - 1:
+        a, b = words[i], words[i + 1]
+        if (a[0].isupper() and b[0].isupper() and a.lower() not in _STOP and b.lower() not in _STOP
+                and a.isalpha() and b.isalpha() and len(a) > 1 and len(b) > 2):
+            nm = a + " " + b
+            if nm.lower() not in seen:
+                seen.add(nm.lower()); out.append(nm)
+            i += 2
+            continue
+        i += 1
+    return out
+
+
+def _commons_place(loc, title, timeout=7):
+    """Licensed photo of a named landmark (quoted in the headline) or the story's location. Never a logo or map."""
+    loc = " ".join((loc or "").split())
+    m = re.search(r"[\"“”']([A-Z0-9][^\"“”']{1,60})[\"“”']", title or "")
+    # Possessives like "Riyadh's" must not count; the capture has to start with a capital.
+    q = (m.group(1).strip() + (" " + loc if loc else "")).strip() if m else loc
+    if not q or len(q) < 3:
+        return None
+    qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": q, "gsrnamespace": 6, "gsrlimit": 12,
+                                 "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
+    req = urllib.request.Request("https://commons.wikimedia.org/w/api.php?" + qs, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        pages = (json.loads(r.read().decode()).get("query") or {}).get("pages") or {}
+    landmark = (m.group(1).strip() if m else "")
+    toks = [t.lower() for t in re.findall(r"[A-Za-z0-9]+", landmark or q) if len(t) > 2]
+    best = None
+    for p in pages.values():
+        ii = (p.get("imageinfo") or [{}])[0]
+        md = ii.get("extmetadata") or {}
+        g = lambda k: re.sub(r"<[^>]+>", "", (md.get(k) or {}).get("value") or "").strip()
+        lic = g("LicenseShortName")
+        title_f = (p.get("title") or "").lower()
+        desc = g("ImageDescription").lower()
+        w, h = int(ii.get("width") or 0), int(ii.get("height") or 0)
+        if not license_ok(lic) or not ii.get("thumburl") or w < 800 or h < 400:
+            continue
+        if any(x in title_f for x in ("logo", "icon", "flag", "map", "coat of arms", "signature", "cartoon", "collage")):
+            continue
+        if toks and not any(t in title_f or t in desc for t in toks):
+            continue
+        named = bool(landmark and landmark.lower() in title_f or all(t in title_f or t in desc for t in toks))
+        # portrait landmark shots are useful (subject-right layout); require landscape only when we have no named landmark
+        if not landmark and h > w * 1.25:
+            continue
+        score = (3 if landmark and landmark.lower() in title_f else 0) + (2 if named else 0) + min(w, 2000) / 2000
+        if best is None or score > best[0]:
+            where = landmark or loc
+            yr = (g("DateTimeOriginal") or g("DateTime"))[:4]
+            best = (score, dict(src=ii["thumburl"], credit=f"{g('Artist') or 'Unknown author'} / Wikimedia Commons", license=lic,
+                                link=ii.get("descriptionurl") or "", kind="place", alt=where, w=ii.get("thumbwidth"), h=ii.get("thumbheight"),
+                                caption=f"{where}" + (f", {yr}" if yr.isdigit() else "") + ". File photo; not taken at this event."))
+    if best:
+        best[1]["label"] = best[1]["caption"]
+        return best[1]
+    return None
 
 
 def prefetch(cid, title="", loc="", text=""):
-    """Network, bounded (7 s per request): pick, look up a Commons portrait if the box has none, store the image. Returns the candidate or None."""
+    """Network, bounded (7 s per request): pick, look up a Commons portrait or place photo if the box has none, store the image (disk + persistent DB)."""
     with _LOCK:
         c = pick(cid, title, loc, text)
         if not c:
-            for nm in _named_people(cid, title, text)[:1]:
+            for nm in _named_people(cid, title, text)[:2]:
                 try:
                     c = _commons_portrait(nm)
                 except Exception:
                     c = None
                 if c:
-                    try:
-                        _choice_file(cid).write_text(json.dumps(c))
-                    except Exception:
-                        pass
-        if c and store(c["src"]):
-            return c
+                    break
+        if not c:
+            try:
+                c = _commons_place(loc, title)
+            except Exception:
+                c = None
+        if c:
+            try:
+                _choice_file(cid).write_text(json.dumps(c))
+            except Exception:
+                pass
+            path = store(c["src"])
+            jpg = None
+            if path:
+                try:
+                    jpg = Path(path).read_bytes()
+                except Exception:
+                    jpg = None
+            db_put(cid, c, jpg=jpg, none=False)
+            return c if path else None
+        db_put(cid, None, none=True)
         return None
