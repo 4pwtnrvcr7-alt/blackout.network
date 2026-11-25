@@ -332,7 +332,7 @@
     C.sky.frustumCulled = false; C.scene.add(C.sky); C.stars.renderOrder = -1;
     host.appendChild(C.r.domElement);
     C.ctl = new T.OrbitControls(C.cam, C.r.domElement); C.ctl.enableDamping = true; C.ctl.dampingFactor = 0.09; C.ctl.zoomSpeed = 1.1; C.ctl.rotateSpeed = mob ? 0.7 : 0.9;
-    C.ctl.enablePan = false; C.ctl.maxDistance = 4.5e7;
+    C.ctl.enablePan = true; C.ctl.enableRotate = true; C.ctl.enableZoom = true; C.ctl.enabled = true; C.ctl.maxDistance = 4.5e7;
     C.ctl.touches = { ONE: T.TOUCH.ROTATE, TWO: T.TOUCH.DOLLY_ROTATE };
     return true;
   }
@@ -624,6 +624,7 @@
     C.t = Math.max(0, Math.min(C.tEnd, opt.t || 0)); C.live = !!opt.live; C.playing = !reduce || C.live;
     /* start close on the rocket at the pad, slightly low and off to one side */
     var h = C.R.h; C.cam.position.set(h * 1.7, h * 0.32, h * 1.55); C.ctl.target.set(0, 0, 0); C.ctl.minDistance = Math.max(4, h * 0.35); C.ctl.update();
+    if (C.ctl) { C.ctl.enabled = true; C.ctl.enableRotate = true; C.ctl.enableZoom = true; C.ctl.enablePan = true; }
     C.host.hidden = false; C.open = true; document.body.classList.add("nx-lc-chase"); chResize(); C.last = 0;
     cancelAnimationFrame(C.raf); C.raf = requestAnimationFrame(chFrame); chBarSync();
     return true;

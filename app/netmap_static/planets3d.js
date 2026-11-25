@@ -3,7 +3,7 @@
 (function (w) {
   "use strict";
   var T = w.THREE; if (!T || w.BNPlanets) return;
-  var API = null, SITES = null, PINS = [], SITE = null, TEX = {}, CS = {};
+  var API = null, SITES = null, PINS = [], SITE = null, SITE_O = null, TEX = {}, CS = {};
   var BASE = "/api/netmap/planets";
   var SEG = { moon: 128, mars: 96, earth: 64, jupiter: 64, saturn: 64, default: 48 };
   var CLOSE = { moon: 2.2, mars: 2.3, earth: 3.2 };
@@ -313,13 +313,13 @@
       if (p.lab && p.lab.parentNode) p.lab.parentNode.removeChild(p.lab);
       if (p.group && p.group.parent) p.group.parent.remove(p.group);
     });
-    PINS = []; SITE = null;
+    PINS = []; SITE = null; SITE_O = null;
   }
 
   function openSite(o, rec, kind) {
-    SITE = rec;
+    SITE = rec; SITE_O = o;
     PINS.forEach(function (p) { if (p.lab) p.lab.classList.toggle("sel", p.rec === rec); });
-    var mesh = sphereOf(o); if (!mesh) { siteInfo(o, rec, kind); return; }
+    var mesh = sphereOf(o); if (!mesh) { siteInfo(o, rec, kind); if (API.unlockCam) API.unlockCam(); return; }
     var local = latLonLocal(rec.lat, rec.lon, o.size);
     var world = mesh.localToWorld(local.clone());
     var center = new T.Vector3(); mesh.getWorldPosition(center);
@@ -327,6 +327,7 @@
     var dist = o.size * (CLOSE[o.id] || 2.4) * 0.72;
     if (API.flyTo) API.flyTo(world, world.clone().add(outward.multiplyScalar(dist)), 1100);
     siteInfo(o, rec, kind);
+    if (API.unlockCam) API.unlockCam();
   }
 
   function paintInfo(titleInner, bodyInner) {
@@ -467,6 +468,7 @@
       tmp.project(cam);
       var sx = (tmp.x + 1) / 2 * W, sy = (1 - tmp.y) / 2 * H;
       var hide = o.lab.style.display === "none";
+      if (SITE && SITE_O && o === SITE_O) { o.lab.style.display = "none"; hide = true; }
       if (!hide && disc && o !== disc.o && tmp.z < 1) {
         var dx = sx - disc.cx, dy = sy - disc.cy;
         if (dx * dx + dy * dy < (disc.r + 18) * (disc.r + 18)) {
@@ -649,7 +651,7 @@
     if (SITE && o && (o.id === "moon" || o.id === "mars" || o.id === "jupiter" || o.id === "saturn")) {
       /* planet re-focus clears a site only when the body itself was chosen, not a pin */
     }
-    SITE = null;
+    SITE = null; SITE_O = null;
     if (o.kind === "planet" && (TEX[o.id + ".jpg"] || o.id === "moon" || o.id === "mars" || o.id === "jupiter" || o.id === "saturn" || o.id === "earth")) {
       return planetInfo(o);
     }

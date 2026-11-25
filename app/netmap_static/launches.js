@@ -103,6 +103,7 @@
     if (!LC.lbl) { LC.lbl = document.createElement("div"); LC.lbl.className = "nx-lc-lbls"; map.getContainer().appendChild(LC.lbl); }
     if (map && !LC._tap) {
       LC._tap = true;
+      map.on("dragstart", function () { LC.follow = false; window.__nxSpinHold = false; });
       map.on("click", function (e) {
         if (!LC.on || !LC.reveal || LC.sel >= 0 || !LC.lbl) return;
         var oe = e.originalEvent || {}, cx = oe.clientX, cy = oe.clientY;
