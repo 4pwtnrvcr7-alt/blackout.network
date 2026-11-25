@@ -663,8 +663,9 @@ def _writer_worker(ready, paused):
     while True:
         try:
             if paused(): STATE["paused"] = "deploy handoff"; time.sleep(5); continue
-            if not enabled(): STATE["paused"] = "no API key" if not key_set() else "BN_WRITER=0"; time.sleep(30); continue
-            STATE["paused"] = None
+            if not templates_on() and not api_enabled():
+                STATE["paused"] = "no API key" if not key_set() else "BN_WRITER=0"; time.sleep(30); continue
+            STATE["paused"] = None if api_enabled() else "BN_WRITER=0, templates on"
             if not STATE.get("gate_booted") and templates_on():
                 boot_gate()
             if templates_on():
