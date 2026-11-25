@@ -31,9 +31,9 @@
       ".s3-labs{position:absolute;inset:0;pointer-events:none;z-index:2}.s3-lab{position:absolute;left:0;top:0;transform:translate(-50%,-130%);font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(5,6,10,.55);color:#dfe3ec;white-space:nowrap;cursor:pointer;user-select:none;-webkit-user-select:none;pointer-events:auto}" +
       "@media (pointer:coarse),(hover:none){.s3-lab,.s3-pin{pointer-events:none}}" +
       ".s3-lab.sc{color:#b9c6ff}.s3-lab.sel{background:#e8eaf0;color:#05060a}" +
-      ".s3-info{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:min(420px,calc(100% - 20px));max-height:34%;overflow:auto;background:linear-gradient(90deg,rgba(5,6,10,.72),rgba(5,6,10,.35));border-left:2px solid rgba(255,255,255,.5);padding:6px 10px;font-size:12px;pointer-events:none}.s3-info a,.s3-info button{pointer-events:auto}" +
+      ".s3-info,.s3-info *{pointer-events:none}.s3-info{position:absolute;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);max-width:min(420px,calc(100% - 20px));max-height:34%;overflow:auto;background:linear-gradient(90deg,rgba(5,6,10,.72),rgba(5,6,10,.35));border-left:2px solid rgba(255,255,255,.5);padding:6px 10px;font-size:12px}.s3-info a,.s3-info button,.s3-info .s3-tog,.s3-info input{pointer-events:auto}" +
       ".s3-info h3{margin:0 0 2px;font-size:15px}.s3-info p{margin:2px 0}.s3-info .s3-tag{display:inline-block;font-size:10px;border:1px solid rgba(255,255,255,.35);border-radius:6px;padding:0 5px;margin-left:6px;vertical-align:2px;opacity:.85}" +
-      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;max-width:100%;max-height:42vh;width:auto;height:auto;object-fit:contain;margin:0 auto;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}.s3 .s3-tog{display:inline-block;margin-left:8px;padding:1px 9px;font-size:11px;vertical-align:2px}.s3-info:not(.open) .s3-body{display:none}.s3-info:not(.open) h3{margin:0}.s3-info.open{max-height:62%}@media (max-width:600px){.s3-info{font-size:11.5px}.s3-info h3{font-size:14px}.s3-info.open{max-height:58%}.s3-ph img{max-height:34vh}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
+      ".s3-info a{color:#b9c6ff}.s3-ph{margin:6px 0 2px}.s3-ph img{display:block;max-width:100%;max-height:42vh;width:auto;height:auto;object-fit:contain;margin:0 auto;border-radius:6px}.s3-ph figcaption{font-size:10.5px;opacity:.75;margin-top:2px}.s3 .s3-tog{display:inline-block;margin-left:8px;padding:1px 9px;font-size:11px;vertical-align:2px}.s3-info:not(.open) .s3-body{display:none}.s3-info:not(.open) h3{margin:0}.s3-info.open{max-height:42%}@media (max-width:600px){.s3-info{font-size:11.5px}.s3-info h3{font-size:14px}.s3-info.open{max-height:32%;max-width:min(420px,calc(100% - 20px))}.s3-ph img{max-height:18vh}}.s3-msg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:.8}";
     d.head.appendChild(st);
   }
   function imperial() { try { return !w.BNUnits || !w.BNUnits.isImperial || w.BNUnits.isImperial(); } catch (e) { return true; } }
@@ -458,11 +458,16 @@
   }
   function addObj(o) { OBJ[o.id] = o; LIST.push(o); S.root.add(o.node); }
 
+  function unlockCam() {
+    if (!S.ctl) return;
+    S.ctl.enabled = true; S.ctl.enableRotate = true; S.ctl.enableZoom = true; S.ctl.enablePan = true;
+  }
   function flyTo(toT, toP, dur) {
     FLY = { t0: performance.now(), dur: dur || 1100, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: toT.clone(), toP: toP.clone() };
+    unlockCam();
   }
   function hookApi() {
-    return { T: T, S: S, LIST: LIST, OBJ: OBJ, esc: esc, imperial: imperial, fmtAU: fmtAU, fmtV: fmtV, flyTo: flyTo, cancelFly: function () { FLY = null; }, sel: function () { return SEL; } };
+    return { T: T, S: S, LIST: LIST, OBJ: OBJ, esc: esc, imperial: imperial, fmtAU: fmtAU, fmtV: fmtV, flyTo: flyTo, cancelFly: function () { FLY = null; }, unlockCam: unlockCam, sel: function () { return SEL; } };
   }
   function attachPlanets() {
     var run = function () { try { if (w.BNPlanets && w.BNPlanets.attach) w.BNPlanets.attach(hookApi()); } catch (e) {} };
@@ -563,6 +568,7 @@
     tracks(o);
     S._trk = null;
     FLY = { t0: performance.now(), dur: 1300, fromP: S.cam.position.clone(), fromT: S.ctl.target.clone(), toT: tgt, toP: tgt.clone().add(dir.multiplyScalar(dist)) };
+    unlockCam();
     info(o);
   }
   function tracks(sel) {   /* fade every trajectory, highlight the selected one */
@@ -677,5 +683,10 @@
     if (!S.el) return; S.el.hidden = true; d.documentElement.style.overflow = ""; if (raf) { w.cancelAnimationFrame(raf); raf = 0; }
     try { d.dispatchEvent(new CustomEvent("bn:solar-close")); } catch (e) {}
   }
-  w.BNSolar = { open: open, close: close, focus: function (id, vdir, vmul) { focus(id, vdir, vmul); }, _state: function () { return { data: !!DATA, objects: LIST.map(function (o) { return o.id; }), sel: SEL && SEL.id, open: !!(S.el && !S.el.hidden) }; } };
+  w.BNSolar = { open: open, close: close, focus: function (id, vdir, vmul) { focus(id, vdir, vmul); }, _state: function () {
+      var ctl = S.ctl, cam = S.cam, dist = (cam && ctl) ? cam.position.distanceTo(ctl.target) : 0;
+      return { data: !!DATA, objects: LIST.map(function (o) { return o.id; }), sel: SEL && SEL.id, open: !!(S.el && !S.el.hidden),
+        cam: cam && cam.position.toArray(), tgt: ctl && ctl.target.toArray(), dist: dist,
+        enabled: !!(ctl && ctl.enabled), rotate: !!(ctl && ctl.enableRotate), zoom: !!(ctl && ctl.enableZoom), pan: !!(ctl && ctl.enablePan), fly: !!FLY };
+    } };
 })(window);
