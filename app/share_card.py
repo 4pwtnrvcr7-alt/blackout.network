@@ -1337,10 +1337,15 @@ def _story_build(cid, fetch=False):
                     except Exception:
                         pass
                 pending = bool(it and it.get("photo_pending"))
+                th = ""
+                try:
+                    th = story_photo.card_title_key((it or {}).get("title") or "")
+                except Exception:
+                    th = ""
                 if src.startswith("https://") and not pending:
-                    story_photo.put_card(cid, b, src)
+                    story_photo.put_card(cid, b, src, title_hash=th)
                 elif fetch and not pending:
-                    story_photo.put_card(cid, b, src)
+                    story_photo.put_card(cid, b, src, title_hash=th)
                 if not fetch and not src.startswith("https://"):
                     if _r_story_pending(cid):
                         _NEED.add(cid)
@@ -1400,6 +1405,7 @@ _FLOCK = threading.Lock()
 _FHIGH = []          # urgent cids, index 0 is next (newest first: insert at 0)
 _FLOW = []           # backfill cids, FIFO
 _FWAIT = {}          # cid -> Future
+_FSKIP_NET = set()   # typography-only jobs: skip Commons prefetch (local JPEG + current title)
 _FWAKE = threading.Event()
 _FWORKER = None
 _FSEQ = 0
@@ -1536,20 +1542,30 @@ def _photo_jobs():
             # Timeout covers only the network prefetch. Card render is local (stored JPEG)
             # and must not be inside the join: a photo=1 at ~10s was logging timeout at 15s
             # while typography was still running.
-            box = {"done": False, "err": None}
-            def _prefetch_job(c=cid, b=box):
-                try:
-                    _network_prefetch(c)
-                except Exception as e:
-                    b["err"] = e
-                finally:
-                    b["done"] = True
-            th = threading.Thread(target=_prefetch_job, daemon=True, name=f"photo-{cid[:8]}")
-            th.start()
-            th.join(LOOKUP_TIMEOUT)
-            if th.is_alive() and not box["done"]:
-                _mark_prefetch(cid, "timeout")
-                print(f"story_photo: prefetch {cid} photo=0 err=timeout {LOOKUP_TIMEOUT}s", flush=True)
+            # Typography-only jobs (stale title hash / VERSION) skip the network and re-render
+            # from the stored JPEG with the current cleaned title. The old _pool() path could hang
+            # behind other typography work (max_workers=1) and never replace Zelensky's dashed PNG.
+            skip_net = False
+            with _FLOCK:
+                skip_net = cid in _FSKIP_NET
+                _FSKIP_NET.discard(cid)
+            box = {"done": True, "err": None}
+            th = None
+            if not skip_net:
+                box = {"done": False, "err": None}
+                def _prefetch_job(c=cid, b=box):
+                    try:
+                        _network_prefetch(c)
+                    except Exception as e:
+                        b["err"] = e
+                    finally:
+                        b["done"] = True
+                th = threading.Thread(target=_prefetch_job, daemon=True, name=f"photo-{cid[:8]}")
+                th.start()
+                th.join(LOOKUP_TIMEOUT)
+                if th.is_alive() and not box["done"]:
+                    _mark_prefetch(cid, "timeout")
+                    print(f"story_photo: prefetch {cid} photo=0 err=timeout {LOOKUP_TIMEOUT}s", flush=True)
             # Render from whatever is stored now (reuse a JPEG if prefetch finished).
             try:
                 b = _story_build(cid, False)
@@ -1565,7 +1581,7 @@ def _photo_jobs():
                 if not fut.done():
                     fut.set_result(b)
             # If prefetch is still running, let it finish and rebuild typography from the JPEG.
-            if th.is_alive():
+            if th is not None and th.is_alive():
                 def _after_prefetch(c=cid, thread=th):
                     thread.join(30)
                     try:
@@ -1579,20 +1595,20 @@ def _photo_jobs():
 
 
 def submit(cid, fetch=False, urgent=False):
-    """Start (or join) the build of a story's card. fetch=True (may download the photo) uses the photo worker.
-    urgent=True (hit-triggered, new publish) jumps the backfill and is newest-first.
-    Backfill must pass urgent=False and is never auto-promoted onto the request queue
-    (entity backfill used to insert(0) and keep bumping requested ids behind a 50-item queue)."""
-    if not fetch:
-        f = _INFLIGHT.get(cid)
-        if f is None or (f.done() and cid not in _SC):
-            f = _pool().submit(_story_build, cid, False)
-            _INFLIGHT[cid] = f
-            f.add_done_callback(lambda _f, c=cid: _INFLIGHT.pop(c, None))
-        return f
+    """Start (or join) the build of a story's card. Both typography (fetch=False) and photo
+    lookups (fetch=True) use the photo worker — typography used to go through a 1-thread
+    _pool() that could hang and never rewrite a stale title. urgent=True (hit-triggered,
+    new publish) jumps the backfill and is newest-first. Backfill must pass urgent=False
+    and is never auto-promoted onto the request queue."""
     from concurrent.futures import Future
     _ensure_fworker()
     with _FLOCK:
+        if fetch:
+            _FSKIP_NET.discard(cid)
+        else:
+            # A later fetch=True for the same cid clears this so a portrait lookup still runs.
+            if cid not in _FINFLIGHT and cid not in _FWAIT:
+                _FSKIP_NET.add(cid)
         run = _FINFLIGHT.get(cid)
         if run is not None and not run.done():
             return run
@@ -1625,10 +1641,22 @@ def _queue_card_work(cid):
         has_jpg = bool(story_photo.has_photo(cid))
         has_pcard = bool(story_photo.card_has_photo(cid))
         meta = story_photo.card_meta(cid)
+        current_key = ""
+        try:
+            import story
+            r, _al = story.load(cid)
+            if r:
+                current_key = story_photo.card_title_key(_card_headline(r.get("title") or "") or "")
+        except Exception:
+            current_key = ""
         stale = bool(meta and story_photo.card_stale(meta))
+        if meta and story_photo.card_title_stale(meta, current_key):
+            stale = True
+        if not meta:
+            stale = False
         if stale or (has_jpg and not has_pcard):
-            # Local typography / photo-from-JPEG rebuild (no network).
-            submit(cid, fetch=False)
+            # Re-render from the stored JPEG with the current cleaned title (photo worker, no network).
+            submit(cid, fetch=False, urgent=True)
         if not has_pcard and not has_jpg:
             submit(cid, fetch=True, urgent=True)
     except Exception:
