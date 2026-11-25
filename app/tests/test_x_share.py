@@ -88,6 +88,24 @@ STORIES = {
         "brief": "WHAT: Tornado Watch issued November 21 at 6:23PM EST until November 21 at 10:00PM EST by NWS Melbourne FL [NWS severity: Extreme; urgency: Future; event type: Tornado Watch]. WHERE: Indian River, FL; Martin, FL; Okeechobee, FL; St. Lucie, FL (approx. 30.11, -81.88).",
         "hidden": False, "watchlist": 0,
     },
+    "bessent_iran": {
+        "cluster_id": "e2ca47e325c5b8e1",
+        "rank": 2,
+        "category": "politics",
+        "location": "Iran; Strait of Hormuz; Tehran",
+        "title": "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz: Crud",
+        "brief": "WHAT: Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz.",
+        "hidden": False, "watchlist": 0,
+    },
+    "riyadh_tower": {
+        "cluster_id": "6b27e568eb9f503f",
+        "rank": 2,
+        "category": "war/conflict",
+        "location": "Riyadh",
+        "title": "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days",
+        "brief": "",
+        "hidden": False, "watchlist": 0,
+    },
 }
 
 
@@ -401,6 +419,27 @@ class EntityFirst(unittest.TestCase):
         self.assertNotIn("#Moderna", got)
         self.assertLessEqual(len([t for t in got if t in GENERICS]), 1)
         self.assertIsNone(L.validate(["#Moderna", "#Pfizer", "#Tesla"], title, "", ""))
+
+
+    def test_bessent_names_the_person_agency_topic_and_keeps_location(self):
+        it = STORIES["bessent_iran"]
+        tags = X.hashtags(it)
+        self.assertIn("#ScottBessent", tags)
+        self.assertIn("#Treasury", tags)
+        self.assertIn("#Sanctions", tags)
+        self.assertTrue(any(t in tags for t in ("#Iran", "#Tehran", "#Hormuz")), tags)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertLessEqual(len(tags), 5)
+        text = X.share_text(it)
+        self.assertIn("#ScottBessent", text)
+        self.assertLessEqual(X.weighted_len(text, X.story_url(it)), 280)
+
+    def test_named_person_at_start_of_title_is_tagged(self):
+        it = {"cluster_id": "a"*16, "rank": 5, "category": "politics", "location": "Washington",
+              "title": "Jane Doe Imposes new export controls in Washington", "brief": "", "hidden": False, "watchlist": 0}
+        tags = X.hashtags(it)
+        self.assertIn("#JaneDoe", tags)
+
 
 
 if __name__ == "__main__":
