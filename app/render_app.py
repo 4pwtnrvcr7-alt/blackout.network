@@ -475,14 +475,14 @@ def _boot_warm(timeout=45):
     return can_serve_wire_og()
 
 def _card_backfill():
-    """Top 50 live clusters plus stored cards: queue photo lookups with a pause between each."""
+    """One boot thread: audit, then a single paced v3 photo-rebuild worker (bounded RAM)."""
     cids = []
     try:
         if has_data():
             c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=5)
             cids = [r[0] for r in c.execute(
                 "SELECT cluster_id FROM clusters WHERE watchlist IN (0,1) "
-                "ORDER BY COALESCE(updated, first_seen) DESC LIMIT 50")]
+                "ORDER BY COALESCE(updated, first_seen) DESC LIMIT 400")]
             c.close()
     except Exception:
         cids = []
@@ -498,7 +498,16 @@ def _card_backfill():
         share_card.audit_stored_photo_cards()
         share_card.force_rebuild_listed_cards()
         share_card.rebuild_card_places()
-        share_card.backfill_photos(cids, pause=0.6)
+        if share_card.card_photo_on():
+            # Newest stories first (cids already DESC), then any other stored cards.
+            try:
+                import story_photo
+                extra = [c for c in story_photo.card_cids(400) if c not in cids]
+            except Exception:
+                extra = []
+            share_card.rebuild_card_photos(list(cids) + extra, pause=0.4)
+        else:
+            share_card.backfill_photos(cids, pause=0.6)
     except Exception:
         traceback.print_exc()
 

@@ -1107,6 +1107,39 @@ def photo_rule_allows(headline, commons_title="", src=""):
         if any(full.lower() == x.lower() or full.lower() in x.lower() or x.lower() in full.lower() for x in (pif_names or [])):
             if _exact_name_in(full, ft):
                 return True, "landmark:" + full
+    ok, why = _v3_photo_allows(headline, ft, src=src)
+    if ok:
+        return True, why
+    return False, "no_match"
+
+
+def _v3_photo_allows(headline, commons_title="", src="", kind="", label="", text=""):
+    """When photo cards are on, also allow a curated agency topic file or a place photo of this story's place."""
+    try:
+        import card_photo as CP
+        if not CP.enabled():
+            return False, "v3_off"
+    except Exception:
+        return False, "v3_off"
+    ft = (commons_title or "").replace("File:", "").replace("_", " ").strip().lower()
+    if not ft:
+        return False, "no_commons_title"
+    titles = CP.topic_file_titles()
+    if ft in titles:
+        key = titles[ft]
+        haz = CP.hazard_for((headline or "") + " " + (text or ""))
+        if haz == key or (key in CP.TOPIC_BEFORE_PLACE and haz in CP.TOPIC_BEFORE_PLACE):
+            return True, "topic:" + key
+        return False, "topic_hazard_mismatch"
+    if (kind or "") == "place" or label:
+        try:
+            import share_card as S
+            place, _, _ = S.story_map_place(headline or "", "", text or "")
+        except Exception:
+            place = ""
+        subj = " ".join((label or "", kind or "")).strip()
+        if place and subj and (place.lower() in subj.lower() or subj.lower() in place.lower()):
+            return True, "place:" + place
     return False, "no_match"
 
 
@@ -1125,6 +1158,9 @@ def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", com
     title, text = _story_text(cid, title, text)
     ft = commons_file_title(src=src or "", title=commons_title or "")
     ok, _why = photo_rule_allows(title, commons_title=ft, src=src or "")
+    if ok:
+        return True
+    ok, _why = _v3_photo_allows(title, ft, src=src or "", kind=kind or "", label="", text=text or "")
     return ok
 
 
@@ -1164,6 +1200,9 @@ def stored_photo_matches(cid):
         return None
     ft = commons_file_title(src=src, link=c.get("link") or "", title=c.get("title") or "")
     ok, _why = photo_rule_allows(title, commons_title=ft, src=src)
+    if ok:
+        return True
+    ok, _why = _v3_photo_allows(title, ft, src=src, kind=c.get("kind") or "", label=c.get("label") or c.get("caption") or "", text=text or "")
     return ok
 
 

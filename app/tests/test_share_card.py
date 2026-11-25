@@ -185,3 +185,87 @@ class CrawlerFirstFetch(unittest.TestCase):
             self.assertEqual(code, 200)
             self.assertIn("twitter:card", body)
         W._INFL.pop("abcdabcdabcdabcd", None)
+
+
+class CardPhotoV3(unittest.TestCase):
+    """v3 photo cards: topic before place for disease/wildfire/storm/flood; bare Congo is DRC."""
+
+    def test_topic_comes_before_place_for_disease_wildfire_storm_flood(self):
+        import card_photo as CP
+        self.assertEqual(CP.choose_order("Gaza Health Ministry epidemic alert over meningitis"), ("person", "topic", "place"))
+        self.assertEqual(CP.choose_order("Forest fire burns acres in Virginia"), ("person", "topic", "place"))
+        self.assertEqual(CP.choose_order("NWS Freeze Watch for Lake Charles"), ("person", "topic", "place"))
+        self.assertEqual(CP.choose_order("Coastal Flood Warning issued by NWS Seattle"), ("person", "topic", "place"))
+        self.assertEqual(CP.choose_order("Measles outbreak in Wisconsin"), ("person", "topic", "place"))
+        # Quake and cyber keep place before topic.
+        self.assertEqual(CP.choose_order("Magnitude 6.0 earthquake near Guam"), ("person", "place", "topic"))
+        self.assertEqual(CP.choose_order("Cisco security advisory on a VPN vulnerability"), ("person", "place", "topic"))
+
+    def test_bare_congo_is_dr_congo_unless_brazzaville_is_named(self):
+        import signal_place as SP
+        self.assertEqual(SP.named_countries("Ebola outbreak in Congo approaches 5,000 deaths"), ["CD"])
+        hit = SP.infer("Ebola outbreak in Congo approaches 5,000 deaths")
+        self.assertEqual((hit or {}).get("cc"), "CD")
+        self.assertIn("Democratic Republic", (hit or {}).get("place") or "")
+        hit2 = SP.infer("Republic of the Congo reports cases in Brazzaville")
+        self.assertEqual((hit2 or {}).get("cc"), "CG")
+
+    def test_flag_off_disables_chooser(self):
+        import os, card_photo as CP
+        old = os.environ.get("BN_CARD_PHOTO")
+        os.environ["BN_CARD_PHOTO"] = "0"
+        try:
+            self.assertFalse(CP.enabled())
+        finally:
+            if old is None:
+                os.environ.pop("BN_CARD_PHOTO", None)
+            else:
+                os.environ["BN_CARD_PHOTO"] = old
+            self.assertTrue(CP.enabled() or old == "0")
+
+    def test_rebuild_is_one_paced_worker_and_drops_pngs_from_ram(self):
+        """A long v3 rebuild must not start a thread per story or keep PNGs in _SC."""
+        import share_card as S
+        from unittest import mock
+        fake = b"\x89PNG" + b"x" * (800 * 1024)  # mid-range of the 0.6–1.2 MB live cards
+        ids = [f"{i:016x}" for i in range(12)]
+        started = []
+
+        def fake_thread(*a, **k):
+            started.append(k.get("name") or "t")
+            class T:
+                def start(self):
+                    started.append("start")
+            return T()
+
+        put_sizes = []
+
+        def fake_put(cid, png, src="", title_hash="", allow_downgrade=None):
+            put_sizes.append(len(png))
+
+        with mock.patch.object(S, "card_photo_on", return_value=True), \
+             mock.patch.object(S, "apply_card_photo", return_value={"src": "https://example.test/x.jpg"}), \
+             mock.patch.object(S, "render_story_fresh", return_value=fake), \
+             mock.patch.object(S, "generic_story_card", return_value=None), \
+             mock.patch.object(S, "_force_title", return_value=("Title", "", "")), \
+             mock.patch.object(S, "invalidate_card_layers"), \
+             mock.patch("share_card.threading.Thread", side_effect=fake_thread), \
+             mock.patch("story_photo.put_card", side_effect=fake_put), \
+             mock.patch("story_photo.pick", return_value=None):
+            for cid in ids:
+                S._SC[cid] = (0, fake, False)
+            out = S.rebuild_card_photos(ids, pause=0)
+        self.assertEqual(out["ids"], 12)
+        self.assertTrue(out["done"])
+        self.assertEqual(started, [])  # no per-story threads
+        self.assertEqual(put_sizes, [len(fake)] * 12)
+        for cid in ids:
+            self.assertNotIn(cid, S._SC)
+        # A second caller is a no-op while a rebuild already holds the lock.
+        S._REBUILD_LOCK.acquire()
+        try:
+            out2 = S.rebuild_card_photos(ids, pause=0)
+            self.assertTrue(out2["done"])
+            self.assertEqual(out2["ids"], 12)  # not reset or re-run
+        finally:
+            S._REBUILD_LOCK.release()
