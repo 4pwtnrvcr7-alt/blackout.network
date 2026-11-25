@@ -175,4 +175,23 @@ class Paging(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertTrue(all((it["lat"] is not None and it["lon"] is not None) for it in body["items"]))
 
+
+class FullStoryTap(unittest.TestCase):
+    def test_full_story_is_a_real_link_and_hover_is_fine_pointer_only(self):
+        app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        def read(*parts):
+            with open(os.path.join(app, *parts), encoding="utf-8") as f: return f.read()
+        js = read("wire_timeline_static", "app.js")
+        self.assertIn('class="w2-btn tl-go" href="/wire/', js)
+        self.assertIn('if(e.target.closest("a,.tl-src,.tl-act,.tl-dr"))return', js)
+        w2 = read("wire_v2_static", "wire2.css")
+        self.assertIn("@media (hover:hover) and (pointer:fine){.w2-btn:hover{background:#fff;color:#000}}", w2)
+        self.assertEqual(w2.count(".w2-btn:hover"), 1)
+        css = read("wire_timeline_static", "app.css")
+        self.assertIn(".tl-go{min-height:42px;padding:12px 20px;touch-action:manipulation", css)
+        self.assertIn("wire2.css?v=7", read("wire_timeline.py"))
+        growth = read("growth_static", "app.css")
+        self.assertIn("@media (hover:hover) and (pointer:fine){.bng-sb:hover", growth)
+        self.assertNotIn(".bng-sb:hover{", growth.split("@media (hover:hover) and (pointer:fine){.bng-sb:hover")[0])
+
 if __name__ == "__main__": unittest.main()

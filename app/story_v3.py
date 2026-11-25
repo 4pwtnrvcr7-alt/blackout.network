@@ -15,7 +15,7 @@ import html, json, os, re
 from datetime import datetime, timezone, timedelta
 
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
-ST_CSS = "/wire2/static/story3.css?v=2"
+ST_CSS = "/wire2/static/story3.css?v=3"
 ST_IMG = "/wire2/static/img"
 ST_VID = "/wire2/static/vid"
 FLAG = "BN_STORY_V3"

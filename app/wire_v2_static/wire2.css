@@ -47,8 +47,10 @@ body.w2-lock{overflow:hidden}
 .w2-hero-band{min-height:88svh}
 /* buttons */
 .w2-btn{display:inline-flex;align-items:center;gap:14px;min-height:46px;padding:14px 26px;border:1px solid #fff;background:transparent;color:#fff;cursor:pointer;
- font:600 11.5px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;transition:background .18s,color .18s}
-.w2-btn svg{width:20px;height:10px}.w2-btn:hover{background:#fff;color:#000}
+ font:600 11.5px/1 Inter,sans-serif;letter-spacing:.16em;text-transform:uppercase;transition:background .18s,color .18s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.w2-btn svg{width:20px;height:10px}
+.w2-btn:active{background:#fff;color:#000}
+@media (hover:hover) and (pointer:fine){.w2-btn:hover{background:#fff;color:#000}}
 .w2-btn-s{min-height:40px;padding:11px 18px;font-size:11px;border-color:rgba(255,255,255,.6)}
 /* sections */
 .w2-sec{padding:120px 0}.w2-sec-t{padding-top:0}
