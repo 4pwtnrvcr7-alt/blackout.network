@@ -185,7 +185,7 @@ def commons_image(filename, width=1600, min_w=700):
             artist = artist[:60].rsplit(" ", 1)[0]
         credit = (artist + " / " if artist else "") + "Wikimedia Commons"
         return {"src": ii.get("thumburl") or ii.get("url"), "credit": credit, "license": lic,
-                "title": p.get("title", fn).replace("File:", ""), "page": ii.get("descriptionurl", ""),
+                "title": p.get("title", fn).replace("File:", ""), "page": ii.get("descriptionurl", ""), "link": ii.get("descriptionurl", ""),
                 "w": int(ii.get("width") or 0), "h": int(ii.get("height") or 0)}
     return None
 
