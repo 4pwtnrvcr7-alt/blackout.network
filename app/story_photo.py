@@ -13,7 +13,8 @@ cached(src)        no network: the stored image file, or None
 prefetch(cid, ...) network, bounded: pick + download + store (background warm and the write-up publish gate only)
 """
 from __future__ import annotations
-import hashlib, io, json, os, re, threading, time, urllib.parse, urllib.request
+import hashlib
+import re, io, json, os, re, threading, time, urllib.parse, urllib.request
 from pathlib import Path
 
 UA = "BLACKOUT.NETWORK-cards/1.0 (https://blackout.network; hello@blackout.network)"
@@ -63,7 +64,10 @@ def cached(src):
 def _cand(d, kind=""):
     if not isinstance(d, dict) or not d.get("src") or not license_ok(d.get("license")):
         return None
-    return dict(src=d["src"], credit=(d.get("credit") or "").strip(), license=d.get("license") or "", caption=(d.get("caption") or "").strip(),
+    cr = (d.get("credit") or "").strip()
+    if len(cr) > 160 or re.search(r"\.(jpe?g|png|webp|tiff?):", cr, re.I):   # a collage of several files: not one clear photo of this story
+        return None
+    return dict(src=d["src"], credit=cr, license=d.get("license") or "", caption=(d.get("caption") or "").strip(),
                 link=d.get("link") or "", kind=d.get("kind") or kind, alt=d.get("alt") or "", w=d.get("w"), h=d.get("h"))
 
 

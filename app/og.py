@@ -640,7 +640,7 @@ def png_for_story_fast(cid):
     the full card keeps building in the background so the next request (and the next crawl) gets it."""
     try:
         import share_card
-        b = share_card.story_png_fast(cid, budget=0.4)
+        b = share_card.story_png_fast(cid, budget=1.0)
         if b:
             return b
     except Exception:
