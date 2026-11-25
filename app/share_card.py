@@ -99,7 +99,10 @@ def _launches():
         import netlaunch
         return netlaunch.launches_cached() or {}
     try:
-        return (_hook("launches", f) or {}).get("launches") or []
+        d = _hook("launches", f) or {}
+        if isinstance(d, (bytes, bytearray, str)):   # netlaunch.launches_cached() returns the JSON bytes
+            d = json.loads(d)
+        return d.get("launches") or []
     except Exception:
         return []
 
@@ -490,7 +493,7 @@ def _r_story(cid):
     hero = None
     try:
         import story_v3
-        if story_v3.on():
+        if it.get("lat") is None and it.get("lon") is None and story_v3.on():   # a located story gets a map crop, so skip the slow hero lookup
             a = story_v3.assemble(story_v3.note_for(cid), it, wire_v2)
             hero = ((a.get("hero") or {}) if isinstance(a.get("hero"), dict) else {}).get("image")
     except Exception:
@@ -1102,9 +1105,45 @@ def card_url(it):
     return f"{SITE}/og/x/{it['kind']}/{quote(str(it['id']), safe='~:.-_')}.png?v={_key(it)[:10]}"
 
 
+_SC = {}   # cid -> (built_at, png, refreshing)
+
+
+def _story_build(cid):
+    b = png_for("story", cid)
+    if b:
+        _SC[cid] = (time.time(), b, False)
+    return b
+
+
 def story_png(cid):
-    """Unique 1200x675 card for a Wire story (used by og.png_for_story, so /wire/<id> shares get it). None if the story is unknown."""
-    return png_for("story", cid)
+    """Unique 1200x675 card for a Wire story (used by og.png_for_story, so /wire/<id> shares get it). None if the story is unknown.
+    Resolving a story reads the live board (api_state), which can take tens of seconds when its cache is stale, so a built card is
+    served from memory at once and refreshed in the background after 10 minutes. warm() builds it ahead of the first crawl."""
+    hit = _SC.get(cid)
+    if hit:
+        if time.time() - hit[0] > 600 and not hit[2]:
+            _SC[cid] = (hit[0], hit[1], True)
+            import threading
+            threading.Thread(target=lambda: _story_refresh(cid), name="story-card", daemon=True).start()
+        return hit[1]
+    return _story_build(cid)
+
+
+def _story_refresh(cid):
+    try:
+        _story_build(cid)
+    except Exception:
+        h = _SC.get(cid)
+        if h:
+            _SC[cid] = (time.time() - 300, h[1], False)
+
+
+def warm(cid):
+    """Build a story's card in the background (called when its page is rendered, so the card is ready before anyone shares it)."""
+    if cid in _SC:
+        return
+    import threading
+    threading.Thread(target=lambda: _story_refresh(cid), name="story-card", daemon=True).start()
 
 
 def handle_get(path, qs=None, headers=None):

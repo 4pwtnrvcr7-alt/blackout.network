@@ -59,6 +59,12 @@ class T(unittest.TestCase):
         code, body, ctype = S.og_share("/og/share/network/cox.png", {})
         self.assertEqual((code, ctype), (200, "image/png"))
 
+    def test_launches_bytes_payload(self):
+        S.HOOKS["launches"] = lambda: json.dumps(LAUNCH).encode()   # netlaunch.launches_cached() returns JSON bytes
+        it = S.resolve("launch", "abc-1")
+        self.assertTrue(it and it["title"].startswith("Starlink"))
+        self.png("launch", "abc-1")
+
     def test_unknown_is_404(self):
         self.assertIsNone(S.png_for("planet", "pluto"))
         self.assertEqual(S.handle_get("/og/share/zzz/none.png")[0], 404)
