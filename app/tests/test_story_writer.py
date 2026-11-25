@@ -242,5 +242,23 @@ class Writer(Base):
         k.close()
         self.assertEqual(q, 0)
 
+
+    def test_requeue_skips_refresh_when_rewrites_disabled(self):
+        mkdb([("adadadadadadadad", "M6.8 earthquake struck the Banda Sea off Indonesia", 6)])
+        k = SW.db()
+        past = SW.iso(NOW - timedelta(hours=2))
+        k.execute("INSERT INTO jobs(cid, reason, status, arrived_at, finished, err, rank, title) VALUES(?,?,?,?,?,?,?,?)",
+                  ("adadadadadadadad", "refresh: new sources", "deferred", past, past, "no readable source text yet", 6, "quake"))
+        k.execute("INSERT INTO jobs(cid, reason, status, arrived_at, finished, err, rank, title) VALUES(?,?,?,?,?,?,?,?)",
+                  ("aeaeaeaeaeaeaeae", "new", "deferred", past, past, "no readable source text yet", 6, "other"))
+        k.commit()
+        self.assertFalse(SW.rewrite_allowed())
+        SW._requeue_deferred(k); k.commit()
+        rows = {r["cid"]: (r["status"], r["err"] or "") for r in k.execute("SELECT cid, status, err FROM jobs")}
+        k.close()
+        self.assertEqual(rows["adadadadadadadad"][0], "skipped")
+        self.assertIn("rewrites disabled", rows["adadadadadadadad"][1])
+        self.assertEqual(rows["aeaeaeaeaeaeaeae"][0], "queued")
+
 if __name__ == "__main__":
     unittest.main()
