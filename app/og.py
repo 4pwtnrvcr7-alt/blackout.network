@@ -506,7 +506,7 @@ def render(title, bg_im=None, tagline=True, rank=None, wordmark=WORDMARK):
 
 def png_bytes(im):
     buf = io.BytesIO()
-    im.convert("RGB").save(buf, format="PNG", optimize=True)
+    im.convert("RGB").save(buf, format="PNG", compress_level=3)   # optimize=True cost ~1 s locally and 4-5 s on Render (X gives up), for only ~10% smaller files
     return buf.getvalue()
 
 
@@ -648,7 +648,7 @@ def png_for_story_fast(cid):
     spec = _db_spec(cid) or {}
     t = spec.get("title") or "The Wire"
     bg_im = _open_bg("wire", "iss070e062746.webp")
-    return png_bytes(render(t, bg_im=bg_im, tagline=True, rank=spec.get("rank")))
+    return _cached(_cache_key("quick", cid, t, spec.get("rank")), lambda: png_bytes(render(t, bg_im=bg_im, tagline=True, rank=spec.get("rank"))))
 
 
 def png_for_story(cid, title=None, rank=None, hero=None):
