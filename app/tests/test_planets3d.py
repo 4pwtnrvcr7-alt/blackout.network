@@ -80,6 +80,8 @@ class Planets3d(unittest.TestCase):
         self.assertIn("SEL && SEL.id === best.dataset.id", js)
         self.assertIn(".s3-info,.s3-info *{pointer-events:none}", js)
         self.assertIn("function unlockCam", js)
+        self.assertIn("S.ctl.touches.ONE = -1", js)
+        self.assertIn('addEventListener("touchmove"', js)
         self.assertIn("unlockCam: unlockCam", js)
         pjs = open(os.path.join(STATIC, "planets3d.js"), encoding="utf-8").read()
         self.assertIn("SITE_O", pjs)

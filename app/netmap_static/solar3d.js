@@ -655,6 +655,27 @@
       S.r.domElement.addEventListener("pointerup", endPtr);
       S.r.domElement.addEventListener("pointercancel", endPtr);
     })();
+    /* One-finger orbit on touch screens runs on raw touch events (always delivered on iOS, preventDefault stops page scroll),
+       the same camera-around-target maths as OrbitControls; OrbitControls keeps two-finger zoom and mouse. */
+    (function () {
+      var el = S.r.domElement, tx = 0, ty = 0, on = false, sph = new T.Spherical(), off = new T.Vector3();
+      S.ctl.touches.ONE = -1;
+      el.addEventListener("touchstart", function (e) { if (e.touches.length === 1) { on = true; tx = e.touches[0].clientX; ty = e.touches[0].clientY; } else on = false; }, { passive: true });
+      el.addEventListener("touchmove", function (e) {
+        if (!on || e.touches.length !== 1) return;
+        e.preventDefault();
+        var q = e.touches[0], dx = q.clientX - tx, dy = q.clientY - ty; tx = q.clientX; ty = q.clientY;
+        if (!dx && !dy) return;
+        FLY = null; S.ctl.enabled = true;
+        var h = Math.max(200, el.clientHeight || 600);
+        off.copy(S.cam.position).sub(S.ctl.target); sph.setFromVector3(off);
+        sph.theta -= 2 * Math.PI * dx / h; sph.phi -= 2 * Math.PI * dy / h;
+        sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi)); sph.makeSafe();
+        off.setFromSpherical(sph); S.cam.position.copy(S.ctl.target).add(off); S.cam.lookAt(S.ctl.target);
+      }, { passive: false });
+      function end() { on = false; }
+      el.addEventListener("touchend", end, { passive: true }); el.addEventListener("touchcancel", end, { passive: true });
+    })();
     S.r.domElement.addEventListener("wheel", function () { FLY = null; }, { passive: true });
     el.querySelector("#s3_back").addEventListener("click", close);
     el.querySelector("#s3_all").addEventListener("click", overview);
