@@ -118,3 +118,42 @@ class QuickFallback(unittest.TestCase):
         finally:
             theme._srv = old_srv
             story.load = old_load
+
+
+class CrawlerFirstFetch(unittest.TestCase):
+    """X cards (Nov 25 2026): a story is not public until its card is baked, and a crawler never waits on the board."""
+
+    def test_allow_holds_story_until_card_baked(self):
+        import story_writer as SW, share_card as S
+        from unittest import mock
+        S._BAKED.discard("abcdabcdabcdabcd")
+        with mock.patch.object(SW, "gate_on", return_value=True), \
+             mock.patch.object(SW, "_is_needs_paid", return_value=False), \
+             mock.patch.object(SW, "has_writeup", return_value=True), \
+             mock.patch.object(S, "card_baked", return_value=False), \
+             mock.patch.object(S, "bake_card") as bake:
+            self.assertFalse(SW.allow("abcdabcdabcdabcd"))
+            bake.assert_called_once_with("abcdabcdabcdabcd")
+        with mock.patch.object(SW, "gate_on", return_value=True), \
+             mock.patch.object(SW, "_is_needs_paid", return_value=False), \
+             mock.patch.object(SW, "has_writeup", return_value=True), \
+             mock.patch.object(S, "card_baked", return_value=True):
+            self.assertTrue(SW.allow("abcdabcdabcdabcd"))
+
+    def test_crawler_gets_og_stub_without_waiting_for_the_board(self):
+        import wire_v2 as W
+        from unittest import mock
+        from concurrent.futures import Future
+        never = Future()   # a board build that never finishes
+        W._C.pop("abcdabcdabcdabcd", None); W._INFL.pop("abcdabcdabcdabcd", None); W._NEG.pop("abcdabcdabcdabcd", None)
+        stub = '<meta name="twitter:card" content="summary_large_image">'
+        class P:
+            def submit(self, *a, **k): return never
+        with mock.patch.object(W, "_pool", return_value=P()), mock.patch.object(W, "_light_story", return_value=stub):
+            import time
+            t0 = time.time()
+            code, body, _ = W.handle("/wire/abcdabcdabcdabcd", {}, headers={"User-Agent": "Twitterbot/1.0"})
+            self.assertLess(time.time() - t0, 0.5)
+            self.assertEqual(code, 200)
+            self.assertIn("twitter:card", body)
+        W._INFL.pop("abcdabcdabcdabcd", None)

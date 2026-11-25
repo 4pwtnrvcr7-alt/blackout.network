@@ -1485,6 +1485,65 @@ def story_map_place(title="", location="", brief="", cid=""):
     return "", None, None
 
 
+_BAKED = set()
+_BAKING = set()
+_BAKE_LOCK = threading.Lock()
+
+
+def card_baked(cid):
+    """True once a PNG card for this story is stored in cards.db (cached per process). Never raises, no network."""
+    if not cid:
+        return True
+    if cid in _BAKED:
+        return True
+    try:
+        import story_photo
+        if story_photo.get_card(cid):
+            _BAKED.add(cid)
+            return True
+    except Exception:
+        return True   # fail open: a cards.db problem must not hide the Wire
+    return False
+
+
+def bake_card(cid):
+    """Queue a designed card for this story on a daemon thread (map render, ~0.3 s, no network), store it, then queue
+    the licensed-photo upgrade. Deduped; returns at once."""
+    if not cid or cid in _BAKED:
+        return
+    with _BAKE_LOCK:
+        if cid in _BAKING:
+            return
+        _BAKING.add(cid)
+
+    def _run():
+        try:
+            import story_photo
+            if not story_photo.get_card(cid):
+                b = generic_story_card(cid)
+                if b and b.startswith(b"\x89PNG"):
+                    title = ""
+                    try:
+                        import story
+                        r, _al = story.load(cid)
+                        title = (r or {}).get("title") or ""
+                    except Exception:
+                        pass
+                    story_photo.put_card(cid, b, "", title_hash=story_photo.card_title_key(_card_headline(title) or ""))
+            _BAKED.add(cid)
+            try:
+                submit(cid, fetch=True, urgent=False)
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"share_card: bake {cid} err={type(e).__name__}", flush=True)
+        finally:
+            with _BAKE_LOCK:
+                _BAKING.discard(cid)
+
+    threading.Thread(target=_run, name="card-bake", daemon=True).start()
+
+
 def generic_story_card(cid):
     """A designed 1200x675 card (generic world map + this story's cleaned title). No geocoding, no board rebuild, no network.
     Used on a true cache miss so the Twitterbot path stays under 1s; a unique locator/photo rebuilds in the background."""

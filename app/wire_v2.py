@@ -425,6 +425,12 @@ def handle(path, qs=None, headers=None):
     fut = _INFL.get(key)
     if fut is None:
         fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
+    if story_page and crawler:
+        # Nov 25 2026 (X cards): a crawler (Twitterbot) gives up after a few seconds. Never make it wait on the live
+        # board build (1.5 s budget + a 1-5 s DB render): answer at once with the OG-complete stub from the DB while the
+        # full page builds in the background for the next hit.
+        light = _light_story(key)
+        if light: return 200, light, "text/html"
     try:
         body = fut.result(timeout=_BUDGET)
     except Exception:
