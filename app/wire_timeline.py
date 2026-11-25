@@ -232,8 +232,8 @@ def _item(r, archive, warm_budget=None):
         bits = [loc] if loc and len(_N(loc) - _N(h)) >= 1 else []
         if srcs: bits.append("via " + ", ".join(srcs[:2]) + (f" +{len(srcs) - 2}" if len(srcs) > 2 else ""))
         s = " · ".join(bits)
-    d = what if what and what != s else ""
-    if not d and title != h: d = _sent(title, 420)
+    dek = what if what and what != s else ""
+    if not dek and title != h: dek = _sent(title, 420)
     rk = r["rank"]
     try: rk = int(rk) if rk is not None else None
     except (TypeError, ValueError): rk = None
@@ -244,35 +244,36 @@ def _item(r, archive, warm_budget=None):
         except (TypeError, ValueError):
             return None
     fs = r["fs"] if "fs" in r.keys() else None
-    d = {"id": r["id"], "t": t, "h": h, "s": s, "d": d, "k": cat_key(r["category"], title, archive),
+    d = {"id": r["id"], "t": t, "h": h, "s": s, "d": dek, "k": cat_key(r["category"], title, archive),
             "g": region_key(loc, title, r["lat"], r["lon"]), "r": rk, "c": r["confidence"] or "", "loc": loc,
             "n": int(r["n_items"] or 0), "f": len(fams), "src": srcs, "l": links, "a": 1 if archive else 0,
             "w": r["watchlist"] or 0, "et": r["event_time"] if not archive else None,
             "do": 1 if archive and (t or "").endswith("T00:00:00Z") else 0,  # archive items dated by day only (no time given)
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
-    if not archive:
+    try:
+        import x_share
+        hid = False
         try:
-            import x_share
-            hid = False
-            try:
-                hid = bool(r["hidden"])
-            except Exception:
-                hid = False
-            if (rk or 0) >= 5 and (warm_budget is None or warm_budget[0] > 0):
-                try:
-                    import share_card; share_card.warm(str(r["id"]))
-                    if warm_budget is not None:
-                        warm_budget[0] -= 1
-                except Exception:
-                    pass
-            d["xu"] = x_share.intent_url(x_share.with_body({
-                "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
-                "category": r["category"], "brief": r["brief"] or "", "rank": rk,
-                "watchlist": r["watchlist"] or 0, "hidden": hid,
-                "links": links, "d": what or d,
-            }))
+            hid = bool(r["hidden"])
         except Exception:
-            d["xu"] = ""
+            hid = False
+        if not archive and (rk or 0) >= 5 and (warm_budget is None or warm_budget[0] > 0):
+            try:
+                import share_card; share_card.warm(str(r["id"]))
+                if warm_budget is not None:
+                    warm_budget[0] -= 1
+            except Exception:
+                pass
+        # Same intent_url / with_body path as the story page. `d` must stay the dek string —
+        # passing the item dict here made hashtags() throw and left xu empty.
+        d["xu"] = x_share.intent_url(x_share.with_body({
+            "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
+            "category": r["category"] or "", "brief": r["brief"] or "", "rank": rk,
+            "watchlist": r["watchlist"] or 0, "hidden": hid,
+            "links": links, "d": what or dek,
+        }))
+    except Exception:
+        d["xu"] = ""
     return d
 
 # t = last activity so newly collected signals on an existing cluster rise to the tip.
