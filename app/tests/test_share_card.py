@@ -123,7 +123,7 @@ class QuickFallback(unittest.TestCase):
 class CrawlerFirstFetch(unittest.TestCase):
     """X cards (Nov 25 2026): a story is not public until its card is baked, and a crawler never waits on the board."""
 
-    def test_allow_holds_story_until_card_baked(self):
+    def test_allow_queues_bake_but_does_not_hold_the_story(self):
         import story_writer as SW, share_card as S
         from unittest import mock
         S._BAKED.discard("abcdabcdabcdabcd")
@@ -132,13 +132,41 @@ class CrawlerFirstFetch(unittest.TestCase):
              mock.patch.object(SW, "has_writeup", return_value=True), \
              mock.patch.object(S, "card_baked", return_value=False), \
              mock.patch.object(S, "bake_card") as bake:
-            self.assertFalse(SW.allow("abcdabcdabcdabcd"))
+            self.assertTrue(SW.allow("abcdabcdabcdabcd"))  # fail open after queueing the bake (OOM hotfix)
             bake.assert_called_once_with("abcdabcdabcdabcd")
         with mock.patch.object(SW, "gate_on", return_value=True), \
              mock.patch.object(SW, "_is_needs_paid", return_value=False), \
              mock.patch.object(SW, "has_writeup", return_value=True), \
              mock.patch.object(S, "card_baked", return_value=True):
             self.assertTrue(SW.allow("abcdabcdabcdabcd"))
+
+
+    def test_bake_card_uses_one_worker_not_one_thread_per_story(self):
+        import share_card as S
+        from unittest import mock
+        S._BAKE_Q = None
+        S._BAKED.clear(); S._BAKING.clear()
+        started = []
+        class Q:
+            def __init__(self):
+                self.items=[]
+            def put(self, cid):
+                self.items.append(cid)
+        def fake_thread(*a, **k):
+            started.append(k.get("name") or (a[0] if a else "t"))
+            class T:
+                def start(self): started.append("start")
+            return T()
+        with mock.patch("share_card.threading.Thread", side_effect=fake_thread):
+            import queue as _q
+            with mock.patch("queue.Queue", side_effect=lambda: Q()):
+                S.bake_card("aaaaaaaaaaaaaaaa")
+                S.bake_card("bbbbbbbbbbbbbbbb")
+                S.bake_card("aaaaaaaaaaaaaaaa")  # dedup
+        # One worker thread started, both distinct cids queued, duplicate skipped
+        self.assertGreaterEqual(started.count("card-bake"), 1)
+        self.assertEqual(started.count("card-bake"), 1)
+        self.assertEqual(S._BAKE_Q.items, ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"])
 
     def test_crawler_gets_og_stub_without_waiting_for_the_board(self):
         import wire_v2 as W

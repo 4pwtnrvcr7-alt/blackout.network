@@ -1075,7 +1075,10 @@ def _card_ready(cid):
         if share_card.card_baked(cid):
             return True
         share_card.bake_card(cid)
-        return False
+        # Fail open after queueing: holding every story with no stored card emptied the Wire and, with
+        # one bake thread per story plus a photo fetch, OOM-killed the 2Gi box after #242 (10:40:19 AM ET).
+        # The single bake worker still stores the map card; the poster can wait on card_baked if needed.
+        return True
     except Exception:
         return True
 
