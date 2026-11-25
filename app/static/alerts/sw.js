@@ -1,5 +1,5 @@
 /* BLACKOUT.NETWORK service worker (t341): Web Push alerts only. No fetch handler and no caching, so the site always loads fresh. */
-var ICON = "/icons/icon-192.png", BADGE = "/alerts/badge.png";
+var ICON = "/icons/icon-192.png?v=4", BADGE = "/alerts/badge.png";
 self.addEventListener("install", function () { self.skipWaiting(); });
 self.addEventListener("activate", function (e) { e.waitUntil(self.clients.claim()); });
 
