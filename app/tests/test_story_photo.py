@@ -65,9 +65,9 @@ class StoryPhoto(unittest.TestCase):
 
     def test_quoted_landmark_not_possessive(self):
         title = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
-        import re
-        m = re.search(r"[\"“”']([A-Z0-9][^\"“”']{1,60})[\"“”']", title)
-        self.assertEqual(m.group(1), "PIF Tower")
+        terms = P._landmark_terms(title)
+        self.assertEqual(terms[0], "PIF Tower")
+        self.assertIn("Public Investment Fund Tower", terms)
 
     def test_persist_choice_and_card_across_empty_disk(self, tmp=None):
         import os, tempfile
@@ -149,9 +149,34 @@ class StoryPhoto(unittest.TestCase):
     def test_card_headline_first_sentence_only(self):
         h = S._card_headline("— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles. Ukraine also expects missiles for F-16s and NASAMS systems.")
         self.assertTrue(h.startswith("Zelensky says"))
+        self.assertFalse(h.startswith("—") or h.startswith("-") or h.startswith("–"))
         self.assertNotIn("NASAMS", h)
         self.assertNotIn("F-16s", h)
         self.assertIn("new arms package", h)
+
+    def test_card_headline_strips_leading_trailing_dashes(self):
+        cases = [
+            "— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine",
+            "– Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine",
+            "― Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine",
+            "... Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine ...",
+            '"Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine."',
+        ]
+        for raw in cases:
+            h = S._card_headline(raw)
+            self.assertTrue(h.startswith("Zelensky says"), repr(h))
+            self.assertFalse(h[0] in "-–—―•.,;:'\"" + "\u201c\u201d", repr(h))
+            self.assertFalse(h.endswith(("...", "…", "-", "–", "—", ".")), repr(h))
+
+    def test_quoted_landmark_curly_and_expand(self):
+        straight = "Riyadh's landmark 'PIF Tower' struck in aerial attack for second time in five days"
+        curly = "Riyadh’s landmark ‘PIF Tower’ struck in aerial attack for second time in five days"
+        self.assertEqual(P._landmark_terms(straight)[0], "PIF Tower")
+        self.assertIn("Public Investment Fund Tower", P._landmark_terms(straight))
+        self.assertEqual(P._landmark_terms(curly)[0], "PIF Tower")
+        self.assertTrue(P.landmark_in(straight) and P.landmark_in(curly))
+        # possessive must not be captured
+        self.assertNotIn("s landmark", " ".join(P._landmark_terms(straight)))
 
     def test_put_card_does_not_replace_photo_with_map(self):
         import os, tempfile
@@ -176,6 +201,71 @@ class StoryPhoto(unittest.TestCase):
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 
+
+
+    def test_fast_path_queues_when_jpeg_exists_but_card_is_map(self):
+        import os, tempfile
+        from unittest import mock
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        try:
+            P._dir = lambda: Path(d)
+            png = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            jpg = b"\xff\xd8" + b"j" * 3000
+            cand = dict(src="https://upload.wikimedia.org/x.jpg", credit="US Treasury", license="Public domain",
+                        caption="Scott Bessent, 2025.", kind="person", label="lab", link="")
+            P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)
+            P.put_card("e2ca47e325c5b8e1", png, "")  # map card, jpeg already stored
+            self.assertTrue(P.has_photo("e2ca47e325c5b8e1"))
+            self.assertFalse(P.card_has_photo("e2ca47e325c5b8e1"))
+            called = []
+            real = S.submit
+            def wrap(cid, fetch=False, urgent=False):
+                called.append((cid, fetch, urgent))
+                class F:
+                    def result(self, timeout=None):
+                        return png
+                return F()
+            S._SC.clear()
+            with mock.patch.object(S, "submit", side_effect=wrap):
+                S.story_png_fast("e2ca47e325c5b8e1")
+            self.assertTrue(any(c[0]=="e2ca47e325c5b8e1" and c[1] is True and c[2] is True for c in called), called)
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_urgent_lookups_jump_backfill(self):
+        # Record the worker's pull order: a later urgent cid must run before a queued backfill cid.
+        import time
+        order = []
+        done = []
+        def fake(cid, fetch=False):
+            order.append(cid)
+            time.sleep(0.05)
+            return cid
+        old = S._story_build
+        S._SC.clear()
+        try:
+            S._story_build = fake
+            # drain any leftover worker state
+            with S._FLOCK:
+                S._FHIGH.clear(); S._FLOW.clear(); S._FWAIT.clear()
+            S.submit("backfillcid000001", fetch=True, urgent=False)
+            time.sleep(0.01)  # let the worker pick up backfill or not
+            S.submit("newstorycid000002", fetch=True, urgent=True)
+            S.submit("hitcid0000000003", fetch=True, urgent=True)
+            # wait for them
+            deadline = time.time() + 3
+            while time.time() < deadline and len(order) < 3:
+                time.sleep(0.05)
+            # The two urgent cids must appear before any remaining backfill if backfill hadn't started,
+            # or immediately after the in-flight backfill. Newest urgent (hit) is front of the urgent lane.
+            self.assertIn("hitcid0000000003", order)
+            self.assertIn("newstorycid000002", order)
+            # hit was submitted last with urgent, so it is at the front of the high queue (unless already running)
+            hi = [c for c in order if c in ("newstorycid000002", "hitcid0000000003")]
+            self.assertEqual(hi[0], "hitcid0000000003", order)
+        finally:
+            S._story_build = old
 
 
 if __name__ == "__main__":

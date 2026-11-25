@@ -761,12 +761,18 @@ def rule_tags(r):
     return list(x_share._entity_first(_item_for_tags(r)) or [])
 
 def build_card(cid):
-    """Render and cache the share card. Returns True when bytes were produced."""
+    """Render and cache the share card. Returns True when bytes were produced.
+    A new story waits briefly for a high-priority photo lookup so the photo card can exist before publish;
+    if the lookup does not finish, the designed map card is used (never the earth fallback)."""
     try:
         import share_card
-        if cid in getattr(share_card, "_SC", {}) and share_card._SC.get(cid) and share_card._SC[cid][1]:
+        import story_photo
+        if story_photo.card_has_photo(cid):
             return True
-        b = share_card.story_png(cid)
+        if hasattr(share_card, "story_png_publish"):
+            b = share_card.story_png_publish(cid)
+        else:
+            b = share_card.story_png(cid)
         return bool(b)
     except Exception:
         traceback.print_exc()
