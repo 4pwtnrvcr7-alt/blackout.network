@@ -75,6 +75,7 @@ class Paging(unittest.TestCase):
         cls.old = (W.DB, W.HDB); W.DB = db; W.HDB = os.path.join(cls.d, "none.db")
     @classmethod
     def tearDownClass(cls): W.DB, W.HDB = cls.old
+    def setUp(self): W._reset_caches()
 
     def test_both_directions_no_gaps(self):
         a = W.page(limit=7); seen = [x["id"] for x in a["items"]]

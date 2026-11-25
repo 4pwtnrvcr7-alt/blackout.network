@@ -174,7 +174,7 @@ class Tags(unittest.TestCase):
         tags = X.hashtags(it)
         self.assertIn("#US", tags)
         self.assertIn("#H5N1", tags)
-        self.assertIn("#Outbreak", tags)
+        self.assertNotIn("#Health", tags)
         self.assertNotIn("#BirdFlu", tags)
         self.assertGreaterEqual(len(tags), 3)
 
@@ -185,7 +185,7 @@ class Tags(unittest.TestCase):
         self.assertIn("#KryvyiRih", tags)
         self.assertIn("#UkraineWar", tags)
         self.assertIn("#MissileStrike", tags)
-        self.assertIn("#War", tags)
+        self.assertTrue({"#UkraineWar", "#MissileStrike", "#Ukraine"} & set(tags), tags)
         self.assertGreaterEqual(len(tags), 3)
         self.assertLessEqual(len(tags), 5)
 
@@ -195,7 +195,7 @@ class Tags(unittest.TestCase):
         self.assertIn("#Ukraine", tags)
         self.assertIn("#Kyiv", tags)
         self.assertIn("#UkraineWar", tags)
-        self.assertIn("#War", tags)
+        self.assertTrue({"#UkraineWar", "#MissileStrike", "#Ukraine"} & set(tags), tags)
         self.assertGreaterEqual(len(tags), 3)
 
     def test_cyber_global_rank3_reaches_three(self):
@@ -209,7 +209,7 @@ class Tags(unittest.TestCase):
         it = STORIES["florida_rain"]
         tags = X.hashtags(it)
         self.assertIn("#Florida", tags)
-        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Weather", tags)
         self.assertTrue("#Storm" in tags or len(tags) >= 3)
         self.assertNotIn("#Hurricane", tags)
         self.assertNotIn("#Tampa", tags)
@@ -221,7 +221,7 @@ class Tags(unittest.TestCase):
         self.assertIn("#Florida", tags)
         self.assertIn("#Miami", tags)
         self.assertIn("#Flood", tags)
-        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Weather", tags)
         self.assertNotIn("#Hollywood", tags)
         self.assertGreaterEqual(len(tags), 3)
         self.assertLessEqual(len(tags), 5)
@@ -231,7 +231,7 @@ class Tags(unittest.TestCase):
         tags = X.hashtags(it)
         self.assertIn("#Florida", tags)
         self.assertIn("#Tornado", tags)
-        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Weather", tags)
         self.assertNotIn("#Melbourne", tags)
         self.assertGreaterEqual(len(tags), 3)
 
@@ -242,7 +242,7 @@ class Tags(unittest.TestCase):
         self.assertNotIn("#Ebola", tags)
         self.assertNotIn("#Outbreak", tags)
         self.assertGreaterEqual(len(tags), 3)
-        self.assertTrue("#News" in tags or "#WorldNews" in tags)
+        self.assertFalse({t.lower() for t in tags} & {"#news", "#worldnews", "#breaking", "#blackoutnetwork", "#alerts"}, tags)
         wl = dict(STORIES["kyiv_bridges"], rank=7, watchlist=1)
         tags = X.hashtags(wl)
         self.assertIn("#Ukraine", tags)
@@ -278,7 +278,7 @@ class Tags(unittest.TestCase):
               "cluster_id": "c0ffeedc0ffeed00"}
         tags = X.hashtags(it)
         self.assertIn("#Czechia", tags)
-        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Weather", tags)
         self.assertGreaterEqual(len(tags), 3, tags)
         self.assertNotIn("#Kenya", tags)
 
@@ -297,7 +297,7 @@ class Tags(unittest.TestCase):
         tags = X.hashtags(it)
         self.assertIn("#Florida", tags)
         self.assertIn("#Flood", tags)
-        self.assertIn("#Weather", tags)
+        self.assertNotIn("#Weather", tags)
         self.assertNotIn("#Hurricane", tags)
         self.assertGreaterEqual(len(tags), 3)
 
@@ -361,7 +361,7 @@ class EntityFirst(unittest.TestCase):
             self.assertIn("#TherivaBiologics", tags)
             self.assertIn("#NYSEAmerican", tags)
             self.assertIn("#TOVX", tags)
-            self.assertTrue(set(tags) & {"#Stocks", "#Biotech", "#Markets"})
+            self.assertFalse(set(tags) & {"#Stocks", "#Biotech", "#Markets"}, tags)   # category words are filler now
             self.assertFalse(set(tags) & GENERICS, tags)
 
     def test_ukraine_strike(self):
@@ -385,7 +385,7 @@ class EntityFirst(unittest.TestCase):
     def test_florida_flood(self):
         tags = X.hashtags(_mk("Flood Watch issued November 23 at 3:58PM EST until November 26 at 1:00AM EST by NWS Miami FL",
                               location="Metro Broward County; Metropolitan Miami Dade", category="natural disaster", rank=4))
-        for t in ("#Florida", "#Flood", "#Weather"):
+        for t in ("#Florida", "#Flood", "#Miami"):
             self.assertIn(t, tags)
 
     def test_libya_drone_vs_russian_vessel_is_not_ukraine_war(self):
@@ -602,7 +602,45 @@ class EntityFirst(unittest.TestCase):
 
 
 
+class FinalTagRule(unittest.TestCase):
+    """Matt, Nov 25: every row, every rank, 3-5 specific entity tags. Never #News, #BlackoutNetwork, #Health, #Alerts or similar."""
+    BANNED = {"#news", "#worldnews", "#breaking", "#breakingnews", "#blackoutnetwork", "#alerts", "#health", "#weather", "#war", "#conflict",
+              "#politics", "#markets", "#space", "#storm", "#security", "#wire", "#live", "#update"}
+    LOW = [
+        ("Synology security advisory (AV26-1193)", "", "cyber", 3),
+        ("Forest fire in Australia (green alert)", "Australia", "natural disaster", 1),
+        ("M 4.7 - 18 km ESE of Güvercinlik, Turkey", "Turkey", "natural disaster", 2),
+        ("Space weather: WATCH: Geomagnetic Storm Category G1 Predicted", "Global (Earth)", "space", 2),
+        ("Minutes of the Board's discount rate meetings on October 19", "", "markets", 1),
+        ("Urgent action needed to safeguard the effectiveness of antibiotics", "", "disease", 1),
+        ("Director Liability Italy: Bank Failure Guide 2026", "", "financial", 4),
+        ("Flood Watch issued November 25 at 1:47AM EST until November 26", "North Carolina", "natural disaster", 4),
+        ("Level 2 - Malaria in Panama", "Panama", "disease", 1),
+        ("Society for UAP Studies Opens Registration for One of the Finest Courses", "", "uap", 2),
+    ]
+
+    def _ok(self, tags, label):
+        self.assertTrue(3 <= len(tags) <= 5, (label, tags))
+        self.assertFalse({t.lower() for t in tags} & self.BANNED, (label, tags))
+        self.assertEqual(len({t.lower() for t in tags}), len(tags), (label, tags))
+
+    def test_low_rank_rows_get_entity_tags_not_filler(self):
+        for title, loc, cat, rk in self.LOW:
+            it = {"cluster_id": "x" + str(abs(hash(title)) % 10**8), "title": title, "headline": title, "location": loc, "category": cat, "rank": rk, "brief": ""}
+            self._ok(X.hashtags(it), title)
+
+    def test_held_rows_and_every_story_fixture_follow_the_rule(self):
+        for name, it in STORIES.items():
+            self._ok(X.hashtags(it), name)
+            self._ok(X.hashtags(dict(it, hidden=True)), name + " (held)")
+
+    def test_finalize_drops_filler_and_pads_from_the_text(self):
+        it = {"title": "Nvidia CEO Jensen Huang meets Trump at the White House", "headline": "Nvidia CEO Jensen Huang meets Trump at the White House", "rank": 4}
+        tags = X.finalize_tags(["#News", "#BlackoutNetwork", "#Alerts", "#Health"], it)
+        self._ok(tags, "padded")
+        self.assertTrue({"#Nvidia", "#JensenHuang"} & set(tags), tags)
+        self.assertEqual(X.finalize_tags(["#Japan", "#Tokyo", "#Earthquake", "#News", "#Weather"], {"title": "Quake near Tokyo, Japan"}), ["#Japan", "#Tokyo", "#Earthquake"])
+
+
 if __name__ == "__main__":
     unittest.main()
-
-
