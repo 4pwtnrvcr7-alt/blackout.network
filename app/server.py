@@ -112,10 +112,14 @@ def clusters_out(rows):
                 continue
         try:
             import story_writer as SW
-            if not SW.allow(r.get("cluster_id") or r.get("id")):
+            cid = r.get("cluster_id") or r.get("id")
+            # published = has a stored write-up (desk / template / API). The listing gate (allow)
+            # can be off during boot; the push feed must still skip unready items and retry later.
+            r["published"] = bool(SW.has_writeup(cid))
+            if not SW.allow(cid):
                 continue
         except Exception:
-            pass
+            r.setdefault("published", True)
         out.append(r)
     return out
 
@@ -799,6 +803,8 @@ class H(BaseHTTPRequestHandler):
         """t347: a dashboard tab name typed as a path (/maps) -> 302 to /#maps; any other unknown non-API path -> the HTML 404 page.
         API / internal paths keep their JSON 404. Returns True if a response was sent."""
         if path.startswith(("/api/", "/internal/")): return False
+        # /wire/<id> has its own story page (or a story-shaped 404). Never replace it with the generic "Page not found".
+        if re.match(r"^/wire/[0-9a-f]{16}/?$", path or ""): return False
         seg = path.strip("/").lower()
         if seg == "elon": seg = "figures"   # t353: the old Elon Musk tab is now Key Figures
         if seg == "ready":   # seo/ready-hub: /ready is a real page (ready.py); variants like /ready/ or /READY 301 to /ready (keep ?utm_*)
