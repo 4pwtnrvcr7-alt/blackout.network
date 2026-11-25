@@ -1589,50 +1589,128 @@ def with_body(item, alerts=None, extra=""):
     return it
 
 
-# --------------------------------------------------------------------------- final tag rule (Nov 25 2026, Matt: 3-5 specific entity tags on every row)
-# Never #News, #BlackoutNetwork, #Health, #Alerts, #Weather, #War ... or any category word. Drop those, then fill with
-# entities (people, orgs, companies, tickers, places, diseases) from the headline and text.
+# --------------------------------------------------------------------------- final tag rule (Nov 25 2026, 1:03 PM ET — Matt: short popular tags for engagement)
+# Hashtags are for social search. Prefer short, popular one-word tags people actually type
+# (#War, #Nuclear, #Ebola, #Iran, #Earthquake, #Wildfire, #Hurricane, #Gaza, #Ukraine, #Tesla, #NVIDIA)
+# plus common short entity names. Never long run-together strings. Popular topic words are good.
+# Still banned: #News, #WorldNews, #Breaking, #BlackoutNetwork, #Alerts, #Update and similar fluff.
+# 3-5 tags, each at most ~12 characters or one well-known name, topic word first, then place/person/company.
 FILLER = {t.lower() for t in (
-    "News", "WorldNews", "Breaking", "BreakingNews", "BlackoutNetwork", "Alerts", "Alert", "Wire", "Live", "Update", "Updates", "Latest",
-    "Headlines", "Trending", "World", "Global", "Today", "Now", "Urgent", "Watch", "Warning", "Advisory", "Report", "Reports",
-    "Health", "Weather", "War", "Conflict", "Politics", "Markets", "Market", "Stocks", "Economy", "Energy", "Tech", "Technology", "Science",
-    "Crime", "Disaster", "Hazard", "Infrastructure", "Aviation", "Transport", "Space", "Storm", "Security", "Safety", "Government",
-    "Military", "Defense", "Business", "Finance", "Environment", "Climate", "Emergency", "Incident", "Event", "Story", "Signal", "Signals",
-    "Intel", "Monitor", "Monitoring", "Threat", "Threats", "Risk", "Crisis", "Cybersecurity", "Social", "Media", "Video", "Photo",
-    "Orange", "Red", "Yellow", "Green", "Level", "Research", "Releases", "Full", "Guests", "Footage", "Forces", "Affairs",
+    "News", "WorldNews", "Breaking", "BreakingNews", "BlackoutNetwork", "Alerts", "Alert", "Wire", "Live",
+    "Update", "Updates", "Latest", "Headlines", "Trending", "World", "Global", "Today", "Now", "Urgent",
+    "Watch", "Warning", "Advisory", "Report", "Reports", "Source", "Sources",
+    "Disaster", "Hazard", "Infrastructure", "Aviation", "Transport", "Safety", "Government",
+    "Incident", "Event", "Story", "Signal", "Signals", "Intel", "Monitor", "Monitoring",
+    "Threat", "Threats", "Risk", "Crisis", "Social", "Media", "Video", "Photo",
+    "Orange", "Red", "Yellow", "Green", "Level", "Research", "Releases", "Full", "Guests", "Footage",
+    "Forces", "Affairs", "Category", "Guide", "Minutes",
     "EST", "EDT", "CST", "CDT", "MST", "MDT", "PST", "PDT", "AKST", "AKDT", "HST", "ET", "PT", "PM", "AM", "UTC", "GMT", "IP", "MMI", "AV", "ID",
-    "WHAT", "WHY", "WHERE", "WHEN", "WHO", "HOW", "Sources", "Source", "Some", "Several", "Many", "Another", "Other")}
+    "WHAT", "WHY", "WHERE", "WHEN", "HOW", "Some", "Several", "Many", "Another", "Other")}
+# Popular topic/search words people actually type (slightly over 12 chars is ok for these).
+POPULAR = {t.lower() for t in (
+    "War", "Nuclear", "Ebola", "Iran", "Earthquake", "Wildfire", "Hurricane", "Gaza", "Ukraine", "Tesla", "Nvidia", "NVIDIA",
+    "Storm", "Cybersecurity", "Outbreak", "Flood", "Tornado", "Cyclone", "Typhoon", "Volcano", "Drought",
+    "Measles", "Cholera", "Polio", "Influenza", "Missile", "Sanctions", "Ransomware", "Cyberattack", "Cyber",
+    "Conflict", "Weather", "Health", "Politics", "Stocks", "Markets", "Economy", "Energy", "Crime", "Space",
+    "Fire", "Quake", "Rain", "Snow", "Blizzard", "Tsunami", "Eruption", "Landslide", "Heatwave", "Freeze",
+    "Airstrike", "Drone", "Israel", "Hamas", "Hezbollah", "Houthis", "Russia", "China", "Taiwan", "Korea",
+    "CVE", "Breach", "Covid", "Mpox", "Vaccine", "NATO", "UN", "WHO", "FEMA", "NWS", "USGS", "NASA", "NOAA",
+    "Military", "Defense", "Climate", "Finance", "Business", "Science", "Tech", "Technology", "Environment",
+    "Security", "Ice", "Hail", "Flooding")}
 _ID_RX = re.compile(r"\b([A-Z]{2,5}\d{0,2}-\d{2,4}(?:-\d{2,5})?)\b")
 _FILL_STOP = {w for w in (
     "the a an this that these those in on at by for as with after amid over into from about to of and or its their his her than is are was were "
     "has have had be been will would could should may might can says said say new more most less very just also not but if then so such "
-    "now today tonight monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october "
-    "declares announces issues warns launches opens releases adds leaves suspects signals unleashes convicted indicted november december officials official authorities reports report media sources source first last next latest top big major minor "
+    "now today tonight monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september "
+    "declares announces issues warns launches opens releases adds leaves suspects signals unleashes convicted indicted october november december officials official authorities reports report media sources source first last next latest top big major minor "
     "news live update updates breaking watch warning alert advisory guide minutes meeting meetings board urgent action needed bizarre "
-    "mockup special general national international local regional state states city county".split())}
+    "mockup special general national international local regional state states city county toward predicted potential possible official various".split())}
 _TINY_STOP = set("the and for with from that this into over after amid about than are was were its their his her has have not but".split())
 _FILL_BADWORDS = {"stop", "it", "special", "october", "november", "december", "january", "february", "march", "april", "june", "july", "august", "september"}
+_JUNK_WORDS = {
+    "category", "media", "reports", "report", "victims", "guide", "women", "men", "youth", "safeguard", "internet",
+    "army", "concerns", "toward", "predicted", "effectiveness", "central", "minutes", "liability", "director",
+    "update", "updates", "latest", "breaking", "says", "amid", "watch", "warning", "potential", "possible",
+    "official", "national", "international", "federal", "various", "several", "another", "major", "minor",
+    "severe", "heavy", "coastal", "tropical", "ongoing", "according", "including", "related", "current",
+    "recent", "additional", "important", "significant", "high", "low", "mid", "small", "large", "big",
+}
+# Isolated gentilics are adjectives, not search tags (#Canadian → use #Canada from the place extractor).
+_GENTILIC = {
+    "canadian", "british", "american", "russian", "chinese", "french", "german", "italian", "japanese", "korean",
+    "mexican", "australian", "indian", "irish", "scottish", "spanish", "turkish", "ukrainian", "israeli", "iranian",
+    "saudi", "egyptian", "nigerian", "brazilian", "argentine", "polish", "swedish", "norwegian", "danish", "dutch",
+    "swiss", "austrian", "portuguese", "greek", "thai", "vietnamese", "indonesian", "filipino", "pakistani",
+    "afghan", "iraqi", "syrian", "lebanese", "jordanian", "yemeni", "sudanese", "kenyan", "ethiopian", "somali",
+}
 
 
-_JUNK_WORDS = {"category", "media", "reports", "report", "victims", "guide", "women", "men", "youth", "safeguard", "internet", "army", "concerns",
-               "toward", "predicted", "effectiveness", "central", "minutes", "liability", "director", "update", "updates", "latest", "breaking", "says", "amid", "watch", "warning"}
+def _camel_words(tag):
+    s = (tag or "").lstrip("#")
+    # Compact ids and strain names stay one token (#D33B, #H5N1, #AV261193, #TOVX).
+    if re.fullmatch(r"H\d+N\d+", s, re.I) or re.fullmatch(r"[A-Za-z]{1,6}\d+[A-Za-z]{0,5}\d*", s) or (re.fullmatch(r"[A-Za-z]{2,6}", s) and s.isupper()):
+        return [s]
+    words = re.findall(r"[A-Z]+(?=[A-Z][a-z]|[0-9]|$)|[A-Z][a-z]+|[a-z]+|[0-9]+", s) or ([s] if s else [])
+    # Glue a trailing compact id: Iceberg + D + 33 + B -> Iceberg, D33B
+    if len(words) >= 2:
+        for i in range(1, len(words)):
+            rest = "".join(words[i:])
+            if re.fullmatch(r"[A-Za-z]{0,4}\d+[A-Za-z]{0,4}", rest) and 2 <= len(rest) <= 10:
+                return words[:i] + [rest]
+    return words
+
+
+def _shorten_tag(tag):
+    """Drop long run-togethers; reduce #NuclearThreat to #Nuclear. Keep short tags and well-known names."""
+    if not tag:
+        return None
+    t = "#" + str(tag).lstrip("#")
+    s = t.lstrip("#")
+    words = _camel_words(s)
+    for w in words:
+        if w.lower() in POPULAR:
+            return to_tag(w) or ("#" + w[0].upper() + w[1:] if w else None)
+    if s.lower() in _GENTILIC or s.lower() in _JUNK_WORDS:
+        return None
+    if len(words) >= 3:
+        return None      # #ChiquitaCanyonLandfill, #WarInTheMiddleEast
+    if len(s) <= 12 and len(words) <= 2:
+        return t
+    if len(words) == 1 and len(s) <= 16:
+        return t
+    if len(words) == 2 and s[0].isupper():
+        if len(s) <= 16:
+            return t     # #JensenHuang, #TherivaBiologics (well-known names slightly over 12)
+        first = to_tag(words[0])
+        if first and first.lstrip("#").lower() not in _JUNK_WORDS | _GENTILIC | {"democratic", "republic", "united", "federal", "national", "state", "department", "ministry"}:
+            return first
+        return None
+    return None
 
 
 def _is_filler(tag):
     t = (tag or "").lstrip("#").lower()
     if not t or t in FILLER:
         return True
-    words = re.findall(r"[a-z0-9]+", re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", (tag or "").lstrip("#")).lower())
+    words = [w.lower() for w in _camel_words(tag)]
     if len(words) == 2 and words[0] == words[1]:
         return True      # #OctoberOctober
     if len(t) < 2 or t.isdigit():
         return True
+    if t in _GENTILIC or t in _JUNK_WORDS or t in _FILL_BADWORDS:
+        return True
+    if any(w in _FILL_BADWORDS for w in words):
+        return True
     if re.match(r"^(?i:some|several|many|another|other|the|this|these)[A-Z]", (tag or "").lstrip("#")):
         return True      # #SomeCentralFlorida, #TheWhite...
-    if any(w in words for w in _JUNK_WORDS):
-        return True      # #MediaReports #GeomagneticStormCategory #DefraudVictims
+    if any(w in _JUNK_WORDS or w in _FILL_STOP for w in words):
+        # allow a popular topic next to a junk modifier (#SevereRain already shortened; leftover #TowardX)
+        if not any(w in POPULAR for w in words):
+            return True
     if re.match(r"^(?:AM|PM)?[ECMPHA][KS]?[SD]?T$", (tag or "").lstrip("#")):
         return True      # time zones: #EST #AMET #AKST
+    if _shorten_tag(tag) is None:
+        return True
     return False
 
 
@@ -1712,7 +1790,7 @@ def _bigram_fill(item, headline=None):
     out = []
     for m in _ID_RX.finditer(title):
         tg = to_tag(m.group(1).replace("-", ""))
-        if tg and tg not in out:
+        if tg and tg not in out and not _is_filler(tg):
             out.append(tg)
     words = [w for w in re.findall(r"[A-Za-z][A-Za-z']{3,}", title) if w.lower().strip("'s") not in _FILL_STOP]
     for a, b in zip(words, words[1:]):
@@ -1727,7 +1805,7 @@ def _bigram_fill(item, headline=None):
 
 
 def entity_fill(item, headline=None, topics=True):
-    """Entity candidates in priority order for padding a short tag list. No category words, no brand."""
+    """Entity and popular-topic candidates for padding a short tag list."""
     item = _normalize_item(item)
     out = []
     for fn in (person_tags, entity_tags, location_tags):
@@ -1740,11 +1818,15 @@ def entity_fill(item, headline=None, topics=True):
         out += ["#" + t.lstrip("#") for t in _proper_noun_fill(item, headline=headline)]
     except Exception:
         pass
+    txt0 = _item_text(item, headline=headline)
+    if re.search(r"discount rate|federal reserve|\bFOMC\b|the Fed\b", txt0, re.I):
+        out.append("#Fed")
+        out.append("#Markets")
     if not topics:                      # held rows may be false positives: names and places only, never the topic
         try:
-            ban = {t.lower() for t in topic_tags(item, headline=headline)} | {"#ebola", "#outbreak", "#measles", "#cholera", "#h5n1", "#birdflu"}
+            ban = {t.lower() for t in topic_tags(item, headline=headline)} | {"#ebola", "#outbreak", "#measles", "#cholera", "#h5n1", "#birdflu", "#war", "#conflict"}
         except Exception:
-            ban = {"#ebola", "#outbreak"}
+            ban = {"#ebola", "#outbreak", "#war"}
         return [t for t in out if t.lower() not in ban]
     try:
         out += topic_tags(item, headline=headline)
@@ -1760,24 +1842,96 @@ def entity_fill(item, headline=None, topics=True):
     out += ["#" + t.lstrip("#") for t in _bigram_fill(item, headline=headline)]
     txt = _item_text(item, headline=headline)
     if re.search(r"vulnerab|security advisory|\bCVE-\d", txt, re.I):
-        out.append("#Vulnerability")
+        out.append("#Cybersecurity")
     if re.search(r"\bpatch(?:es|ed)?\b|\bzero[- ]day\b", txt, re.I):
-        out.append("#Patch")
+        out.append("#Cyber")
+    if re.search(r"antibiotic|outbreak|malaria|measles|ebola|influenza|vaccine|virus|disease", txt, re.I):
+        out.append("#Health")
+    if re.search(r"discount rate|federal reserve|\bFOMC\b|the Fed\b", txt, re.I):
+        out.append("#Fed")
+        out.append("#Markets")
     return out
 
 
+def _order_tags(tags, item=None, headline=None):
+    """Topic word first, then the main place, then person or company."""
+    places, people = set(), set()
+    try:
+        places = {t.lower() for t in location_tags(item or {}, headline=headline)}
+    except Exception:
+        pass
+    try:
+        people = {t.lower() for t in person_tags(item or {}, headline=headline)}
+    except Exception:
+        pass
+
+    def key(t):
+        k = (t or "").lstrip("#").lower()
+        if k in POPULAR:
+            return (0, tags.index(t) if t in tags else 0)
+        if t.lower() in places:
+            return (1, tags.index(t) if t in tags else 0)
+        if t.lower() in people:
+            return (2, tags.index(t) if t in tags else 0)
+        return (3, tags.index(t) if t in tags else 0)
+
+    return sorted(tags, key=key)
+
+
+
+_TOPIC_HINTS = {
+    "earthquake": ("earthquake", "quake", "seismic", "magnitude"),
+    "wildfire": ("wildfire", "forest fire", "bushfire", "wild fire", "fire"),
+    "weather": ("weather", "rain", "snow", "storm", "wind", "flood", "tornado", "hurricane", "blizzard", "ice", "hail"),
+    "war": ("war", "missile", "airstrike", "air strike", "combat", "invasion", "battlefield", "shelling", "offensive", "drone strike"),
+    "flood": ("flood", "flooding"),
+    "storm": ("storm", "blizzard", "cyclone", "hurricane", "typhoon", "geomagnetic"),
+    "stocks": ("stock", "shares", "trading", "nyse", "nasdaq", "market"),
+    "markets": ("market", "trading", "nyse", "nasdaq", "shares", "stock"),
+    "health": ("health", "hospital", "disease", "outbreak", "virus", "vaccine", "malaria", "measles", "ebola", "influenza", "antibiotic", "antibiotics"),
+    "cybersecurity": ("cybersecurity", "cyber", "vulnerab", "cve", "ransomware", "breach", "advisory", "exploited"),
+    "cyberattack": ("cyberattack", "cyber attack", "cyber", "exploited", "ransomware", "breach"),
+    "cyber": ("cyber", "vulnerab", "cve", "ransomware", "breach"),
+}
+
+def _topic_earned(tag, item, headline=None, allowed=None):
+    k = (tag or "").lstrip("#").lower()
+    if k not in POPULAR:
+        return True
+    if allowed and tag.lower() in {t.lower() for t in allowed}:
+        return True
+    text = _item_text(item, headline).lower()
+    if k == "war":
+        text = re.sub(r"secretary of war|department of war|minister of war", " ", text)
+    if k == "hurricane" and re.search(r"hurricane \w+ record", text) and not re.search(r"hurricane (watch|warning|landfall|makes landfall)", text):
+        return False
+    for h in _TOPIC_HINTS.get(k, (k,)):
+        if re.search(r"(?<![a-z])" + re.escape(h) + r"(?![a-z])", text):
+            return True
+    return False
+
+
 def finalize_tags(tags, item=None, headline=None, topics=True):
-    """The one rule for every row, every rank: 3-5 specific tags, no filler, no unearned #War/#Conflict."""
+    """The one rule for every row: 3-5 short popular tags, topic first, no fluff, no long run-togethers."""
     item = _normalize_item(item or {})
-    unearned = SOFT_GENERICS if not armed_conflict(item, headline=headline) else set()
+    unearned = set()
+    if not armed_conflict(item, headline=headline):
+        unearned = {g for g in SOFT_GENERICS if not _topic_earned(g, item, headline)}
+    allowed = []
+    try:
+        allowed = topic_tags(item, headline=headline) if topics else []
+    except Exception:
+        allowed = []
     keep = []
     for t in tags or []:
         if not t:
             continue
-        t = "#" + str(t).lstrip("#")
-        if _is_filler(t) or t in unearned or any(t.lower() == k.lower() for k in keep):
+        t = _shorten_tag("#" + str(t).lstrip("#"))
+        if not t or _is_filler(t) or t in unearned or any(t.lower() == k.lower() for k in keep):
             continue
         if t == "#Outbreak" and not re.search(r"outbreak|epidemic|pandemic|infect|cases|deaths|virus|disease|fever|flu\b|measles|cholera|ebola", _item_text(item, headline=headline), re.I):
+            continue
+        if not _topic_earned(t, item, headline, allowed):
             continue
         keep.append(t)
     keep = _cap_one(keep, SECTORS, 1)
@@ -1785,7 +1939,10 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
         for t in entity_fill(item, headline=headline, topics=topics):
             if len(keep) >= MAX_TAGS:
                 break
-            if _is_filler(t) or t in unearned:
+            t = _shorten_tag(t)
+            if not t or _is_filler(t) or t in unearned:
+                continue
+            if not _topic_earned(t, item, headline, allowed):
                 continue
             tl = t.lower()
             if any(tl == k.lower() or (len(tl) >= 5 and (tl in k.lower() or k.lower() in tl) and min(len(tl), len(k)) >= 5) for k in keep):
@@ -1795,12 +1952,54 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
                 break
     if len(keep) < MIN_TAGS:          # nothing distinctive left: allow overlapping pieces (#Iceberg next to #IcebergD33B)
         title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
-        for w in re.findall(r"[A-Za-z0-9][A-Za-z0-9\-]{2,}", title):
-            tg = to_tag(w)
-            if tg and not _is_filler(tg) and w.lower() not in _TINY_STOP and all(tg.lower() != k.lower() for k in keep):
+        hold_ban = set()
+        if not topics:
+            try:
+                hold_ban = {t.lower() for t in topic_tags(item, headline=headline)} | {"#ebola", "#outbreak", "#measles", "#cholera", "#h5n1", "#birdflu", "#war", "#conflict"}
+            except Exception:
+                hold_ban = {"#ebola", "#outbreak", "#war"}
+        for w in [title] + re.findall(r"[A-Za-z0-9][A-Za-z0-9\-]{2,}", title):
+            tg = _shorten_tag(to_tag(w))
+            if tg and not _is_filler(tg) and w.lower() not in _TINY_STOP and tg.lower() not in hold_ban and all(tg.lower() != k.lower() for k in keep):
                 keep.append(tg)
             if len(keep) >= MIN_TAGS:
                 break
+    # Prefer a popular topic in the set (search/engagement) when one is earned; pad short lists from the item's category.
+    _CAT_TOPIC = {"markets": "#Markets", "financial": "#Finance", "cyber": "#Cybersecurity",
+                  "weather": "#Weather", "disease": "#Health", "war/conflict": "#War",
+                  "space": "#Space", "political": "#Politics", "business": "#Business"}
+    if topics:
+        if not any((t or "").lstrip("#").lower() in POPULAR for t in keep):
+            for t in entity_fill(item, headline=headline, topics=True):
+                st = _shorten_tag(t)
+                if st and st.lstrip("#").lower() in POPULAR and not _is_filler(st) and st not in unearned and _topic_earned(st, item, headline, allowed) and all(st.lower() != k.lower() for k in keep):
+                    keep.insert(0, st)
+                    break
+        if len(keep) < MIN_TAGS:
+            try:
+                cat = _cat(item, headline=headline)
+            except Exception:
+                cat = ""
+            g = _CAT_TOPIC.get(cat)
+            if g and g not in unearned and all(g.lower() != k.lower() for k in keep) and _topic_earned(g, item, headline, allowed + [g]):
+                keep.append(g)
+    try:
+        main_places = [t for t in (location_tags(item, headline=headline) or []) if t and not _is_filler(t)]
+    except Exception:
+        main_places = []
+    for p_ in main_places[:2]:
+        p_ = _shorten_tag(p_) or p_
+        if p_ and all(p_.lower() != k.lower() for k in keep):
+            if len(keep) < MAX_TAGS:
+                keep.append(p_)
+            else:
+                # drop the lowest-priority non-topic to make room for the main place
+                for i in range(len(keep) - 1, -1, -1):
+                    if keep[i].lstrip("#").lower() not in POPULAR:
+                        keep[i] = p_
+                        break
+            break
+    keep = _order_tags(keep[:MAX_TAGS], item, headline)
     return keep[:MAX_TAGS]
 
 
@@ -1876,7 +2075,8 @@ def share_text(item, url=None, headline=None, tags=None):
     """
     url = url if url is not None else story_url(item)
     h = _headline(item, headline)
-    tags = list(tags) if tags else hashtags(item, headline=headline)
+    # Always apply the public tag rule, including when a caller passes stored tags.
+    tags = finalize_tags(list(tags) if tags else hashtags(item, headline=headline), item, headline)
     text = _join(h, tags)
     while len(tags) > MIN_TAGS and weighted_len(text, url) > 280:
         tags = tags[:-1]
