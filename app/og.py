@@ -624,6 +624,14 @@ def _bg_from_src(src):
 
 
 def png_for_story(cid, title=None, rank=None, hero=None):
+    if title is None and rank is None and hero is None:
+        try:   # Nov 25 2026: unique per-story card (rank, location map or licensed hero, summary); the old card below is the fallback
+            import share_card
+            b = share_card.story_png(cid)
+            if b:
+                return b
+        except Exception:
+            pass
     spec = _story_spec(cid) or {}
     title = title or spec.get("title") or "The Wire"
     if rank is None:
@@ -687,7 +695,7 @@ def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og
         f'<meta property="og:url" content="{E(url)}">'
         f'<meta property="og:image" content="{E(img)}">'
         f'<meta property="og:image:width" content="1200">'
-        f'<meta property="og:image:height" content="630">'
+        f'<meta property="og:image:height" content="{675 if story_id else 630}">'
         f'<meta property="og:image:alt" content="{E(t)}">'
         f'<meta name="twitter:card" content="summary_large_image">'
         f'<meta name="twitter:image" content="{E(img)}">'
