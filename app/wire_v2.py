@@ -318,10 +318,60 @@ def handle_static(path):
     return 200, b, ct
 
 _C = {}
+_NEG = {}
+_INFL = {}
+_RP = None
+_BUDGET = 1.5   # a cold page that needs the live board (api_state can take tens of seconds when its cache is stale) answers with an OG-complete stub after this
+
+
+def _pool():
+    global _RP
+    if _RP is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _RP = ThreadPoolExecutor(max_workers=4, thread_name_prefix="wire-page")
+    return _RP
+
+
+def _build(key, list_path, noindex):
+    try:
+        srv = __import__("theme")._srv()
+        st = srv.api_state()
+        body = render_list(st, path=list_path, noindex=noindex) if key in ("/wire", "/wire-classic") else render_story(st, key)
+        if body:
+            if len(_C) > 300: _C.clear()
+            _C[key] = (time.time(), body)
+        else:
+            _NEG[key] = time.time()
+        return body
+    finally:
+        _INFL.pop(key, None)
+
+
+def _light_story(cid):
+    """Instant page for crawlers and first-time visitors while the full page builds: complete og:/twitter: tags from the DB (title, summary, card URL)."""
+    try:
+        import story, og
+        r, _al = story.load(cid)
+        if not r: return None
+        full = r.get("title") or ""
+        h = headline(full) or full
+        rank = int(r.get("rank") or 0)
+        brief = r.get("brief") or ""
+        desc = first_sentence(brief or full, 160)
+        meta = og.tags(title=f"{h} | BLACKOUT.NETWORK", desc=desc, url=f"{og.SITE}/wire/{cid}", story_id=cid, rank=rank, og_type="article")
+        return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                f"<title>{E(h)} | BLACKOUT.NETWORK</title><link rel=\"canonical\" href=\"{E(og.SITE)}/wire/{E(cid)}\">{meta}"
+                "<meta http-equiv=\"refresh\" content=\"3\"></head><body style=\"background:#05060a;color:#ECEEF5;font:16px/1.5 Inter,system-ui,sans-serif;padding:48px 24px\">"
+                f"<h1 style=\"font-size:22px\">{E(h)}</h1><p style=\"color:#9aa0aa\">Loading the full story…</p></body></html>")
+    except Exception:
+        return None
+
+
 def handle(path, qs=None):
-    """(code, body, ctype) for /wire, /wire-classic, /wire/<id> when ON, else None (caller falls back to the old pages)."""
+    """(code, body, ctype) for /wire, /wire-classic, /wire/<id> when ON, else None (caller falls back to the old pages).
+    Stale-while-revalidate: a cached page is always served at once (refreshed in the background after 60 s); a cold story page that is
+    not ready within _BUDGET seconds returns an OG-complete stub, so X / link-preview crawlers never wait on a stale board."""
     if not ON: return None
-    srv = __import__("theme")._srv()
     list_path, noindex = "/wire", False
     if path in ("/wire-classic", "/wire-classic/"):
         key, list_path, noindex = "/wire-classic", "/wire-classic", True
@@ -331,11 +381,26 @@ def handle(path, qs=None):
         m = re.match(r"^/wire/([0-9a-f]{16})/?$", path)
         if not m or (qs or {}).get("since"): return None
         key = m.group(1)
+    now = time.time()
     hit = _C.get(key)
-    if hit and time.time() - hit[0] < 60: return 200, hit[1], "text/html"
-    st = srv.api_state()
-    body = render_list(st, path=list_path, noindex=noindex) if key in ("/wire", "/wire-classic") else render_story(st, key)
+    if hit:
+        if now - hit[0] >= 60 and key not in _INFL:
+            _INFL[key] = _pool().submit(_build, key, list_path, noindex)
+        if now - hit[0] < 1800:   # serve stale up to 30 min while it refreshes
+            return 200, hit[1], "text/html"
+    if _NEG.get(key) and now - _NEG[key] < 60: return None
+    fut = _INFL.get(key)
+    if fut is None:
+        fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
+    try:
+        body = fut.result(timeout=_BUDGET)
+    except Exception:
+        if key not in ("/wire", "/wire-classic"):
+            light = _light_story(key)
+            if light: return 200, light, "text/html"
+        try:
+            body = fut.result(timeout=20)
+        except Exception:
+            return None
     if not body: return None   # story no longer on the board: old story page (DB history) handles it
-    if len(_C) > 300: _C.clear()
-    _C[key] = (time.time(), body)
     return 200, body, "text/html"
