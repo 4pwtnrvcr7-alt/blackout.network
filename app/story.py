@@ -153,7 +153,20 @@ def render(cid, since=""):
             pp = PP.strip_html(cid, " ".join([title or "", r.get("brief") or ""] + [a.get("title") or "" for a in al[:60]]))
             if pp: g_ppl = ""
         except Exception: pp = ""
-        g_share = G.share_html(f"{S.SITE}/wire/{cid}", f"{title} (rank {rank}/10) via BLACKOUT.NETWORK", "story")
+        share_url = f"{S.SITE}/wire/{cid}"
+        share_text = f"{title} (rank {rank}/10) via BLACKOUT.NETWORK"
+        x_intent = None
+        try:
+            import x_share
+            x_intent = x_share.intent_url({
+                "cluster_id": cid, "title": title, "headline": title,
+                "location": r.get("location") or "", "category": r.get("category") or "",
+                "brief": r.get("brief") or "", "rank": rank,
+                "watchlist": watch, "hidden": r.get("hidden") or 0,
+            })
+        except Exception:
+            x_intent = None
+        g_share = G.share_html(share_url, share_text, "story", intent=x_intent)
         g_follow = G.follow_html()
     except Exception: g_short = g_loc = g_ppl = g_share = g_follow = pp = ""; g_img = None
     report, dek_note = "", ""
