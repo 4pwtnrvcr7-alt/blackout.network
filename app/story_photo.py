@@ -154,14 +154,35 @@ def _db_jpg(src):
 
 def get_card(cid):
     """Built share-card PNG for this story, or None. No network."""
+    m = card_meta(cid)
+    return m["png"] if m else None
+
+
+def card_meta(cid):
+    """png, v, src for a stored card, or None. No network."""
     if not cid:
         return None
     try:
-        r = _read(lambda k: k.execute("SELECT png FROM story_cards WHERE cid=?", (cid,)).fetchone())
-        b = bytes(r[0]) if r and r[0] else None
-        return b if b and b.startswith(b"\x89PNG") and len(b) > 2000 else None
+        r = _read(lambda k: k.execute("SELECT png, v, src FROM story_cards WHERE cid=?", (cid,)).fetchone())
+        if not r or not r[0]:
+            return None
+        b = bytes(r[0])
+        if not (b.startswith(b"\x89PNG") and len(b) > 2000):
+            return None
+        return {"png": b, "v": (r[1] or ""), "src": (r[2] or "")}
     except Exception:
         return None
+
+
+def card_stale(meta):
+    """True when the stored PNG was built under a previous og.VERSION and should be rebuilt (reusing any stored photo)."""
+    if not meta:
+        return False
+    try:
+        import og
+        return str(meta.get("v") or "") != str(og.VERSION)
+    except Exception:
+        return False
 
 
 def card_has_photo(cid):
@@ -188,8 +209,19 @@ def put_card(cid, png, src=""):
         old_src = (old[0] if old else "") or ""
         if old_src.startswith("https://") and not src.startswith("https://"):
             return
+        # Also refuse a map when this story already has a licensed JPEG in story_photos.
+        if not src.startswith("https://"):
+            ph = k.execute("SELECT src, none, jpg FROM story_photos WHERE cid=?", (cid,)).fetchone()
+            if ph and not ph[1] and (ph[0] or "").startswith("https://") and ph[2]:
+                return
+        ver = "11"
+        try:
+            import og
+            ver = str(og.VERSION)
+        except Exception:
+            pass
         k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at) VALUES(?,?,?,?,?)",
-                  (cid, blob, "3", src, ts))
+                  (cid, blob, ver, src, ts))
     try:
         _write(fn)
     except Exception:
@@ -201,7 +233,9 @@ def has_photo(cid):
     c = db_choice(cid)
     if not c or c.get("none") or not c.get("src") or not license_ok(c.get("license") or ""):
         return False
-    return bool(cached(c["src"]))
+    if cached(c["src"]):
+        return True
+    return bool(_db_jpg(c["src"]))
 
 
 def resolved(cid):

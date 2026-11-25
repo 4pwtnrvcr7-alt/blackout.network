@@ -645,8 +645,16 @@ class RH(server.H):
         path = self.path.split("?", 1)[0]
         if path == "/healthz":
             r = public_ready()
+            ps = {}
+            try:
+                import share_card
+                ps = share_card.photo_status() or {}
+            except Exception:
+                ps = {}
             return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"],
-                                                 "wire": BOOT_WARM["wire"], "og": BOOT_WARM["og"]})
+                                                 "wire": BOOT_WARM["wire"], "og": BOOT_WARM["og"],
+                                                 "photo_q": int(ps.get("depth") or 0), "photo_last": ps.get("last") or "",
+                                                 "photo_worker": bool(ps.get("worker"))})
         if path == "/internal/sync/export":
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})
@@ -827,6 +835,11 @@ if __name__ == "__main__":
     except Exception: traceback.print_exc()
     wait_before_bind()
     try:
+        try:
+            import share_card
+            share_card._ensure_fworker()
+        except Exception:
+            traceback.print_exc()
         _boot_warm()
     except Exception:
         traceback.print_exc()

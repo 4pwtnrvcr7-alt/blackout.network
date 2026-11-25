@@ -218,18 +218,19 @@ class StoryPhoto(unittest.TestCase):
             P.put_card("e2ca47e325c5b8e1", png, "")  # map card, jpeg already stored
             self.assertTrue(P.has_photo("e2ca47e325c5b8e1"))
             self.assertFalse(P.card_has_photo("e2ca47e325c5b8e1"))
-            called = []
-            real = S.submit
-            def wrap(cid, fetch=False, urgent=False):
-                called.append((cid, fetch, urgent))
-                class F:
-                    def result(self, timeout=None):
-                        return png
-                return F()
+            # JPEG already stored: rebuild the photo card immediately (no network), do not leave a map in place.
+            built = []
+            def fake_build(cid, fetch=False):
+                built.append((cid, fetch))
+                photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+                P.put_card(cid, photo, cand["src"])
+                return photo
             S._SC.clear()
-            with mock.patch.object(S, "submit", side_effect=wrap):
-                S.story_png_fast("e2ca47e325c5b8e1")
-            self.assertTrue(any(c[0]=="e2ca47e325c5b8e1" and c[1] is True and c[2] is True for c in called), called)
+            with mock.patch.object(S, "_story_build", side_effect=fake_build):
+                out = S.story_png_fast("e2ca47e325c5b8e1")
+            self.assertTrue(built and built[0][0]=="e2ca47e325c5b8e1" and built[0][1] is False, built)
+            self.assertTrue(P.card_has_photo("e2ca47e325c5b8e1"))
+            self.assertEqual(out, b"\x89PNG\r\n\x1a\n" + b"P" * 4000)
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 
@@ -266,6 +267,74 @@ class StoryPhoto(unittest.TestCase):
             self.assertEqual(hi[0], "hitcid0000000003", order)
         finally:
             S._story_build = old
+
+
+
+    def test_photo_card_survives_version_bump(self):
+        """A stored licensed JPEG+credit is reused after og.VERSION changes; a map rebuild must not replace it."""
+        import os, tempfile
+        from unittest import mock
+        import og
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        prev = og.VERSION
+        try:
+            P._dir = lambda: Path(d)
+            jpg = b"\xff\xd8" + b"j" * 3000
+            photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            newer = b"\x89PNG\r\n\x1a\n" + b"N" * 4000
+            cand = dict(src="https://upload.wikimedia.org/zelensky.jpg", credit="Press Service", license="CC BY 4.0",
+                        caption="Volodymyr Zelenskyy, 2025. File photo; not taken at this event.", kind="person", label="lab", link="")
+            cid = "9f5bc9d66d783d25"
+            P.db_put(cid, cand, jpg=jpg)
+            P.put_card(cid, photo, cand["src"])
+            self.assertTrue(P.has_photo(cid) and P.card_has_photo(cid))
+            og.VERSION = "99"
+            self.assertTrue(P.card_stale(P.card_meta(cid)))
+            P.put_card(cid, mapp, "")
+            self.assertTrue(P.card_has_photo(cid))
+            self.assertEqual(P.get_card(cid), photo)
+            def fake_build(c, fetch=False):
+                P.put_card(c, newer, cand["src"])
+                return newer
+            S._SC.clear()
+            with mock.patch.object(S, "_story_build", side_effect=fake_build):
+                out = S.ensure_current_card(cid)
+            self.assertEqual(out, newer)
+            self.assertTrue(P.card_has_photo(cid))
+            self.assertEqual(P.card_meta(cid)["src"], cand["src"])
+            self.assertEqual(P.card_meta(cid)["v"], "99")
+            self.assertTrue(S._card_headline("— Zelensky says hello").startswith("Zelensky"))
+        finally:
+            og.VERSION = prev
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_lookup_timeout_does_not_block_queue(self):
+        import time
+        order = []
+        def fake(cid, fetch=False):
+            if cid == "stuckcid00000001":
+                time.sleep(8)
+            order.append(cid)
+            return cid
+        old, old_t = S._story_build, S.LOOKUP_TIMEOUT
+        S._SC.clear()
+        try:
+            S._story_build = fake
+            S.LOOKUP_TIMEOUT = 0.25
+            with S._FLOCK:
+                S._FHIGH.clear(); S._FLOW.clear(); S._FWAIT.clear()
+            S.submit("stuckcid00000001", fetch=True, urgent=True)
+            time.sleep(0.05)
+            S.submit("quickcid00000002", fetch=True, urgent=True)
+            deadline = time.time() + 3
+            while time.time() < deadline and "quickcid00000002" not in order:
+                time.sleep(0.05)
+            self.assertIn("quickcid00000002", order, order)
+        finally:
+            S._story_build = old
+            S.LOOKUP_TIMEOUT = old_t
 
 
 if __name__ == "__main__":
