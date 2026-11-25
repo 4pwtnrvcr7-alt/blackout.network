@@ -164,14 +164,32 @@ def get_card(cid):
         return None
 
 
+def card_has_photo(cid):
+    """True when the stored PNG was built from a licensed photo (story_cards.src is a URL). No network."""
+    if not cid:
+        return False
+    try:
+        r = _read(lambda k: k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone())
+        return bool(r and (r[0] or "").startswith("https://"))
+    except Exception:
+        return False
+
+
 def put_card(cid, png, src=""):
+    """Store a built card. A stored photo card always beats a map: never replace a photo PNG with a map PNG
+    (live Zelensky photo was lost when a fetch=True rebuild without a photo overwrote it)."""
     if not cid or not png or not png.startswith(b"\x89PNG"):
         return
     blob = sqlite3.Binary(png)
     ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    src = src or ""
     def fn(k):
+        old = k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone()
+        old_src = (old[0] if old else "") or ""
+        if old_src.startswith("https://") and not src.startswith("https://"):
+            return
         k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at) VALUES(?,?,?,?,?)",
-                  (cid, blob, "2", src or "", ts))
+                  (cid, blob, "3", src, ts))
     try:
         _write(fn)
     except Exception:

@@ -27,23 +27,23 @@ class StoryPhoto(unittest.TestCase):
         d = ImageDraw.Draw(Image.new("RGB", (10, 10)))
         titles = [
             "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using Strait of Hormuz",
-            "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles",
+            "Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles. Ukraine also expects missiles for F-16s and NASAMS systems.",
             "Ethiopia launches polio vaccination campaign to protect more than 11 million children: WHO deployed 28 staff",
             "Scott Bessent Unleashes Fresh Iran Sanctions as Tehran Warns Tankers Against Using…",
         ]
         for raw in titles:
-            t = S._clean_head(raw)
+            t = S._card_headline(raw)
+            self.assertNotIn("NASAMS", t)
             for maxw in (640, 700):
                 f, size, lines = S._story_head(d, t, maxw)
                 joined = " ".join(lines)
                 self.assertLessEqual(len(lines), 3, raw)
+                self.assertGreaterEqual(size, S.HEAD_MIN, (raw, size))
                 self.assertFalse(any("…" in l or l.endswith("...") for l in lines), raw)
                 self.assertNotIn("…", joined)
-                # full text when it is the real headline (the last fixture is already truncated at source)
-                if "Strait of Hormuz" in t:
+                self.assertNotIn("NASAMS", joined)
+                if "Strait of Hormuz" in S._clean_head(raw):
                     self.assertIn("Strait of Hormuz", joined)
-                if "anti-ballistic" in t:
-                    self.assertIn("anti-ballistic", joined)
 
     def test_no_photo_falls_back_to_map_not_black(self):
         it = dict(kind="story", id="t1", title="Magnitude 6.5 earthquake recorded in Vanuatu region", rank=5, color=S.AMBER, kicker="NATURAL DISASTER", loc="Vanuatu region",
@@ -145,6 +145,37 @@ class StoryPhoto(unittest.TestCase):
                 self.assertFalse(any(l.endswith("…") or l.endswith("...") for l in lines), cid)
         finally:
             P.cached = orig
+
+    def test_card_headline_first_sentence_only(self):
+        h = S._card_headline("— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine, including 48 anti-ballistic missiles. Ukraine also expects missiles for F-16s and NASAMS systems.")
+        self.assertTrue(h.startswith("Zelensky says"))
+        self.assertNotIn("NASAMS", h)
+        self.assertNotIn("F-16s", h)
+        self.assertIn("new arms package", h)
+
+    def test_put_card_does_not_replace_photo_with_map(self):
+        import os, tempfile
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        try:
+            P._dir = lambda: Path(d)
+            photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            newer = b"\x89PNG\r\n\x1a\n" + b"N" * 4000
+            src = "https://upload.wikimedia.org/zelensky.jpg"
+            P.put_card("9f5bc9d66d783d25", photo, src)
+            self.assertTrue(P.card_has_photo("9f5bc9d66d783d25"))
+            self.assertEqual(P.get_card("9f5bc9d66d783d25"), photo)
+            # a later map build must not clobber the photo card (the live Zelensky loss)
+            P.put_card("9f5bc9d66d783d25", mapp, "")
+            self.assertEqual(P.get_card("9f5bc9d66d783d25"), photo)
+            self.assertTrue(P.card_has_photo("9f5bc9d66d783d25"))
+            # a later photo card may replace it
+            P.put_card("9f5bc9d66d783d25", newer, src)
+            self.assertEqual(P.get_card("9f5bc9d66d783d25"), newer)
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
+
 
 
 if __name__ == "__main__":
