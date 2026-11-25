@@ -116,7 +116,9 @@ body.sv3 { margin: 0; }
   font: 600 12px/1 Inter, system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase;
   text-decoration: none; display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
 }
+@media (hover:hover) and (pointer:fine){
 .sv3-share .w2-btn:hover, .sv3-share .w2-btn-s:hover { background: #fff; color: #000; }
+}
 .sv3-share .w2-btn:focus-visible, .sv3-share .w2-btn-s:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .sv3-cred { margin: 0; font: 500 12px/1.4 Inter, system-ui, sans-serif; color: #8b9099; }
 .sv3-cred a { color: inherit; }
