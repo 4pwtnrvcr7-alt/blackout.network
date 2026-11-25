@@ -60,25 +60,24 @@ def _desk(cid):
     except Exception:
         return None, []
 
+# Clusters has no `hidden` column (scanner.py schema). #217's slim SELECT asked for it,
+# both queries failed, load() returned no row, and every /wire/<id> 404'd.
+_LOAD_COLS = "cluster_id, title, brief, rank, location, category, watchlist, confidence, families, n_items, first_seen, updated, event_time, lat, lon, links"
+_LOAD_COLS_MIN = "cluster_id, title, brief, rank, location, category, watchlist, confidence, families, n_items, first_seen, updated"
+
 def load(cid):
     """Cluster + alerts from the DB. Never waits more than 1 s on a lock; if the alerts query fails, still returns the title and brief."""
     try: c = _ro()
     except Exception: return _desk(cid)   # no readable blackout.db: desk stories still render
     r = None
     try:
-        try:
-            r = c.execute("SELECT cluster_id, title, brief, rank, location, category, watchlist, hidden, confidence, families, n_items, first_seen, updated, event_time, lat, lon, links FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
-        except Exception:
-            r = None
-        if not r:
+        for cols in (_LOAD_COLS, _LOAD_COLS_MIN, "*"):
             try:
-                c2 = _ro(timeout=0.5)
-                try:
-                    r = c2.execute("SELECT cluster_id, title, brief, rank, location, category, watchlist, hidden, confidence, families, n_items, first_seen, updated FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
-                finally:
-                    c2.close()
+                r = c.execute(f"SELECT {cols} FROM clusters WHERE cluster_id=?", (cid,)).fetchone()
             except Exception:
                 r = None
+            if r:
+                break
         if not r:
             return _desk(cid)
         al = []
