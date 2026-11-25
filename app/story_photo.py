@@ -47,6 +47,12 @@ def _connect_writer(path):
     k.execute("PRAGMA journal_mode=WAL")
     k.execute("PRAGMA busy_timeout=8000")
     k.executescript(_PHOTO_SCHEMA)
+    try:
+        cols = {row[1] for row in k.execute("PRAGMA table_info(story_cards)").fetchall()}
+        if "title_hash" not in cols:
+            k.execute("ALTER TABLE story_cards ADD COLUMN title_hash TEXT")
+    except Exception:
+        pass
     return k
 
 
@@ -209,13 +215,13 @@ def card_meta(cid):
     if not cid:
         return None
     try:
-        r = _read(lambda k: k.execute("SELECT png, v, src FROM story_cards WHERE cid=?", (cid,)).fetchone())
+        r = _read(lambda k: k.execute("SELECT png, v, src, title_hash FROM story_cards WHERE cid=?", (cid,)).fetchone())
         if not r or not r[0]:
             return None
         b = bytes(r[0])
         if not (b.startswith(b"\x89PNG") and len(b) > 2000):
             return None
-        return {"png": b, "v": (r[1] or ""), "src": (r[2] or "")}
+        return {"png": b, "v": (r[1] or ""), "src": (r[2] or ""), "title_hash": (r[3] or "") if len(r) > 3 else ""}
     except Exception:
         return None
 
@@ -240,26 +246,41 @@ def card_has_photo(cid):
         r = _read(lambda k: k.execute("SELECT src, png FROM story_cards WHERE cid=?", (cid,)).fetchone())
         if not (r and (r[0] or "").startswith("https://")):
             return False
-        return not photo_is_wrong_subject(cid, r[0], "")
+        if photo_is_wrong_subject(cid, r[0], ""):
+            return False
+        # A place photo on a person-subject story, or a historical map/scan, is not a valid subject photo.
+        ph = _read(lambda k: k.execute("SELECT kind, credit, caption, label FROM story_photos WHERE cid=?", (cid,)).fetchone())
+        title, text = _story_text(cid)
+        if ph:
+            kind, credit, caption, label = (ph[0] or ""), (ph[1] or ""), (ph[2] or ""), (ph[3] or "")
+            if is_non_photo(caption, " ".join((credit, label)), "", ""):
+                return False
+            if kind == "place" and not place_photo_ok(title, text):
+                return False
+        return True
     except Exception:
         return False
 
 
-def put_card(cid, png, src=""):
+def put_card(cid, png, src="", title_hash=""):
     """Store a built card. A stored photo card always beats a map, with one exception:
-    a wrong-subject photo (Trump on the Huang story) may be replaced by a correct photo or a map."""
+    a wrong-subject photo (Trump or an Altoona map on the Huang story) may be replaced by a
+    correct photo or a map. A typography rebuild may replace a photo PNG with a new photo PNG
+    (same or different src) when the current cleaned title has changed."""
     if not cid or not png or not png.startswith(b"\x89PNG"):
         return
     blob = sqlite3.Binary(png)
     ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     src = src or ""
+    title_hash = title_hash or ""
     def fn(k):
         old = k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone()
         old_src = (old[0] if old else "") or ""
+        # Photo-to-photo replacement is allowed (typography rebuild, or a correct-subject portrait
+        # replacing a wrong-subject image). A correct photo still cannot be replaced by a map.
         if old_src.startswith("https://") and not src.startswith("https://"):
             if not photo_is_wrong_subject(cid, old_src, ""):
                 return
-        # Also refuse a map when this story already has a licensed JPEG, unless that JPEG is the wrong subject.
         if not src.startswith("https://"):
             ph = k.execute("SELECT src, none, jpg, credit, caption, label FROM story_photos WHERE cid=?", (cid,)).fetchone()
             if ph and not ph[1] and (ph[0] or "").startswith("https://") and ph[2]:
@@ -272,8 +293,8 @@ def put_card(cid, png, src=""):
             ver = str(og.VERSION)
         except Exception:
             pass
-        k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at) VALUES(?,?,?,?,?)",
-                  (cid, blob, ver, src, ts))
+        k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at, title_hash) VALUES(?,?,?,?,?,?)",
+                  (cid, blob, ver, src, ts, title_hash))
     try:
         _write(fn)
     except Exception:
@@ -284,6 +305,11 @@ def has_photo(cid):
     """True when a licensed photo of this story's main subject and its JPEG bytes are on hand. No network."""
     c = db_choice(cid)
     if not c or c.get("none") or not c.get("src") or not license_ok(c.get("license") or ""):
+        return False
+    if is_non_photo_candidate(c):
+        return False
+    title, text = _story_text(cid)
+    if (c.get("kind") or "") == "place" and not place_photo_ok(title, text):
         return False
     if photo_is_wrong_subject(cid, c.get("src") or "", " ".join((c.get("credit") or "", c.get("caption") or "", c.get("label") or "", c.get("alt") or ""))):
         return False
@@ -329,6 +355,54 @@ def store_counts():
 def license_ok(lic):
     lic = (lic or "").strip()
     return bool(lic) and bool(OK.search(lic)) and not BAD.search(lic.replace("Public domain", ""))
+
+
+# Historical maps, scans, documents, diagrams and collages are not a photo of the story's subject.
+_NONPHOTO = re.compile(
+    r"\b(maps?|atlas|cadastral|sanborn|plat map|street map|old map|historical map|antique map|"
+    r"scans?|scanned|photocop(?:y|ies)|documents?|letters?|memos?|certificates?|"
+    r"diagrams?|schematics?|flowcharts?|infographics?|org charts?|"
+    r"collages?|montages?|composites?|blueprints?|manuscripts?)\b",
+    re.I)
+_BAD_MIME = re.compile(r"^(application/pdf|image/svg|image/x-djvu|image/vnd|application/postscript|application/vnd)", re.I)
+
+
+def is_non_photo(title="", desc="", categories="", mime=""):
+    """True for historical maps, scans, documents, diagrams, collages (title, category, or MIME)."""
+    if mime and _BAD_MIME.search((mime or "").split(";")[0].strip().lower()):
+        return True
+    blob = " ".join(x for x in (title, desc, (categories or "").replace("|", " ").replace("/", " ")) if x)
+    return bool(blob and _NONPHOTO.search(blob))
+
+
+def is_non_photo_candidate(c):
+    if not c:
+        return True
+    return is_non_photo(c.get("title") or c.get("alt") or "", " ".join((c.get("caption") or "", c.get("label") or "", c.get("credit") or "")),
+                        c.get("categories") or "", c.get("mime") or "")
+
+
+def place_photo_ok(title="", text=""):
+    """Place photos are only for stories about that place, not person-subject stories (Huang must not get Altoona)."""
+    title, text = title or "", text or ""
+    if main_subject(title, text):
+        return False
+    if _named_people("", title, text):
+        return False
+    return True
+
+
+def card_title_key(title):
+    """Short hash of the cleaned card title, used to detect a stale typography PNG."""
+    t = " ".join((title or "").split())
+    return hashlib.sha1(t.encode("utf-8", "replace")).hexdigest()[:16] if t else ""
+
+
+def card_title_stale(meta, current_key):
+    """True when the stored card was rendered with a different title than the current cleaned headline."""
+    if not meta or not current_key:
+        return False
+    return (meta.get("title_hash") or "") != current_key
 
 
 def _dir():
@@ -380,6 +454,9 @@ def _cand(d, kind=""):
     cr = (d.get("credit") or "").strip()
     if len(cr) > 160 or re.search(r"\.(jpe?g|png|webp|tiff?):", cr, re.I):   # a collage of several files: not one clear photo of this story
         return None
+    if is_non_photo(d.get("title") or d.get("alt") or "", " ".join((d.get("caption") or "", cr)),
+                    d.get("categories") or "", d.get("mime") or ""):
+        return None
     return dict(src=d["src"], credit=cr, license=d.get("license") or "", caption=(d.get("caption") or "").strip(),
                 link=d.get("link") or "", kind=d.get("kind") or kind, alt=d.get("alt") or "", w=d.get("w"), h=d.get("h"))
 
@@ -402,8 +479,10 @@ def pick(cid, title="", loc="", text=""):
     def _ok(c):
         if not c or not c.get("src") or not license_ok(c.get("license") or ""):
             return None
+        if is_non_photo_candidate(c):
+            return None
         if (c.get("kind") or "") == "place":
-            return c
+            return c if place_photo_ok(title, text) else None
         if photo_is_wrong_subject(cid, c.get("src") or "", _photo_blob(c), title, text):
             return None
         # An ambiguous person story must not keep a leftover person photo.
@@ -485,11 +564,21 @@ def store(src):
 
 
 def _commons_portrait(name, timeout=7):
-    """Newest-looking licensed Commons portrait whose file name or description carries the person's full name."""
-    q = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": f'"{name}" portrait', "gsrnamespace": 6, "gsrlimit": 12,
-                                "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
-    raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=timeout)
-    pages = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
+    """Newest-looking licensed Commons portrait whose file name or description carries the person's full name.
+
+    Do not require the word 'portrait' in the search query: '"Jensen Huang" portrait' returned
+    no hits, while an unquoted 'Jensen Huang' search finds CC BY 4.0 portraits.
+    """
+    pages = {}
+    for term in (name, f'"{name}"'):
+        q = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
+                                    "prop": "imageinfo", "iiprop": "url|extmetadata|size|mime", "iiurlwidth": 1280})
+        try:
+            raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=timeout)
+            more = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
+            pages.update(more)
+        except Exception:
+            continue
     toks = [t.lower() for t in re.findall(r"[A-Za-z]+", name) if len(t) > 1]
     best = None
     for p in pages.values():
@@ -499,12 +588,20 @@ def _commons_portrait(name, timeout=7):
         lic = g("LicenseShortName")
         title = (p.get("title") or "").lower()
         desc = g("ImageDescription").lower()
-        if not license_ok(lic) or not ii.get("thumburl") or (ii.get("width") or 0) < 600 or (ii.get("height") or 0) < (ii.get("width") or 0) * 0.9:
+        cats = g("Categories")
+        mime = (ii.get("mime") or "")
+        w, h = int(ii.get("width") or 0), int(ii.get("height") or 0)
+        if not license_ok(lic) or not ii.get("thumburl") or w < 600:
+            continue
+        # Prefer a portrait crop; allow mild landscape so a licensed headshot is not dropped.
+        if h < w * 0.75:
+            continue
+        if is_non_photo(title, desc, cats, mime):
             continue
         if not all(t in title or t in desc for t in toks) or any(x in title for x in ("logo", "signature", "caricature", "cartoon")):
             continue
         yr = (g("DateTimeOriginal") or g("DateTime"))[:4]
-        score = ("official" in title or "portrait" in title) * 2 + (int(yr) if yr.isdigit() else 0) / 1e4
+        score = ("official" in title or "portrait" in title or "cropped" in title) * 2 + (h >= w * 0.9) + (int(yr) if yr.isdigit() else 0) / 1e4
         if best is None or score > best[0]:
             best = (score, dict(src=ii["thumburl"], credit=f"{g('Artist') or 'Unknown author'} / Wikimedia Commons", license=lic, link=ii.get("descriptionurl") or "",
                                 kind="person", alt=name, w=ii.get("thumbwidth"), h=ii.get("thumbheight"),
@@ -802,7 +899,7 @@ def _commons_place(loc, title, timeout=7):
     # Unquoted terms: quoted "PIF Tower" missed the licensed Public Investment Fund Tower file (CC BY 4.0).
     for term in (terms or [q]):
         qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
-                                     "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1280})
+                                     "prop": "imageinfo", "iiprop": "url|extmetadata|size|mime", "iiurlwidth": 1280})
         try:
             raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + qs, "application/json", timeout=timeout)
             more = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
@@ -824,6 +921,10 @@ def _commons_place(loc, title, timeout=7):
         desc = g("ImageDescription").lower()
         w, h = int(ii.get("width") or 0), int(ii.get("height") or 0)
         if not license_ok(lic) or not ii.get("thumburl") or w < 800 or h < 400:
+            continue
+        mime = (ii.get("mime") or "")
+        cats = g("Categories")
+        if is_non_photo(title_f, desc, cats, mime):
             continue
         if any(x in title_f for x in ("logo", "icon", "flag", "map", "coat of arms", "signature", "cartoon", "collage")):
             continue
@@ -876,7 +977,7 @@ def prefetch(cid, title="", loc="", text=""):
                         break
                     err = "commons portrait not downloadable"
                     c = None
-        if not c:
+        if not c and place_photo_ok(title, text):
             try:
                 c = _commons_place(loc, title)
             except Exception as e:

@@ -525,5 +525,92 @@ class StoryPhoto(unittest.TestCase):
             P.SUBJECT_HINTS.pop(cid, None)
             os.environ.pop("BN_CARDS_DB", None)
 
+    def test_rejects_historical_maps_scans_diagrams(self):
+        self.assertTrue(P.is_non_photo("File:Map of Altoona Pennsylvania 1939.jpg", "historical map of the city", "Old maps of Pennsylvania", "image/jpeg"))
+        self.assertTrue(P.is_non_photo("Scan of a 1910 document", "", "Scanned documents", "application/pdf"))
+        self.assertTrue(P.is_non_photo("Org chart of Nvidia", "diagram of reporting lines", "Diagrams", "image/png"))
+        self.assertTrue(P.is_non_photo("Press collage of several portraits", "", "Collages", "image/jpeg"))
+        self.assertFalse(P.is_non_photo("Jensen huang stanford 2026-04-09 033.jpg", "Portrait of Jensen Huang", "Jen-Hsun Huang in 2026", "image/jpeg"))
+
+    def test_huang_story_gets_portrait_or_designed_map(self):
+        """Person-subject stories must not use an irrelevant place photo (the Altoona 1939 map)."""
+        import os, tempfile
+        from unittest import mock
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        cid = "cbdfb48145e55048"
+        title = "Trump wanted Jensen Huang back as the CEO of Nvidia"
+        loc = "Pennsylvania"
+        P.SUBJECT_HINTS[cid] = (title, "")
+        portrait = dict(src="https://upload.wikimedia.org/wikipedia/commons/jensen_huang.jpg",
+                        credit="Anders Eidesvik / Wikimedia Commons", license="CC BY 4.0",
+                        caption="Jensen Huang, 2026. File photo; not taken at this event.",
+                        kind="person", alt="Jensen Huang", label="lab", link="")
+        altoona = dict(src="https://upload.wikimedia.org/wikipedia/commons/altoona_1939_map.jpg",
+                       credit="H.J. Baum / Wikimedia Commons", license="Public domain",
+                       caption="Pennsylvania, 1939. File photo; not taken at this event.",
+                       kind="place", alt="Pennsylvania", label="lab", link="")
+        try:
+            P._dir = lambda: Path(d)
+            self.assertFalse(P.place_photo_ok(title, ""))
+            self.assertTrue(P.is_non_photo("Map of Altoona 1939", "File photo", "Old maps of Pennsylvania", "image/jpeg"))
+            # A stored Altoona choice must not be picked for this story.
+            P.db_put(cid, altoona, jpg=b"\xff\xd8" + b"m" * 3000)
+            self.assertIsNone(P.pick(cid, title, loc, ""))
+            # Prefetch must take the Huang portrait, never the place photo.
+            with mock.patch.object(P, "_commons_portrait", return_value=portrait), \
+                 mock.patch.object(P, "_commons_place", return_value=altoona), \
+                 mock.patch.object(P, "store", return_value=Path(d) / "huang.jpg"):
+                (Path(d) / "huang.jpg").write_bytes(b"\xff\xd8" + b"h" * 3000)
+                got = P.prefetch(cid, title, loc, "")
+            self.assertIsNotNone(got)
+            self.assertEqual(got["kind"], "person")
+            self.assertIn("huang", (got.get("src") or "").lower())
+            self.assertNotIn("altoona", (got.get("src") or "").lower())
+            # If no licensed portrait exists, fall back to the designed map — not a place photo.
+            P.db_put(cid, None, none=True)
+            with mock.patch.object(P, "pick", return_value=None), \
+                 mock.patch.object(P, "_commons_portrait", return_value=None), \
+                 mock.patch.object(P, "_commons_place", return_value=altoona) as place:
+                got = P.prefetch(cid, title, loc, "")
+            self.assertIsNone(got, "no portrait → designed map, never a place photo")
+            place.assert_not_called()
+        finally:
+            P.SUBJECT_HINTS.pop(cid, None)
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_title_hash_rebuild_replaces_photo_png(self):
+        """A stale-title photo card may be replaced by a typography rebuild of the same JPEG (photo-to-photo)."""
+        import os, tempfile
+        from pathlib import Path
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        cid = "9f5bc9d66d783d25"
+        raw = "— Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"
+        clean = S._card_headline(raw)
+        self.assertTrue(clean.startswith("Zelensky"))
+        self.assertFalse(clean.startswith("—") or clean.startswith("-"))
+        stale_key = P.card_title_key(raw)
+        fresh_key = P.card_title_key(clean)
+        self.assertNotEqual(stale_key, fresh_key)
+        try:
+            P._dir = lambda: Path(d)
+            old = b"\x89PNG\r\n\x1a\n" + b"O" * 4000
+            new = b"\x89PNG\r\n\x1a\n" + b"N" * 4000
+            src = "https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg"
+            P.put_card(cid, old, src, title_hash=stale_key)
+            meta = P.card_meta(cid)
+            self.assertTrue(P.card_title_stale(meta, fresh_key))
+            # Typography rebuild: photo PNG in, photo PNG out, same src, new title hash.
+            P.put_card(cid, new, src, title_hash=fresh_key)
+            self.assertEqual(P.get_card(cid), new)
+            self.assertEqual(P.card_meta(cid)["src"], src)
+            self.assertEqual(P.card_meta(cid)["title_hash"], fresh_key)
+            self.assertFalse(P.card_title_stale(P.card_meta(cid), fresh_key))
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
+
+
 if __name__ == "__main__":
     unittest.main()
