@@ -17,8 +17,8 @@ import re, io, json, os, re, sqlite3, threading, time, urllib.parse, urllib.requ
 from pathlib import Path
 
 UA = "BLACKOUTNETWORK-cards/1.2 (https://blackout.network/; hello@blackout.network)"
-OK = re.compile(r"^(public domain|cc0|cc by(?! ?-?(sa|nc|nd))|cc-by(?!-(sa|nc|nd))|ogl|open government|u\.?s\.? (government|federal)|attribution$)", re.I)
-BAD = re.compile(r"(\bsa\b|-sa|share ?alike|\bnc\b|-nc|non ?commercial|\bnd\b|-nd|no ?deriv)", re.I)
+OK = re.compile(r"^(public domain|cc0|cc[ -]by(?![ -]?(nc|nd))|ogl|open government|u\.?s\.? (government|federal)|attribution$)", re.I)
+BAD = re.compile(r"(\bnc\b|-nc|non ?commercial|\bnd\b|-nd|no ?deriv)", re.I)   # CC BY-SA is allowed (credit shown); never NC or ND
 MAX_BYTES = 6_000_000
 _LOCK = threading.Lock()
 _MEM = {}
@@ -381,6 +381,20 @@ def card_cids(limit=40):
         return [r[0] for r in (rows or []) if r and r[0]]
     except Exception:
         return []
+
+
+def card_tag(cid):
+    """Short stable tag of the stored card (version, photo src, title hash) for the og:image URL, or "".
+    X caches og:image by URL, so the URL must change when the card does. Metadata only, never PNG bytes."""
+    if not cid:
+        return ""
+    try:
+        r = _read(lambda k: k.execute("SELECT v, src, title_hash FROM story_cards WHERE cid=?", (cid,)).fetchone())
+        if not r:
+            return ""
+        return hashlib.sha1("|".join(str(x or "") for x in r).encode("utf-8", "replace")).hexdigest()[:8]
+    except Exception:
+        return ""
 
 
 def card_heads(limit=400):
@@ -1230,6 +1244,9 @@ def _v3_photo_allows(headline, commons_title="", src="", kind="", label="", text
         haz = CP.hazard_for((headline or "") + " " + (text or ""))
         if haz == key or (key in CP.TOPIC_BEFORE_PLACE and haz in CP.TOPIC_BEFORE_PLACE):
             return True, "topic:" + key
+        # Curated category photo (no map fallback): a fallback-set file, or a story whose only hazard word is a fallback one.
+        if key in CP.FALLBACK_KEYS or haz is None or haz in CP.FALLBACK_KEYS:
+            return True, "category:" + key
         return False, "topic_hazard_mismatch"
     if (kind or "") == "place" or label:
         try:

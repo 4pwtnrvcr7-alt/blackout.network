@@ -7,9 +7,9 @@ import share_card as S
 
 class StoryPhoto(unittest.TestCase):
     def test_license_gate(self):
-        for ok in ("Public domain", "Public domain (U.S. government work)", "CC0", "CC BY 3.0", "CC BY 4.0", "OGL 3", "CC BY 2.0"):
+        for ok in ("Public domain", "Public domain (U.S. government work)", "CC0", "CC BY 3.0", "CC BY 4.0", "OGL 3", "CC BY 2.0", "CC BY-SA 4.0", "CC BY-SA 3.0"):
             self.assertTrue(P.license_ok(ok), ok)
-        for bad in ("", "CC BY-SA 4.0", "CC BY-SA 2.0", "CC BY-NC 4.0", "CC BY-ND 2.0", "All rights reserved", "Fair use"):
+        for bad in ("", "CC BY-NC 4.0", "CC BY-NC-SA 4.0", "CC BY-ND 2.0", "All rights reserved", "Fair use"):
             self.assertFalse(P.license_ok(bad), bad)
 
     def test_headline_whole_in_three_lines(self):
@@ -244,7 +244,8 @@ class StoryPhoto(unittest.TestCase):
                 P.put_card(cid, photo, cand["src"])
                 return photo
             S._SC.clear()
-            with mock.patch.object(S, "_story_build", side_effect=fake_build):
+            # The convert worker may scan this map card at the same time; no network lookup in a unit test.
+            with mock.patch.object(S, "_story_build", side_effect=fake_build), mock.patch.object(S, "apply_card_photo", return_value=None):
                 t0 = time.perf_counter()
                 out = S.story_png_fast("e2ca47e325c5b8e1")
                 self.assertLess(time.perf_counter() - t0, 2.0)
@@ -254,6 +255,104 @@ class StoryPhoto(unittest.TestCase):
                     time.sleep(0.05)
             self.assertTrue(P.card_has_photo("e2ca47e325c5b8e1"))
             self.assertTrue(built and built[0][1] is False, built)
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
+
+    # ---- no map cards (Nov 25 2026, 4:47 PM ET)
+    def test_story_bg_never_draws_a_map(self):
+        from unittest import mock
+        it = dict(kind="story", id="t9", title="IMO: M3.5 earthquake, Iceland", rank=2, color=S.AMBER, kicker="NATURAL DISASTER", loc="Iceland",
+                  art=("story", -19.0, 64.9, None), photo=None, stats=[], tags=[])
+        with mock.patch.object(S, "_map", side_effect=AssertionError("map drawn")):
+            im, portrait, credit, label = S._story_bg(it)
+            self.assertEqual(im.size, (1200, 675))
+            self.assertEqual((credit, label), ("", ""))
+            self.assertEqual(S._lay_story(it).size, (1200, 675))
+
+    def test_fallback_key_hazard_then_category_then_general(self):
+        import card_photo as CP
+        self.assertEqual(CP.fallback_key("Volcanic ash advisory: Telica ash cloud up to 5,000 ft", "", "natural disaster"), "volcano")
+        self.assertEqual(CP.fallback_key("Hackers breach 1Password", "", "cyber"), "cyber")
+        self.assertEqual(CP.fallback_key("Reports of 70 missiles prepared in Russia", "", "war/conflict"), "military")
+        self.assertEqual(CP.fallback_key("Shares slide as inflation rises", "", "markets"), "economy")
+        self.assertEqual(CP.fallback_key("Iran talks stall in Geneva", "", "politics"), "general")      # not the U.S. Capitol
+        self.assertEqual(CP.fallback_key("Senate votes on the budget", "", "politics"), "government")
+        self.assertEqual(CP.fallback_key("Something happened", "", ""), "general")
+        for k in ("military", "aviation", "grid", "economy", "spaceweather", "government", "general"):
+            self.assertIn(k, CP.TOPICS)
+            self.assertIn(k, CP.FALLBACK_KEYS)
+
+    def test_choose_ends_with_category_photo_not_none(self):
+        from unittest import mock
+        import card_photo as CP
+        seen = []
+        def topic(text, seed="", key=None):
+            seen.append((text, key))
+            return dict(src="https://x/y.jpg", path="/tmp/none", kind="topic", label="L", license="Public domain", credit="c") if key else None
+        with mock.patch.object(CP, "person_photo", return_value=None), mock.patch.object(CP, "place_photo", return_value=None), \
+             mock.patch.object(CP, "topic_photo", side_effect=topic), mock.patch.object(CP, "fetch", side_effect=lambda im: "/tmp/none"):
+            im = CP.choose("c1", "Something happened", None, "", "war/conflict")
+        self.assertIsNotNone(im)
+        self.assertEqual(seen[-1][1], "military")
+
+    def test_fallback_topic_photos_are_allowed_by_the_audit(self):
+        import card_photo as CP
+        for key, (_a, files, _n) in CP.TOPICS.items():
+            ft = files[0].replace("File:", "").replace("_", " ")
+            ok, why = P._v3_photo_allows("Totally unrelated headline", ft, kind="topic", text="")
+            if key in CP.FALLBACK_KEYS:
+                self.assertTrue(ok, (key, why))
+
+    def test_us_default_place_is_not_used_for_a_story_with_no_us_word(self):
+        from unittest import mock
+        import card_photo as CP
+        got = {}
+        def choose(cid, title, hit=None, text="", category=""):
+            got["hit"] = hit
+            return None
+        us = {"place": "United States", "lat": 38.9, "lon": -77.0, "cc": "US", "precision": "country"}
+        with mock.patch.object(S, "story_map_hit", return_value=us), mock.patch.object(CP, "choose", side_effect=choose):
+            S.apply_card_photo("c2", "Volcanic ash advisory: Telica ash cloud up to 5,000 ft", "Nicaragua", "", None, None, "natural disaster")
+            self.assertIsNone(got["hit"])
+            S.apply_card_photo("c3", "Pentagon says drills continue", "", "", None, None, "politics")
+            self.assertEqual(got["hit"], us)
+
+    def test_convert_queue_skips_a_card_tried_recently(self):
+        from unittest import mock
+        rows = [dict(cid="aaaaaaaaaaaaaaaa", v="24M", src="", title_hash=""), dict(cid="bbbbbbbbbbbbbbbb", v="24M", src="", title_hash="")]
+        S._CONVERT_TRIED.clear()
+        with mock.patch.object(P, "card_heads", return_value=rows):
+            self.assertEqual(S._pending_convert_cids(), ["aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"])
+            S._CONVERT_TRIED["aaaaaaaaaaaaaaaa"] = __import__("time").time()
+            self.assertEqual(S._pending_convert_cids(), ["bbbbbbbbbbbbbbbb"])
+        S._CONVERT_TRIED.clear()
+
+    def test_og_image_url_changes_with_the_stored_card(self):
+        from unittest import mock
+        import og
+        with mock.patch.object(P, "card_tag", return_value="abc12345"):
+            u1 = og.image_url(story_id="e9a491a27092837f", title="T", rank=2)
+        with mock.patch.object(P, "card_tag", return_value="ffff0000"):
+            u2 = og.image_url(story_id="e9a491a27092837f", title="T", rank=2)
+        with mock.patch.object(P, "card_tag", return_value=""):
+            u3 = og.image_url(story_id="e9a491a27092837f", title="T", rank=2)
+        self.assertTrue(u1.endswith("-abc12345"), u1)
+        self.assertNotEqual(u1, u2)
+        self.assertNotIn("abc12345", u3)
+
+    def test_card_tag_is_metadata_only_and_tracks_src(self):
+        import os, tempfile
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        try:
+            P._dir = lambda: Path(d)
+            png = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            self.assertEqual(P.card_tag("0123456789abcdef"), "")
+            P.put_card("0123456789abcdef", png, "")
+            t1 = P.card_tag("0123456789abcdef")
+            P.put_card("0123456789abcdef", png, "https://upload.wikimedia.org/x.jpg")
+            t2 = P.card_tag("0123456789abcdef")
+            self.assertTrue(t1 and t2 and t1 != t2)
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 

@@ -1338,15 +1338,8 @@ def _story_bg(it):
             return bgim, False, cred, label
         except Exception:
             pass
-    lon, lat = it["art"][1], it["art"][2]
-    try:
-        if lon is not None and lat is not None:
-            m = _map(W, H, float(lon), float(lat), 70 if abs(float(lat)) < 60 else 40, col, fx=0.74)
-        else:
-            m = _map(W, H, 10.0, 22.0, 150, col, fx=0.5, marker=False)
-        return m, False, "", ""
-    except Exception:
-        return _base(it["id"]), False, "", ""
+    # Never a map (Matt 4:47 PM ET Nov 25 2026): with no photo yet, the plain dark card; the convert worker adds a real photo.
+    return _base(it["id"]), False, "", ""
 
 
 def _fit_chip(d, text, maxw):
@@ -1795,14 +1788,21 @@ def card_photo_on():
         return False
 
 
-def apply_card_photo(cid, title="", loc="", brief="", lat=None, lon=None):
+_US_WORDS = re.compile(r"\b(u\.?s\.?a?|united states|(?<!central )(?<!south )(?<!latin )america\\b|americans\\b|washington|pentagon|white house|congress|federal|fbi|cdc|noaa|fema|usgs|nasa|wall street)\b", re.I)
+
+
+def apply_card_photo(cid, title="", loc="", brief="", lat=None, lon=None, category=""):
     """Network: choose a v3 licensed photo, store it, return the photo dict (or None). No-op when the flag is off."""
     if not cid or not card_photo_on():
         return None
     try:
         import card_photo as CP, story_photo as SP
         hit = story_map_hit(title or "", loc or "", brief or "", cid, lat, lon)
-        im = CP.choose(cid, title or "", hit, brief or "")
+        # signal_place falls back to Washington / "United States" when it finds no place; do not show the National Mall
+        # on a Nicaragua volcano. A country-level US hit needs a US word in the story, else use the topic photo.
+        if hit and hit.get("cc") == "US" and hit.get("precision") == "country" and not _US_WORDS.search((title or "") + " " + (brief or "")):
+            hit = None
+        im = CP.choose(cid, title or "", hit, brief or "", category or "")
         if not im:
             return None
         jpg = None
@@ -1836,7 +1836,7 @@ def _network_prefetch(cid):
         loc = r.get("location") or ""
         brief = r.get("brief") or ""
         if card_photo_on():
-            apply_card_photo(cid, title, loc, brief, r.get("lat"), r.get("lon"))
+            apply_card_photo(cid, title, loc, brief, r.get("lat"), r.get("lon"), r.get("category") or "")
         # Always run the existing Commons prefetch too: it is how a PEOPLE-list
         # portrait lands when the v3 chooser misses, and tests mock _commons_portrait.
         story_photo.prefetch(cid, title, loc, brief)
@@ -2608,11 +2608,17 @@ def _ensure_convert():
     return False
 
 
-def _pending_convert_cids(limit=400):
-    """Leftover maps, previous-VERSION cards, and non-ASCII headlines still on the old font.
-    Uses card_heads() so a scan never loads PNG bytes into RAM."""
+_CONVERT_TRIED = {}      # cid -> time of the last attempt; a card that found no photo is retried after _RETRY_S
+_RETRY_S = 1800
+
+
+def _pending_convert_cids(limit=3000):
+    """Leftover maps and previous-VERSION cards first; then non-ASCII / clipped headlines still on old typography.
+    Uses card_heads() so a scan never loads PNG bytes into RAM. A card tried within _RETRY_S is skipped, so one
+    story with no photo can never block the rest of the queue."""
     import story_photo as SP
-    seen, order = set(), []
+    now = time.time()
+    seen, order, rest = set(), [], []
     try:
         rows = SP.card_heads(limit) or []
     except Exception:
@@ -2621,10 +2627,17 @@ def _pending_convert_cids(limit=400):
         cid = row.get("cid") or ""
         if not cid or cid in seen:
             continue
-        if SP.card_stale(row):
-            seen.add(cid)
-            order.append(cid)
+        seen.add(cid)
+        if now - _CONVERT_TRIED.get(cid, 0) < _RETRY_S:
             continue
+        if SP.card_stale(row):
+            order.append(cid)
+        else:
+            rest.append(row)
+    if order:
+        return order
+    for row in rest[:400]:   # newest first; the font/headline pass only runs when no map is waiting
+        cid = row.get("cid") or ""
         title = ""
         try:
             title, _text, _loc = _force_title(cid)
@@ -2632,7 +2645,6 @@ def _pending_convert_cids(limit=400):
         except Exception:
             title = ""
         if SP.card_font_stale(row, title) or card_needs_headline_refit(row, title):
-            seen.add(cid)
             order.append(cid)
     return order
 
@@ -2645,6 +2657,7 @@ def _convert_one_stale(cid):
     try:
         title, text, loc = _force_title(cid)
         lat = lon = None
+        cat = ""
         try:
             import story
             r, _al = story.load(cid)
@@ -2653,6 +2666,7 @@ def _convert_one_stale(cid):
                 loc = r.get("location") or loc
                 text = r.get("brief") or text
                 lat, lon = r.get("lat"), r.get("lon")
+                cat = r.get("category") or ""
         except Exception:
             pass
         has_jpg = False
@@ -2661,7 +2675,7 @@ def _convert_one_stale(cid):
         except Exception:
             has_jpg = False
         if not has_jpg and card_photo_on():
-            apply_card_photo(cid, title or "", loc or "", text or "", lat, lon)
+            apply_card_photo(cid, title or "", loc or "", text or "", lat, lon, cat)
         invalidate_card_layers(cid)
         th = SP.card_title_key(_card_headline(title or "") or "")
         b = render_story_fresh(cid) or generic_story_card(cid)
@@ -2716,6 +2730,7 @@ def _stale_map_jobs():
                 continue
             CONVERT["done"] = False
             idle = 0
+            _CONVERT_TRIED[cids[0]] = time.time()
             ok = _convert_one_stale(cids[0])
             if ok:
                 CONVERT["ids"] += 1
@@ -2760,6 +2775,7 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
             try:
                 title, text, loc = _force_title(cid)
                 lat = lon = None
+                cat = ""
                 try:
                     import story
                     r, _al = story.load(cid)
@@ -2768,6 +2784,7 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
                         loc = r.get("location") or loc
                         text = r.get("brief") or text
                         lat, lon = r.get("lat"), r.get("lon")
+                        cat = r.get("category") or ""
                 except Exception:
                     pass
                 has_jpg = False
@@ -2776,7 +2793,7 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
                 except Exception:
                     has_jpg = False
                 if not has_jpg:
-                    apply_card_photo(cid, title or "", loc or "", text or "", lat, lon)
+                    apply_card_photo(cid, title or "", loc or "", text or "", lat, lon, cat)
                 invalidate_card_layers(cid)
                 th = SP.card_title_key(_card_headline(title or "") or "")
                 b = render_story_fresh(cid) or generic_story_card(cid)
