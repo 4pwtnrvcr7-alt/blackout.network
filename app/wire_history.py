@@ -67,6 +67,11 @@ def page(before=None, limit=50, cats=None, lists=(0, 1), archive="1"):
                             "links": _links(r["links"]), "archive": True, "origin": "archive backfill"})
         finally: h.close()
     out.sort(key=lambda x: (x["t"] or "", x["id"]), reverse=True)
+    try:
+        import story_writer as SW
+        out = [x for x in out if x.get("archive") or SW.allow(x.get("id"))]
+    except Exception:
+        pass
     more = len(out) > limit
     pg = out[:limit]
     nxt = f"{pg[-1]['t']}|{pg[-1]['id']}" if pg and more else None

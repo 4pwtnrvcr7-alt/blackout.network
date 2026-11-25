@@ -132,12 +132,23 @@ def _h1(full, what=""):
     dek = full if short != full else (what if what and what != full else "")
     return f'<h1 class="t">{S.E(short)}</h1>' + (f'<p class="dek">{S.E(dek)}</p>' if dek else "")
 
+def _preparing(cid):
+    body = ('<p class="crumb"><a href="/wire">The Wire</a> › Story</p><h1 class="t">This story is being prepared</h1>'
+            '<p class="dek">The full write-up is not ready yet. It will appear on The Wire as soon as it is.</p>')
+    return 200, S.page("Story being prepared", "This BLACKOUT.NETWORK story is being prepared.", body, f"/wire/{cid}", "threat", noindex=True)
+
 def render(cid, since=""):
     r, al = load(cid)
     if not r:
         body = ('<p class="crumb"><a href="/wire">The Wire</a> › Story</p><h1 class="t">This story is no longer on the board</h1>'
                 '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
+    try:
+        import story_writer as SW
+        if SW.gate_on() and not SW.allow(cid):
+            return _preparing(cid)
+    except Exception:
+        pass
     rank = int(r.get("rank") or 0); k, tname = tier(rank); col = COLORS[band(rank)]
     title = S.clean_title(r.get("title")); what = _what(r.get("brief"), r.get("title"))
     fams = [f for f in (r.get("families") or "").split(",") if f]
@@ -184,7 +195,6 @@ def render(cid, since=""):
                 "cluster_id": cid, "title": title, "headline": title,
                 "location": r.get("location") or "", "category": r.get("category") or "",
                 "brief": r.get("brief") or "", "rank": rank,
-                "body": " ".join([r.get("brief") or "", what or ""] + [a.get("title") or "" for a in (rows or al or [])[:20]]),
                 "watchlist": watch, "hidden": r.get("hidden") or 0,
             })
         except Exception:
@@ -272,7 +282,6 @@ def brief_page(cid):
             "cluster_id": cid, "title": title, "headline": title,
             "location": loc, "category": r.get("category") or "",
             "brief": r.get("brief") or "", "rank": rank,
-            "body": " ".join([r.get("brief") or "", what or ""] + [a.get("title") or "" for a in (al or [])[:20]]),
             "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0,
         })
     except Exception:

@@ -196,6 +196,11 @@ def _x_btn(it, headline=None):
 
 def items(state):
     m = [x for x in (state.get("main") or []) if not x.get("hidden")]
+    try:
+        import story_writer as SW
+        m = [x for x in m if SW.allow(x.get("cluster_id") or x.get("id"))]
+    except Exception:
+        pass
     m.sort(key=lambda x: str(x.get("updated") or ""), reverse=True)
     m.sort(key=lambda x: -(x.get("rank") or 0))   # stable: rank first, newest change first within a rank
     return m

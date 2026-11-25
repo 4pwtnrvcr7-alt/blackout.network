@@ -773,7 +773,7 @@ if __name__ == "__main__":
         story_places.start(ready=lambda: has_data() and HANDOFF["state"] != "pending", paused=lambda: FREEZE["until"] > time.time())
     except Exception as ex:
         print("story_places start:", ex, flush=True)
-    try:   # Nov 21 2026: instant rank 5+ write-ups via the xAI API (story_writer.py; idle without XAI_API_KEY; BN_WRITER=0 = off)
+    try:   # Nov 21 2026: story writer (story_writer.py). Templates + publish gate run even when BN_WRITER=0; the paid API writer is idle without XAI_API_KEY or when BN_WRITER=0
         import story_writer
         story_writer.start(ready=lambda: has_data() and HANDOFF["state"] != "pending", paused=lambda: FREEZE["until"] > time.time())
     except Exception: traceback.print_exc()
