@@ -248,16 +248,7 @@ def card_has_photo(cid):
             return False
         if photo_is_wrong_subject(cid, r[0], ""):
             return False
-        # A place photo on a person-subject story, or a historical map/scan, is not a valid subject photo.
-        ph = _read(lambda k: k.execute("SELECT kind, credit, caption, label FROM story_photos WHERE cid=?", (cid,)).fetchone())
-        title, text = _story_text(cid)
-        if ph:
-            kind, credit, caption, label = (ph[0] or ""), (ph[1] or ""), (ph[2] or ""), (ph[3] or "")
-            if is_non_photo(caption, " ".join((credit, label)), "", ""):
-                return False
-            if kind == "place" and not place_photo_ok(title, text):
-                return False
-        return True
+        return stored_photo_matches(cid)
     except Exception:
         return False
 
@@ -273,19 +264,27 @@ def put_card(cid, png, src="", title_hash=""):
     ts = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     src = src or ""
     title_hash = title_hash or ""
+    # A wrong-subject or non-matching photo may be downgraded to the designed map.
+    # A correctly matched photo still cannot be replaced by a map.
+    allow_downgrade = False
+    if not src.startswith("https://"):
+        meta = card_meta(cid) or {}
+        c = db_choice(cid) or {}
+        old_src = (meta.get("src") or c.get("src") or "")
+        meta_blob = " ".join((c.get("caption") or "", c.get("credit") or "", c.get("label") or "", c.get("alt") or ""))
+        allow_downgrade = (not stored_photo_matches(cid)) or photo_is_wrong_subject(cid, old_src, meta_blob)
     def fn(k):
         old = k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone()
         old_src = (old[0] if old else "") or ""
         # Photo-to-photo replacement is allowed (typography rebuild, or a correct-subject portrait
         # replacing a wrong-subject image). A correct photo still cannot be replaced by a map.
         if old_src.startswith("https://") and not src.startswith("https://"):
-            if not photo_is_wrong_subject(cid, old_src, ""):
+            if not allow_downgrade:
                 return
         if not src.startswith("https://"):
             ph = k.execute("SELECT src, none, jpg, credit, caption, label FROM story_photos WHERE cid=?", (cid,)).fetchone()
             if ph and not ph[1] and (ph[0] or "").startswith("https://") and ph[2]:
-                blob_meta = " ".join(x or "" for x in (ph[3], ph[4], ph[5]))
-                if not photo_is_wrong_subject(cid, ph[0], blob_meta):
+                if not allow_downgrade:
                     return
         ver = "11"
         try:
@@ -308,8 +307,7 @@ def has_photo(cid):
         return False
     if is_non_photo_candidate(c):
         return False
-    title, text = _story_text(cid)
-    if (c.get("kind") or "") == "place" and not place_photo_ok(title, text):
+    if not stored_photo_matches(cid):
         return False
     if photo_is_wrong_subject(cid, c.get("src") or "", " ".join((c.get("credit") or "", c.get("caption") or "", c.get("label") or "", c.get("alt") or ""))):
         return False
@@ -383,13 +381,11 @@ def is_non_photo_candidate(c):
 
 
 def place_photo_ok(title="", text=""):
-    """Place photos are only for stories about that place, not person-subject stories (Huang must not get Altoona)."""
+    """Place photos only when the story is about a named landmark or organization HQ (not a person, not a generic location)."""
     title, text = title or "", text or ""
-    if main_subject(title, text):
+    if main_subject(title, text) or _named_people("", title, text):
         return False
-    if _named_people("", title, text):
-        return False
-    return True
+    return bool(_landmark_terms(title) or org_hq_terms(title, text))
 
 
 def card_title_key(title):
@@ -399,10 +395,16 @@ def card_title_key(title):
 
 
 def card_title_stale(meta, current_key):
-    """True when the stored card was rendered with a different title than the current cleaned headline."""
-    if not meta or not current_key:
+    """True when the stored card was rendered with a different title than the current cleaned headline.
+    An empty stored hash (cards built before title_hash existed) is always stale."""
+    if not meta:
         return False
-    return (meta.get("title_hash") or "") != current_key
+    stored = meta.get("title_hash") or ""
+    if not stored:
+        return True
+    if current_key and stored != current_key:
+        return True
+    return False
 
 
 def _dir():
@@ -482,11 +484,17 @@ def pick(cid, title="", loc="", text=""):
         if is_non_photo_candidate(c):
             return None
         if (c.get("kind") or "") == "place":
-            return c if place_photo_ok(title, text) else None
+            if not place_photo_ok(title, text):
+                return None
         if photo_is_wrong_subject(cid, c.get("src") or "", _photo_blob(c), title, text):
             return None
         # An ambiguous person story must not keep a leftover person photo.
         if (c.get("kind") or "person") == "person" and main_subject(title, text) is None and _named_people(cid, title, text):
+            return None
+        blob = " ".join((c.get("title") or "", c.get("categories") or "", _photo_blob(c), c.get("src") or ""))
+        if not photo_strict_match(cid, src=c.get("src") or "", meta_blob=blob, title=title, text=text,
+                                  commons_title=c.get("title") or "", categories=c.get("categories") or "",
+                                  kind=c.get("kind") or ""):
             return None
         return c
     try:
@@ -563,48 +571,68 @@ def store(src):
         return None
 
 
-def _commons_portrait(name, timeout=7):
-    """Newest-looking licensed Commons portrait whose file name or description carries the person's full name.
+def commons_portrait_queries(name):
+    """Search terms for a person: quoted full name, plus deepcategory of each name variant.
+    Category 'Jensen Huang' is empty on Commons; the files live under 'Jen-Hsun Huang' (and year subcats)."""
+    terms = []
+    if name:
+        terms.append(f'"{name}"')
+    for n in name_variants(name):
+        terms.append(f'deepcategory:"{n}"')
+        terms.append(f'incategory:"{n}"')
+    # unique, keep order
+    out, seen = [], set()
+    for x in terms:
+        k = x.lower()
+        if k not in seen:
+            seen.add(k); out.append(x)
+    return out
 
-    Do not require the word 'portrait' in the search query: '"Jensen Huang" portrait' returned
-    no hits, while an unquoted 'Jensen Huang' search finds CC BY 4.0 portraits.
-    """
+
+def _commons_portrait(name, timeout=7):
+    """Licensed Commons portrait of this exact person (full name in the file title or a person category)."""
     pages = {}
-    for term in (name, f'"{name}"'):
+    for term in commons_portrait_queries(name):
         q = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
                                     "prop": "imageinfo", "iiprop": "url|extmetadata|size|mime", "iiurlwidth": 1280})
         try:
-            raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=timeout)
+            raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=min(6, timeout))
             more = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
             pages.update(more)
         except Exception:
             continue
-    toks = [t.lower() for t in re.findall(r"[A-Za-z]+", name) if len(t) > 1]
+    variants = name_variants(name)
     best = None
     for p in pages.values():
         ii = (p.get("imageinfo") or [{}])[0]
         m = ii.get("extmetadata") or {}
         g = lambda k: re.sub(r"<[^>]+>", "", (m.get(k) or {}).get("value") or "").strip()
         lic = g("LicenseShortName")
-        title = (p.get("title") or "").lower()
-        desc = g("ImageDescription").lower()
+        title = (p.get("title") or "")
+        desc = g("ImageDescription")
         cats = g("Categories")
         mime = (ii.get("mime") or "")
         w, h = int(ii.get("width") or 0), int(ii.get("height") or 0)
         if not license_ok(lic) or not ii.get("thumburl") or w < 600:
             continue
-        # Prefer a portrait crop; allow mild landscape so a licensed headshot is not dropped.
         if h < w * 0.75:
             continue
         if is_non_photo(title, desc, cats, mime):
             continue
-        if not all(t in title or t in desc for t in toks) or any(x in title for x in ("logo", "signature", "caricature", "cartoon")):
+        title_l = title.lower()
+        if any(x in title_l for x in ("logo", "signature", "caricature", "cartoon", "engineering center", "headquarters", "building")):
+            continue
+        blob = title + " " + cats
+        if not any(_exact_name_in(v, blob) for v in variants):
             continue
         yr = (g("DateTimeOriginal") or g("DateTime"))[:4]
-        score = ("official" in title or "portrait" in title or "cropped" in title) * 2 + (h >= w * 0.9) + (int(yr) if yr.isdigit() else 0) / 1e4
+        portrait_cat = any(("portraits of" in (cats or "").lower()) or (v.lower() in (cats or "").lower()) for v in variants)
+        score = (("official" in title_l or "portrait" in title_l or "cropped" in title_l) * 2
+                 + (2 if portrait_cat else 0) + (h >= w * 0.9) + (int(yr) if yr.isdigit() else 0) / 1e4)
         if best is None or score > best[0]:
             best = (score, dict(src=ii["thumburl"], credit=f"{g('Artist') or 'Unknown author'} / Wikimedia Commons", license=lic, link=ii.get("descriptionurl") or "",
                                 kind="person", alt=name, w=ii.get("thumbwidth"), h=ii.get("thumbheight"),
+                                title=title, categories=cats,
                                 caption=f"{name}" + (f", {yr}" if yr.isdigit() else "") + ". File photo; not taken at this event."))
     if best:
         best[1]["label"] = best[1]["caption"]
@@ -887,17 +915,137 @@ def _landmark_terms(title):
     return out
 
 
+# Commons person categories often use a legal/Wikidata name (Jen-Hsun Huang) that differs from the headline.
+_NAME_VARIANTS = {
+    "Jensen Huang": ["Jensen Huang", "Jen-Hsun Huang", "Jen Hsun Huang"],
+    "Volodymyr Zelensky": ["Volodymyr Zelensky", "Volodymyr Zelenskyy", "Volodymyr Zelenskiy"],
+    "Scott Bessent": ["Scott Bessent"],
+    "Andy Burnham": ["Andy Burnham"],
+}
+
+
+def name_variants(name):
+    """Headline name plus known Commons/legal spellings of the same person."""
+    name = (name or "").strip()
+    if not name:
+        return []
+    out, seen = [], set()
+    for n in [name] + list(_NAME_VARIANTS.get(name, [])):
+        k = n.lower()
+        if k not in seen:
+            seen.add(k); out.append(n)
+    return out
+
+
+def org_hq_terms(title, text=""):
+    """Organization headquarters named in the headline ('Nvidia headquarters', 'X HQ')."""
+    blob = " ".join(x for x in (title, text) if x)
+    terms = []
+    for m in re.finditer(r"\b([A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*){0,3})\s+(?:headquarters|HQ|head office)\b", blob):
+        terms.append(m.group(1).strip())
+    for m in re.finditer(r"\b(?:headquarters|HQ|head office)\s+of\s+([A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*){0,3})\b", blob):
+        terms.append(m.group(1).strip())
+    out, seen = [], set()
+    for x in terms:
+        k = x.lower()
+        if k not in seen and len(x) > 1:
+            seen.add(k); out.append(x)
+    return out
+
+
+def _exact_name_in(name, blob):
+    """True when the exact full name appears as words in title/categories/caption (underscores allowed)."""
+    if not name or not blob:
+        return False
+    b = (blob or "").replace("_", " ").replace("|", " ").replace("/", " ")
+    return bool(re.search(r"\b" + re.escape(name) + r"\b", b, re.I))
+
+
+def exact_subject_in(blob, title="", text="", loc=""):
+    """True when blob (Commons title, categories, caption, src) contains an exact named person, landmark, or org HQ from the story.
+    Loose topic words (drone, vessel, memorial, war) never count."""
+    if not blob:
+        return False
+    title, text = _story_text("", title, text) if (not title and not text) else (title or "", text or "")
+    names = []
+    subj = main_subject(title, text)
+    if subj:
+        names = name_variants(subj)
+    for n in _named_people("", title, text):
+        for v in name_variants(n):
+            if v not in names:
+                names.append(v)
+    places = list(_landmark_terms(title)) + list(org_hq_terms(title, text))
+    for n in names + places:
+        if _exact_name_in(n, blob):
+            return True
+    return False
+
+
+def official_event_src(cid, src=""):
+    """True when this src is official event imagery already bound to this exact story id (USGS ShakeMap, etc.)."""
+    if not cid or not (src or "").startswith("https://"):
+        return False
+    try:
+        import story_report as SR
+        for im in ((SR.reports() or {}).get("images") or {}).get(cid) or []:
+            if (im.get("src") or "") == src:
+                return True
+    except Exception:
+        pass
+    # USGS ShakeMap URLs are event imagery for that quake, not a loose Commons topic search.
+    return "shakemap" in (src or "").lower()
+
+
+def photo_strict_match(cid, src="", meta_blob="", title="", text="", loc="", commons_title="", categories="", kind=""):
+    """Accept a photo only for the exact named person (portrait / person category) or exact named landmark or org HQ."""
+    title, text = _story_text(cid, title, text)
+    if official_event_src(cid, src):
+        return True
+    blob = " ".join(x for x in (commons_title, categories, meta_blob, src) if x)
+    if kind == "place" and not place_photo_ok(title, text):
+        return False
+    return exact_subject_in(blob, title, text, loc)
+
+
+# Running audit of stored photo cards (downgrade mismatches to the designed map).
+AUDIT = {"checked": 0, "downgraded": 0, "typography": 0, "done": False, "error": ""}
+
+
+def photo_cids():
+    """Every story id that currently has a stored photo-card PNG (https src). No network."""
+    try:
+        rows = _read(lambda k: k.execute(
+            "SELECT cid FROM story_cards WHERE src LIKE 'https://%'").fetchall())
+        return [r[0] for r in (rows or []) if r and r[0]]
+    except Exception:
+        return []
+
+
+def stored_photo_matches(cid):
+    """Strict match for a stored photo card, using caption/credit/src already in cards.db (no network).
+    If the headline cannot be loaded, only obvious non-photos are rejected (audit skips those rows)."""
+    title, text = _story_text(cid)
+    c = db_choice(cid) or {}
+    meta = card_meta(cid) or {}
+    src = (meta.get("src") or c.get("src") or "")
+    if official_event_src(cid, src):
+        return True
+    if not title:
+        return not is_non_photo_candidate(c) if c else True
+    blob = " ".join((c.get("caption") or "", c.get("label") or "", c.get("credit") or "", c.get("alt") or "",
+                     c.get("title") or "", c.get("categories") or "", src))
+    return photo_strict_match(cid, src=src, meta_blob=blob, title=title, text=text, kind=c.get("kind") or "")
+
+
 def _commons_place(loc, title, timeout=7):
-    """Licensed photo of a named landmark (quoted in the headline) or the story's location. Never a logo or map."""
-    loc = " ".join((loc or "").split())
-    terms = _landmark_terms(title)
-    landmark = terms[0] if terms else ""
-    q = (landmark + (" " + loc if loc and not landmark else "")).strip() if landmark else loc
-    if not q or len(q) < 3:
+    """Licensed photo of an exact named landmark or organization HQ in the headline. Never a logo, map, or loose topic match."""
+    terms = list(_landmark_terms(title)) + list(org_hq_terms(title, ""))
+    if not terms:
         return None
+    landmark = terms[0]
     pages = {}
-    # Unquoted terms: quoted "PIF Tower" missed the licensed Public Investment Fund Tower file (CC BY 4.0).
-    for term in (terms or [q]):
+    for term in terms:
         qs = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
                                      "prop": "imageinfo", "iiprop": "url|extmetadata|size|mime", "iiurlwidth": 1280})
         try:
@@ -908,9 +1056,7 @@ def _commons_place(loc, title, timeout=7):
             continue
         # Stop early if a licensed landmark file is already in the set.
         if any("investment fund tower" in ((p.get("title") or "").lower()) or (landmark and landmark.lower() in (p.get("title") or "").lower()) for p in more.values()):
-            # still keep going only if no licensed candidate yet — checked below after filters
             pass
-    toks = [t.lower() for t in re.findall(r"[A-Za-z0-9]+", landmark or q) if len(t) > 2]
     best = None
     for p in pages.values():
         ii = (p.get("imageinfo") or [{}])[0]
@@ -928,9 +1074,9 @@ def _commons_place(loc, title, timeout=7):
             continue
         if any(x in title_f for x in ("logo", "icon", "flag", "map", "coat of arms", "signature", "cartoon", "collage")):
             continue
-        if toks and not any(t in title_f or t in desc for t in toks):
+        if not any(_exact_name_in(term, title_f + " " + desc + " " + cats) for term in terms):
             continue
-        named = bool(landmark and landmark.lower() in title_f or all(t in title_f or t in desc for t in toks))
+        named = any(_exact_name_in(term, title_f) for term in terms)
         # portrait landmark shots are useful (subject-right layout); require landscape only when we have no named landmark
         if not landmark and h > w * 1.25:
             continue

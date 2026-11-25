@@ -1467,8 +1467,18 @@ def photo_status():
             photos, cards, photo_cards = got
     except Exception:
         pass
+    audit = {}
+    try:
+        import story_photo
+        audit = dict(story_photo.AUDIT)
+    except Exception:
+        audit = {}
     return {"depth": depth + (1 if running else 0), "last": last, "worker": alive, "inflight": running or "",
-            "pid": os.getpid(), "photos": photos, "cards": cards, "photo_cards": photo_cards}
+            "pid": os.getpid(), "photos": photos, "cards": cards, "photo_cards": photo_cards,
+            "audit_checked": int(audit.get("checked") or 0),
+            "audit_downgraded": int(audit.get("downgraded") or 0),
+            "audit_typography": int(audit.get("typography") or 0),
+            "audit_done": bool(audit.get("done"))}
 
 
 def _mark_prefetch(cid, note=""):
@@ -1799,6 +1809,48 @@ def boot_warm_cards(cids, timeout=40):
             pass
     return n
 
+
+
+_AUDIT_FIRST = ("cbdfb48145e55048", "9f5bc9d66d783d25", "4c292ccdd9df73f8")
+
+
+def audit_stored_photo_cards():
+    """Walk every stored photo card. Downgrade mismatches to the designed map (allowed);
+    typography-rebuild a matching photo when the stored title hash is stale or missing.
+    Priority cids (Huang, Zelensky, Libya) run first. Logs the downgrade count."""
+    import story_photo as SP
+    SP.AUDIT.update(checked=0, downgraded=0, typography=0, done=False, error="")
+    cids = SP.photo_cids()
+    first = [c for c in _AUDIT_FIRST if c in cids]
+    rest = [c for c in cids if c not in first]
+    print(f"story_photo: audit starting {len(cids)} photo cards", flush=True)
+    for cid in first + rest:
+        try:
+            SP.AUDIT["checked"] += 1
+            if not SP.stored_photo_matches(cid):
+                _story_build(cid, False)
+                SP.AUDIT["downgraded"] += 1
+                print(f"story_photo: audit downgrade {cid}", flush=True)
+                continue
+            meta = SP.card_meta(cid)
+            current_key = ""
+            try:
+                import story
+                r, _al = story.load(cid)
+                if r:
+                    current_key = SP.card_title_key(_card_headline(r.get("title") or "") or "")
+            except Exception:
+                current_key = ""
+            if meta and SP.card_title_stale(meta, current_key):
+                _story_build(cid, False)
+                SP.AUDIT["typography"] += 1
+                print(f"story_photo: typography {cid} hash={current_key}", flush=True)
+        except Exception as e:
+            SP.AUDIT["error"] = type(e).__name__
+            print(f"story_photo: audit {cid} err={type(e).__name__}", flush=True)
+    SP.AUDIT["done"] = True
+    print(f"story_photo: audit downgraded {SP.AUDIT['downgraded']} of {SP.AUDIT['checked']} photo cards (typography {SP.AUDIT['typography']})", flush=True)
+    return SP.AUDIT["downgraded"]
 
 
 def backfill_photos(cids, pause=0.6):
