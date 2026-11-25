@@ -177,6 +177,15 @@ class Speed(unittest.TestCase):
         self.assertIn("/api/wire_tl/xu?id=", js)
         self.assertIn('data-xid="', js)
 
+    def test_standard_pages_stay_warm_with_no_recent_request(self):
+        """Live miss (Nov 25): limit=100 took 4.7 s because the warm thread only refreshed pages asked for in the last 3 minutes."""
+        W._reset_caches(); W._snap_refresh(block=True); W._PA.clear()
+        W._warm_cycle()
+        for sev in (None, "hi", "mid", "lo"):
+            key = W._pkey(None, None, 100, "", False, None, None, None, sev, None, None, None)
+            self.assertIn(key, W._PC["v"], sev)
+        t0 = time.time(); W.page(limit=100, sev="hi"); self.assertLess(time.time() - t0, 0.05)
+
 
 if __name__ == "__main__":
     unittest.main()
