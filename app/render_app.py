@@ -141,13 +141,9 @@ def _sha(path):
         for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
     return h.hexdigest()
 def _db_snapshot(src_rel):
-    """Consistent copy of a Render-owned sqlite DB (backup API), returned as a temp file path."""
-    src = os.path.join(BASE, src_rel)
-    fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".db"); os.close(fd)
-    s = sqlite3.connect(f"file:{src}?mode=ro", uri=True, timeout=20); d = sqlite3.connect(tmp)
-    try: s.backup(d); d.execute("PRAGMA journal_mode=DELETE"); d.commit()
-    finally: d.close(); s.close()
-    return tmp
+    """Consistent copy of a Render-owned sqlite DB (backup API, WAL inclusive), returned as a temp file path."""
+    import handoff_db
+    return handoff_db.snapshot_sqlite(os.path.join(BASE, src_rel), STATE)
 
 def has_data(): return os.path.exists(os.path.join(BASE, "blackout.db"))
 
@@ -175,6 +171,12 @@ def _install(rel, tmp_path, kind):
         for suf in ("-wal", "-shm"):
             try: os.unlink(dest + suf)       # stale WAL/SHM from the previous file must never be applied to the new one
             except FileNotFoundError: pass
+        if rel == "cards.db":
+            try:
+                import handoff_db
+                handoff_db.reopen_cards(dest)
+            except Exception:
+                pass
 
 PUSHED_SINCE_BOOT = set()     # files the box pushed to THIS instance; a deploy handoff never overwrites them (box data is newer)
 def _apply_tar(tmp, source="push"):
