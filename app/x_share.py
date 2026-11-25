@@ -480,7 +480,9 @@ def _corpus(item, headline=None):
     loc = _norm(_location_value(item))
     title = _norm(item.get("title") or item.get("h") or "")
     display = _norm(headline or item.get("headline") or "") or title
-    brief = item.get("brief") or item.get("d") or item.get("body") or item.get("text") or ""
+    brief = " ".join(str(x) for x in (
+        item.get("brief") or "", item.get("d") or "", item.get("body") or "", item.get("text") or "",
+    ) if x)
     where = ""
     if brief:
         m = re.search(r"WHERE:\s*(.+?)(?=\s+(?:WHAT|WHERE|WHEN|CONFIDENCE|VERIFY):|$)", brief, re.S)
@@ -1180,7 +1182,7 @@ def entity_tags(item, headline=None):
     """Specific named things in the story: company, ticker, exchange, agency/org, person-like proper-noun phrases, plus 'in/of <Place>' places.
     Returns (tags_in_priority_order). Place names found here are only used when the place dictionaries missed them."""
     title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
-    blob = " ".join([title, str(item.get("title") or ""), str(item.get("brief") or "")[:600]])
+    blob = _item_text(item, headline=headline)[:2000]
     out, seen = [], set()
     known_loc = {x.lower() for x in location_tags(item, headline=headline)}
 
@@ -1398,6 +1400,101 @@ def _entity_first(item, headline=None):
     return _cap_one(_dedupe(tags, MAX_TAGS), SECTORS, 1)
 
 
+
+def person_tags(item, headline=None):
+    """People only: dictionary names, First Last in the title, and a surname resolved from the brief/body."""
+    item = _normalize_item(item)
+    title = _clean_title(headline or item.get("headline") or item.get("title") or item.get("h") or "")
+    text = _item_text(item, headline=headline)
+    out, seen = [], set()
+    def add(label, tag=None):
+        tg = tag or to_tag(label)
+        if tg and len(tg) > 2 and tg.lower() not in seen:
+            seen.add(tg.lower()); out.append(tg)
+    for rx, tag, _agency in _PEOPLE:
+        if re.search(rx, title) or re.search(rx, text):
+            add(tag, "#" + tag)
+    m = re.match(r"^(" + _CAP + r")\s+(" + _CAP + r")\s+(.+)$", title)
+    if m and _NAME_VERBS.match(m.group(3) or ""):
+        first, last = m.group(1), m.group(2)
+        low_f, low_l = first.lower(), last.lower()
+        if (not first.isupper() and not last.isupper()
+                and low_f not in _STOP_START and low_l not in _STOP_START
+                and low_f not in _MONTHS and low_l not in _MONTHS
+                and first not in _COMMON_CAPS and last not in _COMMON_CAPS
+                and low_f not in _PLACE_WORDS and low_l not in _PLACE_WORDS
+                and (first + " " + last).lower() not in _NOT_ENTITY
+                and not _is_place(first + " " + last)):
+            add(first + " " + last)
+    full = _resolve_surname(title, text)
+    if full:
+        add(full)
+    return out
+
+
+def _note_text(n, limit=2000):
+    """Flatten a stored write-up / desk note into plain text the extractor can read."""
+    if not n:
+        return ""
+    if isinstance(n, str):
+        return n.strip()
+    if isinstance(n, (list, tuple)):
+        return " ".join(x for x in (_note_text(i, limit) for i in n) if x)
+    if not isinstance(n, dict):
+        return ""
+    parts = []
+    for k in ("headline", "title", "dek", "lede", "what_happened", "what", "where", "place",
+              "summary", "body", "text", "why_it_matters", "analysis"):
+        v = n.get(k)
+        if v:
+            parts.append(v if isinstance(v, str) else _note_text(v, limit))
+    st = n.get("story")
+    if isinstance(st, dict):
+        parts.append(_note_text(st, limit))
+    secs = n.get("sections")
+    if isinstance(secs, dict):
+        parts.extend(v if isinstance(v, str) else _note_text(v, limit) for v in secs.values())
+    elif isinstance(secs, list):
+        parts.append(_note_text(secs, limit))
+    return " ".join(p for p in parts if p)[:limit]
+
+
+def writeup_text(cid):
+    """Stored write-up for a cluster (v3 / desk note / template). Local files and DBs only; never assembles or fetches."""
+    if not cid:
+        return ""
+    try:
+        import story_v3 as V3
+        return _note_text(V3.note_for(cid))
+    except Exception:
+        try:
+            import story_writer as SW
+            return _note_text(SW.note_for(cid))
+        except Exception:
+            return ""
+
+
+def with_body(item, alerts=None, extra=""):
+    """Attach write-up, source titles and extra prose so surname/place extraction can run on the full story."""
+    it = dict(item or {})
+    cid = it.get("cluster_id") or it.get("id") or ""
+    parts = [it.get("body") or "", extra or "", writeup_text(cid)]
+    for a in alerts or []:
+        if isinstance(a, dict):
+            parts.append(str(a.get("title") or a.get("s") or a.get("source") or ""))
+        elif isinstance(a, str):
+            parts.append(a)
+    for L in it.get("links") or it.get("l") or it.get("sources") or []:
+        if isinstance(L, dict):
+            parts.append(str(L.get("title") or L.get("s") or L.get("source") or L.get("name") or ""))
+        elif isinstance(L, str):
+            parts.append(L)
+    body = " ".join(str(p) for p in parts if p)
+    if body:
+        it["body"] = body
+    return it
+
+
 def hashtags(item, headline=None):
     """xAI-generated tags (validated, cached) are primary; the rule-based extractor is the fallback.
     Held / false-positive items keep location + generic only."""
@@ -1405,16 +1502,20 @@ def hashtags(item, headline=None):
     if is_held(item):
         return _dedupe(location_tags(item, headline=headline)[:2] + ["#News", "#BlackoutNetwork", "#Alerts"], MAX_TAGS)
     rule = _entity_first(item, headline=headline)
+    chosen = rule
     try:
         import x_tags_llm
         cid = str(item.get("cluster_id") or item.get("id") or "")
         title = headline or item.get("headline") or item.get("title") or ""
         got = x_tags_llm.lookup(cid, item.get("title") or title, item.get("brief") or "", item.get("location") or "", rule, rank=_rank(item))
         if got and len(specific_tags(got, item, headline)) >= 2:
-            return got
+            chosen = got
     except Exception:
         pass
-    return rule
+    # Person and place tags from the full extractor always appear, even when the xAI set is used.
+    people = person_tags(item, headline=headline)
+    places = location_tags(item, headline=headline)
+    return _dedupe(people + places[:2] + [t for t in chosen if t not in people], MAX_TAGS)
 
 
 # --------------------------------------------------------------------------- compose / intent

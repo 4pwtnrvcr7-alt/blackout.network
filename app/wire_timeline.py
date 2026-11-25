@@ -265,11 +265,12 @@ def _item(r, archive, warm_budget=None):
                         warm_budget[0] -= 1
                 except Exception:
                     pass
-            d["xu"] = x_share.intent_url({
+            d["xu"] = x_share.intent_url(x_share.with_body({
                 "cluster_id": r["id"], "title": title, "headline": h, "location": loc,
                 "category": r["category"], "brief": r["brief"] or "", "rank": rk,
                 "watchlist": r["watchlist"] or 0, "hidden": hid,
-            })
+                "links": links, "d": what or d,
+            }))
         except Exception:
             d["xu"] = ""
     return d

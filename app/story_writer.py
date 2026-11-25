@@ -695,15 +695,20 @@ def _writer_worker(ready, paused):
 def gate_on():
     return bool(STATE.get("gate_on")) and gate_wanted()
 
-def _item_for_tags(r):
-    return {"cluster_id": r.get("cluster_id") or r.get("id"), "title": r.get("title") or "", "headline": r.get("title") or "",
-            "brief": r.get("brief") or "", "location": r.get("location") or "", "category": r.get("category") or "",
-            "rank": r.get("rank") or 0, "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0}
+def _item_for_tags(r, al=None, note=None):
+    """Full extractor input: scanner brief, location, write-up and source titles (surname / place)."""
+    import x_share
+    it = {"cluster_id": r.get("cluster_id") or r.get("id"), "title": r.get("title") or "", "headline": r.get("title") or "",
+          "brief": r.get("brief") or "", "location": r.get("location") or r.get("place") or "",
+          "category": r.get("category") or "", "rank": r.get("rank") or 0,
+          "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0}
+    extra = x_share._note_text(note) if note else ""
+    return x_share.with_body(it, alerts=al, extra=extra)
 
-def rule_tags(r):
+def rule_tags(r, al=None, note=None):
     """Rule-based hashtags only. Does not call x_share.hashtags() (that queues the paid tag model)."""
     import x_share
-    return list(x_share._entity_first(_item_for_tags(r)) or [])
+    return list(x_share._entity_first(_item_for_tags(r, al=al, note=note)) or [])
 
 def build_card(cid):
     """Render and cache the share card. Returns True when bytes were produced."""
@@ -1079,14 +1084,22 @@ def package_one(cid, row=None, al=None):
         if not row:
             _mark_held(cid, "cluster gone"); return False
         kind = "template"
+        note = None
         if desk_covered(cid):
             kind = "desk"
+            try:
+                import story_v3 as V3
+                note = V3.note_for(cid)
+            except Exception:
+                note = note_for(cid)
         else:
             existing = note_for(cid)
             if existing and existing.get("file") != "story_writer_template":
                 kind = "writer"
+                note = existing
             elif existing and existing.get("file") == "story_writer_template":
                 kind = "template"
+                note = existing
             else:
                 note = build_template(row, al or [])
                 with _LK:
@@ -1101,7 +1114,7 @@ def package_one(cid, row=None, al=None):
                 _invalidate(cid)
                 kind = "template"
         try:
-            tags = rule_tags(row)
+            tags = rule_tags(row, al, note)
         except Exception:
             traceback.print_exc(); tags = []
         if not tags:
