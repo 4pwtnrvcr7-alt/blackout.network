@@ -204,7 +204,7 @@ class StoryPhoto(unittest.TestCase):
 
 
     def test_fast_path_queues_when_jpeg_exists_but_card_is_map(self):
-        import os, tempfile
+        import os, tempfile, time
         from unittest import mock
         d = tempfile.mkdtemp()
         os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
@@ -214,11 +214,11 @@ class StoryPhoto(unittest.TestCase):
             jpg = b"\xff\xd8" + b"j" * 3000
             cand = dict(src="https://upload.wikimedia.org/x.jpg", credit="US Treasury", license="Public domain",
                         caption="Scott Bessent, 2025.", kind="person", label="lab", link="")
-            P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)
-            P.put_card("e2ca47e325c5b8e1", png, "")  # map card, jpeg already stored
+            P.put_card("e2ca47e325c5b8e1", png, "")  # map card first
+            P.db_put("e2ca47e325c5b8e1", cand, jpg=jpg)  # JPEG arrives later; put_card would refuse a map over it
             self.assertTrue(P.has_photo("e2ca47e325c5b8e1"))
             self.assertFalse(P.card_has_photo("e2ca47e325c5b8e1"))
-            # JPEG already stored: rebuild the photo card immediately (no network), do not leave a map in place.
+            # Serve the stored map immediately; typography/photo rebuild runs in the background.
             built = []
             def fake_build(cid, fetch=False):
                 built.append((cid, fetch))
@@ -227,10 +227,15 @@ class StoryPhoto(unittest.TestCase):
                 return photo
             S._SC.clear()
             with mock.patch.object(S, "_story_build", side_effect=fake_build):
+                t0 = time.perf_counter()
                 out = S.story_png_fast("e2ca47e325c5b8e1")
-            self.assertTrue(built and built[0][0]=="e2ca47e325c5b8e1" and built[0][1] is False, built)
+                self.assertLess(time.perf_counter() - t0, 2.0)
+                self.assertEqual(out, png)
+                deadline = time.time() + 3
+                while time.time() < deadline and not P.card_has_photo("e2ca47e325c5b8e1"):
+                    time.sleep(0.05)
             self.assertTrue(P.card_has_photo("e2ca47e325c5b8e1"))
-            self.assertEqual(out, b"\x89PNG\r\n\x1a\n" + b"P" * 4000)
+            self.assertTrue(built and built[0][1] is False, built)
         finally:
             os.environ.pop("BN_CARDS_DB", None)
 
@@ -300,8 +305,15 @@ class StoryPhoto(unittest.TestCase):
                 return newer
             S._SC.clear()
             with mock.patch.object(S, "_story_build", side_effect=fake_build):
-                out = S.ensure_current_card(cid)
-            self.assertEqual(out, newer)
+                t0 = __import__("time").perf_counter()
+                out = S.story_png_fast(cid)
+                self.assertLess(__import__("time").perf_counter() - t0, 2.0)
+                # Stored photo is served immediately; typography rebuild is background.
+                self.assertEqual(out, photo)
+                deadline = __import__("time").time() + 3
+                while __import__("time").time() < deadline and P.get_card(cid) != newer:
+                    __import__("time").sleep(0.05)
+            self.assertEqual(P.get_card(cid), newer)
             self.assertTrue(P.card_has_photo(cid))
             self.assertEqual(P.card_meta(cid)["src"], cand["src"])
             self.assertEqual(P.card_meta(cid)["v"], "99")
@@ -313,15 +325,17 @@ class StoryPhoto(unittest.TestCase):
     def test_lookup_timeout_does_not_block_queue(self):
         import time
         order = []
-        def fake(cid, fetch=False):
+        def fake_pre(cid):
             if cid == "stuckcid00000001":
                 time.sleep(8)
+        def fake_build(cid, fetch=False):
             order.append(cid)
             return cid
-        old, old_t = S._story_build, S.LOOKUP_TIMEOUT
+        old_pre, old_b, old_t = S._network_prefetch, S._story_build, S.LOOKUP_TIMEOUT
         S._SC.clear()
         try:
-            S._story_build = fake
+            S._network_prefetch = fake_pre
+            S._story_build = fake_build
             S.LOOKUP_TIMEOUT = 0.25
             with S._FLOCK:
                 S._FHIGH.clear(); S._FLOW.clear(); S._FWAIT.clear()
@@ -333,8 +347,63 @@ class StoryPhoto(unittest.TestCase):
                 time.sleep(0.05)
             self.assertIn("quickcid00000002", order, order)
         finally:
-            S._story_build = old
+            S._network_prefetch = old_pre
+            S._story_build = old_b
             S.LOOKUP_TIMEOUT = old_t
+
+    def test_successful_prefetch_does_not_log_timeout(self):
+        """A photo=1 prefetch that finishes in time must not then log err=timeout while typography renders."""
+        import time
+        def fake_pre(cid):
+            print(f"story_photo: prefetch {cid} photo=1 license=Public domain kind=person", flush=True)
+            time.sleep(0.05)
+        def fake_build(cid, fetch=False):
+            time.sleep(0.3)
+            return cid
+        old_pre, old_b, old_t = S._network_prefetch, S._story_build, S.LOOKUP_TIMEOUT
+        S._SC.clear()
+        try:
+            S._network_prefetch = fake_pre
+            S._story_build = fake_build
+            S.LOOKUP_TIMEOUT = 0.2
+            with S._FLOCK:
+                S._FHIGH.clear(); S._FLOW.clear(); S._FWAIT.clear()
+            fut = S.submit("okcid000000000001", fetch=True, urgent=True)
+            fut.result(timeout=3)
+            st = S.photo_status()
+            self.assertIn("okcid000000000001", st.get("last") or "")
+            self.assertNotIn("timeout", st.get("last") or "")
+        finally:
+            S._network_prefetch = old_pre
+            S._story_build = old_b
+            S.LOOKUP_TIMEOUT = old_t
+
+    def test_twitterbot_path_never_blocks_over_2s(self):
+        """A stored card is returned immediately even if the typography rebuild is slow."""
+        import os, tempfile, time
+        from unittest import mock
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        try:
+            P._dir = lambda: Path(d)
+            photo = b"\x89PNG\r\n\x1a\n" + b"P" * 4000
+            cand = dict(src="https://upload.wikimedia.org/zelensky.jpg", credit="Press Service", license="CC BY 4.0",
+                        caption="Volodymyr Zelenskyy, 2025.", kind="person", label="lab", link="")
+            cid = "9f5bc9d66d783d25"
+            P.db_put(cid, cand, jpg=b"\xff\xd8" + b"j" * 3000)
+            P.put_card(cid, photo, cand["src"])
+            def fake_build(c, fetch=False):
+                time.sleep(3)
+                return c
+            S._SC.clear()
+            with mock.patch.object(S, "_story_build", side_effect=fake_build):
+                t0 = time.perf_counter()
+                out = S.story_png_fast(cid)
+                elapsed = time.perf_counter() - t0
+            self.assertLess(elapsed, 2.0, elapsed)
+            self.assertEqual(out, photo)
+        finally:
+            os.environ.pop("BN_CARDS_DB", None)
 
 
 

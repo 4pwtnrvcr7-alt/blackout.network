@@ -71,23 +71,23 @@ class OgImages(unittest.TestCase):
         self.assertEqual(_img(body).size, (1200, 630))
 
     def test_image_url_version_and_aliases(self):
-        self.assertEqual(og.image_url("crime"), "https://blackout.network/og/crime.png?v=12")
-        self.assertEqual(og.image_url("heatmap"), "https://blackout.network/og/map.png?v=12")
-        self.assertEqual(og.image_url("tv-radio"), "https://blackout.network/og/streams.png?v=12")
+        self.assertEqual(og.image_url("crime"), "https://blackout.network/og/crime.png?v=13")
+        self.assertEqual(og.image_url("heatmap"), "https://blackout.network/og/map.png?v=13")
+        self.assertEqual(og.image_url("tv-radio"), "https://blackout.network/og/streams.png?v=13")
         u = og.image_url("wire", story_id="6727e7f2ac056676", title="Hello", rank=8)
-        self.assertTrue(u.startswith("https://blackout.network/og/wire/6727e7f2ac056676.png?v=12-"))
+        self.assertTrue(u.startswith("https://blackout.network/og/wire/6727e7f2ac056676.png?v=13-"))
         u2 = og.image_url("wire", story_id="6727e7f2ac056676", title="Hello changed", rank=8)
         self.assertNotEqual(u, u2)
 
     def test_tags_include_required_fields(self):
         h = og.tags(title="Crime map | BLACKOUT.NETWORK", desc="Look up crime.",
                     url="https://blackout.network/crime", key="crime")
-        self.assertIn('property="og:image" content="https://blackout.network/og/crime.png?v=12"', h)
+        self.assertIn('property="og:image" content="https://blackout.network/og/crime.png?v=13"', h)
         self.assertIn('property="og:title" content="Crime map | BLACKOUT.NETWORK"', h)
         self.assertIn('property="og:url" content="https://blackout.network/crime"', h)
         self.assertIn('property="og:description" content="Look up crime."', h)
         self.assertIn('name="twitter:card" content="summary_large_image"', h)
-        self.assertIn('name="twitter:image" content="https://blackout.network/og/crime.png?v=12"', h)
+        self.assertIn('name="twitter:image" content="https://blackout.network/og/crime.png?v=13"', h)
         self.assertIn("og:image:width", h)
         self.assertNotIn("icon-og-v2-1200x630", h)
 
@@ -134,7 +134,7 @@ class OgImages(unittest.TestCase):
         shell = wire_v2.shell("The Wire: live threat feed | BLACKOUT.NETWORK", "Live threats.", "<p>x</p>", "/wire")
         self.assertIn("https://blackout.network/og/wire.png?v=", shell)
         story = wire_v2.shell("A headline | BLACKOUT.NETWORK", "Dek.", "<p>x</p>", "/wire/6727e7f2ac056676", rank=8)
-        self.assertIn("/og/wire/6727e7f2ac056676.png?v=12-", story)
+        self.assertIn("/og/wire/6727e7f2ac056676.png?v=13-", story)
         self.assertIn('og:type" content="article"', story)
 
     def test_crawler_share_page(self):
@@ -142,7 +142,7 @@ class OgImages(unittest.TestCase):
         self.assertTrue(og.is_crawler("facebookexternalhit/1.1"))
         self.assertFalse(og.is_crawler("Mozilla/5.0 (iPad; CPU OS 18_0)"))
         html = og.share_page("solar").decode()
-        self.assertIn("/og/solar.png?v=12", html)
+        self.assertIn("/og/solar.png?v=13", html)
         self.assertIn('og:url" content="https://blackout.network/solar"', html)
         self.assertIn("Solar &amp; Seismic", html)
         self.assertNotIn('http-equiv="refresh"', html.lower())

@@ -21,7 +21,7 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
-VERSION = "12"  # bump to force social CDNs to refetch (Nov 25: v12 = photo worker starts in the serving process)
+VERSION = "13"  # bump to force social CDNs to refetch (Nov 25: v13 = Twitterbot never waits; typography rebuild is background)
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
