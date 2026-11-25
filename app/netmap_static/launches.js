@@ -62,7 +62,9 @@
     ".nx-lc-bar .tp{font-variant-numeric:tabular-nums;color:#C9CCD6;min-width:44px}",
     ".nx-lc-note{position:absolute;left:8px;bottom:56px;z-index:6;font-size:10.5px;color:#AEB4C4;text-shadow:0 0 3px #000;pointer-events:none}",
     "body.nx-lc-focus #nx_sky_labs,body.nx-lc-focus .nx-sw,body.nx-lc-focus .nx-ss,body.nx-lc-focus .nx-chip,body.nx-lc-focus .nx-ctl,body.nx-lc-focus .nx-leg,body.nx-lc-focus .nx-card,body.nx-lc-focus .maplibregl-ctrl-bottom-right{display:none!important}",
-    "@media (max-width:760px){body.nx-lc-focus .nx-sf{display:none!important}.nx-lc-bar{bottom:8px;gap:6px;padding:5px 6px;font-size:12px}.nx-lc-bar input[type=range]{width:84px}.nx-lc-l{font-size:10.5px}.nx-lc-bar .t .v{display:none}.nx-lc-bar .t{max-width:96px}.nx-lc-sheet{max-height:46dvh;width:calc(100vw - 34px)}.nx-lc-note{bottom:52px;right:8px}}"
+    "@media (max-width:760px){body.nx-lc-focus .nx-sf{display:none!important}.nx-lc-bar{bottom:8px;gap:6px;padding:5px 6px;font-size:12px}.nx-lc-bar input[type=range]{width:84px}.nx-lc-l{font-size:10.5px}.nx-lc-bar .t .v{display:none}.nx-lc-bar .t{max-width:96px}.nx-lc-sheet{max-height:46dvh;width:calc(100vw - 34px)}.nx-lc-note{bottom:52px;right:8px}" +
+    ".nx-lc-pad{pointer-events:none;background:transparent;border:0;padding:0;margin:0;display:block}.nx-lc-pad .cnt{display:none}.nx-lc-pad .full{display:inline-block;font-size:10px;font-weight:650;max-width:12ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2}.nx-lc-pad .full small{display:none}.nx-lc-pad .full::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:#E8ECF5;margin-right:4px;vertical-align:middle;box-shadow:0 0 3px #000}.nx-lc-pad.badge{pointer-events:none;margin:-9px 0 0 -9px;padding:0;width:18px;height:18px;background:rgba(8,10,16,.72);border:1px solid rgba(232,236,245,.35);border-radius:50%}.nx-lc-pad.badge .full{display:none}.nx-lc-pad.badge .cnt{display:block}" +
+    "}"
   ].join("\n");
   document.head.appendChild(css);
 
@@ -99,6 +101,29 @@
   function lcLabelsDom() {
     var map = window.__nxMap; if (!map) return;
     if (!LC.lbl) { LC.lbl = document.createElement("div"); LC.lbl.className = "nx-lc-lbls"; map.getContainer().appendChild(LC.lbl); }
+    if (map && !LC._tap) {
+      LC._tap = true;
+      map.on("click", function (e) {
+        if (!LC.on || !LC.reveal || LC.sel >= 0 || !LC.lbl) return;
+        var oe = e.originalEvent || {}, cx = oe.clientX, cy = oe.clientY;
+        if (cx == null && e.point) { var br = map.getCanvas().getBoundingClientRect(); cx = br.left + e.point.x; cy = br.top + e.point.y; }
+        if (cx == null) return;
+        var best = null, bestD = 40, pads = LC.lbl.querySelectorAll(".nx-lc-pad");
+        for (var i = 0; i < pads.length; i++) {
+          if ((pads[i].style.transform || "").indexOf("-9999") >= 0) continue;
+          var r = pads[i].getBoundingClientRect(), d = Math.hypot(cx - (r.left + r.width / 2), cy - (r.top + r.height / 2));
+          if (d < bestD) { bestD = d; best = pads[i]; }
+        }
+        if (!best) return;
+        var p = LC.pads[+best.dataset.pad];
+        if (best.classList.contains("badge") && p) {
+          var L = lcList()[p.i], map2 = window.__nxMap;
+          if (map2 && L) { try { map2.easeTo({ center: [L.pad_lon, L.pad_lat], zoom: Math.min(4, map2.getZoom() + 1.4), duration: reduce ? 0 : 900 }); } catch (x) {} }
+          return;
+        }
+        if (p) lcSelect(p.i);
+      });
+    }
     var h = "";
     (LC.pads || []).forEach(function (p, j) {
       var L = lcList()[p.i], past = lcNetMs(L) < Date.now();
@@ -135,11 +160,15 @@
     var x = Math.round((q[0] + 1) * 0.5 * cw), y = Math.round((1 - q[1]) * 0.5 * ch);
     var w = el.offsetWidth || 0, h = el.offsetHeight || 13;
     if (el.classList.contains("left")) x -= w + 6;   /* booster / landing labels sit left of their point, ascent labels right */
+    if (x < -8 || x > cw + 8 || y < -8 || y > ch + 8) { el.style.transform = "translate(-9999px,0)"; return; }
+    var cx0 = x, cy0 = y;
     x = Math.max(4, Math.min(cw - w - 4, x));
-    if (placed) {   /* stack labels that would overlap (events close together near the pad) */
-      for (var k = 0, moved = true; moved && k < 8; k++) {
-        moved = false;
-        for (var i = 0; i < placed.length; i++) { var r = placed[i]; if (x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]) { y = r[1] + r[3] + 1; moved = true; } }
+    y = Math.max(4, Math.min(ch - h - 4, y));
+    if (Math.hypot(x - cx0, y - cy0) > 36) { el.style.transform = "translate(-9999px,0)"; return; }
+    if (placed) {
+      for (var i = 0; i < placed.length; i++) {
+        var r = placed[i];
+        if (x < r[0] + r[2] && x + w > r[0] && y < r[1] + r[3] && y + h > r[1]) { el.style.transform = "translate(-9999px,0)"; return; }
       }
       placed.push([x, y, w, h]);
     }
@@ -153,6 +182,7 @@
     /* zoomed out: full labels only for the next 5 upcoming launches plus anything flying now; other pads are count badges.
        More labels appear as you zoom in (12 at +0.9 zoom, all at +1.8). */
     var z = map.getZoom(), base = mob ? -0.55 : -0.4, lim = z < base + 0.9 ? 5 : z < base + 1.8 ? 12 : 1e9, out = {};
+    if (mob) lim = z < base + 0.9 ? 3 : z < base + 1.8 ? 6 : 1e9;
     var ord = (LC.pads || []).map(function (p, j) { return j; }).filter(function (j) { return LC.pads[j].next < Infinity; })
       .sort(function (a, b) { return LC.pads[a].next - LC.pads[b].next; });
     ord.slice(0, lim).forEach(function (j) { out[j] = 1; });
@@ -163,11 +193,29 @@
     if (!LC.lbl) return;
     var map = window.__nxMap, cnv = map.getCanvas(), cw = cnv.clientWidth, ch = cnv.clientHeight, c = map.getCenter(), cen = lcPos(c.lng, c.lat, 0);
     var focus = LC.sel >= 0, padPlaced = [], feat = lcFeatured(map);
+    var padPos = [];
+    LC.lbl.querySelectorAll(".nx-lc-pad").forEach(function (el) {
+      var j = +el.dataset.pad, p = LC.pads[j], L = lcList()[p.i];
+      if (!LC.on || !LC.reveal || focus) { el.style.transform = "translate(-9999px,0)"; return; }
+      var q = lcProj(m, lcPos(L.pad_lon, L.pad_lat, 0));
+      var vis = q && q[2] > -1 && q[2] < 1 && lcFront(lcPos(L.pad_lon, L.pad_lat, 0), cen);
+      padPos[j] = vis ? [Math.round((q[0] + 1) * 0.5 * cw), Math.round((1 - q[1]) * 0.5 * ch)] : null;
+    });
+    if (mob) {
+      var js = Object.keys(feat).map(Number);
+      js.forEach(function (a) {
+        if (!feat[a] || !padPos[a]) return;
+        js.forEach(function (b) {
+          if (b <= a || !feat[b] || !padPos[b]) return;
+          if (Math.hypot(padPos[a][0] - padPos[b][0], padPos[a][1] - padPos[b][1]) < 52) { feat[b] = 0; }
+        });
+      });
+    }
     LC.lbl.querySelectorAll(".nx-lc-pad").forEach(function (el) {
       var j = +el.dataset.pad, p = LC.pads[j], L = lcList()[p.i];
       if (!LC.on || !LC.reveal || focus) { el.style.transform = "translate(-9999px,0)"; return; }
       var badge = !feat[j]; if (el.classList.contains("badge") !== badge) el.classList.toggle("badge", badge);
-      lcPlace(el, m, lcPos(L.pad_lon, L.pad_lat, 0), cw, ch, cen, badge ? null : padPlaced);
+      lcPlace(el, m, lcPos(L.pad_lon, L.pad_lat, 0), cw, ch, cen, padPlaced);
     });
     var L = lcList()[LC.sel];
     if (!L) return;
