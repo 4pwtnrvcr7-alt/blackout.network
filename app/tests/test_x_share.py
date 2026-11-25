@@ -523,5 +523,47 @@ class EntityFirst(unittest.TestCase):
 
 
 
+
+    def test_burnham_surname_and_uk_from_body_when_brief_and_location_empty(self):
+        """Live share used the scanner title with an empty location and a thin brief; Andy and UK live in the write-up."""
+        it = dict(STORIES["burnham_veterans"])
+        it["brief"] = ""
+        it["location"] = ""
+        it["body"] = ("UK sets up independent panel on health effects of 1950s-60s nuclear tests on veterans and families. "
+                      "On Nov. 24, UK Prime Minister Andy Burnham announced a non-statutory Independent Panel.")
+        tags = X.hashtags(it)
+        self.assertIn("#AndyBurnham", tags, tags)
+        self.assertIn("#UK", tags, tags)
+
+    def test_person_and_place_kept_when_xai_omits_them(self):
+        """xAI is primary but must not drop people or places the full extractor found (live Hegseth missed #Zelensky)."""
+        it = dict(STORIES["hegseth_arms"])
+        fake = ["#PeteHegseth", "#NASAMS", "#F16", "#Ukraine", "#AntiBallisticMissiles"]
+        class _Fake:
+            def lookup(self, *a, **k):
+                return list(fake)
+        import sys
+        sys.modules["x_tags_llm"] = _Fake()
+        try:
+            tags = X.hashtags(it)
+        finally:
+            sys.modules.pop("x_tags_llm", None)
+        self.assertIn("#Zelensky", tags, tags)
+        self.assertIn("#PeteHegseth", tags, tags)
+        self.assertIn("#Ukraine", tags, tags)
+        self.assertNotIn("#WarPeteHegseth", tags)
+        self.assertNotIn("#MissileStrike", tags)
+        self.assertNotIn("#War", tags)
+
+    def test_location_from_body_even_when_brief_has_no_place(self):
+        it = _mk("Burnham launches inquiry into nuclear bomb test veterans' records",
+                 location="", category="conflict", rank=6,
+                 brief="An inquiry into nuclear bomb test veterans' records has been announced.")
+        it["body"] = "UK Prime Minister Andy Burnham announced the panel in Manchester."
+        tags = X.hashtags(it)
+        self.assertIn("#AndyBurnham", tags, tags)
+        self.assertTrue("#UK" in tags or "#Manchester" in tags, tags)
+
+
 if __name__ == "__main__":
     unittest.main()
