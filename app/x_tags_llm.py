@@ -121,6 +121,7 @@ def _worker():
                 with _LOCK:
                     _CACHE[cid] = (_key(title, brief, loc), tags)
                     _save()
+                print("x_tags_llm: cached", cid, " ".join(tags), file=sys.stderr)
         except Exception as e:   # never logs the key or the request
             print("x_tags_llm: generation failed:", type(e).__name__, file=sys.stderr)
         finally:
