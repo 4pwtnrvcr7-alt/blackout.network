@@ -335,6 +335,80 @@ def ready():
     if HANDOFF["state"] == "pending" and time.time() - BOOTED > HANDOFF_WAIT_S + 60: HANDOFF["state"] = "gave_up"   # belt and braces
     return HANDOFF["state"] != "pending"
 
+# Zero-downtime (Nov 25): /healthz stays 503 until this instance can actually serve a wire page and an og card,
+# so Render (when healthCheckPath=/healthz) keeps the old instance on the public URL. Pre-warm runs after the
+# handoff and BEFORE the port is opened. The live service's healthCheckPath must be /healthz (render.yaml already
+# sets it; confirm in the dashboard — an empty path means Render cuts over as soon as the port opens).
+BOOT_WARM = {"wire": False, "og": False, "n": 0, "done": False, "error": ""}
+
+def can_serve_wire_og():
+    return bool(BOOT_WARM["wire"] and BOOT_WARM["og"])
+
+def public_ready():
+    """True only when Render should send public traffic here."""
+    if not ready():
+        return False
+    if not has_data():
+        return HANDOFF["state"] in ("gave_up", "off", "")  # cold start: do not block the box sync
+    return can_serve_wire_og()
+
+def _boot_warm(timeout=45):
+    """In-process: prove /wire and /og work, and pre-warm a few story cards so the first Twitterbot hit has a PNG."""
+    t0 = time.time()
+    try:
+        import og
+        st, body, ctype = og.handle_get("/og/home.png")
+        BOOT_WARM["og"] = st == 200 and (ctype or "").startswith("image/png") and bool(body)
+    except Exception as ex:
+        BOOT_WARM["error"] = "og:" + type(ex).__name__
+        BOOT_WARM["og"] = False
+    cids = []
+    try:
+        if has_data():
+            c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=5)
+            cids = [r[0] for r in c.execute(
+                "SELECT cluster_id FROM clusters WHERE watchlist IN (0,1) AND rank >= 5 "
+                "ORDER BY COALESCE(updated, first_seen) DESC LIMIT 8")]
+            c.close()
+    except Exception:
+        cids = []
+    if cids:
+        try:
+            import story
+            st, html = story.handle_get("/wire/" + cids[0], {})
+            html = html if isinstance(html, str) else (html.decode("utf-8", "replace") if isinstance(html, (bytes, bytearray)) else "")
+            BOOT_WARM["wire"] = st == 200 and "Loading the full story" not in html
+        except Exception as ex:
+            BOOT_WARM["error"] = (BOOT_WARM["error"] + " wire:" + type(ex).__name__).strip()
+            BOOT_WARM["wire"] = False
+        try:
+            import share_card
+            for cid in cids[:5]:
+                if time.time() - t0 > timeout:
+                    break
+                try:
+                    share_card.warm(cid)
+                    BOOT_WARM["n"] += 1
+                except Exception:
+                    pass
+            try:
+                st, body, ctype = og.handle_get("/og/wire/" + cids[0] + ".png")
+                if st == 200 and (ctype or "").startswith("image/png") and body:
+                    BOOT_WARM["og"] = True
+            except Exception:
+                pass
+        except Exception:
+            pass
+    else:
+        try:
+            import story
+            BOOT_WARM["wire"] = BOOT_WARM["wire"] or has_data()
+        except Exception:
+            pass
+    BOOT_WARM["done"] = True
+    print(f"boot warm: wire={BOOT_WARM['wire']} og={BOOT_WARM['og']} cards={BOOT_WARM['n']} in {time.time()-t0:.1f}s {BOOT_WARM['error']}", flush=True)
+    return can_serve_wire_og()
+
 def _sign_get(path):
     ts = str(int(time.time()))
     sig = hmac.new(SYNC_SECRET.encode(), f"{ts}\nGET\n{path}\n{hashlib.sha256(b'').hexdigest()}".encode(), hashlib.sha256).hexdigest()
@@ -525,8 +599,9 @@ class RH(server.H):
     def do_GET(self):
         path = self.path.split("?", 1)[0]
         if path == "/healthz":
-            r = ready()
-            return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"]})
+            r = public_ready()
+            return self.send(200 if r else 503, {"ok": r, "has_data": has_data(), "boot_id": BOOT_ID, "handoff": HANDOFF["state"],
+                                                 "wire": BOOT_WARM["wire"], "og": BOOT_WARM["og"]})
         if path == "/internal/sync/export":
             ok, why = verify(self, "GET", self.path, hashlib.sha256(b"").hexdigest())
             if not ok: return self.send(403, {"error": why})
@@ -706,6 +781,11 @@ if __name__ == "__main__":
         threading.Thread(target=lambda: server._addon_mod("wxmap").warm_once(), name="wxmap-boot", daemon=True).start()
     except Exception: traceback.print_exc()
     wait_before_bind()
+    try:
+        _boot_warm()
+    except Exception:
+        traceback.print_exc()
+        BOOT_WARM["done"] = True
     print(f"blackout.network public node on 0.0.0.0:{port} (boot {BOOT_ID}); background jobs blocked so far: {len(BLOCKED)}", flush=True)
     server.ThreadingHTTPServer.daemon_threads = True
     server.ThreadingHTTPServer.request_queue_size = 256   # t338: the default listen backlog (5) overflowed on page loads (~40 parallel requests) -> Render 502s

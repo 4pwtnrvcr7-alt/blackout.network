@@ -184,6 +184,7 @@ def render(cid, since=""):
                 "cluster_id": cid, "title": title, "headline": title,
                 "location": r.get("location") or "", "category": r.get("category") or "",
                 "brief": r.get("brief") or "", "rank": rank,
+                "body": " ".join([r.get("brief") or "", what or ""] + [a.get("title") or "" for a in (rows or al or [])[:20]]),
                 "watchlist": watch, "hidden": r.get("hidden") or 0,
             })
         except Exception:
@@ -271,6 +272,7 @@ def brief_page(cid):
             "cluster_id": cid, "title": title, "headline": title,
             "location": loc, "category": r.get("category") or "",
             "brief": r.get("brief") or "", "rank": rank,
+            "body": " ".join([r.get("brief") or "", what or ""] + [a.get("title") or "" for a in (al or [])[:20]]),
             "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0,
         })
     except Exception:
