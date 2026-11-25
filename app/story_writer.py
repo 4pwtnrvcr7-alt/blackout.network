@@ -1057,11 +1057,27 @@ def allow(cid, archive=False):
         if _is_needs_paid(cid) and not has_paid_article(cid):
             return False
         if has_writeup(cid) or is_packaged(cid) or has_paid_article(cid):
-            return True
+            return _card_ready(cid)
         return False
     except Exception:
         traceback.print_exc()
         return not gate_on()
+
+
+def _card_ready(cid):
+    """Nov 25 2026 (X cards): a story is not public until its share card is baked, so the first crawler fetch (X fetches
+    the link seconds after the post) never hits a cold build. Queues the bake and holds the story for a few seconds;
+    fails open if the card store is unavailable."""
+    if os.environ.get("BN_CARD_GATE", "1") == "0":
+        return True
+    try:
+        import share_card
+        if share_card.card_baked(cid):
+            return True
+        share_card.bake_card(cid)
+        return False
+    except Exception:
+        return True
 
 _LEGACY_C = {"t": 0.0, "v": set()}
 def _legacy_set_cached():
