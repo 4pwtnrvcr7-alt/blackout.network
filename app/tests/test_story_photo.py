@@ -638,7 +638,8 @@ class StoryPhoto(unittest.TestCase):
 
     def test_commons_portrait_queries_use_full_name_and_category(self):
         qs = P.commons_portrait_queries("Jensen Huang")
-        self.assertIn('"Jensen Huang"', qs)
+        self.assertEqual(qs[0], '"Jensen Huang"')
+        self.assertEqual(qs[1], "Jensen Huang")
         self.assertIn('deepcategory:"Jensen Huang"', qs)
         self.assertIn('deepcategory:"Jen-Hsun Huang"', qs)
         self.assertIn('incategory:"Jensen Huang"', qs)
@@ -678,6 +679,82 @@ class StoryPhoto(unittest.TestCase):
         meta["title_hash"] = "abc123"
         self.assertFalse(P.card_title_stale(meta, "abc123"))
         self.assertTrue(P.card_title_stale(meta, "fff999"))
+
+
+    def test_ensure_current_card_rereads_db_not_stale_memory(self):
+        """The in-memory _SC cache must not hide an audit downgrade of the Libya card (or typography of Zelensky)."""
+        import os, tempfile
+        from pathlib import Path
+        import share_card as S
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        libya, zel = "4c292ccdd9df73f8", "9f5bc9d66d783d25"
+        P.SUBJECT_HINTS[libya] = ("Libya's eastern government suspects a drone attack caused an explosion aboard a Russian vessel", "")
+        P.SUBJECT_HINTS[zel] = ("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine", "")
+        try:
+            P._dir = lambda: Path(d)
+            memorial = b"\x89PNG\r\n\x1a\n" + b"U" * 4000
+            mapp = b"\x89PNG\r\n\x1a\n" + b"M" * 4000
+            dashed = b"\x89PNG\r\n\x1a\n" + b"D" * 4000
+            cleaned = b"\x89PNG\r\n\x1a\n" + b"C" * 4000
+            src_l = "https://upload.wikimedia.org/wikipedia/commons/themis_ukraine.jpg"
+            src_z = "https://upload.wikimedia.org/wikipedia/commons/zelensky.jpg"
+            P.db_put(libya, dict(src=src_l, credit="Latvian pagan / Wikimedia Commons", license="CC0",
+                                 caption="Ukraine Russia, 2023. File photo.", kind="place", label="lab", link=""),
+                     jpg=b"\xff\xd8" + b"j" * 3000)
+            P.put_card(libya, memorial, src_l, title_hash="old")
+            P.db_put(zel, dict(src=src_z, credit="Press Service / Wikimedia Commons", license="CC BY 4.0",
+                               caption="Volodymyr Zelensky, 2025. File photo.", kind="person", label="lab", link=""),
+                     jpg=b"\xff\xd8" + b"z" * 3000)
+            P.put_card(zel, dashed, src_z, title_hash="stale")
+            S._SC[libya] = (0, memorial, False)
+            S._SC[zel] = (0, dashed, False)
+            self.assertFalse(P.stored_photo_matches(libya))
+            # Simulate audit persist + typography without depending on resolve/network.
+            P.put_card(libya, mapp, "", title_hash="new")
+            P.put_card(zel, cleaned, src_z, title_hash=P.card_title_key("Zelensky says US Secretary of War Pete Hegseth has not yet approved a new arms package for Ukraine"))
+            # Even if _SC still held the old bytes, ensure_current_card must re-read cards.db.
+            self.assertEqual(S.ensure_current_card(libya), mapp)
+            self.assertEqual(S.ensure_current_card(zel), cleaned)
+            self.assertEqual(S.story_png_fast(libya), mapp)
+        finally:
+            P.SUBJECT_HINTS.pop(libya, None)
+            P.SUBJECT_HINTS.pop(zel, None)
+            S._SC.pop(libya, None)
+            S._SC.pop(zel, None)
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_cold_miss_serves_generic_designed_card_under_one_second(self):
+        """A cache miss must not wait for a unique locator render (those were 5–7 s). Generic 1200x675, never earth."""
+        import os, tempfile, time, struct
+        from pathlib import Path
+        from unittest import mock
+        import share_card as S
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        cid = "c0ldc0ldc0ldc0ld"
+        try:
+            P._dir = lambda: Path(d)
+            S._SC.pop(cid, None)
+            def slow_build(c, fetch=False):
+                time.sleep(2.5)
+                return b"\x89PNG\r\n\x1a\n" + b"S" * 4000
+            generic = b"\x89PNG\r\n\x1a\n" + bytes([0, 0, 0, 13, 73, 72, 68, 82]) + b"G" * 4000
+            # A real PNG IHDR is nicer; generic_story_card is mocked.
+            with mock.patch.object(S, "generic_story_card", return_value=b"\x89PNG\r\n\x1a\n" + b"G" * 4000), \
+                 mock.patch.object(S, "_story_build", side_effect=slow_build), \
+                 mock.patch.object(S, "submit", return_value=None):
+                t0 = time.perf_counter()
+                out = S.story_png_fast(cid)
+                elapsed = time.perf_counter() - t0
+                self.assertLess(elapsed, 1.0)
+                self.assertTrue(out and out.startswith(b"\x89PNG"))
+                self.assertGreater(len(out), 2000)
+                # 1200x630 earth is not served here; this is a designed 1200x675 stand-in (body is our generic mock).
+                self.assertEqual(out, b"\x89PNG\r\n\x1a\n" + b"G" * 4000)
+        finally:
+            S._SC.pop(cid, None)
+            os.environ.pop("BN_CARDS_DB", None)
 
 
 if __name__ == "__main__":

@@ -127,6 +127,9 @@ def _ensure_writer():
         return _WSTARTED
 
 
+ON_CARD_WRITE = []  # share_card registers cache-invalidation hooks here
+
+
 def _write(fn, timeout=15):
     """Run fn(conn) on the single writer thread and wait for it to commit. Returns False if the write did not finish."""
     if not _ensure_writer():
@@ -248,7 +251,8 @@ def card_has_photo(cid):
             return False
         if photo_is_wrong_subject(cid, r[0], ""):
             return False
-        return stored_photo_matches(cid)
+        m = stored_photo_matches(cid)
+        return m is not False
     except Exception:
         return False
 
@@ -272,7 +276,7 @@ def put_card(cid, png, src="", title_hash=""):
         c = db_choice(cid) or {}
         old_src = (meta.get("src") or c.get("src") or "")
         meta_blob = " ".join((c.get("caption") or "", c.get("credit") or "", c.get("label") or "", c.get("alt") or ""))
-        allow_downgrade = (not stored_photo_matches(cid)) or photo_is_wrong_subject(cid, old_src, meta_blob)
+        allow_downgrade = (stored_photo_matches(cid) is False) or photo_is_wrong_subject(cid, old_src, meta_blob)
     def fn(k):
         old = k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone()
         old_src = (old[0] if old else "") or ""
@@ -294,10 +298,17 @@ def put_card(cid, png, src="", title_hash=""):
             pass
         k.execute("INSERT OR REPLACE INTO story_cards(cid, png, v, src, built_at, title_hash) VALUES(?,?,?,?,?,?)",
                   (cid, blob, ver, src, ts, title_hash))
+    wrote = False
     try:
-        _write(fn)
+        wrote = bool(_write(fn))
     except Exception:
-        pass
+        wrote = False
+    if wrote:
+        for fn_cb in list(ON_CARD_WRITE):
+            try:
+                fn_cb(cid)
+            except Exception:
+                pass
 
 
 def has_photo(cid):
@@ -307,7 +318,7 @@ def has_photo(cid):
         return False
     if is_non_photo_candidate(c):
         return False
-    if not stored_photo_matches(cid):
+    if stored_photo_matches(cid) is False:
         return False
     if photo_is_wrong_subject(cid, c.get("src") or "", " ".join((c.get("credit") or "", c.get("caption") or "", c.get("label") or "", c.get("alt") or ""))):
         return False
@@ -572,11 +583,13 @@ def store(src):
 
 
 def commons_portrait_queries(name):
-    """Search terms for a person: quoted full name, plus deepcategory of each name variant.
-    Category 'Jensen Huang' is empty on Commons; the files live under 'Jen-Hsun Huang' (and year subcats)."""
+    """Search terms for a person: quoted then unquoted full name first (those hit CC BY files),
+    then deepcategory/incategory of each name variant (Category 'Jensen Huang' is empty;
+    files live under 'Jen-Hsun Huang')."""
     terms = []
     if name:
         terms.append(f'"{name}"')
+        terms.append(name)
     for n in name_variants(name):
         terms.append(f'deepcategory:"{n}"')
         terms.append(f'incategory:"{n}"')
@@ -589,28 +602,17 @@ def commons_portrait_queries(name):
     return out
 
 
-def _commons_portrait(name, timeout=7):
-    """Licensed Commons portrait of this exact person (full name in the file title or a person category)."""
-    pages = {}
-    for term in commons_portrait_queries(name):
-        q = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
-                                    "prop": "imageinfo", "iiprop": "url|extmetadata|size|mime", "iiurlwidth": 1280})
-        try:
-            raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=min(6, timeout))
-            more = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
-            pages.update(more)
-        except Exception:
-            continue
-    variants = name_variants(name)
+def _score_portrait_pages(pages, name, variants):
+    """Best exact-name licensed portrait from one Commons search page set, or None."""
     best = None
-    for p in pages.values():
+    for p in (pages or {}).values():
         ii = (p.get("imageinfo") or [{}])[0]
         m = ii.get("extmetadata") or {}
         g = lambda k: re.sub(r"<[^>]+>", "", (m.get(k) or {}).get("value") or "").strip()
         lic = g("LicenseShortName")
         title = (p.get("title") or "")
         desc = g("ImageDescription")
-        cats = g("Categories")
+        cats = (p.get("_cats") or g("Categories"))
         mime = (ii.get("mime") or "")
         w, h = int(ii.get("width") or 0), int(ii.get("height") or 0)
         if not license_ok(lic) or not ii.get("thumburl") or w < 600:
@@ -638,6 +640,39 @@ def _commons_portrait(name, timeout=7):
         best[1]["label"] = best[1]["caption"]
         return best[1]
     return None
+
+
+def _commons_portrait(name, timeout=7):
+    """Licensed Commons portrait of this exact person (full name in the file title or a person category).
+    Score after each query and return as soon as a good portrait is found so a 10s lookup
+    timeout cannot fire while later empty-category searches are still running."""
+    variants = name_variants(name)
+    t0 = time.time()
+    budget = max(2.0, float(timeout or 7))
+    pages = {}
+    for term in commons_portrait_queries(name):
+        if time.time() - t0 > budget - 0.4:
+            break
+        left = max(1.2, budget - (time.time() - t0))
+        q = urllib.parse.urlencode({"action": "query", "format": "json", "generator": "search", "gsrsearch": term, "gsrnamespace": 6, "gsrlimit": 12,
+                                    "prop": "imageinfo|categories", "iiprop": "url|extmetadata|size|mime", "iiurlwidth": 1280, "cllimit": 20})
+        try:
+            # One short try (no long retry budget): the photo worker's LOOKUP_TIMEOUT is 10s.
+            raw, _hdrs = _http("https://commons.wikimedia.org/w/api.php?" + q, "application/json", timeout=min(2.5, left), retries=0)
+            more = (json.loads((raw or b"{}").decode()).get("query") or {}).get("pages") or {}
+            # Merge categories into extmetadata-style string for scoring.
+            for pg in more.values():
+                cl = ", ".join((c.get("title") or "").replace("Category:", "") for c in (pg.get("categories") or []))
+                if cl:
+                    pg["_cats"] = cl
+            pages.update(more)
+        except Exception:
+            continue
+        hit = _score_portrait_pages(pages, name, variants)
+        if hit:
+            print(f"story_photo: portrait {name} via {term}", flush=True)
+            return hit
+    return _score_portrait_pages(pages, name, variants)
 
 
 # Full names for people who often appear as a bare surname in a headline. Commons is still license-gated.
@@ -1032,7 +1067,8 @@ def stored_photo_matches(cid):
     if official_event_src(cid, src):
         return True
     if not title:
-        return not is_non_photo_candidate(c) if c else True
+        # Unknown: audit retries later. has_photo/card_has_photo treat None as "keep".
+        return None
     blob = " ".join((c.get("caption") or "", c.get("label") or "", c.get("credit") or "", c.get("alt") or "",
                      c.get("title") or "", c.get("categories") or "", src))
     return photo_strict_match(cid, src=src, meta_blob=blob, title=title, text=text, kind=c.get("kind") or "")
@@ -1069,7 +1105,7 @@ def _commons_place(loc, title, timeout=7):
         if not license_ok(lic) or not ii.get("thumburl") or w < 800 or h < 400:
             continue
         mime = (ii.get("mime") or "")
-        cats = g("Categories")
+        cats = (p.get("_cats") or g("Categories"))
         if is_non_photo(title_f, desc, cats, mime):
             continue
         if any(x in title_f for x in ("logo", "icon", "flag", "map", "coat of arms", "signature", "cartoon", "collage")):

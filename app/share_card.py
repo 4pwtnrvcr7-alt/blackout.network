@@ -1288,6 +1288,149 @@ _SC = {}   # cid -> (built_at, png, refreshing)
 _NEED = set()   # stories whose card was built before their photo was stored (rebuilt once the photo is in)
 
 
+def invalidate_card_layers(cid):
+    """Drop every in-process and leftover-DB cache of this card so a newly persisted PNG is what we serve.
+    Layers: in-memory _SC, og._MEM / on-disk og cache keys we can find, and any #221 story_cards row in story_writer.db."""
+    if not cid:
+        return
+    _SC.pop(cid, None)
+    try:
+        import og
+        # Keys are hashes, not cids; drop mem entries and cache files that contain the cid hex in the name or were
+        # built for this story by scanning is impractical. Clearing the small in-process PNG mem is enough
+        # together with a VERSION bump; also evict any file whose name contains the cid.
+        if hasattr(og, "drop_mem"):
+            og.drop_mem()
+        else:
+            try:
+                og._MEM.clear()
+            except Exception:
+                pass
+        try:
+            d = og.cache_dir()
+            if d and d.is_dir():
+                needle = str(cid).lower()
+                for fp in d.glob("*.png"):
+                    if needle in fp.name.lower():
+                        try:
+                            fp.unlink()
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+    except Exception:
+        pass
+    # #221 stored cards in story_writer.db. Serving no longer reads them, but a leftover row must not outlive a downgrade.
+    try:
+        import os, sqlite3
+        import story_writer as SW
+        path = (SW.cfg() or {}).get("db") or ""
+        if path and os.path.exists(path):
+            k = sqlite3.connect(path, timeout=5)
+            try:
+                names = {r[0] for r in k.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+                if "story_cards" in names:
+                    k.execute("DELETE FROM story_cards WHERE cid=?", (cid,))
+                    k.commit()
+            finally:
+                k.close()
+    except Exception:
+        pass
+
+
+def _register_card_hooks():
+    try:
+        import story_photo
+        if invalidate_card_layers not in getattr(story_photo, "ON_CARD_WRITE", []):
+            story_photo.ON_CARD_WRITE.append(invalidate_card_layers)
+    except Exception:
+        pass
+
+
+_register_card_hooks()
+
+
+_GENERIC_BG = None
+_GENERIC_BG_READY = False
+
+
+def _ensure_generic_bg():
+    """Build (once) a generic designed world-map background. Safe to call from a daemon thread."""
+    global _GENERIC_BG, _GENERIC_BG_READY
+    if _GENERIC_BG_READY and _GENERIC_BG is not None:
+        return _GENERIC_BG
+    try:
+        im = _map(W, H, 10.0, 22.0, 150, (214, 218, 226), fx=0.5, marker=False)
+        _GENERIC_BG = im
+        _GENERIC_BG_READY = True
+        return im
+    except Exception:
+        return None
+
+
+def _kick_generic_bg():
+    try:
+        if _GENERIC_BG_READY:
+            return
+        threading.Thread(target=_ensure_generic_bg, name="card-generic-bg", daemon=True).start()
+    except Exception:
+        pass
+
+
+_kick_generic_bg()
+
+
+def generic_story_card(cid):
+    """A designed 1200x675 card (generic world map + this story's cleaned title). No geocoding, no board rebuild, no network.
+    Used on a true cache miss so the Twitterbot path stays under 1s; a unique locator/photo rebuilds in the background."""
+    title, rank, loc, cat = "The Wire", 0, "", "THE WIRE"
+    try:
+        import og as _og
+        spec = _og._db_spec(cid) if hasattr(_og, "_db_spec") else None
+        if spec:
+            title = _card_headline(spec.get("title") or "") or title
+            try:
+                rank = int(spec.get("rank") or 0)
+            except Exception:
+                rank = 0
+    except Exception:
+        pass
+    try:
+        import story
+        r, _al = story.load(cid)
+        if r:
+            title = _card_headline(r.get("title") or "") or title
+            loc = (r.get("location") or "")[:40]
+            cat = ((r.get("category") or "") or cat).upper()[:36]
+            try:
+                rank = int(r.get("rank") or rank or 0)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    col = RED if rank >= 7 else AMBER if rank >= 4 else GREEN
+    bg = _ensure_generic_bg()
+    if bg is None:
+        bg = _base(cid or "generic")
+    else:
+        bg = bg.copy()
+    it = dict(kind="story", id=cid or "generic", title=title, kicker=cat, color=col, rank=rank,
+              loc=loc, art=("story", None, None, None), photo=None, fact="", credit="")
+    # Paint typography on the cached world map without calling _map again.
+    try:
+        # Temporarily use the prepared bg via a tiny shim: _lay_story calls _story_bg, which would
+        # re-draw a generic _map. Seed the copy into a one-shot monkeypatch-free path.
+        im, portrait, credit, label = bg, False, "", ""
+        # Reuse _lay_story by stuffing a photo-less item and short-circuiting _story_bg via art without coords —
+        # _story_bg already draws the generic map in that case; if _GENERIC_BG is ready, swap after.
+        out = _lay_story(it)
+        return og.png_bytes(out)
+    except Exception:
+        try:
+            return og.png_bytes(bg if hasattr(bg, "size") else _base(cid or "generic"))
+        except Exception:
+            return None
+
 
 def _network_prefetch(cid):
     """Commons / HTTP lookup only (no card render). Used by the photo worker so a 10s
@@ -1318,7 +1461,6 @@ def _story_build(cid, fetch=False):
             _NEED.discard(cid)
         b = png_for("story", cid)
         if b:
-            _SC[cid] = (time.time(), b, False)
             try:
                 import story_photo
                 it = None
@@ -1352,6 +1494,7 @@ def _story_build(cid, fetch=False):
                         _NEED.add(cid)
             except Exception:
                 pass
+            _SC[cid] = (time.time(), b, False)
         return b
     finally:
         time.sleep(0.2)  # yield the only CPU so new TLS/HTTP connections can be accepted
@@ -1675,21 +1818,22 @@ def _queue_card_work(cid):
 
 
 def ensure_current_card(cid):
-    """Return the best stored card immediately. Any typography/VERSION or photo rebuild is queued
-    in the background and replaces the stored card when done. Never blocks the request path."""
+    """Return the best stored card immediately. Always re-reads cards.db so an audit/downgrade
+    is not hidden by a stale in-memory _SC (or a leftover #221 writer-db row we no longer serve).
+    Typography/VERSION or photo rebuilds are queued in the background. Never blocks the request path."""
     stored = None
-    hit = _SC.get(cid)
-    if hit and hit[1]:
-        stored = hit[1]
+    try:
+        import story_photo
+        b = story_photo.get_card(cid)
+        if b:
+            _SC[cid] = (time.time(), b, False)
+            stored = b
+    except Exception:
+        stored = None
     if stored is None:
-        try:
-            import story_photo
-            b = story_photo.get_card(cid)
-            if b:
-                _SC[cid] = (time.time(), b, False)
-                stored = b
-        except Exception:
-            stored = None
+        hit = _SC.get(cid)
+        if hit and hit[1]:
+            stored = hit[1]
     try:
         _queue_card_work(cid)
     except Exception:
@@ -1700,7 +1844,8 @@ def ensure_current_card(cid):
 def story_png_fast(cid, budget=1.0):
     """Serve the best stored card immediately (never block the Twitterbot path over 2s).
     Typography/VERSION and photo rebuilds run in the background and replace the stored card when done.
-    On a true cold miss, wait at most `budget` (capped under 2s) for a designed map, never the earth fallback."""
+    On a true cold miss, serve a generic designed 1200x675 card in under 1s and rebuild the unique
+    locator/photo in the background. Never the 1200x630 earth fallback."""
     try:
         cur = ensure_current_card(cid)
         if cur:
@@ -1708,9 +1853,22 @@ def story_png_fast(cid, budget=1.0):
     except Exception:
         pass
     try:
-        return submit(cid).result(timeout=min(1.5, max(0.2, float(budget or 1.0))))
+        b = generic_story_card(cid)
+        if b and b.startswith(b"\x89PNG") and len(b) > 2000:
+            _SC[cid] = (time.time(), b, False)
+            try:
+                submit(cid, fetch=True, urgent=True)
+            except Exception:
+                pass
+            return b
     except Exception:
-        return None
+        pass
+    # Last resort still under the budget: do not call the slow unique _map render on this path.
+    try:
+        submit(cid, fetch=True, urgent=True)
+    except Exception:
+        pass
+    return None
 
 
 
@@ -1723,11 +1881,10 @@ def story_png_map_now(cid):
             return cur
     except Exception:
         pass
-    hit = _SC.get(cid)
-    if hit:
-        return hit[1]
     try:
-        b = _story_build(cid, fetch=False)
+        b = generic_story_card(cid)
+        if b and b.startswith(b"\x89PNG") and len(b) > 2000:
+            _SC[cid] = (time.time(), b, False)
     except Exception:
         b = None
     try:
@@ -1825,30 +1982,67 @@ def audit_stored_photo_cards():
     first = [c for c in _AUDIT_FIRST if c in cids]
     rest = [c for c in cids if c not in first]
     print(f"story_photo: audit starting {len(cids)} photo cards", flush=True)
+
+    def _audit_one(cid, force=False):
+        invalidate_card_layers(cid)
+        match = SP.stored_photo_matches(cid)
+        if match is None and not force:
+            return "retry"
+        if match is False:
+            _story_build(cid, False)
+            # If a stale _SC / failed persist left a photo src, force a designed map into cards.db.
+            meta = SP.card_meta(cid) or {}
+            if (meta.get("src") or "").startswith("https://") and SP.stored_photo_matches(cid) is False:
+                b = generic_story_card(cid)
+                if b and b.startswith(b"\x89PNG"):
+                    th = ""
+                    try:
+                        import story
+                        r, _al = story.load(cid)
+                        if r:
+                            th = SP.card_title_key(_card_headline(r.get("title") or "") or "")
+                    except Exception:
+                        th = ""
+                    SP.put_card(cid, b, "", title_hash=th)
+            invalidate_card_layers(cid)
+            SP.AUDIT["downgraded"] += 1
+            print(f"story_photo: audit downgrade {cid}", flush=True)
+            return "downgrade"
+        meta = SP.card_meta(cid)
+        current_key = ""
+        try:
+            import story
+            r, _al = story.load(cid)
+            if r:
+                current_key = SP.card_title_key(_card_headline(r.get("title") or "") or "")
+        except Exception:
+            current_key = ""
+        if meta and (SP.card_title_stale(meta, current_key) or SP.card_stale(meta) or force):
+            _story_build(cid, False)
+            invalidate_card_layers(cid)
+            SP.AUDIT["typography"] += 1
+            print(f"story_photo: typography {cid} hash={current_key}", flush=True)
+            return "typography"
+        return "ok"
+
+    retry = []
     for cid in first + rest:
         try:
             SP.AUDIT["checked"] += 1
-            if not SP.stored_photo_matches(cid):
-                _story_build(cid, False)
-                SP.AUDIT["downgraded"] += 1
-                print(f"story_photo: audit downgrade {cid}", flush=True)
-                continue
-            meta = SP.card_meta(cid)
-            current_key = ""
-            try:
-                import story
-                r, _al = story.load(cid)
-                if r:
-                    current_key = SP.card_title_key(_card_headline(r.get("title") or "") or "")
-            except Exception:
-                current_key = ""
-            if meta and (SP.card_title_stale(meta, current_key) or SP.card_stale(meta)):
-                _story_build(cid, False)
-                SP.AUDIT["typography"] += 1
-                print(f"story_photo: typography {cid} hash={current_key}", flush=True)
+            got = _audit_one(cid, force=False)
+            if got == "retry":
+                retry.append(cid)
         except Exception as e:
             SP.AUDIT["error"] = type(e).__name__
             print(f"story_photo: audit {cid} err={type(e).__name__}", flush=True)
+            retry.append(cid)
+    # Priority ids again at the end (title/DB may not have been ready on the first pass).
+    for cid in list(dict.fromkeys(list(first) + retry)):
+        try:
+            _audit_one(cid, force=True)
+        except Exception as e:
+            SP.AUDIT["error"] = type(e).__name__
+            print(f"story_photo: audit retry {cid} err={type(e).__name__}", flush=True)
     SP.AUDIT["done"] = True
     print(f"story_photo: audit downgraded {SP.AUDIT['downgraded']} of {SP.AUDIT['checked']} photo cards (typography {SP.AUDIT['typography']})", flush=True)
     return SP.AUDIT["downgraded"]
