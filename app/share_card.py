@@ -1342,9 +1342,10 @@ def _story_build(cid, fetch=False):
                     th = story_photo.card_title_key((it or {}).get("title") or "")
                 except Exception:
                     th = ""
-                if src.startswith("https://") and not pending:
-                    story_photo.put_card(cid, b, src, title_hash=th)
-                elif fetch and not pending:
+                # put_card itself refuses to replace a correctly matched photo with a map,
+                # and allows the one exception: a wrong-subject / non-matching photo may be
+                # downgraded to the designed map. fetch=False typography must also persist.
+                if not pending:
                     story_photo.put_card(cid, b, src, title_hash=th)
                 if not fetch and not src.startswith("https://"):
                     if _r_story_pending(cid):
@@ -1841,7 +1842,7 @@ def audit_stored_photo_cards():
                     current_key = SP.card_title_key(_card_headline(r.get("title") or "") or "")
             except Exception:
                 current_key = ""
-            if meta and SP.card_title_stale(meta, current_key):
+            if meta and (SP.card_title_stale(meta, current_key) or SP.card_stale(meta)):
                 _story_build(cid, False)
                 SP.AUDIT["typography"] += 1
                 print(f"story_photo: typography {cid} hash={current_key}", flush=True)
