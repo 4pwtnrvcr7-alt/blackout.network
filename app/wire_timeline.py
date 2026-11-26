@@ -83,6 +83,14 @@ _STORED = {"war/conflict": "conflict", "disease": "disease", "space weather": "s
 def cat_key(category, title, archive):
     """Display category. Title rules run first so a stored war/conflict tag on a quake (or similar mislabel) is corrected."""
     c = (category or "").lower(); t = title or ""
+    tw = t
+    if not archive:
+        try:   # Nov 25 2026 9:27 PM: "forces storm a building" is a raid, not weather
+            import storm_verb as _SVB
+            if _SVB.is_raid(t):
+                tw = _SVB.strip(t); c = _SVB.fix_category(c, t).lower()
+        except Exception:
+            pass
     m = _RW.match(t) if archive else None
     if m:   # archive ReliefWeb items carry a coarse stored category; their own type label is better for display
         ty = m.group(1)
@@ -104,7 +112,7 @@ def cat_key(category, title, archive):
     if _WRECK.search(t): return "wreck"
     if _INFRA.search(t): return "infra"
     if c == "natural disaster":
-        if _WX.search(t): return "weather"
+        if _WX.search(tw): return "weather"
         return "hazard"
     if _OBIT.search(t): return "deaths"
     if c != "war/conflict":
@@ -112,7 +120,7 @@ def cat_key(category, title, archive):
         if _CRIME.search(t): return "crime"
         if _PEOPLE.search(t): return "people"
     if _SCANDAL.search(t): return "scandal"
-    if _WX.search(t) and c not in ("war/conflict", "political"): return "weather"
+    if _WX.search(tw) and c not in ("war/conflict", "political"): return "weather"
     return _STORED.get(c, "other")
 
 # ------------------------------------------------------------------ regions (display only)
@@ -487,7 +495,8 @@ def _near(r, lat, lon, r_mi):
     except (TypeError, ValueError):
         return False
 
-_POST_FETCH = 1000          # rows per scan batch when a post-filter (category/region/near) is on
+_POST_FETCH = 1000          # archive rows per scan batch when a post-filter (category/region/near) is on
+_POST_LIVE = 4000           # live rows per batch then: one sort of clusters usually covers all of them
 _SCAN_BUDGET_S = float(os.environ.get("BN_WIRE_SCAN_S", "2.0"))
 _SEV = {"lo": (0, 3), "mid": (4, 6), "hi": (7, 10)}
 _CAT_KEYS = {c[0] for c in CATS}
@@ -547,8 +556,11 @@ def _facet_ok(r, archive, cats, regs):
         return False
     return True
 
-def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win):
-    """One over-fetch from live + archive, already sorted in page direction."""
+def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win, meta=None, live_n=None):
+    """One over-fetch from live + archive, already sorted in page direction.
+    Nov 25 2026: rows past the "safe edge" (the nearer of the two sources' last rows when that source came back full)
+    are dropped, because the other source was not read that far; meta gets done (both sources exhausted) and edge."""
+    live_n = live_n or fetch_n
     op, order = (">", "ASC") if newer else ("<", "DESC")
     geo, ga = _geo_clause(lat, lon, r_mi)
     sv, sa = _sev_clause(sev)
@@ -560,9 +572,10 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
         sql = (f"SELECT {_LIVE_COLS} FROM clusters WHERE ({_TCOL}{op}? OR ({_TCOL}=? AND cluster_id{op}?)) "
                f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo}{sv}{tw} "
                f"ORDER BY {_TCOL} {order}, cluster_id {order} LIMIT ?")
-        rows += [(r, False) for r in c.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, fetch_n])]
+        rows += [(r, False) for r in c.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, live_n])]
     finally:
         c.close()
+    n_live = len(rows); last_live = rows[-1][0] if rows else None
     h = _hdb()
     if h is not None:
         try:
@@ -574,9 +587,18 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
             rows += [(r, True) for r in h.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, fetch_n])]
         finally:
             h.close()
+    n_arch = len(rows) - n_live; last_arch = rows[-1][0] if n_arch else None
+    key = lambda r: (r["t"] or "", r["id"])
+    lasts = [key(x) for x, full in ((last_live, n_live >= live_n), (last_arch, n_arch >= fetch_n)) if x is not None and full]
+    safe = (min(lasts) if newer else max(lasts)) if lasts else None
+    if safe is not None:
+        rows = [(r, a) for r, a in rows if (key(r) <= safe if newer else key(r) >= safe)]
+    rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
+    if meta is not None:
+        meta["done"] = safe is None
+        meta["edge"] = safe if safe is not None else (key(rows[-1][0]) if rows else None)
     if geo:
         rows = [(r, a) for r, a in rows if _near(r, lat, lon, r_mi)]
-    rows.sort(key=lambda x: (x[0]["t"] or "", x[0]["id"]), reverse=not newer)
     return rows
 
 def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None, r_mi=None,
@@ -606,12 +628,14 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
     deadline = time.time() + _SCAN_BUDGET_S
     acc, seen, exhausted, cut = [], set(), False, False
     while True:
-        batch = _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win)
-        if not batch:
+        fm = {}
+        batch = _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win, meta=fm,
+                              live_n=_POST_LIVE if post else None)
+        if fm.get("edge"):
+            ct, cid = fm["edge"]
+        if not batch and fm.get("done", True):
             exhausted = True
             break
-        edge = batch[-1][0]
-        ct, cid = edge["t"] or "", edge["id"]
         for r, a in batch:
             rid = r["id"]
             if rid in seen:
@@ -622,7 +646,7 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
             acc.append((r, a))
         if len(acc) >= limit + 1:
             break
-        if len(batch) < fetch_n:
+        if fm.get("done"):
             exhausted = True
             break
         if time.time() >= deadline:
