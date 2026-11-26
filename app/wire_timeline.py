@@ -394,7 +394,7 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
                 lt = []
             k = WC.category(cat_key(r["category"], title, False), h, what or dek)
             vt = WC.tags(raw, k, h, lt)
-            if len(vt) >= 3:
+            if vt:   # 1-2 validated tags beat junk padding (rows outside the window publish without a verdict)
                 # post exactly the validated tags: x_share.share_text re-runs finalize_tags, which pads with entity_fill
                 # words (#Hicks, #Zealand, #Later) and replaced validated tags on about half the items
                 xu, final = _vt_intent(x_share, body, vt)
@@ -415,7 +415,7 @@ def _vt_intent(x_share, body, vt):
     h = x_share._headline(body, None)
     tags = list(vt)[:5]
     text = x_share._join(h, tags)
-    while len(tags) > 3 and x_share.weighted_len(text, url) > 280:
+    while len(tags) > min(3, len(vt)) and x_share.weighted_len(text, url) > 280:
         tags = tags[:-1]; text = x_share._join(h, tags)
     if x_share.weighted_len(text, url) > 280:
         budget = max(8, 280 - (1 + x_share.TCO) - len(" " + " ".join(tags)))
@@ -481,6 +481,16 @@ def _item(r, archive, warm_budget=None, compute=None):
         d["g"] = region_key(e["loc"], title, e["lat"], e["lon"])
     elif _v_on():
         d["k"] = _kfix(r["id"], d["k"], h, what or dek)
+        # rows outside the validator window get the stateless fixes too: no dangling headline tail, no agency code as place
+        try:
+            import wire_check as WC
+            d["h"] = WC.headline(d["h"])[0]
+            nl, la, lo, note = WC.location(d["loc"], d["lat"], d["lon"])
+            if note:
+                d["loc"], d["lat"], d["lon"] = nl, la, lo
+                d["g"] = region_key(nl, title, la, lo)
+        except Exception:
+            pass
     try:
         hid = False
         try:
@@ -681,7 +691,9 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
     # keeps paging (it already loads again while the footer is in view).
     post = bool(cats or regs or (lat is not None))
     fetch_n = _POST_FETCH if post else min(MAXL, max((limit + 1) * 4, 80))
-    deadline = time.time() + _SCAN_BUDGET_S
+    # the warm thread builds pages nobody is waiting on; it shares the CPU with the photo worker and the validator, so a
+    # 2 s budget cut its first page to ~20 items (Nov 25 10:50 PM). Give it 4x; a request still waits at most 2 s.
+    deadline = time.time() + _SCAN_BUDGET_S * (4 if _warming() else 1)
     acc, seen, exhausted, cut = [], set(), False, False
     while True:
         fm = {}
@@ -859,6 +871,7 @@ def _warm_rows(n):
         time.sleep(0.01)
     _warm_bake(rows[:150])
     if _v_on():
+        _warm_old_photos(rows[:300])
         try:
             c = _ro(DB)
             try:
@@ -1008,6 +1021,30 @@ def _v_eval(r, now):
                 "lat": v.get("lat"), "lon": v.get("lon"), "why": why, "at": now, "photo": pv}
     _V_STATS["evals"] += 1
     return ok
+
+_OLDW = {}
+def _warm_old_photos(rows):
+    """Rows outside the validator window are public without a verdict; ask the paced photo worker for their photo cards
+    too (newest first, 4 per cycle, each row once per 30 min) so older Wire items stop sharing the text fallback."""
+    import share_card, wire_check as WC
+    now = time.time(); n = 0; cut = _v_cutoff()
+    for r in rows:
+        if n >= 4:
+            break
+        fs = r["fs"] if "fs" in r.keys() else None
+        if fs and fs >= cut:
+            continue
+        cid = r["id"]
+        if now - _OLDW.get(cid, 0) < 1800 or not _public_row(r, False, strict=False):
+            continue
+        _OLDW[cid] = now
+        try:
+            if not WC.photo_state(cid)[1]:
+                share_card.warm(cid); n += 1
+        except Exception:
+            pass
+    if len(_OLDW) > 20000:
+        _OLDW.clear()
 
 _V_QUICK = {"no-photo-card", "paced", "photo-check-error", "validator-error", "photo-bad"}
 
