@@ -43,6 +43,72 @@ def snapshot_sqlite(src_path, dest_dir):
     return tmp
 
 
+def slim_cards_snapshot(src_path, dest_dir, budget_mb):
+    """Nov 25 2026 (Matt: a restart must not wipe our images): a cards.db copy that fits budget_mb.
+
+    The full cards.db is 0.6-1.3 GB (built PNG cards are ~1 MB each), too big for the box mirror (BN_SYNC_MAX_MB)
+    and slow for the deploy handoff. The copy keeps every table and every photo choice, the licensed photo JPEGs
+    newest first, then the newest built PNG cards with what is left of the budget. Anything left out is rebuilt
+    from its JPEG (or looked up again) by the boot photo rebuild, newest first. Returns a temp file path."""
+    os.makedirs(dest_dir, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=dest_dir, suffix=".db")
+    os.close(fd)
+    left = int(float(budget_mb) * 1024 * 1024)
+    ok = False
+    try:
+        d = sqlite3.connect(tmp, timeout=20)
+        try:
+            d.execute("ATTACH DATABASE ? AS s", (src_path,))   # read-write attach: uncheckpointed WAL commits are visible
+            objs = d.execute("SELECT type, name, sql FROM s.sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' "
+                             "ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END").fetchall()
+            tables = [n for t, n, _ in objs if t == "table"]
+            for t, n, sql in objs:
+                if t == "table":
+                    d.execute(sql)
+            def cols(n):
+                return [r[1] for r in d.execute(f'PRAGMA s.table_info("{n}")').fetchall()]
+            for n in tables:
+                if n in ("story_photos", "story_cards"):
+                    continue
+                d.execute(f'INSERT INTO main."{n}" SELECT * FROM s."{n}"')
+            if "story_photos" in tables:
+                c = cols("story_photos")
+                sel = ", ".join("NULL" if x == "jpg" else f'"{x}"' for x in c)
+                d.execute(f'INSERT INTO main.story_photos({", ".join(chr(34) + x + chr(34) for x in c)}) SELECT {sel} FROM s.story_photos')
+                if "jpg" in c:
+                    order = "stored_at" if "stored_at" in c else "rowid"
+                    for cid, n in d.execute(f"SELECT cid, length(jpg) FROM s.story_photos WHERE jpg IS NOT NULL ORDER BY {order} DESC").fetchall():
+                        if n and n <= left:
+                            d.execute("UPDATE main.story_photos SET jpg=(SELECT jpg FROM s.story_photos WHERE cid=?) WHERE cid=?", (cid, cid))
+                            left -= n
+            if "story_cards" in tables:
+                c = cols("story_cards")
+                order = "built_at" if "built_at" in c else "rowid"
+                for cid, n in d.execute(f"SELECT cid, length(png) FROM s.story_cards ORDER BY {order} DESC").fetchall():
+                    if n and n <= left:
+                        d.execute('INSERT OR REPLACE INTO main.story_cards SELECT * FROM s.story_cards WHERE cid=?', (cid,))
+                        left -= n
+            for t, n, sql in objs:
+                if t != "table":
+                    try:
+                        d.execute(sql)
+                    except Exception:
+                        pass
+            d.commit()
+            d.execute("DETACH DATABASE s")
+            d.execute("PRAGMA journal_mode=DELETE")
+            ok = True
+        finally:
+            d.close()
+    finally:
+        if not ok:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    return tmp
+
+
 def install_sqlite(dest_path, tmp_path):
     """Atomically replace dest_path with a verified snapshot; drop stale WAL/SHM."""
     dest_dir = os.path.dirname(dest_path)
