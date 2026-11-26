@@ -140,14 +140,9 @@ def _sha(path):
     with open(path, "rb") as f:
         for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
     return h.hexdigest()
-CARDS_HANDOFF_MB = float(os.environ.get("BN_CARDS_HANDOFF_MB", "300"))   # deploy handoff copy of cards.db (fits the 120 s export)
-CARDS_MIRROR_MB = float(os.environ.get("BN_CARDS_MIRROR_MB", "80"))      # box mirror copy: one push under BN_SYNC_MAX_MB (96)
-def _db_snapshot(src_rel, slim_mb=None):
-    """Consistent copy of a Render-owned sqlite DB (backup API, WAL inclusive), returned as a temp file path.
-    cards.db with slim_mb: photo JPEGs + newest PNG cards within slim_mb (Nov 25 2026, restart-safe images)."""
+def _db_snapshot(src_rel):
+    """Consistent copy of a Render-owned sqlite DB (backup API, WAL inclusive), returned as a temp file path."""
     import handoff_db
-    if src_rel == "cards.db" and slim_mb:
-        return handoff_db.slim_cards_snapshot(os.path.join(BASE, src_rel), STATE, slim_mb)
     return handoff_db.snapshot_sqlite(os.path.join(BASE, src_rel), STATE)
 
 def has_data(): return os.path.exists(os.path.join(BASE, "blackout.db"))
@@ -211,7 +206,6 @@ def _apply_tar(tmp, source="push"):
                     SYNC["restored"] = True   # the live list was kept; do not leave the scheduler waiting on a skipped restore
                     continue
             _install(m.name, dtmp, kind)
-            if m.name == "cards.db" and source == "push": _kick_card_rebuild()   # box restore after an eviction (the handoff path has the boot rebuild)
             with _mlock: MAN[m.name] = (meta.get("hashes") or {}).get(m.name) or _sha(os.path.join(BASE, m.name))
             if source == "push": PUSHED_SINCE_BOOT.add(m.name)
             done.append(m.name); SYNC["bytes"] += m.size
@@ -266,33 +260,7 @@ def handle_rt(h, path):
     except Exception as ex:
         traceback.print_exc(); return 500, {"error": str(ex)[:200]}
 
-def _kick_card_rebuild():
-    """After a cards.db install (handoff or box restore), build missing PNG cards from the stored JPEGs, newest first.
-    One background thread; share_card's rebuild lock makes a second call a no-op while a rebuild runs."""
-    def _cards_after_install():
-        try:
-            import story_photo as SP, share_card
-            have = set(SP.card_cids(5000))
-            rows = SP._read(lambda k: k.execute("SELECT cid FROM story_photos WHERE none=0 AND jpg IS NOT NULL "
-                                                "ORDER BY stored_at DESC LIMIT 600").fetchall())
-            todo = [r[0] for r in rows or [] if r and r[0] and r[0] not in have]
-            if todo:
-                print(f"cards restore: building {len(todo)} PNG cards from stored photos", flush=True)
-                share_card.rebuild_card_photos(todo, pause=0.2)
-        except Exception:
-            traceback.print_exc()
-    try: threading.Thread(target=_cards_after_install, name="bn-cards-restore", daemon=True).start()
-    except Exception: pass
-
-_FP_CACHE = {}
 def _owned_fp(p):
-    # cards.db changes on every card write; let the box re-pull its slim copy at most every 15 min
-    if p.endswith("cards.db"):
-        hit = _FP_CACHE.get(p)
-        if hit and time.time() - hit[0] < 900: return hit[1]
-        fp = _owned_fp_now(p); _FP_CACHE[p] = (time.time(), fp); return fp
-    return _owned_fp_now(p)
-def _owned_fp_now(p):
     parts = []
     for suf in ("", "-wal"):
         try: st = os.stat(p + suf); parts.append(f"{suf}:{st.st_size}:{st.st_mtime_ns}")
@@ -587,7 +555,7 @@ def export_tar(part, out):
         else:
             for rel in R.RENDER_OWNED:
                 if os.path.exists(os.path.join(BASE, rel)):
-                    sp = _db_snapshot(rel, CARDS_HANDOFF_MB); items.append((rel, sp, True)); meta["restore"].append(rel); meta["hashes"][rel] = _sha(sp)
+                    sp = _db_snapshot(rel); items.append((rel, sp, True)); meta["restore"].append(rel); meta["hashes"][rel] = _sha(sp)
             meta["restored"] = bool(SYNC["restored"])
             try:   # analytics 2026-11-01: today's visitor key + hash set, so the new instance doesn't recount today's visitors
                 import usage_stats; meta["usage"] = usage_stats.export_state()
@@ -805,7 +773,7 @@ class RH(server.H):
             from urllib.parse import urlparse, parse_qs
             rel = (parse_qs(urlparse(self.path).query).get("file") or [""])[0]
             if rel not in R.RENDER_OWNED or not os.path.exists(os.path.join(BASE, rel)): return self.send(404, {"error": "not found"})
-            tmp = _db_snapshot(rel, CARDS_MIRROR_MB)
+            tmp = _db_snapshot(rel)
             try: data = gzip.compress(open(tmp, "rb").read(), 6)
             finally: os.unlink(tmp)
             return self.send(200, data, "application/gzip")
@@ -833,6 +801,14 @@ class RH(server.H):
         if path == "/api/rt/refresh":       # public Refresh button (rate-limited per IP inside realtime.refresh)
             self.body()
             try: return self.send(*_rt().refresh(self.ip()))
+            except Exception as ex: traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
+        if path == "/internal/wire/qa":     # Matt 11:18 PM ET: box-signed post-publish QA (holds + read-only card facts)
+            raw = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 400000))
+            ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())
+            if not ok: return self.send(403, {"error": why})
+            try:
+                import wire_timeline as WT
+                return self.send(200, WT.qa_endpoint(json.loads(raw or b"{}")))
             except Exception as ex: traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
         if path in ("/internal/newsletter/test", "/internal/newsletter/status", "/internal/newsletter/send_now"):   # t373: box-signed (BN_SYNC_SECRET HMAC) newsletter ops
             self.body(); raw = getattr(self, "_raw", b"") or b""
