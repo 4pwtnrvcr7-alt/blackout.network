@@ -56,7 +56,13 @@ def _item_text(item, headline=None):
             parts.append(str(L.get("title") or L.get("s") or L.get("source") or L.get("name") or ""))
         elif isinstance(L, str):
             parts.append(L)
-    return " ".join(str(p) for p in parts if p)
+    out = " ".join(str(p) for p in parts if p)
+    try:   # Nov 25 2026 9:27 PM: "forces storm a building" must not earn #Storm/#Weather
+        import storm_verb
+        out = storm_verb.strip(out)
+    except Exception:
+        pass
+    return out
 
 
 def armed_conflict(item, headline=None):
@@ -102,6 +108,11 @@ def _normalize_item(item):
         it["d"] = _strip_related(it["d"])
     elif it.get("d") is not None and not isinstance(it.get("d"), str):
         it["d"] = ""
+    try:   # a raid misfiled as natural disaster is war/conflict for tags too
+        import storm_verb
+        it["category"] = storm_verb.fix_category(it.get("category") or "", it.get("title") or "")
+    except Exception:
+        pass
     return it
 
 
@@ -1915,7 +1926,7 @@ def _topic_earned(tag, item, headline=None, allowed=None):
     if k == "hurricane" and re.search(r"hurricane \w+ record", text) and not re.search(r"hurricane (watch|warning|landfall|makes landfall)", text):
         return False
     for h in _TOPIC_HINTS.get(k, (k,)):
-        if re.search(r"(?<![a-z])" + re.escape(h) + r"(?![a-z])", text):
+        if re.search(r"(?<![a-z])" + re.escape(h) + r"(?:i|is|s|ian|ians)?(?![a-z])", text):   # #Israel from "Israeli"
             return True
     return False
 
@@ -1926,6 +1937,12 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
     unearned = set()
     if not armed_conflict(item, headline=headline):
         unearned = {g for g in SOFT_GENERICS if not _topic_earned(g, item, headline)}
+    try:   # Nov 25 2026 9:27 PM: a raid ("forces storm a building") never earns weather tags
+        import storm_verb
+        if storm_verb.is_raid(" ".join(str(x or "") for x in (headline, item.get("title"), item.get("headline")))):
+            unearned |= {"#Storm", "#Storms", "#Weather", "#Hurricane", "#Disaster"}
+    except Exception:
+        pass
     allowed = []
     try:
         allowed = topic_tags(item, headline=headline) if topics else []
@@ -1938,6 +1955,8 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
         t = _shorten_tag("#" + str(t).lstrip("#"))
         if not t or _is_filler(t) or t in unearned or any(t.lower() == k.lower() for k in keep):
             continue
+        if re.search(r"\b" + re.escape(t[1:]) + r"\s+(?:al|el|ad|an|as|ash|at|az|ar)-", _item_text(item, headline), re.I):
+            continue      # fragment of a longer name: #Khallet from "Khallet al-Iman"
         if t == "#Outbreak" and not re.search(r"outbreak|epidemic|pandemic|infect|cases|deaths|virus|disease|fever|flu\b|measles|cholera|ebola", _item_text(item, headline=headline), re.I):
             continue
         if not _topic_earned(t, item, headline, allowed):

@@ -385,6 +385,11 @@ def place_photo(hit):
 # ------------------------------------------------------------------ tier 3: topic
 def hazard_for(text):
     t = text or ""
+    try:   # storm-as-verb (a raid) is not a hurricane
+        import storm_verb
+        t = storm_verb.strip(t)
+    except Exception:
+        pass
     for key, rx in _HAZARDS:
         if re.search(rx, t, re.I):
             return key
