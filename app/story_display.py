@@ -146,8 +146,19 @@ def apply(row):
     return out
 
 
+# Multi-topic roundups ("Quick takes: A, B, more C") are several unrelated stories in one article. They cannot carry one
+# headline, rank, place or photo, so live lists drop them (Matt, Nov 25 2026 6:55 PM ET: Gavi Ebola vaccine + Texas screwworm).
+_ROUNDUP = re.compile(
+    r"^\s*(?:quick takes|news scan|news roundup|daily roundup|weekly roundup|week in review|news in brief|"
+    r"morning briefing|evening briefing|headlines roundup)\s*(?:[:|\u2013\u2014-]|$)", re.I)
+
+
+def is_roundup(title):
+    return bool(_ROUNDUP.search(title or ""))
+
+
 def visible(row):
     if not row: return False
-    if row.get("hidden") or is_entertainment_junk(row.get("title") or ""):
+    if row.get("hidden") or is_entertainment_junk(row.get("title") or "") or is_roundup(row.get("title") or ""):
         return False
     return True

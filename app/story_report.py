@@ -199,6 +199,12 @@ def figure(im, lead=False):
     except Exception: return ""
     src, link = im.get("src") or "", im.get("link") or ""
     if not re.match(r"^https://", src) or not re.match(r"^https?://", link): return ""
+    try:   # satellite / relief / orbit imagery is never a story hero (Matt, Nov 25 2026: ISS photo of Texas on a roundup page)
+        import card_photo as _CP
+        if _CP.is_map_like(filename=link, title=im.get("alt") or "", credit=im.get("credit") or "", desc=im.get("caption") or "", src=src):
+            return ""
+    except Exception:
+        pass
     cap = (im.get("caption") or "").strip()
     loc, fb = _local(src)
     return (f'<figure class="sr-fig{" sr-lead" if lead else ""}{" sr-file" if im.get("kind") in ("person", "place") else ""}"><a href="{E(link)}" target="_blank" rel="noopener">'

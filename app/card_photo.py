@@ -62,6 +62,7 @@ _MAPLIKE = re.compile(
     r"\bnima\b|world[ _-]wind|"
     r"esa[ /._-]*(?:satellite|envisat|sentinel|copernicus|earth)|"
     r"false[ _-]colou?r|spaceborne|orbital[ _-](?:image|view|photo)|"
+    r"\biss\d{2,3}[ _-]?[a-z]?[ _-]\d{3,}|remote[ _-]sensing|astronaut[ _-]photograph\w*|"
     r"digital[ _-]?elevation|\bdem\b|bathymetr\w*)",
     re.I,
 )
