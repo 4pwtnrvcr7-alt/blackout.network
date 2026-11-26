@@ -71,3 +71,15 @@ class StormVerbTest(unittest.TestCase):
         self.assertNotIn("#Storm", tags); self.assertNotIn("#Khallet", tags); self.assertIn("#Israel", tags)
         self.assertNotIn("#edge", X.finalize_tags(["#edge", "#HKCERT"], item={"title": "Microsoft Edge Multiple Vulnerabilities", "category": "cyber"}))
 if __name__ == "__main__": unittest.main()
+
+
+class NameFragmentTagTest(unittest.TestCase):
+    def test_nablus_share_text_has_no_name_fragments(self):
+        import x_share as X
+        t = ("Israeli occupation forces storm a Palestinian residential building in the Khallet al-Iman neighborhood "
+             "in the Jabal al-Shamali area of \u200b\u200bNablus, occupied West Bank.")
+        it = {"cluster_id": "ad60f9d6117085cd", "title": t, "headline": t, "category": "War/conflict", "location": "Nablus", "brief": ""}
+        tail = X.share_text(it, url="", headline=t).split(".")[-1]
+        for bad in ("#Khallet", "#Iman", "#Storm", "#Jabal", "#Shamali"):
+            self.assertNotIn(bad, tail)
+        self.assertIn("#Nablus", tail)
