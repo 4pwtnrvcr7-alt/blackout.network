@@ -91,6 +91,11 @@ def cat_key(category, title, archive):
         if _WX.search(ty): return "weather"
         if re.search(r"conflict|violence|displacement|refugee|unrest|crisis", ty, re.I): return "conflict"
         return "hazard"
+    # Nov 25 2026 (pt1917u): these stored tags are specific, so they win over title words
+    # ("Geomagnetic Storm Watch" is space weather, not Weather & fire).
+    if c in ("space weather", "space"): return "space"
+    if c in ("obituary", "obituaries", "death", "deaths"): return "deaths"
+    if c in ("wreck", "wrecks", "crash", "crashes", "accident", "transport accident"): return "wreck"
     if c == "people":   # scanner [people] layer (sources_layers.py): keep it under People; its death notices go to Obituaries
         return "deaths" if (_OBIT.search(t) or t.startswith("Death: ")) else "people"
     # Title-first: fix known quake-as-conflict (and similar) mislabels regardless of stored category.
@@ -482,6 +487,8 @@ def _near(r, lat, lon, r_mi):
     except (TypeError, ValueError):
         return False
 
+_POST_FETCH = 1000          # rows per scan batch when a post-filter (category/region/near) is on
+_SCAN_BUDGET_S = float(os.environ.get("BN_WIRE_SCAN_S", "2.0"))
 _SEV = {"lo": (0, 3), "mid": (4, 6), "hi": (7, 10)}
 _CAT_KEYS = {c[0] for c in CATS}
 _REG_KEYS = {"na", "la", "eu", "me", "af", "as", "oc", "sea", "gl"}
@@ -590,12 +597,18 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
     if sev not in _SEV:
         sev = None
     # Rank is SQL-side; cats/regs/geo/public are post-filters, so over-fetch and continue.
+    # Nov 25 2026 (pt1917u): a category filter scans the whole history. The old 24-batch cap (~4,800 of ~28k rows)
+    # reported `end` early, so sparse categories looked empty. Now the scan runs to the true end within a time
+    # budget; if the budget runs out first the page returns `next` = the scan edge with end=false and the client
+    # keeps paging (it already loads again while the footer is in view).
     post = bool(cats or regs or (lat is not None))
-    fetch_n = min(MAXL, max((limit + 1) * (8 if post else 4), 80))
-    acc, seen = [], set()
-    for _ in range(24):
+    fetch_n = _POST_FETCH if post else min(MAXL, max((limit + 1) * 4, 80))
+    deadline = time.time() + _SCAN_BUDGET_S
+    acc, seen, exhausted, cut = [], set(), False, False
+    while True:
         batch = _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win)
         if not batch:
+            exhausted = True
             break
         edge = batch[-1][0]
         ct, cid = edge["t"] or "", edge["id"]
@@ -610,6 +623,10 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
         if len(acc) >= limit + 1:
             break
         if len(batch) < fetch_n:
+            exhausted = True
+            break
+        if time.time() >= deadline:
+            cut = True
             break
     more = len(acc) > limit
     rows = acc[:limit]
@@ -619,6 +636,8 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
         items.reverse()
     edge = (items[0] if newer else items[-1]) if items else None
     nxt = f"{edge['t']}|{edge['id']}" if edge and more else None
+    if nxt is None and cut and not exhausted and not newer:
+        nxt = f"{ct}|{cid}"          # scan budget ran out before the end: continue from the last row scanned
     return {"items": items, "next": nxt, "end": nxt is None, "dir": "newer" if newer else "older", "limit": limit}
 
 def _reset_caches():
@@ -696,7 +715,9 @@ def _warm_cycle():
     for a in _STD:
         args = (None, None, a.get("limit", 100), "", False, None, None, None, a.get("sev"), None, None, None)
         _STD_KEYS[_pkey(*args)] = args
-    todo = {k: (args, 2.0) for k, (args, last) in list(_PA.items()) if now - last <= 180}
+    # pages with a category/region/near filter can scan the whole history (up to _SCAN_BUDGET_S): rebuild those less often
+    todo = {k: (args, 30.0 if (args[9] or args[10] or args[5] is not None) else 2.0)
+            for k, (args, last) in list(_PA.items()) if now - last <= 180}
     for k, args in _STD_KEYS.items():
         todo.setdefault(k, (args, 6.0))
     for key, (args, every) in todo.items():

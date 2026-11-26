@@ -1627,7 +1627,7 @@ _FILL_STOP = {w for w in (
     "mockup special general national international local regional state states city county toward predicted potential possible official various".split())}
 _TINY_STOP = set("the and for with from that this into over after amid about than are was were its their his her has have not but".split())
 _FILL_BADWORDS = {"stop", "it", "special", "october", "november", "december", "january", "february", "march", "april", "june", "july", "august", "september"}
-_JUNK_WORDS = {
+_JUNK_WORDS = {"multiple", 
     "category", "media", "reports", "report", "victims", "guide", "women", "men", "youth", "safeguard", "internet",
     "army", "concerns", "toward", "predicted", "effectiveness", "central", "minutes", "liability", "director",
     "update", "updates", "latest", "breaking", "says", "amid", "watch", "warning", "potential", "possible",
@@ -1660,12 +1660,21 @@ def _camel_words(tag):
     return words
 
 
+_ACRO_OK = {"NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "NOAA", "FEMA", "NATO", "NASA", "OPEC", "USGS", "GDACS", "SPACEX", "OPENAI"}
+
 def _shorten_tag(tag):
     """Drop long run-togethers; reduce #NuclearThreat to #Nuclear. Keep short tags and well-known names."""
     if not tag:
         return None
     t = "#" + str(tag).lstrip("#")
     s = t.lstrip("#")
+    if not s:
+        return None
+    # Nov 25 2026 (Matt 9:09 PM): obscure all-caps acronyms (#HKCERT) are not tags people follow; #edge -> #Edge
+    if s.isalnum() and s.isupper() and len(s) >= 5 and s.lower() not in POPULAR and s not in _ACRO_OK:
+        return None
+    if s[0].islower():
+        s = s[0].upper() + s[1:]; t = "#" + s
     words = _camel_words(s)
     for w in words:
         if w.lower() in POPULAR:
