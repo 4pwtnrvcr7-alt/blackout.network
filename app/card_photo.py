@@ -83,7 +83,8 @@ TOPICS = {
     "ebola": ("CDC PHIL", ["File:Ebola virus virion.jpg"], "Ebola virus"),
     "flu": ("CDC PHIL", ["File:Influenza virus particle color.jpg"], "Influenza virus"),
     "outbreak": ("CDC PHIL", ["File:Influenza virus particle color.jpg"], "Virus"),
-    "storm": ("NOAA", ["File:Hurricane Katrina imaged by NOAA-16 AVHRR instrument (2268-631).jpg"], "Tropical storm"),
+    # Nov 25 2026 (pt1925u): no satellite imagery on cards; a ground-level FEMA storm-damage photo instead of the Katrina satellite shot.
+    "storm": ("FEMA", ["File:FEMA - 38737 - Boats moved on shore and damaged by Hurricane Ike.jpg"], "Storm damage"),
     "freeze": ("NOAA/NWS", ["File:Early February 2022 North American winter storm 2022-02-03.jpg"], "Winter storm"),
     "quake": ("USGS", ["File:1933 Long Beach earthquake damage 1.jpg"], "Earthquake damage"),
     "volcano": ("USGS", ["File:Eruption at the summit of Kilauea volcano (118574).jpeg"], "Volcanic eruption"),
