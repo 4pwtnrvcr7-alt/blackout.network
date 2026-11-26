@@ -330,6 +330,12 @@ def _public_row(r, archive):
     if archive:
         return True
     try:
+        import story_display as _SD
+        if _SD.is_roundup(r["title"] if "title" in r.keys() else ""):
+            return False
+    except Exception:
+        pass
+    try:
         return _gate_ok(r["id"] if "id" in r.keys() else r["cluster_id"])
     except Exception:
         return True

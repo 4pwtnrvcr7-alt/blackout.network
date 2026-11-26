@@ -49,5 +49,27 @@ class Where(unittest.TestCase):
         self.assertIn("WHERE: California", out["brief"])
         self.assertFalse(out["hidden"])
 
+class Roundup(unittest.TestCase):
+    def test_quick_takes_is_hidden_from_live_lists(self):
+        t = "Quick takes: Advance access to Ebola vaccine, chlorhexidine cloth shortage, more screwworm in Texas"
+        self.assertTrue(SD.is_roundup(t))
+        self.assertFalse(SD.visible({"title": t}))
+    def test_real_headlines_stay(self):
+        for t in ("Quickly rising floodwater closes I-95", "Gavi secures 1.5 million Ebola vaccine doses", "Houthis target Saudi Red Sea ports"):
+            self.assertFalse(SD.is_roundup(t)); self.assertTrue(SD.visible({"title": t}))
+
+class SatelliteHero(unittest.TestCase):
+    def test_iss_photo_is_map_like_and_figure_drops_it(self):
+        import card_photo as CP, story_report as SR
+        im = {"src": "https://thumb.wikimedia.org/x/ISS036-E-9064_-_View_of_Texas.jpg", "w": 1200, "h": 798, "kind": "place", "alt": "File photo: Texas",
+              "caption": "File photo of Texas (2013). Not taken at this event.", "license": "Public domain",
+              "credit": "Earth Science and Remote Sensing Unit, Lyndon B. Johnson Space Center / Wikimedia Commons",
+              "link": "https://commons.wikimedia.org/wiki/File:ISS036-E-9064_-_View_of_Texas.jpg"}
+        self.assertTrue(CP.is_map_like(filename=im["link"], credit=im["credit"]))
+        self.assertEqual(SR.figure(im, True), "")
+        ok = dict(im, src="https://thumb.wikimedia.org/x/Austin_skyline.jpg", link="https://commons.wikimedia.org/wiki/File:Austin_skyline.jpg",
+                  credit="Jane Doe / Wikimedia Commons", caption="Austin, 2019. File photo; not taken at this event.")
+        self.assertIn("<img", SR.figure(ok, True))
+
 if __name__ == "__main__":
     unittest.main()
