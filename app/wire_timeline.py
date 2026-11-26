@@ -394,15 +394,34 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
                 lt = []
             k = WC.category(cat_key(r["category"], title, False), h, what or dek)
             vt = WC.tags(raw, k, h, lt)
-            xu = x_share.intent_url(body, tags=vt) if vt else x_share.intent_url(body)
-            final = re.findall(r"#[A-Za-z0-9]+", urllib.parse.unquote(xu.split("text=", 1)[-1].split("&url=", 1)[0]))
-            _VT[r["id"]] = final if (3 <= len(final) <= 5 and all(WC.tag_ok(t, h) for t in final)) else []
+            if len(vt) >= 3:
+                # post exactly the validated tags: x_share.share_text re-runs finalize_tags, which pads with entity_fill
+                # words (#Hicks, #Zealand, #Later) and replaced validated tags on about half the items
+                xu, final = _vt_intent(x_share, body, vt)
+            else:
+                xu = x_share.intent_url(body); final = []
+            _VT[r["id"]] = final if (3 <= len(final) <= 5 and all(WC.tag_ok(t, h, lt) for t in final)) else []
             return xu
         except Exception as ex:
             _WARM["err"] = f"vtags: {type(ex).__name__}: {ex}"[:160]
     if len(stored) >= 3 and not hid:
         return x_share.intent_url(x_share.with_body(item), tags=stored[:5])
     return x_share.intent_url(x_share.with_body(item))
+
+def _vt_intent(x_share, body, vt):
+    """X intent URL with exactly the validated tags (3-5), trimmed to fit 280 the way share_text does."""
+    from urllib.parse import quote
+    url = x_share.story_url(body)
+    h = x_share._headline(body, None)
+    tags = list(vt)[:5]
+    text = x_share._join(h, tags)
+    while len(tags) > 3 and x_share.weighted_len(text, url) > 280:
+        tags = tags[:-1]; text = x_share._join(h, tags)
+    if x_share.weighted_len(text, url) > 280:
+        budget = max(8, 280 - (1 + x_share.TCO) - len(" " + " ".join(tags)))
+        cut = h[: budget - 1].rsplit(" ", 1)[0].rstrip(",;:-\u2014\u2013 ") if " " in h[:budget] else h[: budget - 1]
+        text = x_share._join(cut + "\u2026", tags)
+    return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(url, safe='')}", tags
 
 def _xu_for(r, rk, h, title, loc, links, what, dek, hid, compute):
     cid = r["id"]
@@ -791,6 +810,23 @@ def _warm_cycle():
         time.sleep(0.01)
     # 2. fill the per-row tag cache a slice at a time (newest public live rows, then every rank 7+ row)
     _warm_rows(25)
+    # 3. once per boot, prime every category page (the first filtered page after a boot took 22 s cold); one per cycle
+    if _V_STATS.get("warmed") or not _v_on():
+        _prime_cats()
+
+_PRIMED = set()
+def _prime_cats():
+    for key in [c[0] for c in CATS]:
+        if key in _PRIMED:
+            continue
+        _PRIMED.add(key)
+        for lim in (100, 200):
+            args = (None, None, lim, "", False, None, None, None, None, key, None, None)
+            try:
+                _pstore(_pkey(*args), _page_build(*args))
+            except Exception as ex:
+                _WARM["err"] = "prime: " + str(ex)[:120]
+        return
 
 def _warm_rows(n):
     c = _ro(DB)
@@ -973,18 +1009,31 @@ def _v_eval(r, now):
     _V_STATS["evals"] += 1
     return ok
 
+_V_QUICK = {"no-photo-card", "paced", "photo-check-error", "validator-error", "photo-bad"}
+
 def _warm_validate(rows):
     if not _v_on():
         return
     now = time.time(); t0 = now
     _V_CYC["del"] = 0; _V_CYC["warm"] = 0
+    # Nov 25 10:40 PM: held rows re-checked every 15 s ate the whole budget, so most rows of the last 24 h were never
+    # checked (and stayed hidden). Order: never-checked rows (newest first), then due re-checks. Only holds that can clear
+    # by themselves (photo card building, pacing) re-check every 15 s; tag/category/headline holds re-check every 5 min.
+    new_rows, due = [], []
     for r in rows:
-        if time.time() - t0 > _V_BUDGET_S:
-            break
-        cid = r["id"]
-        e = _VR.get(cid)
-        if e is not None and now - e["at"] < (300.0 if e["ok"] else _V_RECHECK_S):
+        e = _VR.get(r["id"])
+        if e is None:
+            new_rows.append(r)
             continue
+        quick = all(w.split(":")[0] in _V_QUICK for w in e["why"])
+        if now - e["at"] >= (300.0 if (e["ok"] or not quick) else _V_RECHECK_S):
+            due.append(r)
+    budget = _V_BUDGET_S * (3 if new_rows else 1)
+    complete = True
+    for r in new_rows + due:
+        if time.time() - t0 > budget:
+            complete = False
+            break
         if not _public_row(r, False, strict=False):
             continue
         try:
@@ -995,7 +1044,7 @@ def _warm_validate(rows):
     for e in list(_VR.values()):
         for w in e["why"]:
             held[w.split(":")[0]] = held.get(w.split(":")[0], 0) + 1
-    if not _V_STATS.get("warmed") and time.time() - t0 < _V_BUDGET_S:
+    if not _V_STATS.get("warmed") and complete:
         _V_STATS["warmed"] = True                      # one full pass done: from now on fresh releases are paced
     rel, _V_REL["ids"] = _V_REL["ids"], []
     if rel:
