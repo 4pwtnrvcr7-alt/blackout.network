@@ -919,6 +919,11 @@ if __name__ == "__main__":
         wire_timeline.start_warm()
     except Exception:
         traceback.print_exc()
+    try:   # Nov 25 2026: /tmp hit Render's 2 GB eviction limit 4x; one thread trims stale archives and rebuildable caches
+        import tmp_janitor
+        tmp_janitor.start()
+    except Exception:
+        traceback.print_exc()
     try:   # after og=true: one-time throttled photo backfill of the top Wire items (does not block healthz)
         if BOOT_WARM.get("og"):
             threading.Thread(target=_card_backfill, name="card-backfill", daemon=True).start()
