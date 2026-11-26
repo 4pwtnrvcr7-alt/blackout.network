@@ -153,5 +153,22 @@ class Scheduling(unittest.TestCase):
             if env is None: os.environ.pop("BN_WIRE_VALIDATE", None)
             else: os.environ["BN_WIRE_VALIDATE"] = env
 
+class QAHold(unittest.TestCase):
+    def test_hold_hides_and_release_restores(self):
+        import tempfile, wire_timeline as W
+        W._QAH_FILE = os.path.join(tempfile.mkdtemp(), "h.json")
+        class R(dict):
+            def keys(self): return super().keys()
+        r = R(id="c0000000000000qa", title="x", fs="2020-01-01T00:00:00Z")
+        try:
+            out = W.qa_endpoint({"holds": {"c0000000000000qa": "tags"}, "replace": True})
+            self.assertEqual(out["held"], 1)
+            self.assertFalse(W._public_row(r, False))
+            self.assertTrue(W._public_row(r, True))                 # archive rows are never held
+            W.qa_endpoint({"holds": {}, "release": ["c0000000000000qa"]})
+            self.assertNotIn("c0000000000000qa", W._QAH)
+        finally:
+            W._QAH.clear()
+
 if __name__ == "__main__":
     unittest.main()

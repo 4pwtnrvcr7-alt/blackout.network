@@ -345,6 +345,10 @@ def _public_row(r, archive, strict=True):
     strict=False is only for the warm thread, which prepares held rows (tags, card, verdict)."""
     if archive:
         return True
+    if strict and _QAH:
+        cid0 = r["id"] if "id" in r.keys() else r["cluster_id"]
+        if cid0 in _QAH:          # held by the box's post-publish QA sweep (wire_qa.py)
+            return False
     if strict and _v_on() and not _V_STATS.get("degraded"):
         cid = r["id"] if "id" in r.keys() else r["cluster_id"]
         e = _VR.get(cid)
@@ -366,6 +370,54 @@ def _public_row(r, archive, strict=True):
         return _gate_ok(r["id"] if "id" in r.keys() else r["cluster_id"])
     except Exception:
         return True
+
+# ---- post-publish QA holds (Matt 11:18 PM ET): the box's independent QA sweep sends holds through the signed
+# /internal/wire/qa endpoint (render_app). The box re-sends its whole hold list every run, so a restart loses them for at
+# most one sweep; they are also kept in the state dir for restarts of the same instance.
+_QAH = {}
+_QAH_FILE = os.path.join(os.environ.get("BN_STATE_DIR", "/tmp/bn_state"), "wire_qa_holds.json")
+try:
+    _QAH.update(json.load(open(_QAH_FILE)))
+except Exception:
+    pass
+
+def qa_endpoint(d):
+    """{"holds": {cid: reason}, "replace": bool, "info": [cid, ...]} -> held count + read-only photo/card facts per cid."""
+    out = {}
+    holds = d.get("holds")
+    if isinstance(holds, dict):
+        clean = {str(k)[:40]: str(v)[:200] for k, v in list(holds.items())[:5000] if re.match(r"^[A-Za-z0-9_.:\-]{1,40}$", str(k))}
+        if d.get("replace"):
+            _QAH.clear()
+        _QAH.update(clean)
+        for k in d.get("release") or []:
+            _QAH.pop(str(k), None)
+        try:
+            tmp = _QAH_FILE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(_QAH, f)
+            os.replace(tmp, _QAH_FILE)
+        except Exception:
+            pass
+        with _PC_LK:
+            for k in list(_PC["t"]):
+                _PC["t"][k] = 0.0
+    info = {}
+    for cid in (d.get("info") or [])[:300]:
+        cid = str(cid)
+        if not re.match(r"^[A-Za-z0-9_.:\-]{1,40}$", cid):
+            continue
+        try:
+            import story_photo as SP
+            c = SP.db_choice(cid) or {}
+            row = SP._read(lambda k: k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone())
+            info[cid] = {"photo_src": c.get("src", ""), "caption": c.get("caption", ""), "label": c.get("label", ""),
+                         "kind": c.get("kind", ""), "none": bool(c.get("none")), "card_src": (row[0] if row else "") or "",
+                         "verdict": (_VR.get(cid) or {}).get("why")}
+        except Exception as ex:
+            info[cid] = {"error": str(ex)[:120]}
+    out.update(held=len(_QAH), info=info)
+    return out
 
 def _stored_tags(cid):
     raw = ((_SNAP.get("s") or {}).get("ready") or {}).get(cid)
@@ -693,7 +745,7 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
     fetch_n = _POST_FETCH if post else min(MAXL, max((limit + 1) * 4, 80))
     # the warm thread builds pages nobody is waiting on; it shares the CPU with the photo worker and the validator, so a
     # 2 s budget cut its first page to ~20 items (Nov 25 10:50 PM). Give it 4x; a request still waits at most 2 s.
-    deadline = time.time() + _SCAN_BUDGET_S * (4 if _warming() else 1)
+    deadline = time.time() + _SCAN_BUDGET_S     # (#270's 4x warm budget held the GIL for 8 s and stalled requests: reverted)
     acc, seen, exhausted, cut = [], set(), False, False
     while True:
         fm = {}
@@ -1027,9 +1079,12 @@ def _warm_old_photos(rows):
     """Rows outside the validator window are public without a verdict; ask the paced photo worker for their photo cards
     too (newest first, 4 per cycle, each row once per 30 min) so older Wire items stop sharing the text fallback."""
     import share_card, wire_check as WC
+    # fresh stories first: only when the validator window has almost no rows waiting for a card
+    if sum(1 for e in list(_VR.values()) if "no-photo-card" in e["why"]) > 20:
+        return
     now = time.time(); n = 0; cut = _v_cutoff()
     for r in rows:
-        if n >= 4:
+        if n >= 2:
             break
         fs = r["fs"] if "fs" in r.keys() else None
         if fs and fs >= cut:

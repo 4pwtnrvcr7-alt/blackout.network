@@ -834,6 +834,14 @@ class RH(server.H):
             self.body()
             try: return self.send(*_rt().refresh(self.ip()))
             except Exception as ex: traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
+        if path == "/internal/wire/qa":     # Matt 11:18 PM ET: box-signed post-publish QA (holds + read-only card facts)
+            raw = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 400000))
+            ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())
+            if not ok: return self.send(403, {"error": why})
+            try:
+                import wire_timeline as WT
+                return self.send(200, WT.qa_endpoint(json.loads(raw or b"{}")))
+            except Exception as ex: traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
         if path in ("/internal/newsletter/test", "/internal/newsletter/status", "/internal/newsletter/send_now"):   # t373: box-signed (BN_SYNC_SECRET HMAC) newsletter ops
             self.body(); raw = getattr(self, "_raw", b"") or b""
             ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())
