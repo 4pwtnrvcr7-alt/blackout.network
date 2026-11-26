@@ -1931,6 +1931,16 @@ def _topic_earned(tag, item, headline=None, allowed=None):
     return False
 
 
+def _is_name_fragment(t, item, headline):
+    """#Khallet from "Khallet al-Iman": the first word of an Arabic al-/el- name is not a tag."""
+    try:
+        w = re.escape(str(t).lstrip("#")); txt = _item_text(item, headline)
+        return bool(re.search(r"\b" + w + r"\s+(?:al|el|ad|an|as|ash|at|az|ar)-", txt, re.I)
+                    or re.search(r"\b(?:al|el|ad|an|as|ash|at|az|ar)-" + w + r"\b", txt, re.I))
+    except Exception:
+        return False
+
+
 def finalize_tags(tags, item=None, headline=None, topics=True):
     """The one rule for every row: 3-5 short popular tags, topic first, no fluff, no long run-togethers."""
     item = _normalize_item(item or {})
@@ -1955,7 +1965,7 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
         t = _shorten_tag("#" + str(t).lstrip("#"))
         if not t or _is_filler(t) or t in unearned or any(t.lower() == k.lower() for k in keep):
             continue
-        if re.search(r"\b" + re.escape(t[1:]) + r"\s+(?:al|el|ad|an|as|ash|at|az|ar)-", _item_text(item, headline), re.I):
+        if _is_name_fragment(t, item, headline):
             continue      # fragment of a longer name: #Khallet from "Khallet al-Iman"
         if t == "#Outbreak" and not re.search(r"outbreak|epidemic|pandemic|infect|cases|deaths|virus|disease|fever|flu\b|measles|cholera|ebola", _item_text(item, headline=headline), re.I):
             continue
@@ -1968,7 +1978,7 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
             if len(keep) >= MAX_TAGS:
                 break
             t = _shorten_tag(t)
-            if not t or _is_filler(t) or t in unearned:
+            if not t or _is_filler(t) or t in unearned or _is_name_fragment(t, item, headline):
                 continue
             if not _topic_earned(t, item, headline, allowed):
                 continue
@@ -1988,7 +1998,7 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
                 hold_ban = {"#ebola", "#outbreak", "#war"}
         for w in [title] + re.findall(r"[A-Za-z0-9][A-Za-z0-9\-]{2,}", title):
             tg = _shorten_tag(to_tag(w))
-            if tg and not _is_filler(tg) and w.lower() not in _TINY_STOP and tg.lower() not in hold_ban and all(tg.lower() != k.lower() for k in keep):
+            if tg and not _is_filler(tg) and w.lower() not in _TINY_STOP and tg.lower() not in hold_ban and all(tg.lower() != k.lower() for k in keep) and not _is_name_fragment(tg, item, headline):
                 keep.append(tg)
             if len(keep) >= MIN_TAGS:
                 break
