@@ -130,10 +130,17 @@ def photo_state(cid):
     try:
         import story_photo as SP
         c = SP.db_choice(cid)
-        has = bool(SP.has_photo(cid))
-        if has:   # the finished PNG must be the photo card, not the text fallback (src only: never load the PNG blob here)
-            row = SP._read(lambda k: k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone())
-            has = bool(row and (row[0] or "").startswith("https://"))
+        # the finished PNG must be the photo card, not the text fallback (src only: never load the PNG blob here)
+        row = SP._read(lambda k: k.execute("SELECT src FROM story_cards WHERE cid=?", (cid,)).fetchone())
+        has = bool(row and (row[0] or "").startswith("https://"))
+        if has:
+            # same subject/licence checks as story_photo.has_photo, minus "the JPEG bytes are on hand": after a restart the
+            # JPEG cache is rebuilt slowly while the finished photo PNG is already stored (116 of 161 rows were held for it)
+            ok = bool(c and not c.get("none") and c.get("src") and SP.license_ok(c.get("license") or "")
+                      and not SP.is_non_photo_candidate(c) and SP.stored_photo_matches(cid) is not False
+                      and not SP.photo_is_wrong_subject(cid, c.get("src") or "", " ".join((c.get("credit") or "", c.get("caption") or "", c.get("label") or "", c.get("alt") or "")))
+                      and (row[0] or "") == (c.get("src") or ""))
+            has = ok
     except Exception:
         return None, None            # unknown (cards.db problem): the caller must not read this as "no photo"
     return c, has
