@@ -78,6 +78,15 @@ PROVIDER_TAGS = {"aws": ["AWS", "Cloud"], "azure": ["Azure", "Microsoft"], "gcp"
                  "workspace": ["GoogleWorkspace", "Outage"], "cloudflare": ["Cloudflare", "Outage"], "akamai": ["Akamai", "CDN"], "linode": ["Akamai", "Cloud"]}
 
 
+
+def _fix_cat(category, title):
+    """Nov 25 2026 9:27 PM: a raid ("forces storm a building") misfiled as natural disaster shows as conflict."""
+    try:
+        import storm_verb
+        return storm_verb.fix_category(category, title)
+    except Exception:
+        return category
+
 def _hook(name, fn):
     h = HOOKS.get(name)
     return h() if h else fn()
@@ -470,7 +479,7 @@ def _story_item(cid):
         "brief": r.get("brief") or "",
         "rank": r.get("rank") or 0,
         "location": r.get("location") or "",
-        "category": r.get("category") or "",
+        "category": _fix_cat(r.get("category") or "", r.get("title") or ""),
         "lat": r.get("lat"),
         "lon": r.get("lon"),
         "n_families": r.get("eff_families") or len(fams) or 1,
@@ -1747,7 +1756,7 @@ def generic_story_card(cid):
             title = _card_headline(r.get("title") or "") or title
             place, _, _ = story_map_place(r.get("title") or "", r.get("location") or "", r.get("brief") or "", cid)
             loc = (place or "")[:40]
-            cat = ((r.get("category") or "") or cat).upper()[:36]
+            cat = (_fix_cat(r.get("category") or "", r.get("title") or "") or cat).upper()[:36]
             try:
                 rank = int(r.get("rank") or rank or 0)
             except Exception:
@@ -1835,7 +1844,7 @@ def _network_prefetch(cid):
         loc = r.get("location") or ""
         brief = r.get("brief") or ""
         if card_photo_on():
-            apply_card_photo(cid, title, loc, brief, r.get("lat"), r.get("lon"), r.get("category") or "")
+            apply_card_photo(cid, title, loc, brief, r.get("lat"), r.get("lon"), _fix_cat(r.get("category") or "", r.get("title") or ""))
         # Always run the existing Commons prefetch too: it is how a PEOPLE-list
         # portrait lands when the v3 chooser misses, and tests mock _commons_portrait.
         story_photo.prefetch(cid, title, loc, brief)
@@ -2665,7 +2674,7 @@ def _convert_one_stale(cid):
                 loc = r.get("location") or loc
                 text = r.get("brief") or text
                 lat, lon = r.get("lat"), r.get("lon")
-                cat = r.get("category") or ""
+                cat = _fix_cat(r.get("category") or "", r.get("title") or "")
         except Exception:
             pass
         has_jpg = False
@@ -2798,7 +2807,7 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
                         loc = r.get("location") or loc
                         text = r.get("brief") or text
                         lat, lon = r.get("lat"), r.get("lon")
-                        cat = r.get("category") or ""
+                        cat = _fix_cat(r.get("category") or "", r.get("title") or "")
                 except Exception:
                     pass
                 has_jpg = False
@@ -2861,7 +2870,8 @@ MAPLIKE_REBUILD = {"done": False, "ids": 0, "error": ""}
 
 # Hazard stories that previously stored a generic place/culture photo (NZ haka, Iceland city, Telica).
 # Do not bump og.VERSION; only these cards are rebuilt at boot.
-HAZARD_PLACE_CARDS = ("d9c1418515395db1", "dcd0416e4a66964e", "a03826e8db39746e")
+HAZARD_PLACE_CARDS = ("d9c1418515395db1", "dcd0416e4a66964e", "a03826e8db39746e",
+                      "ad60f9d6117085cd")   # Nov 25 9:27 PM: Nablus raid ("forces storm") had a NOAA hurricane photo
 HAZARD_PLACE_REBUILD = {"done": False, "ids": 0, "error": ""}
 
 
@@ -2890,7 +2900,7 @@ def rebuild_maplike_place_cards(force=False):
                     loc = r.get("location") or loc
                     text = r.get("brief") or text
                     lat, lon = r.get("lat"), r.get("lon")
-                    cat = r.get("category") or ""
+                    cat = _fix_cat(r.get("category") or "", r.get("title") or "")
             except Exception:
                 pass
             if card_photo_on():
@@ -2943,7 +2953,7 @@ def rebuild_hazard_place_cards(force=False):
                     loc = r.get("location") or loc
                     text = r.get("brief") or text
                     lat, lon = r.get("lat"), r.get("lon")
-                    cat = r.get("category") or ""
+                    cat = _fix_cat(r.get("category") or "", r.get("title") or "")
             except Exception:
                 pass
             if card_photo_on():
