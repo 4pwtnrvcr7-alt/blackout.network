@@ -190,6 +190,7 @@ function toggle(key){
   var n=rendered.get(key),opening=!exp.has(key),hd=n&&n.querySelector(".tl-hd");
   if(opening){
     if(!He[key])measure([r.it],true);
+    if(!r.it.a&&!r.it._pf){r.it._pf=1;try{var pl=d.createElement("link");pl.rel="prefetch";pl.href="/wire/"+r.it.id;d.head.appendChild(pl)}catch(e){}}
     transition(function(){exp.add(key);if(n){n.classList.add("open");n.insertAdjacentHTML("beforeend",drawerHTML(r.it));hd&&hd.setAttribute("aria-expanded","true");var dr=n.querySelector(".tl-dr");
       if(DUR&&dr)dr.animate([{clipPath:"inset(0 0 100% 0)",opacity:.3},{clipPath:"inset(0 0 0 0)",opacity:1}],{duration:DUR,easing:EASE});}},key);
     /* if the drawer runs below the fold, glide it into view */
@@ -231,6 +232,7 @@ function stamp(){stampAt=Date.now();paintUpd()}
 function tick(){var k=dayKey(new Date().toISOString());if(k!==todayK){todayK=k;yK=dayKey(new Date(Date.now()-864e5).toISOString());relabel()}paintUpd()}
 tickT=setInterval(tick,15000);
 function relabel(){ /* re-render on-screen rows so day labels and times are current */
+  if(hold()){setTimeout(relabel,2000);return}
   rebuild();layout();rendered.forEach(function(n){n.remove()});rendered.clear();render()}
 function sinceLabel(){return items[0]?fT.format(dt(items[0].t)):fT.format(new Date())}
 function flash(txt,ms){if(!elUpd)return;elUpd.hidden=false;elUpd.textContent=txt;msgUntil=Date.now()+(ms||3200);
@@ -240,6 +242,13 @@ function showPill(){if(!bNew)return;bNew.hidden=pending<=0;if(pending>0)bNew.tex
 function busy(on){if(!bRef)return;bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
 /* ---------- arrivals: near the top, new items slide in one at a time (oldest first, newest ends on top) */
 var drip=[],queued={},dripT=0;
+/* Nov 25 2026 (pt1918u): Full story needed 3-4 taps on iPhone because arrivals re-laid the list mid-tap. */
+var touching=0,touchT=0,heldArr=[];
+function hold(){return !!touching||exp.size>0}
+function flushHeld(){if(!heldArr.length||hold())return;var a=heldArr;heldArr=[];arrive(a)}
+d.addEventListener("touchstart",function(){touching=1;clearTimeout(touchT)},{passive:true,capture:true});
+["touchend","touchcancel"].forEach(function(ev){d.addEventListener(ev,function(){clearTimeout(touchT);touchT=setTimeout(function(){touching=0;flushHeld()},450)},{passive:true,capture:true})});
+setInterval(flushHeld,2000);
 function gap(){return RM?0:Math.max(180,Math.min(700,4000/(drip.length+1)))}   /* a scan's batch streams in over about 4 s */
 function flipAdd(it){
   var old=new Map();rendered.forEach(function(n,k){if(n._r)old.set(k,n._r.top)});
@@ -252,6 +261,7 @@ function flipAdd(it){
 }
 function dripNext(){dripT=0;
   if(!drip.length)return;
+  if(hold()){dripT=setTimeout(dripNext,800);return}
   if(!nearTop()||anim){var rest=drip.splice(0);rest.forEach(function(x){delete queued[x.id]});
     keepAnchor(function(){var n=add(rest.slice().reverse(),"top");rebuild();pending+=n});showPill();return}
   var it=drip.shift();delete queued[it.id];if(seen[it.id])return dripNext();
@@ -260,6 +270,7 @@ function dripNext(){dripT=0;
 }
 function arrive(arr){
   if(!arr||!arr.length)return 0;
+  if(hold()){heldArr=heldArr.concat(arr);return 0}  /* Nov 25 (pt1918u): never shift rows under a finger or an open drawer */
   var fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});if(!fresh.length)return 0;
   var t=Date.now();fresh.forEach(function(it){NEW[it.id]=t});
   if(nearTop()&&!RM){fresh.slice().reverse().forEach(function(it){queued[it.id]=1;drip.push(it)});if(!dripT)dripNext();return fresh.length}
