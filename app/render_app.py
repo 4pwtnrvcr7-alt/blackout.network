@@ -217,12 +217,12 @@ def handle_push(h):
     n = int(h.headers.get("Content-Length") or 0)
     if n <= 0 or n > MAX_PUSH: return 413, {"error": f"push must be 1..{MAX_PUSH} bytes"}
     fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".tgz"); hsh = hashlib.sha256(); left = n
-    with os.fdopen(fd, "wb") as f:
-        while left > 0:
-            b = h.rfile.read(min(left, 1 << 20))
-            if not b: break
-            f.write(b); hsh.update(b); left -= len(b)
-    try:
+    try:   # Nov 25 2026: the upload read is inside the try, so a dropped push never leaves its partial .tgz in /tmp
+        with os.fdopen(fd, "wb") as f:
+            while left > 0:
+                b = h.rfile.read(min(left, 1 << 20))
+                if not b: break
+                f.write(b); hsh.update(b); left -= len(b)
         if left: return 400, {"error": "short body"}
         ok, why = verify(h, "POST", "/internal/sync/push", hsh.hexdigest())
         if not ok: return 403, {"error": why}

@@ -14,7 +14,7 @@ SOFT_MB = int(os.environ.get("BN_TMP_SOFT_MB", "1200"))
 TARGET_MB = int(os.environ.get("BN_TMP_TARGET_MB", "800"))
 SWEEP_S = int(os.environ.get("BN_TMP_SWEEP_S", "60"))
 LOG_S = int(os.environ.get("BN_TMP_LOG_S", "600"))
-ARCHIVE_AGE_S = 900          # a push/handoff/export archive older than this is never still in use
+ARCHIVE_AGE_S = 420          # a push/handoff/export archive older than this is never still in use (box push timeout 300 s)
 TMP_AGE_S = 1800
 # Rebuildable caches only (each module re-creates its directory and re-fetches on a miss).
 CACHE_DIRS = ("bn-og-cache", "bn_card_photo", "bn-story-photos", "bn_wxcache", "bn_crime_news", "bn_backfill_cache",
@@ -90,6 +90,13 @@ def sweep(now=None):
         mb = total / 1048576.0
     STATS["sweeps"] += 1; STATS["last_mb"] = round(mb, 1)
     STATS["top"] = [(k, round(v / 1048576.0, 1)) for k, v in sorted(sizes.items(), key=lambda kv: -kv[1])[:8]]
+    try:   # what is inside the state dir (sync archives, queues): the biggest 5 files
+        st = os.path.basename(STATE.rstrip("/"))
+        _, sf = _walk(STATE)
+        STATS["state_top"] = [(os.path.relpath(fp, STATE), round(sz / 1048576.0, 1), int(now - mt))
+                              for mt, sz, fp in sorted(sf, key=lambda x: -x[1])[:5] if os.path.exists(fp)]
+    except Exception:
+        STATS["state_top"] = []
     return mb
 
 def _tmp_sweep():
@@ -105,7 +112,7 @@ def _tmp_sweep():
                 except Exception:
                     pass
                 print(f"tmp_janitor: /tmp {mb:.0f} MB{fs}; top {STATS['top']}; deleted {STATS['deleted']} files "
-                      f"({STATS['freed_mb']:.0f} MB) since boot", flush=True)
+                      f"({STATS['freed_mb']:.0f} MB) since boot; state {STATS.get('state_top')}", flush=True)
         except Exception as ex:   # never let the janitor take the node down
             STATS["err"] = str(ex)[:200]
         time.sleep(SWEEP_S)
