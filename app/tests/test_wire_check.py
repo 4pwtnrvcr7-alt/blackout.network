@@ -79,5 +79,24 @@ class Gate(unittest.TestCase):
         finally:
             W._gate_ok = real; W._VR.pop("c0000000000000aa", None); os.environ["BN_WIRE_VALIDATE"] = "0"
 
+
+class Release(unittest.TestCase):
+    def test_release_pushes_to_the_stream(self):
+        import sys, types, wire_timeline as W
+        got = []
+        rt = types.SimpleNamespace(on=lambda: True, announce=lambda ids, src="": got.append((list(ids), src)))
+        real = sys.modules.get("realtime"); sys.modules["realtime"] = rt
+        warmed = W._V_STATS.get("warmed")
+        try:
+            W._V_STATS["warmed"] = True
+            W._PC["t"]["k"] = 123.0
+            W._release(["c0000000000000aa"])
+            self.assertEqual(got, [(["c0000000000000aa"], "release")])
+            self.assertEqual(W._PC["t"]["k"], 0.0)        # the poll the event triggers rebuilds the page
+        finally:
+            W._PC["t"].pop("k", None); W._V_STATS["warmed"] = warmed
+            if real is None: sys.modules.pop("realtime", None)
+            else: sys.modules["realtime"] = real
+
 if __name__ == "__main__":
     unittest.main()

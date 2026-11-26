@@ -19,7 +19,7 @@ Data: blackout.db clusters (live scanner) + trends_history.db stories (archive b
 (file:...?mode=ro), the same sources /api/wire_history merges. Display-only grouping (category colours, regions) is
 computed here and never written back. Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py or config.json.
 """
-import html, json, os, re, sqlite3, threading, time, urllib.parse
+import html, json, os, re, sqlite3, sys, threading, time, urllib.parse
 from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -865,6 +865,8 @@ _VDEL = {}      # cid -> last time a wrong stored photo was deleted (once an hou
 _VWARM = {}     # cid -> last photo-card request (once every 3 min)
 _V_STATS = {"evals": 0, "ok": 0, "held": {}, "fixed": {}, "last": 0.0, "err": ""}
 _V_CYC = {"del": 0, "warm": 0}
+_V_REL = {"last": 0.0, "ids": [], "n": 0, "times": []}
+_V_PACE_S = float(os.environ.get("BN_WIRE_PACE_S", "15") or 15)
 _V_RECHECK_S = 15.0       # a held row is re-checked this often; a passing row every 5 minutes
 _V_BUDGET_S = 1.5
 _CN = None
@@ -953,6 +955,19 @@ def _v_eval(r, now):
     for f in v.get("fixes") or []:
         _V_STATS["fixed"][f.split(":")[0]] = _V_STATS["fixed"].get(f.split(":")[0], 0) + 1
     ok = not why
+    prev = _VR.get(cid)
+    if ok and not (prev and prev["ok"]):
+        # Matt 9:54 PM ET: a steady stream, one or two at a time. A fresh arrival (first seen in the last 30 min) is released
+        # at most one every _V_PACE_S; a scan batch that becomes ready together streams out over a minute or two instead of landing
+        # as one block. Older rows (boot warm-up) are released at once.
+        fs = r["fs"] if "fs" in r.keys() else None
+        fresh = bool(fs) and fs >= time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 1800))
+        if fresh and _V_STATS.get("warmed") and now - _V_REL["last"] < _V_PACE_S:
+            ok = False; why = ["paced"]
+        elif fresh:
+            _V_REL["last"] = now
+        if ok:
+            _V_REL["ids"].append(cid)
     _VR[cid] = {"ok": ok, "k": v.get("k") or d["k"], "h": v.get("h") or d["h"], "loc": v.get("loc", d["loc"]),
                 "lat": v.get("lat"), "lon": v.get("lon"), "why": why, "at": now, "photo": pv}
     _V_STATS["evals"] += 1
@@ -980,6 +995,11 @@ def _warm_validate(rows):
     for e in list(_VR.values()):
         for w in e["why"]:
             held[w.split(":")[0]] = held.get(w.split(":")[0], 0) + 1
+    if not _V_STATS.get("warmed") and time.time() - t0 < _V_BUDGET_S:
+        _V_STATS["warmed"] = True                      # one full pass done: from now on fresh releases are paced
+    rel, _V_REL["ids"] = _V_REL["ids"], []
+    if rel:
+        _release(rel)
     errs = held.get("photo-check-error", 0) + held.get("validator-error", 0)
     # fail open (logged in /api/wire_tl/vstatus) only when the checker itself is broken, never for real failures
     _V_STATS["degraded"] = len(_VR) >= 20 and errs > 0.8 * len(_VR)
@@ -988,9 +1008,25 @@ def _warm_validate(rows):
         for k in sorted(_VR, key=lambda k: _VR[k]["at"])[:2000]:
             _VR.pop(k, None); _VT.pop(k, None)
 
+def _release(ids):
+    """Event-driven publish: a row that just passed is pushed to open pages now (realtime stream), not on the next poll."""
+    with _PC_LK:
+        for k in list(_PC["t"]):
+            _PC["t"][k] = 0.0                          # next list read rebuilds, so the poll the event triggers sees the row
+    now = time.time()
+    _V_REL["n"] += len(ids); _V_REL["times"] = [t for t in _V_REL["times"] if now - t < 3600] + [now] * len(ids)
+    rt = sys.modules.get("realtime")
+    if rt is not None and _V_STATS.get("warmed"):
+        try:
+            if rt.on():
+                rt.announce(ids, src="release")
+        except Exception as ex:
+            _V_STATS["err"] = "release: " + str(ex)[:120]
+
 def validator_status():
     return {"on": _v_on(), "degraded": bool(_V_STATS.get("degraded")), "checked": len(_VR), "public": _V_STATS["ok"], "held_by_reason": _V_STATS["held"],
-            "fixed": _V_STATS["fixed"], "evals": _V_STATS["evals"], "last": _V_STATS["last"], "err": _V_STATS["err"]}
+            "fixed": _V_STATS["fixed"], "evals": _V_STATS["evals"], "released_total": _V_REL["n"],
+            "released_last_hour": len([t for t in _V_REL["times"] if time.time() - t < 3600]), "pace_s": _V_PACE_S, "last": _V_STATS["last"], "err": _V_STATS["err"]}
 
 def xu_for_id(cid):
     """Post-on-X URL for one live row (the timeline asks when a row was not pre-warmed). Computed once, then cached."""
