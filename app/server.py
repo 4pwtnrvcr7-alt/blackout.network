@@ -94,9 +94,16 @@ def jet_loop():
         jet_wake.wait(timeout=st["sample_minutes"] * 60); jet_wake.clear()
 
 def q(sql, args=()):
-    c = scanner.db()
-    try: return [dict(r) for r in c.execute(sql, args)]
-    finally: c.close()
+    # Nov 25 2026: a box sync swaps blackout.db; one /api/state read hit "database is locked". Retry briefly instead of a 500.
+    for i in range(4):
+        try:
+            c = scanner.db()
+            try: return [dict(r) for r in c.execute(sql, args)]
+            finally: c.close()
+        except sqlite3.OperationalError as ex:
+            if "locked" not in str(ex) and "busy" not in str(ex) or i == 3:
+                raise
+            time.sleep(0.25 * (i + 1))
 
 def clusters_out(rows):
     try:

@@ -98,5 +98,60 @@ class Release(unittest.TestCase):
             if real is None: sys.modules.pop("realtime", None)
             else: sys.modules["realtime"] = real
 
+class Leftovers(unittest.TestCase):
+    """COS-33 leftovers (Nov 25 10:38 PM ET)."""
+    def test_function_words_and_fragments(self):
+        h = "M 5.2 - 183 km N of Hicks Bay, New Zealand"
+        for t in ("#LoggedNov", "#Later", "#Which", "#WhatHappened", "#Zealand", "#Hicks", "#Maybe"):
+            self.assertFalse(WC.tag_ok(t, h + " later which what happened logged Nov"), t)
+        self.assertTrue(WC.tag_ok("#NewZealand", h))
+        self.assertIn("#NewZealand", WC.tags(["#Earthquake", "#Hicks", "#Zealand"], "quake", h))
+
+    def test_unknown_capitalised_word_is_not_an_entity(self):
+        self.assertFalse(WC.tag_ok("#Rachel", "Children in Gaza, says Rachel at the UN"))
+        self.assertTrue(WC.tag_ok("#Nablus", "Raid in Nablus", known=["#Nablus"]))
+
+    def test_volcano_never_gets_earthquake(self):
+        tg = WC.tags(["#Eruption", "#SCEZSantiago"], "quake", "Volcanic ash advisory: Eruption Mt Nevados De Chillan ash cloud")
+        self.assertNotIn("#Earthquake", tg); self.assertGreaterEqual(len(tg), 3)
+
+    def test_weather_misfiles(self):
+        self.assertEqual(WC.category("conflict", "Thanksgiving Nor'Easter brings Holiday Storm to the Northeast", ""), "weather")
+        self.assertEqual(WC.category("politics", "Chincoteague braces for coastal storm and flooding", ""), "weather")
+
+    def test_intent_posts_exactly_the_validated_tags(self):
+        import x_share, wire_timeline as W
+        body = x_share.with_body({"cluster_id": "c1", "title": "M 5.2 - 183 km N of Hicks Bay, New Zealand",
+                                  "headline": "M 5.2 - 183 km N of Hicks Bay, New Zealand", "location": "New Zealand",
+                                  "category": "quake", "brief": "", "rank": 5, "watchlist": 0, "hidden": False, "links": [], "d": ""})
+        xu, final = W._vt_intent(x_share, body, ["#Earthquake", "#NewZealand", "#Seismic"])
+        self.assertEqual(final, ["#Earthquake", "#NewZealand", "#Seismic"])
+        self.assertNotIn("Hicks%20%23", xu); self.assertNotIn("%23Zealand", xu)
+
+class Scheduling(unittest.TestCase):
+    def test_new_rows_before_rechecks(self):
+        import time as _t, wire_timeline as W
+        seen = []
+        real_eval, real_pub = W._v_eval, W._public_row
+        old = dict(W._VR); env = os.environ.get("BN_WIRE_VALIDATE")
+        try:
+            os.environ["BN_WIRE_VALIDATE"] = "1"
+            W._VR.clear()
+            now = _t.time()
+            for i in range(5):
+                W._VR["h%d" % i] = {"ok": False, "why": ["no-photo-card"], "at": now - 60, "k": "x", "h": "", "loc": "", "lat": None, "lon": None, "photo": ""}
+            W._VR["t0"] = {"ok": False, "why": ["tags"], "at": now - 60, "k": "x", "h": "", "loc": "", "lat": None, "lon": None, "photo": ""}
+            W._v_eval = lambda r, n: seen.append(r["id"]) or True
+            W._public_row = lambda r, a, strict=True: True
+            rows = [{"id": "h%d" % i} for i in range(5)] + [{"id": "t0"}, {"id": "n1"}, {"id": "n2"}]
+            W._warm_validate(rows)
+            self.assertEqual(seen[:2], ["n1", "n2"])          # never-checked rows first
+            self.assertNotIn("t0", seen)                       # a tag hold is not re-checked every 15 s
+        finally:
+            W._v_eval, W._public_row = real_eval, real_pub
+            W._VR.clear(); W._VR.update(old)
+            if env is None: os.environ.pop("BN_WIRE_VALIDATE", None)
+            else: os.environ["BN_WIRE_VALIDATE"] = env
+
 if __name__ == "__main__":
     unittest.main()

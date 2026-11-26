@@ -159,7 +159,9 @@ def location(loc, lat, lon):
 _ACRO = {"NATO", "UN", "EU", "US", "UK", "WHO", "CDC", "FBI", "CIA", "NSA", "DHS", "FEMA", "NOAA", "NWS", "USGS", "NASA", "FAA", "IDF", "ISIS",
          "OPEC", "IAEA", "CISA", "UAE", "DRC", "GOP", "SEC", "IMF", "ICE", "ATF", "DOJ", "DOD", "UAP", "UFO", "AI", "CVE", "H5N1", "MPOX",
          "NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "SPACEX", "OPENAI", "BBC", "CNN", "NYC", "LA", "DC", "EV", "FIFA", "NFL", "NBA", "F1", "BNP"}
-_EXTRA = {"Earthquake", "Volcano", "Eruption", "Tsunami", "Flood", "Flooding", "Storm", "WinterStorm", "Hurricane", "Typhoon", "Cyclone", "Tornado",
+_EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScotia", "NewBrunswick", "Newfoundland", "Yukon", "Nunavut",
+          "Queensland", "Victoria", "Tasmania", "NewSouthWales", "WesternAustralia", "SouthAustralia", "Scotland", "Wales", "England",
+          "Earthquake", "Volcano", "Eruption", "VolcanicAsh", "Tsunami", "Flood", "Flooding", "Storm", "WinterStorm", "Hurricane", "Typhoon", "Cyclone", "Tornado",
           "Wildfire", "Weather", "Snow", "Rain", "Heatwave", "HeatWave", "Drought", "Landslide", "Avalanche", "Blizzard", "HighWind",
           "Cybersecurity", "Cyberattack", "Ransomware", "Hacking", "Hackers", "DataBreach", "Malware", "Vulnerability", "Phishing", "Breach",
           "War", "Military", "Conflict", "Missile", "Missiles", "Drone", "Drones", "Airstrike", "Navy", "Army", "Ceasefire", "Nuclear", "Terrorism",
@@ -183,7 +185,12 @@ _COMMON = set("""maybe what happened two three four five one six seven ten audio
 disrupted fascist children pitcher coup near incident naval ballistic volcanic satellite security hacker gentlemen princess mass watch
 read live update breaking report says new latest funniest scariest reactions weird lead join today tonight special first last big
 good bad more most many some several another other people man woman men women police officials official president minister city
-state county region area north south east west central western eastern northern southern upper lower total about after""".split())
+state county region area north south east west central western eastern northern southern upper lower total about after
+later which what who whom whose where when why how this that these those then now soon still just also only very here there
+logged posted updated reported confirmed blamed according amid during while before since until again even yet already
+happened happening whathappened jan feb mar apr jun jul aug sep sept oct nov dec january february march april june july
+august september october november december monday tuesday wednesday thursday friday saturday sunday morning evening night
+week weekend month year yesterday tomorrow thanks thanksgiving holiday treaty vulnerabilities vulnerability""".split())
 
 def _known_set():
     global _known
@@ -209,15 +216,20 @@ def _title_case(title):
     w = [x for x in re.findall(r"[A-Za-z][A-Za-z'\u2019-]*", title or "") if len(x) > 3]
     return bool(w) and sum(1 for x in w if x[0].isupper()) / len(w) > 0.6
 
-def tag_ok(tag, title=""):
+def tag_ok(tag, title="", known=()):
+    """known: extra known entities for this story (x_share.location_tags: geocoded places)."""
     t = (tag or "").lstrip("#")
     if not t or not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{1,24}", t):
         return False
     lo = t.lower()
     if lo in _BAD:
         return False
-    if lo in _known_set():
+    if lo in _known_set() or lo in {str(x).lstrip("#").lower() for x in (known or ())}:
         return True
+    # function words and run-togethers of them (#Later, #Which, #WhatHappened, #LoggedNov) are never tags
+    hump = [p.lower() for p in re.findall(r"[A-Z][a-z0-9]*", t)]
+    if lo in _COMMON or (hump and all(p in _COMMON for p in hump)) or (len(hump) == 2 and hump[1] in _COMMON):
+        return False
     if t.isupper():                       # obscure acronyms (#WAAF, #HKCERT, #READ) are not tags people search
         return False
     if t[0].islower():
@@ -229,7 +241,9 @@ def tag_ok(tag, title=""):
         if any(p.lower() in _COMMON for p in parts):
             return False
         return bool(re.search(r"\b" + parts[0] + r"[\s-]+" + parts[1] + r"\b", title or ""))
-    # an unknown single word: only a proper noun the headline itself capitalises mid-sentence (a brand or a name)
+    # an unknown single word is not a known entity: never a tag (Nov 25 10:40 PM: #Hicks, #Zealand, #Later)
+    if os.environ.get("BN_WIRE_TAG_STRICT", "1") != "0":
+        return False
     if _title_case(title):
         return False
     words = re.findall(r"[A-Za-z][A-Za-z0-9'\u2019]*", title or "")
@@ -258,7 +272,7 @@ def tags(raw, k, title="", loc_tags=()):
     out = []
     for t in list(raw or []) + list(loc_tags or []):
         t = "#" + _case(str(t).lstrip("#"))
-        if tag_ok(t, title) and t.lower() not in {x.lower() for x in out}:
+        if tag_ok(t, title, loc_tags) and t.lower() not in {x.lower() for x in out}:
             out.append(t)
     have = lambda t: t.lower() in {x.lower() for x in out}
     ct = _CAT_TAG.get(k)
@@ -276,7 +290,8 @@ def tags(raw, k, title="", loc_tags=()):
                     if n == 1 and (cand.lower() in _COMMON or (cand.upper() in _ACRO and not words[i].isupper())):
                         continue
                     out.append("#" + _case(cand))
-    for extra in _CAT_TAG2.get(k, ()):
+    volc = k == "quake" and re.search(r"volcan|erupt|ash cloud|ash advisory", title or "", re.I)
+    for extra in (("Volcano", "Eruption", "VolcanicAsh") if volc else _CAT_TAG2.get(k, ())):
         if len(out) >= 3:
             break
         if extra == "Military" and not _HARD_MIL.search(title or ""):
