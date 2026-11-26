@@ -19,7 +19,7 @@ Data: blackout.db clusters (live scanner) + trends_history.db stories (archive b
 (file:...?mode=ro), the same sources /api/wire_history merges. Display-only grouping (category colours, regions) is
 computed here and never written back. Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py or config.json.
 """
-import html, json, os, re, sqlite3, threading, time
+import html, json, os, re, sqlite3, sys, threading, time, urllib.parse
 from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -233,6 +233,7 @@ _SNAP = {}; _SNAP_LK = threading.Lock(); _SNAP_TTL = 4.0
 _XC = {}; _XC_MAX = 4000; _XC_TTL = 900.0      # cid -> (sig, xu, built_at); rows with fewer than 3 tags are cached too
 _PC = {"t": {}, "v": {}}; _PC_TTL = 3.0; _PC_LK = threading.Lock()
 _PA = {}                                         # page key -> (args, last_requested)
+_FRESH = {"t": 0.0}
 _PC_STALE = 20.0                                 # a cached page may be served this long while the warmer rebuilds it
 _WARM = {"thread": None, "rows_at": 0.0, "cursor": 0, "baked": {}, "err": ""}
 _WARM_LK = threading.Lock()
@@ -338,10 +339,23 @@ def _gate_ok(cid):
         return False
     return bool(desk or note is not None)
 
-def _public_row(r, archive):
-    """Live clusters are held until story_writer has a write-up, tags and card. Archive items stay visible."""
+def _public_row(r, archive, strict=True):
+    """Live clusters are held until story_writer has a write-up, tags and card. Archive items stay visible.
+    strict (every public path): the item must also have passed the pre-publish validator (wire_check) with its photo card built.
+    strict=False is only for the warm thread, which prepares held rows (tags, card, verdict)."""
     if archive:
         return True
+    if strict and _v_on() and not _V_STATS.get("degraded"):
+        cid = r["id"] if "id" in r.keys() else r["cluster_id"]
+        e = _VR.get(cid)
+        if e is None:
+            # rows first seen before the validator window keep the previous gate (with the stateless category fix), so
+            # category history still pages back; every newer row must have a passing verdict
+            fs = r["fs"] if "fs" in r.keys() else None
+            if not fs or fs >= _v_cutoff():
+                return False
+        elif not e["ok"]:
+            return False
     try:
         import story_display as _SD
         if _SD.is_roundup(r["title"] if "title" in r.keys() else ""):
@@ -369,6 +383,23 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
             "category": r["category"] or "", "brief": r["brief"] or "", "rank": rk,
             "watchlist": r["watchlist"] or 0, "hidden": hid, "links": links, "d": what or dek}
     stored = [t for t in _stored_tags(r["id"]) if not x_share._is_filler(t)]
+    if _v_on():
+        try:
+            import wire_check as WC
+            body = x_share.with_body(item)
+            raw = stored[:5] if (len(stored) >= 3 and not hid) else x_share.hashtags(body)
+            try:
+                lt = x_share.location_tags(body)
+            except Exception:
+                lt = []
+            k = WC.category(cat_key(r["category"], title, False), h, what or dek)
+            vt = WC.tags(raw, k, h, lt)
+            xu = x_share.intent_url(body, tags=vt) if vt else x_share.intent_url(body)
+            final = re.findall(r"#[A-Za-z0-9]+", urllib.parse.unquote(xu.split("text=", 1)[-1].split("&url=", 1)[0]))
+            _VT[r["id"]] = final if (3 <= len(final) <= 5 and all(WC.tag_ok(t, h) for t in final)) else []
+            return xu
+        except Exception as ex:
+            _WARM["err"] = f"vtags: {type(ex).__name__}: {ex}"[:160]
     if len(stored) >= 3 and not hid:
         return x_share.intent_url(x_share.with_body(item), tags=stored[:5])
     return x_share.intent_url(x_share.with_body(item))
@@ -425,6 +456,12 @@ def _item(r, archive, warm_budget=None, compute=None):
     if archive:
         d["xu"] = ""          # the timeline shows no Post on X for archive rows
         return d
+    e = _VR.get(r["id"])
+    if e is not None:          # validator corrections (category, headline, location) for the public row
+        d["k"] = e["k"]; d["h"] = e["h"]; d["loc"] = e["loc"]; d["lat"] = e["lat"]; d["lon"] = e["lon"]
+        d["g"] = region_key(e["loc"], title, e["lat"], e["lon"])
+    elif _v_on():
+        d["k"] = _kfix(r["id"], d["k"], h, what or dek)
     try:
         hid = False
         try:
@@ -550,7 +587,7 @@ def _facet_ok(r, archive, cats, regs):
         return True
     title = _clean(r["title"])
     loc = _clean(r["location"])[:90] if r["location"] else ""
-    if cats and cat_key(r["category"], title, archive) not in cats:
+    if cats and _vk(r, title, archive) not in cats:
         return False
     if regs and region_key(loc, title, r["lat"], r["lon"]) not in regs:
         return False
@@ -774,7 +811,7 @@ def _warm_rows(n):
         e = _XC.get(r["id"])
         if e is not None and now - e[2] < _XC_TTL:
             continue
-        if not _public_row(r, False):
+        if not _public_row(r, False, strict=False):
             continue
         try:
             _item(r, False, compute=True)            # fills _XC (rows with fewer than 3 tags too)
@@ -785,6 +822,17 @@ def _warm_rows(n):
         done += 1
         time.sleep(0.01)
     _warm_bake(rows[:150])
+    if _v_on():
+        try:
+            c = _ro(DB)
+            try:
+                win = list(c.execute(f"SELECT {_LIVE_COLS} FROM clusters WHERE watchlist IN (0,1) AND first_seen >= ? "
+                                     f"ORDER BY first_seen DESC LIMIT 3000", (_v_cutoff(),)))
+            finally:
+                c.close()
+        except sqlite3.Error:
+            win = []
+        _warm_validate(win or rows[:700])
 
 def _warm_bake(rows):
     """Queue card bakes the way story_writer.allow() used to on every list call, once per story per 10 minutes."""
@@ -795,7 +843,7 @@ def _warm_bake(rows):
         return
     for r in rows:
         cid = r["id"]
-        if now - _WARM["baked"].get(cid, 0) < 600 or not _public_row(r, False):
+        if now - _WARM["baked"].get(cid, 0) < 600 or not _public_row(r, False, strict=False):
             continue
         _WARM["baked"][cid] = now
         try:
@@ -805,6 +853,180 @@ def _warm_bake(rows):
             pass
     if len(_WARM["baked"]) > 2000:
         _WARM["baked"].clear()
+
+# ------------------------------------------------------------------ pre-publish validator (Nov 25 2026, Matt 9:28 PM ET, pt1925u)
+# Every live row is checked by wire_check in the warm thread (never in a request): category vs text, photo vs category,
+# location sanity, 3-5 rule-passing tags, headline, and a finished photo card. Only a passing row is public (list, realtime
+# stream, Post on X). Deterministic fixes are applied (category, headline tail, location, tags; a wrong stored photo is
+# deleted so the photo worker picks the category photo again); anything else is held until it passes.
+_VR = {}        # cid -> verdict {"ok", "k", "h", "loc", "lat", "lon", "why", "at", "sig"}
+_VT = {}        # cid -> validated tags actually in the Post on X text
+_VDEL = {}      # cid -> last time a wrong stored photo was deleted (once an hour)
+_VWARM = {}     # cid -> last photo-card request (once every 3 min)
+_V_STATS = {"evals": 0, "ok": 0, "held": {}, "fixed": {}, "last": 0.0, "err": ""}
+_V_CYC = {"del": 0, "warm": 0}
+_V_REL = {"last": 0.0, "ids": [], "n": 0, "times": []}
+_V_PACE_S = float(os.environ.get("BN_WIRE_PACE_S", "15") or 15)
+_V_RECHECK_S = 15.0       # a held row is re-checked this often; a passing row every 5 minutes
+_V_BUDGET_S = 1.5
+_CN = None
+
+def _v_on():
+    try:
+        import wire_check as WC
+        return WC.on()
+    except Exception:
+        return False
+
+_KF = {}
+def _kfix(cid, k, h, text=""):
+    """Stateless category fix (wire_check.category) for rows outside the validator window; cached per row."""
+    v = _KF.get(cid)
+    if v is not None and v[0] == k:
+        return v[1]
+    try:
+        import wire_check as WC
+        out = WC.category(k, h, text)
+    except Exception:
+        out = k
+    if len(_KF) > 40000:
+        _KF.clear()
+    _KF[cid] = (k, out)
+    return out
+
+def _v_cutoff():
+    h = float(os.environ.get("BN_WIRE_VALIDATE_H", "24") or 24)
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - h * 3600))
+
+def _vk(r, title, archive):
+    k = cat_key(r["category"], title, archive)
+    if not archive:
+        e = _VR.get(r["id"])
+        if e is not None:
+            return e["k"]
+        if _v_on():
+            return _kfix(r["id"], k, headline(title))
+    return k
+
+def _country_names():
+    global _CN
+    if _CN is None:
+        try:
+            import x_share
+            _CN = {k.lower() for k in x_share._COUNTRIES} | {str(v).lower() for v in x_share._COUNTRIES.values()}
+        except Exception:
+            _CN = set()
+    return _CN
+
+def _v_eval(r, now):
+    import wire_check as WC
+    cid = r["id"]
+    if cid not in _VT:
+        _XC.pop(cid, None)                      # force _xu_build so the validated tags are known
+    d = _item(r, False, compute=True)           # fills the validated tags (_VT) through _xu_build
+    if not d.get("xu"):
+        _XC.pop(cid, None); d = _item(r, False, compute=True)
+    choice, has = WC.photo_state(cid)
+    v = WC.check(d, choice=choice, has_photo=has, country_names=_country_names())
+    why = list(v.get("reasons") or [])
+    tg = _VT.get(cid) or []
+    if len(tg) < 3:
+        why.append("tags")
+    if v.get("error"):
+        why.append("validator-error")
+    pv = v.get("photo") or ""
+    if pv.startswith("bad") and now - _VDEL.get(cid, 0) > 3600 and _V_CYC["del"] < 6:
+        _V_CYC["del"] += 1
+        _VDEL[cid] = now
+        try:
+            import story_photo, share_card
+            story_photo.delete_stored_photo(cid)
+            share_card._BAKED.discard(cid)
+        except Exception:
+            pass
+        _VWARM.pop(cid, None)
+    if (not has or pv.startswith("bad")) and now - _VWARM.get(cid, 0) > 180 and _V_CYC["warm"] < 8:
+        _VWARM[cid] = now; _V_CYC["warm"] += 1          # bounded: share_card.warm keeps at most 20 photo jobs in flight
+        try:
+            import share_card
+            share_card.warm(cid)                # the paced photo worker builds the licensed photo card
+        except Exception:
+            pass
+    for f in v.get("fixes") or []:
+        _V_STATS["fixed"][f.split(":")[0]] = _V_STATS["fixed"].get(f.split(":")[0], 0) + 1
+    ok = not why
+    prev = _VR.get(cid)
+    if ok and not (prev and prev["ok"]):
+        # Matt 9:54 PM ET: a steady stream, one or two at a time. A fresh arrival (first seen in the last 30 min) is released
+        # at most one every _V_PACE_S; a scan batch that becomes ready together streams out over a minute or two instead of landing
+        # as one block. Older rows (boot warm-up) are released at once.
+        fs = r["fs"] if "fs" in r.keys() else None
+        fresh = bool(fs) and fs >= time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 1800))
+        if fresh and _V_STATS.get("warmed") and now - _V_REL["last"] < _V_PACE_S:
+            ok = False; why = ["paced"]
+        elif fresh:
+            _V_REL["last"] = now
+        if ok:
+            _V_REL["ids"].append(cid)
+    _VR[cid] = {"ok": ok, "k": v.get("k") or d["k"], "h": v.get("h") or d["h"], "loc": v.get("loc", d["loc"]),
+                "lat": v.get("lat"), "lon": v.get("lon"), "why": why, "at": now, "photo": pv}
+    _V_STATS["evals"] += 1
+    return ok
+
+def _warm_validate(rows):
+    if not _v_on():
+        return
+    now = time.time(); t0 = now
+    _V_CYC["del"] = 0; _V_CYC["warm"] = 0
+    for r in rows:
+        if time.time() - t0 > _V_BUDGET_S:
+            break
+        cid = r["id"]
+        e = _VR.get(cid)
+        if e is not None and now - e["at"] < (300.0 if e["ok"] else _V_RECHECK_S):
+            continue
+        if not _public_row(r, False, strict=False):
+            continue
+        try:
+            _v_eval(r, now)
+        except Exception as ex:
+            _V_STATS["err"] = f"{type(ex).__name__}: {ex}"[:160]
+    held = {}
+    for e in list(_VR.values()):
+        for w in e["why"]:
+            held[w.split(":")[0]] = held.get(w.split(":")[0], 0) + 1
+    if not _V_STATS.get("warmed") and time.time() - t0 < _V_BUDGET_S:
+        _V_STATS["warmed"] = True                      # one full pass done: from now on fresh releases are paced
+    rel, _V_REL["ids"] = _V_REL["ids"], []
+    if rel:
+        _release(rel)
+    errs = held.get("photo-check-error", 0) + held.get("validator-error", 0)
+    # fail open (logged in /api/wire_tl/vstatus) only when the checker itself is broken, never for real failures
+    _V_STATS["degraded"] = len(_VR) >= 20 and errs > 0.8 * len(_VR)
+    _V_STATS["held"] = held; _V_STATS["ok"] = sum(1 for e in list(_VR.values()) if e["ok"]); _V_STATS["last"] = now
+    if len(_VR) > 6000:
+        for k in sorted(_VR, key=lambda k: _VR[k]["at"])[:2000]:
+            _VR.pop(k, None); _VT.pop(k, None)
+
+def _release(ids):
+    """Event-driven publish: a row that just passed is pushed to open pages now (realtime stream), not on the next poll."""
+    with _PC_LK:
+        for k in list(_PC["t"]):
+            _PC["t"][k] = 0.0                          # next list read rebuilds, so the poll the event triggers sees the row
+    now = time.time()
+    _V_REL["n"] += len(ids); _V_REL["times"] = [t for t in _V_REL["times"] if now - t < 3600] + [now] * len(ids)
+    rt = sys.modules.get("realtime")
+    if rt is not None and _V_STATS.get("warmed"):
+        try:
+            if rt.on():
+                rt.announce(ids, src="release")
+        except Exception as ex:
+            _V_STATS["err"] = "release: " + str(ex)[:120]
+
+def validator_status():
+    return {"on": _v_on(), "degraded": bool(_V_STATS.get("degraded")), "checked": len(_VR), "public": _V_STATS["ok"], "held_by_reason": _V_STATS["held"],
+            "fixed": _V_STATS["fixed"], "evals": _V_STATS["evals"], "released_total": _V_REL["n"],
+            "released_last_hour": len([t for t in _V_REL["times"] if time.time() - t < 3600]), "pace_s": _V_PACE_S, "last": _V_STATS["last"], "err": _V_STATS["err"]}
 
 def xu_for_id(cid):
     """Post-on-X URL for one live row (the timeline asks when a row was not pre-warmed). Computed once, then cached."""
@@ -1079,6 +1301,8 @@ def handle_get(path, qs):
         if n == "meta":
             try: return 200, meta()
             except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
+        if n == "vstatus":
+            return 200, validator_status()
         if n == "count":
             q = (g("q", "") or "")[:80]
             try: return 200, count(q, g("bg") == "1")
@@ -1118,6 +1342,13 @@ def handle_get(path, qs):
         cats = (g("cats", "") or "")[:200]
         regs = (g("regs", "") or "")[:200]
         time_win = (g("time", "") or "")[:16]
+        if g("fresh") == "1" and time.time() - _FRESH["t"] >= 1.0:   # the refresh button: a fresh server read, not a cached page
+            _FRESH["t"] = time.time()
+            try:
+                args = (before, after, lim, q, g("bg") == "1", lat, lon, rmi, sev, cats, regs, time_win)
+                out = _page_build(*args); _pstore(_pkey(*args), out); _PA[_pkey(*args)] = (args, time.time())
+                return 200, out
+            except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
         try: return 200, page(before, after, lim, q, g("bg") == "1", lat, lon, rmi, sev, cats, regs, time_win)
         except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
     return 404, {"error": "not found"}

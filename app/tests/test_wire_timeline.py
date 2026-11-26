@@ -1,5 +1,6 @@
 """Wire timeline (/wire; /wire-next 301s here). Run: cd app && python3 -m unittest tests.test_wire_timeline -v"""
 import os, sqlite3, sys, tempfile, unittest
+os.environ["BN_WIRE_VALIDATE"] = "0"   # these cover paging/speed/gate; the pre-publish validator has tests/test_wire_check.py
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import addons, wire_timeline as W
 

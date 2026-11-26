@@ -1810,6 +1810,16 @@ def apply_card_photo(cid, title="", loc="", brief="", lat=None, lon=None, catego
         # on a Nicaragua volcano. A country-level US hit needs a US word in the story, else use the topic photo.
         if hit and hit.get("cc") == "US" and hit.get("precision") == "country" and not _US_WORDS.search((title or "") + " " + (brief or "")):
             hit = None
+        # Nov 25 2026 (pt1925u): the photo follows the validated Wire category (a "storm a building" raid is not weather), and a
+        # country-level place (Russia -> the Kremlin on a Kyiv strike) is never the photo for a conflict, crime, wreck or hazard story.
+        try:
+            import wire_check as WC
+            if WC.on():
+                category = WC.photo_category(category or "", title or "", brief or "")
+                if hit and hit.get("precision") == "country" and WC.no_country_photo(category):
+                    hit = None
+        except Exception:
+            pass
         im = CP.choose(cid, title or "", hit, brief or "", category or "")
         if not im:
             return None

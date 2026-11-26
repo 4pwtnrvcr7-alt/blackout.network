@@ -283,10 +283,12 @@ function pollNewer(manual){
   if(loading.n||!topCur)return Promise.resolve(0);
   if(!manual&&d.hidden)return Promise.resolve(0);
   loading.n=1;var g=gen,got=0;if(manual)busy(true);
-  return api("after="+encodeURIComponent(topCur)+"&limit=100&"+qp()).then(function(j){if(g!==gen)return;
-    var arr=j.items||[];
-    if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
-    topEnd=arr.length<100;
+  /* Nov 25 2026 (pt1925u): read the top of the Wire, not "after the top row". A story is dated by its event time, so one that
+     finished its write-up/card a few minutes later sorts just under the current top and an after= cursor never returned it. */
+  return api("limit=100&"+qp()).then(function(j){if(g!==gen)return;
+    var arr=(j.items||[]).filter(function(it){return !seen[it.id]&&!queued[it.id]});
+    if(j.items&&j.items[0]&&(!topCur||j.items[0].t+"|"+j.items[0].id>topCur))topCur=j.items[0].t+"|"+j.items[0].id;
+    topEnd=true;
     if(arr.length)got=arrive(arr);
     stamp();
   }).catch(function(){}).then(function(){if(g!==gen)return got;loading.n=0;if(manual)busy(false);status();check();return got});
@@ -310,7 +312,7 @@ function refresh(){
     fetch("/api/wire_tl/meta?_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(m){if(m&&m.total!=null){meta=m;total=m.total;status()}}).catch(function(){});
     if(!topEnd){reset();scrollToList();return loadOlder().then(function(){busy(false);stamp();flash("Showing the latest stories")})}
     loading.n=1;
-    return api("limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
+    return api("fresh=1&limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;   /* fresh=1: a new server read, no cached page */
       var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});
       if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
       topEnd=true;todayK=dayKey(new Date().toISOString());yK=dayKey(new Date(Date.now()-864e5).toISOString());
@@ -318,7 +320,7 @@ function refresh(){
       if(fresh.length)arrive(fresh);stamp();
       var n=0;for(var k in NEW)if(NEW[k]>=t0)n++;   /* counts what the stream delivered during the refresh too */
       var wait=Math.max(0,700-(Date.now()-t0));
-      setTimeout(function(){if(n)flash(n+" new stor"+(n===1?"y":"ies"));else showNone()},wait);
+      setTimeout(function(){if(n)flash(n+" new stor"+(n===1?"y":"ies"));else flash("No new stories",2200)},wait);
     }).catch(function(){flash("Could not reach the server. Try again in a moment.")}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
   });
 }

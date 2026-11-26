@@ -5,6 +5,7 @@ holds the story_writer database never raise 'database is locked', never open a s
 lock on the request path, and stay under 1 s; (3) rows with fewer than 3 tags are cached, not recomputed.
 """
 import json, os, sqlite3, sys, tempfile, threading, time, unittest
+os.environ["BN_WIRE_VALIDATE"] = "0"   # these cover paging/speed/gate; the pre-publish validator has tests/test_wire_check.py
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 D = tempfile.mkdtemp()
