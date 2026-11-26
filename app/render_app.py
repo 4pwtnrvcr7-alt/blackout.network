@@ -217,12 +217,12 @@ def handle_push(h):
     n = int(h.headers.get("Content-Length") or 0)
     if n <= 0 or n > MAX_PUSH: return 413, {"error": f"push must be 1..{MAX_PUSH} bytes"}
     fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".tgz"); hsh = hashlib.sha256(); left = n
-    with os.fdopen(fd, "wb") as f:
-        while left > 0:
-            b = h.rfile.read(min(left, 1 << 20))
-            if not b: break
-            f.write(b); hsh.update(b); left -= len(b)
-    try:
+    try:   # Nov 25 2026: the upload read is inside the try, so a dropped push never leaves its partial .tgz in /tmp
+        with os.fdopen(fd, "wb") as f:
+            while left > 0:
+                b = h.rfile.read(min(left, 1 << 20))
+                if not b: break
+                f.write(b); hsh.update(b); left -= len(b)
         if left: return 400, {"error": "short body"}
         ok, why = verify(h, "POST", "/internal/sync/push", hsh.hexdigest())
         if not ok: return 403, {"error": why}
@@ -260,12 +260,21 @@ def handle_rt(h, path):
     except Exception as ex:
         traceback.print_exc(); return 500, {"error": str(ex)[:200]}
 
+def _owned_fp(p):
+    parts = []
+    for suf in ("", "-wal"):
+        try: st = os.stat(p + suf); parts.append(f"{suf}:{st.st_size}:{st.st_mtime_ns}")
+        except FileNotFoundError: parts.append(f"{suf}:-")
+    return "fp:" + hashlib.sha256("|".join(parts).encode()).hexdigest()
+
 def manifest():
     owned = {}
     for rel in R.RENDER_OWNED:
         p = os.path.join(BASE, rel)
         if os.path.exists(p):
-            try: tmp = _db_snapshot(rel); owned[rel] = _sha(tmp); os.unlink(tmp)
+            # Nov 25 2026: fingerprint from size+mtime of the DB and its WAL, not a full snapshot. The box calls this every
+            # cycle and only compares it with the value it saw last time; snapshotting cards.db (~600 MB) here filled /tmp.
+            try: owned[rel] = _owned_fp(p)
             except Exception as ex: owned[rel] = "error:" + str(ex)[:80]
     with _mlock:   # t338: only files that are really on disk (a restart can keep /tmp/bn_state but lose the pushed data -> "Syncing" forever)
         for rel in [r for r in MAN if not os.path.exists(os.path.join(BASE, r))]: MAN.pop(rel, None)
