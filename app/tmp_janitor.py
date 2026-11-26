@@ -6,7 +6,7 @@ volume /tmp exceeded the limit of 2GB"; each eviction dropped the Wire data unti
 stale sync/handoff archives and orphaned *.tmp files, and when /tmp is over SOFT_MB trims rebuildable caches
 (card/OG/photo/weather/crime caches) oldest first down to TARGET_MB. It never deletes databases, WAL/SHM files,
 secrets or the sync manifest."""
-import os, time, threading
+import os, re, time, threading
 
 ROOT = os.environ.get("BN_TMP_ROOT", "/tmp")
 STATE = os.environ.get("BN_STATE_DIR", "/tmp/bn_state")
@@ -55,6 +55,8 @@ def _rm(fp, size):
     except OSError:
         return 0
 
+_SNAP_RE = re.compile(r"^tmp[a-z0-9_]{6,12}\.db$")
+
 def _is_cache(name):
     return name in CACHE_DIRS or name.startswith(CACHE_PREFIXES)
 
@@ -74,6 +76,10 @@ def sweep(now=None):
             age = now - mt
             stale_archive = fp.endswith((".tgz", ".tar.gz")) and age > ARCHIVE_AGE_S and (fp.startswith(STATE) or os.path.dirname(fp) == ROOT)
             stale_tmp = base.endswith(".tmp") and age > TMP_AGE_S
+            # handoff_db.snapshot_sqlite temp copies (mkstemp "tmpXXXXXXXX.db") left by a failed snapshot; never report_queue.db etc.
+            stale_snap = (os.path.dirname(fp) == STATE.rstrip("/") and _SNAP_RE.match(base) is not None and age > ARCHIVE_AGE_S)
+            if stale_snap:
+                sz -= _rm(fp, s); continue
             if (stale_archive or stale_tmp) and not _keep(fp):
                 sz -= _rm(fp, s); continue
             if _is_cache(name) and not _keep(fp):
