@@ -18,19 +18,28 @@ def snapshot_sqlite(src_path, dest_dir):
     os.close(fd)
     # Open read-write so uncheckpointed WAL commits are visible. A mode=ro
     # connection can miss WAL pages when it cannot take the shm write lock.
-    s = sqlite3.connect(src_path, timeout=20)
-    d = sqlite3.connect(tmp)
-    try:
+    ok = False
+    try:   # Nov 25 2026: a failed snapshot must not leave its partial copy in /tmp (cards.db is ~600 MB)
+        s = sqlite3.connect(src_path, timeout=20)
+        d = sqlite3.connect(tmp)
         try:
-            s.execute("PRAGMA wal_checkpoint(PASSIVE)")
-        except Exception:
-            pass
-        s.backup(d)
-        d.execute("PRAGMA journal_mode=DELETE")
-        d.commit()
+            try:
+                s.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            except Exception:
+                pass
+            s.backup(d)
+            d.execute("PRAGMA journal_mode=DELETE")
+            d.commit()
+            ok = True
+        finally:
+            d.close()
+            s.close()
     finally:
-        d.close()
-        s.close()
+        if not ok:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
     return tmp
 
 
