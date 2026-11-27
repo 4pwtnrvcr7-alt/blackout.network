@@ -3,6 +3,7 @@
 Pulls public machine-readable sources, normalizes, clusters (fuzzy cross-source),
 scores severity 0-100, separates watchlist, writes SQLite. Research only."""
 import json, os, re, sqlite3, time, math, html, hashlib, traceback, threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
@@ -43,14 +44,175 @@ def parse_t(s):
     except Exception:
         return None
 def strip(s): return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+# Fetch-phase knobs only (do not change scoring). Tight timeouts so one hung source cannot dominate the cycle.
+FETCH_TIMEOUT = float(os.environ.get("BN_FETCH_TIMEOUT", "10") or 10)
+FETCH_WORKERS = int(os.environ.get("BN_FETCH_WORKERS", "8") or 8)
+SLOW_EVERY_S = float(os.environ.get("BN_SLOW_EVERY_S", "600") or 600)
+SLOW_MS = int(os.environ.get("BN_SLOW_MS", "12000") or 12000)
+# Functions that are rate-limited or issue many serial GETs. Isolated so they cannot block official/fast sources.
+SLOW_FNS = {"f_gdelt", "f_telegram", "f_youtube_live", "f_bluesky", "f_mastodon"}
+_SLOW = {"names": set(), "last": 0.0, "busy": False, "dyn": set()}
+_HTTP_CACHE = {}          # url -> {etag, last_mod, body, headers}
+_HTTP_CACHE_MAX = 64
+_HTTP_CACHE_BYTES = 2 * 1024 * 1024
+_SLOW_LK = threading.Lock()
+
+class _CachedResp:
+    """Minimal requests-like response used when a conditional GET returns 304."""
+    def __init__(self, body, headers=None, status=200):
+        self.content = body if isinstance(body, (bytes, bytearray)) else (body or b"")
+        self.text = self.content.decode("utf-8", "replace") if isinstance(self.content, (bytes, bytearray)) else (self.content or "")
+        self.headers = headers or {}
+        self.status_code = status
+        self.url = ""
+    def json(self):
+        return json.loads(self.text) if self.text.strip() else {}
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code}")
+
 def get(url, **kw):
+    """HTTP GET with a short timeout, one immediate retry, and cheap conditional GET (ETag / Last-Modified)."""
     h = {**UA, **kw.pop("headers", {})}
-    to = kw.pop("timeout", 30)
+    to = kw.pop("timeout", FETCH_TIMEOUT)
+    cached = _HTTP_CACHE.get(url)
+    if cached:
+        if cached.get("etag"):
+            h.setdefault("If-None-Match", cached["etag"])
+        if cached.get("last_mod"):
+            h.setdefault("If-Modified-Since", cached["last_mod"])
+    def _do():
+        return requests.get(url, headers=h, timeout=to, **kw)
     try:
-        r = requests.get(url, headers=h, timeout=to, **kw)
+        r = _do()
     except (requests.ConnectionError, requests.Timeout):
-        time.sleep(3); r = requests.get(url, headers=h, timeout=to, **kw)   # one retry on transient network/TLS errors
-    r.raise_for_status(); return r
+        r = _do()                                       # one retry, no 3 s sleep (that used to stack on every timeout)
+    if r.status_code == 304 and cached and cached.get("body") is not None:
+        return _CachedResp(cached["body"], cached.get("headers") or {}, 200)
+    r.raise_for_status()
+    body = r.content
+    if body is not None and len(body) <= _HTTP_CACHE_BYTES:
+        if len(_HTTP_CACHE) >= _HTTP_CACHE_MAX and url not in _HTTP_CACHE:
+            # drop the oldest insertion
+            try:
+                _HTTP_CACHE.pop(next(iter(_HTTP_CACHE)))
+            except Exception:
+                _HTTP_CACHE.clear()
+        _HTTP_CACHE[url] = {
+            "etag": r.headers.get("ETag") or r.headers.get("Etag") or "",
+            "last_mod": r.headers.get("Last-Modified") or "",
+            "body": body,
+            "headers": dict(r.headers),
+        }
+    return r
+
+def _run_source(name, url, fn):
+    t0 = time.monotonic()
+    try:
+        res = fn()
+        note = {}
+        if isinstance(res, tuple):
+            res, note = res
+        return {"name": name, "url": url, "ok": 1, "items": res or [], "note": note or {},
+                "err": None, "ms": int((time.monotonic() - t0) * 1000)}
+    except Exception as ex:
+        return {"name": name, "url": url, "ok": 0, "items": [], "note": {},
+                "err": f"{type(ex).__name__}: {str(ex)[:300]}", "ms": int((time.monotonic() - t0) * 1000)}
+
+def _pool_fetch(pairs, workers=None):
+    """Run source fetchers concurrently. Bounded pool; results in completion order."""
+    if not pairs:
+        return []
+    n = max(1, min(int(workers if workers is not None else FETCH_WORKERS), len(pairs)))
+    if n == 1 or len(pairs) == 1:
+        return [_run_source(name, url, fn) for name, url, fn in pairs]
+    out = []
+    with ThreadPoolExecutor(max_workers=n) as ex:
+        futs = [ex.submit(_run_source, name, url, fn) for name, url, fn in pairs]
+        for f in as_completed(futs):
+            out.append(f.result())
+    return out
+
+def _is_slow_fn(fn, name=""):
+    n = getattr(fn, "__name__", "") or ""
+    if n in SLOW_FNS:
+        return True
+    if name in _SLOW["dyn"] or n in _SLOW["dyn"]:
+        return True
+    return False
+
+def _partition_sources(sources):
+    fast, slow = [], []
+    for row in sources:
+        name, url, fn = row[0], row[1], row[2]
+        (slow if _is_slow_fn(fn, name) else fast).append(row)
+    return fast, slow
+
+def _record_health(c, result):
+    name, url = result["name"], result["url"]
+    note = dict(result.get("note") or {})
+    note["ms"] = result["ms"]
+    if result["ok"]:
+        c.execute("INSERT OR REPLACE INTO source_health VALUES(?,?,?,?,?,?,?,?)",
+                  (name, url, 1, len(result["items"]), iso(now()), iso(now()), None, json.dumps(note)))
+        if result["ms"] >= SLOW_MS and getattr(result, "fn_name", None) not in SLOW_FNS:
+            _SLOW["dyn"].add(name)
+    else:
+        prev = c.execute("SELECT last_ok FROM source_health WHERE name=?", (name,)).fetchone()
+        c.execute("INSERT OR REPLACE INTO source_health VALUES(?,?,?,?,?,?,?,?)",
+                  (name, url, 0, 0, iso(now()), prev["last_ok"] if prev else None, result["err"], json.dumps(note)))
+        _SLOW["dyn"].add(name)
+    print(f"scan fetch {name}: {result['ms']}ms ok={result['ok']} n={len(result['items'])}"
+          + (f" err={result['err'][:80]}" if result['err'] else ""), flush=True)
+
+def _ingest_results(c, results, trigger, started=None, extra_error=None):
+    allitems, ok, bad = [], 0, 0
+    for r in results:
+        if r["ok"]:
+            allitems += r["items"]; ok += 1
+        else:
+            bad += 1
+        _record_health(c, r)
+    new = ingest_items(c, allitems)
+    finished = iso(now())
+    c.execute("INSERT INTO scans(started,finished,trigger,fetched,new_items,ok_sources,failed_sources,error) VALUES(?,?,?,?,?,?,?,?)",
+              (started or finished, finished, trigger, len(allitems), len(new), ok, bad, extra_error))
+    return new, ok, bad, len(allitems), finished
+
+def _slow_worker(pairs, trigger="slow"):
+    try:
+        results = _pool_fetch(pairs, workers=min(3, max(1, len(pairs))))
+        if not SCAN_LOCK.acquire(timeout=180):
+            print("scan slow: skipped ingest, lock busy", flush=True)
+            return
+        try:
+            c = db()
+            try:
+                _ingest_results(c, results, trigger)
+                c.commit()
+            finally:
+                c.close()
+        finally:
+            SCAN_LOCK.release()
+    except Exception:
+        traceback.print_exc()
+    finally:
+        with _SLOW_LK:
+            _SLOW["busy"] = False
+            _SLOW["last"] = time.time()
+
+def _kick_slow(pairs, trigger="slow"):
+    if not pairs:
+        return False
+    now_t = time.time()
+    with _SLOW_LK:
+        if _SLOW["busy"]:
+            return False
+        if _SLOW["last"] and now_t - _SLOW["last"] < SLOW_EVERY_S:
+            return False
+        _SLOW["busy"] = True
+    threading.Thread(target=_slow_worker, args=(pairs, trigger), name="scan-slow", daemon=True).start()
+    return True
 
 def local(tag): return tag.split("}", 1)[-1]
 def rss_items(text):
@@ -317,12 +479,32 @@ def f_reliefweb():
 TG_CHANNELS = ["OSINTdefender", "ClashReport", "warmonitors", "intelslava"]
 TG_EXTRA = ["Middle_East_Spectator", "rnintel", "BellumActaNews", "CIG_telegram", "AuroraIntel", "insiderpaper", "disclosetv",
             "spectatorindex", "TheIslanderNews", "nexta_live", "QudsNen"]
+def _telegram_channel(ch):
+    """Fetch one public t.me/s/ preview. Parse stays in f_telegram."""
+    return ch, get(f"https://t.me/s/{ch}").text
+
 def f_telegram():
     out = []; errs = []
     import sources_ext as X
-    for ch in TG_CHANNELS + TG_EXTRA:
+    chans = list(TG_CHANNELS + TG_EXTRA)
+    pages = []
+    if len(chans) <= 1:
+        for ch in chans:
+            try:
+                pages.append(_telegram_channel(ch))
+            except Exception as ex:
+                errs.append(f"{ch}: {ex}")
+    else:
+        with ThreadPoolExecutor(max_workers=min(4, len(chans))) as ex:
+            futs = {ex.submit(_telegram_channel, ch): ch for ch in chans}
+            for f in as_completed(futs):
+                ch = futs[f]
+                try:
+                    pages.append(f.result())
+                except Exception as ex:
+                    errs.append(f"{ch}: {ex}")
+    for ch, h in pages:
         try:
-            h = get(f"https://t.me/s/{ch}").text
             for blk in re.split(r'<div class="tgme_widget_message_wrap', h)[1:]:
                 post = re.search(r'data-post="([^"]+)"', blk)
                 txt = re.search(r'tgme_widget_message_text[^>]*>(.*?)</div>', blk, re.S)
@@ -613,32 +795,30 @@ def rank_cluster(rows, exs, score, conf, nf, official, news_only, rising, tiers)
 def scan(trigger="scheduled"):
     if not SCAN_LOCK.acquire(blocking=False):
         return {"status": "busy"}
+    t0 = time.monotonic()
     try:
         c = db(); started = iso(now())
-        allitems, ok, bad = [], 0, 0
-        for name, url, fn in SOURCES:
-            try:
-                res = fn(); note = {}
-                if isinstance(res, tuple): res, note = res
-                allitems += res; ok += 1
-                c.execute("INSERT OR REPLACE INTO source_health VALUES(?,?,?,?,?,?,?,?)",
-                          (name, url, 1, len(res), iso(now()), iso(now()), None, json.dumps(note) if note else None))
-            except Exception as ex:
-                bad += 1
-                prev = c.execute("SELECT last_ok FROM source_health WHERE name=?", (name,)).fetchone()
-                c.execute("INSERT OR REPLACE INTO source_health VALUES(?,?,?,?,?,?,?,?)",
-                          (name, url, 0, 0, iso(now()), prev["last_ok"] if prev else None, f"{type(ex).__name__}: {str(ex)[:300]}", None))
+        fast, slow = _partition_sources(SOURCES)
+        results = _pool_fetch(fast, workers=FETCH_WORKERS)
+        # Demote consistently slow official sources so later cycles stay short (GDELT/social already start on the slow loop).
+        for r in results:
+            if r["ok"] and r["ms"] >= SLOW_MS:
+                _SLOW["dyn"].add(r["name"])
+        new, ok, bad, fetched, finished = _ingest_results(c, results, trigger, started=started)
         for name, url, why in FAILED_SOURCES:
             c.execute("INSERT OR REPLACE INTO source_health VALUES(?,?,?,?,?,?,?,?)", (name, url, -1, 0, iso(now()), None, why, "disabled after test"))
-        new = ingest_items(c, allitems)
         cut = iso(now() - timedelta(days=HISTORY_D))
         c.execute("DELETE FROM alerts WHERE COALESCE(event_time, first_seen) < ? AND last_seen < ?", (cut, cut))
         c.execute("DELETE FROM clusters WHERE cluster_id NOT IN (SELECT DISTINCT cluster_id FROM alerts WHERE cluster_id IS NOT NULL)")
         c.execute("DELETE FROM scans WHERE started < ?", (cut,))
-        c.execute("INSERT INTO scans(started,finished,trigger,fetched,new_items,ok_sources,failed_sources,error) VALUES(?,?,?,?,?,?,?,?)",
-                  (started, iso(now()), trigger, len(allitems), len(new), ok, bad, None))
         c.commit(); c.close()
-        return {"status": "ok", "started": started, "fetched": len(allitems), "new": len(new), "ok_sources": ok, "failed_sources": bad}
+        kicked = _kick_slow(slow, trigger=(trigger or "scheduled") + "-slow")
+        fetch_s = round(time.monotonic() - t0, 2)
+        print(f"scan {trigger}: fetch_s={fetch_s} fast={len(fast)} slow={len(slow)} kicked={int(kicked)} "
+              f"fetched={fetched} new={len(new)} ok={ok} fail={bad}", flush=True)
+        return {"status": "ok", "started": started, "finished": finished, "fetch_s": fetch_s,
+                "fetched": fetched, "new": len(new), "ok_sources": ok, "failed_sources": bad,
+                "fast_sources": len(fast), "slow_sources": len(slow), "slow_kicked": bool(kicked)}
     except Exception as ex:
         traceback.print_exc()
         return {"status": "error", "error": str(ex)}

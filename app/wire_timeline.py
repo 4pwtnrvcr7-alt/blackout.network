@@ -402,6 +402,19 @@ def qa_endpoint(d):
         with _PC_LK:
             for k in list(_PC["t"]):
                 _PC["t"][k] = 0.0
+    if d.get("validator_holds") or d.get("holds_list"):
+        want = str(d.get("reason") or "").strip()
+        rows = []
+        for cid, e in list(_VR.items()):
+            if e.get("ok"):
+                continue
+            why = list(e.get("why") or [])
+            if want and not any(str(w) == want or str(w).startswith(want) for w in why):
+                continue
+            rows.append({"id": cid, "why": why, "h": (e.get("h") or "")[:300],
+                         "k": e.get("k") or "", "loc": (e.get("loc") or "")[:120]})
+        out["validator_hold_n"] = len(rows)
+        out["validator_holds"] = rows[:800]
     info = {}
     for cid in (d.get("info") or [])[:300]:
         cid = str(cid)
@@ -444,8 +457,10 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
                 lt = x_share.location_tags(body)
             except Exception:
                 lt = []
-            k = WC.category(cat_key(r["category"], title, False), h, what or dek)
-            vt = WC.tags(raw, k, h, lt)
+            # Prefer the longer of raw title vs display headline so category rescue and tag_ok see the full story.
+            text = title if len(title or "") >= len(h or "") else (h or title or "")
+            k = WC.category(cat_key(r["category"], title, False), text, what or dek)
+            vt = WC.tags(raw, k, text, lt)
             if vt:   # 1-2 validated tags beat junk padding (rows outside the window publish without a verdict)
                 # post exactly the validated tags: x_share.share_text re-runs finalize_tags, which pads with entity_fill
                 # words (#Hicks, #Zealand, #Later) and replaced validated tags on about half the items
