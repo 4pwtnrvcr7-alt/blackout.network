@@ -140,13 +140,17 @@ class Scheduling(unittest.TestCase):
             now = _t.time()
             for i in range(5):
                 W._VR["h%d" % i] = {"ok": False, "why": ["no-photo-card"], "at": now - 60, "k": "x", "h": "", "loc": "", "lat": None, "lon": None, "photo": ""}
-            W._VR["t0"] = {"ok": False, "why": ["tags"], "at": now - 60, "k": "x", "h": "", "loc": "", "lat": None, "lon": None, "photo": ""}
+            W._VR["t0"] = {"ok": False, "why": ["tags"], "at": now - 20, "k": "x", "h": "", "loc": "", "lat": None, "lon": None, "photo": ""}
             W._v_eval = lambda r, n: seen.append(r["id"]) or True
             W._public_row = lambda r, a, strict=True: True
             rows = [{"id": "h%d" % i} for i in range(5)] + [{"id": "t0"}, {"id": "n1"}, {"id": "n2"}]
             W._warm_validate(rows)
             self.assertEqual(seen[:2], ["n1", "n2"])          # never-checked rows first
-            self.assertNotIn("t0", seen)                       # a tag hold is not re-checked every 15 s
+            self.assertNotIn("t0", seen)                       # a tag hold is not re-checked every 15 s (45 s interval)
+            seen.clear()
+            W._VR["t0"]["at"] = now - 50
+            W._warm_validate(rows)
+            self.assertIn("t0", seen)                          # but a 45 s tag recheck is due after 50 s
         finally:
             W._v_eval, W._public_row = real_eval, real_pub
             W._VR.clear(); W._VR.update(old)

@@ -300,7 +300,7 @@ def _snap():
     s = _SNAP.get("s")
     if s is not None:
         age = time.time() - s["t"]
-        if age < _SNAP_TTL or (_warm_alive() and age < 60):
+        if age < _SNAP_TTL or (_warm_alive() and age < 20):
             return s
     return _snap_refresh(block=s is None)
 
@@ -452,7 +452,9 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
                 xu, final = _vt_intent(x_share, body, vt)
             else:
                 xu = x_share.intent_url(body); final = []
-            _VT[r["id"]] = final if (3 <= len(final) <= 5 and all(WC.tag_ok(t, h, lt) for t in final)) else []
+            # Trust WC.tags (already tag_ok + category fills). A second all(tag_ok) wipe used to
+            # drop a valid 3-tag set to [] and leave the row stuck on a "tags" hold.
+            _VT[r["id"]] = list(final)[:5] if 3 <= len(final) <= 5 else []
             return xu
         except Exception as ex:
             _WARM["err"] = f"vtags: {type(ex).__name__}: {ex}"[:160]
@@ -977,6 +979,7 @@ _V_CYC = {"del": 0, "warm": 0}
 _V_REL = {"last": 0.0, "ids": [], "n": 0, "times": []}
 _V_PACE_S = float(os.environ.get("BN_WIRE_PACE_S", "15") or 15)
 _V_RECHECK_S = 15.0       # a held row is re-checked this often; a passing row every 5 minutes
+_V_TAG_RECHECK_S = 45.0   # tag holds are a free recompute; 5 min was too slow for a ~1 min public target
 _V_BUDGET_S = 1.5
 _CN = None
 
@@ -1030,8 +1033,9 @@ def _country_names():
 def _v_eval(r, now):
     import wire_check as WC
     cid = r["id"]
-    if cid not in _VT:
-        _XC.pop(cid, None)                      # force _xu_build so the validated tags are known
+    if len(_VT.get(cid) or []) < 3:
+        _XC.pop(cid, None)                      # force _xu_build; empty/short tags were cached and never retried
+        _VT.pop(cid, None)
     d = _item(r, False, compute=True)           # fills the validated tags (_VT) through _xu_build
     if not d.get("xu"):
         _XC.pop(cid, None); d = _item(r, False, compute=True)
@@ -1133,8 +1137,16 @@ def _warm_validate(rows):
         if e is None:
             new_rows.append(r)
             continue
-        quick = all(w.split(":")[0] in _V_QUICK for w in e["why"])
-        if now - e["at"] >= (300.0 if (e["ok"] or not quick) else _V_RECHECK_S):
+        reasons = [w.split(":")[0] for w in e["why"]]
+        quick = all(w in _V_QUICK for w in reasons)
+        tag_hold = (not e["ok"]) and any(w == "tags" or w.startswith("tags") for w in reasons)
+        if e["ok"] or (not quick and not tag_hold):
+            interval = 300.0
+        elif tag_hold:
+            interval = _V_TAG_RECHECK_S
+        else:
+            interval = _V_RECHECK_S
+        if now - e["at"] >= interval:
             due.append(r)
     budget = _V_BUDGET_S * (3 if new_rows else 1)
     complete = True
@@ -1170,6 +1182,10 @@ def _release(ids):
     with _PC_LK:
         for k in list(_PC["t"]):
             _PC["t"][k] = 0.0                          # next list read rebuilds, so the poll the event triggers sees the row
+    # Drop the cluster snapshot too so /api/wire_tl is current within seconds, not a 20–60 s warm-cache lag.
+    s = _SNAP.get("s")
+    if s is not None:
+        s["t"] = 0.0
     now = time.time()
     _V_REL["n"] += len(ids); _V_REL["times"] = [t for t in _V_REL["times"] if now - t < 3600] + [now] * len(ids)
     rt = sys.modules.get("realtime")
