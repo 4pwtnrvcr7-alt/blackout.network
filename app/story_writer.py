@@ -521,21 +521,114 @@ def spent_today(k=None):
         return dict(r) if r else {"usd": 0.0, "tokens_in": 0, "tokens_out": 0, "calls": 0}
     finally:
         if own: k.close()
+def _bump_spend(k, tin, tout, usd, calls=1):
+    k.execute("INSERT INTO spend(day, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,?) ON CONFLICT(day) DO UPDATE SET "
+              "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+excluded.calls",
+              (et_day(), usd, tin, tout, calls))
+    k.execute("INSERT INTO spend_model(day, model, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,?,?) ON CONFLICT(day, model) DO UPDATE SET "
+              "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+excluded.calls",
+              (et_day(), cfg()["model"], usd, tin, tout, calls))
+
 def _add_spend(k, tin, tout, usd):
-    k.execute("INSERT INTO spend(day, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,1) ON CONFLICT(day) DO UPDATE SET "
-              "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+1",
-              (et_day(), usd, tin, tout))
-    k.execute("INSERT INTO spend_model(day, model, usd, tokens_in, tokens_out, calls) VALUES(?,?,?,?,?,1) ON CONFLICT(day, model) DO UPDATE SET "
-              "usd=usd+excluded.usd, tokens_in=tokens_in+excluded.tokens_in, tokens_out=tokens_out+excluded.tokens_out, calls=calls+1",
-              (et_day(), cfg()["model"], usd, tin, tout))
+    _bump_spend(k, tin, tout, usd, 1)
 def written_last_hour(k):
     return k.execute("SELECT COUNT(*) FROM jobs WHERE status='done' AND calls>0 AND finished>=? AND COALESCE(model,'')=?",
                      (iso(now() - timedelta(hours=1)), cfg()["model"])).fetchone()[0]
 def blocked_reason(k):
     c = cfg(); sp = spent_today(k)
+    if ledger_untrusted() and float(sp["usd"] or 0) <= 0:
+        return "spend ledger missing after deploy; paid writer closed until seed"
     if sp["usd"] >= c["daily_usd"]: return f"daily cap reached (${sp['usd']:.4f} of ${c['daily_usd']:.2f})"
     if written_last_hour(k) >= c["max_per_hour"]: return f"hourly limit reached ({c['max_per_hour']}/h)"
     return None
+
+# ---------------------------------------------------------------- spend ledger seed / fall-closed
+_UNTRUSTED_NAME = "story_writer.ledger_untrusted"
+
+def _untrusted_path():
+    d = os.path.dirname(cfg()["db"]) or "."
+    return os.path.join(d, _UNTRUSTED_NAME)
+
+def mark_ledger_untrusted(reason=""):
+    """After a failed deploy handoff the writer DB (and today's spend row) may be gone.
+
+    Paid calls stay blocked for the rest of the ET day until a signed seed raises the ledger,
+    so a reset-to-zero ledger cannot start a second day of spend under the same cap.
+    """
+    payload = {"day": et_day(), "reason": str(reason or "")[:200], "at": iso()}
+    pth = _untrusted_path(); tmp = pth + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(payload, f)
+    os.replace(tmp, pth)
+
+def clear_ledger_untrusted():
+    try:
+        os.unlink(_untrusted_path())
+    except FileNotFoundError:
+        pass
+
+def ledger_untrusted():
+    try:
+        with open(_untrusted_path()) as f:
+            d = json.load(f)
+    except Exception:
+        return False
+    return d.get("day") == et_day()
+
+def seed_spend(body):
+    """Raise today's spend ledger to the given floors. Never decreases counts or the cap.
+
+    body: {floor_usd (required), tokens_in?, tokens_out?, calls?, day_et?, clear_untrusted?}
+    day_et must be today's ET date when provided. floor_usd is capped at $50 to catch typos.
+    """
+    if not isinstance(body, dict):
+        raise ValueError("body must be an object")
+    day = str(body.get("day_et") or et_day())
+    if day != et_day():
+        raise ValueError(f"day_et must be today ({et_day()})")
+    if "floor_usd" not in body and "usd" not in body:
+        raise ValueError("floor_usd is required")
+    try:
+        floor_usd = float(body["floor_usd"] if "floor_usd" in body else body.get("usd"))
+    except (TypeError, ValueError):
+        raise ValueError("floor_usd must be a number")
+    if not (0 <= floor_usd <= 50):
+        raise ValueError("floor_usd out of range")
+
+    def floor_int(key, lo=0, hi=50_000_000):
+        if key not in body:
+            return None
+        try:
+            v = int(body[key])
+        except (TypeError, ValueError):
+            raise ValueError(f"{key} must be an integer")
+        if v < lo or v > hi:
+            raise ValueError(f"{key} out of range")
+        return v
+
+    floor_in = floor_int("tokens_in")
+    floor_out = floor_int("tokens_out")
+    floor_calls = floor_int("calls", hi=100000)
+    with _LK:
+        k = db()
+        try:
+            cur = spent_today(k)
+            d_usd = max(0.0, floor_usd - float(cur["usd"] or 0))
+            d_in = max(0, floor_in - int(cur["tokens_in"] or 0)) if floor_in is not None else 0
+            d_out = max(0, floor_out - int(cur["tokens_out"] or 0)) if floor_out is not None else 0
+            d_calls = max(0, floor_calls - int(cur["calls"] or 0)) if floor_calls is not None else 0
+            if d_usd or d_in or d_out or d_calls:
+                _bump_spend(k, d_in, d_out, d_usd, d_calls)
+                k.commit()
+            now = spent_today(k)
+            if body.get("clear_untrusted") or float(now["usd"] or 0) > 0:
+                clear_ledger_untrusted()
+            out = {"ok": True, "added_usd": round(d_usd, 6), "added_calls": d_calls,
+                   "spend_today": now, "ledger_untrusted": ledger_untrusted()}
+            out["spend_today"]["day_et"] = et_day()
+            return out
+        finally:
+            k.close()
 
 # ---------------------------------------------------------------- queue
 STATE = {"thread": None, "started": None, "last_scan": None, "last_error": None, "scans": 0, "paused": None, "initial_done": False, "boot_backfill": 0}
@@ -1420,6 +1513,7 @@ def status(n=20):
             k = db()
             try:
                 out["spend_today"] = spent_today(k); out["spend_today"]["day_et"] = et_day()
+                out["ledger_untrusted"] = ledger_untrusted()
                 out["spend_today_all_models"] = spent_all_today(k); out["spend_today_all_models"]["day_et"] = et_day()
                 out["rewrites"] = rewrite_allowed()
                 try: out["needs_paid"] = k.execute("SELECT COUNT(*) FROM needs_paid").fetchone()[0]
