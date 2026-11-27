@@ -1682,9 +1682,14 @@ def generic_story_card(cid):
             return b
     except Exception:
         pass
-    # Fall through to the legacy typography path only as a last structure; reject if it
-    # would be the dark stub so callers never serve or store it.
-    return _generic_story_card_legacy(cid)
+    try:
+        b = local_pool_story_card(cid)
+        if b:
+            return b
+    except Exception:
+        pass
+    # Never the dark stub or typography fallback.
+    return None
 
 
 def _generic_story_card_legacy(cid):
@@ -1786,7 +1791,101 @@ def _photo_card_now(cid):
     b = render_story_fresh(cid)
     if b and b.startswith(b"\x89PNG") and len(b) > 2000 and not is_stub_card(b):
         return b
-    return None
+    return local_pool_story_card(cid, title, cat)
+
+
+def _cover_1200x675(im):
+    im = im.convert("RGB")
+    tw, th = 1200, 675
+    scale = max(tw / im.size[0], th / im.size[1])
+    nw, nh = max(tw, int(im.size[0] * scale + 0.5)), max(th, int(im.size[1] * scale + 0.5))
+    im = im.resize((nw, nh), Image.Resampling.LANCZOS)
+    left = max(0, (nw - tw) // 2)
+    top = max(0, (nh - th) // 2)
+    return im.crop((left, top, left + tw, top + th))
+
+
+def local_pool_story_card(cid, title="", category=""):
+    """Last-resort unique 1200x675 photo from on-disk newsletter pool assets.
+
+    Used when Commons cannot be reached in the Twitterbot window. Never typography,
+    never the 12KB stub, never the 1200x630 'Global threat monitoring' card.
+    """
+    if not cid:
+        return None
+    try:
+        import json, base64, io, zlib
+        import card_photo as CP
+        root = Path(__file__).resolve().parent
+        pool_path = root / "newsletter_pool.json"
+        media = root / "theme_static" / "media"
+        images = (json.loads(pool_path.read_text()).get("images") or []) if pool_path.exists() else []
+        if not title:
+            try:
+                title, _b, _l = _force_title(cid)
+            except Exception:
+                title = ""
+        blob = f"{title} {category}"
+        sub = CP.subtopic_for(blob, category) if hasattr(CP, "subtopic_for") else None
+        want = "cyber" if sub == "cyber" or (not sub and re.search(r"cyber|breach|internet", blob, re.I)) else "war"
+        ranked = [im for im in images if (im.get("topic") or "").lower() == want]
+        if not ranked:
+            ranked = [im for im in images if (im.get("topic") or "").lower() in ("war", "cyber")]
+        if not ranked:
+            ranked = list(images)
+        if not ranked:
+            return None
+        k = zlib.crc32(str(cid).encode()) % len(ranked)
+        order = ranked[k:] + ranked[:k]
+        used = set()
+        try:
+            used = CP.used_file_keys(cid)
+        except Exception:
+            used = set()
+        picked = None
+        for im in order:
+            key = CP.file_key(title=im.get("title") or "", filename=im.get("name") or "",
+                              link=im.get("page") or "", src=im.get("page") or "")
+            if key and key in used:
+                continue
+            name = im.get("name") or ""
+            bp = media / (name + ".b64")
+            if not bp.exists():
+                bp = media / name
+            if not bp.exists():
+                continue
+            picked = (im, bp)
+            break
+        if not picked:
+            return None
+        imeta, bp = picked
+        raw = bp.read_text() if bp.suffix == ".b64" else None
+        if raw is not None:
+            # file may be raw base64 or already binary saved as .b64
+            try:
+                data = base64.b64decode(re.sub(r"\s+", "", raw))
+            except Exception:
+                data = bp.read_bytes()
+        else:
+            data = bp.read_bytes()
+        from PIL import Image as _Im
+        photo = _cover_1200x675(_Im.open(io.BytesIO(data)))
+        buf = io.BytesIO()
+        photo.save(buf, format="PNG", optimize=True)
+        b = buf.getvalue()
+        if not (b.startswith(b"\x89PNG") and len(b) > 5000) or is_stub_card(b):
+            return None
+        src = imeta.get("page") or ""
+        if not str(src).startswith("https://"):
+            src = ""
+        try:
+            import story_photo
+            story_photo.put_card(cid, b, src=src)
+        except Exception:
+            pass
+        return b
+    except Exception:
+        return None
 
 
 _US_WORDS = re.compile(r"\b(u\.?s\.?a?|united states|(?<!central )(?<!south )(?<!latin )america\\b|americans\\b|washington|pentagon|white house|congress|federal|fbi|cdc|noaa|fema|usgs|nasa|wall street)\b", re.I)

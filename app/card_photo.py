@@ -227,7 +227,7 @@ _infer_pool_subtypes()
 
 # First matching event sub-topic wins. Nuclear before missiles; drones before aviation.
 _SUBTOPIC_RX = (
-    ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|(?:security|cisa|vendor) advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit|cyberattack|cyberfraud|cyber fraud)\b"),
+    ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|(?:security|cisa|vendor) advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit|cyberattack|cyberfraud|cyber fraud|fraud ring|internet (?:went |is )?down)\b"),
     ("drones", r"\b(drones?|uavs?|\bfpv\b|reaper|predator|loitering munition|unmanned (?:aerial|aircraft))\b"),
     ("nuclear", r"\b(nuclear|nukes?|icbm|warheads?|minuteman|trident|atomic)\b"),
     ("missiles", r"\b(missiles?|ballistic|cruise missile|atacms|jassm|tomahawk)\b|(?:missile|ballistic|rocket).{0,40}(?:exercise|launch)|(?:\bexercise|\blaunch).{0,40}(?:missile|ballistic|rocket)"),
@@ -684,8 +684,10 @@ _HAZARD_CAT = re.compile(
 
 
 def skip_place_photo(title="", text="", category=""):
-    """True for hazard / outbreak stories: do not use a generic place or country photo."""
-    blob = " ".join(x for x in (title, text) if x)
+    """True for hazard / outbreak stories, and when a conflict/cyber sub-topic
+    matches: do not use a generic place or country photo (church on a breach,
+    plaza on an airstrike, Kremlin on a Europe-wide sabotage story)."""
+    blob = " ".join(x for x in (title, text, category) if x)
     k = hazard_for(blob)
     if k in HAZARD_SKIP_PLACE:
         return True
@@ -694,6 +696,46 @@ def skip_place_photo(title="", text="", category=""):
         return True
     if cat and _HAZARD_CAT.search(cat):
         return True
+    if subtopic_for(blob, category):
+        return True
+    return False
+
+
+def file_matches_subtopic(sub, src="", title="", filename=""):
+    """True when the stored Commons file belongs to this sub-topic (or its fallbacks)."""
+    if not sub:
+        return True
+    blob = " ".join(x for x in (src, title, filename) if x).lower().replace("_", " ")
+    if not blob:
+        return False
+    allowed = set(_SUBTOPIC_FALLBACKS.get(sub, (sub,)))
+    names = []
+    for sk in allowed:
+        names.extend(SUBTYPE_FILES.get(sk, []))
+    for fn, sk in FILE_SUBTYPES.items():
+        if sk in allowed:
+            names.append(fn)
+    for fn in names:
+        n = fn.replace("File:", "").replace("_", " ").strip().lower()
+        if n and n in blob:
+            return True
+    return False
+
+
+def place_subject_in_story(subject, title="", text=""):
+    """True when a place photo's subject (e.g. 'Kremlin', 'Donetsk') is clearly named in the story."""
+    blob = (" " + " ".join(x for x in (title, text) if x) + " ").lower()
+    # Strip caption tails like "File photo; not taken at this event."
+    raw = re.sub(r"file photo.*", "", subject or "", flags=re.I)
+    raw = re.split(r"[.,;(]", raw, 1)[0]
+    tokens = [w for w in re.findall(r"[A-Za-z][A-Za-z'\-]{2,}", raw) if w.lower() not in {
+        "the", "and", "of", "in", "on", "at", "from", "with", "for", "city", "view",
+        "skyline", "aerial", "photo", "file", "capital", "province", "region",
+    }]
+    # Require a distinctive place token (skip bare country adjectives already handled elsewhere).
+    for w in tokens:
+        if re.search(r"" + re.escape(w) + r"", blob, re.I):
+            return True
     return False
 
 

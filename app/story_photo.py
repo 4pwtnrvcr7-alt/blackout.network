@@ -227,7 +227,10 @@ def is_stub_card_png(data):
         from PIL import Image
         im = Image.open(BytesIO(data)).convert("RGB")
         w, h = im.size
-        # Only the designed 1200x675 (or close) gradient. Tiny test fixtures and other sizes are not stubs.
+        # Tiny test fixtures are not stubs. Any 1200x630 typography / earth / "_safe_png"
+        # card is invalid as a story share image (Matt: unique photo, no text, 1200x675).
+        if w == 1200 and h == 630:
+            return True
         if w < 1000 or h < 500 or w > 1400 or h > 800:
             return False
         samples = [im.getpixel((x, y)) for x in (0, max(0, w // 2), w - 1) for y in (0, max(0, h // 2), h - 1)]
@@ -316,18 +319,32 @@ def card_stale(meta):
                     if ch and is_non_photo_candidate(ch):
                         return True
                     # Hazard / outbreak stories must not keep a generic place/country photo.
-                    if ch and (ch.get("kind") or "") == "place":
-                        t, x = _story_text(cid, "", "")
-                        cat = ""
-                        try:
-                            import story
-                            r, _al = story.load(cid)
-                            if r:
-                                cat = r.get("category") or ""
-                        except Exception:
-                            pass
-                        if CP.skip_place_photo(t, x, cat):
+                    t, x = _story_text(cid, "", "")
+                    cat = ""
+                    try:
+                        import story
+                        r, _al = story.load(cid)
+                        if r:
+                            cat = r.get("category") or ""
+                    except Exception:
+                        pass
+                    kind = (ch.get("kind") or "") if ch else ""
+                    if kind == "place" and CP.skip_place_photo(t, x, cat):
+                        return True
+                    # Already-baked topic/place photos that do not match the story's
+                    # sub-topic (B-2 on a tanker, church on a cyber breach, plaza on
+                    # an airstrike, Kremlin on a Europe-wide sabotage story) must rebuild.
+                    if ch and kind != "person":
+                        sub = CP.subtopic_for(" ".join((t, x, cat)), cat)
+                        src = meta.get("src") or ch.get("src") or ""
+                        fn = ch.get("title") or ch.get("filename") or ch.get("commons_title") or ""
+                        if sub and not CP.file_matches_subtopic(sub, src=src, title=fn, filename=fn):
                             return True
+                        if kind == "place":
+                            subj = " ".join(s for s in (
+                                ch.get("subject") or "", ch.get("label") or "", fn) if s)
+                            if subj and not CP.place_subject_in_story(subj, t, x):
+                                return True
             except Exception:
                 pass
     except Exception:
