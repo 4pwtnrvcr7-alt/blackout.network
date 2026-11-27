@@ -1459,6 +1459,75 @@ class StoryPhoto(unittest.TestCase):
             CP.place_photo, CP.topic_photo, CP.person_photo, CP.fetch = orig
             os.environ.pop("BN_CARDS_DB", None)
 
+
+    def test_stub_gradient_is_detected_and_real_photo_is_not(self):
+        import share_card as SC
+        from io import BytesIO
+        from PIL import Image
+        stub = SC._base("aaaaaaaaaaaaaaaa")
+        buf = BytesIO(); stub.save(buf, "PNG")
+        self.assertTrue(P.is_stub_card_png(buf.getvalue()))
+        real = Image.new("RGB", (1200, 675), (20, 180, 40))
+        buf = BytesIO(); real.save(buf, "PNG")
+        self.assertFalse(P.is_stub_card_png(buf.getvalue()))
+        self.assertFalse(P.is_stub_card_png(None))
+        self.assertFalse(P.is_stub_card_png(b"not-a-png"))
+
+    def test_subtopic_keywords_pick_matching_pool_files(self):
+        import card_photo as CP
+        self.assertEqual(CP.subtopic_for("Iran reports explosion on oil tanker"), "naval")
+        self.assertEqual(CP.subtopic_for("Widespread ballistic missile exercises in Iran"), "missiles")
+        self.assertEqual(CP.subtopic_for("Russian Aerospace Forces airstrike in the Donetsk sector"), "ruins")
+        self.assertEqual(CP.subtopic_for("Russian FPV interceptor drone crews destroyed 10 UAVs"), "drones")
+        self.assertEqual(CP.subtopic_for("China is testing a new way to land troops ashore"), "troops")
+        self.assertEqual(CP.subtopic_for("Russia has threatened preemptive nuclear strikes"), "nuclear")
+        self.assertEqual(CP.subtopic_for("Japan education ministry discloses a data breach", "cyber"), "cyber")
+        self.assertEqual(CP.choose_order("Iran reports explosion on oil tanker", "", "conflict")[1], "topic")
+        self.assertEqual(CP.choose_order("Imaan Mazari, human rights lawyer", "", "politics")[1], "place")
+
+        calls = []
+        def fake_commons(fn, width=1600, min_w=700):
+            calls.append(fn)
+            name = fn.replace("File:", "").replace(" ", "_")
+            return {"src": f"https://upload.wikimedia.org/wikipedia/commons/{name}",
+                    "credit": "U.S. Navy", "license": "Public domain", "title": fn,
+                    "page": f"https://commons.wikimedia.org/wiki/{fn.replace(' ', '_')}", "w": 1600, "h": 900}
+        orig = CP.commons_image
+        CP.commons_image = fake_commons
+        try:
+            im = CP.topic_photo("Iran reports explosion on an oil tanker in the Strait of Hormuz",
+                                seed="tankertankertank", key="military", except_cid="tankertankertank")
+            self.assertIsNotNone(im)
+            key = CP.file_key(filename=im.get("title") or "")
+            naval = {CP.file_key(filename=fn) for fn in CP.SUBTYPE_FILES.get("naval") or []}
+            self.assertIn(key, naval, f"tanker should get a naval file, got {key}")
+            calls.clear()
+            im = CP.topic_photo("Widespread ballistic missile exercises in Iran",
+                                seed="missilmissilmissi", key="military", except_cid="missilmissilmissi")
+            self.assertIsNotNone(im)
+            key = CP.file_key(filename=im.get("title") or "")
+            missile_like = {CP.file_key(filename=fn) for fn in (CP.SUBTYPE_FILES.get("missiles") or []) + (CP.SUBTYPE_FILES.get("nuclear") or [])}
+            self.assertIn(key, missile_like, f"missile exercises should get a missile file, got {key}")
+        finally:
+            CP.commons_image = orig
+
+    def test_generic_story_card_does_not_return_the_dark_stub(self):
+        """Even with no stored photo and a failed chooser, the served card must not be the 12KB gradient."""
+        import share_card as SC
+        orig_apply = SC.apply_card_photo
+        orig_fresh = SC.render_story_fresh
+        SC.apply_card_photo = lambda *a, **k: None
+        SC.render_story_fresh = lambda *a, **k: None
+        try:
+            b = SC.generic_story_card("deadbeefdeadbeef")
+            if b:
+                self.assertFalse(P.is_stub_card_png(b))
+                self.assertFalse(SC.is_stub_card(b))
+        finally:
+            SC.apply_card_photo = orig_apply
+            SC.render_story_fresh = orig_fresh
+
+
     def test_topic_photos_are_unique_across_stories(self):
         """Two conflict stories must not be assigned the same category photo (the live B-2 repeat)."""
         import os, tempfile

@@ -707,10 +707,9 @@ def png_for_story_fast(cid):
             return b
     except Exception:
         pass
-    spec = _db_spec(cid) or {}
-    t = spec.get("title") or "The Wire"
-    bg_im = _open_bg("wire", "iss070e062746.webp")
-    return _cached(_cache_key("quick", cid, t, spec.get("rank"), "wire:iss070e062746.webp"), lambda: png_bytes(render(t, bg_im=bg_im, tagline=True, rank=spec.get("rank"))))
+    # Never the 1200x630 ISS / earth card on a story share image (Matt: no satellite; also
+    # never a near-black stub — share_card.story_png_map_now returns a photo or None).
+    return None
 
 
 def png_for_story(cid, title=None, rank=None, hero=None):

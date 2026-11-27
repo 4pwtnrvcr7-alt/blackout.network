@@ -128,6 +128,22 @@ def _pool_filename(item):
     return urllib.parse.unquote(m.group(1).replace("%20", " "))
 
 
+
+FILE_SUBTYPES = {}  # File: title -> set of subtype keys
+SUBTYPE_FILES = {}  # subtype -> list of File: titles
+
+
+def _register_subtype(fn, subtype):
+    """Record that a Commons file belongs to a conflict/cyber subtype."""
+    if not fn or not subtype:
+        return
+    subtype = str(subtype).strip().lower()
+    FILE_SUBTYPES.setdefault(fn, set()).add(subtype)
+    lst = SUBTYPE_FILES.setdefault(subtype, [])
+    if fn not in lst:
+        lst.append(fn)
+
+
 def _extend_topics_from_pool_file(path):
     """Append unique, non-maplike pool files from one JSON (newsletter or share-card) to the curated topic lists."""
     try:
@@ -155,6 +171,15 @@ def _extend_topics_from_pool_file(path):
         files = TOPICS[key][1]
         if fn not in files:
             files.append(fn)
+        raw_sub = item.get("subtype") or item.get("subtypes") or ""
+        if isinstance(raw_sub, str):
+            subs = [s.strip().lower() for s in raw_sub.replace(",", " ").split() if s.strip()]
+        elif isinstance(raw_sub, (list, tuple)):
+            subs = [str(s).strip().lower() for s in raw_sub if str(s).strip()]
+        else:
+            subs = []
+        for sub in subs:
+            _register_subtype(fn, sub)
 
 
 def _extend_topics_from_newsletter_pool():
@@ -165,6 +190,95 @@ def _extend_topics_from_newsletter_pool():
 
 
 _extend_topics_from_newsletter_pool()
+
+
+# Infer subtypes for curated + email-pool files that have no JSON subtype.
+_INFER_SUBTYPE = (
+    ("drones", r"reaper|predator|global hawk|raven launch|\buav\b|mq-9|mq-1|rq-4|rq-11"),
+    ("artillery", r"howitzer|himars|paladin|mlrs|artillery"),
+    ("nuclear", r"minuteman|trident|\bicbm\b"),
+    ("missiles", r"tomahawk|atacms|jassm|missile"),
+    ("air_defense", r"thaad|patriot|nasams|stinger|aegis|sm[- ]?3"),
+    ("naval", r"carrier|uss |navy imagery|\b navy\b|destroyer|submarine|zumwalt|arleigh|amphibious|lha-6"),
+    ("troops", r"patrol|marines|airborne|soldier|paratroop|abrams|infantry"),
+    ("ruins", r"destroy|ruins|raqqa|mariupol|borodyanka|coventry"),
+    ("protests", r"euromaidan|tahrir|protest|maidan|minsk"),
+    ("aviation", r"f-35|b-2|rafale|flyover|fighter|air force|jets?"),
+    ("cyber", r"server|data center|datacenter|supercomputer|fiber optic"),
+)
+
+
+def _infer_pool_subtypes():
+    for key in ("military", "cyber"):
+        if key not in TOPICS:
+            continue
+        for fn in list(TOPICS[key][1]):
+            if fn in FILE_SUBTYPES:
+                continue
+            blob = fn.replace("_", " ").replace("File:", "")
+            for sub, rx in _INFER_SUBTYPE:
+                if re.search(rx, blob, re.I):
+                    _register_subtype(fn, sub)
+                    break
+
+
+_infer_pool_subtypes()
+
+
+# First matching event sub-topic wins. Nuclear before missiles; drones before aviation.
+_SUBTOPIC_RX = (
+    ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|(?:security|cisa|vendor) advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit|cyberattack|cyberfraud|cyber fraud)\b"),
+    ("drones", r"\b(drones?|uavs?|\bfpv\b|reaper|predator|loitering munition|unmanned (?:aerial|aircraft))\b"),
+    ("nuclear", r"\b(nuclear|nukes?|icbm|warheads?|minuteman|trident|atomic)\b"),
+    ("missiles", r"\b(missiles?|ballistic|cruise missile|atacms|jassm|tomahawk)\b|(?:missile|ballistic|rocket).{0,40}(?:exercise|launch)|(?:\bexercise|\blaunch).{0,40}(?:missile|ballistic|rocket)"),
+    ("naval", r"\b(tankers?|warships?|destroyers?|submarines?|carriers?|straits?|naval|navy|vessels?|maritime|amphibious|oil tanker|hormuz)\b"),
+    ("ruins", r"\b(airstrikes?|air[\s-]strikes?|bombings?|bombed|shelling|shelled|destroyed|ruins?|rubble|aftermath)\b"),
+    ("troops", r"\b(troops|soldiers?|infantry|marines?|paratroop\w*|amphibious landing|land(?:ing)? troops)\b"),
+    ("artillery", r"\b(artillery|howitzers?|himars|mlrs|paladin)\b"),
+    ("air_defense", r"\b(patriot|thaad|nasams|stinger|air[\s-]defen[cs]e|aegis|interceptors?)\b"),
+    ("protests", r"\b(protests?|protesters?|demonstrat\w+|riots?)\b"),
+    ("aviation", r"\b(fighter(?:s)?|jets?|aircraft|air force|flyover|bomber)\b"),
+)
+
+# If the primary subtype pool is exhausted (all used), try these next.
+_SUBTOPIC_FALLBACKS = {
+    "cyber": ("cyber",),
+    "drones": ("drones", "aviation"),
+    "nuclear": ("nuclear", "missiles"),
+    "missiles": ("missiles", "artillery", "nuclear"),
+    "naval": ("naval",),
+    "ruins": ("ruins",),
+    "troops": ("troops", "naval"),
+    "artillery": ("artillery", "missiles"),
+    "air_defense": ("air_defense", "missiles"),
+    "protests": ("protests",),
+    "aviation": ("aviation", "drones"),
+}
+
+
+def subtopic_for(text, category=""):
+    """Conflict/cyber event subtype from the headline, body, or Wire category, or None."""
+    cat = (category or "").strip().lower()
+    blob = " ".join(x for x in (text, category) if x)
+    if cat in ("cyber", "cyberattack") or "cyber" in cat:
+        return "cyber"
+    for key, rx in _SUBTOPIC_RX:
+        if re.search(rx, blob, re.I):
+            return key
+    return None
+
+
+def place_is_clear(hit, title="", text=""):
+    """True when the geocoded place is actually named in the story and is more specific than a country."""
+    if not hit or not (hit.get("place") or "").strip():
+        return False
+    if (hit.get("precision") or "").strip().lower() == "country":
+        return False
+    place = (hit.get("place") or "").split(",")[0].strip()
+    if not place or len(place) < 3:
+        return False
+    blob = " ".join(x for x in (title, text) if x)
+    return bool(re.search(r"\b" + re.escape(place) + r"\b", blob, re.I))
 
 
 def file_key(src="", link="", title="", filename=""):
@@ -498,14 +612,48 @@ def fallback_key(title, text="", category=""):
 
 
 def topic_photo(text, seed="", key=None, except_cid=""):
-    """Licensed topic photo, unique across stories: skip file titles already used by another card."""
+    """Licensed topic photo, unique across stories: skip file titles already used by another card.
+
+    When a conflict/cyber sub-topic matches the headline (drone, tanker, missile, airstrike…),
+    those pool files are tried first, then the rest of the topic list. No repeats.
+    """
     key = key or hazard_for(text)
     key = _TOPIC_ALIAS.get(key, key)
+    sub = subtopic_for(text)
+    if not key and sub == "cyber":
+        key = "cyber"
+    if not key and sub:
+        key = "military"
     if not key or key not in TOPICS:
         return None
     agency, files, noun = TOPICS[key]
     order = list(files)
-    if len(order) > 1:
+    if sub:
+        preferred = []
+        seen = set()
+        fallbacks = list(_SUBTOPIC_FALLBACKS.get(sub, (sub,)))
+        primary = fallbacks[0] if fallbacks else sub
+        # Rotate only the primary subtype so a fallback (e.g. artillery after missiles) cannot win first.
+        for sk in fallbacks:
+            group = [fn for fn in SUBTYPE_FILES.get(sk, []) if fn in files and fn not in seen]
+            if sk == primary and len(group) > 1:
+                k = zlib.crc32(str(seed).encode()) % len(group)
+                group = group[k:] + group[:k]
+            preferred.extend(group)
+            seen.update(group)
+        rest = [fn for fn in files if fn not in seen]
+        if preferred:
+            if len(rest) > 1:
+                k = zlib.crc32((str(seed) + ":r").encode()) % len(rest)
+                rest = rest[k:] + rest[:k]
+            order = preferred + rest
+        elif len(order) > 1:
+            k = zlib.crc32(str(seed).encode()) % len(order)
+            order = order[k:] + order[:k]
+        if sub == "cyber" and "cyber" in TOPICS:
+            # Noun/credit should say server racks, not "Military aircraft".
+            agency, _cf, noun = TOPICS["cyber"]
+    elif len(order) > 1:
         k = zlib.crc32(str(seed).encode()) % len(order)
         order = order[k:] + order[:k]
     used = used_file_keys(except_cid or seed)
@@ -555,9 +703,14 @@ def enabled():
 
 
 def choose_order(title, text="", category=""):
-    """('person', 'topic') for hazard/outbreak stories (no place photo); else person, place, topic."""
+    """Person first; then a sub-topic/cyber pool photo ahead of a generic place photo
+    when the headline names an event type (drone, tanker, missile, airstrike, breach…).
+    Hazard/outbreak stories still skip place. Else person, place, topic."""
     if skip_place_photo(title, text, category):
         return ("person", "topic")
+    blob = " ".join(x for x in (title, text, category) if x)
+    if subtopic_for(blob, category):
+        return ("person", "topic", "place")
     return ("person", "place", "topic")
 
 
@@ -586,6 +739,10 @@ def choose(cid, title, hit=None, text="", category=""):
             print(f"card_photo: tier error {type(e).__name__}: {e}", flush=True)
             im = None
         if im:
+            if tier == "place":
+                blob = " ".join(x for x in (title, text, category) if x)
+                if subtopic_for(blob, category) and not place_is_clear(hit, title, text):
+                    continue
             # Skip a person/place (or leftover topic) file already used on another story
             # so Russia-related cards do not all get the same Kremlin / St. Basil's photo.
             try:
