@@ -53,7 +53,8 @@ def good(urls=(U1, U2), extra=""):
 class Base(unittest.TestCase):
     def setUp(self):
         os.environ.update(PATHS); os.environ["XAI_API_KEY"] = "test-not-a-key"
-        for p in (PATHS["BN_WRITER_DB"], PATHS["BN_STORY_REPORTS"], PATHS["BN_STORY_V3_BRIEFS"]):
+        for p in (PATHS["BN_WRITER_DB"], PATHS["BN_STORY_REPORTS"], PATHS["BN_STORY_V3_BRIEFS"],
+                  os.path.join(os.path.dirname(PATHS["BN_WRITER_DB"]), "story_writer.ledger_untrusted")):
             assert p.startswith(TMP)
             if os.path.exists(p): os.unlink(p)
         import story_report as SR; self._sr_reports = SR.REPORTS; SR.REPORTS = PATHS["BN_STORY_REPORTS"]; SR._RC.update(mt=None, v={})
@@ -323,6 +324,73 @@ class Writer(Base):
             self.assertEqual(status, "deferred")
         finally:
             os.environ.pop("BN_WRITER_DAILY_USD")
+
+class SpendLedger(Base):
+    def test_seed_spend_raises_floor_and_is_idempotent(self):
+        k = SW.db(); SW._add_spend(k, 100, 20, 0.18); k.commit(); k.close()
+        out = SW.seed_spend({"floor_usd": 1.185958, "tokens_in": 574421, "tokens_out": 187158, "calls": 157, "day_et": SW.et_day()})
+        self.assertTrue(out["ok"])
+        self.assertAlmostEqual(out["spend_today"]["usd"], 1.185958, places=6)
+        self.assertEqual(out["spend_today"]["calls"], 157)
+        self.assertEqual(out["spend_today"]["tokens_in"], 574421)
+        again = SW.seed_spend({"floor_usd": 1.185958, "tokens_in": 574421, "tokens_out": 187158, "calls": 157, "day_et": SW.et_day()})
+        self.assertAlmostEqual(again["added_usd"], 0.0)
+        self.assertEqual(again["spend_today"]["calls"], 157)
+        self.assertAlmostEqual(again["spend_today"]["usd"], 1.185958, places=6)
+
+    def test_seed_spend_never_decreases(self):
+        k = SW.db(); SW._add_spend(k, 50, 10, 0.5); k.commit(); k.close()
+        out = SW.seed_spend({"floor_usd": 0.1, "tokens_in": 1, "tokens_out": 1, "calls": 1})
+        self.assertAlmostEqual(out["added_usd"], 0.0)
+        self.assertAlmostEqual(out["spend_today"]["usd"], 0.5, places=6)
+        self.assertGreaterEqual(out["spend_today"]["calls"], 1)
+        self.assertGreaterEqual(out["spend_today"]["tokens_in"], 50)
+
+    def test_seed_spend_rejects_other_day_and_out_of_range(self):
+        with self.assertRaises(ValueError):
+            SW.seed_spend({"floor_usd": 1.0, "day_et": "1999-01-01"})
+        with self.assertRaises(ValueError):
+            SW.seed_spend({"floor_usd": 99})
+        with self.assertRaises(ValueError):
+            SW.seed_spend({"floor_usd": -0.1})
+        with self.assertRaises(ValueError):
+            SW.seed_spend("nope")
+
+    def test_add_spend_still_counts_one_call(self):
+        k = SW.db(); SW._add_spend(k, 3, 4, 0.01); k.commit()
+        sp = SW.spent_today(k); k.close()
+        self.assertEqual(sp["calls"], 1)
+        self.assertEqual(sp["tokens_in"], 3)
+        self.assertAlmostEqual(sp["usd"], 0.01, places=6)
+
+    def test_ledger_untrusted_blocks_when_spend_zero(self):
+        k = SW.db()
+        self.assertIsNone(SW.blocked_reason(k))
+        SW.mark_ledger_untrusted(reason="The read operation timed out")
+        self.assertTrue(SW.ledger_untrusted())
+        why = SW.blocked_reason(k)
+        self.assertIsNotNone(why)
+        self.assertIn("spend ledger missing", why)
+        k.close()
+
+    def test_ledger_untrusted_clears_after_seed(self):
+        os.environ["BN_WRITER_DAILY_USD"] = "1.00"
+        try:
+            k = SW.db()
+            SW.mark_ledger_untrusted(reason="handoff gave_up")
+            self.assertIn("spend ledger missing", SW.blocked_reason(k))
+            k.close()
+            out = SW.seed_spend({"floor_usd": 1.0025, "calls": 137, "day_et": SW.et_day()})
+            self.assertFalse(out["ledger_untrusted"])
+            self.assertFalse(SW.ledger_untrusted())
+            k = SW.db()
+            why = SW.blocked_reason(k)
+            self.assertIsNotNone(why)
+            self.assertIn("daily cap reached", why)
+            self.assertAlmostEqual(SW.spent_today(k)["usd"], 1.0025, places=6)
+            k.close()
+        finally:
+            os.environ.pop("BN_WRITER_DAILY_USD", None)
 
 if __name__ == "__main__":
     unittest.main()

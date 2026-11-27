@@ -431,6 +431,11 @@ def public_ready():
     if not ready():
         return False
     if not has_data():
+        # A deploy that saw a live peer must keep /healthz unready so Render stays on the old instance.
+        # Cold start (no peer) may go public empty so the box sync can fill this node.
+        import handoff_db
+        if not handoff_db.allow_public_without_data(HANDOFF):
+            return False
         return HANDOFF["state"] in ("gave_up", "off", "")  # cold start: do not block the box sync
     if can_serve_wire_og():
         return True
@@ -559,6 +564,10 @@ def _sign_get(path):
     sig = hmac.new(SYNC_SECRET.encode(), f"{ts}\nGET\n{path}\n{hashlib.sha256(b'').hexdigest()}".encode(), hashlib.sha256).hexdigest()
     return {"X-BN-Ts": ts, "X-BN-Sig": sig, "User-Agent": "blackout-handoff/1.0"}
 
+def _handoff_timeout_detail(ex):
+    import handoff_db
+    return handoff_db.err_is_timeout(ex)
+
 def _peer_get(path, timeout, to_file=None, want=None):
     """GET from the peer (old) instance. Returns (status, bytes|None); with to_file the body is streamed to disk.
     want = the old instance's boot_id: during a deploy Render can route the public URL to EITHER instance (Nov 1 push 2: the new
@@ -616,10 +625,16 @@ def _handoff():
     def _done(state, detail):
         HANDOFF.update(state=state, detail=detail, seconds=round(time.time() - t0, 1))
         print(f"deploy handoff: {state} ({detail}) after {HANDOFF['seconds']} s", flush=True)
+        if state == "gave_up" and (HANDOFF.get("peer_boot") or _handoff_timeout_detail(detail)):
+            try:
+                import story_writer
+                story_writer.mark_ledger_untrusted(reason=detail or "handoff gave_up")
+            except Exception:
+                traceback.print_exc()
     while time.time() - t0 < HANDOFF_WAIT_S:
         if SYNC["pushes"] and has_data(): return _done("superseded", "the box sync filled this instance first")
         try:
-            code, body = _peer_get("/healthz", 10)
+            code, body = _peer_get("/healthz", int(os.environ.get("BN_HANDOFF_PEER_HEALTHZ_S", "30")))
             try: info = json.loads(body or b"{}")
             except Exception: info = {}
             if info.get("boot_id") == BOOT_ID:              # Render routed us to ourselves: not a miss, just ask again
@@ -627,7 +642,7 @@ def _handoff():
             if info.get("boot_id") and info.get("has_data"):
                 if HANDOFF["peer_boot"] != info["boot_id"]: done_parts = {}
                 HANDOFF["peer_boot"] = info["boot_id"]
-                for part, tmo in (("bulk", 300), ("owned", 120)):
+                for part, tmo in (("bulk", 300), ("owned", int(os.environ.get("BN_HANDOFF_OWNED_S", "300")))):
                     if part in done_parts: continue
                     for attempt in range(40):                # each try may land on either instance; 409/421 = wrong one
                         fd, tmp = tempfile.mkstemp(dir=STATE, suffix=".handoff.tgz"); os.close(fd)
@@ -654,7 +669,14 @@ def _handoff():
                 raise RuntimeError("export had no blackout.db")
             misses += 1; HANDOFF["detail"] = f"no live peer with data (HTTP {code})"
         except Exception as ex:
-            misses += 1; HANDOFF["detail"] = str(ex)[:200]; print(f"deploy handoff: attempt {misses} failed: {HANDOFF['detail']}", flush=True)
+            HANDOFF["detail"] = str(ex)[:200]
+            print(f"deploy handoff: attempt failed: {HANDOFF['detail']}", flush=True)
+            # A busy old instance (photo/writer) times out /healthz at 10s; that is not "no peer".
+            # Keep retrying until BN_HANDOFF_WAIT_S so Render stays on the live node.
+            if _handoff_timeout_detail(ex):
+                time.sleep(2)
+                continue
+            misses += 1
         if misses >= HANDOFF_NOPEER_TRIES: return _done("gave_up", HANDOFF["detail"])
         time.sleep(10)
     _done("gave_up", "timeout: " + str(HANDOFF["detail"]))
@@ -834,6 +856,17 @@ class RH(server.H):
             self.body()
             try: return self.send(*_rt().refresh(self.ip()))
             except Exception as ex: traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
+        if path == "/internal/writer/spend":   # box-signed: raise today's spend ledger floor (never decreases the cap or the counts)
+            raw = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 400000))
+            ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())
+            if not ok: return self.send(403, {"error": why})
+            try:
+                import story_writer
+                return self.send(200, story_writer.seed_spend(json.loads(raw or b"{}")))
+            except ValueError as ex:
+                return self.send(400, {"error": str(ex)[:200]})
+            except Exception as ex:
+                traceback.print_exc(); return self.send(500, {"error": str(ex)[:200]})
         if path == "/internal/wire/qa":     # Matt 11:18 PM ET: box-signed post-publish QA (holds + read-only card facts)
             raw = self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 400000))
             ok, why = verify(self, "POST", path, hashlib.sha256(raw).hexdigest())

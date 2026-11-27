@@ -148,3 +148,24 @@ def reopen_cards(dest_path=""):
         story_photo.reopen()
     except Exception:
         pass
+
+
+def err_is_timeout(ex):
+    """True when a peer GET failed because the old instance was too busy to answer, not absent."""
+    if isinstance(ex, TimeoutError):
+        return True
+    reason = getattr(ex, "reason", None)
+    if isinstance(reason, TimeoutError):
+        return True
+    msg = str(ex).lower()
+    if reason is not None:
+        msg = msg + " " + str(reason).lower()
+    return "timed out" in msg or "timeout" in msg
+
+
+def allow_public_without_data(handoff):
+    """Cold start may go public empty so the box can fill the node.
+
+    A deploy that already saw a live peer must not: Render would cut over and the Wire would empty.
+    """
+    return not bool((handoff or {}).get("peer_boot"))
