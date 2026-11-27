@@ -82,8 +82,15 @@ def category(k, title, text=""):
         return "other"
     if k == "conflict" and _ACCIDENT.search(t) and not _HARD_MIL.search(full):
         return "wreck"
-    if k in ("people", "other", "deaths", "scandal", "hazard", "infra"):
+    if k in ("people", "deaths", "scandal", "hazard", "infra"):
         return k
+    if k == "other":
+        # Display-only rescue: a stored "other" used to return immediately, so strikes, wind
+        # warnings, and cyber headlines never got category tag fills and stayed held for tags.
+        for c in _RESCUE_ORDER:
+            if _has(c, t):
+                return c
+        return "other"
     if _has(k, t) or (k not in ("quake", "weather", "disease", "cyber") and _has(k, full)):
         return k
     for c in _RESCUE_ORDER:
@@ -176,7 +183,8 @@ def location(loc, lat, lon):
 # ------------------------------------------------------------------ tags
 _ACRO = {"NATO", "UN", "EU", "US", "UK", "WHO", "CDC", "FBI", "CIA", "NSA", "DHS", "FEMA", "NOAA", "NWS", "USGS", "NASA", "FAA", "IDF", "ISIS",
          "OPEC", "IAEA", "CISA", "UAE", "DRC", "GOP", "SEC", "IMF", "ICE", "ATF", "DOJ", "DOD", "UAP", "UFO", "AI", "CVE", "H5N1", "MPOX",
-         "NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "SPACEX", "OPENAI", "BBC", "CNN", "NYC", "LA", "DC", "EV", "FIFA", "NFL", "NBA", "F1", "BNP"}
+         "NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "SPACEX", "OPENAI", "BBC", "CNN", "NYC", "LA", "DC", "EV", "FIFA", "NFL", "NBA", "F1", "BNP",
+         "CENTCOM", "EUCOM", "INDOPACOM", "NORTHCOM", "AFRICOM", "SOCOM", "IRGC", "IAF"}
 _EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScotia", "NewBrunswick", "Newfoundland", "Yukon", "Nunavut",
           "Queensland", "Victoria", "Tasmania", "NewSouthWales", "WesternAustralia", "SouthAustralia", "Scotland", "Wales", "England",
           "Earthquake", "Volcano", "Eruption", "VolcanicAsh", "Tsunami", "Flood", "Flooding", "Storm", "WinterStorm", "Hurricane", "Typhoon", "Cyclone", "Tornado",
@@ -188,7 +196,7 @@ _EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScoti
           "Protest", "Protests", "Crime", "Police", "Shooting", "Accident", "Crash", "Aviation", "Outage", "PowerOutage", "Internet", "Markets",
           "Stocks", "Oil", "Economy", "Inflation", "Tariffs", "Banking", "Crypto", "Bitcoin", "SpaceWeather", "Solar", "Aurora", "UAP", "Religion",
           "Obituary", "Evacuation", "Emergency", "Refugees", "Sanctions", "Energy", "Space", "Science", "Climate", "Disaster", "Trump", "Putin",
-          "Zelensky", "Netanyahu", "Kushner", "Xi", "Microsoft", "Google", "Apple", "Amazon", "Meta", "Tesla", "Nvidia", "GitLab", "GitHub",
+          "Zelensky", "Netanyahu", "Kushner", "Witkoff", "CENTCOM", "Xi", "Microsoft", "Google", "Apple", "Amazon", "Meta", "Tesla", "Nvidia", "GitLab", "GitHub",
           "Cisco", "Fortinet", "Juniper", "Drupal", "Hitachi", "Siemens", "Boeing", "Airbus", "OpenAI", "Gaza", "Hamas", "Hezbollah", "Houthis",
           "Israel", "Iran", "Ukraine", "Russia", "China", "Taiwan", "MicrosoftEdge", "Chrome", "Android", "iOS", "Windows", "Linux", "Telegram",
           "Ethereum", "Seismic", "ISIL", "FinCEN", "Cybercrime", "GeoNet", "Interpol", "Europol", "Hezbollah", "Vatican", "Pope", "Moscow", "Kyiv", "Tehran", "Beijing", "Jerusalem", "Sanaa", "Cairo", "RedSea", "Hormuz", "Strait"}
@@ -253,7 +261,7 @@ def tag_ok(tag, title="", known=()):
     if t[0].islower():
         return False
     parts = re.findall(r"[A-Z][a-z0-9]*", t)
-    if len(t) > 14 or len(parts) > 2:     # long run-togethers are never tags unless a known name
+    if len(t) > 12 or len(parts) > 2:     # long run-togethers are never tags unless a known name (Matt: ~12 chars)
         return False
     if len(parts) == 2:                   # a two-word proper name written that way in the headline (#AlJazeera, #TeAraroa)
         if any(p.lower() in _COMMON for p in parts):

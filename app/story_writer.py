@@ -1428,7 +1428,7 @@ def package_pending(max_new=80, max_backfill=200):
         cid = r["cluster_id"]
         if has_writeup(cid):
             if not is_packaged(cid):
-                package_one(cid, row=r, build_card_now=cid not in legacy)
+                package_one(cid, row=r, build_card_now=False)
             continue
         is_new = cid not in legacy
         if is_new and packaged >= max_new:
@@ -1437,7 +1437,7 @@ def package_pending(max_new=80, max_backfill=200):
             continue
         if not _backoff_ok(cid):
             continue
-        ok = package_one(cid, row=r, build_card_now=is_new)
+        ok = package_one(cid, row=r, build_card_now=False)
         if is_new:
             packaged += 1
         else:
@@ -1450,6 +1450,13 @@ def package_pending(max_new=80, max_backfill=200):
 
 def warm_cards(n=5):
     """Build share cards for packaged write-ups that do not have one yet. Failures are not held."""
+    try:
+        import wire_check as WC
+        if not WC.story_cards_on():
+            return
+    except Exception:
+        if os.environ.get("BN_STORY_CARDS", "0") != "1":
+            return
     with _LK:
         k = db()
         try:
