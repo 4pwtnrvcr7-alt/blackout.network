@@ -855,17 +855,61 @@ def _valid_png(b):
     return isinstance(b, (bytes, bytearray)) and len(b) > 1000 and b[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def _is_typography_fallback(b):
+    """The 1200x630 'Global threat monitoring' / ISS / _safe_png card."""
+    if not _valid_png(b):
+        return False
+    try:
+        im = Image.open(io.BytesIO(b))
+        if im.size == (1200, 630):
+            return True
+    except Exception:
+        return False
+    try:
+        import share_card
+        if share_card.is_stub_card(b):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _valid_story_png(b):
+    """A story share card must be a 1200x675 (or close) photo, never typography or a stub."""
+    if not _valid_png(b) or _is_typography_fallback(b):
+        return False
+    try:
+        im = Image.open(io.BytesIO(b))
+        w, h = im.size
+        if w < 1100 or h < 640 or h > 720:
+            return False
+    except Exception:
+        return False
+    return True
+
+
 def handle_get(path, qs=None):
     """Addon entry: /og/<page>.png and /og/wire/<id>.png. Always a 200 image/png for those paths (never a redirect, HTML, or 5xx)."""
     try:
         p = (path or "").split("?")[0].rstrip("/")
         m = re.fullmatch(r"/og/wire/([0-9a-f]{16})(?:\.png)?", p, re.I)
         if m:
+            cid = m.group(1).lower()
             try:
-                b = png_for_story_fast(m.group(1).lower())
+                b = png_for_story_fast(cid)
             except Exception:
                 b = None
-            return 200, b if _valid_png(b) else _safe_png(), "image/png"
+            # Never the 1200x630 typography / earth / "_safe_png" card on a story path.
+            if not _valid_story_png(b):
+                try:
+                    import share_card
+                    b = share_card.local_pool_story_card(cid) or share_card.generic_story_card(cid)
+                except Exception:
+                    b = None
+            if _valid_story_png(b):
+                return 200, b, "image/png"
+            # Still a 200 PNG so crawlers do not get HTML, but never the typography card.
+            return 200, b if _valid_png(b) and not _is_typography_fallback(b) else (b or b""), "image/png"
         m = re.fullmatch(r"/og/([a-z0-9-]{1,40})(?:\.png)?", p)
         if m:
             key = m.group(1).lower()

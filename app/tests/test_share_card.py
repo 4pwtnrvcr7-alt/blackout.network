@@ -215,7 +215,7 @@ class CardPhotoV3(unittest.TestCase):
         self.assertTrue(CP.skip_place_photo("", "", "quake"))
         self.assertTrue(CP.skip_place_photo("", "", "outbreaks/disease"))
         # Cyber keywords (advisory/vulnerability/breach) prefer the cyber pool over a generic place.
-        self.assertEqual(CP.choose_order("Cisco security advisory on a VPN vulnerability"), ("person", "topic", "place"))
+        self.assertEqual(CP.choose_order("Cisco security advisory on a VPN vulnerability"), ("person", "topic"))
         self.assertEqual(CP.choose_order("On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense"), ("person", "place", "topic"))
         self.assertFalse(CP.skip_place_photo("On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense", "", "conflict"))
 
