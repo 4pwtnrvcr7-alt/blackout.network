@@ -235,17 +235,41 @@ CREDITS_LEDGER = [
   ("Ebola reconstruction (human travel) hero diagram", "Original BLACKOUT.NETWORK diagram of places named in the Science reconstruction, plotted approximately. Not a surveyed map.", "BLACKOUT.NETWORK"),
   ("Fed AI / bank-run warning hero diagram", "Original BLACKOUT.NETWORK typographic diagram using a phrase from Governor Barr's 16 Nov 2026 speech. Not a photograph of any person or building.", "BLACKOUT.NETWORK")]),
 ]
-def _nl_credits():
-    """Newsletter topic divider images (newsletter_pool.json): one row per image, licence and author."""
+def _pool_credit_rows(filename, heading, note):
+    """One credits row per image in a newsletter-style pool JSON."""
     try:
         import json
-        d = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "newsletter_pool.json")))
-        return [("newsletter", "Newsletter section images", [(f"{im['topic'].title()} divider ({im['name'].split('-')[0]})",
-                 f"{im['title']}, {im['artist']}, via Wikimedia Commons ({im['page']})", im["license"]) for im in d.get("images") or []]
-                 + [("Note", "Generic topic images that open each newsletter section. They do not show the events in the stories.", "")])]
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), filename), encoding="utf-8") as fh:
+            d = json.load(fh)
+        rows = [(f"{im['topic'].title()} photo ({im['name'].split('-')[0]})",
+                 f"{im['title']}, {im['artist']}, via Wikimedia Commons ({im['page']})", im["license"])
+                for im in d.get("images") or []]
+        rows.append(("Note", note, ""))
+        return [("newsletter", heading, rows)]
     except Exception:
         return []
+
+
+def _nl_credits():
+    """Newsletter topic divider images (newsletter_pool.json): one row per image, licence and author."""
+    return _pool_credit_rows(
+        "newsletter_pool.json",
+        "Newsletter section images",
+        "Generic topic images that open each newsletter section. They do not show the events in the stories.",
+    )
+
+
+def _og_pool_credits():
+    """Extra share-card conflict/cyber pool (card_photo_pool.json), same attribution fields as the email pool."""
+    return _pool_credit_rows(
+        "card_photo_pool.json",
+        "Wire / share-card topic photos",
+        "Generic rights-cleared topic photos used on Wire share cards when a story has no unique person or unused place photo. They do not show the events in the stories.",
+    )
+
+
 CREDITS_LEDGER += _nl_credits()
+CREDITS_LEDGER += _og_pool_credits()
 CREDITS_PAGE_KEY = {"/": "intro", "/live": "live", "/dashboard": "live", "/wire": "wire"}
 
 def _credits_og():

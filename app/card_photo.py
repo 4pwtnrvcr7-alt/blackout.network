@@ -128,11 +128,10 @@ def _pool_filename(item):
     return urllib.parse.unquote(m.group(1).replace("%20", " "))
 
 
-def _extend_topics_from_newsletter_pool():
-    """Append unique, non-maplike newsletter pool files to the curated topic lists."""
-    path = Path(__file__).resolve().parent / "newsletter_pool.json"
+def _extend_topics_from_pool_file(path):
+    """Append unique, non-maplike pool files from one JSON (newsletter or share-card) to the curated topic lists."""
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(Path(path).read_text())
     except Exception:
         return
     for item in data.get("images") or []:
@@ -156,6 +155,13 @@ def _extend_topics_from_newsletter_pool():
         files = TOPICS[key][1]
         if fn not in files:
             files.append(fn)
+
+
+def _extend_topics_from_newsletter_pool():
+    """Load the email divider pool and the extra share-card conflict/cyber pool."""
+    root = Path(__file__).resolve().parent
+    _extend_topics_from_pool_file(root / "newsletter_pool.json")
+    _extend_topics_from_pool_file(root / "card_photo_pool.json")
 
 
 _extend_topics_from_newsletter_pool()
@@ -580,6 +586,15 @@ def choose(cid, title, hit=None, text="", category=""):
             print(f"card_photo: tier error {type(e).__name__}: {e}", flush=True)
             im = None
         if im:
+            # Skip a person/place (or leftover topic) file already used on another story
+            # so Russia-related cards do not all get the same Kremlin / St. Basil's photo.
+            try:
+                key = file_key(src=im.get("src") or "", link=im.get("link") or "",
+                               title=im.get("title") or "", filename=im.get("filename") or "")
+                if key and key in used_file_keys(cid):
+                    continue
+            except Exception:
+                pass
             try:
                 im["path"] = fetch(im)
             except Exception as e:  # noqa: BLE001
