@@ -1190,6 +1190,13 @@ def _card_ready(cid):
     if os.environ.get("BN_CARD_GATE", "1") == "0":
         return True
     try:
+        import wire_check as WC
+        if not WC.story_cards_on():
+            return True
+    except Exception:
+        if os.environ.get("BN_STORY_CARDS", "0") != "1":
+            return True
+    try:
         import share_card
         if share_card.card_baked(cid):
             return True

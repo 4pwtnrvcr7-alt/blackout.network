@@ -19,6 +19,17 @@ import os, re
 
 def on(): return os.environ.get("BN_WIRE_VALIDATE", "1") != "0"
 
+def story_cards_on():
+    """Wire story photo cards, og:image, and the photo-card publish hold.
+
+    Off by default (Matt, 11:44 AM ET Nov 27 2026): stories publish without a
+    share card; story pages use twitter:card=summary and no og:image. Newsletter
+    images, /bnt/media, and non-story /og/<page>.png cards are unrelated and stay on.
+    Set BN_STORY_CARDS=1 to restore the old photo-card gate and generation.
+    """
+    return os.environ.get("BN_STORY_CARDS", "0") == "1"
+
+
 # ------------------------------------------------------------------ category / text consistency
 _W = lambda s: re.compile(s, re.I)
 EV = {
@@ -352,15 +363,16 @@ def check(it, raw_tags=None, loc_tags=(), choice=None, has_photo=None, country_n
             v["tags"] = tg
             if len(tg) < 3:
                 v["ok"] = False; v["reasons"].append(f"tags<{len(tg)}>")
-        if has_photo is None:
-            v["ok"] = False; v["reasons"].append("photo-check-error")
-        else:
-            pv = photo_verdict(k, choice, country_names)
-            v["photo"] = pv
-            if not has_photo:
-                v["ok"] = False; v["reasons"].append("no-photo-card")
-            elif pv.startswith("bad"):
-                v["ok"] = False; v["reasons"].append("photo-" + pv)
+        if story_cards_on():
+            if has_photo is None:
+                v["ok"] = False; v["reasons"].append("photo-check-error")
+            else:
+                pv = photo_verdict(k, choice, country_names)
+                v["photo"] = pv
+                if not has_photo:
+                    v["ok"] = False; v["reasons"].append("no-photo-card")
+                elif pv.startswith("bad"):
+                    v["ok"] = False; v["reasons"].append("photo-" + pv)
     except Exception as ex:   # a validator bug must not hide the whole Wire: report it, keep the item's previous state
         v["error"] = f"{type(ex).__name__}: {ex}"[:160]
     return v
