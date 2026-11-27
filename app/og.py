@@ -778,17 +778,39 @@ def attr(s):
 
 
 def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og_type="website"):
-    """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id."""
+    """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id.
+
+    Story pages (story_id set, no explicit image) omit og:image and twitter:image and
+    use twitter:card=summary unless BN_STORY_CARDS=1, so X does not show a stale or stub card.
+    """
     E = attr
-    if story_id:
+    t = title if title else BRAND
+    d = desc or TAGLINE
+    cards = False
+    try:
+        import wire_check as WC
+        cards = WC.story_cards_on()
+    except Exception:
+        cards = os.environ.get("BN_STORY_CARDS", "0") == "1"
+    if story_id and not image and not cards:
+        return (
+            f'<meta property="og:type" content="{E(og_type)}">'
+            f'<meta property="og:site_name" content="{BRAND}">'
+            f'<meta property="og:title" content="{E(t)}">'
+            f'<meta property="og:description" content="{E(d)}">'
+            f'<meta property="og:url" content="{E(url)}">'
+            f'<meta name="twitter:card" content="summary">'
+            f'<meta name="twitter:site" content="{HANDLE}">'
+            f'<meta name="twitter:title" content="{E(t)}">'
+            f'<meta name="twitter:description" content="{E(d)}">'
+        )
+    if story_id and cards:
         try:   # build the story's share card now, so it is ready before the first crawler or share
             import share_card; share_card.warm(str(story_id))
         except Exception:
             pass
     img = image or image_url(key or "home", story_id=story_id, title=title, rank=rank)
     img_h = 675 if (story_id or "/og/share/" in (image or "")) else 630   # story and share cards are 1200x675
-    t = title if title else BRAND
-    d = desc or TAGLINE
     return (
         f'<meta property="og:type" content="{E(og_type)}">'
         f'<meta property="og:site_name" content="{BRAND}">'
@@ -894,6 +916,14 @@ def handle_get(path, qs=None):
         p = (path or "").split("?")[0].rstrip("/")
         m = re.fullmatch(r"/og/wire/([0-9a-f]{16})(?:\.png)?", p, re.I)
         if m:
+            cards = False
+            try:
+                import wire_check as WC
+                cards = WC.story_cards_on()
+            except Exception:
+                cards = os.environ.get("BN_STORY_CARDS", "0") == "1"
+            if not cards:
+                return 404, b"", "text/plain"
             cid = m.group(1).lower()
             try:
                 b = png_for_story_fast(cid)

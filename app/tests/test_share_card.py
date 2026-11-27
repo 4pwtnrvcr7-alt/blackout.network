@@ -139,8 +139,8 @@ class CrawlerFirstFetch(unittest.TestCase):
              mock.patch.object(SW, "has_writeup", return_value=True), \
              mock.patch.object(S, "card_baked", return_value=False), \
              mock.patch.object(S, "bake_card") as bake:
-            self.assertTrue(SW.allow("abcdabcdabcdabcd"))  # fail open after queueing the bake (OOM hotfix)
-            bake.assert_called_once_with("abcdabcdabcdabcd")
+            self.assertTrue(SW.allow("abcdabcdabcdabcd"))  # story cards off: no bake, still public
+            bake.assert_not_called()
         with mock.patch.object(SW, "gate_on", return_value=True), \
              mock.patch.object(SW, "_is_needs_paid", return_value=False), \
              mock.patch.object(SW, "has_writeup", return_value=True), \

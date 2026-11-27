@@ -269,6 +269,13 @@ def handle_rt(h, path):
 def _kick_card_rebuild():
     """After a cards.db install (handoff or box restore), build missing PNG cards from the stored JPEGs, newest first.
     One background thread; share_card's rebuild lock makes a second call a no-op while a rebuild runs."""
+    try:
+        import wire_check as WC
+        if not WC.story_cards_on():
+            return
+    except Exception:
+        if os.environ.get("BN_STORY_CARDS", "0") != "1":
+            return
     def _cards_after_install():
         try:
             import story_photo as SP, share_card
@@ -484,6 +491,17 @@ def _boot_warm(timeout=45):
             BOOT_WARM["error"] = (BOOT_WARM["error"] + " wire:" + type(ex).__name__).strip()
             BOOT_WARM["wire"] = False
         try:
+            import wire_check as WC
+            cards = WC.story_cards_on()
+        except Exception:
+            cards = os.environ.get("BN_STORY_CARDS", "0") == "1"
+        if not cards:
+            # Story cards are off: page OG (/og/home.png) is enough for og-ready. Do not
+            # start the photo worker or require a designed /og/wire/<id>.png card.
+            BOOT_WARM["og"] = home_ok
+            BOOT_WARM["n"] = 0
+        else:
+          try:
             import share_card
             # Designed cards (map at least; photo if the lookup finishes) must exist before og=true.
             left = max(8, timeout - (time.time() - t0))
@@ -507,7 +525,7 @@ def _boot_warm(timeout=45):
             if not designed and BOOT_WARM["n"] > 0:
                 # Maps were built in-process even if the handle_get check failed.
                 BOOT_WARM["og"] = True
-        except Exception:
+          except Exception:
             pass
     else:
         try:
@@ -522,6 +540,13 @@ def _boot_warm(timeout=45):
 
 def _card_backfill():
     """One boot thread: audit, then a single paced v3 photo-rebuild worker (bounded RAM)."""
+    try:
+        import wire_check as WC
+        if not WC.story_cards_on():
+            return
+    except Exception:
+        if os.environ.get("BN_STORY_CARDS", "0") != "1":
+            return
     cids = []
     try:
         if has_data():
@@ -988,8 +1013,10 @@ if __name__ == "__main__":
     wait_before_bind()
     try:
         try:
-            import share_card
-            share_card._ensure_fworker()
+            import wire_check as WC
+            if WC.story_cards_on():
+                import share_card
+                share_card._ensure_fworker()
         except Exception:
             traceback.print_exc()
         _boot_warm()

@@ -551,8 +551,10 @@ def _item(r, archive, warm_budget=None, compute=None):
             hid = False
         if (rk or 0) >= 5 and warm_budget is not None and warm_budget[0] > 0:
             try:
-                import share_card; share_card.warm(str(r["id"]))
-                warm_budget[0] -= 1
+                import wire_check as WC
+                if WC.story_cards_on():
+                    import share_card; share_card.warm(str(r["id"]))
+                    warm_budget[0] -= 1
             except Exception:
                 pass
         go = _warming() if compute is None else compute
@@ -937,6 +939,12 @@ def _warm_rows(n):
 
 def _warm_bake(rows):
     """Queue card bakes the way story_writer.allow() used to on every list call, once per story per 10 minutes."""
+    try:
+        import wire_check as WC
+        if not WC.story_cards_on():
+            return
+    except Exception:
+        return
     now = time.time()
     try:
         import share_card
@@ -1036,7 +1044,13 @@ def _v_eval(r, now):
     if v.get("error"):
         why.append("validator-error")
     pv = v.get("photo") or ""
-    if pv.startswith("bad") and now - _VDEL.get(cid, 0) > 3600 and _V_CYC["del"] < 6:
+    cards = True
+    try:
+        import wire_check as _WC
+        cards = _WC.story_cards_on()
+    except Exception:
+        cards = False
+    if cards and pv.startswith("bad") and now - _VDEL.get(cid, 0) > 3600 and _V_CYC["del"] < 6:
         _V_CYC["del"] += 1
         _VDEL[cid] = now
         try:
@@ -1046,7 +1060,7 @@ def _v_eval(r, now):
         except Exception:
             pass
         _VWARM.pop(cid, None)
-    if (not has or pv.startswith("bad")) and now - _VWARM.get(cid, 0) > 180 and _V_CYC["warm"] < 8:
+    if cards and (not has or pv.startswith("bad")) and now - _VWARM.get(cid, 0) > 180 and _V_CYC["warm"] < 8:
         _VWARM[cid] = now; _V_CYC["warm"] += 1          # bounded: share_card.warm keeps at most 20 photo jobs in flight
         try:
             import share_card
@@ -1079,6 +1093,8 @@ def _warm_old_photos(rows):
     """Rows outside the validator window are public without a verdict; ask the paced photo worker for their photo cards
     too (newest first, 4 per cycle, each row once per 30 min) so older Wire items stop sharing the text fallback."""
     import share_card, wire_check as WC
+    if not WC.story_cards_on():
+        return
     # fresh stories first: only when the validator window has almost no rows waiting for a card
     if sum(1 for e in list(_VR.values()) if "no-photo-card" in e["why"]) > 20:
         return
