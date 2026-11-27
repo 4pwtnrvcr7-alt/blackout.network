@@ -64,6 +64,15 @@ _ACCIDENT = _W(r"\b(fuel (?:truck|tanker)|tanker (?:truck|lorry)|petroleum produ
 _HARD_MIL = _W(r"\b(missiles?|rockets?|drones?|air ?strikes?|shell(?:ing|ed)|artillery|troops?|soldiers?|army|military|militants?|hamas|hezbollah|houthis?|idf|occupation forces|invasion|ballistic|bomb(?:ing|ed|s)?|warships?)\b")
 _SPORT = _W(r"\b(league|football|soccer|nba|nfl|nhl|mlb|f1|formula (?:1|one)|grand prix|olympic\w*|world cup|cup final|match|matches|bayern|losc|premier league|champions league|tennis|golf|cricket|rugby|boxing|ufc|coach|quarterback|playoffs?|tournament|cost cap)\b")
 _RESCUE_ORDER = ("quake", "weather", "disease", "conflict", "space", "cyber", "wreck", "crime", "unrest", "markets", "politics", "faith", "uap")
+# Stored "hazard" may still be a weather warning (MeteoAlarm / NWS). Tight on purpose:
+# a generic "warning" or "NOAA" alone must not flip a chemical or industrial hazard.
+_HAZARD_WEATHER = _W(
+    r"\b(thunderstorms?|high winds?|gale warnings?|high wind (?:watch|warning|advisory)|"
+    r"wind (?:watch|warning|advisory)|blizzard|hurricanes?|typhoons?|cyclones?|tornado\w*|"
+    r"flash floods?|flood (?:watch|warning|advisory)|heat (?:advisory|warning|watch)|"
+    r"winter (?:storm|weather) (?:watch|warning|advisory)|red flag|fire weather|meteoalarm|"
+    r"(?:storm|flood|wind|gale|surf|frost|freeze|heat|blizzard|hurricane|typhoon) (?:warning|watch|advisory))\b"
+)
 
 def _defig(text):
     for rx, rep in _FIG:
@@ -82,7 +91,13 @@ def category(k, title, text=""):
         return "other"
     if k == "conflict" and _ACCIDENT.search(t) and not _HARD_MIL.search(full):
         return "wreck"
-    if k in ("people", "deaths", "scandal", "hazard", "infra"):
+    if k in ("people", "deaths", "scandal", "infra"):
+        return k
+    if k == "hazard":
+        # Display-only: a stored "hazard" used to return immediately, so MeteoAlarm
+        # thunderstorm and NWS high-wind warnings never got #Weather/#Storm fills.
+        if _HAZARD_WEATHER.search(t):
+            return "weather"
         return k
     if k == "other":
         # Display-only rescue: a stored "other" used to return immediately, so strikes, wind
@@ -184,7 +199,7 @@ def location(loc, lat, lon):
 _ACRO = {"NATO", "UN", "EU", "US", "UK", "WHO", "CDC", "FBI", "CIA", "NSA", "DHS", "FEMA", "NOAA", "NWS", "USGS", "NASA", "FAA", "IDF", "ISIS",
          "OPEC", "IAEA", "CISA", "UAE", "DRC", "GOP", "SEC", "IMF", "ICE", "ATF", "DOJ", "DOD", "UAP", "UFO", "AI", "CVE", "H5N1", "MPOX",
          "NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "SPACEX", "OPENAI", "BBC", "CNN", "NYC", "LA", "DC", "EV", "FIFA", "NFL", "NBA", "F1", "BNP",
-         "CENTCOM", "EUCOM", "INDOPACOM", "NORTHCOM", "AFRICOM", "SOCOM", "IRGC", "IAF"}
+         "CENTCOM", "EUCOM", "INDOPACOM", "NORTHCOM", "AFRICOM", "SOCOM", "IRGC", "IAF", "GEOFON", "SAP"}
 _EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScotia", "NewBrunswick", "Newfoundland", "Yukon", "Nunavut",
           "Queensland", "Victoria", "Tasmania", "NewSouthWales", "WesternAustralia", "SouthAustralia", "Scotland", "Wales", "England",
           "Earthquake", "Volcano", "Eruption", "VolcanicAsh", "Tsunami", "Flood", "Flooding", "Storm", "WinterStorm", "Hurricane", "Typhoon", "Cyclone", "Tornado",
@@ -199,7 +214,7 @@ _EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScoti
           "Zelensky", "Netanyahu", "Kushner", "Witkoff", "CENTCOM", "Xi", "Microsoft", "Google", "Apple", "Amazon", "Meta", "Tesla", "Nvidia", "GitLab", "GitHub",
           "Cisco", "Fortinet", "Juniper", "Drupal", "Hitachi", "Siemens", "Boeing", "Airbus", "OpenAI", "Gaza", "Hamas", "Hezbollah", "Houthis",
           "Israel", "Iran", "Ukraine", "Russia", "China", "Taiwan", "MicrosoftEdge", "Chrome", "Android", "iOS", "Windows", "Linux", "Telegram",
-          "Ethereum", "Seismic", "ISIL", "FinCEN", "Cybercrime", "GeoNet", "Interpol", "Europol", "Hezbollah", "Vatican", "Pope", "Moscow", "Kyiv", "Tehran", "Beijing", "Jerusalem", "Sanaa", "Cairo", "RedSea", "Hormuz", "Strait"}
+          "Ethereum", "Seismic", "ISIL", "FinCEN", "Cybercrime", "GeoNet", "Interpol", "Europol", "Hezbollah", "Vatican", "Pope", "Moscow", "Kyiv", "Tehran", "Beijing", "Jerusalem", "Sanaa", "Cairo", "RedSea", "Hormuz", "Strait", "GEOFON", "Kamchatka", "MeteoAlarm", "Lukoil", "Bolsonaro", "Walmart", "Melenchon", "Melanchon", "EasyJet", "Attack", "Assassination", "Refinery", "Tanker", "Banks"}
 _CAT_TAG = {"conflict": "Conflict", "weather": "Weather", "quake": "Earthquake", "disease": "Health", "cyber": "Cybersecurity",
             "politics": "Politics", "markets": "Markets", "crime": "Crime", "unrest": "Protest", "wreck": "Accident", "infra": "Outage",
             "space": "SpaceWeather", "hazard": "Emergency", "deaths": "Obituary", "uap": "UAP", "faith": "Religion", "scandal": "Politics"}
@@ -324,11 +339,37 @@ def tags(raw, k, title="", loc_tags=()):
             continue
         if not have("#" + extra):
             out.append("#" + extra)
+    # Last short popular topic word already in the headline (Matt: one-word tags, no filler).
+    # Run on de-figured text so a figurative "explosion" / "storm" is not promoted.
+    if len(out) < 3:
+        blob = _defig(title or "")
+        for extra in _TOPIC_FILL:
+            if len(out) >= 3:
+                break
+            if have("#" + extra):
+                continue
+            if re.search(r"\b" + re.escape(extra) + r"s?\b", blob, re.I):
+                out.append("#" + extra)
+        if len(out) < 3 and not have("#Attack") and re.search(r"\bassassina", blob, re.I):
+            out.append("#Attack")
+        if len(out) < 3:  # well-known country names from adjectival forms already in the headline
+            for rx, name in _GENTILE:
+                if len(out) >= 3:
+                    break
+                if have("#" + name):
+                    continue
+                if re.search(rx, blob, re.I):
+                    out.append("#" + name)
     return out[:5]
 
 _CAT_TAG2 = {"quake": ("Earthquake", "Seismic"), "weather": ("Weather", "Storm"), "cyber": ("Cybersecurity", "Hacking"),
              "markets": ("Markets", "Economy"), "disease": ("Health", "Outbreak"), "politics": ("Politics",),
-             "conflict": ("Conflict", "Military"), "space": ("SpaceWeather", "Solar"), "wreck": ("Accident",), "unrest": ("Protest",)}
+             "conflict": ("Conflict", "Military"), "space": ("SpaceWeather", "Solar"), "wreck": ("Accident",), "unrest": ("Protest",),
+             "hazard": ("Emergency", "Disaster"), "infra": ("Outage", "Emergency")}
+_TOPIC_FILL = ("Fire", "Flood", "Strike", "Explosion", "Sanctions", "Banking", "Banks",
+               "Refinery", "Tanker", "Attack", "Storm", "Earthquake", "Emergency", "Disaster")
+_GENTILE = ((r"\bisraeli", "Israel"), (r"\bukrainian", "Ukraine"), (r"\brussian", "Russia"),
+            (r"\biranian", "Iran"), (r"\bchinese", "China"))
 
 # ------------------------------------------------------------------ headline
 _DANGLE = re.compile(r"(?:[\s,;:\-\u2013\u2014]+(?:[Tt]he|[Aa]n?|at|of|to|and|or|in|on|for|with|by|from|as|into|over|after|amid|about|than|that|its|his|her|their|our|is|are|was|were|be|has|have|had|but|nor|via))+\s*(\u2026|\.\.\.)?$")

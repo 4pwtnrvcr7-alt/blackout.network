@@ -70,5 +70,70 @@ class TagHoldRecheck(unittest.TestCase):
         self.assertLess(WT._V_TAG_RECHECK_S, 300)
 
 
+class HazardWeatherAndKnownFills(unittest.TestCase):
+    def test_meteoalarm_thunderstorm_stored_hazard_becomes_weather(self):
+        title = "Greece: Orange thunderstorm warning, 2 areas (Thessalia, Central Makedonia) - MeteoAlarm"
+        k, tg = _tags(title, stored="hazard")
+        self.assertEqual(k, "weather")
+        self.assertGreaterEqual(len(tg), 3)
+        self.assertLessEqual(len(tg), 5)
+        self.assertIn("#Weather", tg)
+        self.assertTrue("#Storm" in tg or "#Greece" in tg or "#MeteoAlarm" in tg)
+        self.assertNotIn("#News", tg)
+        self.assertNotIn("#BlackoutNetwork", tg)
+
+    def test_chemical_hazard_does_not_become_weather(self):
+        title = "Chemical spill warning after a toxic leak at the plant prompts an evacuation"
+        k, tg = _tags(title, stored="hazard")
+        self.assertEqual(k, "hazard")
+
+    def test_geofon_kamchatka_quake_gets_three_tags(self):
+        title = "GEOFON: M5.0 earthquake Off East Coast of Kamchatka"
+        k, tg = _tags(title, stored="quake")
+        self.assertEqual(k, "quake")
+        self.assertGreaterEqual(len(tg), 3)
+        self.assertTrue("#GEOFON" in tg or "#Kamchatka" in tg)
+        self.assertTrue("#Earthquake" in tg or "#Seismic" in tg)
+        self.assertNotIn("#OffEastCoast", tg)
+
+    def test_lukoil_refinery_strike_gets_three_tags(self):
+        title = "Ukraine hits Lukoil's Novoshakhtinsk Perm refinery halting production as a strike on a Zap"
+        k, tg = _tags(title, stored="conflict")
+        self.assertEqual(k, "conflict")
+        self.assertGreaterEqual(len(tg), 3)
+        self.assertIn("#Ukraine", tg)
+        self.assertTrue("#Lukoil" in tg or "#Conflict" in tg)
+        self.assertNotIn("#Novoshakhtinsk", tg)
+
+    def test_hamas_assassination_people_gets_three_tags(self):
+        title = "Hamas says attempted assassination of its leader’s son is continuation of ‘criminal policy"
+        k, tg = _tags(title, stored="people")
+        self.assertEqual(k, "people")
+        self.assertGreaterEqual(len(tg), 3)
+        self.assertIn("#Hamas", tg)
+        self.assertTrue("#Attack" in tg)
+        self.assertNotIn("#News", tg)
+
+    def test_no_long_run_together_or_filler(self):
+        title = "High Wind Watch issued November 27 at 1:39PM EST until November 30 at 1:00AM EST"
+        k, tg = _tags(title, stored="hazard")
+        self.assertEqual(k, "weather")
+        self.assertGreaterEqual(len(tg), 3)
+        self.assertTrue(all(len(t.lstrip("#")) <= 12 or t.lstrip("#").lower() in {x.lower() for x in (WC._EXTRA | WC._ACRO)} for t in tg))
+        self.assertNotIn("#News", tg)
+        self.assertNotIn("#BlackoutNetwork", tg)
+        self.assertNotIn("#HighWindWatch", tg)
+
+    def test_israeli_gentilic_fills_israel(self):
+        title = "Western sanctions on Israeli settlers serve to shield the Israeli state"
+        k, tg = _tags(title, stored="politics")
+        self.assertEqual(k, "politics")
+        self.assertGreaterEqual(len(tg), 3)
+        self.assertIn("#Israel", tg)
+        self.assertIn("#Sanctions", tg)
+        self.assertNotIn("#News", tg)
+
+
+
 if __name__ == "__main__":
     unittest.main()
