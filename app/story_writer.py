@@ -550,10 +550,25 @@ def _invalidate(cid):
         except Exception: pass
 
 def enqueue(k, cid, reason, arrived_at, rank, title):
-    if k.execute("SELECT 1 FROM jobs WHERE cid=? AND status IN ('queued','running')", (cid,)).fetchone(): return False
+    if k.execute("SELECT 1 FROM jobs WHERE cid=? AND status IN ('queued','running','deferred')", (cid,)).fetchone(): return False
     k.execute("INSERT INTO jobs(cid, reason, status, enq_at, arrived_at, rank, title) VALUES(?,?,?,?,?,?,?)",
               (cid, reason, "queued", iso(), arrived_at, rank, (title or "")[:200]))
     return True
+
+def _dedupe_open_jobs(k):
+    """Keep one open paid job per story. Duplicate deferred/queued upgrades were starving package_pending."""
+    rows = k.execute(
+        "SELECT id, cid, status FROM jobs WHERE status IN ('queued','running','deferred') "
+        "ORDER BY cid, CASE status WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, id"
+    ).fetchall()
+    seen = set()
+    for r in rows:
+        cid = r["cid"]
+        if cid in seen:
+            if r["status"] != "running":
+                k.execute("UPDATE jobs SET status='skipped', err='duplicate job' WHERE id=? AND status IN ('queued','deferred')", (r["id"],))
+        else:
+            seen.add(cid)
 
 def _is_template_brief(h):
     m = (h or {}).get("model") or ""
@@ -572,6 +587,7 @@ def scan():
             have = {r["cid"]: dict(r) for r in k.execute("SELECT cid, written_at, src_urls, alias_of, model FROM briefs")}
             seen = {r["cid"]: dict(r) for r in k.execute("SELECT cid, first_seen, backfill FROM seen")}
             covered_rows = [r for r in rows if desk_covered(r["cluster_id"], maps)]
+            _dedupe_open_jobs(k)
             queued = {x[0] for x in k.execute("SELECT cid FROM jobs WHERE status IN ('queued','running')")}
             deferred = {x[0] for x in k.execute("SELECT cid FROM jobs WHERE status='deferred'")}
             claimed = [r for r in rows if (r["cluster_id"] in have and not have[r["cluster_id"]].get("alias_of") and not _is_template_brief(have[r["cluster_id"]])) or r["cluster_id"] in queued]
@@ -584,7 +600,7 @@ def scan():
                 if cid in have:
                     h = have[cid]
                     if h.get("alias_of"): continue
-                    if _is_template_brief(h) and rank >= c["min_rank"] and cid not in queued:
+                    if _is_template_brief(h) and rank >= c["min_rank"] and cid not in queued and cid not in deferred:
                         if enqueue(k, cid, "upgrade", seen[cid]["first_seen"], rank, r.get("title")):
                             queued.add(cid); claimed.append(r)
                         continue
@@ -728,7 +744,17 @@ def _writer_worker(ready, paused):
                 if mt != last_mt or time.time() - (parse_t(STATE["last_scan"]) or now()).timestamp() > 120 or not STATE["initial_done"]:
                     scan(); last_mt = mt
                 with _LK:
-                    k = db(); _requeue_deferred(k); k.commit(); job = next_job(k); k.close()
+                    k = db()
+                    _dedupe_open_jobs(k)
+                    blocked = blocked_reason(k)
+                    # When the daily cap (or hourly limit) is hit, do not requeue or drain
+                    # cap-deferred upgrades: write_one would bounce in ~0.3s and `continue`
+                    # would skip package_pending, leaving new Wire stories without tags/cards.
+                    if not blocked:
+                        _requeue_deferred(k)
+                    k.commit()
+                    job = None if blocked else next_job(k)
+                    k.close()
                 if job:
                     write_one(job)
                     continue  # drain the paid queue before the slow template/card pass

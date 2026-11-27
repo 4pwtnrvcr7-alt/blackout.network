@@ -260,5 +260,69 @@ class Writer(Base):
         self.assertIn("rewrites disabled", rows["adadadadadadadad"][1])
         self.assertEqual(rows["aeaeaeaeaeaeaeae"][0], "queued")
 
+    def test_deferred_upgrade_is_not_enqueued_again(self):
+        """A cap/wrapper deferral must not grow a new upgrade job on every scan (live: 316 jobs / 6 cids)."""
+        cid = "acacacacacacacac"
+        mkdb([(cid, "M6.8 earthquake struck the Banda Sea off Indonesia", 7)])
+        r, al = SW.cluster(cid)
+        note = SW.build_template(r, al)
+        k = SW.db()
+        k.execute("INSERT OR REPLACE INTO briefs(cid, note, written_at, model, src_urls, alias_of, tokens_in, tokens_out, usd, rank, title) VALUES(?,?,?,?,?,NULL,0,0,0,?,?)",
+                  (cid, __import__("json").dumps(note), SW.iso(), "template", "[]", 7, r["title"]))
+        k.commit(); k.close(); SW._NC["t"] = 0
+        SW.scan()
+        k = SW.db()
+        k.execute("UPDATE jobs SET status='deferred', err=?, finished=? WHERE cid=?",
+                  ("daily cap reached ($1.0025 of $1.00)", SW.iso(), cid))
+        k.commit(); k.close()
+        SW.scan(); SW.scan()
+        k = SW.db()
+        n = k.execute("SELECT COUNT(*) FROM jobs WHERE cid=?", (cid,)).fetchone()[0]
+        open_n = k.execute("SELECT COUNT(*) FROM jobs WHERE cid=? AND status IN ('queued','running','deferred')", (cid,)).fetchone()[0]
+        k.close()
+        self.assertEqual(n, 1)
+        self.assertEqual(open_n, 1)
+
+    def test_dedupe_collapses_duplicate_open_jobs(self):
+        cid = "bbbbbbbbbbbbbbbb"
+        mkdb([(cid, "M6.8 earthquake struck the Banda Sea off Indonesia", 7)])
+        k = SW.db()
+        past = SW.iso(NOW - timedelta(minutes=5))
+        for _ in range(5):
+            k.execute("INSERT INTO jobs(cid, reason, status, arrived_at, finished, err, rank, title) VALUES(?,?,?,?,?,?,?,?)",
+                      (cid, "upgrade", "deferred", past, past, "daily cap reached ($1.00 of $1.00)", 7, "quake"))
+        k.commit()
+        SW._dedupe_open_jobs(k); k.commit()
+        rows = list(k.execute("SELECT id, status, err FROM jobs WHERE cid=? ORDER BY id", (cid,)))
+        k.close()
+        open_rows = [r for r in rows if r["status"] in ("queued", "running", "deferred")]
+        skipped = [r for r in rows if r["status"] == "skipped"]
+        self.assertEqual(len(open_rows), 1)
+        self.assertEqual(len(skipped), 4)
+        self.assertTrue(all("duplicate job" in (r["err"] or "") for r in skipped))
+
+    def test_blocked_cap_does_not_requeue_paid_jobs(self):
+        """When today's cap is already spent, leave deferred upgrades parked so packaging can run."""
+        os.environ["BN_WRITER_DAILY_USD"] = "0.000001"
+        try:
+            cid = "cccccccccccccccc"
+            mkdb([(cid, "M6.8 earthquake struck the Banda Sea off Indonesia", 7)])
+            k = SW.db()
+            SW._add_spend(k, 1, 1, 0.01)
+            past = SW.iso(NOW - timedelta(hours=2))
+            k.execute("INSERT INTO jobs(cid, reason, status, arrived_at, finished, err, rank, title) VALUES(?,?,?,?,?,?,?,?)",
+                      (cid, "upgrade", "deferred", past, past, "daily cap reached ($0.01 of $0.00)", 7, "quake"))
+            k.commit()
+            self.assertIsNotNone(SW.blocked_reason(k))
+            # Mirror the worker: do not requeue while blocked.
+            if not SW.blocked_reason(k):
+                SW._requeue_deferred(k)
+            k.commit()
+            status = k.execute("SELECT status FROM jobs WHERE cid=?", (cid,)).fetchone()[0]
+            k.close()
+            self.assertEqual(status, "deferred")
+        finally:
+            os.environ.pop("BN_WRITER_DAILY_USD")
+
 if __name__ == "__main__":
     unittest.main()
