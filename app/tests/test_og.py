@@ -66,9 +66,8 @@ class OgImages(unittest.TestCase):
         self.assertEqual(ctype, "image/png")
         self.assertEqual(_img(body).size, (1200, 630))
         code, body, ctype = og.handle_get("/og/wire/6727e7f2ac056676.png")
-        self.assertEqual(code, 200)
-        self.assertEqual(ctype, "image/png")
-        self.assertEqual(_img(body).size, (1200, 675))  # designed card, never the 1200x630 earth fallback
+        self.assertEqual(code, 404)  # story cards off (BN_STORY_CARDS default 0)
+        self.assertFalse(body)
 
     def test_image_url_version_and_aliases(self):
         self.assertEqual(og.image_url("crime"), f"https://blackout.network/og/crime.png?v={og.VERSION}")
@@ -153,7 +152,10 @@ class OgImages(unittest.TestCase):
         shell = wire_v2.shell("The Wire: live threat feed | BLACKOUT.NETWORK", "Live threats.", "<p>x</p>", "/wire")
         self.assertIn("https://blackout.network/og/wire.png?v=", shell)
         story = wire_v2.shell("A headline | BLACKOUT.NETWORK", "Dek.", "<p>x</p>", "/wire/6727e7f2ac056676", rank=8)
-        self.assertIn(f"/og/wire/6727e7f2ac056676.png?v={og.VERSION}-", story)
+        self.assertNotIn("/og/wire/6727e7f2ac056676.png", story)
+        self.assertNotIn("og:image", story)
+        self.assertNotIn("twitter:image", story)
+        self.assertIn('name="twitter:card" content="summary"', story)
         self.assertIn('og:type" content="article"', story)
 
     def test_crawler_share_page(self):

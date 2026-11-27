@@ -58,7 +58,9 @@ class NoStubForHumans(unittest.TestCase):
             self.assertIsNotNone(r)
             self.assertEqual(r[0], 200)
             body = r[1]
-            self.assertIn("og:image", body)
+            self.assertNotIn("og:image", body)
+            self.assertNotIn("twitter:image", body)
+            self.assertIn('name="twitter:card" content="summary"', body)
             self.assertIn("Loading the full story", body)
             self.assertIn(f"/wire/{CID}?full=1", body)
             self.assertIn("content=\"3;url=", body)
@@ -83,11 +85,10 @@ class CardAndShare(unittest.TestCase):
         cid = "e2ca47e325c5b8e1"
         html = og.tags(title="Bessent Iran sanctions", desc="d", url="https://blackout.network/wire/"+cid,
                        story_id=cid, rank=7, og_type="article")
-        self.assertIn("twitter:image", html)
-        self.assertIn("og:image", html)
-        self.assertIn("/og/wire/%s.png?v=" % cid, html)
-        self.assertIn("?v=22", html)
-        self.assertNotIn("?v=5-", html)
+        self.assertNotIn("twitter:image", html)
+        self.assertNotIn("og:image", html)
+        self.assertNotIn("/og/wire/%s.png" % cid, html)
+        self.assertIn('name="twitter:card" content="summary"', html)
 
     def test_share_url_has_s_param(self):
         import x_share as X
@@ -101,7 +102,5 @@ class CardAndShare(unittest.TestCase):
 
     def test_card_endpoint_always_png(self):
         code, body, ct = og.handle_get("/og/wire/" + "f"*16 + ".png")
-        self.assertEqual(code, 200)
-        self.assertEqual(ct, "image/png")
-        self.assertTrue(body[:8] == b"\x89PNG\r\n\x1a\n")
-        self.assertGreater(len(body), 1000)
+        self.assertEqual(code, 404)
+        self.assertFalse(body)
