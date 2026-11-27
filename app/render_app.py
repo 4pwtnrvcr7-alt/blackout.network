@@ -335,6 +335,33 @@ try:
 except Exception: _trim = lambda: None
 
 def _iso(t): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t)) if t else None
+def _scan_stats(limit=8):
+    """Recent scan cycle times from the synced blackout.db (read-only, no secrets)."""
+    try:
+        c = sqlite3.connect(f"file:{BASE}/blackout.db?mode=ro", uri=True, timeout=5)
+        try:
+            rows = list(c.execute(
+                "SELECT started, finished, trigger, fetched, new_items, ok_sources, failed_sources "
+                "FROM scans WHERE finished IS NOT NULL ORDER BY id DESC LIMIT ?", (limit,)))
+        finally:
+            c.close()
+        out = []
+        parse = getattr(getattr(server, "scanner", None), "parse_t", None)
+        for started, finished, trigger, fetched, new, ok, failed in rows:
+            dur = None
+            try:
+                a = parse(started) if parse else None
+                b = parse(finished) if parse else None
+                if a and b:
+                    dur = round((b - a).total_seconds(), 1)
+            except Exception:
+                pass
+            out.append({"started": started, "finished": finished, "trigger": trigger, "fetched": fetched,
+                        "new": new, "ok": ok, "failed": failed, "duration_s": dur})
+        return out
+    except Exception:
+        return []
+
 def public_status():
     """Public, secret-free freshness report: when the box last pushed data and when the scanner last finished."""
     lp = SYNC["last_push"]; ls = server.state.get("last_scan")
@@ -343,6 +370,7 @@ def public_status():
             "last_sync": _iso(lp), "last_sync_age_s": age, "sync_healthy": bool(lp) and age < 900,
             "pushes_since_boot": SYNC["pushes"], "files_installed_since_boot": SYNC["files"], "owned_restored": SYNC["restored"],
             "last_scan": _iso(ls), "last_scan_age_s": round(time.time() - ls) if ls else None, "now": _iso(time.time()),
+            "scans": _scan_stats(),
             "deploy_handoff": {k: HANDOFF[k] for k in ("state", "files", "bytes", "seconds")}, "writes_paused": FREEZE["until"] > time.time(),
             "memory": {**_mem(), "limit_mb": 512, "malloc_arena_max": os.environ.get("MALLOC_ARENA_MAX")}, "realtime": _rt_public()}
 def _rt_public():
