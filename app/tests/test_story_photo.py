@@ -286,7 +286,7 @@ class StoryPhoto(unittest.TestCase):
         from unittest import mock
         import card_photo as CP
         seen = []
-        def topic(text, seed="", key=None):
+        def topic(text, seed="", key=None, except_cid=""):
             seen.append((text, key))
             return dict(src="https://x/y.jpg", path="/tmp/none", kind="topic", label="L", license="Public domain", credit="c") if key else None
         with mock.patch.object(CP, "person_photo", return_value=None), mock.patch.object(CP, "place_photo", return_value=None), \
@@ -463,7 +463,7 @@ class StoryPhoto(unittest.TestCase):
             self.assertEqual(P.get_card(cid), newer)
             self.assertTrue(P.card_has_photo(cid))
             self.assertEqual(P.card_meta(cid)["src"], cand["src"])
-            self.assertEqual(P.card_meta(cid)["v"], "99M")
+            self.assertEqual(P.card_meta(cid)["v"], "99MP")
             self.assertTrue(S._card_headline("— Zelensky says hello").startswith("Zelensky"))
         finally:
             og.VERSION = prev
@@ -1383,6 +1383,98 @@ class StoryPhoto(unittest.TestCase):
             for k in (libya, gaza, zel):
                 P.SUBJECT_HINTS.pop(k, None)
             os.environ.pop("BN_CARDS_DB", None)
+
+
+    def test_style_mark_is_stale_until_p_without_bumping_og_version(self):
+        import og
+        old = {"v": og.VERSION + "M", "src": "https://example.test/x.jpg"}
+        new = {"v": og.VERSION + "MP", "src": "https://example.test/x.jpg"}
+        self.assertTrue(P.card_style_stale(old))
+        self.assertFalse(P.card_style_stale(new))
+        self.assertFalse(P.card_stale(old))
+        self.assertFalse(P.card_stale(new))
+        self.assertTrue(P.card_ver_current().endswith("P"))
+        self.assertTrue(P.card_ver_current().startswith(str(og.VERSION)))
+
+    def test_newsletter_pool_extends_military_with_unique_files(self):
+        import card_photo as CP
+        titles = CP.topic_file_titles()
+        self.assertIn("b-2 spirit original.jpg", titles)
+        # Email-pool carrier / tank photos (not the repeating B-2 / F-35 pair).
+        self.assertIn("flickr - official u.s. navy imagery - aircraft carrier at sea..jpg", titles)
+        self.assertIn("abrams in formation.jpg", titles)
+        # Satellite / ISS hurricane views from the email hazards pool must not be share-card files.
+        self.assertNotIn("cyclone catarina from the iss on march 26 2004.jpg", titles)
+        self.assertGreaterEqual(len(CP.TOPICS["military"][1]), 8)
+
+    def test_topic_photos_are_unique_across_stories(self):
+        """Two conflict stories must not be assigned the same category photo (the live B-2 repeat)."""
+        import os, tempfile
+        import card_photo as CP
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        files = list(CP.TOPICS["military"][1][:6])
+        self.assertGreaterEqual(len(files), 4)
+        calls = []
+
+        def fake_commons(fn, width=1600, min_w=700):
+            calls.append(fn)
+            name = fn.replace("File:", "").replace(" ", "_")
+            return {"src": f"https://upload.wikimedia.org/wikipedia/commons/{name}",
+                    "credit": "U.S. Navy", "license": "Public domain", "title": fn,
+                    "page": f"https://commons.wikimedia.org/wiki/{fn.replace(' ', '_')}", "w": 1600, "h": 900}
+
+        orig = CP.commons_image
+        CP.commons_image = fake_commons
+        try:
+            P._dir = lambda: Path(d)
+            a = CP.topic_photo("Iran ballistic missile exercises", seed="aaaaaaaaaaaaaaaa", key="military", except_cid="aaaaaaaaaaaaaaaa")
+            self.assertIsNotNone(a)
+            P.db_put("aaaaaaaaaaaaaaaa", dict(src=a["src"], credit=a.get("credit") or "", license=a.get("license") or "",
+                                              caption=a.get("label") or "", kind="topic", label=a.get("label") or "",
+                                              link=a.get("page") or ""), jpg=b"\xff\xd8" + b"a" * 3000)
+            b = CP.topic_photo("Ukraine drone evacuation", seed="bbbbbbbbbbbbbbbb", key="military", except_cid="bbbbbbbbbbbbbbbb")
+            self.assertIsNotNone(b)
+            self.assertNotEqual(CP.file_key(src=a["src"], filename=a.get("title")), CP.file_key(src=b["src"], filename=b.get("title")))
+            # A third story also gets a still-unused file.
+            P.db_put("bbbbbbbbbbbbbbbb", dict(src=b["src"], credit=b.get("credit") or "", license=b.get("license") or "",
+                                              caption=b.get("label") or "", kind="topic", label=b.get("label") or "",
+                                              link=b.get("page") or ""), jpg=b"\xff\xd8" + b"b" * 3000)
+            c = CP.topic_photo("Japan defense policy", seed="cccccccccccccccc", key="military", except_cid="cccccccccccccccc")
+            self.assertIsNotNone(c)
+            keys = {CP.file_key(src=x["src"], filename=x.get("title")) for x in (a, b, c)}
+            self.assertEqual(len(keys), 3, keys)
+        finally:
+            CP.commons_image = orig
+            os.environ.pop("BN_CARDS_DB", None)
+
+    def test_share_card_is_photo_only_no_headline_text(self):
+        """The X card is the photo itself: no dark gradient, no burned-in headline or wordmark."""
+        from PIL import Image
+        import tempfile, os
+        d = tempfile.mkdtemp()
+        jpg = Path(d) / "p.jpg"
+        Image.new("RGB", (1600, 900), (20, 180, 40)).save(jpg, "JPEG")
+        orig = P.cached
+        P.cached = lambda src: jpg
+        try:
+            ph = dict(src="https://upload.wikimedia.org/wikipedia/commons/unique_photo.jpg",
+                      credit="U.S. Navy / Wikimedia Commons", license="Public domain", kind="topic",
+                      label="Military aircraft (U.S. Air Force). File photo; not taken at this event.")
+            it = dict(kind="story", id="abcabcabcabcabca",
+                      title="Iran reports explosion on oil tanker after a strike in the Strait of Hormuz",
+                      rank=6, color=S.AMBER, kicker="CONFLICT", loc="Strait of Hormuz",
+                      art=("story", None, None, ph["src"]), photo=ph, stats=[], tags=[])
+            im = S._lay_story(it)
+            self.assertEqual(im.size, (1200, 675))
+            # A typography card darkened the left third and painted white headline glyphs.
+            # A plain photo keeps the source green across the frame.
+            samples = [im.getpixel((x, y))[:3] for x, y in ((40, 40), (600, 40), (1160, 40), (40, 337), (600, 337), (1160, 630), (200, 250))]
+            for px in samples:
+                self.assertGreater(px[1], 140, px)
+                self.assertLess(px[0], 80, px)
+        finally:
+            P.cached = orig
 
 
 
