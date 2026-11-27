@@ -1618,16 +1618,23 @@ def _bake_one(cid):
         import story_photo
         if not story_photo.get_card(cid):
             b = generic_story_card(cid)
-            if b and b.startswith(b"\x89PNG"):
+            if b and b.startswith(b"\x89PNG") and not is_stub_card(b):
                 title = ""
+                src = ""
                 try:
                     import story
                     r, _al = story.load(cid)
                     title = (r or {}).get("title") or ""
                 except Exception:
                     pass
-                story_photo.put_card(cid, b, "", title_hash=story_photo.card_title_key(_card_headline(title) or ""))
-        _BAKED.add(cid)
+                try:
+                    src = (story_photo.db_choice(cid) or {}).get("src") or ""
+                except Exception:
+                    src = ""
+                story_photo.put_card(cid, b, src, title_hash=story_photo.card_title_key(_card_headline(title) or ""))
+                _BAKED.add(cid)
+        else:
+            _BAKED.add(cid)
         # Do not submit(fetch=True) here: a flood of Commons downloads is what OOM-killed the 2Gi box
         # after #242 (10:40:19 AM ET). The existing paced photo backfill upgrades the map later.
     except Exception as e:
@@ -1664,8 +1671,24 @@ def bake_card(cid):
 
 
 def generic_story_card(cid):
-    """A designed 1200x675 card (generic world map + this story's cleaned title). No geocoding, no board rebuild, no network.
-    Used on a true cache miss so the Twitterbot path stays under 1s; a unique locator/photo rebuilds in the background."""
+    """A unique licensed pool photo for this story, or None.
+
+    Formerly a dark designed gradient (the 12KB near-black card). That image is never
+    returned: if no photo is stored, pick a unique rights-cleared pool photo now.
+    """
+    try:
+        b = _photo_card_now(cid)
+        if b:
+            return b
+    except Exception:
+        pass
+    # Fall through to the legacy typography path only as a last structure; reject if it
+    # would be the dark stub so callers never serve or store it.
+    return _generic_story_card_legacy(cid)
+
+
+def _generic_story_card_legacy(cid):
+    """Legacy designed-gradient card. Callers must discard the result when it is a stub."""
     title, rank, loc, cat = "The Wire", 0, "", "THE WIRE"
     try:
         import og as _og
@@ -1708,10 +1731,12 @@ def generic_story_card(cid):
         # Reuse _lay_story by stuffing a photo-less item and short-circuiting _story_bg via art without coords —
         # _story_bg already draws the generic map in that case; if _GENERIC_BG is ready, swap after.
         out = _lay_story(it)
-        return og.png_bytes(out)
+        b = og.png_bytes(out)
+        return None if is_stub_card(b) else b
     except Exception:
         try:
-            return og.png_bytes(bg if hasattr(bg, "size") else _base(cid or "generic"))
+            b = og.png_bytes(bg if hasattr(bg, "size") else _base(cid or "generic"))
+            return None if is_stub_card(b) else b
         except Exception:
             return None
 
@@ -1723,6 +1748,45 @@ def card_photo_on():
         return CP.enabled()
     except Exception:
         return False
+
+
+def is_stub_card(data):
+    """True for the near-black 12KB gradient card. Never serve this as an X / og:image."""
+    try:
+        import story_photo as SP
+        return SP.is_stub_card_png(data)
+    except Exception:
+        return bool(data and data.startswith(b"\x89PNG") and 2000 < len(data) < 20000)
+
+
+def _photo_card_now(cid):
+    """Pick a unique licensed pool photo and render it now so a stub is never served."""
+    if not cid or not card_photo_on():
+        return None
+    try:
+        import story
+        r, _al = story.load(cid)
+    except Exception:
+        r = None
+    title = loc = brief = cat = ""
+    lat = lon = None
+    if r:
+        title = r.get("title") or ""
+        loc = r.get("location") or ""
+        brief = r.get("brief") or ""
+        lat, lon = r.get("lat"), r.get("lon")
+        cat = _fix_cat(r.get("category") or "", title)
+    else:
+        try:
+            title, brief, loc = _force_title(cid)
+            title = _card_headline(title or "") or title
+        except Exception:
+            pass
+    apply_card_photo(cid, title, loc, brief, lat, lon, cat)
+    b = render_story_fresh(cid)
+    if b and b.startswith(b"\x89PNG") and len(b) > 2000 and not is_stub_card(b):
+        return b
+    return None
 
 
 _US_WORDS = re.compile(r"\b(u\.?s\.?a?|united states|(?<!central )(?<!south )(?<!latin )america\\b|americans\\b|washington|pentagon|white house|congress|federal|fbi|cdc|noaa|fema|usgs|nasa|wall street)\b", re.I)
@@ -2215,10 +2279,15 @@ def ensure_current_card(cid):
     except Exception:
         stored = None
         meta = None
+    if stored and is_stub_card(stored):
+        stored = None
+        _SC.pop(cid, None)
     if stored is None:
         hit = _SC.get(cid)
-        if hit and hit[1]:
+        if hit and hit[1] and not is_stub_card(hit[1]):
             stored = hit[1]
+        elif hit and hit[1] and is_stub_card(hit[1]):
+            _SC.pop(cid, None)
     try:
         import story_photo
         is_map = not (meta and (meta.get("src") or "").startswith("https://"))
@@ -2253,13 +2322,13 @@ def story_png_fast(cid, budget=1.0):
     locator/photo in the background. Never the 1200x630 earth fallback."""
     try:
         cur = ensure_current_card(cid)
-        if cur:
+        if cur and not is_stub_card(cur):
             return cur
     except Exception:
         pass
     try:
-        b = generic_story_card(cid)
-        if b and b.startswith(b"\x89PNG") and len(b) > 2000:
+        b = generic_story_card(cid)  # picks a unique pool photo; never a dark stub
+        if b and b.startswith(b"\x89PNG") and len(b) > 2000 and not is_stub_card(b):
             _SC[cid] = (time.time(), b, False)
             try:
                 submit(cid, fetch=True, urgent=True)
@@ -2268,7 +2337,6 @@ def story_png_fast(cid, budget=1.0):
             return b
     except Exception:
         pass
-    # Last resort still under the budget: do not call the slow unique _map render on this path.
     try:
         submit(cid, fetch=True, urgent=True)
     except Exception:
@@ -2282,14 +2350,16 @@ def story_png_map_now(cid):
     so the 1200x630 earth fallback is never served for a known story. Rebuilds and photo lookups are background."""
     try:
         cur = ensure_current_card(cid)
-        if cur:
+        if cur and not is_stub_card(cur):
             return cur
     except Exception:
         pass
     try:
         b = generic_story_card(cid)
-        if b and b.startswith(b"\x89PNG") and len(b) > 2000:
+        if b and b.startswith(b"\x89PNG") and len(b) > 2000 and not is_stub_card(b):
             _SC[cid] = (time.time(), b, False)
+        else:
+            b = None
     except Exception:
         b = None
     try:

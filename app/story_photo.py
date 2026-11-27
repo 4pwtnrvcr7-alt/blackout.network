@@ -207,8 +207,41 @@ def _db_jpg(src):
         return None
 
 
+def is_stub_card_png(data):
+    """True for the near-black ~12KB 1200x675 gradient used when no photo was stored.
+
+    A real 1200x675 photo PNG is typically 100KB–1.5MB. This catches the designed
+    `_base` card (a 4–16 value vertical grey-blue gradient, ~12KB, ~9 colors) so
+    it is never served as an X / og:image card (Matt, Nov 27 2026).
+    """
+    if not data or not isinstance(data, (bytes, bytearray)):
+        return False
+    if not data.startswith(b"\x89PNG"):
+        return False
+    if len(data) > 40000:
+        return False
+    if len(data) < 2000:
+        return False
+    try:
+        from io import BytesIO
+        from PIL import Image
+        im = Image.open(BytesIO(data)).convert("RGB")
+        w, h = im.size
+        # Only the designed 1200x675 (or close) gradient. Tiny test fixtures and other sizes are not stubs.
+        if w < 1000 or h < 500 or w > 1400 or h > 800:
+            return False
+        samples = [im.getpixel((x, y)) for x in (0, max(0, w // 2), w - 1) for y in (0, max(0, h // 2), h - 1)]
+        if samples and all(max(px) <= 24 for px in samples):
+            return True
+        small = im.resize((16, 9))
+        avg = sum(sum(px) for px in small.getdata()) / float(16 * 9 * 3)
+        return avg < 22
+    except Exception:
+        return False
+
+
 def get_card(cid):
-    """Built share-card PNG for this story, or None. No network."""
+    """Built share-card PNG for this story, or None. No network. Stubs are treated as missing."""
     m = card_meta(cid)
     return m["png"] if m else None
 
@@ -223,6 +256,8 @@ def card_meta(cid):
             return None
         b = bytes(r[0])
         if not (b.startswith(b"\x89PNG") and len(b) > 2000):
+            return None
+        if is_stub_card_png(b):
             return None
         return {"png": b, "v": (r[1] or ""), "src": (r[2] or ""), "title_hash": (r[3] or "") if len(r) > 3 else ""}
     except Exception:
