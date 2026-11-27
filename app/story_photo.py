@@ -230,10 +230,12 @@ def card_meta(cid):
 
 
 # Suffix stored on every new card. "L" = Latin-Extended face; "M" = mid-phrase headline cut fix.
+# "P" = plain photo share card (no headline/wordmark/chips on the image; Matt, Nov 27 2026).
 # Compared as a suffix so og.VERSION itself does not have to bump for every ASCII card.
 FONT_MARK = "L"
 TYPO_MARK = "M"
-_TYPO_MARKS = "LM"
+STYLE_MARK = "P"
+_TYPO_MARKS = "LMP"
 
 
 def card_ver_base(v):
@@ -247,9 +249,9 @@ def card_ver_base(v):
 def card_ver_current():
     try:
         import og
-        return str(og.VERSION) + TYPO_MARK
+        return str(og.VERSION) + TYPO_MARK + STYLE_MARK
     except Exception:
-        return "11" + TYPO_MARK
+        return "11" + TYPO_MARK + STYLE_MARK
 
 
 def card_stale(meta):
@@ -303,7 +305,7 @@ def card_font_stale(meta, title=""):
     if not meta or not title:
         return False
     v = str(meta.get("v") or "")
-    if v.endswith(TYPO_MARK) or v.endswith(FONT_MARK):
+    if TYPO_MARK in v or FONT_MARK in v:  # marks may be followed by STYLE_MARK ("25MP")
         return False
     if not any(ord(ch) > 127 for ch in title):
         return False
@@ -516,6 +518,33 @@ def place_photo_ok(title="", text=""):
     if main_subject(title, text) or _named_people("", title, text):
         return False
     return bool(_landmark_terms(title) or org_hq_terms(title, text))
+
+
+def card_style_stale(meta):
+    """True when the stored card predates the plain-photo (no text overlay) layout. Does not bump og.VERSION."""
+    if not meta:
+        return False
+    return STYLE_MARK not in str(meta.get("v") or "")
+
+
+def used_file_keys(except_cid=""):
+    """Normalized Commons file titles already assigned to another story. No network, no PNG bytes."""
+    out = set()
+    try:
+        rows = _read(lambda k: k.execute(
+            "SELECT cid, src, link FROM story_photos WHERE none=0 AND src LIKE 'https://%'"
+        ).fetchall()) or []
+    except Exception:
+        rows = []
+    for row in rows:
+        if not row or not row[0]:
+            continue
+        if except_cid and row[0] == except_cid:
+            continue
+        key = (commons_file_title(src=row[1] or "", link=(row[2] or "") if len(row) > 2 else "") or "").strip().lower()
+        if key:
+            out.add(key)
+    return out
 
 
 def card_title_key(title):

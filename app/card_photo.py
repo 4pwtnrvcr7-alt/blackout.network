@@ -107,6 +107,81 @@ FALLBACK_KEYS = frozenset({"military", "aviation", "grid", "economy", "spaceweat
 CATEGORY_KEY = (("conflict", "military"), ("war", "military"), ("cyber", "cyber"), ("weather", "storm"), ("storm", "storm"),
                 ("disease", "outbreak"), ("health", "outbreak"), ("outbreak", "outbreak"), ("quake", "quake"), ("seismic", "quake"),
                 ("politic", "government"), ("government", "government"), ("market", "economy"), ("econom", "economy"), ("financ", "economy"))
+
+# Newsletter v4 divider pool (the same rights-cleared Commons photos the email uses).
+# Topic keys follow the email pool; satellite / ISS / relief views are skipped (Matt: no map/satellite/relief on cards).
+_POOL_TOPIC = {
+    "war": "military",
+    "cyber": "cyber",
+    "health": "outbreak",
+    "politics": "government",
+    "money": "economy",
+}
+
+
+def _pool_filename(item):
+    page = (item or {}).get("page") or ""
+    m = re.search(r"(File:[^?#]+)$", page)
+    if not m:
+        title = (item or {}).get("title") or ""
+        return ("File:" + title) if title else ""
+    return urllib.parse.unquote(m.group(1).replace("%20", " "))
+
+
+def _extend_topics_from_newsletter_pool():
+    """Append unique, non-maplike newsletter pool files to the curated topic lists."""
+    path = Path(__file__).resolve().parent / "newsletter_pool.json"
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return
+    for item in data.get("images") or []:
+        if not isinstance(item, dict):
+            continue
+        topic = (item.get("topic") or "").strip().lower()
+        title = " ".join(x for x in (item.get("title"), item.get("page"), item.get("name")) if x)
+        fn = _pool_filename(item)
+        if not fn or is_map_like(filename=fn, title=title, credit=item.get("artist") or "", src=item.get("page") or ""):
+            continue
+        key = _POOL_TOPIC.get(topic)
+        if topic == "hazards":
+            if re.search(r"wildfire|firefighters?|fire line|fire_line", title, re.I):
+                key = "wildfire"
+            elif re.search(r"flood", title, re.I):
+                key = "flood"
+            else:
+                key = "storm"
+        if not key or key not in TOPICS:
+            continue
+        files = TOPICS[key][1]
+        if fn not in files:
+            files.append(fn)
+
+
+_extend_topics_from_newsletter_pool()
+
+
+def file_key(src="", link="", title="", filename=""):
+    """Normalized Commons file title for dedupe (no 'File:' prefix, spaces not underscores)."""
+    raw = filename or title or ""
+    if not raw and (src or link):
+        try:
+            import story_photo as SP
+            return (SP.commons_file_title(src=src or "", link=link or "", title=title or "") or "").strip().lower()
+        except Exception:
+            raw = src or link or ""
+    s = re.sub(r"^\d+px-", "", (raw or "").replace("File:", "").replace("_", " ").strip().lower())
+    s = re.sub(r"[?#].*$", "", s)
+    return s
+
+
+def used_file_keys(except_cid=""):
+    """Commons file titles already assigned to another story. Empty when the card DB is not ready."""
+    try:
+        import story_photo as SP
+        return SP.used_file_keys(except_cid)
+    except Exception:
+        return set()
 _US_POLITICS = re.compile(r"\b(congress|senate|senator|house (?:speaker|republicans?|democrats?)|white house|capitol|u\.?s\.?|trump|biden|vance|republican|democrat|washington|pentagon|supreme court)\b", re.I)
 _HAZARDS = [
     ("cyber", r"\b(cyber|ransomware|malware|vulnerabilit(?:y|ies)|cve-?\d|(?:security|cisa|vendor) advisory|zero-day|hack(?:ed|ers?)?|data breach|phishing|botnet|ddos|exploit)"),
@@ -416,7 +491,8 @@ def fallback_key(title, text="", category=""):
     return k or "general"
 
 
-def topic_photo(text, seed="", key=None):
+def topic_photo(text, seed="", key=None, except_cid=""):
+    """Licensed topic photo, unique across stories: skip file titles already used by another card."""
     key = key or hazard_for(text)
     key = _TOPIC_ALIAS.get(key, key)
     if not key or key not in TOPICS:
@@ -426,9 +502,15 @@ def topic_photo(text, seed="", key=None):
     if len(order) > 1:
         k = zlib.crc32(str(seed).encode()) % len(order)
         order = order[k:] + order[:k]
+    used = used_file_keys(except_cid or seed)
     for fn in order:
+        if file_key(filename=fn) in used:
+            continue
         im = commons_image(fn)
         if im:
+            if is_map_like(filename=fn, title=im.get("title") or "", credit=im.get("credit") or "",
+                           desc=im.get("desc") or "", src=im.get("src") or im.get("page") or ""):
+                continue
             im.update(kind="topic", tier=3, subject=noun, hazard=key,
                       label=f"{noun} ({agency}). {LABEL_TAIL}" if agency not in _NO_AGENCY else f"{noun}. {LABEL_TAIL}")
             return im
@@ -488,8 +570,8 @@ def choose(cid, title, hit=None, text="", category=""):
     steps = {
         "person": lambda: person_photo(title, text),
         "place": lambda: place_photo(hit),
-        "topic": lambda: topic_photo(title + " " + (text or ""), cid),
-        "category": lambda: topic_photo("", cid, key=fallback_key(title, text, category)),
+        "topic": lambda: topic_photo(title + " " + (text or ""), cid, except_cid=cid),
+        "category": lambda: topic_photo("", cid, key=fallback_key(title, text, category), except_cid=cid),
     }
     for tier in choose_order(title, text, category) + ("category",):
         try:

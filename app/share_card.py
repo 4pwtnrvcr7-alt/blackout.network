@@ -24,7 +24,7 @@ import x_share
 
 SITE = "https://blackout.network"
 W, H = 1200, 675
-VERSION = "6"
+VERSION = "7"  # plain photo story cards; do not bump og.VERSION
 BASE = Path(__file__).resolve().parent
 NM = BASE / "netmap_static"
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -1279,7 +1279,7 @@ def card_needs_headline_refit(meta, title=""):
     """True when a stored card predates the mid-phrase typography fix (24M) and the headline would have been clipped."""
     if not meta:
         return False
-    if str(meta.get("v") or "").endswith("M"):
+    if "M" in str(meta.get("v") or ""):  # typography mark may be followed by STYLE_MARK P
         return False
     return _headline_would_clip(title or "")
 
@@ -1321,29 +1321,9 @@ def _story_bg(it):
                 cred += ". " + " ".join(str(ph.get("license")).split())
             cred += "."
             label = " ".join((ph.get("label") or "").split())
-            if sh >= sw * 1.05:   # portrait: sharp subject on the right over a soft field taken from the photo's own background
-                band = src.crop((0, 0, sw, max(8, int(sh * 0.36))))
-                field = og._cover(band, W, H).filter(ImageFilter.GaussianBlur(36))
-                field = ImageEnhance.Brightness(ImageEnhance.Color(field).enhance(0.55)).enhance(0.22)
-                c = src.crop((int(sw * 0.06), int(sh * 0.04), int(sw * 0.94), int(sh * 0.80)))
-                scale = H / c.size[1]
-                sub = c.resize((max(1, int(c.size[0] * scale)), H), Image.Resampling.LANCZOS)
-                if sub.size[0] > 540:
-                    k = 540 / sub.size[0]
-                    cx0 = int(c.size[0] * (1 - k) / 2)
-                    c = c.crop((cx0, 0, cx0 + int(c.size[0] * k), c.size[1]))
-                    sub = c.resize((max(1, int(c.size[0] * H / c.size[1])), H), Image.Resampling.LANCZOS)
-                sub = ImageEnhance.Contrast(sub).enhance(1.05).convert("RGBA")
-                fade = min(100, sub.size[0] // 3)
-                m = Image.new("L", sub.size, 255)
-                md = ImageDraw.Draw(m)
-                for x in range(fade):
-                    md.line([(x, 0), (x, H)], fill=int(255 * (x / fade) ** 1.15))
-                sub.putalpha(m)
-                field = field.convert("RGBA")
-                field.paste(sub, (W - sub.size[0], 0), sub)
-                return field.convert("RGB"), True, cred, label
-            bgim = ImageEnhance.Brightness(og._cover(src, W, H)).enhance(0.72)   # landscape: full bleed
+            # Photo-only share card (Matt Nov 27): full-bleed crop, no dimming and no portrait sidebar.
+            # Those treatments existed so white headline text would read; the image itself is now the card.
+            bgim = og._cover(src, W, H)
             return bgim, False, cred, label
         except Exception:
             pass
@@ -1368,64 +1348,13 @@ def _fit_chip(d, text, maxw):
         parts = parts[:-1]
 
 def _lay_story(it):
-    """News card: photo (or dark location map) full bleed, dark gradient on the left, rank badge, whole headline, category + place chips."""
-    col = it["color"]
-    im, portrait, credit, label = _story_bg(it)
-    ov = Image.new("L", (W, H), 0)
-    od = ImageDraw.Draw(ov)
-    edge = 0.58 if portrait else 0.74
-    for x in range(W):
-        t = min(1.0, max(0.0, x / (edge * W)))
-        t = t * t * (3 - 2 * t)
-        od.line([(x, 0), (x, H)], fill=int(205 * (1 - t) + (18 if portrait else 70) * t))
-    im = Image.composite(Image.new("RGB", (W, H), (5, 6, 10)), im, ov)
-    bot = Image.new("L", (W, 120), 0)
-    bd = ImageDraw.Draw(bot)
-    for y in range(120):
-        bd.line([(0, y), (W, y)], fill=int(170 * (y / 120) ** 1.4))
-    im.paste(Image.new("RGB", (W, 120), (5, 6, 10)), (0, H - 120), bot)
-    top = Image.new("L", (W, 90), 0)
-    td = ImageDraw.Draw(top)
-    for y in range(90):
-        td.line([(0, y), (W, y)], fill=int(110 * (1 - y / 90)))
-    im.paste(Image.new("RGB", (W, 90), (5, 6, 10)), (0, 0), top)
-    d = ImageDraw.Draw(im)
-    wm = og.inter(20, bold=True)
-    x = og.draw_wordmark(im, d, 56, 34, wm, (232, 234, 238), tracking=2.6, mark=36, gap=10) + 22
-    chips = [((it.get("kicker") or "THE WIRE").upper(), col)]
-    ph = it.get("photo")
-    if it.get("loc") and not (ph and ph.get("kind") == "person"):   # a person's portrait is not a picture of the story's place
-        chips.append((og._strip_emoji(it["loc"]).upper(), (214, 218, 226)))
-    for text, c in chips:
-        f, trk, text, wd = _fit_chip(d, text, W - 56 - x - 24 - 24)
-        d.rounded_rectangle([x, 34, x + wd + 24, 64], radius=15, fill=(8, 10, 14), outline=c, width=2)
-        _tx(d, (x + 12, 41 + (13 - getattr(f, "size", 13)) // 2), text, f, c, trk)
-        x += wd + 34
-    rank = it.get("rank") or 0
-    rf = og.mont(26, 800)
-    label_r = f"{rank} / 10"
-    wd = og._text_w(d, label_r, rf, 0)
-    d.rounded_rectangle([56, 196, 56 + wd + 28, 236], radius=8, fill=(8, 10, 14), outline=col, width=2)
-    d.rectangle([56, 203, 60, 229], fill=col)
-    _tx(d, (72, 202), label_r, rf, col, 0)
-    f, size, lines = _story_head(d, it["title"], 640 if portrait else 700)
-    y = 252
-    for i, l in enumerate(lines):
-        _tx(d, (56, y + i * int(size * 1.08)), l, f, WHITE, 0)
-    y += len(lines) * int(size * 1.08)
-    if label:
-        for i, l in enumerate(_wrap_full(d, label, og.inter(15), 620)[:2]):
-            _tx(d, (56, y + 14 + i * 20), l, og.inter(15), (186, 192, 202), 0)
-    elif not ph and it.get("loc"):
-        _tx(d, (56, y + 16), og._strip_emoji(it["loc"]).upper()[:40], og.inter(14, bold=True), (200, 205, 214), 2.6)
-    if credit:
-        cf = og.inter(12)
-        t = " ".join(str(credit).split())
-        while t and og._text_w(d, t, cf, 0) > W - 112 and len(t) > 24:
-            t = t[:-2]
-        im.paste(Image.new("RGB", (W, 38), (5, 6, 10)), (0, H - 38), Image.new("L", (W, 38), 190))
-        d = ImageDraw.Draw(im)
-        _tx(d, (56, H - 28), t, cf, (156, 162, 172), 0)
+    """News share card: the story's licensed photo (or designed map fallback) full bleed, no text.
+
+    Matt (Nov 27 2026): X cards follow the newsletter image formula — a unique, relevant photo
+    with no headline, wordmark, rank, chips or credit burned into the picture. Credits stay
+    on the story page and in og:image:alt. Size stays 1200x675 (existing story cards / tests).
+    """
+    im, _portrait, _credit, _label = _story_bg(it)
     return im
 
 
@@ -2662,7 +2591,7 @@ def _pending_convert_cids(limit=3000):
             title = _card_headline(title or "") or title
         except Exception:
             title = ""
-        if SP.card_font_stale(row, title) or card_needs_headline_refit(row, title):
+        if SP.card_font_stale(row, title) or card_needs_headline_refit(row, title) or SP.card_style_stale(row):
             order.append(cid)
     return order
 
@@ -2693,9 +2622,14 @@ def _convert_one_stale(cid):
         except Exception:
             has_jpg = False
         # Relief / satellite place photos, and place photos on hazard/outbreak stories, must be dropped and re-chosen.
+        # Topic/category photos already used by another story are also dropped so each card is unique.
         try:
             ch = SP.db_choice(cid) or {}
             drop = bool(ch and SP.is_non_photo_candidate(ch))
+            if not drop and ch and (ch.get("kind") or "") in ("topic", "category", ""):
+                key = (SP.commons_file_title(src=ch.get("src") or "", link=ch.get("link") or "") or "").strip().lower()
+                if key and key in SP.used_file_keys(cid):
+                    drop = True
             if not drop and ch and (ch.get("kind") or "") == "place":
                 try:
                     import card_photo as CP
