@@ -70,13 +70,16 @@ def pick(topic, issue, c):
         pass
     return {"src": f"{V2._base(c)}/bnt/media/{im['name']}", "alt": "", "kind": "divider", "credit": None}
 
-def _divider(topic, issue, c, first=False):
+def _divider(topic, issue, c, first=False, url=None):
     im = pick(topic, issue, c)
     lab = (f'<div class="bnm" style="font:600 12px/18px {FACE};letter-spacing:2.4px;color:{MU}">{E(TOPIC_LABEL.get(topic, "World").upper())}</div>')
     out = _row(lab, ("8px" if first else "64px") + " 24px 16px 24px")
     if im:
-        out += (f'<tr><td style="padding:0;background:{BG}"><img src="{E(im["src"])}" width="{W}" alt="" style="display:block;width:100%;max-width:{W}px;'
-                f'height:auto;border:0;outline:none;background:{SURF}"></td></tr>')
+        img = (f'<img src="{E(im["src"])}" width="{W}" alt="" style="display:block;width:100%;max-width:{W}px;'
+               f'height:auto;border:0;outline:none;background:{SURF}">')
+        if url:
+            img = f'<a href="{E(url)}" style="display:block;text-decoration:none;border:0">{img}</a>'
+        out += f'<tr><td style="padding:0;background:{BG}">{img}</td></tr>'
     return out
 
 def rank_col(rk):
@@ -97,10 +100,13 @@ def _rank_line(it, extra=()):
     sep = f'<span style="color:{DIM}"> &nbsp;&middot;&nbsp; </span>'
     return f'<div style="font:600 12px/18px {FACE};letter-spacing:1.6px;margin:0 0 10px 0">{sep.join(parts)}</div>'
 
-def _headline(text, big=False):
+def _headline(text, big=False, url=None):
     sz = "30px/36px" if big else "22px/28px"
+    inner = E(text)
+    if url:
+        inner = (f'<a href="{E(url)}" class="bnt" style="color:{TX};text-decoration:none">{inner}</a>')
     return (f'<div class="bnt bnh1" data-bn-h="1" style="font:600 {sz} {FACE};letter-spacing:-0.3px;color:{TX};text-align:left;margin:0">'
-            f'{E(text)}</div>')
+            f'{inner}</div>')
 
 def _summary(text):
     return f'<p class="bnx" style="margin:12px 0 0 0;font:400 16px/25px {FACE};color:{BODY};text-align:left">{E(text)}</p>'
@@ -129,9 +135,12 @@ def _section(label):
     return _row(f'<div class="bnm" style="font:600 12px/18px {FACE};letter-spacing:2.4px;color:{MU}">{E(label.upper())}</div>', "48px 24px 0 24px")
 
 def story(it, c, refs, lead=False, label="Read the full story", url=None, head=None, text=None, first=False, big=False):
-    N = _N(); url = url or N.wire_url(it["cluster_id"], c=c); head = head or N.card_headline(it)
+    N = _N()
+    url = url or (N.wire_url(it["cluster_id"], c=c) if it.get("cluster_id") else None)
+    if not url: return ""   # never show a story with no page to open
+    head = head or N.card_headline(it)
     s = text if text is not None else V2.summary(it)
-    body = _rank_line(it) + _headline(head, big=big) + (_summary(s) if s else "")
+    body = _rank_line(it) + _headline(head, big=big, url=url) + (_summary(s) if s else "")
     al = N.also_line(it)
     if al: body += _summary(al)
     body += button(label, url)
@@ -145,10 +154,19 @@ def _masthead(issue, c):
                 f'<div class="bnm" style="font:400 13px/18px {FACE};letter-spacing:1.8px;color:{DIM};margin:22px 0 0 0">{E(lab.upper())} BRIEF &middot; {E(day.upper())}</div>',
                 "36px 24px 28px 24px")
 
-def _top_list(pool, first=False):
-    if len(pool) < 2: return ""
-    li = "".join(f'<tr><td valign="top" class="bnt" style="padding:14px 0;border-top:1px solid {LINE};font:400 16px/23px {FACE};color:{TX};text-align:left">'
-                 f'<b style="font-weight:700">{i}. {E(_N().card_headline(it))}</b></td></tr>' for i, it in enumerate(pool, 1))
+def _top_list(pool, c, first=False):
+    """Numbered Right Now list: each row is a tappable link to that story's page. Items with no story URL are dropped."""
+    N = _N(); rows = []
+    for it in pool or []:
+        url = N.wire_url(it["cluster_id"], c=c) if it.get("cluster_id") else None
+        if not url: continue
+        rows.append((it, url))
+    if len(rows) < 2: return ""
+    li = "".join(
+        f'<tr><td valign="top" style="padding:0;border-top:1px solid {LINE}">'
+        f'<a href="{E(url)}" class="bnt" style="display:block;padding:14px 0;font:700 16px/23px {FACE};color:{TX};'
+        f'text-align:left;text-decoration:none">{i}. {E(N.card_headline(it))}</a></td></tr>'
+        for i, (it, url) in enumerate(rows, 1))
     return (_row(f'<div class="bnm" style="font:600 12px/18px {FACE};letter-spacing:2.4px;color:{MU}">RIGHT NOW</div>', "0 24px")
             + _row(f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0 0">{li}</table>', "0 24px"))
 
@@ -264,13 +282,13 @@ def render(issue, links, c):
     items = V2._story_items(issue)
     top = V2.top_stories(issue, 3)
     seen = set()
-    B.append(_top_list(top, first=True))
+    B.append(_top_list(top, c, first=True))
     for lab, key in ((f"Near you &middot; {issue.get('loc_label') or 'your area'}", "near"), ("Stories you follow", "follow")):
-        if issue.get(key):
-            B.append(_row(f'<div class="bnm" style="font:600 12px/18px {FACE};letter-spacing:2.4px;color:{MU}">{lab.upper()}</div>', "48px 24px 0 24px"))
-            for it in issue[key]:
-                if it.get("cluster_id") in seen: continue
-                seen.add(it.get("cluster_id")); B.append(story(it, c, refs))
+        rows = [it for it in (issue.get(key) or []) if it.get("cluster_id") and it.get("cluster_id") not in seen]
+        if not rows: continue
+        B.append(_row(f'<div class="bnm" style="font:600 12px/18px {FACE};letter-spacing:2.4px;color:{MU}">{lab.upper()}</div>', "48px 24px 0 24px"))
+        for it in rows:
+            seen.add(it.get("cluster_id")); B.append(story(it, c, refs))
     feats = []
     for f_ in issue.get("featured") or []:
         feats.append(dict({"cluster_id": f_["cluster_id"], "title": f_["title"], "display_title": f_["title"], "rank": None, "where": "",
@@ -279,11 +297,18 @@ def render(issue, links, c):
     if not groups:
         B.append(_row(_headline(N.MATTERS) + _summary("A quiet window: nothing new passed our brief gate.") + button("Open the live site", V2._base(c) + "/"), "24px 24px 0 24px"))
     for gi, (g, its) in enumerate(groups):
-        B.append(_divider(g, issue, c))
-        for k, it in enumerate(its):
-            seen.add(it.get("cluster_id")); f_ = it.get("_feat")
-            if f_: B.append(story(it, c, refs, url=f_["url"], head=f_["title"], text=f_.get("text") or "", first=k == 0, big=gi == 0 and k == 0))
-            else: B.append(story(it, c, refs, first=k == 0, big=gi == 0 and k == 0))
+        kept = []
+        for it in its:
+            f_ = it.get("_feat")
+            url = (f_.get("url") if f_ else None) or (N.wire_url(it["cluster_id"], c=c) if it.get("cluster_id") else None)
+            if not url: continue
+            kept.append((it, url, f_))
+        if not kept: continue
+        B.append(_divider(g, issue, c, url=kept[0][1]))
+        for k, (it, url, f_) in enumerate(kept):
+            seen.add(it.get("cluster_id"))
+            if f_: B.append(story(it, c, refs, url=url, head=f_["title"], text=f_.get("text") or "", first=k == 0, big=gi == 0 and k == 0))
+            else: B.append(story(it, c, refs, url=url, first=k == 0, big=gi == 0 and k == 0))
     try: B.extend(_weather(issue))
     except Exception as ex: N.log(f"weather section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
     try: B.extend(_network(issue))
@@ -301,15 +326,16 @@ def render(issue, links, c):
             for x in its:
                 B.append(_line(N._cut(x["title"], 140), x["url"], f'{E(_d(x.get("date")))} &middot; {E(x.get("place") or "")} &middot; {E(x.get("source") or "")}'))
         B.append(_row("".join(_summary(x) for x in cr["lines"][:2 if its else 3]) + button("See the numbers", cr["url"]), "14px 24px 0 24px"))
-    others = [it for it in issue.get("developing") or [] if not it.get("lead") and it.get("cluster_id") not in seen]
-    if others or issue.get("watchlist"):
+    others = [it for it in issue.get("developing") or [] if not it.get("lead") and it.get("cluster_id") and it.get("cluster_id") not in seen]
+    wl = [it for it in (issue.get("watchlist") or []) if it.get("cluster_id")]
+    if others or wl:
         B.append(_section("Also on the wire"))   # short list, no divider image
         B.append('<tr><td style="font-size:0;line-height:14px;height:14px">&nbsp;</td></tr>')
         for it in others:
             rk = int(it.get("rank") or 0)
             B.append(_line(N._cut(it["title"], 140), N.wire_url(it["cluster_id"], c=c),
                            f'<span style="color:{rank_col(rk)}">Rank {rk}</span> &middot; first logged {E(N.fmt_et(it.get("first_seen")))}'))
-        for it in issue.get("watchlist") or []:
+        for it in wl:
             B.append(_line(N._cut(it["title"], 140), N.wire_url(it["cluster_id"], c=c), f'Unconfirmed &middot; {E(N.fmt_et(it.get("first_seen")))}'))
     why = f"You get this because you confirmed a subscription to the {N.BRAND} newsletter. Change how often it arrives, or turn off breaking alerts, under Manage subscription."
     pool = N._story_pool(issue)
