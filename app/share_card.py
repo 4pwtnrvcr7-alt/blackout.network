@@ -2288,6 +2288,7 @@ def submit(cid, fetch=False, urgent=False):
     and is never auto-promoted onto the request queue."""
     from concurrent.futures import Future
     _ensure_fworker()
+    defer_backfill = (not urgent) and photo_holds_heavy()
     with _FLOCK:
         if fetch:
             _FSKIP_NET.discard(cid)
@@ -2307,6 +2308,8 @@ def submit(cid, fetch=False, urgent=False):
                     _FHIGH.remove(cid)
                 _FHIGH.insert(0, cid)
             return wait
+        if defer_backfill:
+            return None
         fut = Future()
         _FWAIT[cid] = fut
         if urgent:
@@ -2907,6 +2910,12 @@ def rebuild_card_photos(cids=None, pause=0.4, budget=0):
         for cid in order:
             if budget and time.time() - t0 > float(budget):
                 break
+            while photo_holds_heavy():
+                if budget and time.time() - t0 > float(budget):
+                    break
+                time.sleep(2.0)
+            if photo_holds_heavy() and budget and time.time() - t0 > float(budget):
+                break
             b = None
             try:
                 title, text, loc = _force_title(cid)
@@ -3176,6 +3185,8 @@ def backfill_photos(cids, pause=0.6):
         if not cid or cid in seen:
             continue
         seen.add(cid)
+        while photo_holds_heavy():
+            time.sleep(2.0)
         try:
             import story_photo
             if story_photo.card_has_photo(cid):
@@ -3190,11 +3201,48 @@ def backfill_photos(cids, pause=0.6):
 
 
 _WARM_CAP = 20   # at most this many card builds queued or running (timeline pre-warm must not flood Render)
+_PHOTO_HOLD_PAUSE = 20  # same bar as wire_timeline._warm_old_photos: pause boot backfill when 24h no-photo-card holds are large
+
+
+def no_photo_holds():
+    """Validator 24h-window holds waiting on a photo card. 0 if the validator is off or not imported."""
+    try:
+        import wire_timeline as WT
+        return int((WT._V_STATS.get("held") or {}).get("no-photo-card") or 0)
+    except Exception:
+        return 0
+
+
+def photo_holds_heavy(threshold=None):
+    return no_photo_holds() >= (threshold if threshold is not None else _PHOTO_HOLD_PAUSE)
+
+
+def _card_queue_depth():
+    live = sum(1 for f in list(_INFLIGHT.values()) + list(_FINFLIGHT.values()) if f is not None and not f.done())
+    live += sum(1 for f in list(_FWAIT.values()) if f is not None and not f.done())
+    return live
+
+
+def _evict_flow(n=1):
+    """Drop queued (not in-flight) low-priority backfill jobs so an urgent warm can take a slot."""
+    evicted = 0
+    with _FLOCK:
+        while evicted < n and _FLOW:
+            cid = _FLOW.pop()
+            fut = _FWAIT.pop(cid, None)
+            if fut is not None and not fut.done():
+                try:
+                    fut.cancel()
+                except Exception:
+                    pass
+            evicted += 1
+    return evicted
 
 
 def warm(cid):
     """Build a story's card ahead of the first crawl (bounded pool, deduped, cap of 20 in flight/queued).
-    After a deploy the in-memory cache is empty: hydrate the stored PNG, and only skip a photo lookup when one already ran."""
+    After a deploy the in-memory cache is empty: hydrate the stored PNG, and only skip a photo lookup when one already ran.
+    Validator no-photo-card holds are urgent: if the cap is full of boot backfill, evict a _FLOW job instead of bailing."""
     try:
         import story_photo
         if cid not in _SC:
@@ -3206,10 +3254,10 @@ def warm(cid):
     except Exception:
         if cid in _SC and cid not in _NEED:
             return
-    live = sum(1 for f in list(_INFLIGHT.values()) + list(_FINFLIGHT.values()) if f is not None and not f.done())
-    live += sum(1 for f in list(_FWAIT.values()) if f is not None and not f.done())
+    live = _card_queue_depth()
     if live >= _WARM_CAP:
-        return
+        if not _evict_flow(live - _WARM_CAP + 1):
+            return
     try:
         submit(cid, fetch=True, urgent=True)
     except Exception:
