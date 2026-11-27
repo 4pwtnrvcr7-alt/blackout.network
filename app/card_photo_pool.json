@@ -1,0 +1,365 @@
+{
+ "note": "Share-card conflict/cyber topic pool (Wikimedia Commons: public domain, CC BY, or CC BY-SA, commercial-OK). Attribution recorded the same way as newsletter_pool.json; credits on /credits#newsletter. Loaded by card_photo.py. Not used as newsletter divider assets (no local .b64 files). No satellite/map/relief imagery.",
+ "images": [
+  {
+   "name": "ogwar01-d.jpg",
+   "topic": "war",
+   "title": "MQ-9 Reaper UAV.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AMQ-9_Reaper_UAV.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Air Force Photo / Lt. Col. Leslie Pratt",
+   "bytes": 4622074
+  },
+  {
+   "name": "ogwar02-d.jpg",
+   "topic": "war",
+   "title": "MQ-1 Predator unmanned aircraft.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AMQ-1_Predator_unmanned_aircraft.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Air Force photo/Lt Col Leslie Pratt",
+   "bytes": 1255196
+  },
+  {
+   "name": "ogwar03-d.jpg",
+   "topic": "war",
+   "title": "RQ-4 Global Hawk.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ARQ-4_Global_Hawk.jpg",
+   "license": "Public domain",
+   "artist": "Stacey Knott",
+   "bytes": 774416
+  },
+  {
+   "name": "ogwar04-d.jpg",
+   "topic": "war",
+   "title": "Raven launch (6537184).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ARaven_launch_%286537184%29.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Army photo by Spc. Esmeralda Cervantes",
+   "bytes": 3889270
+  },
+  {
+   "name": "ogwar05-d.jpg",
+   "topic": "war",
+   "title": "M777 howitzer.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AM777_howitzer.jpg",
+   "license": "Public domain",
+   "artist": "Lance Corporal Ray Lewis",
+   "bytes": 210151
+  },
+  {
+   "name": "ogwar06-d.jpg",
+   "topic": "war",
+   "title": "M142 HIMARS firing.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AM142_HIMARS_firing.jpg",
+   "license": "Public domain",
+   "artist": "US Army Staff Sergeant Jameson Harris",
+   "bytes": 365897
+  },
+  {
+   "name": "ogwar07-d.jpg",
+   "topic": "war",
+   "title": "M109A6 Paladin at Qayyarah October 2016.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AM109A6_Paladin_at_Qayyarah_October_2016.jpg",
+   "license": "Public domain",
+   "artist": "Spc. Christopher Brecht",
+   "bytes": 2066178
+  },
+  {
+   "name": "ogwar08-d.jpg",
+   "topic": "war",
+   "title": "Exercise Predator’s Walk 26- US Marines and Australian Defence Force conduct combined artillery fire missions (9777135).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AExercise_Predator%E2%80%99s_Walk_26-_US_Marines_and_Australian_Defence_Force_conduct_combined_artillery_fire_missions_%289777135%29.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Marine Corps photo by Cpl. Caleb Goodwin",
+   "bytes": 12433979
+  },
+  {
+   "name": "ogwar09-d.jpg",
+   "topic": "war",
+   "title": "USS Zumwalt departs Bath, Maine to conduct acceptance trials. (26493633871).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AUSS_Zumwalt_departs_Bath%2C_Maine_to_conduct_acceptance_trials._%2826493633871%29.jpg",
+   "license": "Public domain",
+   "artist": "Official U.S. Navy Page from United States of America",
+   "bytes": 4519336
+  },
+  {
+   "name": "ogwar10-d.jpg",
+   "topic": "war",
+   "title": "USS Arleigh Burke is underway. (11177376336).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AUSS_Arleigh_Burke_is_underway._%2811177376336%29.jpg",
+   "license": "Public domain",
+   "artist": "Official U.S. Navy Page from United States of America MC2 JEFF ATHERTON/U.S. Navy",
+   "bytes": 756590
+  },
+  {
+   "name": "ogwar11-d.jpg",
+   "topic": "war",
+   "title": "US Navy 110909-N-JB219-267 The Virginia-class attack submarine Pre-Commissioning Unit (PCU) California (SSN 781) gets underway from Naval Station N.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AUS_Navy_110909-N-JB219-267_The_Virginia-class_attack_submarine_Pre-Commissioning_Unit_%28PCU%29_California_%28SSN_781%29_gets_underway_from_Naval_Station_N.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Navy photo by Mass Communication Specialist 2nd Class Danna M. Morris",
+   "bytes": 1730401
+  },
+  {
+   "name": "ogwar12-d.jpg",
+   "topic": "war",
+   "title": "USS America (LHA-6) off Pascagoula in 2013.JPG",
+   "page": "https://commons.wikimedia.org/wiki/File%3AUSS_America_%28LHA-6%29_off_Pascagoula_in_2013.JPG",
+   "license": "Public domain",
+   "artist": "U.S. Navy photo by Senior Chief Aviation Ordnanceman Lawrence Grove",
+   "bytes": 2621689
+  },
+  {
+   "name": "ogwar13-d.jpg",
+   "topic": "war",
+   "title": "US Navy 110329-N-XO436-010 The Arleigh Burke-class guided-missile destroyer USS Barry (DDG 52) launches a Tomahawk cruise missile to support Joint.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AUS_Navy_110329-N-XO436-010_The_Arleigh_Burke-class_guided-missile_destroyer_USS_Barry_%28DDG_52%29_launches_a_Tomahawk_cruise_missile_to_support_Joint.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Navy photo by Mass Communication Specialist 3rd Class Jonathan Sunderman",
+   "bytes": 1362143
+  },
+  {
+   "name": "ogwar14-d.jpg",
+   "topic": "war",
+   "title": "Flight Test THAAD-23 (FTT-23) (5711549).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AFlight_Test_THAAD-23_%28FTT-23%29_%285711549%29.jpg",
+   "license": "Public domain",
+   "artist": "This image was released by the United States Department of Defense with the ID 190830-D-N7474-006 (next) . This tag does not indicate the copyright status of the attached work. A n",
+   "bytes": 15314901
+  },
+  {
+   "name": "ogwar15-d.jpg",
+   "topic": "war",
+   "title": "Exercise Formidable Shield 2023 (7791957).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AExercise_Formidable_Shield_2023_%287791957%29.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Marine Corps photo by Lance Cpl. Eric Dmochowski",
+   "bytes": 7854657
+  },
+  {
+   "name": "ogwar16-d.jpg",
+   "topic": "war",
+   "title": "2nd LAAD Stinger Missile Live-fire Sweden (8631972).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3A2nd_LAAD_Stinger_Missile_Live-fire_Sweden_%288631972%29.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Marine Corps photo by Sgt. Scott Jenkins",
+   "bytes": 17080074
+  },
+  {
+   "name": "ogwar17-d.jpg",
+   "topic": "war",
+   "title": "SM 3 Block IIA launched from the Aegis Ashore Missile Defense Test Complex at Hawaii.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ASM_3_Block_IIA_launched_from_the_Aegis_Ashore_Missile_Defense_Test_Complex_at_Hawaii.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Army",
+   "bytes": 166760
+  },
+  {
+   "name": "ogwar18-d.jpg",
+   "topic": "war",
+   "title": "Unarmed Minuteman III test launch from Vandenberg (6406505).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AUnarmed_Minuteman_III_test_launch_from_Vandenberg_%286406505%29.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Air Force photo by Michael Peterson",
+   "bytes": 6567166
+  },
+  {
+   "name": "ogwar19-d.jpg",
+   "topic": "war",
+   "title": "An unarmed Trident II D5 missile launches from USS Rhode Island (SSBN-740) off the coast of Cape Canaveral 9 May 2019.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AAn_unarmed_Trident_II_D5_missile_launches_from_USS_Rhode_Island_%28SSBN-740%29_off_the_coast_of_Cape_Canaveral_9_May_2019.jpg",
+   "license": "Public domain",
+   "artist": "John Kowalski",
+   "bytes": 2298908
+  },
+  {
+   "name": "ogwar20-d.jpg",
+   "topic": "war",
+   "title": "U S Army field artillery launches ATACMS in Australia (7952501).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AU_S_Army_field_artillery_launches_ATACMS_in_Australia_%287952501%29.jpg",
+   "license": "Public domain",
+   "artist": "U.S. Army photo by Sgt. 1st Class Andrew Dickson",
+   "bytes": 5957643
+  },
+  {
+   "name": "ogwar21-d.jpg",
+   "topic": "war",
+   "title": "JASSM m02006120800040.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AJASSM_m02006120800040.jpg",
+   "license": "Public domain",
+   "artist": "US Air Force",
+   "bytes": 1405607
+  },
+  {
+   "name": "ogwar22-d.jpg",
+   "topic": "war",
+   "title": "Flickr - The U.S. Army - Afghanistan patrol (1).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AFlickr_-_The_U.S._Army_-_Afghanistan_patrol_%281%29.jpg",
+   "license": "Public domain",
+   "artist": "The U.S. Army Pfc Boyd Cameron/U.S. Army",
+   "bytes": 1348881
+  },
+  {
+   "name": "ogwar23-d.jpg",
+   "topic": "war",
+   "title": "Marines patrol Marjah (4370376696).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AMarines_patrol_Marjah_%284370376696%29.jpg",
+   "license": "Public domain",
+   "artist": "Marines from Arlington, VA, United States",
+   "bytes": 1596722
+  },
+  {
+   "name": "ogwar24-d.jpg",
+   "topic": "war",
+   "title": "101st Airborne in Kunar province returning fire.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3A101st_Airborne_in_Kunar_province_returning_fire.jpg",
+   "license": "Public domain",
+   "artist": "Pfc. Cameron Boyd",
+   "bytes": 1577821
+  },
+  {
+   "name": "ogwar25-d.jpg",
+   "topic": "war",
+   "title": "U.S. Army paratroopers with the 1st Battalion, 501st Parachute Infantry Regiment, 2nd Infantry Brigade Combat Team (Airborne), 11th Airborne Division, “Arctic Angels,” descend after jumping from a C-17 Globemaster III.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AU.S._Army_paratroopers_with_the_1st_Battalion%2C_501st_Parachute_Infantry_Regiment%2C_2nd_Infantry_Brigade_Combat_Team_%28Airborne%29%2C_11th_Airborne_Division%2C_%E2%80%9CArctic_Angels%2C%E2%80%9D_descend_after_jumping_from_a_C-17_Globemaster_III.jpg",
+   "license": "Public domain",
+   "artist": "Senior Airman Julia Lebens",
+   "bytes": 3970271
+  },
+  {
+   "name": "ogwar26-d.jpg",
+   "topic": "war",
+   "title": "An Afghan National Army soldier provides security for a mounted patrol in Paktika province, Afghanistan, Aug. 14, 2011 110814-A-AR883-003.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AAn_Afghan_National_Army_soldier_provides_security_for_a_mounted_patrol_in_Paktika_province%2C_Afghanistan%2C_Aug._14%2C_2011_110814-A-AR883-003.jpg",
+   "license": "Public domain",
+   "artist": "Spc. George Hunt",
+   "bytes": 14497238
+  },
+  {
+   "name": "ogwar27-d.jpg",
+   "topic": "war",
+   "title": "Бородянка - світ продовжують жахати наслідки російської окупації у населених пунктах під Києвом 04.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3A%D0%91%D0%BE%D1%80%D0%BE%D0%B4%D1%8F%D0%BD%D0%BA%D0%B0_-_%D1%81%D0%B2%D1%96%D1%82_%D0%BF%D1%80%D0%BE%D0%B4%D0%BE%D0%B2%D0%B6%D1%83%D1%8E%D1%82%D1%8C_%D0%B6%D0%B0%D1%85%D0%B0%D1%82%D0%B8_%D0%BD%D0%B0%D1%81%D0%BB%D1%96%D0%B4%D0%BA%D0%B8_%D1%80%D0%BE%D1%81%D1%96%D0%B9%D1%81%D1%8C%D0%BA%D0%BE%D1%97_%D0%BE%D0%BA%D1%83%D0%BF%D0%B0%D1%86%D1%96%D1%97_%D1%83_%D0%BD%D0%B0%D1%81%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D1%85_%D0%BF%D1%83%D0%BD%D0%BA%D1%82%D0%B0%D1%85_%D0%BF%D1%96%D0%B4_%D0%9A%D0%B8%D1%94%D0%B2%D0%BE%D0%BC_04.jpg",
+   "license": "CC BY 4.0",
+   "artist": "КМДА, Олексій Самсонов",
+   "bytes": 4122130
+  },
+  {
+   "name": "ogwar28-d.jpg",
+   "topic": "war",
+   "title": "Destroyed neighborhood in Raqqa.png",
+   "page": "https://commons.wikimedia.org/wiki/File%3ADestroyed_neighborhood_in_Raqqa.png",
+   "license": "Public domain",
+   "artist": "Mahmoud Bali (VOA)",
+   "bytes": 1613541
+  },
+  {
+   "name": "ogwar29-d.jpg",
+   "topic": "war",
+   "title": "Mariupol downtown street destroyed by the Russian siege.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AMariupol_downtown_street_destroyed_by_the_Russian_siege.jpg",
+   "license": "CC BY 4.0",
+   "artist": "Міністерство внутрішніх справ України",
+   "bytes": 189674
+  },
+  {
+   "name": "ogwar30-d.jpg",
+   "topic": "war",
+   "title": "Destroyed buildings in mariupol.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ADestroyed_buildings_in_mariupol.jpg",
+   "license": "Public domain",
+   "artist": "Mariupol City Council",
+   "bytes": 257176
+  },
+  {
+   "name": "ogwar31-d.jpg",
+   "topic": "war",
+   "title": "Coventry Cathedral ruins.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ACoventry_Cathedral_ruins.jpg",
+   "license": "Public domain",
+   "artist": "User G-Man on en.wikipedia",
+   "bytes": 205966
+  },
+  {
+   "name": "ogwar32-d.jpg",
+   "topic": "war",
+   "title": "Euromaidan IMG 5201 (11879525114).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AEuromaidan_IMG_5201_%2811879525114%29.jpg",
+   "license": "CC BY 2.0",
+   "artist": "Sasha Maksymenko",
+   "bytes": 10643344
+  },
+  {
+   "name": "ogwar33-d.jpg",
+   "topic": "war",
+   "title": "Independence Square on Sunday.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AIndependence_Square_on_Sunday.jpg",
+   "license": "CC BY 2.0",
+   "artist": "Ivan Bandura",
+   "bytes": 5417006
+  },
+  {
+   "name": "ogwar34-d.jpg",
+   "topic": "war",
+   "title": "Tahrir Square during 8 February 2011.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ATahrir_Square_during_8_February_2011.jpg",
+   "license": "CC BY 2.0",
+   "artist": "Mona",
+   "bytes": 796151
+  },
+  {
+   "name": "ogwar35-d.jpg",
+   "topic": "war",
+   "title": "Protests in Minsk, Belarus (50391832532).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AProtests_in_Minsk%2C_Belarus_%2850391832532%29.jpg",
+   "license": "CC0",
+   "artist": "Jana Shnipelson from Minsk, Belarus",
+   "bytes": 11263763
+  },
+  {
+   "name": "ogcybea-d.jpg",
+   "topic": "cyber",
+   "title": "Pleiades supercomputer.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3APleiades_supercomputer.jpg",
+   "license": "Public domain",
+   "artist": "Marco Librero, NASA Ames Research Center",
+   "bytes": 4720249
+  },
+  {
+   "name": "ogcybeb-d.jpg",
+   "topic": "cyber",
+   "title": "Fiber optic illuminated.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AFiber_optic_illuminated.jpg",
+   "license": "CC BY-SA 3.0",
+   "artist": "Hustvedt",
+   "bytes": 371834
+  },
+  {
+   "name": "ogcybec-d.jpg",
+   "topic": "cyber",
+   "title": "Google Servers.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3AGoogle_Servers.jpg",
+   "license": "CC BY-SA 2.0",
+   "artist": "Wesley Nitsckie",
+   "bytes": 9901256
+  },
+  {
+   "name": "ogcybed-d.jpg",
+   "topic": "cyber",
+   "title": "NOAA Weather supercomputer.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ANOAA_Weather_supercomputer.jpg",
+   "license": "CC BY 2.0",
+   "artist": "NOAA Photo Library",
+   "bytes": 654965
+  },
+  {
+   "name": "ogcybee-d.jpg",
+   "topic": "cyber",
+   "title": "Cern datacenter.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File%3ACern_datacenter.jpg",
+   "license": "CC BY-SA 3.0",
+   "artist": "Hugovanmeijeren",
+   "bytes": 2657902
+  }
+ ]
+}

@@ -2626,7 +2626,7 @@ def _convert_one_stale(cid):
         try:
             ch = SP.db_choice(cid) or {}
             drop = bool(ch and SP.is_non_photo_candidate(ch))
-            if not drop and ch and (ch.get("kind") or "") in ("topic", "category", ""):
+            if not drop and ch and (ch.get("kind") or "") in ("topic", "category", "place", "person", ""):
                 key = (SP.commons_file_title(src=ch.get("src") or "", link=ch.get("link") or "") or "").strip().lower()
                 if key and key in SP.used_file_keys(cid):
                     drop = True

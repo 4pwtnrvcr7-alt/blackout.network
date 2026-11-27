@@ -1406,6 +1406,58 @@ class StoryPhoto(unittest.TestCase):
         # Satellite / ISS hurricane views from the email hazards pool must not be share-card files.
         self.assertNotIn("cyclone catarina from the iss on march 26 2004.jpg", titles)
         self.assertGreaterEqual(len(CP.TOPICS["military"][1]), 8)
+        # Follow-up conflict pool (card_photo_pool.json): drones, missiles, ruins, etc.
+        self.assertIn("mq-9 reaper uav.jpg", titles)
+        self.assertIn("unarmed minuteman iii test launch from vandenberg (6406505).jpg", titles)
+        self.assertIn("m142 himars firing.jpg", titles)
+        self.assertGreaterEqual(len(CP.TOPICS["military"][1]), 40)
+        self.assertGreaterEqual(len(CP.TOPICS["cyber"][1]), 8)
+
+    def test_choose_skips_a_place_photo_already_used_by_another_story(self):
+        """A second Russia story must not reuse the same Kremlin/place file; it falls through to a topic photo."""
+        import os, tempfile
+        import card_photo as CP
+        d = tempfile.mkdtemp()
+        os.environ["BN_CARDS_DB"] = str(Path(d) / "cards.db")
+        kremlin = "https://upload.wikimedia.org/wikipedia/commons/Kremlin_St_Basils.jpg"
+        P._dir = lambda: Path(d)
+        P.db_put("aaaaaaaaaaaaaaaa", dict(src=kremlin, credit="Example", license="CC BY 2.0",
+                                          caption="Moscow.", kind="place", label="Moscow.",
+                                          link="https://commons.wikimedia.org/wiki/File:Kremlin_St_Basils.jpg"),
+                 jpg=b"\xff\xd8" + b"a" * 3000)
+
+        def fake_place(hit):
+            return {"src": kremlin, "credit": "Example", "license": "CC BY 2.0",
+                    "title": "File:Kremlin St Basils.jpg",
+                    "page": "https://commons.wikimedia.org/wiki/File:Kremlin_St_Basils.jpg",
+                    "kind": "place", "w": 1600, "h": 900}
+
+        def fake_topic(text, seed="", key=None, except_cid=""):
+            return {"src": "https://upload.wikimedia.org/wikipedia/commons/MQ-9_Reaper_UAV.jpg",
+                    "credit": "U.S. Air Force", "license": "Public domain",
+                    "title": "File:MQ-9 Reaper UAV.jpg",
+                    "page": "https://commons.wikimedia.org/wiki/File:MQ-9_Reaper_UAV.jpg",
+                    "kind": "topic", "w": 1600, "h": 900}
+
+        def fake_person(title, text=""):
+            return None
+
+        def fake_fetch(im):
+            return "/tmp/fake.jpg"
+
+        orig = (CP.place_photo, CP.topic_photo, CP.person_photo, CP.fetch)
+        CP.place_photo, CP.topic_photo, CP.person_photo, CP.fetch = fake_place, fake_topic, fake_person, fake_fetch
+        try:
+            im = CP.choose("bbbbbbbbbbbbbbbb", "Russian sabotage across Europe has risen",
+                           hit={"place": "Moscow", "lat": 55.75, "lon": 37.62, "cc": "RU", "precision": "city"},
+                           text="", category="conflict")
+            self.assertIsNotNone(im)
+            self.assertEqual(im.get("kind"), "topic")
+            self.assertNotEqual(CP.file_key(src=im.get("src") or "", filename=im.get("title") or ""),
+                                CP.file_key(src=kremlin, filename="Kremlin St Basils.jpg"))
+        finally:
+            CP.place_photo, CP.topic_photo, CP.person_photo, CP.fetch = orig
+            os.environ.pop("BN_CARDS_DB", None)
 
     def test_topic_photos_are_unique_across_stories(self):
         """Two conflict stories must not be assigned the same category photo (the live B-2 repeat)."""
