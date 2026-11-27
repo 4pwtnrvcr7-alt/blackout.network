@@ -85,14 +85,21 @@ class QuickFallback(unittest.TestCase):
             story.load = lambda cid: ({"title": "Theriva Biologics halted on NYSE American", "rank": 7}, [])
             try:
                 a = og.png_for_story_fast("a" * 16)
-                self.assertGreater(len(a), 5000)
                 from PIL import Image
                 import io
-                im = Image.open(io.BytesIO(a))
-                self.assertEqual(im.size, (1200, 675))  # designed map card, never the 1200x630 earth fallback
-                self.assertEqual(a, og.png_for_story_fast("a" * 16))
-                code, body, ct = og.handle_get("/og/wire/" + "a" * 16 + ".png")
-                self.assertEqual(body, a)
+                # story_png_fast is forced off. A unique pool photo (1200x675) is ok;
+                # never the 1200x630 ISS / earth fallback, and never a near-black stub.
+                if a:
+                    self.assertGreater(len(a), 5000)
+                    im = Image.open(io.BytesIO(a))
+                    self.assertEqual(im.size, (1200, 675))
+                    self.assertFalse(share_card.is_stub_card(a))
+                    self.assertEqual(a, og.png_for_story_fast("a" * 16))
+                    code, body, ct = og.handle_get("/og/wire/" + "a" * 16 + ".png")
+                    if body:
+                        self.assertEqual(body, a)
+                else:
+                    self.assertIsNone(a)
             finally:
                 story.load = o
         finally:
@@ -207,8 +214,8 @@ class CardPhotoV3(unittest.TestCase):
         self.assertTrue(CP.skip_place_photo("", "", "natural disaster"))
         self.assertTrue(CP.skip_place_photo("", "", "quake"))
         self.assertTrue(CP.skip_place_photo("", "", "outbreaks/disease"))
-        # Cyber and conflict still use a place photo when no person matches.
-        self.assertEqual(CP.choose_order("Cisco security advisory on a VPN vulnerability"), ("person", "place", "topic"))
+        # Cyber keywords (advisory/vulnerability/breach) prefer the cyber pool over a generic place.
+        self.assertEqual(CP.choose_order("Cisco security advisory on a VPN vulnerability"), ("person", "topic", "place"))
         self.assertEqual(CP.choose_order("On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense"), ("person", "place", "topic"))
         self.assertFalse(CP.skip_place_photo("On Monday, U.S. Secretary of War Pete Hegseth will receive Turkish Minister of National Defense", "", "conflict"))
 
