@@ -58,8 +58,8 @@ class NoStubForHumans(unittest.TestCase):
             self.assertIsNotNone(r)
             self.assertEqual(r[0], 200)
             body = r[1]
-            self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200.png"', body)
-            self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"', body)
+            self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200-red.png"', body)
+            self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200-red.png"', body)
             self.assertIn('name="twitter:card" content="summary"', body)
             self.assertNotIn("/og/wire/", body)
             self.assertNotIn("summary_large_image", body)
@@ -87,8 +87,8 @@ class CardAndShare(unittest.TestCase):
         cid = "e2ca47e325c5b8e1"
         html = og.tags(title="Bessent Iran sanctions", desc="d", url="https://blackout.network/wire/"+cid,
                        story_id=cid, rank=7, og_type="article")
-        self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"', html)
-        self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200.png"', html)
+        self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200-red.png"', html)
+        self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200-red.png"', html)
         self.assertNotIn("/og/wire/%s.png" % cid, html)
         self.assertIn('name="twitter:card" content="summary"', html)
         self.assertNotIn("summary_large_image", html)

@@ -53,7 +53,8 @@ class StoryCardsOff(unittest.TestCase):
         cid = "e2ca47e325c5b8e1"
         html = og.tags(title="A headline", desc="d", url="https://blackout.network/wire/" + cid,
                        story_id=cid, rank=7, og_type="article")
-        logo = og.STORY_SHARE_IMAGE
+        logo = og.story_share_image(7)
+        self.assertEqual(logo, "https://blackout.network/img/share-logo-1200-red.png")
         self.assertIn('name="twitter:card" content="summary"', html)
         self.assertNotIn("summary_large_image", html)
         self.assertIn(f'property="og:image" content="{logo}"', html)
@@ -100,7 +101,7 @@ class StoryCardsOff(unittest.TestCase):
                            story_id=cid, rank=7, og_type="article")
             self.assertIn("summary_large_image", html)
             self.assertIn(f"/og/wire/{cid}.png", html)
-            self.assertNotIn("/img/share-logo-1200.png", html)
+            self.assertNotIn("share-logo-1200", html)
         finally:
             if old is None:
                 os.environ.pop("BN_STORY_CARDS", None)

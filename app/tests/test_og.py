@@ -153,8 +153,9 @@ class OgImages(unittest.TestCase):
         self.assertIn("https://blackout.network/og/wire.png?v=", shell)
         story = wire_v2.shell("A headline | BLACKOUT.NETWORK", "Dek.", "<p>x</p>", "/wire/6727e7f2ac056676", rank=8)
         self.assertNotIn("/og/wire/6727e7f2ac056676.png", story)
-        self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200.png"', story)
-        self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"', story)
+        red = "https://blackout.network/img/share-logo-1200-red.png"
+        self.assertIn(f'property="og:image" content="{red}"', story)
+        self.assertIn(f'name="twitter:image" content="{red}"', story)
         self.assertIn('name="twitter:card" content="summary"', story)
         self.assertNotIn("summary_large_image", story)
         self.assertIn('og:type" content="article"', story)
