@@ -154,9 +154,7 @@ ROUTES = {
     "/icons": "pwa",
     "/install-guide.js": "pwa",
     "/install-guide.css": "pwa",
-    "/bn-menu-city.js": "pwa",      # menu background loop (menu5.py)
-    "/bn-menu-city-m.mp4": "pwa",
-    "/bn-menu-city-d.mp4": "pwa",
+    "/bn-menu-city.js": "pwa",      # menu city animation (menu5.py)
     "/sw.js": "webpush",            # Alerts (t341): service worker at root scope, bell + panel, subscribe API (webpush.py)
     "/alerts.js": "webpush",
     "/alerts.css": "webpush",
