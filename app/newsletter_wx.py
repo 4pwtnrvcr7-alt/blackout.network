@@ -79,7 +79,7 @@ def _nws_points(lat, lon):
     def go():
         P = (_get(f"{NWS}/points/{lat:.4f},{lon:.4f}").get("properties") or {})
         if not P.get("forecast"): return None
-        return {"forecast": P["forecast"], "tz": P.get("timeZone")}
+        return {"forecast": P["forecast"], "hourly": P.get("forecastHourly"), "tz": P.get("timeZone")}
     return _cached(("pts", round(lat, 3), round(lon, 3)), 7 * 86400, go)
 
 def _nws_days(lat, lon, n=4):
@@ -141,7 +141,7 @@ def _intl_days(lat, lon, n=4):
 # ---------------------------------------------------------------- alerts
 def _alert(p, url=None):
     return {"event": p.get("event") or "", "area": p.get("areaDesc") or "", "until": p.get("ends") or p.get("expires"), "severity": p.get("severity") or "",
-            "headline": p.get("headline") or "", "url": url, "red": (p.get("event") or "") in RED_EVENTS or p.get("severity") == "Extreme"}
+            "headline": p.get("headline") or "", "onset": p.get("onset") or p.get("effective"), "url": url, "red": (p.get("event") or "") in RED_EVENTS or p.get("severity") == "Extreme"}
 
 def _local_alerts(lat, lon):
     def go():
@@ -186,9 +186,146 @@ def _storms():
             k = kind.get(str(s.get("classification") or "").upper(), "Tropical cyclone")
             try: mph = round(int(s.get("intensity")) * 1.15078 / 5) * 5
             except Exception: mph = None
-            out.append({"name": f"{k} {s.get('name') or ''}".strip(), "mph": mph, "url": ((s.get("publicAdvisory") or {}).get("url")) or NHC_PAGE})
+            try: la, lo = float(s.get("latitudeNumeric")), float(s.get("longitudeNumeric"))
+            except Exception: la = lo = None
+            out.append({"name": f"{k} {s.get('name') or ''}".strip(), "mph": mph, "lat": la, "lon": lo,
+                        "url": ((s.get("publicAdvisory") or {}).get("url")) or NHC_PAGE})
         return out
     return _cached(("nhc",), 1800, go)
+
+
+# ---------------------------------------------------------------- next-24-hours series (v5: weather graphic + storm verdict)
+COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+_MPH = re.compile(r"(\d+)(?:\s*to\s*(\d+))?\s*mph", re.I)
+
+def _wind(txt):
+    m = _MPH.search(str(txt or ""))
+    if not m: return None
+    lo = int(m.group(1)); hi = int(m.group(2) or lo)
+    return hi
+
+def _hours(lat, lon, n=24):
+    """NWS hourly forecast for the next n hours (starting with the hour in progress):
+    {"hours": [{"t","h","temp","rh","wind","dir","pop","day","text"}], "tz","tzname","src","url"} or None."""
+    pts = _nws_points(lat, lon)
+    if not pts or not pts.get("hourly"): return None
+    def go():
+        per = (_get(pts["hourly"]).get("properties") or {}).get("periods") or []
+        now = datetime.now(timezone.utc); out = []
+        for p in per:
+            st = _pt(p.get("startTime")); en = _pt(p.get("endTime"))
+            if not st or (en and en <= now): continue
+            temp = p.get("temperature")
+            if temp is None: continue
+            if str(p.get("temperatureUnit") or "F").upper() == "C": temp = temp * 9 / 5 + 32
+            rh = (p.get("relativeHumidity") or {}).get("value")
+            wd = str(p.get("windDirection") or "").upper()
+            out.append({"t": p.get("startTime"), "h": st.hour, "temp": int(round(temp)), "rh": None if rh is None else int(round(rh)),
+                        "wind": _wind(p.get("windSpeed")), "dir": COMPASS.index(wd) if wd in COMPASS else None,
+                        "pop": int(round((p.get("probabilityOfPrecipitation") or {}).get("value") or 0)),
+                        "day": bool(p.get("isDaytime")), "text": p.get("shortForecast") or ""})
+            if len(out) >= n: break
+        if len(out) < 12: return None
+        return {"hours": out, "tz": pts.get("tz"), "src": "National Weather Service",
+                "url": f"https://forecast.weather.gov/MapClick.php?lat={lat:.4f}&lon={lon:.4f}"}
+    return _cached(("hr", round(lat, 3), round(lon, 3)), 1800, go)
+
+def _tzname(tz, t0):
+    try:
+        from zoneinfo import ZoneInfo
+        d = _pt(t0)
+        return d.astimezone(ZoneInfo(tz)).strftime("%Z") if d else ""
+    except Exception:
+        return ""
+
+def hour_label(t, tz=None):
+    """'9 PM' in the reader's own time zone (the offset carried by the NWS timestamp)."""
+    d = _pt(t)
+    return "" if not d else d.strftime("%-I %p")
+
+def outlook(hrs):
+    """Plain-language facts from the hourly list (the same numbers the graphic draws)."""
+    H = hrs["hours"]; temps = [x["temp"] for x in H]
+    hi = max(H, key=lambda x: x["temp"]); lo = min(H, key=lambda x: x["temp"])
+    rain = max(H, key=lambda x: x["pop"]); rhs = [x["rh"] for x in H if x["rh"] is not None]
+    wins = [x["wind"] for x in H if x["wind"] is not None]
+    return {"now": H[0]["temp"], "hi": hi["temp"], "hi_t": hi["t"], "lo": lo["temp"], "lo_t": lo["t"], "pop": rain["pop"], "pop_t": rain["t"],
+            "rh0": H[0]["rh"], "rh_lo": min(rhs) if rhs else None, "rh_hi": max(rhs) if rhs else None,
+            "wind_lo": min(wins) if wins else None, "wind_hi": max(wins) if wins else None,
+            "dir": COMPASS[H[0]["dir"]] if H[0].get("dir") is not None else "", "n": len(H)}
+
+def sky_kind(hrs, alerts=()):
+    """Which header photo fits the next 12 hours: storm | snow | rain | clear | clouds."""
+    ev = " ".join(a.get("event", "") for a in alerts if a.get("storm"))
+    if re.search(r"tornado|thunderstorm|hurricane|tropical|typhoon|storm surge|extreme wind", ev, re.I): return "storm"
+    if re.search(r"winter|blizzard|ice storm|snow|freez", ev, re.I): return "snow"
+    if re.search(r"flood", ev, re.I): return "rain"
+    tx = " ".join(x["text"] for x in (hrs or {}).get("hours", [])[:12]).lower()
+    if "thunder" in tx: return "storm"
+    if re.search(r"snow|sleet|flurr|ice|wintry|freezing", tx): return "snow"
+    if re.search(r"rain|shower|drizzle", tx): return "rain"
+    if re.search(r"sunny|clear|fair", tx) and not re.search(r"cloud", tx): return "clear"
+    return "clouds"
+
+NON_STORM = {"Extreme Heat Warning", "Excessive Heat Warning", "Heat Advisory", "Extreme Cold Warning", "Wind Chill Warning", "Fire Weather Watch",
+             "Red Flag Warning", "Air Quality Alert", "Dense Fog Advisory", "Dust Advisory", "Earthquake Warning"}
+
+def _miles(a, b, c, d):
+    from math import radians, sin, cos, asin, sqrt
+    p1, p2 = radians(a), radians(c); dp = p2 - p1; dl = radians(d - b)
+    h = sin(dp / 2) ** 2 + cos(p1) * cos(p2) * sin(dl / 2) ** 2
+    return 3958.8 * 2 * asin(sqrt(h))
+
+NHC_NEAR_MI = 400   # an active tropical cyclone within this distance counts as 'headed your way'
+
+def storm_verdict(w, lat=None, lon=None, now=None):
+    """The one-line answer Matt asked for (Nov 27 2026): is a major storm headed for this reader in the next 24 hours?
+    -> {"state": "storm"|"clear"|"unknown", "line", "detail", "red", "url", "ahead"}. A feed that did not answer never produces an all-clear."""
+    now = now or datetime.now(timezone.utc)
+    if not w or w.get("scope") != "local" or w.get("unit") == "C" or (w.get("fc") or {}).get("unit") == "C":
+        return None
+    if not w.get("alerts_ok"):
+        return {"state": "unknown", "line": "Storm check unavailable right now.", "detail": "The National Weather Service alert feed did not answer. See current alerts at weather.gov.",
+                "red": False, "url": NWS_ALERTS_PAGE, "ahead": None}
+    near = []
+    for a in w.get("alerts") or []:
+        if a.get("event") in NON_STORM: continue
+        on = _pt(a.get("onset")); soon = (on is None) or (on <= now + timedelta(hours=24))
+        near.append((0 if soon else 1, a, on))
+    near.sort(key=lambda x: (x[0], x[2] or now))
+    nowc = [x for x in near if x[0] == 0]
+    if nowc:
+        _, a, on = nowc[0]
+        when = []
+        if on and on > now + timedelta(minutes=30): when.append("from " + _loc_str(a["onset"], w))
+        if a.get("until"): when.append("until " + _loc_str(a["until"], w))
+        return {"state": "storm", "line": "Major storm headed your way: " + a["event"], "detail": " · ".join(when) + (" · " if when else "") + "National Weather Service",
+                "red": bool(a.get("red")), "url": a.get("url") or NWS_ALERTS_PAGE, "ahead": None, "event": a["event"]}
+    if lat is not None and lon is not None:
+        for s in w.get("storms") or []:
+            if s.get("lat") is None: continue
+            mi = _miles(lat, lon, s["lat"], s["lon"])
+            if mi <= NHC_NEAR_MI:
+                return {"state": "storm", "line": f"Major storm headed your way: {s['name']}",
+                        "detail": f"about {int(round(mi, -1)):,} miles away" + (f" · {s['mph']} mph winds" if s.get("mph") else "") + " · National Hurricane Center",
+                        "red": bool(s.get("mph") and s["mph"] >= 74), "url": s.get("url") or NHC_PAGE, "ahead": None, "event": s["name"]}
+    ahead = None
+    if near:
+        _, a, on = near[0]; ahead = f"Looking ahead: {a['event']} {('from ' + _loc_str(a['onset'], w)) if on else 'in effect'}"
+    return {"state": "clear", "line": "No major storms headed your way in the next 24 hours.",
+            "detail": "No Tornado, Hurricane, Winter Storm, Flood or Severe Thunderstorm alerts for your location. National Weather Service.", "red": False,
+            "url": NWS_ALERTS_PAGE, "ahead": ahead}
+
+def _loc_str(s, w):
+    """'Sat 6 AM EST' in the reader's own zone (falls back to Eastern)."""
+    d = _pt(s)
+    if not d: return ""
+    h = w.get("hourly") or {}
+    try:
+        from zoneinfo import ZoneInfo
+        d = d.astimezone(ZoneInfo(h.get("tz") or "America/New_York"))
+    except Exception: pass
+    return d.strftime("%a %-I:%M %p %Z").replace(":00 ", " ")
 
 # ---------------------------------------------------------------- national forecast
 def _cities():
@@ -232,6 +369,14 @@ def for_sub(sub, c=None):
                 except Exception: v = None
                 if v is not None: out[key] = v
                 if key in ("alerts", "nat_alerts") and f is not None: out[key + "_ok"] = v is not None
+        for a in out["alerts"] or []: a["storm"] = a.get("event") not in NON_STORM
+        if out["scope"] == "local" and out["fc"] and out["fc"].get("unit") == "F":
+            try:
+                hr = _hours(lat, lon)
+                if hr:
+                    hr = dict(hr); hr["tzname"] = _tzname(hr.get("tz"), hr["hours"][0]["t"]) or "ET"; out["hourly"] = hr
+                    out["lat"], out["lon"] = lat, lon
+            except Exception: pass
         out["alerts"] = out["alerts"] or []; out["nat_alerts"] = out["nat_alerts"] or []; out["storms"] = out["storms"] or []
         # local reader: national list only for events not already listed locally
         have = {a["event"] for a in out["alerts"]}
@@ -272,6 +417,23 @@ def text_lines(w):
     """Plain-text part."""
     if not w: return []
     T = []
+    if w.get("hourly") and w.get("scope") == "local":
+        try:
+            import newsletter_v4 as V4
+            v = storm_verdict(w, w.get("lat"), w.get("lon")); F = V4.weather_facts(w, __import__(__name__))
+            T += [f"WEATHER · {w['label'].upper()} · NEXT 24 HOURS ({F['tz']})"]
+            if v:
+                T.append(v["line"] + (f" ({v['detail']})" if v.get("detail") else ""))
+                if v.get("ahead"): T.append(v["ahead"])
+            T += [f"- Temperature: {F['temp'][0]} now, {F['temp'][1]}", f"- Chance of rain: {F['rain'][0]}, {F['rain'][1]}", f"- Wind: {F['wind'][0]}, {F['wind'][1]}"]
+            if F["hum"]: T.append(f"- Humidity: {F['hum'][0]} now, {F['hum'][1]}")
+            T += [f"Full forecast: {w['hourly']['src']} {w['hourly']['url']}", ""]
+            if w.get("nat_alerts"):
+                T += ["ELSEWHERE IN THE US"] + [f"- {g['event']}: {nat_line(g)}" for g in w["nat_alerts"]] + [""]
+            for s_ in w.get("storms") or []: T.append(f"- {s_['name']}" + (f", {s_['mph']} mph winds" if s_.get("mph") else "") + f" {s_['url']}")
+            return T
+        except Exception:
+            T = []
     if has_forecast(w):
         if w.get("fc"):
             fc = w["fc"]; T += [f"WEATHER · {w['label'].upper()}"]
