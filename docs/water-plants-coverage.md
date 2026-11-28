@@ -1,16 +1,17 @@
 # Water plant coverage
 
-152,517 plants with source-cited coordinates; U.S. 54,456.
+157,204 plants with source-cited coordinates; U.S. 54,456.
 
-178 countries/territories.
+191 countries/territories.
 
 ## By country (ISO 3166-1 alpha-2)
 
 - US: 54,456
 - FR: 16,085
 - DE: 14,776
-- GB: 7,499
+- GB: 7,500
 - IT: 5,034
+- CN: 3,979
 - RU: 3,947
 - CA: 3,212
 - ES: 3,207
@@ -22,11 +23,11 @@
 - JP: 2,024
 - PT: 1,973
 - IN: 1,783
-- MY: 1,671
+- MY: 1,670
 - AT: 1,658
 - TR: 1,172
 - SK: 1,137
-- IE: 1,128
+- IE: 1,127
 - BY: 1,065
 - ZA: 1,019
 - BE: 903
@@ -60,10 +61,12 @@
 - LV: 214
 - LU: 203
 - DZ: 200
-- TH: 185
+- TH: 186
+- IL: 177
 - SI: 174
 - EE: 169
 - HR: 167
+- SA: 166
 - MD: 164
 - PE: 154
 - NO: 150
@@ -75,10 +78,12 @@
 - KE: 91
 - LY: 91
 - CU: 86
+- HK: 86
 - RS: 86
 - MA: 84
 - CR: 77
 - NA: 73
+- AE: 72
 - NP: 70
 - ZW: 70
 - BD: 67
@@ -86,14 +91,17 @@
 - PA: 60
 - BA: 57
 - UY: 57
+- PS: 56
 - AO: 52
 - LS: 51
+- SN: 49
 - CI: 47
 - WS: 46
 - TZ: 44
-- JO: 43
 - CY: 42
 - SG: 41
+- OM: 40
+- JO: 39
 - LB: 38
 - ET: 37
 - ZM: 37
@@ -122,9 +130,11 @@
 - AL: 23
 - MV: 23
 - NG: 22
-- YE: 21
+- QA: 22
+- BH: 20
 - KH: 20
 - TG: 20
+- YE: 20
 - NC: 19
 - IS: 18
 - CD: 17
@@ -140,9 +150,11 @@
 - ME: 13
 - MK: 13
 - AF: 12
+- KW: 12
 - BJ: 11
 - LA: 11
 - SD: 11
+- MO: 10
 - NE: 10
 - SL: 10
 - SZ: 10
@@ -167,6 +179,7 @@
 - SH: 4
 - TO: 4
 - CG: 3
+- GM: 3
 - MP: 3
 - TD: 3
 - VU: 3
@@ -240,7 +253,7 @@
 
 ## By source
 
-- OpenStreetMap (ODbL): 104,258
+- OpenStreetMap (ODbL): 108,945
 - U.S. EPA ECHO / FRS, SIC 4952 (sewerage systems): 39,625
 - Geoscience Australia, National Wastewater Treatment Facilities (CC BY 4.0): 1,363
 - Environment and Climate Change Canada, WSER reported data (Open Government Licence - Canada): 2,475
