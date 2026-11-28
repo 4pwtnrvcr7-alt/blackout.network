@@ -485,3 +485,47 @@ class ArchiveWire(unittest.TestCase):
             m = W.meta(); self.assertEqual(m["earliest"][:4], "2000")
         finally:
             W._public_row, W.DB, W.HDB, W.ADB_PATH = sv; W._M["t"] = 0
+
+class MajorAlertGlow(unittest.TestCase):
+    """Rank 7 is Major (scoring.RANKS / RN); 7-10 already use .rh and the hi filter. Visual: a subtle analog lamp."""
+    @classmethod
+    def setUpClass(cls):
+        app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        def read(*parts):
+            with open(os.path.join(app, *parts), encoding="utf-8") as f: return f.read()
+        cls.js, cls.css = read("wire_timeline_static", "app.js"), read("wire_timeline_static", "app.css")
+
+    def test_rank_7_is_major_and_starts_the_high_band(self):
+        self.assertIn('7:"Major"', self.js)
+        self.assertIn('8:"Severe"', self.js)
+        self.assertIn('9:"Critical"', self.js)
+        self.assertIn('10:"Catastrophic"', self.js)
+        self.assertIn('return r>=7?"rh"', self.js)
+        self.assertIn('F.sev==="hi"&&!(r>=7&&r<=10)', self.js)
+
+    def test_js_marks_rows_rank_7_and_up(self):
+        self.assertIn('+(r.it.r>=7?" major":"")', self.js)
+        self.assertIn("var nw=isNew(r.it.id),up=!nw&&isUpdated(r.it.id),gl=isGlow(r.it.id),hi=r.it.r>=7", self.js)
+        self.assertIn('n.classList.toggle("major",hi)', self.js)
+        # Refresh's temporary white glow is still applied independently
+        self.assertIn('n.classList.toggle("glow",gl)', self.js)
+        self.assertIn('n.classList.toggle("fresh",nw)', self.js)
+        self.assertIn('n.classList.toggle("updated",up)', self.js)
+
+    def test_css_lamp_and_edge_breathe_and_honor_reduced_motion(self):
+        self.assertIn(".tl-it.major::before", self.css)
+        self.assertIn(".tl-it.major::after", self.css)
+        self.assertIn("animation:tllamp 3.6s ease-in-out infinite", self.css)
+        self.assertIn("animation:tledge 3.6s ease-in-out infinite", self.css)
+        self.assertIn("@keyframes tllamp", self.css)
+        self.assertIn("@keyframes tledge", self.css)
+        self.assertIn("--tl-lamp:#E5484D", self.css)
+        self.assertIn(".tl-it.major::before,.tl-it.major::after{animation:none}", self.css)
+        # lamp/edge use pseudos; the Refresh white flash keeps box-shadow on .tl-it itself
+        self.assertIn(".tl-it.glow{box-shadow:", self.css)
+        major_rule = self.css.split(".tl-it.major{")[1].split("}")[0]
+        self.assertNotIn("box-shadow", major_rule)
+        major_block = self.css.split("Major alerts, rank 7+")[1]
+        self.assertNotIn("yellow", major_block.lower())
+        self.assertNotIn("#ffc", major_block.lower())
+        self.assertNotIn("#ffe", major_block.lower())
