@@ -445,6 +445,17 @@ class ArchiveWire(unittest.TestCase):
         cls.AW = AW
         if not os.path.exists(AW.DBF): AW.build(quiet=True)
 
+    def test_phase2_sources_categories_and_tags(self):
+        """Phase 2 shards: CISA KEV stays Cyber (title words like 'Corruption' must not make it a scandal), NTSB is Wrecks, solar is Space; no empty tags."""
+        c = sqlite3.connect(f"file:{self.AW.DBF}?mode=ro", uri=True)
+        want = {"CISA KEV": "cyber", "NTSB": "wreck", "NOAA SWPC": "space", "GFZ Kp index": "space"}
+        for src, k in want.items():
+            n, wrong = c.execute("SELECT COUNT(*), SUM(k != ?) FROM stories WHERE sources LIKE ?", (k, f'%"{src}"%')).fetchone()
+            self.assertGreater(n, 0, src); self.assertEqual(wrong, 0, src)
+        self.assertEqual(c.execute("SELECT COUNT(*) FROM stories WHERE tags LIKE '%\"\"%'").fetchone()[0], 0)
+        self.assertEqual(W.cat_key("cyber", "CISA adds Memory Corruption Vulnerability (CVE-2020-1)", True), "cyber")
+        self.assertEqual(W.cat_key("cyber", "A corruption probe", False), "scandal")   # live rows keep the title rule
+
     def test_every_row_has_a_source_link_and_tags(self):
         c = sqlite3.connect(f"file:{self.AW.DBF}?mode=ro", uri=True)
         n, bad = c.execute("SELECT COUNT(*), SUM(links NOT LIKE '%\"url\": \"http%') FROM stories").fetchone()
