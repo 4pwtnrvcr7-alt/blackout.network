@@ -8,7 +8,7 @@ big licensed video or photograph (see CREDITS rows below; all graded grey), an u
 button to the section, and one strip of real live numbers, like the SpaceX launch strip. Native scroll with CSS scroll-snap.
 
 Live strips come from /api/intro/live: a compact, read-only, 60 s stale-while-revalidate roll-up of numbers the site already serves:
-  wire     top-ranked Wire stories of the last 24 h          wire_timeline /api/wire_tl?time=24h
+  wire     top-ranked Wire stories of the last 24 h          wire_timeline /api/wire_tl?time=1 (same window the Wire page uses; "24h" is not a valid time value there)
   map      stories pinned in the last 24 h, by region         same read
   weather  NWS alerts in effect now, by state               api.weather.gov/alerts/active/count (public, no key)
   grid     outages on the Wire (24 h / 7 d), U.S. customers   netmap /api/netmap/data (outages.layers, summary.power_customers)
@@ -192,19 +192,29 @@ def _row(x):
     return {"id": x.get("id"), "h": _clean(x.get("h") or x.get("d")), "r": int(x.get("r") or 0), "t": x.get("t"), "loc": _clean(x.get("loc") or "", 40)}
 
 def _b_feed():
-    """One Wire read (last 24 h) shared by the Wire, Heat Map and Weather strips."""
-    now, it, seen, qs, more = time.time(), [], set(), {"time": ["24h"], "limit": ["200"]}, False
-    for page in range(4):                       # follow the "older" cursor: a page can come back short (or empty) with more behind it
+    """One Wire read (last 24 h) shared by the Wire and Heat Map strips.
+
+    The Wire page's 24-hour chip sends time=1 (a number of days). time=24h is not a valid
+    window and the API treats it as unfiltered, which is also how the empty-first-page
+    glitch produced counts in the tens instead of the hundreds. Page until the API says
+    we are done, so the totals are the same set the Wire would show for that window.
+    """
+    now, it, seen, more = time.time(), [], set(), False
+    qs = {"time": ["1"], "limit": ["200"]}      # 1 day: same parameter the /wire "24 hours" chip sends
+    for page in range(20):
         d = _call("wire_timeline", "/api/wire_tl", qs)
         rows = [x for x in (d.get("items") or []) if x.get("t") and x.get("id") not in seen]
         seen.update(x.get("id") for x in rows)
         it += [x for x in rows if now - _epoch(x["t"]) <= 86400 + 300]
         nx = d.get("next")
-        if d.get("end") or not nx or not _CUR.match(str(nx)) or now - _epoch(str(nx).split("|")[0]) > 86400 + 300 or len(it) >= 200: break
-        more = page == 3
-        qs = {"time": ["24h"], "limit": ["200"], "before": [str(nx)]}
+        if d.get("end") or not nx or not _CUR.match(str(nx)) or now - _epoch(str(nx).split("|")[0]) > 86400 + 300:
+            more = False
+            break
+        if page == 19:
+            more = True
+            break
+        qs = {"time": ["1"], "limit": ["200"], "before": [str(nx)]}
     if not it: raise RuntimeError("no wire items")
-    more = more or len(it) >= 200
     ok = [x for x in it if _readable(x.get("h") or x.get("d"))]
     top = sorted(ok, key=lambda x: (-int(x.get("r") or 0), -_epoch(x["t"])))
     wire = {"n": len(it), "more": more, "hi": sum(1 for x in it if int(x.get("r") or 0) >= 7), "top": [_row(x) for x in top[:3]]}

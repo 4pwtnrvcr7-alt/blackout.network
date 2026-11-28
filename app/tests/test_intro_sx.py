@@ -96,6 +96,40 @@ class IntroSx(unittest.TestCase):
             for k in intro_sx.KEYS: self.assertIn(k, v)
         finally: intro_sx.BUILDERS = orig; intro_sx._C.update(t=0, v=None, good={})
 
+
+    def test_feed_uses_the_wire_page_24h_window_and_counts_every_page(self):
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        def iso(hours):
+            return (now - datetime.timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        def item(i, hours, lat=None, g="eu"):
+            row = {"id": "%04x" % i, "h": "A long enough readable headline about event %d in the feed" % i,
+                   "r": 4, "t": iso(hours), "g": g}
+            if lat is not None:
+                row["lat"], row["lon"] = lat, 10
+            return row
+        pages = [
+            {"items": [item(i, 1, lat=1 if i < 3 else None) for i in range(200)], "end": False, "next": iso(8) + "|00c7"},
+            {"items": [item(i, 10, lat=2 if i == 200 else None) for i in range(200, 250)], "end": True, "next": None},
+        ]
+        calls = []
+        def fake(mod, path, qs=None):
+            calls.append((path, dict(qs or {})))
+            assert len(calls) <= len(pages), calls; return pages[len(calls) - 1]
+        orig = intro_sx._call
+        try:
+            intro_sx._call = fake
+            out = intro_sx._b_feed()
+        finally:
+            intro_sx._call = orig
+        self.assertEqual(calls[0][1]["time"], ["1"])          # not "24h": that is not a valid Wire time window
+        self.assertNotIn("before", calls[0][1])
+        self.assertEqual(calls[1][1]["before"], [pages[0]["next"]])
+        self.assertEqual(out["wire"]["n"], 250)
+        self.assertFalse(out["wire"]["more"])                 # reached the last page, so no "+"
+        self.assertEqual(out["map"]["n"], 4)
+        self.assertFalse(out["map"]["more"])
+
     def test_clean_titles(self):
         self.assertEqual(intro_sx._clean("8/ Ukrainian forces struck https://t.co/x"), "Ukrainian forces struck")
 
