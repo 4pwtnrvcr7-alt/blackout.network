@@ -333,7 +333,7 @@ def drawer(sn, active=""):
     out = [(M4_CSS if m4 else "") + '<div class="bn-drawer bn-m3' + (' bn-m4' if m4 else '') + '" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
            '<nav class="bn-panel" aria-label="Site menu"><div class="bn-mhead"><div class="bn-mbar">'
            f'<a class="bn-logo" href="/" aria-label="{E(sn.BRAND)} home">{logo_html()}</a>'
-           f'<a class="bn-close m3-close" href="#_" role="button" aria-label="Close menu">{I_CLOSE}<span>Close</span></a></div>'
+           f'<a class="bn-close m3-close" href="#_" role="button" aria-label="Close menu">{I_CLOSE}</a></div>'
            '<div class="bn-ph">'
            '<div class="bn-dsearch bn-js-only" id="bn_dsearch"></div>'
            '<div class="m3-tools"><button type="button" class="m3-tl m3-alerts bn-js-only">Alerts</button>'
