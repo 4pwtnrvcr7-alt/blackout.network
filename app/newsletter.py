@@ -3218,7 +3218,12 @@ def probe_subscriber(email, slot=None):
     L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
     out["html_bytes"] = len(hb.encode()); out["html_has_weather"] = hb.upper().count("WEATHER · ") + hb.upper().count("WEATHER &MIDDOT; ")
     out["html_has_weather_alerts"] = hb.upper().count("MAJOR WEATHER ALERTS"); out["html_has_crime"] = hb.upper().count("CRIME NEAR YOU")
+    out["v5_storm_check"] = "STORM CHECK" in hb.upper(); out["v5_nlwx_img"] = "/nlwx/" in hb
+    out["v5_wx_photo"] = "/bnt/media/nlwx" in hb; out["v5_crime_photo"] = "/bnt/media/nlcrime" in hb
+    out["v5_crime_bars"] = "VIOLENT" in hb.upper() and "PROPERTY" in hb.upper() and "per 100,000" in hb
+    out["v5_tiles"] = "CHANCE OF RAIN" in hb.upper() and "TEMPERATURE" in hb.upper()
     out["text_has_weather"] = "WEATHER" in tx.upper().split("MAJOR WEATHER")[0] and "WEATHER ·" in tx.upper(); out["text_has_crime"] = "CRIME NEAR YOU" in tx.upper()
+    out["text_has_storm_check"] = "STORM CHECK" in tx.upper() or "No major storms" in tx or "Major storm" in tx
     out["stories_main"] = len(issue.get("main") or []); out["layout"] = "v4" if (lambda m: m.on(c))(__import__("newsletter_v4")) else "v2/v1"
     qa = qa_gate(issue, subj, hb, tx, c); out["qa_ok"] = None if qa is None else bool(qa["ok"]); out["qa_blockers"] = [] if not qa else qa["blockers"][:3]
     return out

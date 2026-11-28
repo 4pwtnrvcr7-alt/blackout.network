@@ -482,7 +482,14 @@ def brief_for(sub):
         except Exception:
             items = []
         if not lines and not items: return None
-        return {"label": d["place"]["label"], "url": url, "lines": lines, "items": items,
+        rates = []   # structured copy of the FBI figures above (newsletter v5 draws them as bars); empty when the FBI rows are absent
+        try:
+            for nm, row in ((cn and cn.get("name"), cn), (st and st.get("name"), st), ("United States", nat)):
+                if nm and row and row.get("v_rate") is not None and row.get("p_rate") is not None:
+                    rates.append({"name": nm, "v": row["v_rate"], "p": row["p_rate"], "year": row.get("year")})
+        except Exception:
+            rates = []
+        return {"label": d["place"]["label"], "url": url, "lines": lines, "items": items, "rates": rates if len(rates) >= 2 else [],
                 "source": "Local police and news reports, police open data and FBI Crime Data Explorer"}
     except Exception:
         return None

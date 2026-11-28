@@ -34,6 +34,7 @@ ROUTES = {
     "/og/share": "share_card",       # Nov 25 2026: unique 1200x675 cards for the Post on X buttons (ahead of /og; falls back to share_cards.card_png)
     "/share": "share_cards",         # Nov 25 2026: per-item Post on X landing pages (og:image + twitter:card) /share/<kind>/<id>
     "/api/share": "share_cards",     # bnshare.js + /api/share/tags (hashtags from x_share.py)
+    "/nlwx": "nlwx",                 # Nov 27 2026: signed per-reader 24-hour weather strip PNG for the newsletter (/nlwx/<data>.<sig>.png)
     "/og": "og",                     # per-page Open Graph / Twitter share images (1200x630)
     "/map": "signal_map",             # Global signal map (Control panel v2 look): /map page. Not /maps (printable maps tab).
     "/api/signal/feed-health": "feed_health",  # Nov 23 2026: Wire/home staleness; must sit above /api/signal

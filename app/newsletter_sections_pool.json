@@ -1,0 +1,86 @@
+{
+ "note": "Newsletter v5 Weather and Crime-near-you header photos (Wikimedia Commons: public domain, CC0 or CC BY; credits on /credits#newsletter). Weather picks the photo that matches the forecast sky.",
+ "images": [
+  {
+   "name": "nlwxstorma-d.jpg",
+   "topic": "storm",
+   "title": "Nssl0225 - Flickr - NOAA Photo Library.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Nssl0225_-_Flickr_-_NOAA_Photo_Library.jpg",
+   "license": "Public domain",
+   "artist": "Sean Waugh NOAA/NSSL.",
+   "bytes": 27922
+  },
+  {
+   "name": "nlwxstormb-d.jpg",
+   "topic": "storm",
+   "title": "Nssl0378 - Flickr - NOAA Photo Library.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Nssl0378_-_Flickr_-_NOAA_Photo_Library.jpg",
+   "license": "Public domain",
+   "artist": "Credit: NOAA National Severe Storms Laboratory.",
+   "bytes": 28869
+  },
+  {
+   "name": "nlwxstormc-d.jpg",
+   "topic": "storm",
+   "title": "Supercell-thunderstorm-in-Kansas.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Supercell-thunderstorm-in-Kansas.jpg",
+   "license": "Public domain",
+   "artist": "NOAA National Severe Storms Laboratory",
+   "bytes": 20433
+  },
+  {
+   "name": "nlwxraina-d.jpg",
+   "topic": "rain",
+   "title": "After a day of monsoonal showers near Williamson Valley, AZ.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:After_a_day_of_monsoonal_showers_near_Williamson_Valley,_AZ.jpg",
+   "license": "Public domain",
+   "artist": "NOAA Photo Library",
+   "bytes": 31191
+  },
+  {
+   "name": "nlwxsnowa-d.jpg",
+   "topic": "snow",
+   "title": "Snowfall descending on the Buffalo Southtowns (27940598775).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Snowfall_descending_on_the_Buffalo_Southtowns_(27940598775).jpg",
+   "license": "Public domain",
+   "artist": "NOAA Photo Library",
+   "bytes": 70064
+  },
+  {
+   "name": "nlwxcloudsa-d.jpg",
+   "topic": "clouds",
+   "title": "Crepuscular rays8 - NOAA.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Crepuscular_rays8_-_NOAA.jpg",
+   "license": "Public domain",
+   "artist": "Grant W. Goodge",
+   "bytes": 59280
+  },
+  {
+   "name": "nlwxcleara-d.jpg",
+   "topic": "clear",
+   "title": "Cumulus16 - NOAA.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Cumulus16_-_NOAA.jpg",
+   "license": "Public domain",
+   "artist": "NOAA",
+   "bytes": 61515
+  },
+  {
+   "name": "nlcrimea-d.jpg",
+   "topic": "crime",
+   "title": "Police Line Do Not Cross (42422022254).jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Police_Line_Do_Not_Cross_(42422022254).jpg",
+   "license": "CC BY 2.0",
+   "artist": "Tony Webster from Minneapolis, Minnesota, United States",
+   "bytes": 46047
+  },
+  {
+   "name": "nlcrimeb-d.jpg",
+   "topic": "crime",
+   "title": "Crime-scene-do-not-cross.jpg",
+   "page": "https://commons.wikimedia.org/wiki/File:Crime-scene-do-not-cross.jpg",
+   "license": "CC0",
+   "artist": "Kat Wilcox",
+   "bytes": 57798
+  }
+ ]
+}
