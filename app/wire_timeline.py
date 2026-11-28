@@ -365,7 +365,7 @@ def _social_junk(r):
         import wire_social as WS
         keys = r.keys()
         lk = r["links"] if "links" in keys else None
-        if not lk or "luesky" not in str(lk):
+        if not lk or ("luesky" not in str(lk) and "astodon" not in str(lk)):
             return False
         cid = r["id"] if "id" in keys else r["cluster_id"]
         title = r["title"] if "title" in keys else ""
@@ -385,7 +385,7 @@ def _social_junk(r):
         return junk
     except Exception:
         try:
-            return "luesky" in str(r["links"])     # fail closed for Bluesky rows
+            return "luesky" in str(r["links"]) or "astodon" in str(r["links"])     # fail closed for social rows
         except Exception:
             return False
 
