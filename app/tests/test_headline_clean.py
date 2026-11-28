@@ -5,6 +5,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import headline_clean as HC
 import theme
 import x_share as X
+import story as ST
+import re, html
 from urllib.parse import parse_qs, urlparse, unquote
 
 
@@ -142,6 +144,100 @@ class ShareIntentText(unittest.TestCase):
         self.assertEqual(h, "M4.5 earthquake northwest of the Kuril Islands")
         self.assertEqual(_text(href), h)
         self.assertNotIn("GEOFON", unquote(href))
+
+
+# Live story fields as of the #345 verify (America/New_York, 2:17 AM ET Nov 28).
+# Location still holds the raw agency phrase; a second display_headline pass
+# must not glue it back on, and the H1 / Post on X href must match the
+# first-pass title used for the document title.
+MEXICO = {
+    "title": "INGV: M5.9 earthquake Mexico [Sea]",
+    "location": "Mexico [Sea]",
+    "want": "M5.9 earthquake off the coast of Mexico",
+    "tags": ["#Earthquake", "#Mexico", "#Seismic"],
+}
+JAPAN = {
+    "title": "JMA: M5.5 earthquake - Adjacent Sea of\u200b Chichijima Island, max seismic intensity 2",
+    "location": "Adjacent Sea of\u200b Chichijima Island, Japan",
+    "want": "M5.5 earthquake near Chichijima, Japan",
+    "tags": ["#Earthquake", "#Japan", "#Seismic"],
+}
+KURIL = {
+    "title": "GEOFON: M4.5 earthquake Northwest of Kuril Islands",
+    "location": "Northwest of Kuril Islands",
+    "want": "M4.5 earthquake northwest of the Kuril Islands",
+    "tags": ["#Earthquake", "#KurilIslands", "#Seismic"],
+}
+LIVE = (("Mexico", MEXICO), ("Japan", JAPAN), ("Kuril", KURIL))
+
+
+def _h1_text(markup):
+    m = re.search(r'<h1 class="t">(.*?)</h1>', markup, re.I | re.S)
+    return html.unescape(re.sub(r"<[^>]+>", "", m.group(1))).strip() if m else ""
+
+
+class FirstPassSurfaces(unittest.TestCase):
+    """H1, document title, and Post on X href stay on the first-pass clean headline."""
+
+    def test_display_headline_idempotent_with_raw_location(self):
+        for name, ex in LIVE:
+            with self.subTest(name):
+                first = HC.display_headline(ex["title"], location=ex["location"])
+                self.assertEqual(first, ex["want"], name)
+                self.assertEqual(HC.display_headline(first, location=ex["location"]), first, name)
+                self.assertNotIn("\u200b", first)
+                self.assertNotIn("[Sea]", first)
+                self.assertNotIn("Adjacent Sea", first)
+                self.assertNotIn("INGV", first)
+                self.assertNotIn("JMA", first)
+                self.assertNotIn("GEOFON", first)
+
+    def test_h1_matches_first_pass_title(self):
+        for name, ex in LIVE:
+            with self.subTest(name):
+                title = ST._display_title(ex["title"], ex["location"])
+                self.assertEqual(title, ex["want"], name)
+                # Same call the story page now makes: H1 from the first-pass title,
+                # not from a desk/template dek_note that lost the [Sea] cue.
+                markup = ST._h1(title, "A brief that is not the headline.", ex["location"])
+                self.assertEqual(_h1_text(markup), ex["want"], name)
+                self.assertNotIn("Adjacent Sea", markup)
+                self.assertNotIn("[Sea]", markup)
+                self.assertNotIn("\u200b", markup)
+
+    def test_mexico_h1_keeps_off_the_coast_even_if_dek_note_lost_sea(self):
+        title = ST._display_title(MEXICO["title"], MEXICO["location"])
+        self.assertEqual(title, MEXICO["want"])
+        # Old path: _h1(clean_title(dek_note), ...) with a note that had no [Sea].
+        dirty_note = "M5.9 earthquake Mexico"
+        self.assertEqual(ST._h1(dirty_note, "", MEXICO["location"]).count("off the coast of"), 0)
+        self.assertIn("off the coast of", ST._h1(title, dirty_note, MEXICO["location"]))
+        self.assertEqual(_h1_text(ST._h1(title, dirty_note, MEXICO["location"])), MEXICO["want"])
+
+    def test_intent_href_matches_first_pass_when_headline_already_clean(self):
+        for name, ex in LIVE:
+            with self.subTest(name):
+                first = HC.display_headline(ex["title"], location=ex["location"])
+                it = {
+                    "cluster_id": "abcd1234abcd1234",
+                    "title": first,
+                    "headline": first,
+                    "location": ex["location"],
+                    "category": "natural disaster",
+                    "rank": 4,
+                    "brief": "",
+                }
+                href, h, tags = X.compose_intent(it, tags=ex["tags"])
+                self.assertEqual(h, ex["want"], name)
+                self.assertEqual(_text(href), ex["want"], name)
+                self.assertNotIn("Adjacent Sea", unquote(href))
+                self.assertNotIn("[Sea]", unquote(href))
+                self.assertNotIn("%E2%80%8B", href)
+                self.assertNotIn("INGV", unquote(href))
+                self.assertNotIn("JMA", unquote(href))
+                self.assertNotIn("GEOFON", unquote(href))
+
+
 
 
 if __name__ == "__main__":

@@ -108,19 +108,48 @@ def _the(place):
     return p
 
 
+# Leading agency-style geography on a location field ("Adjacent Sea of X",
+# "Northwest of X", "off the coast of X"). Reduced to the core place before
+# appending so a second display_headline pass does not glue the raw phrase
+# back onto an already-clean title.
+_LOC_PREFIX = re.compile(
+    r"^(?:the\s+)?(?:"
+    r"adjacent\s+sea\s+of|"
+    r"off\s+(?:the\s+)?(?:east|west|north|south)\s+coast\s+of|"
+    r"off\s+(?:the\s+)?coast\s+of|"
+    r"(?:north(?:west|east)?|south(?:west|east)?|east|west|offshore)\s+of|"
+    r"near|in|at|around|by"
+    r")\s+(?:the\s+)?",
+    re.I,
+)
+
+
+def _loc_cores(location):
+    """Bare place names from a source location, minus region codes and raw phrases."""
+    loc = tidy_text(location or "")
+    loc = _REGION_CODE.sub("", loc)
+    loc = _TRAIL_REGION.sub("", loc)
+    loc = loc.split(";")[0].strip()
+    if not loc or len(loc) > 60:
+        return []
+    if re.fullmatch(r"[A-Z]{3}(?:,\s*US[A]?)?", loc):
+        return []
+    cores = []
+    for part in loc.split(","):
+        part = _LOC_PREFIX.sub("", part.strip()).strip()
+        part = _trim_island(part)
+        if part:
+            cores.append(part)
+    return cores
+
+
 def _with_loc(place, location):
     """Append a source location (usually a country) if it is not already named."""
-    loc = tidy_text(location or "")
-    if not loc:
+    cores = _loc_cores(location)
+    if not cores:
         return place
-    loc = loc.split(";")[0].strip()
-    if re.fullmatch(r"[A-Z]{3}(?:,\s*US[A]?)?", loc):
-        return place
-    if len(loc) > 60:
-        return place
-    parts = [p.strip() for p in loc.split(",") if p.strip()]
     pl = place.lower()
-    missing = [p for p in parts if p.lower() not in pl and pl not in p.lower()]
+    missing = [p for p in cores if p.lower() not in pl and pl not in p.lower()]
     if not missing:
         return place
     return f"{place}, {', '.join(missing)}"
