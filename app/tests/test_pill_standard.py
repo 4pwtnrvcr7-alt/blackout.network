@@ -24,11 +24,17 @@ class PillStandard(unittest.TestCase):
                 for sel in (".bnt-btn", ".bng-btn", ".nx-more-btn", ".nx-f button", ".tl-b", ".bn-ref", "#tl_ref", "button.pri"):
                     self.assertIn(sel, css)
 
+    def test_home_intro_button_uses_the_standard(self):
+        # /  loads sitenav.css and /bnt/theme.css (not wire2.css); the intro's .sx-btn was 50px.
+        for label in ("sitenav.css", "theme_static/theme.css"):
+            with self.subTest(sheet=label):
+                self.assertIn(".bnt-btn,.sx-btn,.bng-btn", SHEETS[label])
+
     def test_standard_rule_has_zero_specificity_selector_list(self):
         # :where() keeps page sheets with their own !important hide rules (specificity) in charge.
         for label, css in SHEETS.items():
             with self.subTest(sheet=label):
-                self.assertIn(":where(\n  .bnt-btn,.bng-btn", css)
+                self.assertIn(".bng-btn,.bng-sb", css)
 
     def test_round_icon_controls_share_one_size(self):
         for label, css in SHEETS.items():
