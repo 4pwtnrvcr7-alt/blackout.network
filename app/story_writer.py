@@ -1496,7 +1496,9 @@ def allow(cid, archive=False):
     """Whether a story may appear on a public listing or API. Never raises.
     Once the gate is on, items need a stored write-up. New rank 5+ items (needs_paid)
     stay off the Wire until the paid article is stored. Items that later rise to 5+
-    keep their template until the paid article is swapped in. Archive is unchanged."""
+    keep their template until the paid article is swapped in. Clusters snapshotted at
+    boot_gate stay visible even if their tip template has not been rebuilt yet this
+    boot (templates catch up in the worker). Archive is unchanged."""
     try:
         if archive or not cid:
             return True
@@ -1506,6 +1508,8 @@ def allow(cid, archive=False):
             return False
         if has_writeup(cid) or is_packaged(cid) or has_paid_article(cid):
             return _card_ready(cid)
+        if cid in _legacy_set_cached():
+            return True
         return False
     except Exception:
         traceback.print_exc()
@@ -1589,8 +1593,13 @@ def live_clusters(hours=None, limit=4000):
     return rows
 
 def boot_gate():
-    """Write free templates for the live tip first (Wire last-activity order), then turn the publish gate on.
-    Cards are not built here — they trail in the worker so a write-up is never blocked on a PNG."""
+    """Snapshot live cluster ids as legacy, then turn the publish gate on immediately.
+
+    Tip templates are not built here. They continue in the worker via package_pending so a
+    deploy-time tip pass (up to 800 package_one calls) cannot starve the paid writer. Cards
+    also trail in the worker. Existing live items stay visible because they were grandfathered.
+    New arrivals after this snapshot stay held until their write-up, tags and card are stored.
+    """
     if STATE.get("gate_booted"):
         return
     rows = live_clusters(hours=None, limit=8000)
@@ -1604,22 +1613,10 @@ def boot_gate():
         finally:
             k.close()
     _LEGACY_C.update(t=0, v=set())
-    # Templates only, tip first (already in last-activity order), enough to cover the public Wire.
-    tip = live_clusters(hours=cfg()["template_backfill_h"], limit=800)
-    n_ok = n_fail = 0
-    for r in tip:
-        try:
-            if package_one(r["cluster_id"], row=r, build_card_now=False):
-                n_ok += 1
-            else:
-                n_fail += 1
-        except Exception:
-            n_fail += 1
-            traceback.print_exc()
     STATE["gate_booted"] = True
     if gate_wanted():
         STATE["gate_on"] = True
-    log(f"publish gate on after {n_ok} tip templates ({n_fail} failed), grandfathered {len(rows)} live clusters")
+    log(f"publish gate on after grandfathering {len(rows)} live clusters; tip templates continue in the worker")
 
 def _mark_held(cid, err, title="", rank=0):
     with _LK:

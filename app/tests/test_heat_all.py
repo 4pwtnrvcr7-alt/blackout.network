@@ -108,3 +108,46 @@ class IataAirportPin(unittest.TestCase):
         self.assertTrue(41.9 < p["lat"] < 42.05 and -88.0 < p["lon"] < -87.8, p)
         self.assertRegex(p.get("place") or "", r"O.?Hare")
         self.assertNotRegex(p.get("place") or "", r"Nebraska")
+
+    def test_memoized_ord_nebraska_pin_is_replaced(self):
+        """Live path: story_places.db memo would keep Ord, NE forever unless IATA overrides it."""
+        from unittest.mock import patch
+        item = {"id": "56aa6cc76b03647a", "title": "FAA Ground stop: ORD (equipment outage)",
+                "loc": "ORD, US", "category": "other", "brief": "", "links": "[]"}
+        stored = {"located": 1, "lat": 41.6033, "lon": -98.9262, "place": "Ord, Valley County, Nebraska, 68862, United States",
+                  "country": "US", "admin1_code": "US.NE", "city": "Ord", "precision": "city",
+                  "method": "nominatim", "confidence": "medium"}
+        bad = {"lat": 41.6033, "lon": -98.9262, "place": "Ord, Valley County, Nebraska, 68862, United States",
+               "prec": "city", "tier": "exact", "cc": "US", "how": "geo", "rid": ""}
+        saved = []
+        def fake_get(sid, sig):
+            return dict(bad)
+        def fake_put(entries):
+            saved.extend(entries)
+        with patch("story_places.memo_get", fake_get), patch("story_places.memo_put_many", fake_put), \
+             patch("story_places.llm_get", lambda sid: None):
+            out = H._stored_places([item], {item["id"]: stored})
+        p = out[0]
+        self.assertTrue(p and p.get("lat") is not None, p)
+        self.assertTrue(41.9 < p["lat"] < 42.05 and -88.0 < p["lon"] < -87.8, p)
+        self.assertRegex(p.get("place") or "", r"O.?Hare")
+        self.assertNotRegex(p.get("place") or "", r"Nebraska")
+        self.assertTrue(saved, "corrected pin should be written back to the memo")
+        self.assertRegex((saved[0][2] or {}).get("place") or "", r"O.?Hare")
+
+    def test_memoized_lex_west_virginia_pin_is_replaced(self):
+        from unittest.mock import patch
+        item = {"id": "0aa19ce16958724b", "title": "FAA Ground stop: LEX (disabled aircraft on the runway)",
+                "loc": "LEX, US", "category": "other", "brief": "", "links": "[]"}
+        stored = {"located": 1, "lat": 37.3704, "lon": -81.8004, "place": "Lex, McDowell County, West Virginia, United States",
+                  "country": "US", "admin1_code": "US.WV", "city": "Lex", "precision": "city",
+                  "method": "nominatim", "confidence": "medium"}
+        bad = {"lat": 37.3704, "lon": -81.8004, "place": "Lex, McDowell County, West Virginia, United States",
+               "prec": "city", "tier": "exact", "cc": "US", "how": "geo", "rid": ""}
+        with patch("story_places.memo_get", lambda sid, sig: dict(bad)), \
+             patch("story_places.memo_put_many", lambda entries: None), \
+             patch("story_places.llm_get", lambda sid: None):
+            out = H._stored_places([item], {item["id"]: stored})
+        p = out[0]
+        self.assertTrue(37.9 < p["lat"] < 38.2 and -84.8 < p["lon"] < -84.4, p)
+        self.assertNotRegex(p.get("place") or "", r"West Virginia")
