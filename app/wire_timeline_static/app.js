@@ -205,7 +205,7 @@ function toggle(key){
 }
 list.addEventListener("click",function(e){if(e.target.closest("a,.tl-src,.tl-act,.tl-dr"))return;var hd=e.target.closest(".tl-hd");if(!hd)return;var n=hd.parentNode;if(n&&n._k)toggle(n._k)});
 /* ---------- data */
-function api(qs){return fetch("/api/wire_tl?"+qs+(qs?"&":"")+"_="+Date.now(),{credentials:"same-origin",cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
+function api(qs){return fetch("/api/wire_tl?"+qs+(qs?"&":"")+"_="+Date.now(),{credentials:"same-origin",cache:"no-store",headers:{"Cache-Control":"no-store","Pragma":"no-cache"}}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
 function qp(){var p=[];if(Q)p.push("q="+encodeURIComponent(Q));if(F.loc){p.push("lat="+F.loc.lat);p.push("lon="+F.loc.lon);p.push("r="+F.loc.r)}if(F.sev)p.push("sev="+encodeURIComponent(F.sev));if(F.cats.size)p.push("cats="+encodeURIComponent(Array.from(F.cats).join(",")));if(F.regs.size)p.push("regs="+encodeURIComponent(Array.from(F.regs).join(",")));if(F.time)p.push("time="+encodeURIComponent(F.time));return p.join("&")}
 function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){seen[it.id]=1;fresh.push(it)}});measure(fresh,false);
   if(where==="top"){items=fresh.concat(items);items.sort(function(a,b){return a.t<b.t?1:a.t>b.t?-1:a.id<b.id?1:a.id>b.id?-1:0})}else items=items.concat(fresh);return fresh.length}
@@ -239,7 +239,8 @@ function flash(txt,ms){if(!elUpd)return;elUpd.hidden=false;elUpd.textContent=txt
   if(stat)stat.style.visibility="hidden";clearTimeout(noneT);noneT=setTimeout(function(){msgUntil=0;if(stat)stat.style.visibility="";paintUpd()},ms||3200)}
 function showNone(){flash("Up to date · nothing new since "+sinceLabel()+" ET")}
 function showPill(){if(!bNew)return;bNew.hidden=pending<=0;if(pending>0)bNew.textContent=pending+" new"}
-function busy(on){if(!bRef)return;bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
+function busy(on){if(!bRef)return;if(on){bRef.classList.remove("is-result");var sp=bRef.querySelector(".tl-ref-lab");if(sp)sp.textContent="Refresh";bRef.setAttribute("aria-label","Refresh")}bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
+function doneBtn(lab){if(!bRef)return;var sp=bRef.querySelector(".tl-ref-lab");clearTimeout(bRef._doneT);if(!lab){bRef.classList.remove("is-result");if(sp)sp.textContent="Refresh";bRef.setAttribute("aria-label","Refresh");return}bRef.classList.add("is-result");if(sp)sp.textContent=lab;bRef.setAttribute("aria-label",lab);bRef._doneT=setTimeout(function(){doneBtn("")},2200)}
 /* ---------- arrivals: near the top, new items slide in one at a time (oldest first, newest ends on top) */
 var drip=[],queued={},dripT=0;
 /* Nov 25 2026 (pt1918u): Full story needed 3-4 taps on iPhone because arrivals re-laid the list mid-tap. */
@@ -303,26 +304,45 @@ if(W.BNRT){
     if(topEnd)pollNewer(false);else{pending+=(ev.new||[]).length+(ev.more_new||0);showPill()}});
 }
 function refresh(){
-  /* Real refresh: the server drops its caches and asks the scanner for anything newer (waits up to 6 s), then the page re-fetches the
-     top of the Wire and the totals, re-renders the on-screen times and says what happened ("3 new stories" / "Up to date"). */
+  /* Real refresh: fetch the top of the Wire immediately with fresh=1 (no cache), in parallel with asking the
+     scanner for anything newer. New items are rendered at the top. Do not wait for the scanner (up to 6 s)
+     before the first read, or a story already on the server would not appear on a single tap. */
   if(bRef&&bRef.classList.contains("busy"))return Promise.resolve();
   busy(true);var g=gen,t0=Date.now();
-  var srv=W.BNRT?BNRT.refresh():Promise.resolve({});
-  return srv.then(function(res){if(g!==gen)return;
-    fetch("/api/wire_tl/meta?_="+Date.now(),{cache:"no-store"}).then(function(r){return r.json()}).then(function(m){if(m&&m.total!=null){meta=m;total=m.total;status()}}).catch(function(){});
-    if(!topEnd){reset();scrollToList();return loadOlder().then(function(){busy(false);stamp();flash("Showing the latest stories")})}
+  function applyPage(j){
+    if(g!==gen||!j)return 0;
+    var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});
+    if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
+    topEnd=true;todayK=dayKey(new Date().toISOString());yK=dayKey(new Date(Date.now()-864e5).toISOString());
+    if(!fresh.length&&!drip.length)relabel();
+    if(fresh.length)arrive(fresh);stamp();
+    var n=0;for(var k in NEW)if(NEW[k]>=t0)n++;
+    return n;
+  }
+  function loadFresh(){
+    if(!topEnd){reset();scrollToList();return loadOlder().then(function(){return -1})}
     loading.n=1;
-    return api("fresh=1&limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;   /* fresh=1: a new server read, no cached page */
-      var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});
-      if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
-      topEnd=true;todayK=dayKey(new Date().toISOString());yK=dayKey(new Date(Date.now()-864e5).toISOString());
-      if(!fresh.length&&!drip.length)relabel();
-      if(fresh.length)arrive(fresh);stamp();
-      var n=0;for(var k in NEW)if(NEW[k]>=t0)n++;   /* counts what the stream delivered during the refresh too */
-      var wait=Math.max(0,700-(Date.now()-t0));
-      setTimeout(function(){if(n)flash(n+" new stor"+(n===1?"y":"ies"));else flash("No new stories",2200)},wait);
-    }).catch(function(){flash("Could not reach the server. Try again in a moment.")}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
-  });
+    return api("fresh=1&limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return 0;return applyPage(j)});
+  }
+  function loadMeta(){
+    return fetch("/api/wire_tl/meta?_="+Date.now(),{credentials:"same-origin",cache:"no-store",headers:{"Cache-Control":"no-store","Pragma":"no-cache"}}).then(function(r){return r.json()}).then(function(m){if(m&&m.total!=null){meta=m;total=m.total;status()}}).catch(function(){});
+  }
+  var srv=W.BNRT?BNRT.refresh():Promise.resolve({});
+  loadMeta();
+  return Promise.all([loadFresh(),srv]).then(function(pair){
+    if(g!==gen)return pair[0];
+    var n=pair[0]||0,res=pair[1]||{};
+    if(res&&res.pulled_new>0)return loadFresh().then(function(n2){return (n2||0)>n?n2:n});
+    return n;
+  }).then(function(n){
+    if(g!==gen)return;
+    var wait=Math.max(0,700-(Date.now()-t0));
+    setTimeout(function(){
+      if(n===-1){doneBtn("Latest");flash("Showing the latest stories")}
+      else if(n){doneBtn(n+" new");flash(n+" new stor"+(n===1?"y":"ies"))}
+      else{doneBtn("Up to date");flash("Up to date",2200)}
+    },wait);
+  }).catch(function(){flash("Could not reach the server. Try again in a moment.")}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
 }
 var chk=0;
 function check(){if(chk)return;chk=requestAnimationFrame(function(){chk=0;if(anim)return;
@@ -352,7 +372,7 @@ function status(){
   if(bFilt)bFilt.classList.toggle("on",sheet&&!sheet.hidden);
   if(active()){var m=loadedMatch();s=filtNames().join(" + ")+" &middot; "+m[0].toLocaleString()+" of "+m[1].toLocaleString()+" loaded"+(condensed?" &middot; condensed":"")}
   else if(Q)s="&ldquo;"+esc(Q)+"&rdquo; &middot; "+(qCount==null?"searching":qCount.toLocaleString()+" match"+(qCount===1?"":"es"));
-  else s=total?total.toLocaleString()+" signals &middot; since "+(meta&&meta.earliest?(/T00:00:00Z$/.test(meta.earliest)?fUs:fL).format(dt(meta.earliest)).replace(/^\w+, /,""):""):"";
+  else s="";
   stat.innerHTML=s;bClear.hidden=!active();bCond.disabled=!active()&&!condensed;
 }
 function chipHTML(k,label,color,grp){return'<button type="button" class="tl-chip" data-g="'+grp+'" data-k="'+k+'" aria-pressed="false"'+(color?' style="--c:'+color+'"':"")+">"+(color?'<i aria-hidden="true"></i>':"")+esc(label)+"</button>"}
@@ -501,7 +521,7 @@ function feedHealth(){var el=$("tl_stale");if(!el)return;
 setInterval(feedHealth,30000);
 /* ---------- boot */
 function boot(){syncBar();lastW=list.clientWidth;cw=lastW;measureTop();feedHealth();
-  fetch("/api/wire_tl/meta").then(function(r){return r.json()}).then(function(m){meta=m;total=m.total||0;buildJump();status()}).catch(function(){buildJump()});
+  fetch("/api/wire_tl/meta?_="+Date.now(),{credentials:"same-origin",cache:"no-store",headers:{"Cache-Control":"no-store","Pragma":"no-cache"}}).then(function(r){return r.json()}).then(function(m){meta=m;total=m.total||0;buildJump();status()}).catch(function(){buildJump()});
   var hs=(location.hash||"").match(/^#d=(\d{4}-\d{2}-\d{2})$/);
   if(hs)jumpTo(endOfDayET(hs[1]));else loadOlder();
   startPoll();

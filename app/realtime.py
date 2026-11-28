@@ -151,8 +151,12 @@ def bust(force=False):
         try:
             with sm._HLOCK: sm._HEAT["t"] = 0.0; sm._HEAT["g"] = sm._HEAT.get("g", 0) + 1
         except Exception: pass
-    if force or now - ST["last_meta_bust"] > 120:
-        wt = sys.modules.get("wire_timeline")
+    wt = sys.modules.get("wire_timeline")
+    if wt is not None and hasattr(wt, "bust_pages"):
+        try:
+            wt.bust_pages(); ST["last_meta_bust"] = now
+        except Exception: pass
+    elif force or now - ST["last_meta_bust"] > 120:
         if wt is not None and hasattr(wt, "bust_meta"):
             try: wt.bust_meta(); ST["last_meta_bust"] = now
             except Exception: pass

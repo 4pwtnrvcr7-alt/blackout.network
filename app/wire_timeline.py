@@ -1247,6 +1247,15 @@ def bust_meta():
     """Forget the cached meta (totals) so the next read rebuilds it (realtime.py calls this at most every 2 minutes)."""
     with _LK: _M["t"] = 0
 
+def bust_pages():
+    """Drop cached Wire pages, the gate snapshot, and totals so the next list read is from the database."""
+    with _PC_LK:
+        _PC["v"].clear(); _PC["t"].clear()
+    s = _SNAP.get("s")
+    if s is not None:
+        s["t"] = 0.0
+    bust_meta()
+
 def count(q="", bg=False):
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -1380,7 +1389,7 @@ def page_html():
   <button type="button" class="tl-b" id="tl_filt" aria-expanded="false" aria-controls="tl_sheet" aria-label="Filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span>Filters</span><b class="tl-fbadge" id="tl_fbadge" hidden></b></button>
   <button type="button" class="tl-b" id="tl_when" aria-expanded="false" aria-controls="tl_jump"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 10h16M9 3.5v4M15 3.5v4" stroke="currentColor" stroke-width="1.4"/></svg><span>Date</span></button>
   <button type="button" class="tl-b tl-cond" id="tl_cond" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6m0 0-3-3m3 3 3-3M12 21v-6m0 0-3 3m3-3 3 3M4 12h16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="tl-cl">Condense</span></button>
-  <button type="button" class="tl-b" id="tl_ref" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span>Refresh</span></button>
+  <button type="button" class="tl-b tl-ref" id="tl_ref" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><i class="tl-ref-radar" aria-hidden="true"></i><span class="tl-ref-lab">Refresh</span></button>
  </div>
  <div class="tl-sheet" id="tl_sheet" hidden>
   <div class="tl-sheet-h"><span>Filters</span><button type="button" class="tl-clear" id="tl_fclear">Clear all</button></div>
@@ -1525,7 +1534,9 @@ def handle_get(path, qs):
         cats = (g("cats", "") or "")[:200]
         regs = (g("regs", "") or "")[:200]
         time_win = (g("time", "") or "")[:16]
-        if g("fresh") == "1" and time.time() - _FRESH["t"] >= 1.0:   # the refresh button: a fresh server read, not a cached page
+        if g("fresh") == "1":   # the refresh button: drop caches, rebuild the gate snapshot, read the database
+            bust_pages()
+            _snap_refresh(block=True)
             _FRESH["t"] = time.time()
             try:
                 args = (before, after, lim, q, g("bg") == "1", lat, lon, rmi, sev, cats, regs, time_win)
