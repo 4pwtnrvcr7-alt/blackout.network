@@ -1,6 +1,6 @@
 """Wire timeline (preview, Nov 18 2026, Matt 1:23 AM ET): one chronological research timeline of everything collected.
 
-GET /wire                      the live Wire timeline (indexable). BN_WIRE_TIMELINE=0 lets story.py restore the previous listing.
+GET /wire                      the live Wire timeline (indexable). The newest rows are in the HTML itself (see "server-rendered first page"). BN_WIRE_TIMELINE=0 lets story.py restore the previous listing.
 GET /wire-next                 301 to /wire (old preview URL). Redirects even when the flag is off.
 GET /api/wire_tl               items, newest first by last activity (COALESCE(updated, first_seen)). before=<cursor>
                                (older) or after=<cursor> (newer), limit 1..200, q=<keywords> (all words, title/place),
@@ -13,7 +13,7 @@ GET /api/wire_tl/xu?id=         Post-on-X URL (3-5 entity tags) for one live row
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
 GET /api/wire_tl/geo?q=        keyless ZIP/place geocode (US Census ZCTA table + offline gazetteer).
 GET /api/wire_tl/crime?q=      local crime headlines for a US place when BN_CRIME_NEWS is on (cached).
-GET /api/wire_tl/app.js|app.css|scan-bg.js
+GET /api/wire_tl/app.js|app.css
 
 Data: blackout.db clusters (live scanner) + trends_history.db stories (archive backfill), both opened read-only
 (file:...?mode=ro), the same sources /api/wire_history merges. Display-only grouping (category colours, regions) is
@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "blackout.db"); HDB = os.path.join(BASE, "trends_history.db")
-STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css", "scan-bg.js": "application/javascript"}
+STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css"}
 MAXL = 200
 _CUR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(\|[A-Za-z0-9_.:\-]{1,80})?$")
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -1476,6 +1476,80 @@ def meta_cached():
         threading.Thread(target=run, daemon=True).start()
     return d or {}
 
+# ------------------------------------------------------------------ server-rendered first page
+# Nov 28 2026 (Matt 12:24 AM ET: "User should be greeted with live data. No more loading time."). /wire's HTML already carries the newest
+# rows, so the first paint shows current stories with no request, no loader and no animation. They come from the same in-memory page
+# the API serves (the warm thread rebuilds it every ~6 s; page() gate, public rows, location fixes and verdicts included), read without
+# ever building or waiting. app.js adopts the very same rows as its first page (BN_TL_BOOT), swaps the flow markup for the windowed list
+# in one frame, then fetches anything newer in place. Nothing is rendered when the copy is missing or older than _SSR_MAX_AGE.
+_SSR_N = 40                    # rows in the first paint (about three screens on a phone, two on a desktop)
+_SSR_MAX_AGE = 300.0           # older than this and the page falls back to the client load rather than show stale stories
+_SSR = {"src": None, "n": 0, "html": "", "boot": ""}
+_SSR_LK = threading.Lock()
+_ET = None
+def _et():
+    global _ET
+    if _ET is None:
+        from zoneinfo import ZoneInfo
+        _ET = ZoneInfo("America/New_York")
+    return _ET
+
+def _ssr_dt(t):
+    return datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).astimezone(_et())
+
+def _ssr_rkc(r):
+    if r is None: return "rn"
+    return "rh" if r >= 7 else "r" + str(max(0, min(6, int(r))))
+
+def _ssr_row(it, cats):
+    c = cats.get(it.get("k")) or cats.get("other") or ("Other", "#777")
+    r = it.get("r")
+    try: tm = "<abbr title=\"Dated by day only\">&mdash;</abbr>" if it.get("do") else E(_ssr_dt(it["t"]).strftime("%-I:%M %p"))
+    except Exception: tm = ""
+    major = " major" if (r is not None and r >= 7) else ""
+    return ('<div class="tl-it%s" role="listitem" style="--c:%s"><button type="button" class="tl-hd" aria-expanded="false"><span class="tl-tm">%s</span>'
+            '<span class="tl-nd" aria-hidden="true"></span><span class="tl-tx"><span class="tl-h">%s</span><span class="tl-s%s"><b class="tl-k">%s</b>%s%s</span></span>'
+            '<span class="tl-rk %s" title="Rank %s">%s</span></button></div>') % (
+        major, E(c[1]), tm, E(it.get("h")), " tl-sa" if it.get("a") else "", E(c[0]),
+        '<b class="tl-ar">Archive</b>' if it.get("a") else "", E(it.get("s")) if it.get("s") else "",
+        _ssr_rkc(r), "n/a" if r is None else r, "&ndash;" if r is None else r)
+
+def _ssr_render(out):
+    """(rows html, boot json) for the first _SSR_N rows of a page. Day labels and times are Eastern, like the client's."""
+    items = (out.get("items") or [])[:_SSR_N]
+    if not items: return "", ""
+    cats = {k: (l, col) for k, l, col in CATS}
+    now = datetime.now(_et()); today = now.date(); yday = today.fromordinal(today.toordinal() - 1)
+    parts, last = [], None
+    for it in items:
+        try: d = _ssr_dt(it["t"])
+        except Exception: continue
+        if d.date() != last:
+            last = d.date()
+            lab = "Today" if last == today else "Yesterday" if last == yday else d.strftime("%a, %b ") + str(d.day) + d.strftime(", %Y")
+            parts.append('<div class="tl-day"><span>%s</span></div>' % E(lab))
+        parts.append(_ssr_row(it, cats))
+    full = len(out.get("items") or []) <= _SSR_N
+    edge = items[-1]
+    boot = {"items": items, "next": out.get("next") if full else "%s|%s" % (edge["t"], edge["id"]), "end": bool(out.get("end")) if full else False}
+    return "".join(parts), json.dumps(boot, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+
+def ssr_first_page():
+    """(rows html, boot script, age in ms) from memory only, or None. Never builds a page, never waits on the warm thread."""
+    key = _pkey(None, None, 100, "", False, None, None, None, None, None, None, None)
+    out = _PC["v"].get(key); at = _PC["t"].get(key, 0.0)
+    if not out or not out.get("items"): return None
+    age = time.time() - at
+    if age > _SSR_MAX_AGE: return None
+    with _SSR_LK:
+        if _SSR["src"] is not out:
+            try: html_, boot = _ssr_render(out)
+            except Exception: return None
+            _SSR.update(src=out, html=html_, boot=boot)
+        html_, boot = _SSR["html"], _SSR["boot"]
+    if not html_: return None
+    return html_, boot, int(age * 1000)
+
 # ------------------------------------------------------------------ page
 _FILE = {}
 def _file(name):
@@ -1502,7 +1576,7 @@ def page_html():
     except Exception:
         menu = ""; w2 = "/wire2/static"
     cfg = {"cats": [{"k": k, "label": l, "color": col} for k, l, col in CATS], "regions": [{"k": k, "label": l} for k, l in REGIONS]}
-    v_css, v_js, v_bg = _ver("app.css"), _ver("app.js"), _ver("scan-bg.js")
+    v_css, v_js = _ver("app.css"), _ver("app.js")
     title = "The Wire: live threat feed | BLACKOUT.NETWORK"
     desc = "Every signal BLACKOUT.NETWORK has collected, in one timeline."
     try:
@@ -1510,19 +1584,20 @@ def page_html():
         ogmeta = og.tags(title=title, desc=desc, url="https://blackout.network/wire", key="wire", og_type="website")
     except Exception:
         ogmeta = ""
+    ssr = ssr_first_page()
+    ssr_html = ('<div class="tl-ssr" id="tl_ssr">' + ssr[0] + '</div>') if ssr else ""
+    ssr_js = ('<script>window.BN_TL_BOOT={"age":%d,"page":%s};</script>' % (ssr[2], ssr[1])) if ssr else ""
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2 data-bn-tl><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/wire">
 {ogmeta}<meta name="theme-color" content="#000">
 <!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->
 <link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}"></head>
-<body class="w2 tl bn-has-ref"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
+<body class="w2 tl bn-has-ref">
+<header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu}
-<div class="tl-bg" aria-hidden="true"><canvas class="tl-scanbg" id="tl_scanbg"></canvas><i class="tl-veil"></i></div>
 <main id="tl_main">
-<section class="tl-hero" aria-label="The Wire"><div class="tl-hc"><p class="w2-eb">The Wire &middot; Timeline</p><h1 class="w2-ht">Every signal</h1>
-<p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
-<a class="tl-cue" href="#tl_start" aria-label="Scroll to the timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></a></section>
+<p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p>
 <div id="tl_start"></div>
 <div class="tl-ctl" id="tl_ctl">
  <div class="tl-row1">
@@ -1548,13 +1623,13 @@ def page_html():
  <div class="tl-jump" id="tl_jump" hidden><div class="tl-jq" id="tl_jq"></div><label class="tl-jd"><span>Go to date</span><input type="date" id="tl_date"></label></div>
  <div class="tl-stat"><button type="button" class="tl-now" id="tl_now" aria-label="Current date; tap to jump"></button><span id="tl_stat" aria-live="polite"></span><span id="tl_upd" class="tl-upd" hidden></span><button type="button" class="tl-clear" id="tl_clear" hidden>Clear</button></div>
 </div>
-<section class="tl-wrap" aria-label="Timeline"><div class="tl-list" id="tl_list" role="list"></div><div class="tl-foot" id="tl_foot"></div></section>
+<section class="tl-wrap" aria-label="Timeline"><div class="tl-list" id="tl_list" role="list">{ssr_html}</div><div class="tl-foot" id="tl_foot"></div></section>
 <button type="button" class="tl-newp" id="tl_new" hidden></button>
 <button type="button" class="tl-top" id="tl_top" hidden aria-label="Back to the latest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>Latest</span></button>
 </main>
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
-<script>window.BN_TL={json.dumps(cfg)};</script>
-<script src="{w2}/wire2.js?v=3" defer></script><script src="/bn-refresh.js" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/scan-bg.js?v={v_bg}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
+<script>window.BN_TL={json.dumps(cfg)};</script>{ssr_js}
+<script src="{w2}/wire2.js?v=3" defer></script><script src="/bn-refresh.js" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
 
 # ------------------------------------------------------------------ location (keyless) + local crime
 _ZIP = None
