@@ -146,6 +146,7 @@ class Leftovers(unittest.TestCase):
                                   "category": "quake", "brief": "", "rank": 5, "watchlist": 0, "hidden": False, "links": [], "d": ""})
         xu, final = W._vt_intent(x_share, body, ["#Earthquake", "#NewZealand", "#Seismic"])
         self.assertEqual(final, ["#Earthquake", "#NewZealand", "#Seismic"])
+        self.assertIn("hashtags=Earthquake,NewZealand,Seismic", xu)
         self.assertNotIn("Hicks%20%23", xu); self.assertNotIn("%23Zealand", xu)
 
 class Scheduling(unittest.TestCase):
