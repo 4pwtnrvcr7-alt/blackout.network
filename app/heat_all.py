@@ -195,6 +195,23 @@ def _story_texts(item):
         pass
     return [x for x in texts if x]
 
+def _iata_airport_pin(item):
+    """FAA ground-stop/delay items: resolve the IATA code as the airport, even if geo.db stored a same-named town."""
+    try:
+        import geo
+        title = item.get("title") or ""
+        loc = item.get("loc") or item.get("location") or ""
+        if not geo.aviation_iata_codes(title, loc):
+            return None
+        sg = _server_geocode(item)
+        if sg and _ok(sg.get("lat"), sg.get("lon")):
+            sg = dict(sg, how="IATA airport code")
+            return sg
+    except Exception:
+        return None
+    return None
+
+
 def _drop_bad_stored(item, g, base):
     """Clear a stored geo.db pin that is a different city than the headline, or the wrong state."""
     if not g or not g.get("located") or base.get("how") != "geo":
@@ -302,6 +319,9 @@ def place(item, g):
         except Exception:
             return base
         return base
+    iata_pin = _iata_airport_pin(item)
+    if iata_pin:
+        return iata_pin
     g, base = _drop_bad_stored(item, g, base)
     pin = _headline_pin(item)
     if pin:
