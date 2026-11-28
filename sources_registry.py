@@ -7,8 +7,8 @@ per host at a time, ETag/Last-Modified), parsed into scanner items, and handed t
 never waits on them. Public RSS/Atom/JSON/HTML previews only: no keys, no logins, no scraping behind bot checks, no X.
 
 Feed types: rss (RSS/Atom/RDF, YouTube/Mastodon tag RSS), bsky, mastodon, telegram, statuspage, kev, gdelt2, ll2, jetstream.
-v5: honest cycle logs (304 vs parsed, per-type counts), Jetstream ping/pong + tighter keep filter, GDELT lastupdate not
-conditional-GET, merge-friendly GDELT/LL2/GNews titles and GNews base=15, pause cycles while SCAN_LOCK is held.
+v5.1: same as v5, plus cycle start/progress logs, Jetstream 30s heartbeat and kept-every-10 (v5 only logged at 1 and 100,
+so a live socket looked stuck), wait for the first scan lock before the first 600-feed cycle, reject oversized WS frames before reading.
 Modes: all (forced category; obituaries, patents), threat (news: threat keywords + classifier), classify (official), crime.
 Kill switches: env BN_SOURCES_REGISTRY=0, file `sources_registry_off`, `off: true` on a feed, or ids in sources_registry_disabled.json.
 Does not touch scoring, ingest_items, push.py, jets.py or config.json. GNews items use news_item-like base 15; other news stays 6 unless BOOST_RX.
@@ -16,7 +16,7 @@ Does not touch scoring, ingest_items, push.py, jets.py or config.json. GNews ite
 import os, re, json, time, hashlib, threading, html, ipaddress, socket, traceback, functools
 from urllib.parse import urlparse, quote, urljoin
 from datetime import timedelta, datetime, timezone
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 import scanner as S
 
@@ -523,12 +523,12 @@ def _js_recv(sock, buf):
         need(2); ln = int.from_bytes(buf[:2], "big"); buf = buf[2:]
     elif ln == 127:
         need(8); ln = int.from_bytes(buf[:8], "big"); buf = buf[8:]
+    if ln > 1_000_000: raise ValueError("frame too big")
     if masked:
         need(4); mask = buf[:4]; buf = buf[4:]
     need(ln); data, buf = buf[:ln], buf[ln:]
     if masked:
         data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
-    if ln > 1_000_000: raise ValueError("frame too big")
     return opcode, data, buf
 
 def _js_tcp_keepalive(sock):
@@ -578,7 +578,7 @@ def _jetstream_loop():
         try:
             sock, buf = _js_connect(host)
             print(f"registry: jetstream connected {host}", flush=True)
-            backoff = 5; n_min = 0; window = time.time(); kept = 0; last_ping = time.time()
+            backoff = 5; n_min = 0; window = time.time(); kept = 0; last_ping = time.time(); last_hb = time.time()
             fails_this_host = 0
             while True:
                 try:
@@ -589,7 +589,11 @@ def _jetstream_loop():
                         try: _js_send(sock, 0x9, b"kb")
                         except Exception: raise ConnectionError("ping failed")
                         last_ping = time.time()
+                    if time.time() - last_hb >= 30:
+                        print(f"registry: jetstream alive kept {kept} on {host}", flush=True); last_hb = time.time()
                     continue
+                if time.time() - last_hb >= 30:
+                    print(f"registry: jetstream alive kept {kept} on {host}", flush=True); last_hb = time.time()
                 if op == 0x9:                      # ping -> pong (missing this was closing the socket after ~1 kept post)
                     try: _js_send(sock, 0xA, data)
                     except Exception: raise ConnectionError("pong failed")
@@ -615,7 +619,7 @@ def _jetstream_loop():
                                    extra={"tier": "social", "via": "jetstream"})
                 if it and not _dedupe_title(text[:200]):
                     _enqueue([it]); n_min += 1; kept += 1
-                    if kept == 1 or kept % 100 == 0:
+                    if kept == 1 or kept % 10 == 0:
                         print(f"registry: jetstream kept {kept} on {host}", flush=True)
             try: sock.close()
             except Exception: pass
@@ -675,8 +679,15 @@ def _cycle():
     due = due[:600]
     if not due: return
     t0 = time.time()
+    print(f"registry cycle: starting {len(due)} due of {len(feeds)}", flush=True)
+    res = []; last_prog = t0
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
-        res = list(ex.map(_do, due))
+        futs = [ex.submit(_do, f) for f in due]
+        for i, fut in enumerate(as_completed(futs), 1):
+            res.append(fut.result())
+            if time.time() - last_prog >= 20 or i == len(due):
+                print(f"registry cycle: progress {i}/{len(due)} in {time.time() - t0:.0f}s", flush=True)
+                last_prog = time.time()
     new = sum(r[0] for r in res)
     notmod = sum(1 for r in res if r[3] == "notmod")
     empty = sum(1 for r in res if r[1] and r[3] != "notmod" and r[0] == 0)
@@ -698,6 +709,25 @@ def _loop():
     for _ in range(45):                      # let the scanner finish importing before the first cycle
         if hasattr(S, "scan"): break
         time.sleep(1)
+    # After a restart the first scan grabs SCAN_LOCK a moment later. If we start a 600-feed
+    # first pass in that gap, the cycle log only prints at the end (often 4-8 min) and it
+    # contends with the scan. Wait for that first scan, with a liveness line every 20 s.
+    deadline = time.time() + 90
+    saw = False
+    while time.time() < deadline:
+        if _scan_busy():
+            saw = True
+            print("registry: waiting for the current scan to finish before the first cycle", flush=True)
+            last = time.time()
+            while _scan_busy():
+                if time.time() - last >= 20:
+                    print("registry: still waiting for the scan to finish", flush=True); last = time.time()
+                time.sleep(2)
+            print("registry: scan finished; starting feed cycles", flush=True)
+            break
+        time.sleep(0.5)
+    if not saw:
+        print("registry: no scan lock seen; starting feed cycles", flush=True)
     while True:
         try:
             if enabled(): _cycle()
