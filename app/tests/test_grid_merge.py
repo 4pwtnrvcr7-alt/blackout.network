@@ -41,8 +41,9 @@ class GridMerge(unittest.TestCase):
         self.assertIn('og:title" content="The Grid:', body)
         self.assertNotIn("Network Status", body)
         for s in ('data-k="grid"', 'id="gx_more_btn"', 'id="gx_more"', 'id="gx_card"', 'id="gx_reg"', 'id="gx_kpis"', 'id="nb_grid"',
-                  "/api/netmap/gridlayer.js", "/api/netmap/gridlayer.css", "Energizing the grid"):
+                  "/api/netmap/gridlayer.js", "/api/netmap/gridlayer.css", 'id="nx_ldn"', 'class="gx-ldn"'):
             self.assertIn(s, body)
+        self.assertNotIn("Energizing the grid", body)
         for sid in ("gx-regions", "gx-world", "gx-outages", "gx-weather", "gx-threats", "gx-space", "gx-local", "gx-sources"):
             self.assertEqual(body.count(f'id="{sid}"'), 1, sid)
         for f in ("gridlayer.js", "gridlayer.css"): self.assertEqual(netmap.handle_get("/api/netmap/" + f)[0], 200)
