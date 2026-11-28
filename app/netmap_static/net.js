@@ -565,6 +565,9 @@
     });
     var us = usAllNone ? "U.S.: none major" : kinds.map(function (k) { return (layers[k] || {}).us; }).filter(function (u) { return u && u !== "U.S.: none major"; })[0] || "U.S.: none major";
     var labels = { internet: "internet outages", power: "power outages", hydro: "dam incidents", cloud: "cloud outages", cable: "cable cuts", towers: "cell and telecom outages", dc: "data-center incidents" };
+    var labels1 = { internet: "internet outage", power: "power outage", hydro: "dam incident", cloud: "cloud outage", cable: "cable cut", towers: "cell and telecom outage", dc: "data-center incident" };
+    function lab(k, n) { return n === 1 ? (labels1[k] || "outage") : (labels[k] || "outages"); }
+    function ctry(n) { return n + (n === 1 ? " country" : " countries"); }
     var active24 = kinds.filter(function (k) { return (layers[k] || {}).n24; });
     var txt, chip = $("nx_chip");
     if (!Object.keys(layers).length && !(D.outages && D.outages.wire_ok)) {
@@ -579,18 +582,19 @@
       txt = kinds.length === 1 ? ("No " + labels[kinds[0]] + " in 24 h · " + n7 + " this week · " + us) : ("No outages in 24 h · " + n7 + " this week · " + us);
       chip.className = "nx-chip live s-7d";
     } else if (active24.length === 1) {
-      txt = n24 + " " + labels[active24[0]] + " in 24 h · " + ((layers[active24[0]] || {}).countries_24h || 0) + " countries · " + us;
+      var m24 = (layers[active24[0]] || {}).countries_24h || 0;
+      txt = n24 + " " + lab(active24[0], n24) + " in 24 h · " + ctry(m24) + " · " + us;
       chip.className = "nx-chip live " + (n6 ? "s-out" : "s-24h");
     } else {
-      txt = n24 + " outages in 24 h · " + countries + " countries · " + us;
+      txt = n24 + " " + (n24 === 1 ? "outage" : "outages") + " in 24 h · " + ctry(countries) + " · " + us;
       chip.className = "nx-chip live " + (n6 ? "s-out" : "s-24h");
     }
     $("nx_sum").textContent = txt;
     var more = $("nx_more_lbl"); if (more) more.textContent = "All " + (s.networks || "") + " networks";
     var ln = $("nx_wire_leg_n");
     if (ln) {
-      if (kinds.length === 1) ln.textContent = n7 ? (n7 + " " + labels[kinds[0]] + " this week") : ("No " + labels[kinds[0]] + " on the Wire in the last 7 days");
-      else ln.textContent = n7 ? (n7 + " Wire outage stories this week") : "No matching outage stories on the Wire in the last 7 days";
+      if (kinds.length === 1) ln.textContent = n7 ? (n7 + " " + lab(kinds[0], n7) + " this week") : ("No " + labels[kinds[0]] + " on the Wire in the last 7 days");
+      else ln.textContent = n7 ? (n7 + " Wire outage " + (n7 === 1 ? "story" : "stories") + " this week") : "No matching outage stories on the Wire in the last 7 days";
     }
   }
 
