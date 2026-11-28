@@ -31,6 +31,10 @@ class SocialGate(unittest.TestCase):
             ("I think it is China that is hacking all of these government networks again and again.", "cyber"),
             ("Ironic all these hacks happen after trump meets with the others within the axis of evil.", "cyber"),
             ("Hacked", "cyber"),
+            ("AI NEWS Nov.27.26 Story 1: LA schools block Google AI features Story 2: OpenAI fixes GPT-6.2 billing error", "cyber"),
+            ("cyber Monday?? sexting hackers everywhere today", "cyber"),
+            ("Is Pedostan behind all the hacks?", "cyber"),
+            ("Just having read Steven Levy's Hackers: Heroes of the Computer Revolution and loving the culture", "cyber"),
         ]
         for t, k in junk:
             self.assertFalse(WS.verdict(t, k)[0], t)

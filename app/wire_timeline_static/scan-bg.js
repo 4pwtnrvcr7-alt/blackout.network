@@ -162,7 +162,7 @@
     pings.push({
       p:node.p,t:now,life:2.2+Math.random()*0.5,
       red:rare,r0:6+node.s*2,
-      label:rare?"SIGNAL ACQUIRED \u00B7 RARE":"SIGNAL ACQUIRED"
+      label:""
     });
     node.hot=1;
     node.armed=false;

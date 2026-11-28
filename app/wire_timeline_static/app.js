@@ -152,8 +152,18 @@ function render(keep){
   var sy=W.scrollY,vh=W.innerHeight,y0=sy-tlTop-vh*BUF,y1=sy-tlTop+vh*(1+BUF),want=new Set();
   if(rows.length){for(var i=idxAt(Math.max(0,y0));i<rows.length&&rows[i].top<=y1;i++){var r=rows[i];if(r.hid)continue;want.add(r.key);paint(nodeFor(r),r)}}
   var gone=[];rendered.forEach(function(n,k){if(!want.has(k)){rendered.delete(k);if(keep)gone.push(n);else n.remove()}});
+  heal();
   return gone;
 }
+/* Nov 27 2026 (Matt 11:30 PM ET: rows stacked on each other). Rows are absolutely placed from measured heights; a height measured at
+   the wrong width / before fonts / without the New tag drifts from the real one and the rows below overlap it. After every render
+   the real height of each shown row is compared with the model; any drift is written back and the list is laid out again. */
+var healT=0,healN=0,healAt=0;
+function heal(){if(healT)return;healT=requestAnimationFrame(function(){healT=0;if(d.hidden)return;
+  var nw=Date.now();if(nw-healAt>3000){healAt=nw;healN=0}if(++healN>10)return;
+  var fix=0;rendered.forEach(function(n,k){var r=n._r;if(!r||r.scan||r.day||r.hid||exp.has(k))return;
+    var h=n.offsetHeight;if(h<24)return;if(Math.abs(h-hOf(r))>1.5){Hc[k]=h;fix++}});
+  if(fix)keepAnchor(function(){})})}
 /* ---------- scroll anchoring */
 function anchorRow(){ /* row at the viewport centre that is shown */
   var c=W.scrollY+W.innerHeight/2-tlTop;if(!rows.length)return null;var i=rowAt(c);if(i>=rows.length)i=rows.length-1;
@@ -639,5 +649,7 @@ function boot(){syncBar();lastW=list.clientWidth;cw=lastW;measureTop();feedHealt
   frame();
 }
 W.BN_TL_DEBUG={dbg:DBG,rows:function(){return rows},items:function(){return items},anchor:anchorRow,rendered:rendered,jumpTo:jumpTo,state:function(){return{condensed:condensed,anim:anim,tlTop:tlTop,listH:listH,padX:padX,topEnd:topEnd,botEnd:botEnd,n:items.length}}};
-if(d.fonts&&d.fonts.ready)d.fonts.ready.then(boot);else boot();
+/* Nov 27 2026 (Matt 11:30 PM ET: the Wire loads slowly): never wait on web fonts for the first request; heal() fixes heights once they land */
+var booted=0;function boot1(){if(booted)return;booted=1;boot()}
+if(d.fonts&&d.fonts.ready){d.fonts.ready.then(function(){boot1();heal()});setTimeout(boot1,600)}else boot1();
 })();
