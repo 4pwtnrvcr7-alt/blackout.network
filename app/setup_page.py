@@ -482,16 +482,30 @@ function setN(el,it,ex){
 var sn=$$(".sp-n"),smp=$("#su_smp");
 function clock(){var d=new Date();$("#su_t").textContent=d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}).replace(/\s?[AP]M/i,"");$("#su_d").textContent=d.toLocaleDateString([],{weekday:"long",month:"long",day:"numeric"})}
 try{clock()}catch(e){}
-var since=new Date(Date.now()-14*864e5).toISOString().slice(0,19)+"Z";
-fetch("/api/new_high?mode=alert&since="+since,{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){
-  var its=(j.items||[]).filter(function(x){return x.rank>=7&&x.title}).sort(function(a,b){return (b.high_at||"").localeCompare(a.high_at||"")}).slice(0,2);
-  if(!its.length)throw 0;
-  its.forEach(function(it,i){setN(sn[i],it,false)});
-  if(smp)smp.textContent="Sample · the latest rank 7+ stories on The Wire";
-}).catch(function(){
-  setN(sn[0],{title:"Major hurricane makes landfall; storm surge warnings in effect",eff_families:3,location:"Example City"},true);
-  if(smp)smp.textContent="Sample · illustration only";
-});
+/* fetched only when the phone is about to scroll into view (the feed is large), newest 48 h first, then 14 days, 8 s limit */
+function get(days){
+  var ac=window.AbortController?new AbortController():null,tm=setTimeout(function(){if(ac)ac.abort()},8000);
+  var since=new Date(Date.now()-days*864e5).toISOString().slice(0,19)+"Z";
+  return fetch("/api/new_high?mode=alert&since="+since,{cache:"no-store",signal:ac?ac.signal:undefined}).then(function(r){clearTimeout(tm);if(!r.ok)throw 0;return r.json()}).then(function(j){
+    var its=(j.items||[]).filter(function(x){return x.rank>=7&&x.title}).sort(function(a,b){return (b.high_at||"").localeCompare(a.high_at||"")}).slice(0,2);
+    if(!its.length)throw 0;return its;
+  });
+}
+var started=false;
+function sample(){
+  if(started)return;started=true;
+  get(2).catch(function(){return get(14)}).then(function(its){
+    its.forEach(function(it,i){setN(sn[i],it,false)});
+    if(smp)smp.textContent="Sample \u00b7 the latest rank 7+ stories on The Wire";
+  }).catch(function(){
+    setN(sn[0],{title:"Major hurricane makes landfall; storm surge warnings in effect",eff_families:3,location:"Example City"},true);
+    if(smp)smp.textContent="Sample \u00b7 illustration only";
+  });
+}
+var ph=$(".sp-ph");
+if(ph&&"IntersectionObserver" in window){
+  var po=new IntersectionObserver(function(es){if(es.some(function(e){return e.isIntersecting})){po.disconnect();sample()}},{rootMargin:"900px 0px"});po.observe(ph);
+}else sample();
 /* reveal on scroll (no-js shows everything) */
 if("IntersectionObserver" in window){
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("sp-on");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px"});

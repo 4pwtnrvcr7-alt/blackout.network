@@ -39,6 +39,7 @@ class SetupPage(unittest.TestCase):
         self.assertIn('role="tablist"', body)
         self.assertIn("detect()", body)                       # OS auto-detect
         self.assertIn("/api/new_high?mode=alert", body)       # sample notification is the real latest rank 7+ story
+        self.assertIn("get(2)", body)                         # small 48 h window first, fetched lazily near the phone
         self.assertIn("Sample", body)                         # clearly labelled sample
         # features: only things that exist
         for href in ("/wire", "/map", "/weather", "/grid", "/markets", "/newsletter"):
