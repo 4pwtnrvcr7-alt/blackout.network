@@ -146,6 +146,11 @@ def plain(article):
 _LEAD = re.compile(r"^[^\w(\"'“‘\[]+")
 _HYPE = re.compile(r"^(?:#?(?-i:BREAKING(?: NEWS)?|JUST IN)\b\s*[:!\-–—|]*\s*|(?:BREAKING(?: NEWS)?|JUST IN|URGENT|ALERT|FLASH|DEVELOPING)\s*[:!\-–—|]+\s*)+", re.I)
 def clean_title(t):
+    try:
+        import headline_clean as HC
+        t = HC.tidy_text(t)
+    except Exception:
+        t = re.sub(r"\s+", " ", t or "").strip()
     t = re.sub(r"\s+", " ", t or "").strip(); c = _LEAD.sub("", _HYPE.sub("", _LEAD.sub("", t)))
     c = re.sub(r"(\s+@[A-Za-z0-9_.]{2,30})+\.?$", "", c).strip()
     return c or t

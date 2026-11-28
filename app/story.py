@@ -122,13 +122,28 @@ def _cut(t, n=80):
     c = t[:n].rsplit(" ", 1)[0].rstrip(",;:-—– ")
     return c + "…"
 
-def _h1(full, what=""):
+def _display_title(t, location=""):
+    """Page H1 / share headline: drop source junk, keep only places the source gave."""
+    t = S.clean_title(t or "")
+    try:
+        import headline_clean as HC
+        return HC.display_headline(t, location=location)
+    except Exception:
+        return t
+
+def _h1(full, what="", location=""):
     """Nov 17 push C: short clean headline (theme._headline, display only); the full wording stays just below as the dek."""
     try:
-        import theme; short = theme._headline(full)
-    except Exception: short = full
+        import headline_clean as HC
+        cleaned = HC.display_headline(full, location=location)
+    except Exception:
+        cleaned = full
+    try:
+        import theme; short = theme._headline(cleaned, location=location)
+    except Exception:
+        short = cleaned
     short = _cut(short)
-    dek = full if short != full else (what if what and what != full else "")
+    dek = cleaned if short != cleaned else (what if what and what != cleaned else "")
     return f'<h1 class="t">{S.E(short)}</h1>' + (f'<p class="dek">{S.E(dek)}</p>' if dek else "")
 
 def _preparing(cid):
@@ -170,7 +185,7 @@ def render(cid, since=""):
     # Known item: generate a template now (cheap, DB-only) and serve the full page. Never 404 a held-but-known story.
     _ensure_writeup(cid, r, al)
     rank = int(r.get("rank") or 0); k, tname = tier(rank); col = COLORS[band(rank)]
-    title = S.clean_title(r.get("title")); what = _what(r.get("brief"), r.get("title"))
+    title = _display_title(r.get("title"), r.get("location") or ""); what = _what(r.get("brief"), r.get("title"))
     fams = [f for f in (r.get("families") or "").split(",") if f]
     eff = int(r.get("eff_families") or len(fams) or 0)
     watch = int(r.get("watchlist") or 0)
@@ -252,7 +267,7 @@ def render(cid, since=""):
             f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>'
             f'<div><span class="pill{" pill-hi" if rank >= 7 else ""}">RANK {rank}/10 · {tname.upper()}</span>'
             f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill">WATCHLIST</span>' if watch == 1 else "") + '</div>'
-            + _h1(S.clean_title(dek_note).rstrip(". ") if dek_note else title, what if not dek_note else "")
+            + _h1(S.clean_title(dek_note).rstrip(". ") if dek_note else title, what if not dek_note else "", r.get("location") or "")
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
             + g_ppl + g_share + upd + report + breakdown + (g_short if report else (g_short or g_loc))
@@ -309,7 +324,7 @@ def brief_page(cid):
                 '<p class="dek">Stories are merged or retired as reports change. The live, ranked feed is on <a href="/wire">The Wire</a>.</p>')
         return 404, S.page("Story not found", "This BLACKOUT.NETWORK story is no longer on the board.", body, f"/wire/{cid}", "threat", noindex=True)
     _ensure_writeup(cid, r, al)
-    title = S.clean_title(r.get("title") or "Story")
+    title = _display_title(r.get("title") or "Story", r.get("location") or "")
     what = _what(r.get("brief"), r.get("title"))
     rank = int(r.get("rank") or 0)
     loc = r.get("location") or ""
@@ -337,7 +352,7 @@ def brief_page(cid):
         lab = a.get("source") or "Source"
         if str(url).startswith("http"):
             src += f'<li><a href="{S.E(url)}" rel="noopener nofollow" target="_blank">{S.E(lab)}</a></li>'
-    body = (f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>{_h1(title, what)}'
+    body = (f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>{_h1(title, what, loc)}'
             + (f'<p class="dek">{S.E(what)}</p>' if what and what != title else "")
             + (f'<p class="meta">{S.E(loc)} · Rank {rank} of 10</p>' if True else "")
             + (f'<section class="card"><h2>Sources</h2><ul>{src}</ul></section>' if src else "")
