@@ -1389,6 +1389,34 @@
   if (!WK) ["temp", "rain", "snow"].forEach(function (m) { var b = document.querySelector('#wx_modes [data-m="' + m + '"]'); b.disabled = true; b.title = "Needs a newer browser"; });
   legend(); label(); boot(); loadFrames(true); loadGrids().then(function () { step("grids"); }, function () { step("grids"); });
   setTimeout(function () { step("grids"); step("gfs"); }, 20000);
+  function refreshNow(btn) {
+    var R = window.BNRefresh, b = btn || document.getElementById("wx_ref");
+    if (b && R && R.isBusy(b)) return Promise.resolve();
+    if (b && R) { R.busy(b, true); R.stage(b, 8); }
+    function fin(lab) {
+      if (b && R) { R.stage(b, 100); var wait = (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) ? 0 : 220;
+        setTimeout(function () { R.busy(b, false); if (lab) R.done(b, lab); }, wait); }
+    }
+    if (b && R) R.stage(b, 20);
+    return Promise.all([
+      loadFrames(false),
+      loadAlerts().then(function (x) { if (b && R) R.stage(b, 45); return x; }),
+      loadStorms(),
+      loadTropical(),
+      loadGlobal(),
+      loadGrids()
+    ]).then(function () {
+      if (b && R) R.stage(b, 90);
+      fin("Updated");
+    }).catch(function () {
+      if (b && R) { R.stage(b, 100); R.busy(b, false); }
+    });
+  }
+  window.bnRefreshPage = function () { return refreshNow(document.getElementById("wx_ref")); };
+  if (window.BNRefresh) {
+    var _rb = document.getElementById("wx_ref");
+    if (_rb) BNRefresh.bind(_rb, function () { return refreshNow(_rb); });
+  }
   setInterval(function () { if (document.hidden) return; loadFrames(false); loadAlerts(); }, 180000);
   setInterval(function () { if (!document.hidden) { loadStorms(); loadTropical(); loadGlobal(); } }, 600000);
   setInterval(function () { if (!document.hidden) loadGrids(); }, 1800000);

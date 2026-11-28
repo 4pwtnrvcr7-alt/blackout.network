@@ -229,3 +229,6 @@ body.wx-lays-on .wx-lays{opacity:1;visibility:visible}
 .wx-srcs li.off{opacity:.5}.wx-srcs li.off i{background:rgba(240,240,250,.35)}
 .wx-srcs b{display:block;font-weight:600;color:var(--wx-tx)}
 .wx-srcs small{display:block;color:var(--wx-mu);font-size:11px}
+
+/* Shared #293 Refresh above the search and layer modes */
+.wx-top .bn-ref{align-self:center;background:rgba(5,6,10,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
