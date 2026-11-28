@@ -10,7 +10,10 @@ def it(**k):
     d.update(k); return d
 
 class Water(unittest.TestCase):
-    def setUp(self): W._C.clear()
+    def setUp(self):
+        W._C.clear()
+        if getattr(W, '_PAY', None) is not None:
+            W._PAY.update(t=0, items=None, map=None, list_meta=None)
     def test_title_case_only_for_all_caps(self):
         self.assertEqual(W._title("PORT PROTECTION"), "Port Protection")
         self.assertEqual(W._title("RURAL MUNICIPALITY OF MONTCALM ( MORRIS REGIONAL )"), "Rural Municipality of Montcalm (Morris Regional)")
@@ -128,16 +131,17 @@ class Water(unittest.TestCase):
         self.assertIn("summary_large_image", body)
         self.assertIn("BLACKOUT.NETWORK", body)
         self.assertIn("akabc123defg", body)
-        self.assertIn("Post on X", body)
-        self.assertIn("Copy link", body)
-        self.assertIn("bng-share", body)
         self.assertIn("window.BN_WATER", body)
+        self.assertIn("bnshare.js", body)
+        self.assertIn('id="nx_card"', body)
+        self.assertNotIn("nx_water_btn", body)
+        self.assertNotIn('id="nx_water"', body)
         code, home, _ = netmap.handle_get("/grid/water")
         self.assertEqual(code, 200)
         self.assertIn("/og/share/water/page.png", home)
-        self.assertIn("Post on X", home)
-        self.assertIn("bng-share", home)
         self.assertIn('data-k="water"', home)
+        self.assertIn("bnshare.js", home)
+        self.assertNotIn("nx_water_btn", home)
 
     def test_share_card_is_typographic_not_a_map(self):
         import share_card
@@ -184,5 +188,36 @@ class Water(unittest.TestCase):
         self.assertIn("fl", water.FETCH)
         ids = [s[0] for s in water.SOURCES]
         self.assertEqual(ids[:3], ["ak", "or", "fl"])
+
+    def test_data_and_map_never_wait_on_slow_sources(self):
+        import time
+        def slow():
+            time.sleep(5)
+            return [it()]
+        W.FETCH.update({s[0]: (lambda: []) for s in W.SOURCES})
+        W.FETCH["ak"] = slow
+        W._C.clear(); W._PAY.update(t=0, items=None, map=None, list_meta=None)
+        t0 = time.time()
+        code, body, ct = W.handle_get("/api/water/map")[:3]
+        self.assertEqual(code, 200)
+        self.assertLess(time.time() - t0, 1.0, "map must not wait on upstream")
+        self.assertEqual(body.get("r"), [])
+        t0 = time.time()
+        code, body, ct = W.handle_get("/api/water/data", {"limit": ["30"], "offset": ["0"]})[:3]
+        self.assertEqual(code, 200)
+        self.assertLess(time.time() - t0, 2.5, "list must return within the 2 s cold budget")
+        # Warm path: a cached source is served at once.
+        W._C["ak"] = {"t": time.time(), "ok_t": time.time(), "items": [it()], "err": None, "busy": False}
+        W._rebuild()
+        t0 = time.time()
+        code, body, ct = W.handle_get("/api/water/data", {"limit": ["30"]})[:3]
+        self.assertEqual(code, 200)
+        self.assertEqual(len(body["items"]), 1)
+        self.assertLess(time.time() - t0, 1.0)
+        t0 = time.time()
+        code, body, ct = W.handle_get("/api/water/map")[:3]
+        self.assertEqual(code, 200)
+        self.assertEqual(len(body["r"]), 1)
+        self.assertLess(time.time() - t0, 1.0)
 
 if __name__ == "__main__": unittest.main()

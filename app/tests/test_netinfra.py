@@ -29,15 +29,25 @@ class Infra(unittest.TestCase):
         self.assertIn('type: "vector", tiles:', js)
         self.assertIn("© OpenStreetMap contributors", js)
 
-    def test_opens_on_map_with_every_layer_on(self):   # pt1787u
+    def test_opens_on_map_with_only_power_grid_on(self):   # Nov 28 2026 (Matt): only Power grid on at /grid
         js = open(os.path.join(ST, "net.js")).read()
-        self.assertIn("sea: true, towers: true, grid: true }", js)
-        self.assertNotIn("false, ", js[js.index("var ON = {"):js.index("};", js.index("var ON = {"))])
+        block = js[js.index("var ON = {"):js.index("};", js.index("var ON = {")) + 2]
+        self.assertIn("grid: true", block)
+        self.assertIn("internet: false", block)
+        self.assertIn("hydro: false", block)
+        self.assertIn("sea: false", block)
+        self.assertIn("water: !!(window.BN_WATER && window.BN_WATER.open)", block)
         self.assertNotIn('localStorage.getItem("bn_net_layers")', js)
         html = netmap.page({})
-        self.assertNotIn('aria-pressed="false"><i></i>', html)
-        for k in ("sea", "towers", "grid", "dc"): self.assertIn(f'data-k="{k}" aria-pressed="true"', html)
-        self.assertIn('<body class="nx">', html); self.assertIn('data-m="map" aria-pressed="true"', html)
+        self.assertIn('data-k="grid" aria-pressed="true"', html)
+        for k in ("internet", "water", "hydro", "cloud", "sea", "towers", "dc"):
+            self.assertIn(f'data-k="{k}" aria-pressed="false"', html)
+        self.assertNotIn('data-k="internet" aria-pressed="true"', html)
+        self.assertIn('<body class="nx', html); self.assertIn('data-m="map" aria-pressed="true"', html)
+        html_w = netmap.page({"_water": 1})
+        self.assertIn('data-k="grid" aria-pressed="true"', html_w)
+        self.assertIn('data-k="water" aria-pressed="true"', html_w)
+        self.assertIn('data-k="internet" aria-pressed="false"', html_w)
 
     def test_cables_drawn_landing_to_landing(self):   # pt1787u: dead ends at sea are not drawn; news matching keeps every name
         import json, netcables

@@ -7,6 +7,7 @@ APP = ROOT / "app"
 NET = (APP / "netmap_static" / "net.js").read_text()
 WL = (APP / "netmap_static" / "waterlayer.js").read_text()
 CSS = (APP / "netmap_static" / "waterlayer.css").read_text()
+PY = (APP / "netmap.py").read_text()
 
 class GridWater(unittest.TestCase):
     def test_loader_weights_unchanged(self):
@@ -18,20 +19,70 @@ class GridWater(unittest.TestCase):
 
     def test_water_is_lazy_and_not_in_boot_order(self):
         self.assertNotIn('"water"', re.search(r"MAP_ORDER = (\[[^\]]+\])", NET).group(1))
-        self.assertIn("/api/netmap/water?", WL)       # viewport clusters / points, never the whole inventory
-        self.assertIn("/api/water/data?limit=30", WL)  # paged panel list
+        self.assertIn("/api/netmap/water?", WL)
         self.assertIn("/api/water/map", WL)
+        self.assertNotIn("/api/water/data", WL)   # advisories load as map markers, not a list panel
         self.assertNotIn("water_plants.json", WL)
         self.assertFalse((APP / "netmap_static" / "water_plants.json").exists(), "no 9.7 MB JSON in the tree")
-        self.assertIn("Post on X", WL)
-        self.assertIn("Copy link", WL)
-        self.assertIn("Permalink", WL)
+        self.assertIn("window.__wtHit", WL)
+        self.assertIn("window.__wtHit", NET)
+        self.assertIn("BNShare", WL)
+
+    def test_no_panel_or_stray_water_button(self):
+        self.assertNotIn("nx_water_btn", PY)
+        self.assertNotIn('id="nx_water"', PY)
+        # #353 hides the old floating button if a stale build still has the markup
+        if "nx-water-btn" in CSS:
+            self.assertIn("display:none!important", CSS)
+        self.assertNotIn("openPanel", WL)
+        self.assertNotIn("accountForPanel", WL)
+        self.assertNotIn("Loading water data", PY)
+        self.assertNotIn("Get the free brief", WL)
+        self.assertNotIn("wt-panel", PY)
+        self.assertNotIn('id="nx_water"', WL)
+
+    def test_plain_grid_opens_with_only_power_grid_on(self):
+        import netmap
+        html = netmap.page({})
+        self.assertIn('data-k="grid" aria-pressed="true"', html)
+        for k in ("internet", "water", "hydro", "cloud", "sea", "towers", "dc"):
+            self.assertIn(f'data-k="{k}" aria-pressed="false"', html)
+        html_w = netmap.handle_get("/grid/water")[1]
+        self.assertIn('data-k="water" aria-pressed="true"', html_w)
+        self.assertIn('data-k="grid" aria-pressed="true"', html_w)
+        self.assertIn('data-k="internet" aria-pressed="false"', html_w)
+        self.assertNotIn("wt-panel", html_w)
+        self.assertNotIn('id="nx_water"', html_w)
+
+    def test_advisory_since_is_formatted_in_et(self):
+        self.assertIn("function fmtSince", WL)
+        self.assertIn("America/New_York", WL)
+        self.assertIn("esc(fmtSince(it.since))", WL)
+        self.assertNotIn('esc(it.since)', WL)
 
     def test_no_yellow_in_water_layer(self):
-        for t in (WL, CSS):
-            for h in re.findall(r"#([0-9a-fA-F]{6})\b", t):
+        for t in (WL, CSS, PY):
+            # only check the water layer assets and the water legend snippet
+            chunk = t
+            if t is PY:
+                i = t.find('data-leg="water"')
+                chunk = t[i:i + 900] if i >= 0 else ""
+            for h in re.findall(r"#([0-9a-fA-F]{6})\b", chunk):
                 r, g, b = int(h[:2], 16), int(h[2:4], 16), int(h[4:], 16)
                 self.assertFalse(r > 200 and g > 170 and b < 120, "yellow-ish colour #" + h)
+
+    def test_operating_plants_are_blue_circles(self):
+        self.assertIn("#4FC3F7", WL)
+        self.assertIn("#4FC3F7", PY)
+        self.assertNotIn("#2EE6D6", WL)
+        self.assertNotIn("#C084FC", WL)
+        self.assertNotIn("icon-image", WL)
+        self.assertNotIn("wt-dw", WL)
+        self.assertIn('type: "circle"', WL)
+        self.assertIn("#FF3B3B", WL)   # do-not-drink, same red as other layers
+        self.assertIn("#FFA040", WL)   # boil / violation, same watch colour as other layers
+        self.assertIn("Plant operating", PY)
+        self.assertIn("id=\"nx_card\"", PY)
 
     def test_redirects_and_grid_route(self):
         import water, netmap, netpages
@@ -45,11 +96,10 @@ class GridWater(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertIn("text/html", ctype)
         self.assertIn('data-k="water"', html)
-        self.assertIn("id=\"nx_water\"", html)
+        self.assertNotIn("id=\"nx_water\"", html)
+        self.assertNotIn("nx_water_btn", html)
         self.assertIn("waterlayer.js", html)
         self.assertIn("BN_WATER", html)
-        # netpages forwards the path
-        # (import is enough to keep the route hook in the tree)
         src = (APP / "netpages.py").read_text()
         self.assertIn("/grid/water", src)
 
@@ -105,18 +155,9 @@ class GridWater(unittest.TestCase):
     def test_water_view_centers_on_the_lower_48(self):
         self.assertIn("var US = [[-125.5, 23.5], [-66, 50]]", WL)
         self.assertIn("fitBounds(US", WL)
-        self.assertIn("accountForPanel", WL)
+        self.assertNotIn("accountForPanel", WL)
 
-    def test_plant_marks_are_distinct_drops_not_circles(self):
-        self.assertIn("icon-image", WL)
-        self.assertIn("wt-dw", WL)
-        self.assertIn("wt-ww", WL)
-        self.assertIn("#2EE6D6", WL)
-        self.assertIn("#C084FC", WL)
-        self.assertIn("wt-mapleg", CSS)
-        self.assertIn("Drinking-water plant", WL)
-
-    def test_panel_plant_count_comes_from_the_shipped_db(self):
+    def test_boot_payload_still_reads_the_shipped_db(self):
         import waterdb, netmap
         st = waterdb.stats()
         self.assertTrue(st and st["plants"] > 100000)
