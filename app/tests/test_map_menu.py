@@ -16,6 +16,8 @@ class MapPageLoadsSitenav(unittest.TestCase):
         self.assertIn('id="bn-menu"', body)
         self.assertIn('class="bn-hx"', body)
         self.assertIn('id="bnm_mb"', body)
+        self.assertNotIn('<span>Menu</span>', body)
+        self.assertIn('class="bn-hx"', body)
         self.assertIn('href="#bn-menu"', body)
         # in-head defer, not only the 1.5s retry
         self.assertRegex(body, r'<script src="/sitenav\.js"[^>]*defer')
@@ -43,7 +45,8 @@ class HeaderStaysForClose(unittest.TestCase):
         self.assertIn("z-index:2700!important", css)
         self.assertIn("transform:none!important", css)
         self.assertIn("html.bn-menu-on body.bnm .bnm-mb", css)
-        self.assertIn("pointer-events:none!important", css)
+        self.assertIn("pointer-events:auto!important", css)
+        self.assertIn("z-index:2700!important", css)
 
 class IpadPanelAboveScrim(unittest.TestCase):
     def test_sitenav_css_panel_stacks_above_scrim(self):

@@ -14,7 +14,8 @@ REFRESH = (ROOT / "static" / "bn-refresh.css").read_text(encoding="utf-8")
 _ALLOWED_SQUARE = re.compile(
     r"(\.pill\b|\.card\b|stale|select\b|textarea\b|input\[type=(text|search|email|password|number)"
     r"|\.hw-i\b|ul\.tl>li|\.sr-sec|\.sr-side|\.tl-hd\b|\.tl-search\b|\.tl-loc input|\.tl-fbadge\b"
-    r"|maplibre|leaflet|\.bn-dsearch|\.bns-go\b|\.pn\b|banner)",
+    r"|maplibre|leaflet|\.bn-dsearch|\.bns-go\b|\.pn\b|banner"
+    r"|h-burger|bn-burger|w2-mbtn|#w2_open|#w2_close|w2-close|h-x\b|bnm-mb|bn-fbm|bn-mbar)",
     re.I,
 )
 
@@ -56,6 +57,8 @@ class PillToken(unittest.TestCase):
         rule=SITENAV[SITENAV.index(":is(", start):SITENAV.index("html body:has(#bn_story)")]
         self.assertNotIn('[class*="-chip"]', rule)
         self.assertIn('.nx-chip,.bnm-chip,.tl-chip', rule)
+        self.assertIn('a.bn-burger', rule)
+        self.assertIn('.h-burger', rule)
         self.assertIn(".bn-mrow", SITENAV)
         self.assertIn(".bns-go", SITENAV)
         # Story typography .pill stays an underline, not a capsule.
@@ -114,5 +117,6 @@ class WireAllUnsetPills(unittest.TestCase):
         self.assertIn("all:unset", m.group(1))
         # Refresh keeps its own radius in bn-refresh.css; this sheet must not restyle #tl_ref.
         self.assertNotRegex(tl, r"#tl_ref\s*\{[^}]*border-radius")
-        self.assertRegex(w2, r"#w2_open\.w2-mbtn[^}]*border-radius\s*:\s*var\(--bn-radius-pill")
-        self.assertRegex(w2, r"\.w2-mbtn[^}]*border-radius\s*:\s*var\(--bn-radius-pill")
+        # Matt 7:39 AM ET Nov 28: the header menu control is a bare icon, not a pill
+        self.assertRegex(w2, r"#w2_open\.w2-mbtn\{[^}]*border-radius:0")
+        self.assertNotRegex(w2, r"#w2_open\.w2-mbtn\{[^}]*border-radius\s*:\s*var\(--bn-radius-pill")
