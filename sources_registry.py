@@ -6,11 +6,12 @@ as the fallback, so new feeds need NO Mac paste. Feeds are fetched by a backgrou
 per host at a time, ETag/Last-Modified), parsed into scanner items, and handed to the scan in capped batches, so the scan itself
 never waits on them. Public RSS/Atom/JSON/HTML previews only: no keys, no logins, no scraping behind bot checks, no X.
 
-Feed types: rss (RSS/Atom/RDF, also Reddit/Lemmy/YouTube/Mastodon tag RSS), bsky (Bluesky public search), mastodon (public tag
-timelines), telegram (t.me/s previews), statuspage (Atlassian /api/v2/incidents.json), kev (CISA KEV JSON).
+Feed types: rss (RSS/Atom/RDF, YouTube/Mastodon tag RSS), bsky, mastodon, telegram, statuspage, kev, gdelt2, ll2, jetstream.
+v5: honest cycle logs (304 vs parsed, per-type counts), Jetstream ping/pong + tighter keep filter, GDELT lastupdate not
+conditional-GET, merge-friendly GDELT/LL2/GNews titles and GNews base=15, pause cycles while SCAN_LOCK is held.
 Modes: all (forced category; obituaries, patents), threat (news: threat keywords + classifier), classify (official), crime.
 Kill switches: env BN_SOURCES_REGISTRY=0, file `sources_registry_off`, `off: true` on a feed, or ids in sources_registry_disabled.json.
-Does not touch scoring, ingest_items, push.py, jets.py or config.json. Scores stay low (news 6, official 10, social 5).
+Does not touch scoring, ingest_items, push.py, jets.py or config.json. GNews items use news_item-like base 15; other news stays 6 unless BOOST_RX.
 """
 import os, re, json, time, hashlib, threading, html, ipaddress, socket, traceback, functools
 from urllib.parse import urlparse, quote, urljoin
@@ -117,13 +118,14 @@ def _sem(host):
     with _hostlk:
         return _hostsem.setdefault(host, threading.BoundedSemaphore(2))
 
-def _http(f, url, accept="application/rss+xml, application/atom+xml, application/xml, text/xml, application/json, text/html;q=0.5, */*;q=0.3"):
+def _http(f, url, accept="application/rss+xml, application/atom+xml, application/xml, text/xml, application/json, text/html;q=0.5, */*;q=0.3", conditional=True):
     st = _state["feeds"].setdefault(f["id"], {})
     h = {"User-Agent": f.get("ua") or UA, "Accept": accept}
     key = "et:" + url
-    if st.get(key) and st.get("body_ok"): h["If-None-Match"] = st[key]
     key2 = "lm:" + url
-    if st.get(key2) and st.get("body_ok"): h["If-Modified-Since"] = st[key2]
+    if conditional:
+        if st.get(key) and st.get("body_ok"): h["If-None-Match"] = st[key]
+        if st.get(key2) and st.get("body_ok"): h["If-Modified-Since"] = st[key2]
     host = urlparse(url).hostname or ""
     with _sem(host):
         r = requests.get(url, headers=h, timeout=(5, TIMEOUT), stream=True, allow_redirects=True)
@@ -140,7 +142,12 @@ def _http(f, url, accept="application/rss+xml, application/atom+xml, application
 def _norm(t): return re.sub(r"[^a-z0-9 ]", "", (t or "").lower())[:90]
 
 def _t(e):
-    return S.parse_t(e.get("pubDate") or e.get("updated") or e.get("published") or e.get("date") or e.get("created") or e.get("sent"))
+    for k in ("pubDate", "pubdate", "published", "updated", "date", "dc:date", "created", "issued", "modified", "sent", "isoDate"):
+        v = e.get(k)
+        if v:
+            t = S.parse_t(v)
+            if t: return t
+    return None
 
 def _dedupe_title(title):
     k = _norm(title)
@@ -173,8 +180,42 @@ def _enqueue(items):
                 _state["pending"].pop(k, None)
 
 # ---------------------------------------------------------------- adapters
+
+def _publisher(e, link=""):
+    return _domain(e.get("source@url") or e.get("source_url") or "") or _domain(link)
+
+def _headline_from_url(url):
+    """Turn a SOURCEURL path slug into a merge-friendly headline; None if it is not a usable slug."""
+    try:
+        from urllib.parse import unquote
+        path = unquote(urlparse(url or "").path or "").rstrip("/")
+        slug = path.split("/")[-1] if path else ""
+        slug = re.sub(r"\.(html?|amp|cms|story|shtml|aspx?)$", "", slug, flags=re.I)
+        slug = re.sub(r"[-_]+", " ", slug).strip()
+        slug = re.sub(r"^\d{6,}\s*", "", slug)
+        if len(slug) < 24 or slug.lower() in ("index", "article", "story", "news", "post", "index.html"):
+            return None
+        if slug.isupper() or slug.isdigit():
+            return None
+        return slug[0].upper() + slug[1:] if slug[0].islower() else slug
+    except Exception:
+        return None
+
+def _scan_busy():
+    lk = getattr(S, "SCAN_LOCK", None)
+    if lk is None: return False
+    got = lk.acquire(blocking=False)
+    if got:
+        try: lk.release()
+        except Exception: pass
+        return False
+    return True
+
 def _a_rss(f, body):
-    out = []; maxage = float(f.get("maxage_d", 2)); cap = int(f.get("cap", 8)); tier = f.get("tier", "news"); mode = f.get("mode") or ("threat" if tier == "news" else "classify")
+    out = []; cap = int(f.get("cap", 8)); tier = f.get("tier", "news"); mode = f.get("mode") or ("threat" if tier == "news" else "classify")
+    is_gnews = "news.google.com" in (f.get("url") or "") or str(f.get("fam") or "").startswith("agg:gnews")
+    maxage = float(f.get("maxage_d", 2))
+    if is_gnews: maxage = max(maxage, 2)
     now = S.now(); seen = 0
     for e in S.rss_items(body):
         t = _t(e)
@@ -204,10 +245,18 @@ def _a_rss(f, body):
                                default_cat=cat if cat != "other" else "other", media_flag="youtube.com" in link or "youtu.be" in link)
             if it: out.append(it)
         else:
-            base = int(f.get("base", 10 if tier == "official" else 6))
-            out.append(S.item(f["name"], f.get("family") or _domain(link) or f["id"], e.get("guid") or e.get("id") or link or title, title, cat, link, t,
+            pub = _publisher(e, link)
+            if is_gnews:
+                base = max(15, int(f.get("base") or 0) or 15)
+                fam = f.get("family") or pub or "GoogleNews"
+            else:
+                base = int(f.get("base", 10 if tier == "official" else 6))
+                fam = f.get("family") or pub or _domain(link) or f["id"]
+            if tier != "official" and re.search(getattr(S, "BOOST_RX", r"$^"), title, re.I):
+                base = min(40, base + 20)
+            out.append(S.item(f["name"], fam, e.get("guid") or e.get("id") or link or title, title, cat, link, t,
                               location=f.get("loc"), base=base, official=(tier == "official"),
-                              extra={"tier": "official" if tier == "official" else "news", "publisher": _domain(link), "desc": desc[:300], "registry": f["id"]}))
+                              extra={"tier": "official" if tier == "official" else "news", "publisher": pub or _domain(link), "desc": desc[:300], "registry": f["id"]}))
         seen += 1
         if seen >= cap: break
     return out
@@ -312,7 +361,8 @@ _CAMEO_CAT = {"14":"political","17":"war/conflict","18":"war/conflict","19":"war
 def _a_gdelt2(f, body=None):
     """GDELT 2.0 15-minute event export (no API key, one zip ~30 KB). Titles are built from CAMEO codes + actors."""
     import zipfile, io
-    raw = body if body and b"export.CSV.zip" in (body if isinstance(body, bytes) else b"") else _http(f, f["url"], "text/plain")
+    st = _state["feeds"].setdefault(f["id"], {})
+    raw = body if body and b"export.CSV.zip" in (body if isinstance(body, bytes) else b"") else _http(f, f["url"], "text/plain", conditional=False)
     if not raw: return []
     text = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
     export = None
@@ -320,7 +370,10 @@ def _a_gdelt2(f, body=None):
         if "export.CSV.zip" in ln:
             export = ln.split()[-1].replace("http://", "https://"); break
     if not export or not _safe_url(export): return []
-    zbody = _http(f, export, "application/zip")
+    # same 15-min file already parsed this process — do not re-emit (conditional GET on lastupdate was wrongly returning [])
+    if st.get("gdelt_export") == export:
+        return []
+    zbody = _http(f, export, "application/zip", conditional=False)
     if not zbody or zbody[:2] != b"PK": return []
     z = zipfile.ZipFile(io.BytesIO(zbody)); rows = z.read(z.namelist()[0]).decode("utf-8", "replace").splitlines()
     cap = int(f.get("cap", 60)); out = []; scored = []
@@ -332,7 +385,7 @@ def _a_gdelt2(f, body=None):
             ns, nm, gs = int(float(p[32] or 0)), int(float(p[31] or 0)), float(p[30] or 0)
         except Exception:
             continue
-        space = bool(re.search(r"iss|astronaut|spacecraft|satellite|re-?entr|launch|spacex|nasa|debris|conjunction", url, re.I))
+        space = bool(re.search(r"\b(iss|astronauts?|spacecraft|satellites?|spacex|nasa|artemis|starship)\b|orbital debris|re-?entr(y|ies|ing)?", url, re.I))
         if not (root in ("13","14","15","16","17","18","19","20") or ns >= 4 or gs <= -5 or space):
             continue
         scored.append((ns, -gs, p))
@@ -342,17 +395,22 @@ def _a_gdelt2(f, body=None):
         actor1, actor2 = (p[6] or "").title(), (p[16] or "").title()
         geo = p[53] or p[36] or ""
         verb = _CAMEO.get(p[28], "event")
-        title = " ".join(x for x in (actor1, verb, actor2) if x).strip() or "GDELT event"
-        if geo: title = f"{title} — {geo}"
-        title = (title + " (GDELT)").replace("  ", " ")
+        slug = _headline_from_url(p[60])
+        if slug:
+            title = slug
+        else:
+            title = " ".join(x for x in (actor1, verb, actor2) if x).strip() or "GDELT event"
+            if geo: title = f"{title} — {geo}"
         if _dedupe_title(title) or _dedupe_title(p[60]): continue
         t = S.parse_t(re.sub(r"^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$", r"\1-\2-\3T\4:\5:\6Z", p[59] or "")) or now
-        cat = "space" if re.search(r"iss|astronaut|spacecraft|satellite|re-?entr|launch|spacex|nasa|debris", p[60]+title, re.I) else _CAMEO_CAT.get(p[28]) or S.classify(title, "other")
+        cat = "space" if re.search(r"\b(iss|astronauts?|spacecraft|satellites?|spacex|nasa|artemis|starship)\b|orbital debris|re-?entr(y|ies|ing)?", (p[60] or "")+" "+title, re.I) else _CAMEO_CAT.get(p[28]) or S.classify(title + " " + (slug or ""), "other")
         if cat == "other": cat = "political"
         out.append(S.item("GDELT 2.0 events", "GDELT", p[0], title[:280], cat, p[60], t,
                           location=geo, base=int(f.get("base", 8)), official=False,
-                          extra={"tier": "aggregate", "goldstein": p[30], "sources": p[32], "root": p[28], "registry": f["id"]}))
+                          extra={"tier": "aggregate", "goldstein": p[30], "sources": p[32], "root": p[28], "registry": f["id"], "via": "gdelt2"}))
         if len(out) >= cap: break
+    st["gdelt_export"] = export
+    st["gdelt_n"] = len(out)
     return out
 
 def _a_ll2(f, body=None):
@@ -377,20 +435,77 @@ def _a_ll2(f, body=None):
                 loc = pad.get("location")
                 pad = (loc.get("name") if isinstance(loc, dict) else None) or pad.get("name") or ""
             pad = pad if isinstance(pad, str) else ""
-            title = f"Launch {st.lower() or 'update'}: {name}" + (f" — {pad}" if pad else "")
+            # "{name} (status) — pad" merges with SpaceNews / NASA headlines better than "Launch launch successful: ..."
+            status = st or "scheduled"
+            title = name + (f" ({status})" if status.lower() not in name.lower() else "") + (f" — {pad}" if pad else "")
             if _dedupe_title(title): continue
             url = L.get("url") or L.get("news_url") or "https://thespacedevs.com/"
             out.append(S.item("Launch Library 2", "LaunchLibrary", str(L.get("id") or title), title[:280], "space", url, t,
-                              location=pad, base=int(f.get("base", 12)), official=False,
-                              extra={"tier": "aggregate", "status": st, "registry": f["id"]}))
+                              location=pad, base=max(15, int(f.get("base") or 0) or 15), official=False,
+                              extra={"tier": "aggregate", "status": st, "registry": f["id"], "via": "ll2"}))
             seen += 1
             if seen >= cap: return out
     return out
 
 # ---------------------------------------------------------------- Bluesky Jetstream (public websocket, no account). Keyword-filtered only.
-_JS_HOSTS = ("jetstream2.us-east.bsky.network", "jetstream1.us-east.bsky.network", "jetstream2.us-west.bsky.network")
+# Tight keep-filter (word-bounded "hack" so Hacksaw does not match; drop job listings, ham-radio chatter,
+# and non-English unless a high-signal token is present). Client frames are masked; pings get pongs so the
+# socket stays open across cycles instead of closing after the first kept post.
+_JS_HOSTS = ("jetstream2.us-east.bsky.network", "jetstream1.us-east.bsky.network", "jetstream2.us-west.bsky.network", "jetstream1.us-west.bsky.network")
 _JS_PATH = "/subscribe?wantedCollections=app.bsky.feed.post"
-_JS_RX = re.compile(THREAT + r"|\b(iss\b|astronaut|spacex|starship|falcon 9|soyuz|shenzhou|ariane|re-?entr|orbital debris|conjunction|eva\b|spacewalk|docking)\b", re.I)
+_JS_RX = re.compile(
+    r"\b(killed|dead|deaths?|casualt|injur(?:y|ed|ies)|wounded|evacuat\w*|missile|airstrike|strikes?|attacks?|attacked|"
+    r"shelling|drones?|troops|invasion|\bwar\b|explosion|blast|outbreak|epidemic|riot|clashes|unrest|curfew|"
+    r"sanction|emergency|martial law|coup|earthquake|tsunami|flood|cyclone|hurricane|typhoon|wildfire|eruption|"
+    r"ransomware|\bhacks?\b|\bhacked\b|\bhackers?\b|\bhacking\b|data breach|breached|cyber(?:attack|security)?|"
+    r"terror|hostage|shooting|gunman|nuclear|radiation|chemical spill|derail|"
+    r"ebola|marburg|h5n1|bird flu|cholera|mpox|measles|hijack|shot down|ceasefire|assassinat|"
+    r"iss\b|astronaut|spacex|starship|falcon 9|soyuz|shenzhou|ariane|re-?entr|orbital debris|conjunction|"
+    r"eva\b|spacewalk|docking)\b", re.I)
+_JS_JOB = re.compile(r"\b(hiring|we['’]re hiring|now hiring|job openings?|apply (now|today|here)|open positions?|job listings?|job alerts?|looking for work|submit (your )?resume|we are hiring)\b", re.I)
+_JS_HAM = re.compile(r"\b(baofeng|ham radio|amateurradio|hamradio|\bqrp\b|ft-?8\b|ft-?991|d-?star|\bcq dx\b|ham operators?|repeater net)\b", re.I)
+_JS_SIGNAL = re.compile(r"\b(cve-\d{4}-\d+|ransomware|earthquake|magnitude\s+\d|astronaut|spacex|starship|\biss\b|data breach|nuclear|missile)\b", re.I)
+
+def _js_english_or_signal(text):
+    if _JS_SIGNAL.search(text or ""): return True
+    if re.search(r"[\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]", text or ""):
+        if len(re.findall(r"[A-Za-z]", text)) < 48: return False
+    try:
+        from langdetect import detect
+        return detect(text) == "en"
+    except Exception:
+        return len(re.findall(r"[A-Za-z]", text or "")) >= 20
+
+_JS_WEAK = re.compile(r"\b(merch(?:andise)?|hacking fud|\bfud\b|weekend sale|considering buying|teenage girl hackers?)\b", re.I)
+_JS_HACK_ONLY = re.compile(r"\b(hacks?|hacked|hackers?|hacking)\b", re.I)
+_JS_HACK_CTX = re.compile(r"\b(ransomware|data|breach|hospital|government|ministr(?:y|ies)|airline|pipeline|power grid|stolen|customers?|database|servers?|cyber(?:attack|security)?|officials?|county|city|agency|cve-|phishing|malware|exploit|password|network)\b", re.I)
+
+def _js_keep(text):
+    if not text or len(text) < 20: return False
+    if _JS_JOB.search(text) or _JS_HAM.search(text) or _JS_WEAK.search(text): return False
+    if not _JS_RX.search(text): return False
+    # bare "hack/hackers/hacking" without a serious context token is chatter or merch
+    if _JS_HACK_ONLY.search(text):
+        rest = _JS_HACK_ONLY.sub(" ", text)
+        if not _JS_RX.search(rest) and not _JS_HACK_CTX.search(text):
+            return False
+    if not _js_english_or_signal(text): return False
+    return True
+
+def _js_send(sock, opcode, payload=b""):
+    """RFC 6455 client frame (must be masked). opcode 0x9 ping, 0xA pong, 0x8 close."""
+    import os
+    mask = os.urandom(4)
+    ln = len(payload)
+    hdr = bytes([0x80 | (opcode & 0x0F)])
+    if ln < 126:
+        hdr += bytes([0x80 | ln])
+    elif ln < 65536:
+        hdr += bytes([0x80 | 126]) + ln.to_bytes(2, "big")
+    else:
+        hdr += bytes([0x80 | 127]) + ln.to_bytes(8, "big")
+    masked = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+    sock.sendall(hdr + mask + masked)
 
 def _js_recv(sock, buf):
     """Minimal RFC 6455 client reader. Returns (opcode, payload) or raises."""
@@ -416,9 +531,26 @@ def _js_recv(sock, buf):
     if ln > 1_000_000: raise ValueError("frame too big")
     return opcode, data, buf
 
+def _js_tcp_keepalive(sock):
+    import sys
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        if sys.platform == "darwin":
+            sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, "TCP_KEEPALIVE", 0x10), 30)
+        else:
+            if hasattr(socket, "TCP_KEEPIDLE"):
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 30)
+            if hasattr(socket, "TCP_KEEPINTVL"):
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
+            if hasattr(socket, "TCP_KEEPCNT"):
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 3)
+    except Exception:
+        pass
+
 def _js_connect(host):
-    import ssl, os, base64, socket
-    raw = socket.create_connection((host, 443), timeout=15)
+    import ssl, os, base64, socket as _socket
+    raw = _socket.create_connection((host, 443), timeout=15)
+    _js_tcp_keepalive(raw)
     ss = ssl.create_default_context().wrap_socket(raw, server_hostname=host)
     key = base64.b64encode(os.urandom(16)).decode()
     req = (f"GET {_JS_PATH} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
@@ -431,7 +563,7 @@ def _js_connect(host):
         buf += c
     head, rest = buf.split(b"\r\n\r\n", 1)
     if b" 101 " not in head.split(b"\r\n", 1)[0]: raise ConnectionError(head.split(b"\r\n", 1)[0].decode("latin1")[:120])
-    ss.settimeout(60)
+    ss.settimeout(45)
     return ss, rest
 
 def _jetstream_loop():
@@ -439,43 +571,64 @@ def _jetstream_loop():
     if os.environ.get("BN_JETSTREAM", "1") == "0":
         print("registry: jetstream off (BN_JETSTREAM=0)", flush=True); return
     print("registry: jetstream starting", flush=True)
-    hi = 0; backoff = 5
+    hi = 0; backoff = 5; fails_this_host = 0
     while True:
-        host = _JS_HOSTS[hi % len(_JS_HOSTS)]; hi += 1
+        host = _JS_HOSTS[hi % len(_JS_HOSTS)]
+        kept = 0
         try:
             sock, buf = _js_connect(host)
             print(f"registry: jetstream connected {host}", flush=True)
-            backoff = 5; n_min = 0; window = time.time(); kept = 0
+            backoff = 5; n_min = 0; window = time.time(); kept = 0; last_ping = time.time()
+            fails_this_host = 0
             while True:
-                op, data, buf = _js_recv(sock, buf)
-                if op == 0x8: break
-                if op == 0x1:
-                    try: ev = json.loads(data)
-                    except Exception: continue
-                    rec = ((ev.get("commit") or {}).get("record")) or {}
-                    if rec.get("$type") not in (None, "app.bsky.feed.post"): 
-                        if rec.get("$type") and "feed.post" not in rec.get("$type",""): continue
-                    text = rec.get("text") or ""
-                    if len(text) < 20 or not _JS_RX.search(text): continue
-                    nowm = time.time()
-                    if nowm - window >= 60: n_min = 0; window = nowm
-                    if n_min >= 40: continue          # cap 40 kept posts/min so the firehose cannot flood ingest
-                    did = ev.get("did") or ""
-                    rkey = ((ev.get("commit") or {}).get("rkey")) or ev.get("time_us") or str(int(nowm))
-                    uri = f"at://{did}/app.bsky.feed.post/{rkey}"
-                    handle = did[:20]
-                    t = S.parse_t(rec.get("createdAt")) or S.now()
-                    it = X.social_item(f"Bluesky firehose", uri, text[:280], f"https://bsky.app/profile/{did}/post/{rkey}", t, [], text,
-                                       extra={"tier": "social", "via": "jetstream"})
-                    if it and not _dedupe_title(text[:200]):
-                        _enqueue([it]); n_min += 1; kept += 1
-                        if kept % 100 == 1:
-                            print(f"registry: jetstream kept {kept} on {host}", flush=True)
+                try:
+                    op, data, buf = _js_recv(sock, buf)
+                except socket.timeout:
+                    # keep the socket alive across quiet stretches
+                    if time.time() - last_ping >= 20:
+                        try: _js_send(sock, 0x9, b"kb")
+                        except Exception: raise ConnectionError("ping failed")
+                        last_ping = time.time()
+                    continue
+                if op == 0x9:                      # ping -> pong (missing this was closing the socket after ~1 kept post)
+                    try: _js_send(sock, 0xA, data)
+                    except Exception: raise ConnectionError("pong failed")
+                    last_ping = time.time(); continue
+                if op == 0xA: continue
+                if op == 0x8: raise ConnectionError("peer close")
+                if op != 0x1: continue
+                try: ev = json.loads(data)
+                except Exception: continue
+                rec = ((ev.get("commit") or {}).get("record")) or {}
+                if rec.get("$type") not in (None, "app.bsky.feed.post"):
+                    if rec.get("$type") and "feed.post" not in rec.get("$type", ""): continue
+                text = rec.get("text") or ""
+                if not _js_keep(text): continue
+                nowm = time.time()
+                if nowm - window >= 60: n_min = 0; window = nowm
+                if n_min >= 40: continue          # cap 40 kept posts/min so the firehose cannot flood ingest
+                did = ev.get("did") or ""
+                rkey = ((ev.get("commit") or {}).get("rkey")) or ev.get("time_us") or str(int(nowm))
+                uri = f"at://{did}/app.bsky.feed.post/{rkey}"
+                t = S.parse_t(rec.get("createdAt")) or S.now()
+                it = X.social_item(f"Bluesky firehose", uri, text[:280], f"https://bsky.app/profile/{did}/post/{rkey}", t, [], text,
+                                   extra={"tier": "social", "via": "jetstream"})
+                if it and not _dedupe_title(text[:200]):
+                    _enqueue([it]); n_min += 1; kept += 1
+                    if kept == 1 or kept % 100 == 0:
+                        print(f"registry: jetstream kept {kept} on {host}", flush=True)
             try: sock.close()
             except Exception: pass
         except Exception as ex:
             print(f"registry: jetstream {host} {type(ex).__name__}: {ex}"[:200], flush=True)
-            time.sleep(backoff); backoff = min(300, backoff * 2)
+            if kept > 0:
+                # had traffic on this host; reconnect here after a short pause, do not hop
+                time.sleep(2); backoff = 5
+            else:
+                fails_this_host += 1
+                if fails_this_host >= 2:
+                    hi += 1; fails_this_host = 0
+                time.sleep(backoff); backoff = min(300, backoff * 2)
 
 
 def _fetch_feed(f):
@@ -494,19 +647,28 @@ def _fetch_feed(f):
 def _do(f):
     st = _state["feeds"].setdefault(f["id"], {})
     now = time.time()
+    ty = f.get("type") or "rss"
+    # family hint so GNews / GDELT / LL2 show up as their own buckets in the cycle log
+    if ty == "rss" and (str(f.get("fam") or "").startswith("agg:gnews") or "news.google.com" in (f.get("url") or "")):
+        ty = "gnews"
     try:
         items = _fetch_feed(f)
         st.update(ok=True, fails=0, err=None, last_ok=now, next=now + float(f.get("iv") or DEFAULT_IV.get(f.get("tier", "news"), 300)))
-        if items is None: st["n"] = st.get("n", 0); return 0, True
+        if items is None: st["n"] = st.get("n", 0); return 0, True, ty, "notmod"
         st["n"] = len(items); st["last_items"] = now if items else st.get("last_items")
         _enqueue(items)
-        return len(items), True
+        return len(items), True, ty, "ok"
     except Exception as ex:
         fails = st.get("fails", 0) + 1
         st.update(ok=False, fails=fails, err=f"{type(ex).__name__}: {str(ex)[:120]}", n=0, next=now + (900 if fails < 3 else 3600 if fails < 6 else 21600))
-        return 0, False
+        return 0, False, ty, "fail"
 
 def _cycle():
+    # Rotation is intended: only feeds whose interval has elapsed are fetched, capped at 600, so later
+    # cycles show 36-117 of ~1298. First fill takes a few cycles (next=0 for not-yet-fetched feeds).
+    if _scan_busy():
+        print("registry cycle: skipped (scan in progress)", flush=True)
+        return
     reg = _load_registry(); feeds = reg["feeds"]; now = time.time()
     due = [f for f in feeds if _state["feeds"].get(f["id"], {}).get("next", 0) <= now]
     due.sort(key=lambda f: _state["feeds"].get(f["id"], {}).get("next", 0))
@@ -516,9 +678,16 @@ def _cycle():
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         res = list(ex.map(_do, due))
     new = sum(r[0] for r in res)
+    notmod = sum(1 for r in res if r[3] == "notmod")
+    empty = sum(1 for r in res if r[1] and r[3] != "notmod" and r[0] == 0)
+    by = {}
+    for n, ok_f, ty, st in res:
+        if n:
+            by[ty] = by.get(ty, 0) + n
     ok = sum(1 for f in feeds if _state["feeds"].get(f["id"], {}).get("ok")); bad = sum(1 for f in feeds if _state["feeds"].get(f["id"], {}).get("ok") is False)
     _state.update(ok=ok, fail=bad, n=len(feeds))
-    print(f"registry cycle: {len(due)} feeds in {time.time() - t0:.0f}s, {new} items parsed, ok={ok} fail={bad} of {len(feeds)}", flush=True)
+    by_s = (", by type: " + ", ".join(f"{k}={v}" for k, v in sorted(by.items(), key=lambda kv: (-kv[1], kv[0])))) if by else ""
+    print(f"registry cycle: {len(due)} due of {len(feeds)} in {time.time() - t0:.0f}s, {new} items parsed (304={notmod} empty={empty}), ok={ok} fail={bad}{by_s}", flush=True)
     try:
         h = {f["id"]: {k: v for k, v in _state["feeds"].get(f["id"], {}).items() if k in ("ok", "n", "err", "fails", "last_ok", "last_items")} for f in feeds}
         tmp = HEALTH + ".tmp"; json.dump({"t": time.time(), "ok": ok, "fail": bad, "feeds": h}, open(tmp, "w")); os.replace(tmp, HEALTH)
