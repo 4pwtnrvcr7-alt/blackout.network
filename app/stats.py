@@ -18,12 +18,14 @@ DESC = ("BLACKOUT.NETWORK's open stats: daily visitors and page views, the most-
         "plus YouTube @blkoutntw and X @BlkoutNtw growth. Aggregate totals only.")
 _C = {"mt": 0, "d": None}
 
-def load():
+def load(force=False):
     try:
         mt = os.path.getmtime(DATA)
-        if _C["d"] is None or mt != _C["mt"]:
+        if force or _C["d"] is None or mt != _C["mt"]:
             with open(DATA, encoding="utf-8") as f: _C["d"] = json.load(f)
             _C["mt"] = mt
+            if force:
+                _NL["t"] = 0
     except Exception: _C["d"] = _C["d"] or {}
     return _C["d"] or {}
 
@@ -58,9 +60,9 @@ def _with_live_nl(d):
     d = dict(d); d["newsletter"] = v
     return d
 
-def public_json():
+def public_json(force=False):
     """Only the published aggregates (the file holds nothing else, but keep the allow-list explicit)."""
-    d = _with_live_nl(load()); keep = {}
+    d = _with_live_nl(load(force=force)); keep = {}
     for k in ("generated", "min_bucket", "site", "newsletter", "youtube", "x", "growth"): keep[k] = d.get(k)
     if isinstance(keep.get("youtube"), dict): keep["youtube"] = {k: v for k, v in keep["youtube"].items() if k not in ("analytics_note", "daily", "traffic_sources", "views_28d", "minutes_28d", "subs_net_28d", "analytics")}   # audit Nov 1 2026: no YouTube Analytics data on public /stats
     if isinstance(keep.get("youtube"), dict):
@@ -255,6 +257,27 @@ def subs_chart(rows):
 
 CH_COLORS = {"Search": "#4aa3ff", "Social": "#FF4D4F", "Direct / bookmarks / apps": "#8B95A3", "Email": "#F5A524", "AI assistants": "#b37feb", "Other sites": "#2BB673"}
 
+STATS_REF_JS = """
+<p class="st-mu" id="st_up" aria-live="polite"></p>
+<script>
+(function(){
+  function ago(iso){if(!iso)return "";try{var s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
+    if(s<90)return"just now";if(s<3600)return Math.round(s/60)+" min ago";
+    if(s<86400)return Math.round(s/3600)+" h ago";return Math.round(s/86400)+" d ago"}catch(e){return""}}
+  function pulled(){try{return "Last pulled "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){return "Updated"}}
+  window.bnRefreshPage=function(){
+    return fetch("/api/stats?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){
+      var y=j.youtube||{},x=j.x||{},yt=document.getElementById("st_yt_up"),xu=document.getElementById("st_x_up"),st=document.getElementById("st_up");
+      if(yt)yt.textContent=ago(y.fetched)||yt.textContent;
+      if(xu)xu.textContent=ago(x.fetched)||xu.textContent;
+      if(st)st.textContent=pulled();
+      return "Updated";
+    });
+  };
+})();
+</script>
+"""
+
 def render():
     d = _with_live_nl(load()); s = d.get("site") or {}; y = d.get("youtube") or {}; x = d.get("x") or {}; nl = d.get("newsletter") or {}; g = (d.get("growth") or {}).get("series") or []
     since = s.get("since"); since_txt = when(since, "%b %-d, %Y") if since else "—"
@@ -324,7 +347,7 @@ def render():
         an += "</div>"
     yt_html = ('<div class="st-sec"><h2>YouTube</h2><span class="st-mu">Trending videos on @blkoutntw: the most-watched of the last 7 days.</span></div>'
                f'<div class="st-plat">{I_YT}<div class="nm"><div><b>@blkoutntw</b><span>{n(y.get("subscribers"))} subscribers · {n(y.get("video_views_total"))} views · '
-               f'{n(y.get("uploads_7d"))} new videos this week · updated {E(ago(y.get("fetched")))}</span></div></div>'
+               f'{n(y.get("uploads_7d"))} new videos this week · updated <span id="st_yt_up">{E(ago(y.get("fetched")))}</span></span></div></div>'
                f'<a class="st-btn red" href="https://www.youtube.com/@blkoutntw?sub_confirmation=1" target="_blank" rel="noopener">{I_YT} Subscribe</a></div>'
                + (f'<div class="st-vids">{vcards}</div>' if vcards else '<div class="st-empty">Videos load here after the next hourly refresh.</div>') + an
                + (f'<div class="st-card" style="margin-top:12px"><h3>YouTube views per day</h3>{spark(ytg, "#FF0033")}</div>' if len([v for v in ytg if v is not None]) >= 2 else ""))
@@ -336,7 +359,7 @@ def render():
         f'<span><b>{n(p.get("reposts"))}</b> reposts</span><span><b>{n(p.get("replies"))}</b> replies</span></div></a>' for p in posts)
     x_html = ('<div class="st-sec"><h2>X</h2><span class="st-mu">Top posts from @BlkoutNtw this week, by impressions.</span></div>'
               f'<div class="st-plat">{I_X}<div class="nm"><div><b>@BlkoutNtw</b><span>{n(x.get("followers"))} followers · {n(x.get("posts"))} posts · '
-              f'{n(x.get("impressions_7d"))} impressions and {n(x.get("engagements_7d"))} engagements this week · updated {E(ago(x.get("fetched")))}</span></div></div>'
+              f'{n(x.get("impressions_7d"))} impressions and {n(x.get("engagements_7d"))} engagements this week · updated <span id="st_x_up">{E(ago(x.get("fetched")))}</span></span></div></div>'
               f'<a class="st-btn" href="https://x.com/intent/follow?screen_name=BlkoutNtw" target="_blank" rel="noopener">{I_X} Follow @BlkoutNtw</a></div>'
               + (f'<div class="st-posts">{pcards}</div>' if pcards else '<div class="st-empty">Posts load here after the next hourly refresh.</div>'))
     nlv = n(nl.get("subscribers"), nl.get("lt5"))
@@ -374,11 +397,12 @@ def render():
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=5" sizes="any">'
             f'<style>body{{margin:0;background:var(--bn-bg,#0B0D10);overflow-x:hidden}}{CSS}</style></head><body><a class="skip bn-skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>'
-            + sitenav.header_html("@stats") + body + foot + '</body></html>').encode("utf-8")
+            + sitenav.header_html("@stats") + body + STATS_REF_JS + foot + '</body></html>').encode("utf-8")
 
 def handle_get(path, qs):
     if path == "/stats" or path == "/stats/":
         return 200, render(), "text/html; charset=utf-8"
     if path == "/api/stats":
-        return 200, public_json()
+        force = str((qs or {}).get("fresh", [""])[0] or "").lower() in ("1", "true", "yes")
+        return 200, public_json(force=force)
     return 404, {"error": "not found"}

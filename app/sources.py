@@ -401,7 +401,7 @@ def page_html():
     b = s["bands"]
     P = []
     a = P.append
-    a('<section class="sc-card sc-intro"><h2>Every source we use, rated</h2>'
+    a('<section class="sc-card sc-intro"><h2>Every source we use, rated</h2><p class="sc-sm mu" id="sc_up" aria-live="polite"></p>'
       '<p>This catalog lists every source the monitor has drawn on: official agencies, news outlets, social accounts and channels, the scanner\'s own feeds, '
       'the YouTube channels it watches and the public accounts on the political watch list. Each entry shows how many items it produced, when, what kind, '
       'and a <b>confidence rating from 0 to 10</b> computed by the fixed rule below. Select a rating to see exactly why.</p>'
