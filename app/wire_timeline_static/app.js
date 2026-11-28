@@ -53,7 +53,7 @@ function match(it){
 function itemHTML(it,open){
   var c=CAT[it.k]||CAT.other||{color:"#777",label:"Other"};
   var h='<button type="button" class="tl-hd" aria-expanded="'+(open?"true":"false")+'"><span class="tl-tm">'+(it["do"]?'<abbr title="Dated by day only">&mdash;</abbr>':esc(tm(seenAt(it))))+'</span><span class="tl-nd" aria-hidden="true"></span>'+
-    '<span class="tl-tx"><span class="tl-h">'+hl(it.h)+'</span><span class="tl-s"><b class="tl-k">'+esc(c.label)+"</b>"+(it.a?'<b class="tl-ar">Archive</b>':"")+(it.s?hl(it.s):"")+"</span></span>"+
+    '<span class="tl-tx"><span class="tl-h">'+hl(it.h)+'</span><span class="tl-s'+(it.a?" tl-sa":"")+'"><b class="tl-k">'+esc(c.label)+"</b>"+(it.a?'<b class="tl-ar">Archive</b>':"")+(it.s?hl(it.s):"")+"</span></span>"+
     '<span class="tl-rk '+rkc(it.r)+'" title="Rank '+(it.r==null?"n/a":it.r)+'">'+(it.r==null?"&ndash;":it.r)+"</span></button>";
   if(open)h+=drawerHTML(it);
   return h;
