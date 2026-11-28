@@ -470,19 +470,19 @@
 
   City.prototype.drawCar = function (d, S, c, x, y, p, al, t, pass, dpr, ys, ta, u) {
     var vt = c.vt, dir = c.dir, side = c.kind === 1, sc = Math.max(.12, p), mw = VEHW[vt], mh = VEHH[vt];
-    var dw, dh, view, spr, lights, br, lw, lh, tw, th, rot = 0, p0, p1;
+    var dw, dh, view, spr, lights, br, lw, lh, tw, th, p0, p1, bAng = 1.5708;
     if (side) { dw = (12 + 26 * sc) * u * mw; dh = dw * (96 / 220) * (mh / mw); view = 0; }
     else {
       dw = (8 + 24 * sc) * u * mw; dh = dw * (mh / mw); view = dir > 0 ? 1 : 2;
+      // Avenue heading is used only for the ground beam. The body stays
+      // upright (wheels on the road, no screen-plane roll/tilt).
       p0 = cl(p - .03, .12, 1); p1 = cl(p + .03, .12, 1);
-      rot = Math.atan2((S.H - S.hy) * (p1 - p0), avx(S, c.ai, p1) - avx(S, c.ai, p0));
-      if (dir < 0) rot += Math.PI;
-      rot -= 1.5708;
+      bAng = Math.atan2((S.H - S.hy) * (p1 - p0), avx(S, c.ai, p1) - avx(S, c.ai, p0));
     }
     spr = S.veh[vt][view][c.ci];
     lights = al * ta[tileAt(S, x, y)];
     br = lights > .08 ? brakeAmt(c, t) : 0;
-    function go() { d.setTransform(dpr, 0, 0, dpr, dpr * x, dpr * (y - ys)); if (!side) d.rotate(rot); else if (dir < 0) d.setTransform(-dpr, 0, 0, dpr, dpr * x, dpr * (y - ys)); }
+    function go() { d.setTransform(dpr, 0, 0, dpr, dpr * x, dpr * (y - ys)); if (side && dir < 0) d.setTransform(-dpr, 0, 0, dpr, dpr * x, dpr * (y - ys)); }
     function rst() { d.setTransform(dpr, 0, 0, dpr, 0, -ys * dpr); }
     lw = Math.max(1.4, (side ? 2.2 : 2) * sc * u * (vt === 3 ? 1.15 : 1));
     lh = Math.max(1.15, (side ? 1.5 : 1.35) * sc * u);
@@ -495,7 +495,7 @@
         d.globalAlpha = al * lights * (side ? .58 : .5);
         go();
         if (side) d.drawImage(S.beam, dw * .46, -dh * .28 - bh / 2, bl, bh);
-        else { d.translate(0, -dh * .16); d.rotate(1.5708); d.scale(1, .4); d.drawImage(S.beam, 0, -bh / 2, bl, bh); }
+        else { d.translate(0, -dh * .16); d.rotate(bAng); d.scale(1, .4); d.drawImage(S.beam, 0, -bh / 2, bl, bh); }
         rst();
       }
       return;
