@@ -70,5 +70,47 @@ class MenuThumbLayout(unittest.TestCase):
             self.assertIn(">" + label + "</a>", body)
         self.assertEqual(body.count('<li class="m5-r"'), 8)
 
+class MenuBlankShell(unittest.TestCase):
+    """Matt 11:44 PM ET Nov 27: empty black menu (Alerts + Report status footer) after a tap."""
+
+    def _js(self):
+        return menu5.html_block("/wire").split("<script", 1)[1]
+
+    def test_same_page_tap_closes_instead_of_sticking(self):
+        js = self._js()
+        self.assertIn("function m5shut()", js)
+        self.assertIn("if(same){e.preventDefault();m5shut();return}", js)
+        self.assertIn("window.bnMenuClose", js)
+
+    def test_navigation_starts_immediately(self):
+        """Do not wait 140-400ms after emptying the menu; that is the stuck shell."""
+        js = self._js()
+        self.assertIn("location.assign(u.pathname+u.search+u.hash)", js)
+        self.assertNotIn("setTimeout(function(){location.href=a.href}", js)
+        self.assertNotIn("RM?140:400", js)
+
+
+class MenuChrome(unittest.TestCase):
+    """Matt 12:32-12:33 AM ET Nov 28: drop ALERTS band, icon-only close, fill bottom gap."""
+
+    def test_alerts_band_and_divider_hidden(self):
+        css = menu5.html_block("/wire").split("</style>", 1)[0]
+        self.assertIn("#bn-menu:has(.m5) .m3-alerts", css)
+        self.assertIn("#bn-menu:has(.m5) .bn-ph", css)
+        self.assertIn("border-bottom:0", css)
+
+    def test_close_is_icon_only(self):
+        css = menu5.html_block("/wire").split("</style>", 1)[0]
+        self.assertIn("#bn-menu:has(.m5) .bn-close span{display:none", css)
+        self.assertIn("min-width:44px", css)
+        self.assertIn("min-height:44px", css)
+
+    def test_nav_sits_on_safe_area(self):
+        css = menu5.html_block("/wire").split("</style>", 1)[0]
+        self.assertIn("max(8px,env(safe-area-inset-bottom,0px))", css)
+        self.assertNotIn("padding-bottom:max(20px,2vh)", css)
+        self.assertNotIn("max(16px,env(safe-area-inset-bottom,0px))", css)
+
+
 if __name__ == "__main__":
     unittest.main()
