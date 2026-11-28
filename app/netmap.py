@@ -711,7 +711,7 @@ def page(qs=None, water_id=None):
     water_open = bool(water_id) or (qs or {}).get("_water") == 1
     water_item = None
     og_url = "https://blackout.network/grid"
-    og_img = "https://blackout.network/og/grid.png"
+    og_rank = None
     follow = ""
     page_share = ""
     if water_open:
@@ -719,15 +719,15 @@ def page(qs=None, water_id=None):
             import water as WT, growth
             water_item = WT.item_by_id(water_id) if water_id else None
             if water_item:
-                title = (water_item.get("name") or "Water treatment") + " | BLACKOUT.NETWORK"
-                desc = water_item.get("note") or water_item.get("label") or "Water treatment status."
+                title = WT.og_title(water_item)
+                desc = WT.og_desc(water_item)
                 og_url = WT.permalink(water_item)
-                og_img = f"https://blackout.network/og/share/water/{water_item['id']}.png"
+                og_rank = WT.share_rank(water_item)
             else:
                 title = "Water treatment plants and advisories | BLACKOUT.NETWORK"
                 desc = "Drinking-water and wastewater treatment plants, plus boil-water, do-not-drink and compliance advisories, on The Grid."
                 og_url = "https://blackout.network/water"
-                og_img = "https://blackout.network/og/share/water/page.png"
+                og_rank = None
             follow = page_share = ""
         except Exception:
             follow = page_share = ""
@@ -735,14 +735,23 @@ def page(qs=None, water_id=None):
     _sky_off = {"debris", "ss", "sw"}
     skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="{"false" if g in _sky_off else "true"}"><i style="background:{c};border-color:{c}"></i><span>{E(t)}</span></button>' for g, t, c in SKY_CHIPS)
     chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="{"true" if k == "grid" or (k == "water" and water_open) else "false"}"><i></i>{E(t)}</button>' for k, t in CHIPS)
+    try:
+        import og
+        og_tags = og.tags(title=title, desc=desc, url=og_url, rank=og_rank, og_type="website")
+    except Exception:
+        logo = "https://blackout.network/img/share-logo-1200.png"
+        og_tags = (
+            f'<meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">'
+            f'<meta property="og:url" content="{E(og_url)}"><meta property="og:type" content="website">'
+            f'<meta property="og:image" content="{logo}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200">'
+            f'<meta name="twitter:card" content="summary"><meta name="twitter:image" content="{logo}">'
+        )
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
 <title>{E(title)}</title><meta name="description" content="{E(desc)}">
 <link rel="canonical" href="{E(og_url)}">
 <meta name="robots" content="index,follow,max-image-preview:large">
-<meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
-<meta property="og:url" content="{E(og_url)}"><meta property="og:type" content="website"><meta property="og:image" content="{E(og_img)}">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{E(og_img)}">
+{og_tags}
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link rel="preload" href="/api/netmap/data" as="fetch" crossorigin>
