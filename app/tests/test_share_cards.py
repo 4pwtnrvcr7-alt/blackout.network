@@ -29,8 +29,10 @@ class ShareCards(unittest.TestCase):
 
     def test_page_meta(self):
         h = S.page_html("planet", "jupiter", {}).decode()
-        self.assertIn('name="twitter:card" content="summary_large_image"', h)
-        self.assertIn("/og/share/planet/jupiter.png", h)
+        self.assertIn('name="twitter:card" content="summary"', h)
+        self.assertNotIn("summary_large_image", h)
+        self.assertIn("https://blackout.network/img/share-logo-1200.png", h)
+        self.assertNotIn("/og/share/planet/jupiter.png", h)
         self.assertIn("location.replace", h)
 
     def test_card_png_and_bad_input(self):
@@ -40,6 +42,13 @@ class ShareCards(unittest.TestCase):
 
     def test_no_nc_images_on_cards(self):
         self.assertNotIn("aditya", S.CRAFT_PHOTO); self.assertNotIn("juice", S.CRAFT_PHOTO)
+
+    def test_no_banned_hashtags(self):
+        for k in list(S.KINDS):
+            tags = S.tags_for(k, "Test item", "Florida", "detail")
+            low = {x.lower() for x in tags}
+            self.assertNotIn("#blackoutnetwork", low, (k, tags))
+            self.assertNotIn("#news", low, (k, tags))
 
     def test_dest_whitelist(self):
         s = S.spec("page", "x", {"p": ["//evil.com"]}); self.assertEqual(s["dest"], "/")

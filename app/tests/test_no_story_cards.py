@@ -108,13 +108,15 @@ class StoryCardsOff(unittest.TestCase):
             else:
                 os.environ["BN_STORY_CARDS"] = old
 
-    def test_non_story_pages_keep_og_image(self):
+    def test_non_story_pages_use_severity_logo(self):
         h = og.tags(title="Crime map | BLACKOUT.NETWORK", desc="Look up crime.",
                     url="https://blackout.network/crime", key="crime")
         self.assertIn("og:image", h)
         self.assertIn("twitter:image", h)
-        self.assertIn("summary_large_image", h)
-        self.assertIn("/og/crime.png", h)
+        self.assertIn('name="twitter:card" content="summary"', h)
+        self.assertNotIn("summary_large_image", h)
+        self.assertIn("share-logo-1200.png", h)
+        self.assertNotIn("/og/crime.png", h)
 
     def test_story_og_endpoint_is_404(self):
         code, body, ct = og.handle_get("/og/wire/" + "a" * 16 + ".png")
