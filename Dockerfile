@@ -12,6 +12,8 @@ COPY app/ /workspace/blackout/
 RUN cd /workspace/blackout && python3 install_white_b_icons.py
 # Global Sources directory: build the SQLite/FTS index from the committed gzipped NDJSON shards (no network needed at build time)
 RUN cd /workspace/blackout && python3 sources_directory.py --build
+# Wire archive 2000-2024 (Nov 27 2026, pt1974u): read-only SQLite built from the committed shards; lives in the image, not in the deploy handoff
+RUN cd /workspace/blackout && python3 archive_wire.py --build
 RUN mkdir -p logs snapshots static/vsubs video_subs newsletter_outbox && chown -R bn:bn /workspace
 # Location-accuracy guard (Matt, Nov 23 2026): fail the image build so a bad pin change never deploys.
 RUN cd /workspace/blackout && BN_PLACES_DB=/tmp/story_places_test.db python3 -m unittest tests.test_location_guard tests.test_map_pins

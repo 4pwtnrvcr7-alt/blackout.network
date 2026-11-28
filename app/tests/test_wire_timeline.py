@@ -3,6 +3,7 @@ import os, sqlite3, sys, tempfile, unittest
 os.environ["BN_WIRE_VALIDATE"] = "0"   # these cover paging/speed/gate; the pre-publish validator has tests/test_wire_check.py
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import addons, wire_timeline as W
+W.ADB_PATH = "/nonexistent/archive_off.db"   # the 2000-2024 archive has its own tests (ArchiveWire); the paging tests use tiny fixtures
 
 def hit(path):
     for pre, name in addons.ROUTES.items():
@@ -377,3 +378,52 @@ class FullStoryTap(unittest.TestCase):
         self.assertNotIn(".bng-sb:hover{", growth.split("@media (hover:hover) and (pointer:fine){.bng-sb:hover")[0])
 
 if __name__ == "__main__": unittest.main()
+
+class ArchiveWire(unittest.TestCase):
+    """2000-2024 archive (archive_wire.py): rows link straight to their source, have no write-up page, and page/filter in SQL."""
+    @classmethod
+    def setUpClass(cls):
+        import archive_wire as AW
+        cls.AW = AW
+        if not os.path.exists(AW.DBF): AW.build(quiet=True)
+
+    def test_every_row_has_a_source_link_and_tags(self):
+        c = sqlite3.connect(f"file:{self.AW.DBF}?mode=ro", uri=True)
+        n, bad = c.execute("SELECT COUNT(*), SUM(links NOT LIKE '%\"url\": \"http%') FROM stories").fetchone()
+        self.assertGreater(n, 40000)
+        self.assertEqual(bad, 0)
+        self.assertEqual(c.execute("SELECT COUNT(*) FROM stories WHERE tags IS NULL OR tags='[]' OR title IS NULL OR location IS NULL OR location=''").fetchone()[0], 0)
+        self.assertEqual(c.execute("SELECT MIN(t) FROM stories").fetchone()[0][:4], "2000")
+        self.assertLess(c.execute("SELECT MAX(t) FROM stories").fetchone()[0], "2024-10-29")
+
+    def test_archive_rows_page_with_filters(self):
+        sv = (W._public_row, W.DB, W.HDB, W.ADB_PATH)
+        W.ADB_PATH = None
+        d = tempfile.mkdtemp()
+        for name in ("live", "hist"):    # empty live + history DBs: only the archive answers
+            c = sqlite3.connect(os.path.join(d, name + ".db"))
+            if name == "live":
+                c.executescript("CREATE TABLE clusters(cluster_id TEXT PRIMARY KEY, title TEXT, category TEXT, location TEXT, lat REAL, lon REAL, event_time TEXT, first_seen TEXT, updated TEXT, score INTEGER, confidence TEXT, n_items INTEGER, n_families INTEGER, families TEXT, links TEXT, watchlist INTEGER, brief TEXT, high_at TEXT, rank INTEGER);")
+            else:
+                c.executescript("CREATE TABLE stories(id TEXT PRIMARY KEY, t TEXT, title TEXT, category TEXT, location TEXT, lat REAL, lon REAL, score INTEGER, rank INTEGER, confidence TEXT, watchlist INTEGER, n_items INTEGER, families TEXT, links TEXT, sources TEXT, origin TEXT);")
+            c.commit(); c.close()
+        W.DB, W.HDB = os.path.join(d, "live.db"), os.path.join(d, "hist.db")
+        W._public_row = lambda r, a: True
+        try:
+            o = W._page_build(before="2000-03-01T00:00:00Z", limit=20)
+            self.assertEqual(len(o["items"]), 20)
+            for it in o["items"]:
+                self.assertEqual(it["a"], 1); self.assertTrue(it["l"] and it["l"][0]["u"].startswith("https://")); self.assertTrue(it["t"].startswith("2000-0"))
+                self.assertTrue(it["tg"])
+            o = W._page_build(before="2010-01-01T00:00:00Z", limit=10, cats="weather", regs="na")
+            self.assertTrue(o["items"]); self.assertTrue(all(i["k"] == "weather" and i["g"] == "na" for i in o["items"]))
+            o = W._page_build(before="2010-01-01T00:00:00Z", limit=10, sev="hi")
+            self.assertTrue(o["items"]); self.assertTrue(all(i["r"] >= 7 for i in o["items"]))
+            n, cur = 0, None
+            for _ in range(2000):
+                o = W._page_build(before=cur or "2001-01-01T00:00:00Z", limit=100); n += len(o["items"]); cur = o["next"]
+                if o["end"]: break
+            self.assertTrue(o["end"]); self.assertGreater(n, 1000)
+            m = W.meta(); self.assertEqual(m["earliest"][:4], "2000")
+        finally:
+            W._public_row, W.DB, W.HDB, W.ADB_PATH = sv; W._M["t"] = 0

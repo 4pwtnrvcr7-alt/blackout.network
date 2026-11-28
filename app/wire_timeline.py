@@ -38,6 +38,16 @@ def _hdb():
     try:
         h = _ro(HDB); h.execute("SELECT 1 FROM stories LIMIT 1"); return h
     except sqlite3.Error: return None
+ADB_PATH = None
+def _adb():
+    """The read-only 2000-2024 archive (archive_wire.py: built into the image from committed shards); None when absent."""
+    try:
+        import archive_wire as AW
+        p = ADB_PATH or AW.path()      # ADB_PATH: tests point it at a missing file to turn the archive off
+        if not p or not os.path.exists(p): return None
+        h = _ro(p); h.execute("SELECT 1 FROM stories LIMIT 1"); return h
+    except Exception:
+        return None
 def _j(s, d):
     try: return json.loads(s or "") if s else d
     except Exception: return d
@@ -545,6 +555,8 @@ def _item(r, archive, warm_budget=None, compute=None):
             "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
     if archive:
         d["xu"] = ""          # the timeline shows no Post on X for archive rows
+        if "tg" in r.keys() and r["tg"]:
+            d["tg"] = [x for x in _j(r["tg"], []) if isinstance(x, str)][:5]
         return d
     e = _VR.get(r["id"])
     if e is not None:          # validator corrections (category, headline, location) for the public row
@@ -603,6 +615,9 @@ _LIVE_COLS = (f"cluster_id id, {_TCOL} t, {_DOF_SQL} dof, first_seen fs, event_t
 _ATCOL = "(CASE WHEN substr(t,12)='00:00:00Z' THEN substr(t,1,10)||'T05:00:00Z' ELSE t END)"
 _ARCH_COLS = (f"id, {_ATCOL} t, (substr(t,12)='00:00:00Z') dof, t fs, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
               "NULL brief, sources")
+
+# the 2000-2024 archive (archive_wire.py) adds its precomputed display category/region (ak, ag) and hashtags (tg)
+_ARCH2_COLS = _ARCH_COLS + ", k ak, g ag, tags tg"
 
 def _qwhere(words, cols):
     w, a = "", []
@@ -687,6 +702,8 @@ def _time_clause(time_win, live):
 def _facet_ok(r, archive, cats, regs):
     if not cats and not regs:
         return True
+    if archive and "ak" in r.keys():          # archive.wire rows carry their category/region (already filtered in SQL)
+        return (not cats or r["ak"] in cats) and (not regs or r["ag"] in regs)
     title = _clean(r["title"])
     loc = _clean(r["location"])[:90] if r["location"] else ""
     if cats and _vk(r, title, archive) not in cats:
@@ -695,7 +712,7 @@ def _facet_ok(r, archive, cats, regs):
         return False
     return True
 
-def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win, meta=None, live_n=None):
+def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win, cats=None, regs=None, meta=None, live_n=None):
     """One over-fetch from live + archive, already sorted in page direction.
     Nov 25 2026: rows past the "safe edge" (the nearer of the two sources' last rows when that source came back full)
     are dropped, because the other source was not read that far; meta gets done (both sources exhausted) and edge."""
@@ -727,8 +744,25 @@ def _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, ti
         finally:
             h.close()
     n_arch = len(rows) - n_live; last_arch = rows[-1][0] if n_arch else None
+    # third source (Nov 27 2026, pt1974u): the 2000-2024 archive. Category/region filters run in SQL on its precomputed columns.
+    n_a2 = 0; last_a2 = None
+    a2 = _adb()
+    if a2 is not None:
+        try:
+            qw, qa = _qwhere(words, ("title", "location"))
+            tw, ta = _time_clause(time_win, False)
+            fw, fa = "", []
+            if cats: fw += f" AND k IN ({','.join('?' * len(cats))})"; fa += sorted(cats)
+            if regs: fw += f" AND g IN ({','.join('?' * len(regs))})"; fa += sorted(regs)
+            sql = (f"SELECT {_ARCH2_COLS} FROM stories WHERE ({_ATCOL}{op}? OR ({_ATCOL}=? AND id{op}?)) "
+                   f"AND watchlist IN ({','.join('?' * len(lists))}){qw}{geo}{sv}{tw}{fw} "
+                   f"ORDER BY {_ATCOL} {order}, id {order} LIMIT ?")
+            got = [(r, True) for r in a2.execute(sql, [ct, ct, cid, *lists, *qa, *ga, *sa, *ta, *fa, fetch_n])]
+            rows += got; n_a2 = len(got); last_a2 = got[-1][0] if got else None
+        finally:
+            a2.close()
     key = lambda r: (r["t"] or "", r["id"])
-    lasts = [key(x) for x, full in ((last_live, n_live >= live_n), (last_arch, n_arch >= fetch_n)) if x is not None and full]
+    lasts = [key(x) for x, full in ((last_live, n_live >= live_n), (last_arch, n_arch >= fetch_n), (last_a2, n_a2 >= fetch_n)) if x is not None and full]
     safe = (min(lasts) if newer else max(lasts)) if lasts else None
     if safe is not None:
         rows = [(r, a) for r, a in rows if (key(r) <= safe if newer else key(r) >= safe)]
@@ -770,7 +804,7 @@ def _page_build(before=None, after=None, limit=100, q="", bg=False, lat=None, lo
     acc, seen, exhausted, cut = [], set(), False, False
     while True:
         fm = {}
-        batch = _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win, meta=fm,
+        batch = _fetch_window(ct, cid, fetch_n, newer, words, lists, lat, lon, r_mi, sev, time_win, cats, regs, meta=fm,
                               live_n=_POST_LIVE if post else None)
         if fm.get("edge"):
             ct, cid = fm["edge"]
@@ -1275,12 +1309,21 @@ def count(q="", bg=False):
             lo = min([x for x in (lo, r[1]) if x] or [None]) if (lo or r[1]) else None
             hi = max([x for x in (hi, r[2]) if x] or [None]) if (hi or r[2]) else None
         finally: h.close()
+    a2 = _adb()
+    if a2 is not None:
+        try:
+            qw, qa = _qwhere(words, ("title", "location"))
+            r = a2.execute(f"SELECT COUNT(*), MIN(t), MAX(t) FROM stories WHERE watchlist IN ({','.join('?' * len(lists))}){qw}", [*lists, *qa]).fetchone()
+            n += r[0] or 0
+            lo = min([x for x in (lo, r[1]) if x] or [None]) if (lo or r[1]) else None
+            hi = max([x for x in (hi, r[2]) if x] or [None]) if (hi or r[2]) else None
+        finally: a2.close()
     return {"count": n, "earliest": lo, "latest": hi}
 
 _M = {"t": 0, "key": None, "data": None}; _LK = threading.Lock()
 def _stamp():
     out = []
-    for p in (DB, HDB):
+    for p in (DB, HDB, os.path.join(BASE, "archive_wire", "wire_archive.db")):
         try: out.append(os.path.getmtime(p))
         except OSError: out.append(0)
     return tuple(out)
@@ -1312,6 +1355,16 @@ def meta():
             rows = h.execute("SELECT t, title, category, location, lat, lon FROM stories WHERE watchlist IN (0,1)").fetchall()
             arch = len(rows); take(rows, True)
         finally: h.close()
+    a2 = _adb()
+    if a2 is not None:        # 2000-2024 archive: SQL aggregates on its precomputed columns (never loads its rows into memory)
+        try:
+            for k, v in a2.execute("SELECT k, COUNT(*) FROM stories WHERE watchlist IN (0,1) GROUP BY k"): cats[k] = cats.get(k, 0) + v
+            for k, v in a2.execute("SELECT g, COUNT(*) FROM stories WHERE watchlist IN (0,1) GROUP BY g"): regs[k] = regs.get(k, 0) + v
+            for k, v in a2.execute("SELECT substr(t,1,7), COUNT(*) FROM stories WHERE watchlist IN (0,1) GROUP BY 1"): months[k] = months.get(k, 0) + v
+            r = a2.execute("SELECT COUNT(*), MIN(t), MAX(t) FROM stories WHERE watchlist IN (0,1)").fetchone()
+            n += r[0]; arch += r[0]
+            if r[1]: lo = r[1] if lo is None or r[1] < lo else lo
+        finally: a2.close()
     out = {"total": n, "live": live, "archive": arch, "background": bgn, "earliest": lo, "latest": hi,
            "categories": [{"k": k, "label": l, "color": col, "n": cats[k]} for k, l, col in CATS],
            "regions": [{"k": k, "label": l, "n": regs[k]} for k, l in REGIONS],
