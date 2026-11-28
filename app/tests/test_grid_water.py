@@ -101,3 +101,25 @@ class GridWater(unittest.TestCase):
         gate = (ROOT / "tools" / "grid_boot_gate.py").read_text()
         self.assertIn("window.__nxMap", gate)
         self.assertIn("GATE_OK", gate)
+
+    def test_water_view_centers_on_the_lower_48(self):
+        self.assertIn("var US = [[-125.5, 23.5], [-66, 50]]", WL)
+        self.assertIn("fitBounds(US", WL)
+        self.assertIn("accountForPanel", WL)
+
+    def test_plant_marks_are_distinct_drops_not_circles(self):
+        self.assertIn("icon-image", WL)
+        self.assertIn("wt-dw", WL)
+        self.assertIn("wt-ww", WL)
+        self.assertIn("#2EE6D6", WL)
+        self.assertIn("#C084FC", WL)
+        self.assertIn("wt-mapleg", CSS)
+        self.assertIn("Drinking-water plant", WL)
+
+    def test_panel_plant_count_comes_from_the_shipped_db(self):
+        import waterdb, netmap
+        st = waterdb.stats()
+        self.assertTrue(st and st["plants"] > 100000)
+        boot = netmap._water_boot(True, "", None)
+        self.assertEqual(boot["plants"], st["plants"])
+        self.assertEqual(boot["countries"], st["countries"])

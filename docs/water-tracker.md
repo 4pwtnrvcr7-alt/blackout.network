@@ -29,6 +29,12 @@ Share (Nov 28 2026): each item has a permalink at `/water/<id>` and the standard
 
 ## Grid Water layer (Nov 28 2026)
 
+
+The water view of /grid opens on the lower 48 (same US box as the rest of The Grid), with padding so the Water panel does not hide the United States. The advisory list is ordered by severity, then US first, then recency. Official US advisory sources currently wired: Alaska DEC, Oregon Health Authority (ArcGIS, yourwater.oregon.gov), Florida Department of Health (statewide boil-water table; rows without a system or county are dropped). EPA ECHO SDWIS current health-based violations and ICIS-NPDES significant noncompliance remain as findings, not boil notices. Texas TCEQ, California SWRCB, New York, North Carolina, Louisiana, Mississippi and West Virginia do not publish a machine-readable current statewide boil-water feed that this box can read; they will be added when an official open feed is available. Every item still has a source link. Plant counts in the panel come from the shipped SQLite inventory so they cannot drift from docs/water-plants-coverage.md.
+
+At city zoom, plants are teardrop markers (teal drinking-water, violet wastewater), not the same circles the other layers use, with a legend on the map. No yellow.
+
+
 `/water` permanently redirects (301) to `/grid/water`. `/water/<id>` redirects to `/grid/water/<id>`, which opens The Grid with the Water layer and panel, scrolls to that item, and keeps the typographic share card at `/og/share/water/<id>.png`.
 
 The Water panel reuses the site share set (Post on X, Copy link, native share, Source, Permalink, Follow). Buttons are pills. No yellow except the shared #293 Refresh fill on The Grid.

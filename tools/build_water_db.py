@@ -147,6 +147,46 @@ def in_ni(lat, lon):
             ins = not ins
     return ins
 
+
+def _tag_cc(tags):
+    t = (tags.get("addr:country") or tags.get("addr:country_code") or tags.get("is_in:country_code")
+         or tags.get("ISO3166-1") or tags.get("ISO3166-1:alpha2") or "").strip().upper()
+    t = t.replace("UAE", "AE").replace("PALESTINE", "PS").replace("ISR", "IL")
+    if len(t) >= 2 and t[:2].isalpha():
+        return t[:2]
+    return ""
+
+def gcc_cc(lat, lon, tags):
+    c = _tag_cc(tags)
+    if c in {"AE", "SA", "OM", "QA", "BH", "KW"}:
+        return c
+    if 25.7 <= lat <= 26.4 and 50.3 <= lon <= 50.85: return "BH"
+    if 24.4 <= lat <= 26.25 and 50.7 <= lon <= 51.7: return "QA"
+    if 28.45 <= lat <= 30.15 and 46.5 <= lon <= 48.55: return "KW"
+    if 25.9 <= lat <= 26.7 and 56.05 <= lon <= 56.55: return "OM"   # Musandam
+    if 22.6 <= lat <= 26.15 and 51.5 <= lon <= 56.6: return "AE"
+    if 16.5 <= lat <= 26.6 and 51.8 <= lon <= 60.0: return "OM"
+    return "SA"
+
+def ilps_cc(lat, lon, tags):
+    c = _tag_cc(tags)
+    if c in {"IL", "PS"}:
+        return c
+    if 31.22 <= lat <= 31.62 and 34.20 <= lon <= 34.57: return "PS"   # Gaza
+    if 31.33 <= lat <= 32.57 and 35.05 <= lon <= 35.58: return "PS"   # West Bank, untagged; western edge is approximate
+    return "IL"
+
+def sngm_cc(lat, lon, tags):
+    c = _tag_cc(tags)
+    if c in {"SN", "GM"}:
+        return c
+    if 13.05 <= lat <= 13.83 and -16.82 <= lon <= -13.80:
+        if lon <= -16.55:
+            return "GM" if 13.35 <= lat <= 13.55 else "SN"
+        return "GM"
+    return "SN"
+
+
 def load_osm(folder):
     out = []
     if not folder.is_dir():
@@ -180,6 +220,10 @@ def load_osm(folder):
             ecc = "GB" if (cc == "IE" and in_ni(pt[1], pt[0])) else cc
             if cc == "MY":   # the Geofabrik extract covers Malaysia, Singapore and Brunei
                 ecc = "SG" if (1.15 <= pt[1] <= 1.48 and 103.6 <= pt[0] <= 104.1) else "BN" if (4.0 <= pt[1] <= 5.1 and 114.0 <= pt[0] <= 115.4) else "MY"
+            if cc in {"GCC", "ILPS", "SNGM"}:
+                lat, lon = pt[1], pt[0]
+                tags = el.get("tags") or {}
+                ecc = gcc_cc(lat, lon, tags) if cc == "GCC" else ilps_cc(lat, lon, tags) if cc == "ILPS" else sngm_cc(lat, lon, tags)
             op = _name(tags.get("operator")) if tags.get("operator") else ""
             out.append({
                 "lon": pt[0], "lat": pt[1], "name": name, "kind": kind, "cc": ecc, "st": st if ecc == "US" else "",

@@ -165,5 +165,24 @@ class Water(unittest.TestCase):
         self.assertNotIn("peer-to-peer", js.lower())
         self.assertNotIn("meshtastic", js.lower())
 
+    def test_sort_severity_then_us_then_recency(self):
+        import water
+        rows = [
+            dict(id="nl1", kind="advisory", level="boil", name="Stephenville", cc="CA", pop=10000, since="2026-11-20T00:00:00Z"),
+            dict(id="or1", kind="advisory", level="boil", name="Salem", cc="US", st="OR", pop=50, since="2026-11-10T00:00:00Z"),
+            dict(id="or2", kind="advisory", level="boil", name="Bend", cc="US", st="OR", pop=50, since="2026-11-27T00:00:00Z"),
+            dict(id="ak1", kind="advisory", level="dnd", name="Bethel", cc="US", st="AK", pop=10, since="2026-11-01T00:00:00Z"),
+            dict(id="sd1", kind="violation", level="viol", name="A system", cc="US", st="TX", pop=80000, since="2026-11-28T00:00:00Z"),
+        ]
+        got = [r["id"] for r in water.sort_items(rows)]
+        self.assertEqual(got, ["ak1", "or2", "or1", "nl1", "sd1"])
+        self.assertEqual(water.us_advisory_counts(rows), {"AK": 1, "OR": 2})
+
+    def test_new_us_advisory_sources_are_registered(self):
+        import water
+        self.assertIn("or", water.FETCH)
+        self.assertIn("fl", water.FETCH)
+        ids = [s[0] for s in water.SOURCES]
+        self.assertEqual(ids[:3], ["ak", "or", "fl"])
 
 if __name__ == "__main__": unittest.main()
