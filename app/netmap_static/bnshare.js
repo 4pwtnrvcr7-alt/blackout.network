@@ -9,7 +9,7 @@
     planet: ["#Space", "#Astronomy"], moon: ["#Moon", "#Space"], sun: ["#Sun", "#Space"], craft: ["#Spacecraft", "#Space"], roadster: ["#Starman", "#SpaceX"],
     site: ["#Space", "#Exploration"], sat: ["#Satellites", "#Orbit"], launch: ["#Launch", "#Spaceflight"], cloud: ["#Cloud", "#Outage"],
     network: ["#Outage", "#Internet"], outage: ["#Outage", "#Internet"], weather: ["#Weather", "#Radar"], solar: ["#SpaceWeather", "#Sun"],
-    page: ["#BlackoutNetwork"], dc: ["#DataCenter", "#Cloud"], cable: ["#UnderseaCables", "#Internet"], power: ["#PowerOutage", "#Grid"], grid: ["#PowerGrid", "#Energy"]
+    page: ["#Infrastructure", "#Grid"], water: ["#Water", "#DrinkingWater"], dc: ["#DataCenter", "#Cloud"], cable: ["#UnderseaCables", "#Internet"], power: ["#PowerOutage", "#Grid"], grid: ["#PowerGrid", "#Energy"]
   };
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function clean(s, n) { return String(s == null ? "" : s).replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n || 120); }
