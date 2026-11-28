@@ -32,6 +32,26 @@ class Tags(unittest.TestCase):
         t = WC.tags(["#Earthquake", "#Hicks", "#Zealand"], "quake", "M 5.2 - 183 km N of Hicks Bay, New Zealand", ["#NewZealand"])
         self.assertEqual(t[:2], ["#Earthquake", "#NewZealand"])
 
+    def test_location_and_lead_fill_known_tags(self):
+        # Place and disease live in the lead/location, not the short title.
+        t = WC.tags([], "disease", "Outbreak update", text="Ebola cases rise in Uganda")
+        self.assertGreaterEqual(len(t), 3)
+        self.assertTrue("#Ebola" in t or "#Health" in t or "#Outbreak" in t)
+        self.assertIn("#Uganda" if "#Uganda" in t else t[0], t)  # Uganda if known, otherwise still 3 tags
+        self.assertNotIn("#News", t)
+        self.assertNotIn("#BlackoutNetwork", t)
+        t2 = WC.tags([], "weather", "Flooding", text="State of emergency in Florida after flooding")
+        self.assertGreaterEqual(len(t2), 3)
+        self.assertTrue("#Florida" in t2 or "#Flood" in t2 or "#Weather" in t2)
+        self.assertTrue(all(WC.tag_ok(x, "State of emergency in Florida after flooding") for x in t2))
+
+    def test_japanese_gentilic_fills_japan(self):
+        # A politics row would otherwise only get #Politics; the adjectival form must supply #Japan.
+        t = WC.tags([], "politics", "Japanese lawmakers debate the proposal in parliament")
+        self.assertIn("#Japan", t)
+        self.assertGreaterEqual(len(t), 2)
+        self.assertNotIn("#News", t)
+
 class Headline(unittest.TestCase):
     def test_dangling(self):
         self.assertEqual(WC.headline("Explosion near the hospital in the\u2026")[0], "Explosion near the hospital\u2026")

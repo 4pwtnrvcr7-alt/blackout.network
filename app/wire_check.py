@@ -309,21 +309,23 @@ def _case(tag):
         return t[:1].upper() + t[1:]
     return t
 
-def tags(raw, k, title="", loc_tags=()):
-    """3-5 validated tags. raw: the generator's tags; loc_tags: place tags from x_share.location_tags."""
+def tags(raw, k, title="", loc_tags=(), text=""):
+    """3-5 validated tags. raw: the generator's tags; loc_tags: place tags from x_share.location_tags.
+    text: optional lead, location, or source titles — same fill rules, no loosening of tag_ok."""
+    blob = " ".join(x for x in (title, text) if x)
     out = []
     for t in list(raw or []) + list(loc_tags or []):
         t = "#" + _case(str(t).lstrip("#"))
-        if tag_ok(t, title, loc_tags) and t.lower() not in {x.lower() for x in out}:
+        if tag_ok(t, blob, loc_tags) and t.lower() not in {x.lower() for x in out}:
             out.append(t)
     have = lambda t: t.lower() in {x.lower() for x in out}
     ct = _CAT_TAG.get(k)
-    if k == "quake" and re.search(r"volcan|erupt|ash cloud", title or "", re.I):
+    if k == "quake" and re.search(r"volcan|erupt|ash cloud", blob, re.I):
         ct = "Volcano" if not have("#Volcano") else "Eruption"
     if ct and len(out) < 3 and not have("#" + ct):
         out.append("#" + ct)
-    if len(out) < 3:   # top up from the headline itself: places, known names and popular topic words it contains
-        words = re.findall(r"[A-Za-z][A-Za-z0-9]*", title or "")
+    if len(out) < 3:   # top up from headline + lead/place: places, known names and popular topic words
+        words = re.findall(r"[A-Za-z][A-Za-z0-9]*", blob)
         known = _known_set()
         for n in (3, 2, 1):
             for i in range(len(words) - n + 1):
@@ -332,34 +334,34 @@ def tags(raw, k, title="", loc_tags=()):
                     if n == 1 and (cand.lower() in _COMMON or (cand.upper() in _ACRO and not words[i].isupper())):
                         continue
                     out.append("#" + _case(cand))
-    volc = k == "quake" and re.search(r"volcan|erupt|ash cloud|ash advisory", title or "", re.I)
+    volc = k == "quake" and re.search(r"volcan|erupt|ash cloud|ash advisory", blob, re.I)
     for extra in (("Volcano", "Eruption", "VolcanicAsh") if volc else _CAT_TAG2.get(k, ())):
         if len(out) >= 3:
             break
-        if extra == "Military" and not _HARD_MIL.search(title or ""):
+        if extra == "Military" and not _HARD_MIL.search(blob):
             continue
         if not have("#" + extra):
             out.append("#" + extra)
-    # Last short popular topic word already in the headline (Matt: one-word tags, no filler).
+    # Last short popular topic word already in the text (Matt: one-word tags, no filler).
     # Run on de-figured text so a figurative "explosion" / "storm" is not promoted.
     if len(out) < 3:
-        blob = _defig(title or "")
+        ev = _defig(blob)
         for extra in _TOPIC_FILL:
             if len(out) >= 3:
                 break
             if have("#" + extra):
                 continue
-            if re.search(r"\b" + re.escape(extra) + r"s?\b", blob, re.I):
+            if re.search(r"\b" + re.escape(extra) + r"s?\b", ev, re.I):
                 out.append("#" + extra)
-        if len(out) < 3 and not have("#Attack") and re.search(r"\bassassina", blob, re.I):
+        if len(out) < 3 and not have("#Attack") and re.search(r"\bassassina", ev, re.I):
             out.append("#Attack")
-        if len(out) < 3:  # well-known country names from adjectival forms already in the headline
+        if len(out) < 3:  # well-known country names from adjectival forms already in the text
             for rx, name in _GENTILE:
                 if len(out) >= 3:
                     break
                 if have("#" + name):
                     continue
-                if re.search(rx, blob, re.I):
+                if re.search(rx, ev, re.I):
                     out.append("#" + name)
     return out[:5]
 
@@ -371,7 +373,9 @@ _CAT_TAG2 = {"quake": ("Earthquake", "Seismic"), "weather": ("Weather", "Storm")
 _TOPIC_FILL = ("Fire", "Flood", "Strike", "Explosion", "Sanctions", "Banking", "Banks",
                "Refinery", "Tanker", "Attack", "Storm", "Earthquake", "Emergency", "Disaster")
 _GENTILE = ((r"\bisraeli", "Israel"), (r"\bukrainian", "Ukraine"), (r"\brussian", "Russia"),
-            (r"\biranian", "Iran"), (r"\bchinese", "China"))
+            (r"\biranian", "Iran"), (r"\bchinese", "China"), (r"\bjapanese", "Japan"),
+            (r"\bbritish", "UK"), (r"\bcanadian", "Canada"), (r"\baustralian", "Australia"),
+            (r"\bmexican", "Mexico"), (r"\bgerman", "Germany"), (r"\bfrench", "France"))
 
 # ------------------------------------------------------------------ headline
 _DANGLE = re.compile(r"(?:[\s,;:\-\u2013\u2014]+(?:[Tt]he|[Aa]n?|at|of|to|and|or|in|on|for|with|by|from|as|into|over|after|amid|about|than|that|its|his|her|their|our|is|are|was|were|be|has|have|had|but|nor|via))+\s*(\u2026|\.\.\.)?$")
