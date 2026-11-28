@@ -381,3 +381,15 @@ body.nx-sky .nx-sw,body.nx-sky .nx-ss,.nx-sw,.nx-ss{display:none!important}
 /* Shared #293 Refresh, next to the status chip */
 .nx-top .bn-ref{background:rgba(5,6,10,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);flex:none}
 @media (max-width:700px){.nx-top .bn-ref{padding:0 10px;min-width:0;height:36px}}
+
+/* Nov 28 2026 hotfix: at phone widths the top row (mode + units + chip + Refresh) was 394px in a 366px bar, so Refresh ran off the right edge.
+   Tighten the row so it always fits; the chip is the flexible part and may shrink to its dot. */
+@media (max-width:430px){
+ html body.nx .nx-mode button{padding:6px 8px}
+ html body.nx .nx-units button{padding:6px 6px}
+ .nx-top .nx-chip{padding:8px 0;gap:0;justify-content:center;overflow:hidden}
+ .nx-top .nx-chip #nx_sum{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}   /* dot only when there is no room; the text stays for screen readers */
+ .nx-top .bn-ref{padding:0 9px;gap:6px;letter-spacing:.1em}
+ .nx-top .bn-ref.busy,.nx-top .bn-ref.is-filling,.nx-top .bn-ref.is-result{min-width:0}   /* the fill/result states must not widen the pill past the bar */
+}
+@media (max-width:370px){.nx-top .nx-chip{display:none}}
