@@ -111,16 +111,19 @@ def notes(max_age=5.0):
     out = {}
     try:
         p = cfg()["db"]
-        if os.path.exists(p):
-            k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
-            try:
-                rows = k.execute("SELECT cid, note, alias_of FROM briefs").fetchall()
-            finally: k.close()
-            for c, n, a in rows:
-                if a: out[c] = ("alias", a); continue
-                try: out[c] = json.loads(n) if n else None
-                except Exception: pass
-    except Exception: traceback.print_exc()
+        if not os.path.exists(p):
+            return _NC["v"]                      # mid-handoff: keep the last good cache, do not store empty
+        k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=5)
+        try:
+            rows = k.execute("SELECT cid, note, alias_of FROM briefs").fetchall()
+        finally: k.close()
+        for c, n, a in rows:
+            if a: out[c] = ("alias", a); continue
+            try: out[c] = json.loads(n) if n else None
+            except Exception: pass
+    except Exception:
+        traceback.print_exc()
+        return _NC["v"]                          # 7:15 PM ET 27 Nov 2026: a failed read cached {} and looked like no write-ups
     _NC.update(t=time.time(), v=out)
     return out
 def note_for(cid):
@@ -827,8 +830,12 @@ def _writer_worker(ready, paused):
             STATE["paused"] = None if api_enabled() else "BN_WRITER=0, templates on"
             if not STATE.get("gate_booted") and templates_on():
                 boot_gate()
-            # Paid scan/write first. package_pending walks thousands of clusters and can run
-            # for many minutes (and every deploy restarts it), which was starving the rank 5+ writer.
+            # New arrivals get a free template on every pass, before any paid job.
+            # After a deploy the paid queue can run for many minutes; write_one then
+            # `continue` used to skip package_pending and leave new Wire stories unpublished.
+            if templates_on():
+                counts = package_pending(max_backfill=0)
+                log(f"free templates: {counts.get('new', 0)} packaged")
             if api_enabled():
                 mt = []
                 for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
