@@ -94,3 +94,17 @@ class JS(unittest.TestCase):
         self.assertIn('id="bnm_gbtn"', body)
 
 if __name__ == "__main__": unittest.main()
+
+
+class IataAirportPin(unittest.TestCase):
+    def test_stored_ord_nebraska_pin_is_replaced(self):
+        item = {"id": "56aa6cc76b03647a", "title": "FAA Ground stop: ORD (equipment outage)",
+                "loc": "ORD, US", "category": "other", "brief": "", "links": "[]"}
+        stored = {"located": 1, "lat": 41.6033, "lon": -98.9262, "place": "Ord, Valley County, Nebraska, 68862, United States",
+                  "country": "US", "admin1_code": "US.NE", "city": "Ord", "precision": "city",
+                  "method": "nominatim", "confidence": "medium"}
+        p = H.place(item, stored)
+        self.assertTrue(p and p.get("lat") is not None, p)
+        self.assertTrue(41.9 < p["lat"] < 42.05 and -88.0 < p["lon"] < -87.8, p)
+        self.assertRegex(p.get("place") or "", r"O.?Hare")
+        self.assertNotRegex(p.get("place") or "", r"Nebraska")

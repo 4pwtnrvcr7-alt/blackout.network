@@ -97,6 +97,7 @@ class TestPagesUseSharedButton(unittest.TestCase):
         self.assertIn("loadAlerts()", js)
         self.assertIn("loadStorms()", js)
         self.assertIn("BNRefresh.bind", js)
+        self.assertIn("function raced(p, ms)", js)
 
     def test_markets_replaces_old_button(self):
         html_src = _read("markets.py")
@@ -256,6 +257,69 @@ class TestRefreshModes(unittest.TestCase):
         self.assertIn("/api/people/index?fresh=1", pe)
         self.assertIn("id=\"pf_up\"", pe)
 
+
+
+class TestClickPathFollowUp(unittest.TestCase):
+    def test_people_index_script_is_valid_javascript(self):
+        src = _read("people.py")
+        self.assertIn("PEOPLE_INDEX_JS", src)
+        start = src.find("PEOPLE_INDEX_JS = r")
+        a = src.find("<script>", start) + len("<script>")
+        b = src.find("</script>", a)
+        js = src[a:b]
+        self.assertIn('class="pp-av"', js)
+        self.assertNotIn('class="pp-av" src=""', js.replace('src="\'+String(p.avatar)', ""))
+        import subprocess, tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(js)
+            path = fh.name
+        try:
+            r = subprocess.run(["node", "--check", path], capture_output=True, text=True)
+        finally:
+            os.unlink(path)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_bind_header_delegates_on_document_capture(self):
+        js = _read("static", "bn-refresh.js")
+        self.assertIn('document.addEventListener("click", headerClick, true)', js)
+        self.assertIn("e.target.closest(\"#bn_hdr_ref\")", js)
+        self.assertIn('Promise.reject(new Error("no hook"))', js)
+        self.assertIn("_bnHdrBound", js)
+
+    def test_weather_fill_cannot_hang_on_one_loader(self):
+        js = _read("wxmap_static", "wx.js")
+        self.assertIn("function raced(p, ms)", js)
+        self.assertIn("raced(loadFrames(false), 15000)", js)
+        self.assertIn("raced(loadGrids(), 15000)", js)
+        self.assertIn('fin("Updated")', js)
+        self.assertIn('fin("Couldn\'t refresh")', js)
+
+    def test_classic_hook_updates_stamp_and_keeps_stale_on_timeout(self):
+        w2 = _read("wire_v2.py")
+        self.assertIn("WC_REF_JS", w2)
+        self.assertIn('getElementById("wc_up")', w2)
+        self.assertIn("stale = _C.pop(key, None)", w2)
+        self.assertIn("return 200, stale[1], \"text/html\"", w2)
+        self.assertIn("timeout=20", w2)
+        start = w2.find("WC_REF_JS = r")
+        a = w2.find("<script>", start) + len("<script>")
+        b = w2.find("</script>", a)
+        js = w2[a:b]
+        import subprocess, tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(js)
+            path = fh.name
+        try:
+            r = subprocess.run(["node", "--check", path], capture_output=True, text=True)
+        finally:
+            os.unlink(path)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_netpages_stamp_falls_back_when_fetched_et_missing(self):
+        np = _read("netpages.py")
+        self.assertIn("el.textContent=j.fetched_et||pulled()", np)
+        self.assertIn("window.bnRefreshPage=function()", np)
+        self.assertNotIn("if(el&&j.fetched_et)el.textContent=j.fetched_et", np)
 
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ function ctaCard(i){var k=CTAS[i%CTAS.length],d=document.createElement("div");d.
 function enhanceFeed(root){if(!root)return;var cards=root.querySelectorAll(":scope > .card[data-cid]");cards.forEach(enhanceCard);
  if(root.id!=="feed"||root.querySelector(":scope > [data-bng-cta]"))return;var n=0;
  cards.forEach(function(c,i){if((i+1)%10===0&&i+1<cards.length&&n<6){c.after(ctaCard(n++))}})}
-function footer(){if(document.getElementById("bng_follow"))return;var f=document.getElementById("site_foot")||document.querySelector("footer.ft")||document.querySelector("footer.h-foot")||document.querySelector("footer");if(!f)return;
+function footer(){if(/^\/comms\/?$/.test(location.pathname))return;if(document.getElementById("bng_follow"))return;var f=document.getElementById("site_foot")||document.querySelector("footer.ft")||document.querySelector("footer.h-foot")||document.querySelector("footer");if(!f)return;
  var s=document.createElement("section");s.id="bng_follow";s.className="bng-foot";s.setAttribute("aria-labelledby","bng_follow_h");
  s.innerHTML='<p class="bng-follow-k" id="bng_follow_h">Follow</p><p class="bng-follow-l">Ranked, sourced alerts as they happen.</p><div class="bng-btns">'+btns("footer")+'</div>';
  if(f.classList.contains("h-foot")){var main=document.getElementById("flow")||document.querySelector("main"),host=main&&main.parentNode;

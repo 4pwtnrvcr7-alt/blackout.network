@@ -152,6 +152,28 @@ def menu_html():
             '<div class="w2-mfoot"><a href="/scoring">How we score</a><a href="/sources">Sources</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a>'
             '<a href="https://x.com/BlkoutNtw" rel="noopener" target="_blank">X</a><a href="https://www.youtube.com/@blkoutntw" rel="noopener" target="_blank">YouTube</a></div></div>')
 
+
+WC_REF_JS = r"""
+<script>
+(function(){
+  function pulled(){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){return "Updated"}}
+  window.bnRefreshPage=function(){
+    return fetch("/wire-classic?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){
+      if(!r.ok)throw new Error(r.status);return r.text();
+    }).then(function(html){
+      var doc=new DOMParser().parseFromString(html,"text/html");
+      var neu=doc.getElementById("w2_main"),cur=document.getElementById("w2_main");
+      if(neu&&cur)cur.innerHTML=neu.innerHTML;
+      var st=document.getElementById("wc_up");
+      var neuSt=doc.getElementById("wc_up");
+      if(st)st.textContent=(neuSt&&neuSt.textContent.trim())||pulled();
+      return "Updated";
+    });
+  };
+})();
+</script>
+"""
+
 def shell(title, desc, body, path, rank=None, noindex=False):
     try:
         import og, re as _re
@@ -179,13 +201,7 @@ def shell(title, desc, body, path, rank=None, noindex=False):
                 ".w2-bar .bn-ref-sm{flex:none}</style>"
             )
             btn = sitenav_ui.refresh_fill_btn("bn_hdr_ref", compact=True)
-            extra_js = (
-                '<script>window.bnRefreshPage=function(){return fetch("/wire-classic?fresh=1&_="+Date.now(),{cache:"no-store"})'
-                ".then(function(r){if(!r.ok)throw new Error(r.status);return r.text()}).then(function(html){"
-                'var doc=new DOMParser().parseFromString(html,"text/html");'
-                'var neu=doc.getElementById("w2_main"),cur=document.getElementById("w2_main");'
-                "if(neu&&cur)cur.innerHTML=neu.innerHTML;return \"Updated\"})};</script>"
-            )
+            extra_js = WC_REF_JS
         except Exception:
             btn = ""
         bar_end = f'<div class="w2-bar-end">{btn}{menu_btn}</div>'
@@ -450,19 +466,19 @@ def handle(path, qs=None, headers=None):
         oldfut = _INFL.get(key)
         if oldfut is not None:
             try:
-                oldfut.result(timeout=8)
+                oldfut.result(timeout=20)
             except Exception:
                 pass
-        _C.pop(key, None)
+        stale = _C.pop(key, None)
         fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
         try:
-            body = fut.result(timeout=8)
+            body = fut.result(timeout=20)
         except Exception:
-            hit = _C.get(key)
-            if hit:
-                return 200, hit[1], "text/html"
-            return None
+            body = None
         if not body:
+            if stale:
+                _C[key] = stale
+                return 200, stale[1], "text/html"
             return None
         return 200, body, "text/html"
     hit = _C.get(key)

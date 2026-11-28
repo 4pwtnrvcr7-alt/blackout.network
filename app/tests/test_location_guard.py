@@ -120,6 +120,25 @@ class LocationGuard(unittest.TestCase):
         self.assertTrue(G.pin_contradicts_headline("Campton declares state of emergency amid lake water concerns", "Springfield", "US", "", ""))
 
 
+
+    def test_libya_soe_in_tripoli_is_not_a_contradiction(self):
+        """Pre-existing false positive: a country declaring an emergency in a city it names was flagged."""
+        self.assertFalse(G.pin_contradicts_headline(
+            "Libya declares state of emergency in Tripoli",
+            "Tripoli, Tripoli, Libya", "LY", "", "city"))
+        # still a contradiction when the pin city is not in the headline
+        self.assertTrue(G.pin_contradicts_headline(
+            "Libya declares state of emergency in Tripoli",
+            "Benghazi, Libya", "LY", "", "city"))
+
+    def test_faa_ord_pin_at_ord_nebraska_is_a_contradiction(self):
+        self.assertTrue(G.pin_contradicts_headline(
+            "FAA Ground stop: ORD (equipment outage)",
+            "Ord, Valley County, Nebraska, 68862, United States", "US", "US.NE", "city"))
+        self.assertFalse(G.pin_contradicts_headline(
+            "FAA Ground stop: ORD (equipment outage)",
+            "Chicago O'Hare International Airport, Illinois, United States", "US", "US.IL", "point"))
+
     def test_live_share_when_configured(self):
         if not os.environ.get("LOCATION_GUARD_LIVE"):
             self.skipTest("LOCATION_GUARD_LIVE not set; run: python3 -m location_guard --live")
