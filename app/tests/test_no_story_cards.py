@@ -49,15 +49,63 @@ class StoryCardsOff(unittest.TestCase):
         self.assertTrue(any(r.startswith("tags") for r in v["reasons"]))
         self.assertFalse(v["ok"])
 
-    def test_story_tags_are_summary_without_images(self):
+    def test_story_tags_are_summary_with_logo(self):
         cid = "e2ca47e325c5b8e1"
         html = og.tags(title="A headline", desc="d", url="https://blackout.network/wire/" + cid,
                        story_id=cid, rank=7, og_type="article")
+        logo = og.STORY_SHARE_IMAGE
         self.assertIn('name="twitter:card" content="summary"', html)
         self.assertNotIn("summary_large_image", html)
-        self.assertNotIn("og:image", html)
-        self.assertNotIn("twitter:image", html)
+        self.assertIn(f'property="og:image" content="{logo}"', html)
+        self.assertIn(f'name="twitter:image" content="{logo}"', html)
+        self.assertIn('property="og:image:width" content="1200"', html)
+        self.assertIn('property="og:image:height" content="1200"', html)
         self.assertNotIn("/og/wire/", html)
+        self.assertNotIn("?v=", html)
+
+    def test_site_page_wire_uses_logo_not_story_card(self):
+        import site_page
+        html = site_page.page("A headline", "d", "<p>x</p>", "/wire/e2ca47e325c5b8e1").decode()
+        logo = "https://blackout.network/img/share-logo-1200.png"
+        self.assertIn('name="twitter:card" content="summary"', html)
+        self.assertNotIn("summary_large_image", html)
+        self.assertIn(f'property="og:image" content="{logo}"', html)
+        self.assertIn(f'name="twitter:image" content="{logo}"', html)
+        self.assertNotIn("/og/wire/", html)
+
+    def test_share_logo_file_is_square_png(self):
+        import install_white_b_icons as inst
+        from PIL import Image
+        from io import BytesIO
+        import static_files
+        dest = inst.IMG / "share-logo-1200.png"
+        if not dest.is_file():
+            raw = __import__("base64").b64decode("".join(inst.SHARE_B64.read_text().split()))
+            dest.write_bytes(raw)
+        code, body, ct = static_files.handle_get("/img/share-logo-1200.png", {})
+        self.assertEqual(code, 200)
+        self.assertEqual(ct, "image/png")
+        self.assertLess(len(body), 1_000_000)
+        im = Image.open(BytesIO(body))
+        self.assertEqual(im.size, (1200, 1200))
+        self.assertEqual(im.format, "PNG")
+        self.assertFalse(im.info.get("exif"))
+
+    def test_story_cards_flag_restores_per_story_image(self):
+        old = os.environ.get("BN_STORY_CARDS")
+        try:
+            os.environ["BN_STORY_CARDS"] = "1"
+            cid = "e2ca47e325c5b8e1"
+            html = og.tags(title="A headline", desc="d", url="https://blackout.network/wire/" + cid,
+                           story_id=cid, rank=7, og_type="article")
+            self.assertIn("summary_large_image", html)
+            self.assertIn(f"/og/wire/{cid}.png", html)
+            self.assertNotIn("/img/share-logo-1200.png", html)
+        finally:
+            if old is None:
+                os.environ.pop("BN_STORY_CARDS", None)
+            else:
+                os.environ["BN_STORY_CARDS"] = old
 
     def test_non_story_pages_keep_og_image(self):
         h = og.tags(title="Crime map | BLACKOUT.NETWORK", desc="Look up crime.",
