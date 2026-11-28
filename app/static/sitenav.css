@@ -496,7 +496,7 @@ nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:non
   .w2-btn,.w2-btn-s,.nl-btn,.nla-btn,.tl-b,.tl-chip,.tl-jb,.tl-top,.tl-newp,.tl-clear,.tl-now,
   .nx-chip,.bnm-chip,.tl-chip
 )
-:not(.leaflet-control *,.leaflet-ctrl *,.maplibregl-ctrl-group *,.maplibregl-popup-close-button,.maplibregl-ctrl-attrib-button):not(.nsa-b,.ss-ah,.hm-ah,.ns-row,.bn-mrow,.bn-theme-row,.bns-go,.bna-barday,.tl-hd,.wt-it>button,.nb-t,.nb-sug button,.h-chip,.nb-key,.wx-leg,.nx-leg,.nx-leg-body,.nx-leg-mini,.nx-card,.gx-card,.gx-leg,.nb-v,.nb-d,.nb-q,.nb-pulse,.nl-card,.nlx-card){
+:not(.leaflet-control *,.leaflet-ctrl *,.maplibregl-ctrl-group *,.maplibregl-popup-close-button,.maplibregl-ctrl-attrib-button):not(.nsa-b,.ss-ah,.hm-ah,.ns-row,.bn-mrow,.bn-theme-row,.bns-go,.bna-barday,.tl-hd,.wt-it>button,.nb-t,.nb-sug button,.h-chip,.nb-key,.wx-leg,.nx-leg,.nx-leg-body,.nx-leg-mini,.nx-card,.gx-card,.gx-leg,.nb-v,.nb-d,.nb-q,.nb-pulse,.nl-card,.nlx-card,.h-burger,a.bn-burger,#w2_open,.w2-mbtn,.bn-mbar .bn-close,.h-x,#w2_close,.w2-close,.bnm-mb,.bn-fbm){
   border-radius:var(--bn-radius-pill, 9999px)!important;
 }
 html body:has(#bn_story) .pill{border-radius:0!important}
@@ -515,7 +515,7 @@ html body:has(#bn_story) .pill{border-radius:0!important}
 html:not(#bn_pill) body :where(
   .bnt-btn,.sx-btn,.bng-btn,.bng-sb,.w2-btn,.np-btn,.bnt-mbtn,.bnt-rf,.bnt-foldb,.bnm-fbtn,.bnm-chip,
   .nx-more-btn,.gx-more-btn,.nx-leg-btn,.nx-chip,.nx-f button,.nx-sf button,.wx-reg button,
-  .tl-b,.w2-mbtn,#w2_open,a.bn-burger,.h-burger,button.pri,.nl-btn,.nla-btn,.rs-row button,
+  .tl-b,button.pri,.nl-btn,.nla-btn,.rs-row button,
   .m5-txt,#h_install,#h_moreopt,.h-extras button,.bn-ref,#tl_ref
 ):not([hidden]){
   box-sizing:border-box!important;height:var(--bn-pill-h)!important;min-height:var(--bn-pill-h)!important;max-height:var(--bn-pill-h)!important;
@@ -526,10 +526,12 @@ html:not(#bn_pill) body :where(
   white-space:nowrap!important;
 }
 html body :is(a.nl-btn,a.nla-btn,.rs-row button,.bnt-foldb,.bnt-rf,.m5-txt,#h_install,#h_moreopt,.h-extras button){display:inline-flex;align-items:center;justify-content:center}
-/* burger / close-menu targets: header chrome, same 40px height, close state is a 40px circle */
-html:not(#bn_pill) body :is(.h-burger,a.bn-burger,#w2_open,.bn-mbar .bn-close){height:var(--bn-pill-h)!important;min-height:var(--bn-pill-h)!important;min-width:var(--bn-pill-h)!important}
-html:not(#bn_pill) body :is(.h-burger,a.bn-burger,#w2_open,.bn-mbar .bn-close)[aria-label="Close menu"]{padding:0!important;width:var(--bn-pill-h)!important;max-width:var(--bn-pill-h)!important}
-:where(.bnt-foldb,.bnt-rf,.rs-row button,.m5-txt,#h_install,#h_moreopt,.h-extras button,a.bn-burger,.h-burger){border-color:var(--bn-pill-bd);background:transparent;color:inherit;text-decoration:none!important}
+/* burger / close-menu targets: bare 40px icons, no pill, no circle (Matt 7:39 AM ET Nov 28) */
+/* Matt 7:39 AM ET Nov 28: hamburger / close X are bare icons, not pills */
+html:not(#bn_pill) body :is(.h-burger,a.bn-burger,#w2_open,.w2-mbtn,.bn-mbar .bn-close,.h-x,#w2_close,.w2-close,.bnm-mb,.bn-fbm){border:0!important;background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border-radius:0!important;height:40px!important;width:40px!important;min-height:40px!important;min-width:40px!important;max-width:40px!important;padding:0!important;gap:0!important}
+html:not(#bn_pill) body :is(.h-burger,a.bn-burger,#w2_open,.w2-mbtn,.bn-mbar .bn-close,.h-x,#w2_close,.w2-close,.bnm-mb,.bn-fbm) .bn-bl{display:none!important}
+
+:where(.bnt-foldb,.bnt-rf,.rs-row button,.m5-txt,#h_install,#h_moreopt,.h-extras button){border-color:var(--bn-pill-bd);background:transparent;color:inherit;text-decoration:none!important}
 html body :is(.bnt-btn,.bng-btn,.w2-btn,.np-btn,.bnt-mbtn,.nl-btn,.nla-btn,button.pri,.nx-more-btn,.gx-more-btn):not(:hover){border-color:inherit}
 :where(.bn-ref,#tl_ref){border-color:var(--bn-pill-bd)}
 /* segmented groups: the group is the 40px pill, the inner buttons sit 3px inside it */

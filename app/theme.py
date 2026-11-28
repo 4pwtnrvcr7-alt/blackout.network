@@ -404,7 +404,7 @@ def _home_page_raw():
     wm = '<span class="bnt-wm">blackout.network</span>'
     m4 = __import__("os").environ.get("BN_MENU_V2", "1") != "0"   # Push H: SpaceX-language full-screen menu (BN_MENU_V2=0 = side drawer)
     m4cls = " h-menu4" if m4 else ""
-    m4btn = ('<span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span>' if m4 else "")
+    m4btn = ""  # Matt 7:39 AM ET Nov 28: bare hamburger, no MENU text
     hx = '<span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span>'
     mlead = ('<div class="h-m4lead"><a href="#s1" data-h-close>Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>' if m4
              else '<a class="h-mlive" href="/live">Live dashboard</a><a class="h-mlive" href="/wire">The Wire</a>')
