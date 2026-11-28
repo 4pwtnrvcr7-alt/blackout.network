@@ -185,37 +185,61 @@
   var US = [[-125.5, 23.5], [-66, 50]];
   function PAD() { var m = innerWidth < 768; return m ? { top: 150, bottom: 120, left: 18, right: 18 } : { top: 160, bottom: 90, left: 60, right: 80 }; }
 
-  /* ---------- loader: typographic boot, real step()/prog() weights, restrained ember accent (Matt 1:42 AM ET Nov 28) ---------- */
+  /* ---------- loader: 100 phosphor blocks tile the viewport, one per real percent, bottom-to-top (Matt pt2022u) ---------- */
   var P = { map: 0, nets: 0, out: 0, dc: 0, rep: 0 }, W8 = { map: 0.3, nets: 0.3, out: 0.1, dc: 0.15, rep: 0.15 }, shown = 0, ldDone = false, t0 = performance.now();
-  var ldN = 0, ldWant = 0, ldTimer = 0, ldAfter = null;
+  var ldN = 0, ldWant = 0, ldOrder = [], ldTimer = 0, ldAfter = null, ldByKey = null;
   function prog() { var p = 0; for (var k in P) p += W8[k] * P[k]; return Math.min(1, p); }
-  function ldPaintSteps() {
-    var list = document.querySelectorAll("#nx_ldsteps [data-s]"), i, el, v;
-    for (i = 0; i < list.length; i++) {
-      el = list[i]; v = P[el.getAttribute("data-s")] || 0;
-      el.classList.toggle("on", v > 0 && v < 0.999);
-      el.classList.toggle("ok", v >= 0.999);
+  function ldCache() {
+    if (ldByKey) return ldByKey;
+    ldByKey = new Array(100);
+    var nodes = document.querySelectorAll("#nx_ldb .gx-ldcell"), i, el;
+    for (i = 0; i < nodes.length; i++) {
+      el = nodes[i];
+      ldByKey[(+el.getAttribute("data-r")) * 10 + (+el.getAttribute("data-c"))] = el;
     }
+    return ldByKey;
   }
+  (function buildOrder() {
+    var r, c, i, a, b, tmp, row;
+    for (r = 0; r < 10; r++) {
+      row = [];
+      for (c = 0; c < 10; c++) row.push(r * 10 + c);
+      for (i = row.length - 1; i > 0; i--) { a = (Math.random() * (i + 1)) | 0; tmp = row[i]; row[i] = row[a]; row[a] = tmp; }
+      ldOrder = ldOrder.concat(row);
+    }
+    for (r = 0; r < 9; r++) {   /* scatter a few slots across the current/next row so it still reads bottom-to-top */
+      var nSwap = 2 + ((Math.random() * 2) | 0);
+      for (i = 0; i < nSwap; i++) {
+        a = r * 10 + 7 + ((Math.random() * 3) | 0);
+        b = (r + 1) * 10 + ((Math.random() * 3) | 0);
+        tmp = ldOrder[a]; ldOrder[a] = ldOrder[b]; ldOrder[b] = tmp;
+      }
+    }
+  })();
   function ldWrite(n) {
-    var pn = $("nx_ldn"), root = $("nx_ld"), bar = $("nx_ldbar");
+    var pn = $("nx_ldn"), root = $("nx_ld");
     if (pn) pn.textContent = String(n);
     if (root) root.setAttribute("aria-valuenow", String(n));
-    if (bar) { bar.style.width = n + "%"; bar.classList.toggle("on", n > 0); }
-    ldPaintSteps();
+  }
+  function ldDropOne() {
+    var k = ldOrder[ldN], el = ldCache()[k];
+    if (el) {
+      el.style.setProperty("--fall", ((11 - (k / 10 | 0)) * 2.4) + "vh");
+      el.classList.add("in");
+    }
+    ldN++;
+    ldWrite(ldN);
   }
   function ldSnap(n) {
     n = Math.max(0, Math.min(100, n | 0));
-    ldN = n;
-    ldWrite(ldN);
+    while (ldN < n) ldDropOne();
   }
   function ldTick() {
     ldTimer = 0;
     var want = (ldDone || prog() >= 0.999) ? 100 : ldWant;
     if (reduce) { ldSnap(want); if (ldN >= 100 && ldAfter) { var cb = ldAfter; ldAfter = null; cb(); } return; }
     if (ldN < want) {
-      ldN++;
-      ldWrite(ldN);
+      ldDropOne();
       var gap = want - ldN;
       var ms = gap > 40 ? 12 : gap > 15 ? 20 : 36;
       if (ldN < want || (ldDone && ldN < 100)) ldTimer = setTimeout(ldTick, ms);
@@ -231,26 +255,25 @@
     P[k] = Math.max(P[k], v);
     if (ldDone) return;
     var p = prog();
-    ldPaintSteps();
     if (p >= 0.999) {
       ldChase(100);
       setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0)));
     } else if (!BOOT) ldChase(Math.round(p * 100));
-  }   /* never a flash: the boot shows for at least ~2.6 s; percent is never capped at 99 */
+  }   /* never a flash: the build shows for at least ~2.6 s; percent is never capped at 99 */
   function finish() {
     if (ldDone) return; ldDone = true; shown = 1;
     var gone = false;
-    function reveal() {
+    function reveal() {   /* blocks have settled at 100%, then the overlay fades into the page */
       if (gone) return; gone = true;
       document.body.classList.add("nx-ready");
       try { window.__nxLoad = Math.round(performance.now() - t0); } catch (e) {}
       setTimeout(function () { if (BOOT) BOOT.stop(); var l = $("nx_ld"); if (l) l.remove(); }, 900);
     }
-    function afterFull() {
+    function afterBlocks() {
       ldWrite(100);
       if (BOOT) { BOOT.done(reveal); setTimeout(reveal, 3200); } else setTimeout(reveal, reduce ? 0 : 520);
     }
-    if (ldN >= 100) afterFull(); else ldChase(100, afterFull);
+    if (ldN >= 100) afterBlocks(); else ldChase(100, afterBlocks);
   }
   setTimeout(function () { if (!ldDone) { var m = $("nx_ldmsg"); if (m) { m.hidden = false; m.textContent = "Some layers are still loading. They finish in the background."; } setTimeout(finish, 900); } }, 25000);
   var BOOT = null;
@@ -284,7 +307,7 @@
   var pData = retry("/api/netmap/data", "nets", 3).then(liveOnly), pDc = retry("/api/netmap/dc", "dc", 2), pWorld = getJSON("/api/signal/world.geojson"),
     pInet = Promise.all([getJSON("/api/netmap/inet"), getJSON("/api/netmap/inet.json")]);   /* pt1810u: internet status per state, territory, country */
   pData.then(function () { step("out", 0.5); }, function () {});
-  setTimeout(function () { step("rep", 1); }, 9000);   /* safety fallback only: board.js normally reports first; does not invent progress */
+  setTimeout(function () { step("rep", 1); }, 9000);   /* the board's own fetch normally lands first; never hold the loader on it */
   window.__nxData = pData;   /* the status board (board.js) reads the same download */
   var D = null, DC = null, WORLD = null, INET = null, INETG = null, map = null, ready = false;
   /* Nov 24 2026 (Matt): map pop-ups sit next to the tapped item, always fully inside the visible screen (below the header and chips,
