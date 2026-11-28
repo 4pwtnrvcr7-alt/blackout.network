@@ -168,8 +168,11 @@ def _news_hits(items, places):
             hits.setdefault(k, []).append(dict(t=t, src=it.get("src"), url=it.get("url"), at=it.get("at"), shutdown=bool(_re.search(r"shutdown|blackout|nationwide", t, _re.I))))
     return hits
 
-def serve(server, news_items=None, now=None):
-    """Pick the freshest good snapshot (server build, last good in memory, box relay) and add news evidence."""
+def serve(server, news_items=None, now=None, wire=None):
+    """Pick the freshest good snapshot (server build, last good in memory, box relay) and add news evidence.
+    Nov 27 2026: when IODA and the relay are stale, overlay The Wire's internet-outage stories
+    (same live data as /wire) so the map is not grey worldwide and 'no outages' is only shown
+    when the Wire also has none."""
     now = now or time.time()
     if _good(server): _LG["v"] = server
     cands = [dict(x, via=v) for x, v in ((server if _good(server) else None, "server"), (_LG.get("v"), "server-last-good"), (relay(), "box-relay")) if x]
@@ -187,6 +190,17 @@ def serve(server, news_items=None, now=None):
         p = out["places"][k]; lvl = 3 if any(h["shutdown"] for h in hs) else 2
         p["news"] = hs[:3]
         if lvl > p.get("level", -1): p.update(level=lvl, status="Outage" if lvl == 3 else "Degraded")
-    lv = [p.get("level", -1) for p in out["places"].values()]
-    out["counts"] = dict(places=len(lv), live=sum(1 for x in lv if x >= 0), outage=lv.count(3), degraded=lv.count(2), normal=lv.count(0), no_data=lv.count(-1))
+    if wire is None:
+        try:
+            import netwire
+            wire = netwire.load()
+        except Exception:
+            wire = None
+    if isinstance(wire, dict):
+        import netwire
+        out = netwire.apply_inet(out, wire)
+    else:
+        out["wire_ok"] = False
+        lv = [p.get("level", -1) for p in out["places"].values()]
+        out["counts"] = dict(places=len(lv), live=sum(1 for x in lv if x >= 0), outage=lv.count(3), degraded=lv.count(2), normal=lv.count(0), no_data=lv.count(-1))
     return out

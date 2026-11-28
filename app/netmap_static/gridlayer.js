@@ -45,7 +45,9 @@
       WD.operators.forEach(function (o) { var s = regStatus(o.status); IDX["i:" + o.id] = o;
         f.push({ type: "Feature", geometry: { type: "Point", coordinates: [o.lon, o.lat] }, properties: { k: "i:" + o.id, kind: "region", s: s, c: COL[s], label: o.id === "GRIDINDIA" ? "INDIA" : o.id === "ENTSOE" ? "ENTSO-E" : o.id } }); });
       var seen = {}; D.weather.forEach(function (w) { seen[w.cluster_id] = 1; });
-      WD.wire.forEach(function (x) { if (seen[x.id]) return; var s = (x.rank || 0) >= 7 ? "out" : "strain"; IDX["x:" + x.id] = x;
+      (WD.wire || []).concat(WD.internet || []).forEach(function (x) {
+        if (seen[x.id] || x.lat == null || x.lon == null) return; seen[x.id] = 1;
+        var s = x.cur || (x.rank || 0) >= 7 ? "out" : "strain"; IDX["x:" + x.id] = x;
         f.push({ type: "Feature", geometry: { type: "Point", coordinates: [x.lon, x.lat] }, properties: { k: "x:" + x.id, kind: "weather", s: s, c: COL[s] } }); });
     }
     return { type: "FeatureCollection", features: f };
@@ -77,8 +79,8 @@
       h += '<p class="age">' + (o.source ? esc(o.source) : 'No live feed') + (o.data_time ? ' · ' + esc(ago(o.data_time)) : '') + '</p>';
       h += '<div class="acts">' + (url(o.site) ? '<a href="' + url(o.site) + '" target="_blank" rel="noopener noreferrer">Operator site</a>' : '') + '<button type="button" class="gx-fly" data-more="gx-world">Worldwide</button></div>';
     } else if (t === "x") {
-      var sx = (o.rank || 0) >= 7 ? "out" : "strain", dx = /^[0-9a-f]{16}$/.test(o.id || "") ? "/wire/" + o.id : "";
-      h = '<span class="st" style="color:' + COL[sx] + '"><i style="background:' + COL[sx] + '"></i>Grid alert · rank ' + esc(o.rank) + '</span><h3>' + esc(o.title) + '</h3>' +
+      var inet = o.kind === "internet", sx = (o.cur || (o.rank || 0) >= 7) ? "out" : "strain", dx = o.href || (/^[0-9a-f]{16}$/.test(o.id || "") ? "/wire/" + o.id : "");
+      h = '<span class="st" style="color:' + COL[sx] + '"><i style="background:' + COL[sx] + '"></i>' + (inet ? "Internet outage" : "Grid alert") + (o.rank != null && !inet ? ' · rank ' + esc(o.rank) : (o.cur ? " · ongoing" : "")) + '</span><h3>' + esc(o.title) + '</h3>' +
         (o.place ? '<p class="age">' + esc(o.place) + (o.prec && o.prec !== "exact" && o.prec !== "city" ? ' (approximate)' : '') + '</p>' : '') +
         '<p class="age">' + esc(ago(o.t)) + (o.src ? ' · ' + esc(String(o.src).replace(/\s*\([^)]*\)/g, "").slice(0, 40)) : '') + '</p><div class="acts">' + (dx ? '<a href="' + dx + '">Read on the Wire</a>' : '') +
         (url(o.url) ? '<a href="' + url(o.url) + '" target="_blank" rel="noopener noreferrer">Source</a>' : '') + '</div>';
@@ -265,9 +267,22 @@
         '<span class="m">' + (o.status !== "nodata" ? esc(regLabel(o.status)) + (o.vs_yesterday_pct != null ? ' · ' + pct(o.vs_yesterday_pct) + ' vs yesterday' : '') + (o.carbon_g_kwh != null ? ' · ' + esc(o.carbon_g_kwh) + ' g CO2/kWh' : '') + ' · ' + esc(ago(o.data_time)) : esc(o.reason || "No live feed")) +
         ' · <button type="button" class="gx-fly" data-fly="i:' + esc(o.id) + '">Show on map</button>' + (url(o.site) ? ' · <a href="' + url(o.site) + '" target="_blank" rel="noopener noreferrer">Operator site</a>' : '') + '</span>' +
         (o.series && o.series.length > 1 && o.status !== "nodata" ? '<span class="spk">' + spark(o.series, COL[s]) + '</span>' : '') + '</div>'; }).join("");
-    var wx = WD.wire.slice(0, 25);
+    var inet = (WD.internet || []).slice(0, 40);
+    h += '<p class="gx-k" style="margin-top:16px">Internet outages on the Wire, last 7 days</p>' + (inet.length ? inet.map(function (x) {
+      var d = x.href || (/^[0-9a-f]{16}$/.test(x.id || "") ? "/wire/" + x.id : "");
+      var when = x.t ? esc(ago(x.t)) : "";
+      var dur = x.hours != null ? (Number(x.hours).toFixed(1).replace(/\.0$/, "") + " h") : "";
+      var st = x.cur ? "Ongoing" : (x.end ? "Ended " + esc(ago(x.end)) : "");
+      return '<div class="gx-row"><h4>' + (x.cur ? '<span class="gx-rk hi">now</span>' : '') + esc(x.title) + '</h4><span class="n"></span><span class="m">' +
+        esc(x.place || x.cc || "") + (when ? ' · ' + when : '') + (dur ? ' · ' + esc(dur) : '') + (st ? ' · ' + st : '') +
+        (x.src ? ' · ' + esc(x.src) : '') +
+        (x.lat != null ? ' · <button type="button" class="gx-fly" data-fly="x:' + esc(x.id) + '">Show on map</button>' : '') +
+        (d ? ' · <a href="' + d + '">Story</a>' : '') + '</span></div>';
+    }).join("") : '<p class="gx-empty">No internet outage stories on the Wire in the last 7 days.</p>');
+    var wx = (WD.wire || []).slice(0, 25);
     h += '<p class="gx-k" style="margin-top:16px">Grid and blackout alerts on the Wire, last 7 days</p>' + (wx.length ? wx.map(function (x) { var d = /^[0-9a-f]{16}$/.test(x.id || "") ? "/wire/" + x.id : "";
       return '<div class="gx-row"><h4><span class="gx-rk' + ((x.rank || 0) >= 7 ? " hi" : "") + '">' + esc(x.rank) + '</span>' + esc(x.title) + '</h4><span class="n"></span><span class="m">' + esc(x.place || x.cc || "") + ' · ' + esc(ago(x.t)) +
+        (x.src ? ' · ' + esc(x.src) : '') +
         ' · <button type="button" class="gx-fly" data-fly="x:' + esc(x.id) + '">Show on map</button>' + (d ? ' · <a href="' + d + '">Story</a>' : '') + '</span></div>'; }).join("")
       : '<p class="gx-empty">No grid or blackout alerts with a place on the Wire in the last 7 days.</p>');
     h += '<p class="gx-empty" style="margin-top:10px">Live operator feeds refresh every ' + Math.round((WD.ttl_s || 300) / 60) + ' minutes. Operators without a free public feed show as no live data; nothing is estimated.</p>';
@@ -275,7 +290,7 @@
   }
   function loadWorld() {
     return fetch("/api/gridpage/world").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (w) {
-      WD = w; WD.operators = WD.operators || []; WD.wire = WD.wire || []; renderWorld(); if (D) paint();
+      WD = w; WD.operators = WD.operators || []; WD.wire = WD.wire || []; WD.internet = WD.internet || []; renderWorld(); if (D) paint();
     }).catch(function () { sec("gx-world", '<p class="gx-empty">Worldwide grid data could not be loaded right now.</p>'); });
   }
   function loadThreats() {

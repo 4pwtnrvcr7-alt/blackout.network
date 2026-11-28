@@ -146,7 +146,7 @@ def page(qs=None):
 <div class="gx-scroll" id="gx_scroll">
 <div class="gx-kpis" id="gx_kpis"></div>
 {sec("gx-regions", "Grid operators", "Status, demand and the last 36 hours for each operator region")}
-{sec("gx-world", "Worldwide", "Operators outside the U.S. and grid or blackout alerts on the Wire")}
+{sec("gx-world", "Worldwide", "Operators outside the U.S., internet outages, and grid or blackout alerts on the Wire")}
 {sec("gx-outages", "Outages by state", "Utility outage counts reported to DOE / ORNL ODIN")}
 {sec("gx-weather", "Weather threats to power", "Ranked weather alerts with grid and infrastructure checks")}
 {sec("gx-threats", "Grid threats", "Physical, cyber and reliability threats to U.S. power")}
@@ -272,6 +272,14 @@ def world():
         for x in th: x.start()
         for x in th: x.join(12)
         wire = _wire_grid()
+        internet = []
+        try:
+            import netwire
+            b = netwire.load()
+            if b:
+                internet = b.get("internet") or []
+        except Exception:
+            internet = []
         ops = []
         for oid, name, reg, lon, lat, bb, site, fn, why, src in INTL:
             near = [w for w in wire if _in(bb, w["lon"], w["lat"]) and (_age_h(w["t"] or "") or 99) <= 12]
@@ -292,6 +300,6 @@ def world():
         # Nov 24 2026 (Matt): operators without live data are pulled from the page (map points and the Worldwide list), not shown empty.
         pulled = [{"id": o["id"], "name": o["name"], "reason": o.get("reason")} for o in ops if o.get("status") == "nodata"]
         ops = [o for o in ops if o.get("status") != "nodata"]
-        v = {"generated": _iso(_dt.now(_tz.utc)), "operators": ops, "pulled": pulled, "wire": wire, "ttl_s": WORLD_TTL}
+        v = {"generated": _iso(_dt.now(_tz.utc)), "operators": ops, "pulled": pulled, "wire": wire, "internet": internet, "ttl_s": WORLD_TTL}
         _W.update(t=time.time(), v=v)
         return v

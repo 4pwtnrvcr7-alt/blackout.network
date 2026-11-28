@@ -63,7 +63,7 @@ class T(unittest.TestCase):
                 "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": 0}, "S:Florida": {"k": "S:Florida", "name": "Florida", "level": -1}}}
         d = tempfile.mkdtemp(); netinet.RELAY = d + "/r.json"; json.dump(snap, open(netinet.RELAY, "w"))
         dead = {"generated": netinet._iso(_t.time()), "feeds": {"country": False, "region": False}, "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": -1}}}
-        o = netinet.serve(dead, [{"t": "Internet outage hits Puerto Rico after storm", "src": "X", "url": "https://x"}])
+        o = netinet.serve(dead, [{"t": "Internet outage hits Puerto Rico after storm", "src": "X", "url": "https://x"}], wire=False)
         self.assertEqual((o["via"], o["all_down"]), ("box-relay", False))
         self.assertEqual(o["places"]["S:Florida"]["level"], 0); self.assertEqual(o["places"]["C:PR"]["level"], 2)
         self.assertGreaterEqual(o["age_s"], 299)
@@ -71,7 +71,7 @@ class T(unittest.TestCase):
         import time as _t
         netinet._LG.clear(); netinet.RELAY = "/nonexistent"
         dead = {"generated": netinet._iso(_t.time()), "feeds": {"country": False, "region": False}, "places": {"C:PR": {"k": "C:PR", "name": "Puerto Rico", "level": -1}}}
-        o = netinet.serve(dead, [])
+        o = netinet.serve(dead, [], wire=False)
         self.assertTrue(o["all_down"]); self.assertEqual(o["counts"]["no_data"], 1)
     def test_news_disambiguation(self):
         P = {k: {"name": n} for k, n in [("S:Georgia", "Georgia"), ("C:GE", "Georgia"), ("C:MX", "Mexico"), ("S:New Mexico", "New Mexico"),
@@ -94,5 +94,38 @@ class T(unittest.TestCase):
     def test_static_geo_served(self):
         st, body, ct = netmap.handle_get("/api/netmap/inet.json")
         self.assertEqual((st, ct), (200, "application/json")); self.assertIn(b'"S:Florida"', body); self.assertIn(b'"C:PR"', body)
+
+    def test_wire_outages_fill_map_when_ioda_is_down(self):
+        import netwire
+        netinet._LG.clear(); netinet.RELAY = "/nonexistent"
+        dead = {"generated": netinet._iso(__import__("time").time()), "feeds": {"country": False, "region": False},
+                "places": {"C:MW": {"k": "C:MW", "name": "Malawi", "level": -1, "status": "No data", "signals": []},
+                           "C:FR": {"k": "C:FR", "name": "France", "level": -1, "status": "No data", "signals": []}}}
+        now = netwire._now()
+        from datetime import timedelta
+        t = (now - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        bundle = netwire.stories_from_rows([
+            {"id": "aaaaaaaaaaaaaaaa", "title": "Malawi: internet outage, 10.0 h (IODA)", "place": "Malawi", "cc": "MW",
+             "t": t, "src": "IODA internet outages", "url": "https://ioda.inetintel.cc.gatech.edu/country/MW", "lat": -13.4, "lon": 33.6},
+        ], now=now)
+        o = netinet.serve(dead, [], wire=bundle)
+        self.assertFalse(o["all_down"])
+        self.assertEqual(o["via"], "wire")
+        self.assertEqual(o["places"]["C:MW"]["status"], "Outage")
+        self.assertGreaterEqual(o["places"]["C:MW"]["level"], 2)
+        self.assertEqual(o["places"]["C:FR"]["status"], "Normal")
+        self.assertEqual(o["counts"]["no_data"], 0)
+        self.assertTrue(o["wire_ok"])
+        self.assertEqual(o["wire"][0]["href"], "/wire/aaaaaaaaaaaaaaaa")
+
+    def test_wire_empty_is_green_not_no_data(self):
+        netinet._LG.clear(); netinet.RELAY = "/nonexistent"
+        dead = {"generated": netinet._iso(__import__("time").time()), "feeds": {"country": False, "region": False},
+                "places": {"C:FR": {"k": "C:FR", "name": "France", "level": -1, "status": "No data", "signals": []}}}
+        o = netinet.serve(dead, [], wire={"internet": [], "power": [], "ok": True})
+        self.assertFalse(o["all_down"])
+        self.assertEqual(o["places"]["C:FR"]["status"], "Normal")
+        self.assertEqual(o["counts"]["no_data"], 0)
+
 
 if __name__ == "__main__": unittest.main()
