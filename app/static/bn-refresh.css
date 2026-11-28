@@ -1,7 +1,10 @@
 /* Shared Refresh button (PR #293). Yellow is allowed on this button only.
-   Fill L→R with a yellow–orange–red blend and a moving sheen. Dark #0B0D10 text
-   is clipped to the fill (WCAG ≥6.28:1 on every stop); white text is clipped to
-   the unfilled dark remainder. Used on /wire, /map, /grid, /weather and /markets. */
+   Fill L→R with a yellow–orange–red blend and a moving sheen. Two stacked
+   identical label layers are clipped with clip-path:inset() at the same
+   --tl-ref-p as the fill (full-button box, not the text box) so a letter on
+   the edge can be half #0B0D10 and half white. Dark text on the fill
+   (WCAG ≥6.28:1 on every stop); white text on the unfilled remainder. No
+   per-letter spans. Used on /wire, /map, /grid, /weather and /markets. */
 .bn-ref,#tl_ref{all:unset;box-sizing:border-box;cursor:pointer;position:relative;overflow:hidden;
   display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;flex:none;
   border:1px solid rgba(255,255,255,.55);color:#fff;background:transparent;
@@ -17,8 +20,7 @@
 }
 .bn-ref .bn-ref-fill,.bn-ref .tl-ref-fill,#tl_ref .tl-ref-fill,#tl_ref .bn-ref-fill{
   display:none;position:absolute;inset:0 auto 0 0;width:var(--tl-ref-p);max-width:100%;
-  background:linear-gradient(90deg,#FFE566 0%,#FF9A1A 55%,#FF5A3C 100%);pointer-events:none;z-index:0;
-  transition:width .28s cubic-bezier(.22,.8,.24,1)}
+  background:linear-gradient(90deg,#FFE566 0%,#FF9A1A 55%,#FF5A3C 100%);pointer-events:none;z-index:0}
 .bn-ref .bn-ref-sheen,.bn-ref .tl-ref-sheen,#tl_ref .tl-ref-sheen,#tl_ref .bn-ref-sheen{
   position:absolute;top:0;bottom:0;left:0;width:42%;
   background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
@@ -27,15 +29,29 @@
 #tl_ref.busy .tl-ref-fill,#tl_ref.is-filling .tl-ref-fill,#tl_ref.busy .bn-ref-fill,#tl_ref.is-filling .bn-ref-fill{display:block}
 .bn-ref.busy,.bn-ref.is-filling,.bn-ref.is-result,#tl_ref.busy,#tl_ref.is-filling,#tl_ref.is-result{border-color:#fff;min-width:7.6rem}
 .bn-ref.busy svg,.bn-ref.is-filling svg,#tl_ref.busy svg,#tl_ref.is-filling svg{opacity:0;width:0;margin:0;overflow:hidden;animation:none}
-.bn-ref .bn-ref-lab,.bn-ref .tl-ref-lab,#tl_ref .tl-ref-lab,#tl_ref .bn-ref-lab{position:relative;z-index:1;display:inline-grid;align-items:center;justify-items:center}
+/* Idle: the label sits in the flex row next to the icon. While filling, it
+   covers the whole button so clip-path:inset() percentages match the fill
+   edge (width:var(--tl-ref-p) of the same box). A letter on the edge can be
+   half black and half white. No per-letter spans. */
+.bn-ref .bn-ref-lab,.bn-ref .tl-ref-lab,#tl_ref .tl-ref-lab,#tl_ref .bn-ref-lab{position:relative;z-index:1;display:inline-grid;align-items:center;justify-items:center;pointer-events:none}
 .bn-ref .bn-ref-lab-a,.bn-ref .bn-ref-lab-b,.bn-ref .tl-ref-lab-a,.bn-ref .tl-ref-lab-b,
-#tl_ref .tl-ref-lab-a,#tl_ref .tl-ref-lab-b,#tl_ref .bn-ref-lab-a,#tl_ref .bn-ref-lab-b{grid-area:1/1;white-space:nowrap}
+#tl_ref .tl-ref-lab-a,#tl_ref .tl-ref-lab-b,#tl_ref .bn-ref-lab-a,#tl_ref .bn-ref-lab-b{grid-area:1/1;white-space:nowrap;box-sizing:border-box}
 .bn-ref .bn-ref-lab-a,.bn-ref .tl-ref-lab-a,#tl_ref .tl-ref-lab-a,#tl_ref .bn-ref-lab-a{color:#fff}
-.bn-ref .bn-ref-lab-b,.bn-ref .tl-ref-lab-b,#tl_ref .tl-ref-lab-b,#tl_ref .bn-ref-lab-b{display:none;color:#0B0D10;clip-path:inset(0 calc(100% - var(--tl-ref-p)) 0 0)}
+.bn-ref .bn-ref-lab-b,.bn-ref .tl-ref-lab-b,#tl_ref .tl-ref-lab-b,#tl_ref .bn-ref-lab-b{visibility:hidden;color:#0B0D10}
+.bn-ref.busy .bn-ref-lab,.bn-ref.is-filling .bn-ref-lab,.bn-ref.busy .tl-ref-lab,.bn-ref.is-filling .tl-ref-lab,
+#tl_ref.busy .tl-ref-lab,#tl_ref.is-filling .tl-ref-lab,#tl_ref.busy .bn-ref-lab,#tl_ref.is-filling .bn-ref-lab{
+  position:absolute;inset:0;display:grid;place-items:stretch}
 .bn-ref.busy .bn-ref-lab-a,.bn-ref.is-filling .bn-ref-lab-a,.bn-ref.busy .tl-ref-lab-a,.bn-ref.is-filling .tl-ref-lab-a,
-#tl_ref.busy .tl-ref-lab-a,#tl_ref.is-filling .tl-ref-lab-a,#tl_ref.busy .bn-ref-lab-a,#tl_ref.is-filling .bn-ref-lab-a{clip-path:inset(0 0 0 var(--tl-ref-p))}
 .bn-ref.busy .bn-ref-lab-b,.bn-ref.is-filling .bn-ref-lab-b,.bn-ref.busy .tl-ref-lab-b,.bn-ref.is-filling .tl-ref-lab-b,
-#tl_ref.busy .tl-ref-lab-b,#tl_ref.is-filling .tl-ref-lab-b,#tl_ref.busy .bn-ref-lab-b,#tl_ref.is-filling .bn-ref-lab-b{display:block}
+#tl_ref.busy .tl-ref-lab-a,#tl_ref.is-filling .tl-ref-lab-a,#tl_ref.busy .bn-ref-lab-a,#tl_ref.is-filling .bn-ref-lab-a,
+#tl_ref.busy .tl-ref-lab-b,#tl_ref.is-filling .tl-ref-lab-b,#tl_ref.busy .bn-ref-lab-b,#tl_ref.is-filling .bn-ref-lab-b{
+  display:grid;place-items:center;align-self:stretch;justify-self:stretch;width:100%;height:100%}
+.bn-ref.busy .bn-ref-lab-a,.bn-ref.is-filling .bn-ref-lab-a,.bn-ref.busy .tl-ref-lab-a,.bn-ref.is-filling .tl-ref-lab-a,
+#tl_ref.busy .tl-ref-lab-a,#tl_ref.is-filling .tl-ref-lab-a,#tl_ref.busy .bn-ref-lab-a,#tl_ref.is-filling .bn-ref-lab-a{
+  clip-path:inset(0 0 0 var(--tl-ref-p))}
+.bn-ref.busy .bn-ref-lab-b,.bn-ref.is-filling .bn-ref-lab-b,.bn-ref.busy .tl-ref-lab-b,.bn-ref.is-filling .tl-ref-lab-b,
+#tl_ref.busy .tl-ref-lab-b,#tl_ref.is-filling .tl-ref-lab-b,#tl_ref.busy .bn-ref-lab-b,#tl_ref.is-filling .bn-ref-lab-b{
+  visibility:visible;clip-path:inset(0 calc(100% - var(--tl-ref-p)) 0 0)}
 .bn-ref.is-result,#tl_ref.is-result{background:rgba(255,255,255,.08)}
 .bn-ref.is-result .bn-ref-fill,.bn-ref.is-result .tl-ref-fill,#tl_ref.is-result .tl-ref-fill,#tl_ref.is-result .bn-ref-fill{display:none}
 @keyframes tlsheen{0%{transform:translateX(-120%)}100%{transform:translateX(280%)}}

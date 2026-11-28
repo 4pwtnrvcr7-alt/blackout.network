@@ -24,6 +24,32 @@ class TestSharedRefreshAssets(unittest.TestCase):
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn(".bn-has-ref .bn-tbar .bn-refresh", css)
 
+    def test_label_clip_is_pixel_exact_at_fill_edge(self):
+        """Matt 1:03 AM ET Nov 28: black over the fill, white over the rest,
+        split at the fill edge so one letter can be half of each. Two stacked
+        identical layers, clip-path:inset() on the button box, no per-letter spans."""
+        css = _read("static", "bn-refresh.css")
+        js = _read("static", "bn-refresh.js")
+        markup = _read("sitenav_ui.py")
+        self.assertIn("clip-path:inset(0 0 0 var(--tl-ref-p))", css)
+        self.assertIn("clip-path:inset(0 calc(100% - var(--tl-ref-p)) 0 0)", css)
+        # Clip box is the button (same box as the fill), not the shrink-wrapped text.
+        self.assertIn("position:absolute;inset:0", css)
+        self.assertIn("width:100%;height:100%", css)
+        # Fill and clip stay locked to --tl-ref-p; a lagged width transition
+        # would put dark text on the unfilled side.
+        self.assertNotIn("transition:width", css)
+        self.assertNotRegex(js, r"split\(|\[...lab|charAt|letter")
+        self.assertIn('L.a.textContent = lab', js)
+        self.assertIn('L.b.textContent = lab', js)
+        self.assertIn('tl-ref-lab-a', markup)
+        self.assertIn('tl-ref-lab-b', markup)
+        self.assertNotIn("tl-ref-ch", markup)
+        # Wire page CSS must not shrink the clip box back to the text.
+        wire = _read("wire_timeline_static", "app.css")
+        self.assertNotIn(".tl-ref-lab span{display:inline-grid}", wire)
+        self.assertNotIn("#tl_ref.busy>.tl-ref-lab", wire)
+
     def test_js_tracks_real_stages_and_skips_99(self):
         js = _read("static", "bn-refresh.js")
         self.assertIn("W.BNRefresh", js)
