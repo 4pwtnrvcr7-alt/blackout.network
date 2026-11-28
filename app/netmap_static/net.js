@@ -135,6 +135,47 @@
     return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago";
   }
   var COL = { ok: "#2FD67B", deg: "#FF3B3B", out: "#FF3B3B", na: "#7C8190", dc: "#7FD4FF", minor: "#C9CCD6", watch: "#FFA040" };
+  var WCOL = { "6h": "#FF3B3B", "24h": "#FF8A3D", "7d": "#A35C55" };
+  var KIND_LAYER = { internet: "internet", power: "grid", hydro: "hydro", cloud: "cloud", cable: "sea", towers: "towers", dc: "dc" };
+  var LAYER_KIND = { internet: "internet", grid: "power", hydro: "hydro", cloud: "cloud", sea: "cable", towers: "towers", dc: "dc" };
+  function wireCol(b) { return WCOL[b] || COL.ok; }
+  function wireOp(b) { return b === "6h" ? 0.5 : b === "24h" ? 0.36 : b === "7d" ? 0.22 : 0.28; }
+  function placeBand(r) {
+    if (r && r.band) return r.band;
+    var best = "", rank = { "6h": 3, "24h": 2, "7d": 1 };
+    ((r && r.wire) || []).forEach(function (h) { if ((rank[h.band] || 0) > (rank[best] || 0)) best = h.band; });
+    return best;
+  }
+  function wireLayers() { return (D && D.outages && D.outages.layers) || {}; }
+  function visibleKinds() {
+    var ks = [];
+    ["internet", "grid", "hydro", "cloud", "sea", "towers", "dc"].forEach(function (k) {
+      if (mapOn(k) || (typeof mapOn !== "function" && ON[k])) {
+        if (LAYER_KIND[k] && ks.indexOf(LAYER_KIND[k]) < 0) ks.push(LAYER_KIND[k]);
+      }
+    });
+    return ks.length ? ks : ["internet"];
+  }
+  function storyLink(h) {
+    var href = h && (h.href || h.url || (h.id && /^[0-9a-f]{16}$/.test(h.id) ? "/wire/" + h.id : ""));
+    if (!href) return "";
+    return '<a href="' + url(href) + '"' + (/^\//.test(href) ? "" : ' target="_blank" rel="noopener noreferrer"') + '>' + esc(h.title || h.t || "Open story") + '</a>';
+  }
+  function wireList(stories) {
+    if (!stories || !stories.length) return "";
+    return '<p>On The Wire:</p><ul>' + stories.map(function (h) {
+      var a = storyLink(h);
+      return '<li>' + (a || esc(h.title || h.t || "")) + (h.src ? ' · ' + esc(h.src) : "") + (h.at || h.t ? ' · ' + esc(ago(h.at || h.t)) : "") + (h.cur ? ' · ongoing' : "") + '</li>';
+    }).join("") + '</ul>';
+  }
+  function wireCard(p) {
+    var c = wireCol(p.band), lab = p.band === "6h" ? "Last 6 hours or current" : p.band === "24h" ? "6–24 hours" : "1–7 days";
+    var href = p.href || (p.id && /^[0-9a-f]{16}$/.test(p.id) ? "/wire/" + p.id : "");
+    return '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc((p.layerLabel || "Wire") + " · " + lab) + '</span><h3>' + esc(p.title || p.label || "") + '</h3>' +
+      (p.place ? '<p>' + esc(p.place) + '</p>' : "") +
+      '<div class="acts">' + (href ? linkA(href, "Open story") : "") + '</div>' +
+      (p.src ? '<p class="age">' + esc(p.src) + (p.t ? " · " + esc(ago(p.t)) : "") + '</p>' : "");
+  }
   var PROV = { aws: "#9DB4FF", azure: "#4FC3F7", gcp: "#B39DFF" };
   var PNAME = { aws: "AWS", azure: "Microsoft Azure", gcp: "Google Cloud" };
   function lvCol(l) { return l >= 2 ? COL.out : l === 1 ? COL.watch : l === 0 ? COL.ok : COL.na; }
@@ -401,19 +442,20 @@
     });
   }
 
-  /* IODA internet status. Green normal, red disruption or outage (same as Status cards), grey = IODA has no live data. */
-  function inetCol(l) { return l >= 2 ? COL.out : l === 0 ? COL.ok : COL.na; }
+  /* IODA internet status. Green if no Wire story in 7 days; otherwise recency (red / orange / grey-red). Grey only if measurements are unavailable. */
+  function inetCol(l, band) { return band ? wireCol(band) : (l >= 2 ? COL.out : l === 0 ? COL.ok : COL.na); }
   function applyInet() {
     if (!INET || !INETG || !map || !map.getSource("inet")) return;
     var P = INET.places || {};
     map.getSource("inet").setData({ type: "FeatureCollection", features: (INETG.features || []).map(function (f) {
-      var r = P[f.properties.k], l = r ? r.level : INET.all_down ? -1 : 0;   /* Matt: green unless there is evidence of a problem */
-      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l), l: l, o: l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08 } }; }) });
+      var r = P[f.properties.k], l = r ? r.level : INET.all_down ? -1 : 0, b = placeBand(r);
+      var o = b ? wireOp(b) : (l >= 3 ? 0.55 : l === 2 ? 0.45 : l === 0 ? 0.28 : 0.08);
+      return { type: "Feature", geometry: f.geometry, properties: { kind: "inet", k: f.properties.k, n: f.properties.n, c: inetCol(l, b), l: l, o: o, band: b || "", href: (r && r.wire && r.wire[0] && (r.wire[0].url || (r.wire[0].id ? "/wire/" + r.wire[0].id : ""))) || "" } }; }) });
     if (D) applyData();
     var nd = document.querySelector("#nx_leg .s-na"); if (nd && nd.parentNode) nd.parentNode.style.display = INET.all_down ? "" : "none";   /* "No data" only when every feed is down */
   }
   function inetCard(p) {
-    var r = (INET && INET.places || {})[p.k] || (INET && !INET.all_down ? { name: p.n, level: 0, status: "Normal", signals: [] } : { name: p.n, level: -1, status: "No data", signals: [] }), c = inetCol(r.level);
+    var r = (INET && INET.places || {})[p.k] || (INET && !INET.all_down ? { name: p.n, level: 0, status: "Normal", signals: [] } : { name: p.n, level: -1, status: "No data", signals: [] }), b = placeBand(r), c = inetCol(r.level, b);
     var nws = (r.news || []).map(function (h) { return '<li>' + (url(h.url) ? '<a href="' + url(h.url) + '" target="_blank" rel="noopener noreferrer">' + esc(h.t) + '</a>' : esc(h.t)) + (h.src ? ' · ' + esc(h.src) : '') + (h.at ? ' · ' + esc(ago(h.at)) : '') + '</li>'; }).join("");
     var wires = (r.wire || []).map(function (h) {
       var href = h.url || (h.id && /^[0-9a-f]{16}$/.test(h.id) ? "/wire/" + h.id : "");
@@ -434,7 +476,7 @@
     if (!WORLD || !D || !map.getSource("cty")) return;
     var by = {}; (D.outages.countries || []).forEach(function (c) { by[c.geo] = c; });
     var feats = (WORLD.features || []).filter(function (f) { return by[f.properties.name]; }).map(function (f) {
-      var c = by[f.properties.name]; return { type: "Feature", geometry: f.geometry, properties: { c: c.major ? COL.out : COL.deg, cur: !!c.cur } };
+      var c = by[f.properties.name]; return { type: "Feature", geometry: f.geometry, properties: { c: c.band ? wireCol(c.band) : (c.major ? COL.out : COL.deg), cur: !!c.cur, band: c.band || "", href: c.href || "" } };
     });
     map.getSource("cty").setData({ type: "FeatureCollection", features: feats });
     vis();
@@ -464,6 +506,20 @@
       var l = c.level, ring = l >= 2 ? lvCol(l) : PROV[c.p] || COL.minor;
       f.push(feat(c.lon, c.lat, { kind: "cloud", i: i, c: ring, fill: PROV[c.p] || COL.minor, sw: l >= 2 ? 3 : 1.6, r: 6.5, hot: l >= 2, label: (PNAME[c.p] ? PNAME[c.p] + " · " : "") + c.name, layer: "cloud" }));
     });
+    var LBL = { internet: "Internet", power: "Power", hydro: "Dam", cloud: "Cloud", cable: "Cable", towers: "Cell", dc: "Data center" };
+    var layers = wireLayers();
+    Object.keys(layers).forEach(function (kind) {
+      (layers[kind].stories || []).forEach(function (st) {
+        if (st.lon == null || st.lat == null) return;
+        var lyr = KIND_LAYER[kind];
+        if (!lyr) return;
+        /* Internet country fills already show country-level stories when the choropleth is on. */
+        if (kind === "internet" && INET && st.place && st.place.indexOf(",") < 0 && (st.prec === "country" || !st.prec)) return;
+        var b = st.band, c = wireCol(b);
+        f.push(feat(st.lon, st.lat, { kind: "wire", id: st.id, title: st.title, place: st.place, src: st.src, t: st.t, band: b, href: st.href || (st.id ? "/wire/" + st.id : ""),
+          c: c, fill: b === "6h" ? c : "#05060a", sw: 2, r: b === "6h" ? 7 : b === "24h" ? 6 : 5, hot: b === "6h", label: st.place || st.title, layer: lyr, layerLabel: LBL[kind] || kind }));
+      });
+    });
     PTS = f; vis(); summary(); list(); if (WORLD) applyWorld();
   }
   function feat(lon, lat, p) { return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: p }; }
@@ -487,25 +543,55 @@
     ["cty-fill", "cty-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("internet") && !INET ? "visible" : "none"); });
     ["inet-fill", "inet-line"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("internet") ? "visible" : "none"); });
     /* Nov 24 2026 (pt1816u): with Power grid on, the "normal" internet green is a faint tint so the green / yellow / red power lines stay readable (#129 raised it to 0.28 and washed every U.S. line green) */
-    if (map.getLayer("inet-fill")) map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"]);
-    if (map.getLayer("inet-line")) map.setPaintProperty("inet-line", "line-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.12, 0.45] : 0.45);
+    if (map.getLayer("inet-fill")) map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", [">", ["length", ["get", "band"]], 0], ["get", "o"], ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"]);
+    if (map.getLayer("inet-line")) map.setPaintProperty("inet-line", "line-opacity", mapOn("grid") ? ["case", [">", ["length", ["get", "band"]], 0], 0.7, ["==", ["get", "l"], 0], 0.12, 0.45] : 0.45);
     ["dc", "dc-glow"].forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("dc") ? "visible" : "none"); });
     SEA_L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn("sea") ? "visible" : "none"); });
     if (mapOn("sea")) seaLoad();
     INF_K.forEach(function (k) { INF[k].L.forEach(function (l) { if (map.getLayer(l)) map.setLayoutProperty(l, "visibility", mapOn(k) ? "visible" : "none"); }); if (mapOn(k)) infLoad(k); }); infPanel();
     document.querySelectorAll("#nx_f button").forEach(function (b) { b.setAttribute("aria-pressed", ON[b.dataset.k] ? "true" : "false"); });
     try { document.dispatchEvent(new CustomEvent("nx:layers", { detail: { ops: mapOn("grid") } })); } catch (e) {}   /* gridlayer.js (merged The Grid) */
+    if (D) summary();
   }
 
   function summary() {
     if (SKY.on) return;
-    var s = D.summary || {}, iss = (D.nets || []).filter(function (n) { return n.level >= 2; }), maj = iss.filter(function (n) { return n.level >= 3; });
-    var chip = $("nx_chip"), txt;
-    if (maj.length) { txt = maj.length + " major outage" + (maj.length > 1 ? "s" : "") + " · " + maj[0].name; chip.className = "nx-chip live s-out"; }
-    else if (iss.length) { txt = iss.length + " network" + (iss.length > 1 ? "s" : "") + " disrupted · " + iss[0].name; chip.className = "nx-chip live s-deg"; }
-    else { txt = innerWidth < 768 ? "No major U.S. outages · " + (s.networks || 0) + " tracked" : "No major U.S. network outages · " + (s.networks || 0) + " tracked"; chip.className = "nx-chip live s-ok"; }
+    var s = D.summary || {}, layers = wireLayers(), kinds = visibleKinds();
+    var n6 = 0, n24 = 0, n7 = 0, countries = 0, usAllNone = true;
+    kinds.forEach(function (k) {
+      var L = layers[k] || {};
+      n6 += L.n6 || 0; n24 += L.n24 || 0; n7 += L.n7 || 0; countries += L.countries_24h || 0;
+      if (L.us && L.us !== "U.S.: none major") usAllNone = false;
+    });
+    var us = usAllNone ? "U.S.: none major" : kinds.map(function (k) { return (layers[k] || {}).us; }).filter(function (u) { return u && u !== "U.S.: none major"; })[0] || "U.S.: none major";
+    var labels = { internet: "internet outages", power: "power outages", hydro: "dam incidents", cloud: "cloud outages", cable: "cable cuts", towers: "cell and telecom outages", dc: "data-center incidents" };
+    var active24 = kinds.filter(function (k) { return (layers[k] || {}).n24; });
+    var txt, chip = $("nx_chip");
+    if (!Object.keys(layers).length && !(D.outages && D.outages.wire_ok)) {
+      var iss = (D.nets || []).filter(function (n) { return n.level >= 2; }), maj = iss.filter(function (n) { return n.level >= 3; });
+      if (maj.length) { txt = maj.length + " major outage" + (maj.length > 1 ? "s" : "") + " · " + maj[0].name; chip.className = "nx-chip live s-out"; }
+      else if (iss.length) { txt = iss.length + " network" + (iss.length > 1 ? "s" : "") + " disrupted · " + iss[0].name; chip.className = "nx-chip live s-deg"; }
+      else { txt = "No matching outage stories on the Wire in the last 7 days"; chip.className = "nx-chip live s-ok"; }
+    } else if (n7 === 0) {
+      txt = kinds.length === 1 ? ("No " + labels[kinds[0]] + " on the Wire in the last 7 days") : "No matching outage stories on the Wire in the last 7 days";
+      chip.className = "nx-chip live s-ok";
+    } else if (n24 === 0) {
+      txt = kinds.length === 1 ? ("No " + labels[kinds[0]] + " in 24 h · " + n7 + " this week · " + us) : ("No outages in 24 h · " + n7 + " this week · " + us);
+      chip.className = "nx-chip live s-7d";
+    } else if (active24.length === 1) {
+      txt = n24 + " " + labels[active24[0]] + " in 24 h · " + ((layers[active24[0]] || {}).countries_24h || 0) + " countries · " + us;
+      chip.className = "nx-chip live " + (n6 ? "s-out" : "s-24h");
+    } else {
+      txt = n24 + " outages in 24 h · " + countries + " countries · " + us;
+      chip.className = "nx-chip live " + (n6 ? "s-out" : "s-24h");
+    }
     $("nx_sum").textContent = txt;
-    $("nx_more_lbl").textContent = "All " + (s.networks || "") + " networks";
+    var more = $("nx_more_lbl"); if (more) more.textContent = "All " + (s.networks || "") + " networks";
+    var ln = $("nx_wire_leg_n");
+    if (ln) {
+      if (kinds.length === 1) ln.textContent = n7 ? (n7 + " " + labels[kinds[0]] + " this week") : ("No " + labels[kinds[0]] + " on the Wire in the last 7 days");
+      else ln.textContent = n7 ? (n7 + " Wire outage stories this week") : "No matching outage stories on the Wire in the last 7 days";
+    }
   }
 
   /* ---------- detail card ---------- */
@@ -551,9 +637,11 @@
         '</dd><dt>Networks</dt><dd>' + num(r[ix.nets]) + '</dd><dt>Exchanges</dt><dd>' + num(r[ix.ixs]) + '</dd></dl><div class="acts">' + linkA("https://www.peeringdb.com/fac/" + r[ix.id], "PeeringDB record") + '</div>';
     } else if (p.kind === "country") {
       var o = D.outages.countries[p.i]; c = o.major ? COL.out : COL.deg;
-      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + (o.cur ? (o.major ? "Major outage now" : "Outage signal now") : "Outage in the last 24 h") + '</span><h3>' + esc(o.name) + '</h3>' +
+      c = o.band ? wireCol(o.band) : c;
+      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + (o.cur ? (o.major ? "Major outage now" : "Outage signal now") : (o.band === "6h" ? "Last 6 hours" : o.band === "7d" ? "In the last 7 days" : "In the last 24 h")) + '</span><h3>' + esc(o.name) + '</h3>' +
+        wireList(o.stories) +
         '<dl><dt>Signals</dt><dd>' + esc((o.signals || []).map(function (s) { return { bgp: "Routing (BGP)", "ping-slash24": "Active probing", "merit-nt": "Network telescope", gtr: "Google traffic", "gtr-norm": "Google traffic" }[s] || s; }).join(", ")) + '</dd><dt>Started</dt><dd>' + esc(ago(o.last)) + '</dd></dl>' +
-        '<div class="acts">' + (o.href ? linkA(o.href, "Wire story") : '') + linkA(o.ioda, "Live IODA dashboard") + '</div><p class="age">' +
+        '<div class="acts">' + (o.href ? linkA(o.href, "Open story") : '') + linkA(o.ioda, "Live IODA dashboard") + '</div><p class="age">' +
         (o.src ? esc(o.src) + '. ' : '') + 'Measured by IODA, Georgia Tech, or listed from The Wire when IODA is the source. A signal can be a local network problem, a power cut or a shutdown.</p>';
     } else if (p.kind === "region") {
       var rg = D.outages.us_regions[p.i];
@@ -566,6 +654,7 @@
     } else if (p.kind === "cable" || p.kind === "ls") { h = seaCard(p);
     } else if (p.kind === "tw" || p.kind === "gl" || p.kind === "ss" || p.kind === "hy") { h = infCard(p);
     } else if (p.kind === "inet") { h = inetCard(p);
+    } else if (p.kind === "wire") { h = wireCard(p);
     } else if (p.kind === "cloud") {
       var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = lvCol(cl.level);
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p]) + ' · ' + esc(lvName(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(n.status || "") + '</p>' +
