@@ -415,6 +415,37 @@ class SpendLedger(Base):
         self.assertEqual(out.get("keep-me", {}).get("headline"), "ok")
         self.assertLess(SW._NC["t"], 1)  # cache timestamp not refreshed on failure
 
+    def test_rule_tags_never_emits_news_or_brand(self):
+        row = {"cluster_id": "c" * 16, "title": "High Wind Warning issued November 27 at 10:08AM MST",
+               "brief": "WHAT: High wind warning for the plains.\nWHERE: Montana\nWHEN: tonight",
+               "location": "Montana", "category": "hazard", "rank": 2, "watchlist": 0, "hidden": 0}
+        tags = SW.rule_tags(row)
+        self.assertGreaterEqual(len(tags), 3)
+        self.assertLessEqual(len(tags), 5)
+        low = {t.lstrip("#").lower() for t in tags}
+        self.assertFalse(low & {"news", "blackoutnetwork", "blackout", "breaking", "alerts"})
+        import wire_check as WC
+        self.assertTrue(all(WC.tag_ok(t, row["title"]) for t in tags), tags)
+
+    def test_source_headline_rebuilds_thin_title(self):
+        import wire_check as WC
+        row = {"title": "Fire", "brief": "WHAT: Crews are responding to a warehouse fire.\nWHERE: Miami, Florida",
+               "location": "Miami, Florida", "category": "wreck"}
+        al = [{"title": "Warehouse fire spreads through a Miami industrial district", "source": "Local News"}]
+        h = SW.source_headline(row, al)
+        self.assertFalse(WC.thin_headline(h), h)
+        self.assertIn("Miami", h)
+        # without a source title, the lead plus place is still 4+ words
+        h2 = SW.source_headline({"title": "Update", "brief": "WHAT: Officials declared a state of emergency after flooding.",
+                                 "location": "Como", "category": "weather"}, [])
+        self.assertFalse(WC.thin_headline(h2), h2)
+
+    def test_thin_headline_gate_is_unchanged(self):
+        import wire_check as WC
+        self.assertTrue(WC.thin_headline("Maybe"))
+        self.assertTrue(WC.thin_headline("Fire"))
+        self.assertFalse(WC.thin_headline("Warehouse fire spreads through Miami"))
+
 
 if __name__ == "__main__":
     unittest.main()
