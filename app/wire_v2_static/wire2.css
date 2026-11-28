@@ -165,3 +165,60 @@ body.w2-lock{overflow:hidden}
 .w2-menu.w2-closing .w2-mlead a:nth-child(4){animation-delay:72ms}
 }
 @media (prefers-reduced-motion:reduce){.w2-menu .w2-mlead a,.w2-menu .w2-mg,.w2-menu .w2-mfoot{animation:none!important}}
+
+/* Matt Nov 28 2026 (6:48 AM ET): every button is the SAME pill. One standard for
+   height, padding, font size, letter-spacing and border, applied here so every page
+   that loads the shared sheet gets it. Standard: 40px tall, 14px side padding (12px
+   on phones), 11px / 600 Inter caps, .14em tracking, 1px border, fully round.
+   Icon-only round map controls (zoom, world, home, close) are 40x40 circles.
+   Not touched: the 22px pager dots, borderless header icon targets (.bn-ib),
+   full-width list row headers (.tl-hd etc.), the story-page .pill typography, and
+   the homepage section cards (.h-chip). The shared #293 Refresh keeps its fill, so
+   only its height, padding and type are set here; the fill and clip rules stay in bn-refresh.css. */
+:root{--bn-pill-h:40px;--bn-pill-px:14px;--bn-pill-fs:11px;--bn-pill-ls:.14em;--bn-pill-bd:rgba(255,255,255,.55)}
+@media (max-width:430px){:root{--bn-pill-px:12px}}
+html:not(#bn_pill) body :where(
+  .bnt-btn,.bng-btn,.bng-sb,.w2-btn,.np-btn,.bnt-mbtn,.bnt-rf,.bnt-foldb,.bnm-fbtn,.bnm-chip,
+  .nx-more-btn,.gx-more-btn,.nx-leg-btn,.nx-chip,.nx-f button,.nx-sf button,.wx-reg button,
+  .tl-b,.w2-mbtn,#w2_open,a.bn-burger,.h-burger,button.pri,.nl-btn,.nla-btn,.rs-row button,
+  .m5-txt,#h_install,#h_moreopt,.h-extras button,.bn-ref,#tl_ref
+):not([hidden]){
+  box-sizing:border-box!important;height:var(--bn-pill-h)!important;min-height:var(--bn-pill-h)!important;max-height:var(--bn-pill-h)!important;
+  padding:0 var(--bn-pill-px)!important;
+  font-family:Inter,system-ui,-apple-system,sans-serif!important;font-size:var(--bn-pill-fs)!important;font-weight:600!important;
+  letter-spacing:var(--bn-pill-ls)!important;line-height:1!important;text-transform:uppercase!important;
+  border-width:1px!important;border-style:solid!important;border-radius:9999px!important;
+  white-space:nowrap!important;
+}
+html body :is(a.nl-btn,a.nla-btn,.rs-row button,.bnt-foldb,.bnt-rf,.m5-txt,#h_install,#h_moreopt,.h-extras button){display:inline-flex;align-items:center;justify-content:center}
+/* burger / close-menu targets: header chrome, same 40px height, close state is a 40px circle */
+html:not(#bn_pill) body :is(.h-burger,a.bn-burger,#w2_open,.bn-mbar .bn-close){height:var(--bn-pill-h)!important;min-height:var(--bn-pill-h)!important;min-width:var(--bn-pill-h)!important}
+html:not(#bn_pill) body :is(.h-burger,a.bn-burger,#w2_open,.bn-mbar .bn-close)[aria-label="Close menu"]{padding:0!important;width:var(--bn-pill-h)!important;max-width:var(--bn-pill-h)!important}
+:where(.bnt-foldb,.bnt-rf,.rs-row button,.m5-txt,#h_install,#h_moreopt,.h-extras button,a.bn-burger,.h-burger){border-color:var(--bn-pill-bd);background:transparent;color:inherit;text-decoration:none!important}
+html body :is(.bnt-btn,.bng-btn,.w2-btn,.np-btn,.bnt-mbtn,.nl-btn,.nla-btn,button.pri,.nx-more-btn,.gx-more-btn):not(:hover){border-color:inherit}
+:where(.bn-ref,#tl_ref){border-color:var(--bn-pill-bd)}
+/* segmented groups: the group is the 40px pill, the inner buttons sit 3px inside it */
+:where(.nx-mode,.nx-units,.wx-modes){box-sizing:border-box!important;height:var(--bn-pill-h)!important;align-items:center!important}
+html body :is(.nx-mode,.nx-units,.wx-modes) button{height:32px!important;display:inline-flex!important;align-items:center!important;box-sizing:border-box!important;font-family:Inter,system-ui,sans-serif!important;font-size:var(--bn-pill-fs)!important;font-weight:600!important;letter-spacing:var(--bn-pill-ls)!important;line-height:1!important;text-transform:uppercase!important;padding:0 12px!important}
+html body .nx-units button{padding:0 10px!important}
+@media (max-width:430px){html body :is(.nx-mode,.nx-units,.wx-modes) button{padding:0 9px!important}html body .nx-units button{padding:0 7px!important}}
+/* round icon-only controls: one size, one circle */
+html:not(#bn_pill) body :where(.nx-b,.nx-x,.wx-b,.wx-x,.bnm-b,.wx-play){box-sizing:border-box!important;width:var(--bn-pill-h)!important;height:var(--bn-pill-h)!important;min-width:var(--bn-pill-h)!important;max-width:var(--bn-pill-h)!important;padding:0!important}
+:where(.nx-b,.nx-x,.wx-b,.wx-x,.wx-play){border-radius:50%!important}
+.bnm-b+.bnm-b{border-top-width:0!important}
+/* status chip is a 40px pill. On phones the top row (mode + units + Refresh) has no room for it
+   at the standard size, so it is hidden there (its text was already hidden; the Status view shows the same counts). */
+@media (max-width:430px){html:not(#bn_pill) body .nx-top .nx-chip{display:none!important}}
+/* email fields that sit beside a pill button match its height */
+:where(.h-optin .nl-row input[type=email],.h-optin input[type=email],.nlx-form input[type=email],.nl-form .nl-row input[type=email],.rs-form input){height:var(--bn-pill-h)!important;box-sizing:border-box}
+/* phones: the Grid's top row (mode, units, Refresh) must fit the bar. 390: slightly tighter inner padding;
+   <=380: Refresh drops its icon (label only) and the busy/fill/result states keep that same width. */
+@media (max-width:430px){html body :is(.nx-mode,.nx-units) button{padding-left:8px!important;padding-right:8px!important}html body .nx-units button{padding-left:6px!important;padding-right:6px!important}}
+@media (max-width:430px){html body .nx-top .bn-ref.busy,html body .nx-top .bn-ref.is-filling,html body .nx-top .bn-ref.is-result{min-width:6.7rem!important}}
+@media (max-width:380px){
+  html body :is(.nx-mode,.nx-units) button{padding-left:7px!important;padding-right:7px!important;letter-spacing:.1em!important}
+  html body .nx-units button{padding-left:5px!important;padding-right:5px!important}
+  html body .nx-top .bn-ref{padding-left:10px!important;padding-right:10px!important}
+  html body .nx-top .bn-ref svg{display:none!important}
+  html body .nx-top .bn-ref.busy,html body .nx-top .bn-ref.is-filling,html body .nx-top .bn-ref.is-result{min-width:5.3rem!important}
+}
