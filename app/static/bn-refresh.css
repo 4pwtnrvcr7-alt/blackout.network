@@ -56,3 +56,6 @@
 .bn-ref.bn-ref-sm.busy,.bn-ref.bn-ref-sm.is-filling,.bn-ref.bn-ref-sm.is-result{
   min-width:7.6rem;height:auto;min-height:40px;padding:0 14px;gap:8px}
 .bn-tbar .bn-ref.bn-ref-sm{align-self:center}
+
+.bn-tbar .bn-ref.bn-ref-sm,.w2-bar .bn-ref.bn-ref-sm,.w2-bar-end .bn-ref.bn-ref-sm{
+  position:relative;z-index:5;pointer-events:auto;cursor:pointer}

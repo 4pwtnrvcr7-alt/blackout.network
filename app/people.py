@@ -511,6 +511,38 @@ def profile_page(slug):
                          **({"birthDate": p["born_iso"]} if p.get("born_iso") else {}), **({"image": SITE + av} if av.startswith("/") else {})}}
     return 200, _page(f"{nm}: profile", desc, body, f"/people/{slug}", image=(SITE + av) if av.startswith("/") else None, ld=ld)
 
+
+# Built as a raw string so JS attribute quotes stay intact (the previous
+# concatenation used \" inside single-quoted Python strings, which emits raw
+# " and breaks the script with "Unexpected identifier 'pp'").
+PEOPLE_INDEX_JS = r"""
+<script>
+(function(){
+  function stamp(ts){
+    try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date((ts||0)*1000))+" ET"}
+    catch(e){return "Updated"}
+  }
+  function esc(s){return String(s||"").replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]})}
+  function card(p){
+    var n=+p.mentions_now||0;
+    var av=p.avatar?('<img class="pp-av" src="'+String(p.avatar).replace(/"/g,"&quot;")+'" alt="" width="56" height="56" loading="lazy" decoding="async">'):"";
+    var m=n?('<span class="pf-m">In '+n+" current stor"+(n===1?"y":"ies")+"</span>"):"";
+    return '<a class="pf-card" href="/people/'+encodeURIComponent(p.slug)+'">'+av+'<span class="pp-t"><span class="pp-n">'+esc(p.name)+'</span><span class="pp-r">'+esc(p.role)+"</span>"+m+"</span></a>";
+  }
+  window.bnRefreshPage=function(){
+    return fetch("/api/people/index?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){
+      if(!r.ok)throw new Error(r.status);return r.json();
+    }).then(function(j){
+      var g=document.getElementById("pf_grid");
+      if(g&&j.people)g.innerHTML=j.people.map(card).join("")||"<p>No profiles yet.</p>";
+      var u=document.getElementById("pf_up");if(u)u.textContent=stamp(j.generated);
+      return "Updated";
+    });
+  };
+})();
+</script>
+"""
+
 def index_page():
     P = profiles(); top = [s for s in (block().get("top") or []) if s in P]
     rest = sorted((s for s in P if s not in top), key=lambda s: P[s].get("name") or s)
@@ -524,14 +556,7 @@ def index_page():
             '<p class="dek">Public figures named in the stories BLACKOUT.NETWORK is tracking, most mentioned first. Each profile is neutral and sourced to Wikipedia and Wikidata.</p>'
             '<p class="dek pf-up" id="pf_up" aria-live="polite"></p>'
             f'<div class="pf-grid" id="pf_grid">{index_cards_html([{"slug":s,"name":P[s].get("name") or s,"role":P[s].get("role") or P[s].get("description") or "","avatar":avatar(P[s]) or "","mentions_now":int(P[s].get("mentions_now") or 0)} for s in top+rest])}</div></div>'
-            '<script>(function(){function stamp(ts){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date((ts||0)*1000))+" ET"}catch(e){return "Updated"}}'
-            'function card(p){var n=+p.mentions_now||0,av=p.avatar?("<img class=\"pp-av\" src=\""+String(p.avatar).replace(/"/g,"&quot;")+"\" alt=\"\" width=\"56\" height=\"56\" loading=\"lazy\" decoding=\"async\">"):"";'
-            'var m=n?("<span class=\"pf-m\">In "+n+" current stor"+(n===1?"y":"ies")+"</span>"):"";'
-            'return "<a class=\"pf-card\" href=\"/people/"+encodeURIComponent(p.slug)+"\">"+av+"<span class=\"pp-t\"><span class=\"pp-n\">"+String(p.name||"").replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])})+"</span><span class=\"pp-r\">"+String(p.role||"").replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])})+"</span>"+m+"</span></a>"}'
-            'window.bnRefreshPage=function(){return fetch("/api/people/index?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){'
-            'var g=document.getElementById("pf_grid");if(g&&j.people)g.innerHTML=j.people.map(card).join("")||"<p>No profiles yet.</p>";'
-            'var u=document.getElementById("pf_up");if(u)u.textContent=stamp(j.generated);return "Updated"})};'
-            '})();</script>')
+            + PEOPLE_INDEX_JS)
     return 200, _page("People in the news", "Neutral, sourced profiles of the public figures in BLACKOUT.NETWORK stories.", body, "/people")
 
 PAGE_CSS = """

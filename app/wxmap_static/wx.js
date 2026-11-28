@@ -1398,18 +1398,21 @@
         setTimeout(function () { R.busy(b, false); if (lab) R.done(b, lab); }, wait); }
     }
     if (b && R) R.stage(b, 20);
+    function raced(p, ms) {
+      return Promise.race([p, new Promise(function (resolve) { setTimeout(resolve, ms || 15000); })]);
+    }
     return Promise.all([
-      loadFrames(false),
-      loadAlerts().then(function (x) { if (b && R) R.stage(b, 45); return x; }),
-      loadStorms(),
-      loadTropical(),
-      loadGlobal(),
-      loadGrids()
+      raced(loadFrames(false), 15000),
+      raced(loadAlerts(), 8000).then(function (x) { if (b && R) R.stage(b, 45); return x; }),
+      raced(loadStorms(), 8000),
+      raced(loadTropical(), 8000),
+      raced(loadGlobal(), 8000),
+      raced(loadGrids(), 15000)
     ]).then(function () {
       if (b && R) R.stage(b, 90);
       fin("Updated");
     }).catch(function () {
-      if (b && R) { R.stage(b, 100); R.busy(b, false); }
+      fin("Couldn't refresh");
     });
   }
   window.bnRefreshPage = function () { return refreshNow(document.getElementById("wx_ref")); };

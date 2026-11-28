@@ -731,13 +731,13 @@ def render(slug):
               {"@type": "Question", "name": f"Where do I check {p['name']} status for my own account?", "acceptedAnswer": {"@type": "Answer", "text": f"{p['console'][0][0]}: {p['console'][0][1]}"}},
               {"@type": "Question", "name": f"What caused past {p['name']} outages?", "acceptedAnswer": {"@type": "Answer", "text": " ".join(f"{n['date']}: {n['title']} ({CAT_NAME[n['cat']]})." for n in p["notable"][:3])}}]}]
     body += (
-        '<script>(function(){function go(){var R=window.BNRefresh,b=document.getElementById("bn_hdr_ref");'
+        '<script>(function(){function pulled(){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){return "Updated"}}'
         'window.bnRefreshPage=function(){var slug=location.pathname.split("/").filter(Boolean).pop();'
         'return fetch("/api/network/"+encodeURIComponent(slug)+"/brief?fresh=1&_="+Date.now(),{cache:"no-store"})'
         '.then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){'
-        'var el=document.getElementById("np_fetched");if(el&&j.fetched_et)el.textContent=j.fetched_et;'
+        'var el=document.getElementById("np_fetched");if(el)el.textContent=j.fetched_et||pulled();'
         'return "Updated"})};'
-        '}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();</script>'
+        '})();</script>'
     )
     return site_page.page(title, desc, body, f"/grid/{slug}", active="net", jsonld=ld, og_type="website")
 
