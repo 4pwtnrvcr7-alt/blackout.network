@@ -92,3 +92,19 @@ class NoSquareButtonOverrides(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WireAllUnsetPills(unittest.TestCase):
+    """ /wire skips sitenav.css and theme.css; .tl-b and #w2_open.w2-mbtn use all:unset. """
+
+    def test_filter_date_condense_and_menu_set_pill_in_the_unset_rule(self):
+        tl = (ROOT / "wire_timeline_static" / "app.css").read_text(encoding="utf-8")
+        w2 = (ROOT / "wire_v2_static" / "wire2.css").read_text(encoding="utf-8")
+        m = re.search(r"\.tl-b\{([^}]+)\}", tl)
+        self.assertIsNotNone(m, ".tl-b rule missing")
+        self.assertRegex(m.group(1), r"border-radius\s*:\s*var\(--bn-radius-pill")
+        self.assertIn("all:unset", m.group(1))
+        # Refresh keeps its own radius in bn-refresh.css; this sheet must not restyle #tl_ref.
+        self.assertNotRegex(tl, r"#tl_ref\s*\{[^}]*border-radius")
+        self.assertRegex(w2, r"#w2_open\.w2-mbtn[^}]*border-radius\s*:\s*var\(--bn-radius-pill")
+        self.assertRegex(w2, r"\.w2-mbtn[^}]*border-radius\s*:\s*var\(--bn-radius-pill")

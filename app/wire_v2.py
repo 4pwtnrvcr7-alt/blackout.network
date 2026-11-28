@@ -215,7 +215,7 @@ def shell(title, desc, body, path, rank=None, noindex=False):
         f'<link rel="canonical" href="https://blackout.network{E(path)}">'
         f'{robots}{meta}<meta name="theme-color" content="#000">'
         f'<!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->'
-        f'<link rel="stylesheet" href="{ST}/wire2.css?v=7">{extra_head}</head>'
+        f'<link rel="stylesheet" href="{ST}/wire2.css?v=8">{extra_head}</head>'
         f'<body class="w2"><header class="w2-bar" id="w2_bar">'
         f'<a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>'
         f'{bar_end}</header>'

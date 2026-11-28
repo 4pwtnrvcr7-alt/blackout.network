@@ -40,7 +40,7 @@ body.tl{background:#000}
 .tl-search input::-webkit-search-cancel-button{display:none}
 .tl-qx{all:unset;cursor:pointer;color:#C9CDD3;font-size:22px;line-height:1;padding:0 2px}
 .tl-b{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid rgba(255,255,255,.55);color:#fff;
- font:600 11px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:background .18s,color .18s,border-color .18s,opacity .18s;white-space:nowrap}
+ font:600 11px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:background .18s,color .18s,border-color .18s,opacity .18s;white-space:nowrap;border-radius:var(--bn-radius-pill, 9999px)}
 .tl-b svg{width:16px;height:16px;flex:none}
 .tl-b.on,.tl-b[aria-pressed="true"]{background:#fff;color:#000;border-color:#fff}
 .tl-b:active{background:#fff;color:#000;border-color:#fff}
