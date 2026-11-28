@@ -7,7 +7,7 @@
 - Items rise in (staggered) when the menu opens and fall out on close (the menus' existing open/closing classes drive it);
   a tap on an item zooms through to the page. prefers-reduced-motion: plain fades, no movement.
 - Nov 27 2026 (Matt pt1984u): the old SVG radar is replaced by an original code-rendered canvas loop (static/pwa/bn-menu-city.js): a massive night city, the
-  lights go out in waves, then a peer-to-peer mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
+  lights go out in waves, then a mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
   closed or the tab is hidden, static frame under prefers-reduced-motion. Kill switch: BN_MENU_CITY=0 brings back the SVG radar.
 - "Install on home screen" and "Turn on notifications" buttons open the existing device-aware animated panels
   (static/pwa/install-guide.js: BN.installApp / BN.showNotifyGuide) on tap only. Nothing opens by itself.
@@ -26,6 +26,7 @@ YT_URL = "https://www.youtube.com/@blkoutntw"
 ORDER = [("intro", "Intro", "/?intro=1"), ("threat", "The Wire", "/wire"), ("heatmap", "Heat Map", "/map"), ("weather", "Weather", "/weather"),
          ("net", "The Grid", "/grid"),   # Nov 24 2026 (Matt pt1795u): Network Status merged with The Grid; /grid 302s to /grid
          ("finance", "Markets", "/markets"),
+         ("comms", "Comms", "/comms"),  # Nov 27 2026 (Matt 11:24 PM ET): coming-soon /comms on the traffic menu
          ("newsletter", "Newsletter", "/newsletter")]
 
 def items(intro_href=None):

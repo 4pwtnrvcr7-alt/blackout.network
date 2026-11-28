@@ -1,4 +1,4 @@
-"""Nov 27 2026 (Matt pt1984u): menu city blackout + peer-to-peer animation. Run: cd app && python3 -m unittest tests.test_menu_city -v"""
+"""Nov 27 2026 (Matt pt1984u): menu city blackout + mesh animation. Run: cd app && python3 -m unittest tests.test_menu_city -v"""
 import os, re, sys, unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import menu5
@@ -14,7 +14,7 @@ class MenuCity(unittest.TestCase):
         self.assertNotIn("m5a-sweep", h.split("</style>")[1].split("<script")[0])
         self.assertIn("/bn-menu-city.js?v=", h)
         self.assertNotIn("__CITYV__", h)
-        for label in ("Intro", "The Wire", "Heat Map", "Weather", "The Grid", "Markets", "Newsletter"):
+        for label in ("Intro", "The Wire", "Heat Map", "Weather", "The Grid", "Markets", "Comms", "Newsletter"):
             self.assertIn(label, h)
         self.assertIn("pointer-events:none", h)
 
