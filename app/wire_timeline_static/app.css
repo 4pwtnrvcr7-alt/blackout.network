@@ -228,3 +228,4 @@ body.tl{background:#000}
 /* archive rows (2000-2024 records, Nov 27 2026): grey outlined label, hashtags in the drawer */
 .tl-ar{font:600 9px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9AA0A8;border:1px solid #4A4F57;padding:2px 5px 2px;margin-right:8px;vertical-align:1px}
 .tl-tg{margin:10px 0 14px;font:500 12px/1.5 Inter,sans-serif;color:#8A9098;word-spacing:6px}
+@media (max-width:520px){.tl-sa{-webkit-line-clamp:2}}
