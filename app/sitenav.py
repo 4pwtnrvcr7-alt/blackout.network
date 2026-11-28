@@ -185,6 +185,9 @@ PAGES = {
  "comms": ("", "Comms | BLACKOUT.NETWORK",
            "Comms — coming soon.",
            "Comms — coming soon."),
+ "water": ("", "Water treatment status | BLACKOUT.NETWORK",
+           "Boil-water and do-not-drink notices, EPA drinking-water violations and sewage plant noncompliance, each linked to its source.",
+           "Boil-water notices, EPA violations and sewage plant noncompliance, each linked to its source."),
 }
 
 def tabs():
