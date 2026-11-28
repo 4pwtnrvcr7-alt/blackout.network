@@ -160,12 +160,26 @@ CSS = ('<style id="bn_m5">'
 
 JS = ('<script id="bn_m5js">(function(){if(window.__bnM5)return;window.__bnM5=1;'
  'var RM=false;try{RM=matchMedia("(prefers-reduced-motion: reduce)").matches}catch(e){}'
+ # Matt 11:44 PM ET Nov 27: after a menu tap, an emptied black drawer (boxed Alerts, no links,
+ # footer PRIVACY / TERMS / REPORT STATUS on #bn-menu pages) sometimes stayed on screen.
+ # The click handler preventDefault'd, faded .m5 to opacity 0 (m5-go), then waited 140-400ms to
+ # set location.href. A same-page tap (or /page#bn-menu -> /page) is a no-op, so the empty shell
+ # stuck. The delay also left that shell up during slow loads (Wire).
  'document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest(".m5-list a[href]");if(!a)return;'
  'if(e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||a.target==="_blank")return;'
  'var u;try{u=new URL(a.href,location.href)}catch(x){return}if(u.origin!==location.origin)return;'
- 'if(u.pathname===location.pathname&&u.search===location.search&&u.hash)return;'
- 'var m=a.closest(".m5");if(!m||m.classList.contains("m5-go"))return;e.preventDefault();e.stopPropagation();'
- 'a.parentNode.classList.add("m5-hit");m.classList.add("m5-go");setTimeout(function(){location.href=a.href},RM?140:400)},true);'
+ 'var m=a.closest(".m5");if(!m||m.classList.contains("m5-go"))return;'
+ 'var same=u.pathname===location.pathname&&u.search===location.search;'
+ 'if(same&&u.hash)return;'
+ 'function m5clear(){m.classList.remove("m5-go");[].forEach.call(m.querySelectorAll(".m5-hit"),function(h){h.classList.remove("m5-hit")})}'
+ 'function m5shut(){m5clear();var sh=m.closest("#bn-menu,#h_menu,#w2_menu");'
+ 'if(sh&&sh.id==="bn-menu"&&window.bnMenuClose){window.bnMenuClose();return}'
+ 'var c=sh&&sh.querySelector(".bn-close,#w2_close,.m3-close");if(c)c.click()}'
+ 'if(same){e.preventDefault();m5shut();return}'
+ 'e.preventDefault();e.stopPropagation();'
+ 'a.parentNode.classList.add("m5-hit");m.classList.add("m5-go");'
+ 'location.assign(u.pathname+u.search+u.hash);'
+ 'setTimeout(function(){if(!m.classList.contains("m5-go"))return;if(location.pathname===u.pathname&&location.search===u.search)return;location.assign(u.pathname+u.search+u.hash)},800)},true);'
  'addEventListener("pageshow",function(){[].forEach.call(document.querySelectorAll(".m5.m5-go"),function(m){m.classList.remove("m5-go");'
  '[].forEach.call(m.querySelectorAll(".m5-hit"),function(h){h.classList.remove("m5-hit")})})});'
  'function m5load(src,cb){var x=document.querySelector(\'script[data-m5-src="\'+src+\'"]\');if(x){x.addEventListener("load",cb);return}'

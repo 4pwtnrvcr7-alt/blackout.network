@@ -70,5 +70,25 @@ class MenuThumbLayout(unittest.TestCase):
             self.assertIn(">" + label + "</a>", body)
         self.assertEqual(body.count('<li class="m5-r"'), 8)
 
+class MenuBlankShell(unittest.TestCase):
+    """Matt 11:44 PM ET Nov 27: empty black menu (Alerts + Report status footer) after a tap."""
+
+    def _js(self):
+        return menu5.html_block("/wire").split("<script", 1)[1]
+
+    def test_same_page_tap_closes_instead_of_sticking(self):
+        js = self._js()
+        self.assertIn("function m5shut()", js)
+        self.assertIn("if(same){e.preventDefault();m5shut();return}", js)
+        self.assertIn("window.bnMenuClose", js)
+
+    def test_navigation_starts_immediately(self):
+        """Do not wait 140-400ms after emptying the menu; that is the stuck shell."""
+        js = self._js()
+        self.assertIn("location.assign(u.pathname+u.search+u.hash)", js)
+        self.assertNotIn("setTimeout(function(){location.href=a.href}", js)
+        self.assertNotIn("RM?140:400", js)
+
+
 if __name__ == "__main__":
     unittest.main()
