@@ -218,6 +218,21 @@ class T(unittest.TestCase):
             # Must not jump to O'Hare
             self.assertFalse(41.9 < (r.get("lat") or 0) < 42.05 and -88.0 < (r.get("lon") or 0) < -87.8, r)
 
+    def test_place_label_faa_ord_is_ohare(self):
+        lab = geo.place_label("FAA Ground stop: ORD (equipment outage)", "ORD, US")
+        self.assertRegex(lab, r"O.?Hare")
+        self.assertNotRegex(lab, r"^ORD, US$|Nebraska")
+
+    def test_place_label_faa_lex_is_lexington_ky(self):
+        lab = geo.place_label("FAA Ground stop: LEX (disabled aircraft on the runway)", "LEX, US")
+        self.assertRegex(lab, r"Blue Grass|Lexington")
+        self.assertNotRegex(lab, r"^LEX, US$|West Virginia")
+
+    def test_place_label_ord_nebraska_town_unchanged(self):
+        lab = geo.place_label("Ord, Nebraska evacuates after flash flooding", "Ord, Nebraska, United States")
+        self.assertIn("Ord", lab)
+        self.assertNotRegex(lab, r"O.?Hare")
+
 
 if __name__ == "__main__": unittest.main()
 
