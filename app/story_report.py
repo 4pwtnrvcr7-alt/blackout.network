@@ -207,7 +207,15 @@ def figure(im, lead=False):
         pass
     cap = (im.get("caption") or "").strip()
     loc, fb = _local(src)
-    return (f'<figure class="sr-fig{" sr-lead" if lead else ""}{" sr-file" if im.get("kind") in ("person", "place") else ""}"><a href="{E(link)}" target="_blank" rel="noopener">'
+    orient = ""
+    if im.get("kind") in ("person", "place"):
+        if h > w:
+            orient = " sr-port"
+        elif w >= int(h * 1.9):
+            orient = " sr-wide"
+        else:
+            orient = " sr-land"
+    return (f'<figure class="sr-fig{" sr-lead" if lead else ""}{" sr-file" if im.get("kind") in ("person", "place") else ""}{orient}"><a href="{E(link)}" target="_blank" rel="noopener">'
             f'<img src="{E(loc)}"{fb} alt="{E(im.get("alt") or cap)}" width="{w}" height="{h}" {_LOADING[bool(lead)]} decoding="async" referrerpolicy="no-referrer"></a>'
             f'<figcaption>{E(cap)} <span class="sr-cr">Image: {E(im.get("credit") or "")}. {E(im.get("license") or "")}. '
             f'<a href="{E(link)}" target="_blank" rel="noopener">Source{icon("ext", "sr-i sr-i-s")}</a></span></figcaption></figure>')
@@ -654,7 +662,8 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
         kmh = "" if not li else f'<details class="sr-more"><summary>Key moments ({len(li)})</summary><ol class="sr-tl">{"".join(li)}</ol></details>'
     g = chart_time(rows) + chart_sources(rows)
     graphics = f'<section class="sr-card sr-graphics" aria-label="Graphics">{g}</section>' if g else ""
-    main = head + (lead_vis if lead_vis else "") + (people or "") + "".join(S) + gallery + kmh
+    # File photo first so Bottom line and the brief can wrap around it on tablet/desktop (Matt, 9:36 PM ET Nov 27).
+    main = (lead_vis if lead_vis else "") + head + (people or "") + "".join(S) + gallery + kmh
     side = (f'<div class="sr-loc">{locator}</div>' if locator else "") + facts + graphics
     return (f'<style>{CSS}</style><article class="sr sr2" aria-label="Story brief" data-bnt-skip><div class="sr-grid"><div class="sr-main">{main}</div>'
             f'<aside class="sr-side" aria-label="Key facts and graphics">{side}</aside></div></article>'), dek
@@ -737,11 +746,16 @@ html:not([data-theme="light"]) .sr a:not([class]){color:#F2F2F4}
 .sr-more summary::-webkit-details-marker{display:none}.sr-more[open] summary{margin-bottom:14px}
 .sr2 .sr-fig.sr-lead{margin-bottom:24px}.sr2 .sr-fig img{max-height:420px}
 .sr-gfx{background:transparent!important}.sr-glance{display:block;width:100%;height:auto;color:var(--sr-ink)}
-/* File portraits (person/place): show the whole image on tablet and desktop.
-   The previous cover crop at max-height 380px sliced tall portraits down to hair and eyes. */
-.sr2 .sr-fig.sr-file>a{background:#0d0e10}
-.sr2 .sr-fig.sr-file img{width:100%;height:auto;max-height:min(70vh,720px);object-fit:contain;object-position:50% 20%;background:#0d0e10}
-@media(max-width:767px){.sr2 .sr-fig.sr-file img{max-height:min(56vh,480px);object-fit:contain;object-position:50% 20%}}
+/* File photos: natural aspect, no crop, no letterbox. On tablet and desktop the
+   lead figure floats so the brief wraps around it (Matt, 9:36 PM ET Nov 27). */
+.sr2 .sr-fig.sr-file>a{background:transparent}
+.sr2 .sr-fig.sr-file img{width:100%;height:auto;max-height:none;object-fit:unset;background:transparent}
+@media(min-width:768px){
+.sr2 .sr-fig.sr-lead.sr-file.sr-port{float:right;width:40%;max-width:420px;margin:4px 0 18px 28px}
+.sr2 .sr-fig.sr-lead.sr-file.sr-land{float:right;width:50%;max-width:520px;margin:4px 0 18px 28px}
+.sr2 .sr-fig.sr-lead.sr-file.sr-wide{float:none;width:100%;max-width:none;margin:0 0 24px}
+.sr2 .sr-gal,.sr2 .sr-if,.sr2 .sr-more{clear:both}
+}
 @media(max-width:600px){.sr-if{grid-template-columns:1fr}.sr-share{grid-template-columns:1fr}.sr-share img{max-height:200px}.sr p.sr-bline-p{font-size:17px}.sr-ul li,.sr-ol li{font-size:15.5px}}
 
 
