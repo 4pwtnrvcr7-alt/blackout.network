@@ -44,7 +44,9 @@ class Menus(unittest.TestCase):
         for x in self.hrefs(h): self.assertFalse(D.href_off(x), x)
         for need in ("/wire", "/map", "/weather", "/grid", "/markets", "/newsletter", "https://x.com/BlkoutNtw", "https://www.youtube.com/@blkoutntw"):
             self.assertIn(need, self.hrefs(h))
-        self.assertIn('data-m5-act="install"', h); self.assertIn('data-m5-act="notify"', h)
+        # Nov 28 (#365): Install App and Alerts are regular menu items that open /setup; no Install/Notifications pills
+        self.assertIn("/setup#install", self.hrefs(h)); self.assertIn("/setup#notifications", self.hrefs(h))
+        self.assertNotIn('data-m5-act=', h)
         self.assertIn("prefers-reduced-motion", h)
         self.assertNotRegex(h.lower(), r"#ffc21a|#c97b00")   # no yellow in the menu
     def test_sitenav_drawer(self):
