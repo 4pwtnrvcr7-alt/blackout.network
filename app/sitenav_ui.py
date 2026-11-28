@@ -107,6 +107,20 @@ def theme_btn(cls):
     return (f'<button type="button" class="bn-ib bn-theme {cls}" data-bn-theme aria-label="Switch to light mode" title="Light / dark mode">'
             f'{I_SUN}{I_MOON}<span class="bn-tl">Light mode</span></button>')
 
+
+# Shared #293 Refresh fill button (Matt Nov 27–28 2026). Same markup on /wire, /map, /grid, /weather, /markets.
+_REF_FILL_SVG = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" '
+                 'fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg>')
+def refresh_fill_assets():
+    return '<link rel="stylesheet" href="/bn-refresh.css"><script src="/bn-refresh.js" defer></script>'
+def refresh_fill_btn(id="bn_ref", extra_class=""):
+    cls = ("bn-ref " + (extra_class or "")).strip()
+    return (f'<button type="button" class="{E(cls)}" id="{E(id)}" aria-label="Refresh">'
+            '<i class="tl-ref-fill bn-ref-fill" aria-hidden="true"><i class="tl-ref-sheen bn-ref-sheen"></i></i>'
+            + _REF_FILL_SVG +
+            '<span class="tl-ref-lab bn-ref-lab"><span class="tl-ref-lab-a bn-ref-lab-a">Refresh</span>'
+            '<span class="tl-ref-lab-b bn-ref-lab-b" aria-hidden="true">Refresh</span></span></button>')
+
 def refresh_on():
     try:
         import refresh_all
