@@ -392,5 +392,29 @@ class SpendLedger(Base):
         finally:
             os.environ.pop("BN_WRITER_DAILY_USD", None)
 
+    def test_new_arrivals_templated_before_paid_queue(self):
+        """Free templates for new arrivals must run before write_one/continue (27 Nov 2026 Wire stall)."""
+        import inspect
+        src = inspect.getsource(SW._writer_worker)
+        i_free = src.find("package_pending(max_backfill=0)")
+        i_job = src.find("if job:")
+        self.assertGreaterEqual(i_free, 0, "missing package_pending(max_backfill=0)")
+        self.assertGreaterEqual(i_job, 0, "missing paid-job drain")
+        self.assertLess(i_free, i_job, "new-arrival templates must run before the paid queue")
+        self.assertIn("free templates:", src)
+
+    def test_notes_does_not_cache_empty_on_read_error(self):
+        """A mid-handoff notes() failure must not cache {} and look like no write-ups."""
+        SW._NC.update(t=0, v={"keep-me": {"headline": "ok"}})
+        real = SW.cfg
+        SW.cfg = lambda: {**real(), "db": "/tmp/bn_missing_story_writer_does_not_exist.db"}
+        try:
+            out = SW.notes(max_age=0)
+        finally:
+            SW.cfg = real
+        self.assertEqual(out.get("keep-me", {}).get("headline"), "ok")
+        self.assertLess(SW._NC["t"], 1)  # cache timestamp not refreshed on failure
+
+
 if __name__ == "__main__":
     unittest.main()
