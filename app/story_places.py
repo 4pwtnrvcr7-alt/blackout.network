@@ -59,8 +59,18 @@ def _load():
 
 def sig_of(item, g):
     g = g or {}
+    # Include geo.VERSION only for aviation IATA items so a geocoder rule change re-places those pins
+    # without invalidating every other story's memo.
+    extra = None
+    try:
+        import geo
+        loc = item.get("loc") or item.get("location") or ""
+        if geo.aviation_iata_codes(item.get("title") or "", loc):
+            extra = f"iata:{getattr(geo, 'VERSION', 0)}"
+    except Exception:
+        extra = None
     return hashlib.sha1(json.dumps([item.get("title"), item.get("loc"), item.get("lat"), item.get("lon"), bool(item.get("brief")),
-                                    g.get("located"), g.get("lat"), g.get("lon"), g.get("precision"), g.get("place"), g.get("reason_code")],
+                                    g.get("located"), g.get("lat"), g.get("lon"), g.get("precision"), g.get("place"), g.get("reason_code"), extra],
                                    default=str).encode()).hexdigest()[:16]
 
 def memo_get(sid, sig):

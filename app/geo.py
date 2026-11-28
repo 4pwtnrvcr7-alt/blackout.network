@@ -1047,6 +1047,15 @@ def place_label(title, loc, max_len=90):
     """A readable place for story pages: never a raw NWS zone dump ('Inland Volusia; Orange; ...')."""
     loc = (loc or "").strip()
     if not loc: return ""
+    # v13 follow-up: FAA IATA items must show the airport, not the raw "ORD, US" location field
+    try:
+        codes = aviation_iata_codes(title or "", loc)
+        if codes:
+            ap = iata_place(codes[0])
+            if ap and ap.get("place"):
+                return ap["place"][:max_len]
+    except Exception:
+        pass
     # v10 (pt1686u): the headline names one country and the location field another (a merged GDACS cluster: "Forest fire in Australia",
     # location "Brazil") -> the headline's country
     if ";" not in loc and "," not in loc:
