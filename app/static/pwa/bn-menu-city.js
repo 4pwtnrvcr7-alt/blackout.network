@@ -299,12 +299,12 @@
   };
 
   City.prototype.caption = function (t) {
-    var ctx = this.ctx, txt = "", col = "rgba(200,210,220,", al = 1, mark = 0, n = 0, i;
+    var ctx = this.ctx, txt = "", col = "rgba(200,210,220,", al = 1, mark = 0, i;
     if (t < 2.4) { txt = "GRID ONLINE"; al = sm(t / .4) * (1 - sm((t - 2.1) / .3)); mark = 1; }
     else if (t < 6.8) { txt = "GRID DOWN"; al = sm((t - 2.8) / .3) * (1 - sm((t - 6.5) / .3)); mark = 2; if (t < 2.8) al = 0; }
     else if (t < 12.9) {
-      var full = "PEER-TO-PEER LINK ESTABLISHED", k = Math.floor(clamp01((t - 7.0) / 1.1) * full.length); txt = full.slice(0, k); mark = 3; col = "rgba(190,238,255,";
-      al = sm((t - 6.9) / .2) * (1 - sm((t - 12.6) / .3)); for (i = 0; i < this.nodes.length; i++) if (this.nodes[i].on <= t) n++;
+      var full = "blackout.network activated", k = Math.floor(clamp01((t - 7.0) / 1.1) * full.length); txt = full.slice(0, k); mark = 3; col = "rgba(190,238,255,";
+      al = sm((t - 6.9) / .2) * (1 - sm((t - 12.6) / .3));
     } else { txt = "GRID RESTORED"; al = sm((t - 13.0) / .3) * (1 - sm((t - 14.1) / .3)); mark = 1; }
     function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
     if (al <= .01 || !txt) return;
@@ -315,7 +315,6 @@
     ctx.fillStyle = col + ".95)"; var cx = x + 17, sp = 1.6 * u;
     for (i = 0; i < txt.length; i++) { ctx.fillText(txt[i], cx, y); cx += ctx.measureText(txt[i]).width + sp; }
     if (mark === 2 && Math.floor(t * 2.5) % 2 === 0) ctx.fillRect(cx + 1, y - 5, 5 * u, 10 * u * .9);
-    if (mark === 3 && n) { var s2 = "NODES " + (n < 10 ? "00" : n < 100 ? "0" : "") + n; ctx.fillStyle = "rgba(190,238,255,.7)"; ctx.fillText(s2, x + 17, y + 16 * u); }
     ctx.globalAlpha = 1;
   };
 

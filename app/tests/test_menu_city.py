@@ -35,8 +35,9 @@ class MenuCity(unittest.TestCase):
     def test_script_rules(self):
         s = open(JS, encoding="utf-8").read()
         for needle in ("prefers-reduced-motion", "visibilitychange", "document.hidden", "devicePixelRatio", "Math.min(window.devicePixelRatio || 1, 2",
-                       "GRID DOWN", "PEER-TO-PEER LINK ESTABLISHED", "requestAnimationFrame", "cancelAnimationFrame"):
+                       "GRID DOWN", "blackout.network activated", "requestAnimationFrame", "cancelAnimationFrame"):
             self.assertIn(needle, s)
+        self.assertNotIn("NODES ", s)
         low = s.lower()
         for bad in ("meshtastic", "lora", "http://", "https://", "fetch(", "xmlhttprequest", "#ffc21a", "yellow"):
             self.assertNotIn(bad, low, bad)
