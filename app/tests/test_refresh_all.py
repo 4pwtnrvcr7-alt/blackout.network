@@ -126,12 +126,25 @@ class Wiring(unittest.TestCase):
         self.assertIn('"/api/refresh": "Scans run on', ra)        # the box-only scan endpoint stays refused
 
     def test_refresh_button_sits_next_to_the_theme_icon(self):
-        bar = UI.topbar(sitenav)
-        i, j = bar.find('class="bn-ib bn-js-only bn-refresh"'), bar.find("bn-theme-bar")
+        # Compact shared #293 button only on live-data header pages (Matt: no control if it would refresh nothing).
+        UI.set_page_path("/stats")
+        try:
+            bar = UI.topbar(sitenav)
+        finally:
+            UI.set_page_path("")
+        i, j = bar.find('id="bn_hdr_ref"'), bar.find("bn-theme-bar")
         self.assertGreater(i, 0); self.assertGreater(j, i)
-        self.assertIn('aria-label="Refresh data"', bar)
-        self.assertIn('Refresh data</span>', bar)                # desktop tooltip text
-        self.assertIn('role="status" aria-live="polite"', bar)   # "Updated just now"
+        self.assertIn("bn-ref-sm", bar)
+        self.assertIn("tl-ref-fill", bar)
+        self.assertIn(">Refresh</span>", bar)
+        self.assertNotIn('data-bn-refresh', bar)
+        UI.set_page_path("/privacy")
+        try:
+            legal = UI.topbar(sitenav)
+        finally:
+            UI.set_page_path("")
+        self.assertNotIn('id="bn_hdr_ref"', legal)
+        self.assertNotIn("data-bn-refresh", legal)
 
     def test_client_posts_once_and_reloads(self):
         js = src("static", "sitenav.js")
@@ -186,9 +199,11 @@ if __name__ == "__main__":
 class PhoneMenuRow(unittest.TestCase):
     """Nov 13 (Matt): phone menu top row is one line: Alerts, refresh icon, theme icon, Free brief."""
     def test_menu_has_icon_refresh_next_to_theme(self):
+        # Menu no longer carries a Refresh row; the shared button lives in the page or compact top bar.
         dr = UI.drawer(sitenav, "sources")
-        i, j = dr.find('class="m3-tl bn-rf-row bn-js-only" data-bn-refresh aria-label="Refresh data" title="Refresh data"'), dr.find("bn-theme-row m3-tl")
-        self.assertGreater(i, 0); self.assertGreater(j, i)
+        self.assertNotIn("bn-rf-row", dr)
+        self.assertNotIn("data-bn-refresh", dr)
+        self.assertIn("bn-theme-row", dr)
         with mock.patch.dict(os.environ, {"BN_REFRESH_ALL": "0"}):
             self.assertNotIn("bn-rf-row", UI.drawer(sitenav, "sources"))
 
