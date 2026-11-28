@@ -145,7 +145,7 @@ def _norm_path(path=None):
     return p or "/"
 
 # Pages that already have the full in-page #293 button (header icon stays off).
-_REFRESH_INPAGE = {"/wire", "/map", "/grid", "/weather", "/markets"}
+_REFRESH_INPAGE = {"/wire", "/map", "/grid", "/weather", "/markets", "/water"}
 
 # Static or legal pages: no live data to re-fetch. No refresh control at all.
 _REFRESH_OFF_EXACT = {
