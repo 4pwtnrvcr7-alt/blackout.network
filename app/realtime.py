@@ -309,8 +309,15 @@ def refresh(ip):
             while time.time() < end and not (ST["last_ingest"] and ST["last_ingest"] >= t_ask and ST["ingests"] > before):
                 ST["cv"].wait(timeout=0.25)
         pulled = ST["new_total"] - n0
+    scan = {}
+    try:
+        wt = sys.modules.get("wire_timeline") or _mod("wire_timeline")
+        if wt is not None and hasattr(wt, "scan_stats"):
+            scan = wt.scan_stats() or {}
+    except Exception:
+        scan = {}
     return 200, {"ok": True, "mac": "online" if mac_on else "offline", "asked_scanner": asked, "pulled_new": pulled,
-                 "seq": ST["seq"], "last_scan": _last_scan(), "now": _iso()}
+                 "seq": ST["seq"], "last_scan": _last_scan(), "now": _iso(), "scan": scan}
 
 def public():
     now = time.time()
