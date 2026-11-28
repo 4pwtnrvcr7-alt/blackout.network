@@ -226,7 +226,7 @@
     ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = .55 * avg; ctx.drawImage(this.haze, 0, 0); ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.drawMesh(t);
-    this.scrim(); this.caption(t);
+    this.scrim(); this.fade(); this.caption(t);
   };
 
   City.prototype.drawMesh = function (t) {
@@ -286,6 +286,16 @@
     var ctx = this.ctx, W = this.W, H = this.H;
     if (W >= 900) { var g = ctx.createLinearGradient(W * .38, 0, W * .86, 0); g.addColorStop(0, "rgba(4,6,9,0)"); g.addColorStop(1, "rgba(4,6,9,.55)"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
     else { ctx.fillStyle = "rgba(4,6,9,.18)"; ctx.fillRect(0, 0, W, H); }
+  };
+
+  // soften the canvas edges so the city melts into the menu instead of ending in a hard rectangle
+  City.prototype.fade = function () {
+    var ctx = this.ctx, W = this.W, H = this.H, f = Math.min(44 * this.u, W * .12), g;
+    ctx.globalCompositeOperation = "destination-out";
+    g = ctx.createLinearGradient(0, 0, f, 0); g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)"); ctx.fillStyle = g; ctx.fillRect(0, 0, f, H);
+    g = ctx.createLinearGradient(W - f, 0, W, 0); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,1)"); ctx.fillStyle = g; ctx.fillRect(W - f, 0, f, H);
+    g = ctx.createLinearGradient(0, H - f * .8, 0, H); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,1)"); ctx.fillStyle = g; ctx.fillRect(0, H - f * .8, W, f * .8);
+    ctx.globalCompositeOperation = "source-over";
   };
 
   City.prototype.caption = function (t) {
