@@ -293,8 +293,8 @@ class NetSky(unittest.TestCase):
         self.assertIn("map.setPitch(0); map.setBearing(0)", js)
         self.assertIn('try { map.setProjection({ type: "mercator" }); map.setPitch(0); map.setBearing(0); } catch (e) {}', js)
         self.assertIn("pitch: 0, bearing: 0", js)
-        self.assertIn('["any", ["==", ["get", "hot"], true], ["==", ["get", "kind"], "cloud"]]', js)
-        self.assertIn("r: 6.5", js)
+        self.assertIn('["any", ["==", ["get", "hot"], true], ["all", ["==", ["get", "kind"], "cloud"], ["!=", ["get", "edge"], true]]]', js)   # pt2098u: Cloudflare edge dots carry no always-on label
+        self.assertIn("c.edge ? 3.6 : 6.5", js)
         self.assertIn('layer: "cloud"', js)
 
     def test_sky_chip_show_initialized_from_pressed(self):
