@@ -270,6 +270,23 @@ def _nl_credits():
     )
 
 
+def _nl_sections_credits():
+    """v5: Weather and Crime-near-you header photos (newsletter_sections_pool.json) join the same /credits#newsletter list."""
+    base = _nl_credits()
+    extra = _pool_credit_rows(
+        "newsletter_sections_pool.json",
+        "Newsletter section images",
+        "Weather headers show a real photo of the kind of sky in the forecast (not the reader's town); Crime headers are generic, with no people or incidents.",
+    )
+    if not base or not extra:
+        return base or extra
+    key, head, rows = base[0]
+    note = rows[-1] if rows and rows[-1][0] == "Note" else None
+    rows = rows[:-1] if note else rows
+    rows += extra[0][2][:-1] + [("Note", "Generic topic images that open each newsletter section. They do not show the events in the stories. Weather headers show a real photo of the kind of sky in the forecast, not the reader's town. Crime headers are generic: no people, no incidents.", "")]
+    return [(key, head, rows)]
+
+
 def _og_pool_credits():
     """Extra share-card conflict/cyber pool (card_photo_pool.json), same attribution fields as the email pool."""
     return _pool_credit_rows(
@@ -279,7 +296,7 @@ def _og_pool_credits():
     )
 
 
-CREDITS_LEDGER += _nl_credits()
+CREDITS_LEDGER += _nl_sections_credits()
 CREDITS_LEDGER += _og_pool_credits()
 CREDITS_PAGE_KEY = {"/": "intro", "/live": "live", "/dashboard": "live", "/wire": "wire"}
 
