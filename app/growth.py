@@ -59,7 +59,7 @@ def people_in(text, limit=3):
 def _ro():
     c = sqlite3.connect(f"file:{os.path.join(BASE, 'blackout.db')}?mode=ro", uri=True, timeout=10); c.row_factory = sqlite3.Row; return c
 
-STATIC_PAGES = [("/", "hourly", "1.0"), ("/wire", "hourly", "0.9"), ("/newsletter", "daily", "0.9"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
+STATIC_PAGES = [("/", "hourly", "1.0"), ("/wire", "hourly", "0.9"), ("/newsletter", "daily", "0.9"), ("/comms", "weekly", "0.7"), ("/scoring", "weekly", "0.8"), ("/social", "hourly", "0.8"),
                 ("/sources", "daily", "0.7"), ("/stats", "hourly", "0.6"), ("/crime", "hourly", "0.8"), ("/grid", "hourly", "0.8"), ("/mesh", "hourly", "0.7"), ("/mesh/chat", "weekly", "0.5"), ("/mesh/guide", "monthly", "0.6"), ("/cern", "weekly", "0.7"),
                 ("/grid/aws", "hourly", "0.7"), ("/grid/azure", "hourly", "0.7"), ("/grid/m365", "hourly", "0.7"), ("/grid/gcp", "hourly", "0.7"),
                 ("/grid/workspace", "hourly", "0.7"), ("/grid/cloudflare", "hourly", "0.7"), ("/grid/akamai", "hourly", "0.7"), ("/grid/starlink", "hourly", "0.7"), ("/grid/near", "weekly", "0.6"), ("/newsletter/sample", "daily", "0.5"),
@@ -153,6 +153,7 @@ and situational awareness only; it is not an official warning service. Follow of
 - [How we score]({SITE}/scoring): the 0-100 severity score and the 0-10 rank, explained factor by factor
 - [Sources]({SITE}/sources): every source we use, with item counts and a 0-10 confidence rating
 - [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
+- [Comms]({SITE}/comms): Comms — coming soon.
 - [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
 - [Off-grid network map]({SITE}/mesh): live map of public off-grid mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
 ## Dashboard tabs
