@@ -1,5 +1,5 @@
 /* Water panel and dots on /grid. No yellow. Buttons are the site-wide pills. */
-:root{--wt-dnd:#FF4D4F;--wt-boil:#F0F0FA;--wt-viol:#6EA8FE;--wt-snc:#B79CFF;--wt-news:#8E97A6}
+:root{--wt-dnd:#FF4D4F;--wt-boil:#F0F0FA;--wt-viol:#6EA8FE;--wt-snc:#B79CFF;--wt-news:#8E97A6;--wt-dw:#2EE6D6;--wt-ww:#C084FC}
 body.nx .bng-mesh{display:none!important}
 .nx-water-btn{all:unset;box-sizing:border-box;position:fixed;z-index:21;left:16px;bottom:calc(18px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:99px;cursor:pointer;font:600 13px/1 Inter,system-ui,sans-serif;color:#F0F0FA;background:rgba(20,22,30,.85);border:1px solid rgba(240,240,250,.26);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .nx-water-btn:hover{border-color:rgba(240,240,250,.6)}
@@ -30,3 +30,17 @@ body.nx-water-on .nx-water{visibility:visible}
 .wt-it .x .k{color:rgba(240,240,250,.62);font-size:12px}
 .wt-it.sel>button,.wt-it.open>button{background:rgba(240,240,250,.04)}
 body.nx-sky .nx-water-btn,body.nx-sky .nx-water{display:none!important}
+
+.wt-dot.wt-dw,.wt-dot.wt-plant{background:var(--wt-dw)}
+.wt-drop{display:inline-block;width:9px;height:12px;margin:0 2px 0 0;background:var(--wt-dw);border-radius:70% 70% 60% 60% / 40% 40% 70% 70%;clip-path:polygon(50% 0,100% 62%,80% 90%,50% 100%,20% 90%,0 62%);vertical-align:middle;flex:0 0 auto;box-shadow:0 0 0 1px #05060A}
+.wt-drop.wt-ww{background:var(--wt-ww)}
+.wt-mapleg{position:fixed;z-index:22;left:12px;bottom:calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-radius:12px;background:rgba(20,22,30,.86);border:1px solid rgba(240,240,250,.22);color:#F0F0FA;font:600 11px/1.3 Inter,system-ui,sans-serif;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);pointer-events:none}
+.wt-mapleg[hidden]{display:none!important}
+.wt-mapleg span{display:flex;align-items:center;gap:8px}
+.wt-mapleg .wt-dot{margin:0;width:8px;height:8px;border-radius:50%}
+body.nx-water-on .wt-mapleg{bottom:calc(58dvh + 12px)}
+@media (min-width:768px){
+  .wt-mapleg{left:16px;bottom:24px}
+  body.nx-water-on .wt-mapleg{left:16px;bottom:24px}
+}
+body.nx-sky .wt-mapleg{display:none!important}

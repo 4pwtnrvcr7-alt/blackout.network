@@ -1,12 +1,16 @@
 /* Water layer + panel on /grid. Lazy: nothing is fetched until the Water chip is on (or /grid/water[/id] is opened). Not part of the loader weights.
    Plants: /api/netmap/water?w&s&e&n&z -> viewport clusters (z<9) or capped points (z>=9) from a read-only SQLite store, every plant cites a source.
-   Status dots: /api/water/map (slim). Panel list: /api/water/data?limit=30 (most severe first, paged). One item: /api/water/item?id=. */
+   Status dots: /api/water/map (slim). Panel list: /api/water/data?limit=30 (severity, then US first, then recency; paged). One item: /api/water/item?id=.
+   /grid/water (no item) recenters on the lower 48, with padding so the panel does not hide the United States. */
 (function () {
-  var COL = { dnd: "#FF4D4F", boil: "#F0F0FA", viol: "#6EA8FE", snc: "#B79CFF", news: "#8E97A6", dw: "#6EA8FE", ww: "#B79CFF" };
+  var COL = { dnd: "#FF4D4F", boil: "#F0F0FA", viol: "#6EA8FE", snc: "#B79CFF", news: "#8E97A6", dw: "#2EE6D6", ww: "#C084FC" };
   var LABEL = { dnd: "Do not drink or use", boil: "Boil water", viol: "Drinking-water violation", serious: "Serious violation", snc: "Sewage plant noncompliance", news: "News report" };
   var EMPTY = { type: "FeatureCollection", features: [] };
-  var map = null, on = false, sel = "", bootTried = false, vt = 0, vctl = null, lastKey = "", info = null;
-  var curFeats = [], stFeats = [], adv = [], advTotal = 0, advPulled = false, items = {}, statusRows = null, plantTotal = 0, plantCountries = 0;
+  var US = [[-125.5, 23.5], [-66, 50]];   /* same box as net.js: the lower 48, not Canada */
+  var map = null, on = false, sel = "", bootTried = false, vt = 0, vctl = null, lastKey = "", info = null, fitted = false;
+  var curFeats = [], stFeats = [], adv = [], advTotal = 0, advPulled = false, items = {}, statusRows = null;
+  var plantTotal = (window.BN_WATER && window.BN_WATER.plants) || 0;
+  var plantCountries = (window.BN_WATER && window.BN_WATER.countries) || 0;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -21,17 +25,70 @@
   function chip() { return document.querySelector('#nx_f [data-k="water"]'); }
   function num(n) { return Number(n || 0).toLocaleString("en-US"); }
 
+  function mkDrop(fill) {
+    var s = 64, c = document.createElement("canvas");
+    c.width = s; c.height = s;
+    var g = c.getContext("2d"), cx = 32, top = 4, r = 16, cy = 38;
+    g.beginPath();
+    g.moveTo(cx, top);
+    g.bezierCurveTo(cx + 20, top + 20, cx + r + 6, cy - 10, cx + r, cy);
+    g.arc(cx, cy, r, 0.08 * Math.PI, 0.92 * Math.PI, false);
+    g.bezierCurveTo(cx - r - 6, cy - 10, cx - 20, top + 20, cx, top);
+    g.closePath();
+    g.fillStyle = fill;
+    g.fill();
+    g.lineWidth = 3.2;
+    g.strokeStyle = "#05060A";
+    g.stroke();
+    g.beginPath();
+    g.ellipse(cx - 4, cy - 4, 5, 3.5, -0.5, 0, Math.PI * 2);
+    g.fillStyle = "rgba(255,255,255,.4)";
+    g.fill();
+    return g.getImageData(0, 0, s, s);
+  }
+  function ensureIcons() {
+    if (!map || !map.addImage) return;
+    try {
+      if (!map.hasImage("wt-dw")) map.addImage("wt-dw", mkDrop(COL.dw), { pixelRatio: 2 });
+      if (!map.hasImage("wt-ww")) map.addImage("wt-ww", mkDrop(COL.ww), { pixelRatio: 2 });
+    } catch (e) {}
+  }
+
+  function panelPad() {
+    var m = innerWidth < 768, onp = document.body.classList.contains("nx-water-on");
+    if (m) {
+      var bottom = onp ? Math.min(Math.round(innerHeight * 0.58) + 16, innerHeight - 150 - 200) : 120;
+      return { top: 150, bottom: Math.max(80, bottom), left: 18, right: 18 };
+    }
+    var left = onp ? Math.min(520, innerWidth) + 24 : 60;
+    left = Math.min(left, Math.max(60, innerWidth - 400));
+    return { top: 160, bottom: 90, left: left, right: 80 };
+  }
+  function accountForPanel() {
+    if (!map || bootId()) return;
+    var z = 0;
+    try { z = map.getZoom(); } catch (e) { return; }
+    var pad = panelPad(), opts = { padding: pad, pitch: 0, bearing: 0, duration: fitted ? 400 : 0 };
+    try {
+      if (!fitted || z < 6) map.fitBounds(US, opts);
+      else map.easeTo({ center: map.getCenter(), padding: pad, duration: 300 });
+      fitted = true;
+    } catch (e) {}
+  }
+
   function setOn(v) {
     on = !!v;
     vis();
-    if (on) { loadStatus(); fetchView(true); openPanel(true); openBoot(); } else openPanel(false);
+    if (on) { loadStatus(); fetchView(true); openPanel(true); accountForPanel(); openBoot(); } else openPanel(false);
+    syncLeg();
   }
 
   function vis() {
     if (!map) return;
-    ["wt-cl", "wt-cnt", "wt-pt", "wt-st"].forEach(function (id) {
+    ["wt-cl", "wt-cnt", "wt-pt-halo", "wt-pt", "wt-st"].forEach(function (id) {
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
     });
+    syncLeg();
   }
 
   function addLayers(n) {
@@ -40,6 +97,7 @@
     try {
       if (!map.getSource("wt")) map.addSource("wt", { type: "geojson", data: EMPTY });
       if (!map.getSource("wtst")) map.addSource("wtst", { type: "geojson", data: EMPTY });
+      ensureIcons();
     } catch (e) {   /* style not parsed yet: try again shortly (never a page error) */
       if (n < 40) setTimeout(function () { addLayers(n + 1); }, 400);
       return;
@@ -47,14 +105,17 @@
     if (map.getLayer("wt-st")) return;
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = on ? "visible" : "none"; map.addLayer(o); }
     L({ id: "wt-cl", type: "circle", source: "wt", filter: ["==", ["get", "t"], "c"],
-      paint: { "circle-color": "rgba(110,168,254,.16)", "circle-stroke-color": ["case", [">", ["get", "w"], ["*", ["get", "n"], 0.5]], "#B79CFF", "#6EA8FE"], "circle-stroke-width": 1, "circle-stroke-opacity": 0.75,
+      paint: { "circle-color": "rgba(46,230,214,.16)", "circle-stroke-color": ["case", [">", ["get", "w"], ["*", ["get", "n"], 0.5]], COL.ww, COL.dw], "circle-stroke-width": 1.2, "circle-stroke-opacity": 0.9,
         "circle-radius": ["step", ["get", "n"], 9, 10, 12, 100, 16, 500, 20, 2000, 26, 10000, 32] } });
     L({ id: "wt-cnt", type: "symbol", source: "wt", filter: ["==", ["get", "t"], "c"],
       layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Regular"], "text-size": 10, "text-allow-overlap": true },
       paint: { "text-color": "rgba(240,240,250,.92)" } });
-    L({ id: "wt-pt", type: "circle", source: "wt", filter: ["==", ["get", "t"], "p"],
-      paint: { "circle-color": ["match", ["get", "k"], 1, COL.ww, COL.dw], "circle-stroke-color": "#05060a", "circle-stroke-width": 1,
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 3.5, 12, 5.5, 15, 8] } });
+    L({ id: "wt-pt-halo", type: "circle", source: "wt", filter: ["==", ["get", "t"], "p"],
+      paint: { "circle-color": "rgba(5,6,10,.55)", "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 6, 12, 9, 15, 12], "circle-opacity": 0.7 } });
+    L({ id: "wt-pt", type: "symbol", source: "wt", filter: ["==", ["get", "t"], "p"],
+      layout: { "icon-image": ["match", ["get", "k"], 1, "wt-ww", "wt-dw"], "icon-anchor": "bottom",
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 9, 0.55, 11, 0.8, 13, 1.05],
+        "icon-allow-overlap": true, "icon-ignore-placement": true } });
     L({ id: "wt-st", type: "circle", source: "wtst",
       paint: { "circle-color": ["match", ["get", "lv"], "dnd", COL.dnd, "boil", COL.boil, "serious", COL.dnd, "viol", COL.viol, "snc", COL.snc, COL.news],
         "circle-stroke-color": ["match", ["get", "lv"], "boil", "#8E97A6", "#05060a"], "circle-stroke-width": 1.2,
@@ -134,6 +195,7 @@
       if (off === 0) adv = [];
       it.forEach(function (x) { adv.push(x); items[x.id] = x; });
       advTotal = j.total || adv.length;
+      window._wtByState = j.by_state || null;
       renderList();
       openBoot();
     }, function () { renderList(); });
@@ -166,7 +228,7 @@
   function card(it) {
     var meta = [it.place, it.src || it.by].filter(Boolean).join(" · ");
     var note = it.note ? "<p>" + esc(it.note) + "</p>" : "";
-    var prec = it.precision === "county" ? '<p class="k">Map dot is at the centre of the county served. EPA does not publish this system\'s exact location.</p>' : "";
+    var prec = it.precision === "county" ? '<p class="k">Map dot is at the centre of the county served. The source does not publish this system's exact location.</p>' : "";
     var cls = it.level === "dnd" ? "dnd" : it.kind === "advisory" ? "boil" : (it.kind || "plant");
     var open = sel === it.id;
     return '<article class="wt-it' + (open ? " open sel" : "") + '" data-id="' + esc(it.id) + '"><button type="button" aria-expanded="' + open + '">' +
@@ -179,7 +241,9 @@
     var bits = [];
     if (plantTotal) bits.push(num(plantTotal) + " treatment plants in " + num(plantCountries) + " countries");
     if (advTotal) bits.push(num(advTotal) + " current advisories and findings");
-    var z = map ? map.getZoom() : 0;
+    var bs = window._wtByState, usN = 0, usS = 0;
+    if (bs) { Object.keys(bs).forEach(function (k) { usN += bs[k]; usS += 1; }); }
+    if (usN) bits.push(num(usN) + " U.S. boil or do-not-drink notices in " + usS + " state" + (usS === 1 ? "" : "s"));
     if (info && info.t === "c" && plantTotal) bits.push("zoom in to see individual plants");
     if (info && info.t === "p" && info.more) bits.push("showing the first " + num(info.n) + " here, zoom in for the rest");
     h.textContent = bits.join(" · ") || "Plant inventory is loading…";
@@ -212,7 +276,7 @@
       try { history.replaceState(null, "", "/grid/water/" + encodeURIComponent(id)); } catch (e) {}
       renderList();
       if (fly && map && it.lat != null && it.lon != null) {
-        var wide = window.innerWidth >= 768;   /* centre the dot in the part of the map the panel leaves visible */
+        var wide = window.innerWidth >= 768;
         map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), it.level === "dw" || it.level === "ww" ? 11 : 8), duration: 700,
           offset: wide ? [-Math.round(Math.min(520, window.innerWidth) / 2), 0] : [0, -Math.round(window.innerHeight * 0.58 / 2)] });
       }
@@ -235,6 +299,20 @@
     if (!pan) return;
     document.body.classList.toggle("nx-water-on", !!(show && on));
     pan.hidden = !(show && on);
+    syncLeg();
+  }
+
+  function syncLeg() {
+    var el = $("nx_water_leg");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "nx_water_leg";
+      el.className = "wt-mapleg";
+      el.setAttribute("aria-label", "Water layer key");
+      el.innerHTML = '<span><i class="wt-drop wt-dw"></i>Drinking-water plant</span><span><i class="wt-drop wt-ww"></i>Wastewater plant</span><span><i class="wt-dot wt-dnd"></i>Do not drink</span><span><i class="wt-dot wt-boil"></i>Boil water</span>';
+      document.body.appendChild(el);
+    }
+    el.hidden = !on;
   }
 
   function hook() {
@@ -243,7 +321,6 @@
       c.dataset.wtHook = "1";
       c.addEventListener("click", function () {
         if (fixing) return;
-        /* net.js already flipped ON.water; read aria after the same tick */
         setTimeout(function () { setOn(c.getAttribute("aria-pressed") === "true"); }, 0);
       });
     }
@@ -263,6 +340,7 @@
     if (!map) return;
     addLayers();
     hook();
+    syncLeg();
     if (wantOpen() || bootId()) { setOn(true); syncChip(0); } else vis();
   }
 

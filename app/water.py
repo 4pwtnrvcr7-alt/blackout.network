@@ -5,7 +5,8 @@ fails is shown as unavailable (its last good copy is kept), never filled in.
 
 Layers (each its own kind):
   advisory   active boil-water / do-not-drink notices published as official open data by a state or province:
-             Alaska DEC (ArcGIS), Manitoba Office of Drinking Water (two ArcGIS layers), Newfoundland and Labrador (ArcGIS).
+             Alaska DEC (ArcGIS), Oregon Health Authority Drinking Water Services (ArcGIS), Florida Department of Health boil-water table,
+             Manitoba Office of Drinking Water (two ArcGIS layers), Newfoundland and Labrador (ArcGIS).
              Points come from the agency's own coordinates.
   violation  U.S. community water systems serving more than 3,300 people that EPA's SDWIS (via ECHO) lists with a CURRENT
              health-based violation. EPA publishes no coordinates for these, so the dot sits at the centre of the county served
@@ -50,10 +51,15 @@ AK = "https://dec.alaska.gov/arcgis/rest/services/EH/BWN_DND/FeatureServer/0"
 MB1 = "https://services.arcgis.com/mMUesHYPkXjaFGfS/arcgis/rest/services/Current_BWAPWS/FeatureServer/0"
 MB2 = "https://services.arcgis.com/mMUesHYPkXjaFGfS/arcgis/rest/services/Current_BWA_SPWS/FeatureServer/0"
 NL = "https://maps.gov.nl.ca/gsdw/rest/services/water/BoilAdvisories/FeatureServer/0"
+OR_L = "https://services.arcgis.com/uUvqNMGPm7axC2dD/arcgis/rest/services/advisories/FeatureServer/0"
+FL_PAGE = "https://www.floridahealth.gov/community-environmental-public-health/emergency-preparedness-response/boil-water-notices/"
+FL_AJAX = "https://www.floridahealth.gov/wp-admin/admin-ajax.php?action=get_wdtable&table_id=11"
 
 # id, label, kind, free/paid, publisher URL, TTL seconds
 SOURCES = [
     ("ak", "Alaska DEC boil water and do-not-drink notices", "advisory", "https://dec.alaska.gov/eh/dw/", 600),
+    ("or", "Oregon Health Authority drinking water advisories", "advisory", "https://yourwater.oregon.gov/advisories.php", 600),
+    ("fl", "Florida Department of Health boil water notices", "advisory", FL_PAGE, 600),
     ("mb", "Manitoba Office of Drinking Water boil water advisories", "advisory", "https://geoportal.gov.mb.ca/datasets/manitoba::current-bwapws", 600),
     ("nl", "Newfoundland and Labrador boil water advisories", "advisory", "https://www.gov.nl.ca/ecc/waterres/cwq/drinking-water-advisories/", 600),
     ("sdw", "EPA ECHO: drinking water systems with a current health-based violation", "violation", "https://echo.epa.gov/", 21600),
@@ -114,7 +120,7 @@ def fetch_ak():
         dnd = (a.get("TYPE_CODE_CV") or "").strip().upper() == "DNDU"
         oid = a.get("ESRI_OID")
         out.append(dict(id="ak" + _id(a.get("PWSID")), kind="advisory", level="dnd" if dnd else "boil", label="Do not drink or use" if dnd else "Boil water notice",
-                        name=_title(a.get("TINWSYS_NAME")), place="Alaska", cc="US", lat=p[0], lon=p[1], precision="point", pop=a.get("D_POPULATION_COUNT"),
+                        name=_title(a.get("TINWSYS_NAME")), place="Alaska", cc="US", st="AK", lat=p[0], lon=p[1], precision="point", pop=a.get("D_POPULATION_COUNT"),
                         since=_ms(a.get("BWN_Issue_Date")), note=_clean(a.get("Comments"), 320) or None,
                         by="Alaska Department of Environmental Conservation", src="Alaska DEC (open data)",
                         url=f"{AK}/{oid}?f=html" if oid else AK))
@@ -150,6 +156,93 @@ def fetch_nl():
                         pop=a.get("POPULATION_SERVICED"), since=_ms(a.get("BOIL_ADVISORY_ISSUE_DATE")), note=_clean(a.get("BOIL_ADVISORY_REASON"), 320) or None,
                         by="Government of Newfoundland and Labrador, Water Resources Management", src="Newfoundland and Labrador open data",
                         url=f"{NL}/{oid}?f=html" if oid else NL))
+    return out
+
+
+def _parse_day(s):
+    """Calendar day from a state notice (ISO, US, or 'Month DD, YYYY') to an ISO timestamp. None if unreadable."""
+    s = _clean(s, 40)
+    if not s: return None
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%b %d, %Y", "%B %d, %Y", "%d %b %Y"):
+        try:
+            return datetime.strptime(s[:40], fmt).replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+        except Exception:
+            continue
+    return _ms(s) if s.isdigit() else None
+
+def county_pt(st, name):
+    """County centroid from the bundled Census Gazetteer. Never guesses a point if the name does not match."""
+    if not st or not name: return None
+    want = re.sub(r"\s+county$", "", _clean(name, 80), flags=re.I).lower()
+    for fips, row in centroids().items():
+        lat, lon, nm, stc = row[0], row[1], row[2], row[3]
+        if stc != st: continue
+        if re.sub(r"\s+County$", "", nm, flags=re.I).lower() == want:
+            return (lat, lon)
+    return None
+
+def fetch_or():
+    """Active system-wide (and significant partial) drinking-water advisories published by Oregon Health Authority."""
+    out = []
+    for f in _arc(OR_L):
+        a = f.get("attributes") or {}; g = f.get("geometry") or {}
+        p = _pt(a.get("Lat") or g.get("y"), a.get("Long") or g.get("x"))
+        typ = " ".join(str(x or "") for x in (a.get("Advisory_Type"), a.get("Advisory_Label"))).lower()
+        if re.search(r"do[- ]not[- ](drink|use)", typ):
+            level, label = "dnd", "Do not drink or use"
+        elif "boil" in typ:
+            level, label = "boil", "Boil water advisory"
+        else:
+            continue   # conservation / other notices are not boil or do-not-drink
+        url = (a.get("Link_to_Details_Page") or "").strip()
+        if not url.startswith("https://"):
+            url = "https://yourwater.oregon.gov/advisories.php"
+        county = _title(a.get("County") or "")
+        place = ", ".join(x for x in ((county + " County") if county and "county" not in county.lower() else county, "Oregon") if x)
+        bits = [a.get("Advisory_Label"), a.get("Advisory_Reason"),
+                ("Area affected: " + a["Area_Affected"]) if a.get("Area_Affected") else None]
+        out.append(dict(id="or" + _id(a.get("PWS_Number") or a.get("ObjectId"), a.get("Begin_Date")),
+                        kind="advisory", level=level, label=label, name=_title(a.get("PWS_Name") or "Oregon water system"),
+                        place=place, cc="US", st="OR", lat=p[0] if p else None, lon=p[1] if p else None,
+                        precision="point" if p else None, pop=_num(a.get("Population_Served")),
+                        since=_ms(a.get("Begin_Date")), note=_clean(" ".join(x for x in bits if x), 320) or None,
+                        by="Oregon Health Authority, Drinking Water Services", src="Oregon Health Authority (open data)", url=url))
+    return out
+
+def fetch_fl():
+    """Current Florida DOH boil-water notices (official wpDataTable). Empty rows and already-rescinded notices are dropped."""
+    import http.cookiejar
+    cj = http.cookiejar.CookieJar()
+    op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    req = urllib.request.Request(FL_PAGE, headers={"User-Agent": UA, "Accept": "text/html"})
+    with op.open(req, timeout=20) as r:
+        page = r.read(2_000_000).decode("utf-8", "replace")
+    m = re.search(r'id="wdtNonceFrontendServerSide_11"[^>]*value="([^"]+)"', page)
+    if not m:
+        raise OSError("Florida DOH table nonce missing")
+    body = urllib.parse.urlencode({"draw": "1", "start": "0", "length": "500", "wdtNonce": m.group(1)}).encode()
+    req = urllib.request.Request(FL_AJAX, data=body, headers={"User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded",
+        "X-Requested-With": "XMLHttpRequest", "Referer": FL_PAGE, "Accept": "application/json"})
+    with op.open(req, timeout=20) as r:
+        d = json.loads(r.read(2_000_000))
+    out = []
+    for row in d.get("data") or []:
+        row = list(row) + [""] * 7
+        county, name, issued, rescinded, comments = row[2], row[3], row[4], row[5], row[6]
+        def _cell(v):
+            return _clean(re.sub(r"<[^>]+>", " ", str(v or "")), 200)
+        county, name, issued, rescinded, comments = _cell(county), _title(_cell(name)), _cell(issued), _cell(rescinded), _cell(comments)
+        if rescinded or (not name and not county):
+            continue
+        if not name:
+            name = (county or "Florida") + " water system"
+        pt = county_pt("FL", county) if county else None
+        place = ", ".join(x for x in ((county if county and "county" in county.lower() else (county + " County" if county else "")), "Florida") if x)
+        out.append(dict(id="fl" + _id(name, county, issued), kind="advisory", level="boil", label="Boil water notice",
+                        name=name, place=place, cc="US", st="FL",
+                        lat=pt[0] if pt else None, lon=pt[1] if pt else None, precision="county" if pt else None,
+                        pop=None, since=_parse_day(issued), note=comments or None,
+                        by="Florida Department of Health", src="Florida Department of Health (open data)", url=FL_PAGE))
     return out
 
 # ---------------------------------------------------------------- EPA ECHO
@@ -197,7 +290,7 @@ def fetch_sdw():
         if serious: bits.append("Flagged by EPA as a serious violator.")
         place = ", ".join(x for x in (_title(re.sub(r"\s*\([A-Z]{1,3}\)", "", str(w.get("CitiesServed") or "").split(",")[0])), c[2], w.get("StateCode")) if x)
         out.append(dict(id="sd" + str(w.get("PWSId")), kind="violation", level="serious" if serious else "viol", label="Serious violator" if serious else "Health-based violation",
-                        name=_title(w.get("PWSName")), place=place, cc="US", lat=c[0], lon=c[1], precision="county", pop=pop, since=None, note=" ".join(bits),
+                        name=_title(w.get("PWSName")), place=place, cc="US", st=str(w.get("StateCode") or "").upper()[:2], lat=c[0], lon=c[1], precision="county", pop=pop, since=None, note=" ".join(bits),
                         by="U.S. EPA, Safe Drinking Water Information System (SDWIS)", src="EPA ECHO, SDWIS", url=w.get("DfrUrl") or "https://echo.epa.gov/"))
     out.sort(key=lambda x: (-(x["level"] == "serious"), -(x["pop"] or 0)))
     return out
@@ -217,7 +310,7 @@ def fetch_cwa():
         except Exception: pass
         m = re.match(r"(\d\d)/(\d\d)/(\d{4})", str(w.get("CWPSNCStatusDate") or ""))
         out.append(dict(id="cw" + _id(w.get("SourceID")), kind="wastewater", level="snc", label="Significant noncompliance", name=_title(w.get("CWPName")),
-                        place=", ".join(x for x in (_title(w.get("CWPCity")), w.get("CWPState")) if x), cc="US", lat=p[0], lon=p[1], precision="point", pop=None,
+                        place=", ".join(x for x in (_title(w.get("CWPCity")), w.get("CWPState")) if x), cc="US", st=str(w.get("CWPState") or "").upper()[:2], lat=p[0], lon=p[1], precision="point", pop=None,
                         since=f"{m.group(3)}-{m.group(1)}-{m.group(2)}T00:00:00Z" if m else None, note=" ".join(bits), by="U.S. EPA, ICIS-NPDES", src="EPA ECHO, ICIS-NPDES",
                         url=f"https://echo.epa.gov/detailed-facility-report?fid={rid}&sys=ICIS" if rid else "https://echo.epa.gov/", q=q or 0))
     out.sort(key=lambda x: -x.get("q", 0))
@@ -255,7 +348,7 @@ def fetch_news():
     out.sort(key=lambda x: x["since"], reverse=True)
     return out[:40]
 
-FETCH = {"ak": fetch_ak, "mb": fetch_mb, "nl": fetch_nl, "sdw": fetch_sdw, "cwa": fetch_cwa, "news": fetch_news}
+FETCH = {"ak": fetch_ak, "or": fetch_or, "fl": fetch_fl, "mb": fetch_mb, "nl": fetch_nl, "sdw": fetch_sdw, "cwa": fetch_cwa, "news": fetch_news}
 
 # ---------------------------------------------------------------- cache (stale-while-revalidate, one refresh per source at a time)
 _C = {}            # source id -> {"t": last attempt, "ok_t": last success, "items": [...], "err": str|None, "busy": bool}
@@ -312,6 +405,37 @@ def raw_items():
     return out
 
 _SNAP = [0.0, None]
+
+LEVEL_RANK = {"dnd": 0, "boil": 1, "serious": 2, "viol": 3, "snc": 4, "news": 5}
+
+def _since_ts(it):
+    s = it.get("since") or ""
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+def sort_items(items):
+    """Severity first, then US first, then recency, then population served."""
+    return sorted(items, key=lambda it: (
+        LEVEL_RANK.get(it.get("level"), 9),
+        0 if it.get("cc") == "US" else 1,
+        -_since_ts(it),
+        -(it.get("pop") or 0),
+        (it.get("name") or ""),
+    ))
+
+def us_advisory_counts(items):
+    """Official US boil / do-not-drink notices (kind=advisory) by state. Findings are not included."""
+    out = {}
+    for it in items:
+        if it.get("cc") != "US" or it.get("kind") != "advisory":
+            continue
+        st = (it.get("st") or "").upper()
+        if len(st) == 2:
+            out[st] = out.get(st, 0) + 1
+    return dict(sorted(out.items()))
+
 def snapshot():
     if _SNAP[1] is not None and time.time() - _SNAP[0] < 20:
         return _SNAP[1]
@@ -337,7 +461,7 @@ def _snapshot(deco=True):
 # ---------------------------------------------------------------- page
 CREDITS = ('<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a> '
            '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> · U.S. EPA ECHO · U.S. Census Bureau Gazetteer · '
-           'Alaska DEC · Government of Manitoba (OpenMB licence) · Government of Newfoundland and Labrador')
+           'Alaska DEC · Oregon Health Authority · Florida Department of Health · Government of Manitoba (OpenMB licence) · Government of Newfoundland and Labrador')
 
 _V = {}
 def _v(name):
@@ -617,12 +741,13 @@ def handle_get(path, qs=None, headers=None):
                 v = (qs or {}).get(k)
                 return str((v[0] if isinstance(v, list) and v else v) or "")
             f = q1("fresh").lower() in ("1", "true", "yes")
-            if q1("limit").isdigit():   # panel list: most severe first, paged; decorate only the rows returned
+            if q1("limit").isdigit():   # panel list: severity, then US first, then recency; decorate only the rows returned
                 d = data(force=f, budget=12.0, deco=False) if (f or not raw_items()) else _kick_refresh()
-                rank = {"dnd": 0, "boil": 1, "serious": 2, "viol": 3, "snc": 4, "news": 5}
-                items = sorted(raw_items(), key=lambda it: (rank.get(it.get("level"), 9), -(it.get("pop") or 0)))
+                items = sort_items(raw_items())
                 lim = max(1, min(100, int(q1("limit")))); off = int(q1("offset")) if q1("offset").isdigit() else 0
-                return 200, dict(generated=iso(now()), counts=d.get("counts"), sources=d.get("sources"), items=[decorate(it) for it in items[off:off + lim]], total=len(items), offset=off), "application/json"
+                return 200, dict(generated=iso(now()), counts=d.get("counts"), sources=d.get("sources"),
+                                 items=[decorate(it) for it in items[off:off + lim]], total=len(items), offset=off,
+                                 by_state=us_advisory_counts(items)), "application/json"
             d = data(force=f)
             return 200, d, "application/json"
         except Exception as ex:
