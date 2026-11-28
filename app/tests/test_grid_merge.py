@@ -49,7 +49,15 @@ class GridMerge(unittest.TestCase):
 
     def test_gridlayer_rules(self):
         js = _read("netmap_static", "gridlayer.js"); css = _read("netmap_static", "gridlayer.css")
-        for t in (js.lower(), css.lower()):
+        # pt2007u: Refresh yellow/orange/red is approved on the /grid loader only. Strip that block before the yellow ban.
+        ld0, ld1 = css.find("/* ---------- loader:"), css.find(".gx-b,.gx-x{")
+        self.assertGreater(ld0, -1); self.assertGreater(ld1, ld0)
+        loader, rest = css[ld0:ld1], css[:ld0] + css[ld1:]
+        for h in ("#FFE566", "#FF9A1A", "#FF5A3C"):
+            self.assertIn(h, loader)
+        self.assertIn("@keyframes gx-ld-drop", loader)
+        self.assertIn("prefers-reduced-motion", loader)
+        for t in (js.lower(), rest.lower()):
             self.assertNotIn("yellow", re.sub(r"/\*.*?\*/", "", t, flags=re.S))
             self.assertNotIn("tile.openstreetmap.org", t)
             for c in ("#f5a524", "#ffd", "#ffcc00", "#ffeb3b", "#fde047", "#facc15", "#ffc21a", "#c97b00"): self.assertNotIn(c, t)
