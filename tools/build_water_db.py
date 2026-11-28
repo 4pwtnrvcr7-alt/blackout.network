@@ -136,7 +136,7 @@ def osm_el_pt(el):
         return _pt(c["lat"], c["lon"])
     return None
 
-seen_osm = set()
+seen_osm = {}   # (type, id) -> row; a later, more specific extract can upgrade the country code
 
 # Rough outline of Northern Ireland (lon, lat); the Geofabrik Ireland extract covers both IE and GB-NIR.
 _NI = [(-8.18,54.46),(-7.95,54.72),(-7.65,54.95),(-7.40,55.07),(-7.00,55.26),(-6.20,55.25),(-5.95,55.0),(-5.45,54.65),(-5.43,54.40),(-5.62,54.10),(-6.05,54.00),(-6.28,54.03),(-6.55,54.07),(-6.85,54.0),(-7.10,54.05),(-7.45,54.15),(-7.85,54.20),(-8.18,54.46)]
@@ -198,9 +198,6 @@ def load_osm(folder):
             continue
         cc = (data.get("cc") or fp.stem).upper()
         for el in data.get("elements") or []:
-            if (el.get("type"), el.get("id")) in seen_osm:
-                continue
-            seen_osm.add((el.get("type"), el.get("id")))
             tags = el.get("tags") or {}
             mm = tags.get("man_made")
             kind = "ww" if mm == "wastewater_plant" else "dw" if mm == "water_works" else None
@@ -222,13 +219,27 @@ def load_osm(folder):
                 ecc = "SG" if (1.15 <= pt[1] <= 1.48 and 103.6 <= pt[0] <= 104.1) else "BN" if (4.0 <= pt[1] <= 5.1 and 114.0 <= pt[0] <= 115.4) else "MY"
             if cc in {"GCC", "ILPS", "SNGM"}:
                 lat, lon = pt[1], pt[0]
-                tags = el.get("tags") or {}
                 ecc = gcc_cc(lat, lon, tags) if cc == "GCC" else ilps_cc(lat, lon, tags) if cc == "ILPS" else sngm_cc(lat, lon, tags)
+            # Guangdong (and similar) extracts overlap Hong Kong and Macau; keep their own ISO codes
+            if ecc == "CN":
+                lat, lon = pt[1], pt[0]
+                if 22.13 <= lat <= 22.56 and 113.82 <= lon <= 114.51:
+                    ecc = "HK"
+                elif 22.09 <= lat <= 22.22 and 113.52 <= lon <= 113.63:
+                    ecc = "MO"
+            key = (el.get("type"), el.get("id"))
+            if key in seen_osm:
+                prev = seen_osm[key]
+                if prev["cc"] in {"CN", "MY", "GCC", "ILPS", "SNGM", "IE"} and ecc not in {prev["cc"], ""}:
+                    prev["cc"] = ecc
+                continue
             op = _name(tags.get("operator")) if tags.get("operator") else ""
-            out.append({
+            row = {
                 "lon": pt[0], "lat": pt[1], "name": name, "kind": kind, "cc": ecc, "st": st if ecc == "US" else "",
                 "src": "OpenStreetMap (ODbL)", "id": cid, "url": url, "note": op[:80],
-            })
+            }
+            seen_osm[key] = row
+            out.append(row)
     return out
 
 NAT_SRC = {
