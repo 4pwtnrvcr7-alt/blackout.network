@@ -616,5 +616,24 @@ class TestDeskBriefSkipIsPaidEquivalent(Base):
 
 
 
+
+class IataTemplateLede(unittest.TestCase):
+    def test_build_template_uses_airport_name_not_iata_code(self):
+        import story_writer as SW
+        r = {"title": "FAA Ground stop: ORD (equipment outage)", "location": "ORD, US",
+             "category": "other", "rank": 1, "first_seen": "2026-11-24T21:35:00Z",
+             "event_time": "2026-11-24T21:35:00Z", "updated": "2026-11-24T21:35:00Z",
+             "brief": "WHAT: FAA Ground stop: ORD (equipment outage). WHERE: ORD, US.",
+             "n_items": 1, "n_families": 1, "families": '["FAA"]', "links": "[]"}
+        note = SW.build_template(r, [{"source": "FAA", "title": r["title"], "official": 1,
+                                      "source_url": "https://nasstatus.faa.gov/"}])
+        blob = " ".join(str(note.get(k) or "") for k in ("why_it_matters", "what_happened", "analysis", "place"))
+        self.assertRegex(blob, r"O.?Hare")
+        self.assertIn("Illinois", blob)
+        self.assertNotIn("in ORD, US", blob)
+        self.assertNotIn("location in the record is ORD, US", blob)
+        self.assertNotEqual(note.get("place"), "ORD, US")
+
+
 if __name__ == "__main__":
     unittest.main()

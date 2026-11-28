@@ -12,7 +12,8 @@ from urllib.parse import quote
 SITE = "https://blackout.network"
 TCO = 23  # X counts a link as 23 characters
 MAX_TAGS = 5
-MIN_TAGS = 3
+MIN_TAGS = 3          # prefer 3-5 good tags
+MIN_TAGS_FLOOR = 2    # two good tags beat a junk third
 GENERIC_TAGS = ["#News", "#WorldNews", "#Breaking"]
 
 # Combat wording only — "nuclear bomb test", "nuclear weapons testing", and a stored
@@ -1608,7 +1609,9 @@ def with_body(item, alerts=None, extra=""):
 # plus common short entity names. Never long run-together strings. Popular topic words are good.
 # Still banned: #News, #WorldNews, #Breaking, #BlackoutNetwork, #Alerts, #Update and similar fluff.
 # Source-feed acronyms (#INGV, #JMA, #EMSC, #USGS, #GFZ, #GDACS and similar) are never tags.
-# 3-5 tags, each at most ~12 characters or one well-known name, topic word first, then place/person/company.
+# Prefer 3-5 tags, each at most ~12 characters or one well-known name, topic first, then place/person/company.
+# Direction and geographic filler (#Sea, #AdjacentSea, #Northwest, #North, #Region, #Coast) are never tags.
+# Two good tags beat a junk third. For quakes, pad with a real place or #Seismic (#Tsunami only if mentioned).
 FILLER = {t.lower() for t in (
     "News", "WorldNews", "Breaking", "BreakingNews", "BlackoutNetwork", "Alerts", "Alert", "Wire", "Live",
     "Update", "Updates", "Latest", "Headlines", "Trending", "World", "Global", "Today", "Now", "Urgent",
@@ -1627,6 +1630,115 @@ SOURCE_FEEDS = {t.lower() for t in (
     "PTWC", "FDSN", "NEIC", "GCMT", "IRIS", "CESMD", "GeoNet", "GEONET",
     "LastQuake", "MeteoAlarm", "Meteoalarm", "BMKG", "PHIVOLCS", "PAGASA",
     "SWPC", "SDO", "SOHO", "EONET", "PAGER")}
+# Direction / geographic filler — never search tags (Matt, Nov 28 2026 12:20 AM ET).
+# Compounds made only of these words (#AdjacentSea, #EastCoast) are also dropped.
+# A real place that merely contains one of them stays (#KurilIslands, #WestBank, #IvoryCoast, #NorthKorea).
+PLACE_FILLER = {t.lower() for t in (
+    "Sea", "Coast", "Region", "Area", "Zone", "District",
+    "North", "South", "East", "West",
+    "Northwest", "Northeast", "Southeast", "Southwest",
+    "Northern", "Southern", "Eastern", "Western", "Central", "Mid",
+    "Adjacent", "AdjacentSea", "Offshore", "Onshore", "Inland",
+    "Coastal", "Shore", "Seashore", "Ocean",
+    "Near", "Nearby", "Upper", "Lower", "Inner", "Outer",
+    "Island", "Islands", "Ridge", "Trench", "Basin", "Of", "Off")}
+
+# Leading direction on a made-up compound (#NorthwestKuril) is dropped; known places stay.
+PLACE_FILLER_OK = {t.lower() for t in (
+    "WestBank", "EastJerusalem", "EastTimor", "NorthKorea", "SouthKorea",
+    "SouthAfrica", "SouthSudan", "NorthDakota", "SouthDakota",
+    "NorthCarolina", "SouthCarolina", "WestVirginia", "NorthAmerica",
+    "SouthAmerica", "WestAfrica", "EastAfrica", "NorthAfrica", "SoutheastAsia",
+    "EastAsia", "MiddleEast", "NorthSea", "RedSea", "BlackSea", "SouthChinaSea",
+    "WesternSahara", "NorthwestTerritories", "IvoryCoast", "GoldCoast")}
+_DIRECTION_LEAD = {t.lower() for t in (
+    "North", "South", "East", "West", "Northwest", "Northeast", "Southeast", "Southwest",
+    "Northern", "Southern", "Eastern", "Western", "Central", "Mid",
+    "Adjacent", "Near", "Nearby", "Off", "Offshore", "Onshore", "Inland",
+    "Upper", "Lower", "Inner", "Outer")}
+_TRAIL_FILLER = {t.lower() for t in ("Region", "Area", "Zone", "District", "Sea", "Coast", "Ocean", "Coastal")}
+
+def _is_place_filler(tag):
+    s = (tag or "").lstrip("#")
+    if not s:
+        return False
+    if s.lower() in PLACE_FILLER_OK:
+        return False
+    if s.lower() in PLACE_FILLER:
+        return True
+    words = [w.lower() for w in _camel_words(s)]
+    return bool(words) and all(w in PLACE_FILLER for w in words)
+
+def _strip_place_filler_affixes(tag):
+    """Drop a leading direction (#NorthwestKuril -> #Kuril) or trailing region/sea word (#FijiRegion -> #Fiji).
+    Keep island-chain names (#KurilIslands) and allow-listed places (#WestBank)."""
+    s = (tag or "").lstrip("#")
+    if not s:
+        return None
+    if s.lower() in PLACE_FILLER_OK:
+        return "#" + s
+    words = _camel_words(s)
+    while words and words[0].lower() in _DIRECTION_LEAD:
+        words = words[1:]
+    while words and words[-1].lower() in _TRAIL_FILLER:
+        words = words[:-1]
+    if not words or all(w.lower() in PLACE_FILLER for w in words):
+        return None
+    # Rebuild CamelCase from the remaining tokens
+    rebuilt = "".join(w[:1].upper() + w[1:] if w else "" for w in words)
+    tg = to_tag(rebuilt) or ("#" + rebuilt)
+    if not tg or _is_place_filler(tg):
+        return None
+    return tg
+
+def _camel_prefix_overlap(a, b):
+    """True when the shorter name is a CamelCase (or digit) prefix of the longer.
+    #Kuril vs #KurilIslands and #Burnham vs #AndyBurnham match;
+    #Security vs #Cybersecurity (a suffix) does not."""
+    x, y = (a or "").lstrip("#"), (b or "").lstrip("#")
+    if not x or not y:
+        return False
+    if x.lower() == y.lower():
+        return True
+    if len(x) < 4 or len(y) < 4:
+        return False
+    if len(x) > len(y):
+        x, y = y, x
+    if not y.lower().startswith(x.lower()):
+        # also allow the shorter name as a later CamelCase token (#Burnham in #AndyBurnham)
+        # only when the match starts at an uppercase/digit boundary
+        yl, xl = y.lower(), x.lower()
+        start = 0
+        while True:
+            i = yl.find(xl, start)
+            if i < 0:
+                return False
+            if i > 0 and y[i].isupper() or (i > 0 and y[i].isdigit() and not y[i-1].isdigit()):
+                rest_i = i + len(x)
+                if rest_i == len(y) or y[rest_i].isupper() or y[rest_i].isdigit():
+                    return True
+            start = i + 1
+    rest = y[len(x):]
+    return (not rest) or rest[0].isupper() or rest[0].isdigit()
+
+def _drop_contained(tags):
+    """Keep the longer place (#KurilIslands) and drop a leftover fragment (#Kuril)."""
+    out = []
+    for t in tags or []:
+        name = (t or "").lstrip("#")
+        if not name:
+            continue
+        replaced = False
+        for i, k in enumerate(out):
+            if _camel_prefix_overlap(t, k):
+                kn = k.lstrip("#")
+                if len(name) > len(kn):
+                    out[i] = t
+                replaced = True
+                break
+        if not replaced:
+            out.append(t)
+    return out
 # Popular topic/search words people actually type (slightly over 12 chars is ok for these).
 POPULAR = {t.lower() for t in (
     "War", "Nuclear", "Ebola", "Iran", "Earthquake", "Wildfire", "Hurricane", "Gaza", "Ukraine", "Tesla", "Nvidia", "NVIDIA",
@@ -1691,6 +1803,14 @@ def _shorten_tag(tag):
     s = t.lstrip("#")
     if not s:
         return None
+    stripped = _strip_place_filler_affixes(t)
+    if stripped is None and (s.lower() in PLACE_FILLER or _is_place_filler(t)):
+        return None
+    if stripped and stripped.lstrip("#").lower() != s.lower():
+        t = stripped
+        s = t.lstrip("#")
+        if not s:
+            return None
     # Nov 25 2026 (Matt 9:09 PM): obscure all-caps acronyms (#HKCERT) are not tags people follow; #edge -> #Edge
     if s.isalnum() and s.isupper() and len(s) >= 5 and s.lower() not in POPULAR and s not in _ACRO_OK:
         return None
@@ -1720,7 +1840,7 @@ def _shorten_tag(tag):
 
 def _is_filler(tag):
     t = (tag or "").lstrip("#").lower()
-    if not t or t in FILLER or t in SOURCE_FEEDS:
+    if not t or t in FILLER or t in SOURCE_FEEDS or _is_place_filler(tag):
         return True
     words = [w.lower() for w in _camel_words(tag)]
     if len(words) == 2 and words[0] == words[1]:
@@ -2012,8 +2132,9 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
                 keep.append(tg)
             if len(keep) >= MIN_TAGS:
                 break
-    # When a source-feed acronym was dropped and the list is still short, pad with
-    # a related popular word already earned by a kept topic (#Earthquake -> #Seismic).
+    # When the list is still short, pad with a related popular word already earned
+    # by a kept topic (#Earthquake -> #Seismic). #Tsunami only if the story mentions one.
+    # Stop at two good tags rather than inventing a junk third.
     if len(keep) < MIN_TAGS:
         _SYN = {
             "earthquake": ("#Seismic", "#Quake"),
@@ -2030,11 +2151,19 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
         extras = []
         for k in list(have):
             extras.extend(_SYN.get(k, ()))
+        try:
+            text = _item_text(item, headline).lower()
+        except Exception:
+            text = ""
+        if re.search(r"\btsunami\b", text) and "tsunami" not in have:
+            extras = ["#Tsunami"] + [e for e in extras if e.lstrip("#").lower() != "tsunami"]
+        else:
+            extras = [e for e in extras if e.lstrip("#").lower() != "tsunami"]
         for s in extras:
             if len(keep) >= MIN_TAGS:
                 break
             sl = s.lstrip("#").lower()
-            if sl not in have:
+            if sl not in have and not _is_filler(s) and not _is_place_filler(s):
                 keep.append(s)
                 have.add(sl)
     # Prefer a popular topic in the set (search/engagement) when one is earned; pad short lists from the item's category.
@@ -2062,7 +2191,7 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
         main_places = []
     for p_ in main_places[:2]:
         p_ = _shorten_tag(p_) or p_
-        if p_ and all(p_.lower() != k.lower() for k in keep):
+        if p_ and all(p_.lower() != k.lower() for k in keep) and not _is_place_filler(p_):
             if len(keep) < MAX_TAGS:
                 keep.append(p_)
             else:
@@ -2072,6 +2201,23 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
                         keep[i] = p_
                         break
             break
+    before_drop = list(keep)
+    keep = _drop_contained(keep)
+    dropped = [t for t in before_drop if all(t.lower() != k.lower() for k in keep)]
+    # After dropping a fragment, a quake may be back down to two tags; pad #Seismic if so.
+    if len(keep) < MIN_TAGS:
+        have = {k.lstrip("#").lower() for k in keep}
+        if "earthquake" in have and "seismic" not in have:
+            keep.append("#Seismic")
+        elif "quake" in have and "earthquake" not in have:
+            keep.append("#Earthquake")
+    # Last resort: restore a dropped fragment rather than invent junk (#Iceberg next to #IcebergD33B)
+    if len(keep) < MIN_TAGS:
+        for t in dropped:
+            if len(keep) >= MIN_TAGS:
+                break
+            if all(t.lower() != k.lower() for k in keep):
+                keep.append(t)
     keep = _order_tags(keep[:MAX_TAGS], item, headline)
     return keep[:MAX_TAGS]
 
@@ -2147,15 +2293,24 @@ def _clean_stored(tags):
     Baked-in / validator tags already passed the publish gate. The heuristic
     _is_filler() falsely flags some good entity names (e.g. #NewZealand, because
     "new" is a stop word). Only the explicit FILLER set and SOURCE_FEEDS
-    (#INGV, #JMA, #USGS, #GDACS, …) are removed here.
+    (#INGV, #JMA, #USGS, #GDACS, …) and place-filler words
+    (#Sea, #AdjacentSea, #Northwest, #Region, #Coast, …) are removed here.
     """
     out = []
     for t in tags or []:
         t = "#" + str(t).lstrip("#")
         name = t.lstrip("#")
-        if not name or name.lower() in FILLER or name.lower() in SOURCE_FEEDS:
+        if not name or name.lower() in FILLER or name.lower() in SOURCE_FEEDS or _is_place_filler(t):
             continue
+        stripped = _strip_place_filler_affixes(t)
+        if not stripped:
+            continue
+        t = stripped
+        name = t.lstrip("#")
         if any(t.lower() == k.lower() for k in out):
+            continue
+        # drop a shortened leftover that is already inside a kept place (#Kuril vs #KurilIslands)
+        if any(_camel_prefix_overlap(t, k) for k in out):
             continue
         out.append(t)
         if len(out) >= MAX_TAGS:
@@ -2167,7 +2322,7 @@ def resolve_tags(item, headline=None, tags=None):
     """Prefer a caller-supplied (baked-in) set of 3-5 tags after dropping banned ones.
 
     Does not run entity_fill padding on a valid stored set — that used to replace
-    checked tags with junk. Falls back to the generator when fewer than MIN_TAGS remain.
+    checked tags with junk. Falls back to finalize or the generator when fewer than MIN_TAGS remain; two good tags may stand if a third would be junk.
     """
     if tags:
         cleaned = _clean_stored(tags)
@@ -2179,11 +2334,11 @@ def resolve_tags(item, headline=None, tags=None):
 
 
 def _fit_parts(headline, tags, url):
-    """Trim tags (never below MIN_TAGS) then the headline so headline+tags+t.co fit in 280."""
+    """Trim tags (never below MIN_TAGS_FLOOR) then the headline so headline+tags+t.co fit in 280."""
     h = headline or ""
     tags = list(tags or [])
     text = _join(h, tags)
-    while len(tags) > MIN_TAGS and weighted_len(text, url) > 280:
+    while len(tags) > MIN_TAGS_FLOOR and weighted_len(text, url) > 280:
         tags = tags[:-1]
         text = _join(h, tags)
     if weighted_len(text, url) > 280:
@@ -2200,7 +2355,7 @@ def _fit_parts(headline, tags, url):
 def share_text(item, url=None, headline=None, tags=None):
     """Headline + hashtags, trimmed so headline + tags + t.co link fit in 280.
 
-    Drops the lowest-priority tag first when over budget, but never below MIN_TAGS;
+    Drops the lowest-priority tag first when over budget, but never below MIN_TAGS_FLOOR;
     the headline is shortened instead. Always runs finalize_tags, including when a
     caller passes a stored set, so junk (#Toward, #Canadian) is still cleaned.
     """
