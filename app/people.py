@@ -499,7 +499,12 @@ def profile_page(slug):
             + (f'<p class="pf-s">Summary: <a href="{E(wiki_link(p))}" target="_blank" rel="noopener">Wikipedia</a> (CC BY-SA 4.0)</p>' if p.get("summary") else "")
             + (f'<p class="pf-cr">{credit(po)}</p>' if po and av else "") + '</div></header>')
     jump = '<nav class="pf-nav" aria-label="On this page">' + "".join(f'<a href="#{k}">{E(t.split(" (")[0])}</a>' for k, t in nav) + "</nav>"
-    body = f'<style>{STRIP_CSS}{PAGE_CSS}</style><article class="pf pp-strip">{hero}{jump}{"".join(secs)}</article><script src="/api/people/people.js" defer></script>'
+    body = (f'<style>{STRIP_CSS}{PAGE_CSS}</style><article class="pf pp-strip">{hero}{jump}{''.join(secs)}</article>'
+            '<p class="dek pf-up" id="pf_up" aria-live="polite"></p>'
+            '<script src="/api/people/people.js" defer></script>'
+            '<script>(function(){function stamp(){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){return "Updated"}}'
+            'window.bnRefreshPage=function(){return fetch("/api/people/index?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){'
+            'var u=document.getElementById("pf_up");if(u)u.textContent=stamp();return "Updated"})};})();</script>')
     desc = (f"{nm}: {p.get('role') or p.get('description') or ''}. Neutral, sourced profile: early life, career, ideology, controversies, timeline and every BLACKOUT.NETWORK story about them.")[:300]
     ld = {"@context": "https://schema.org", "@type": "ProfilePage", "url": f"{SITE}/people/{slug}",
           "mainEntity": {"@type": "Person", "name": nm, "description": p.get("role") or p.get("description") or "", "sameAs": [wiki_link(p), p.get("wikidata_url")] + ([p["website"]] if p.get("website") else []),
@@ -517,7 +522,16 @@ def index_page():
                      + (f'<span class="pf-m">In {n} current stor{"y" if n == 1 else "ies"}</span>' if n else "") + '</span></a>')
     body = (f'<style>{STRIP_CSS}{PAGE_CSS}</style><div class="pf pp-strip"><p class="crumb"><a href="/wire">The Wire</a> › People</p><h1 class="t">People in the news</h1>'
             '<p class="dek">Public figures named in the stories BLACKOUT.NETWORK is tracking, most mentioned first. Each profile is neutral and sourced to Wikipedia and Wikidata.</p>'
-            f'<div class="pf-grid">{"".join(cards) or "<p>No profiles yet.</p>"}</div></div>')
+            '<p class="dek pf-up" id="pf_up" aria-live="polite"></p>'
+            f'<div class="pf-grid" id="pf_grid">{index_cards_html([{"slug":s,"name":P[s].get("name") or s,"role":P[s].get("role") or P[s].get("description") or "","avatar":avatar(P[s]) or "","mentions_now":int(P[s].get("mentions_now") or 0)} for s in top+rest])}</div></div>'
+            '<script>(function(){function stamp(ts){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date((ts||0)*1000))+" ET"}catch(e){return "Updated"}}'
+            'function card(p){var n=+p.mentions_now||0,av=p.avatar?("<img class=\"pp-av\" src=\""+String(p.avatar).replace(/"/g,"&quot;")+"\" alt=\"\" width=\"56\" height=\"56\" loading=\"lazy\" decoding=\"async\">"):"";'
+            'var m=n?("<span class=\"pf-m\">In "+n+" current stor"+(n===1?"y":"ies")+"</span>"):"";'
+            'return "<a class=\"pf-card\" href=\"/people/"+encodeURIComponent(p.slug)+"\">"+av+"<span class=\"pp-t\"><span class=\"pp-n\">"+String(p.name||"").replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])})+"</span><span class=\"pp-r\">"+String(p.role||"").replace(/[&<>]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])})+"</span>"+m+"</span></a>"}'
+            'window.bnRefreshPage=function(){return fetch("/api/people/index?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){'
+            'var g=document.getElementById("pf_grid");if(g&&j.people)g.innerHTML=j.people.map(card).join("")||"<p>No profiles yet.</p>";'
+            'var u=document.getElementById("pf_up");if(u)u.textContent=stamp(j.generated);return "Updated"})};'
+            '})();</script>')
     return 200, _page("People in the news", "Neutral, sourced profiles of the public figures in BLACKOUT.NETWORK stories.", body, "/people")
 
 PAGE_CSS = """
@@ -556,12 +570,44 @@ PAGE_CSS = """
 """
 
 # ------------------------------------------------------------------ routing
+
+def index_payload(force=False):
+    """JSON for the /people index. force=True re-reads the reports file even if the mtime looks unchanged."""
+    if force:
+        try:
+            _D["mt"] = None
+        except Exception:
+            pass
+    P = profiles(); top = [s for s in (block().get("top") or []) if s in P]
+    rest = sorted((s for s in P if s not in top), key=lambda s: P[s].get("name") or s)
+    people = []
+    for s in top + rest:
+        p = P[s]
+        people.append({
+            "slug": s, "name": p.get("name") or s, "role": p.get("role") or p.get("description") or "",
+            "avatar": avatar(p) or "", "mentions_now": int(p.get("mentions_now") or 0),
+        })
+    import time as _time
+    return {"ok": True, "n": len(people), "generated": int(_time.time()), "people": people}
+
+def index_cards_html(people):
+    cards = []
+    for p in people:
+        s, av, n = p.get("slug"), p.get("avatar") or "", int(p.get("mentions_now") or 0)
+        cards.append(f'<a class="pf-card" href="/people/{E(s)}">' + (f'<img class="pp-av" src="{E(av)}" alt="" width="56" height="56" loading="lazy" decoding="async">' if av else "")
+                     + f'<span class="pp-t"><span class="pp-n">{E(p.get("name"))}</span><span class="pp-r">{E(p.get("role") or "")}</span>'
+                     + (f'<span class="pf-m">In {n} current stor{"y" if n == 1 else "ies"}</span>' if n else "") + '</span></a>')
+    return "".join(cards) or "<p>No profiles yet.</p>"
+
 def handle_get(path, qs=None):
     p = path.rstrip("/") or "/"
     if p.startswith("/api/media/"):
         r = media_bytes(p[len("/api/media/"):])
         return (200, r[0], r[1]) if r else (404, {"error": "not found"})
     if not on(): return 404, {"error": "not found"}
+    if p == "/api/people/index":
+        force = str((qs or {}).get("fresh", [""])[0] or "").lower() in ("1", "true", "yes")
+        return 200, index_payload(force=force)
     if p == "/api/people/people.js": return 200, JS.encode(), "application/javascript"
     if p.startswith("/api/people/img/") and p.endswith(".webp"):
         s = p[len("/api/people/img/"):-5]
