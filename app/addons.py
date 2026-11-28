@@ -93,6 +93,7 @@ ROUTES = {
     "/cookie-policy": "legal",
     "/privacy-choices": "legal",    # seo/batch-1: Your Privacy Choices (analytics opt-out)
     "/do-not-sell": "legal",
+    "/setup": "setup_page",     # Nov 28 (Matt 7:39 AM ET): install app + alerts, per OS
     "/api/video_subs": "video_subs",
     "/vsubs": "video_subs",
     "/api/search": "search",
