@@ -10,7 +10,8 @@ FIXED = {"/manifest.webmanifest": ("manifest.webmanifest", "application/manifest
          "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
          "/apple-touch-icon-precomposed.png": ("apple-touch-icon.png", "image/png"),
          "/install-guide.js": ("install-guide.js", "application/javascript"),
-         "/install-guide.css": ("install-guide.css", "text/css")}
+         "/install-guide.css": ("install-guide.css", "text/css"),
+         "/bn-menu-city.js": ("bn-menu-city.js", "application/javascript")}   # Nov 27 2026 (pt1984u): menu city blackout + peer-to-peer animation, loaded by menu5.py on first menu open
 def _read(name):
     with open(os.path.join(D, name), "rb") as fh: return fh.read()
 def handle_get(path, qs):

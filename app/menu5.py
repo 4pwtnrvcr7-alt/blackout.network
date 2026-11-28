@@ -6,7 +6,9 @@
 - X and YouTube marks (monochrome SVG) sized to the link text, opening in a new tab.
 - Items rise in (staggered) when the menu opens and fall out on close (the menus' existing open/closing classes drive it);
   a tap on an item zooms through to the page. prefers-reduced-motion: plain fades, no movement.
-- Original text-free artwork (inline SVG: radar rings, sweep, linked nodes, one pulse) in white/grey/cool tones only.
+- Nov 27 2026 (Matt pt1984u): the old SVG radar is replaced by an original code-rendered canvas loop (static/pwa/bn-menu-city.js): a massive night city, the
+  lights go out in waves, then a peer-to-peer mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
+  closed or the tab is hidden, static frame under prefers-reduced-motion. Kill switch: BN_MENU_CITY=0 brings back the SVG radar.
 - "Install on home screen" and "Turn on notifications" buttons open the existing device-aware animated panels
   (static/pwa/install-guide.js: BN.installApp / BN.showNotifyGuide) on tap only. Nothing opens by itself.
 Kill switch: Render env BN_MENU_V5=0 brings back the previous menus unchanged."""
@@ -47,7 +49,21 @@ I_YT = ('<svg class="m5-ico m5-ico-yt" viewBox="0 0 28.57 20" aria-hidden="true"
 I_PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2M12 6.5v7M9.2 10.8 12 13.6l2.8-2.8"/></svg>'
 I_BELL = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 1.8H4.4z"/><path d="M10 20.6a2.2 2.2 0 0 0 4 0"/></svg>'
 
+def _city_on():
+    return os.environ.get("BN_MENU_CITY", "1") != "0"
+
+def _city_ver():
+    try:
+        import hashlib
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "pwa", "bn-menu-city.js"), "rb") as f: return hashlib.sha1(f.read()).hexdigest()[:8]
+    except Exception:
+        return "0"
+
 def _art():
+    if _city_on(): return '<canvas class="m5-art m5-city" aria-hidden="true"></canvas>'
+    return _art_svg()
+
+def _art_svg():
     """Original abstract artwork: early-warning radar over a linked signal network. No words, no logos, no real imagery."""
     nodes = [(132, 214), (204, 132), (318, 98), (436, 150), (486, 262), (452, 392), (340, 470), (214, 446), (122, 344), (262, 262), (376, 300), (300, 372)]
     links = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 7), (7, 8), (8, 0), (9, 1), (9, 2), (9, 8), (9, 10), (10, 3), (10, 4), (10, 11), (11, 6), (11, 7), (9, 11), (10, 5)]
@@ -87,6 +103,7 @@ CSS = ('<style id="bn_m5">'
  '.m5 .m5-list a,.m5 .m5-soc{font:700 clamp(30px,4.2vw,52px)/1.1 Inter,system-ui,sans-serif!important;letter-spacing:.02em!important;text-transform:uppercase}'
  '.m5 .m5-list a{display:inline-block;color:#fff!important;text-decoration:none!important;padding:2px 0!important;background:none!important;border:0!important;'
  'white-space:nowrap;max-width:100%;transform-origin:right center;transition:color .15s}'
+ '.m5 .m5-list a,.m5 .m5-soc a{text-shadow:0 1px 16px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.55)}'
  '.m5 .m5-list a:hover,.m5 .m5-list a:focus-visible{color:#C9CDD3!important}.m5 .m5-list a[aria-current]{color:#C9CDD3!important}'
  '.m5 .m5-list a:focus-visible,.m5 .m5-soc a:focus-visible,.m5 .m5-btn:focus-visible{outline:2px solid #fff;outline-offset:4px}'
  '.m5 .m5-soc{display:flex;gap:.55em;align-items:center;justify-content:flex-end;margin:.34em 0 0;line-height:1}'
@@ -115,6 +132,10 @@ CSS = ('<style id="bn_m5">'
  '.m5.m5-go .m5-r,.m5.m5-go .m5-art{animation:none!important}'
  '.m5.m5-go .m5-r,.m5.m5-go .m5-art,.m5.m5-go .m5-hit a{transition:opacity .15s ease!important;transform:none!important;opacity:0!important}'
  '.m5.m5-go .m5-art{transform:translateY(-50%)!important}}'
+ # Nov 27 2026: city canvas fills the menu behind the links (never takes pointer events); the tap zoom-through only fades it
+ '.m5 canvas.m5-city{position:absolute;z-index:-1;pointer-events:none;left:0;top:0;width:100%;height:100%;max-width:none;display:block;transform:none;opacity:1}'
+ '@keyframes m5cityout{from{opacity:1}to{opacity:0}}'
+ '.m5.m5-go canvas.m5-city{animation:m5cityout .42s ease both!important;transform:none!important}'
  # instruction panels sit above the full-screen menu
  '#bnig,#bnna{z-index:2147482000!important}'
  '#bnig.bnig-on,#bnna.bnig-on{visibility:visible!important}'   # tapped from the menu: show even while the open menu locks the page (html.bn-lock)
@@ -138,6 +159,12 @@ JS = ('<script id="bn_m5js">(function(){if(window.__bnM5)return;window.__bnM5=1;
  'else{if(B.showNotifyGuide)B.showNotifyGuide();else if(B.enableAlerts)B.enableAlerts({});else return false}return true}'
  'document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest("[data-m5-act]");if(!b)return;e.preventDefault();var k=b.getAttribute("data-m5-act");'
  'if(m5act(k))return;if(!document.querySelector(\'link[href*="install-guide.css"]\')){var l=document.createElement("link");l.rel="stylesheet";l.href="/install-guide.css";document.head.appendChild(l)}m5load("/alerts.js",function(){m5load("/install-guide.js",function(){m5act(k)})})})'
+ # Nov 27 2026: load the city animation script the first time a menu opens (nothing is fetched while menus stay closed)
+ ';var cityLoaded=0;function cityLoad(){if(cityLoaded)return;cityLoaded=1;var s=document.createElement("script");s.src="/bn-menu-city.js?v=__CITYV__";s.async=true;document.head.appendChild(s)}'
+ 'function cityWatch(){var cs=document.querySelectorAll("canvas.m5-city"),seen={};[].forEach.call(cs,function(c){var m=c.closest("#bn-menu,#h_menu,#w2_menu");if(!m||seen[m.id])return;seen[m.id]=1;'
+ 'var Q="#bn-menu.bn-open,#h_menu.open,#w2_menu:not([hidden])";if(m.matches(Q)){cityLoad();return}'
+ 'if(window.MutationObserver){var o=new MutationObserver(function(){if(m.matches(Q)){cityLoad();o.disconnect()}});o.observe(m,{attributes:true,attributeFilter:["class","hidden"]})}})}'
+ 'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",cityWatch);else cityWatch();'
  '})()</script>')
 
 def html_block(active_href=None, intro_href=None):
@@ -155,4 +182,4 @@ def html_block(active_href=None, intro_href=None):
             f'<button type="button" class="m5-btn" data-m5-act="install">{I_PHONE}<span>Install on home screen</span></button>'
             f'<button type="button" class="m5-btn" data-m5-act="notify">{I_BELL}<span>Turn on notifications</span></button></div>')
     return (CSS + '<div class="m5" data-m5>' + _art() + '<div class="m5-nav"><ul class="m5-list" aria-label="Pages">' + "".join(li) + '</ul>'
-            + soc + acts + '</div></div>' + JS)
+            + soc + acts + '</div></div>' + JS.replace("__CITYV__", _city_ver()))
