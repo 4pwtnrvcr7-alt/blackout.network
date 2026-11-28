@@ -316,6 +316,9 @@
       if (on) {
         setStatus(s.level === "all" ? "On, all ranked alerts" : "On, major alerts only");
         body(soon(c) + choices(c, s)
+          + '<p class="bnal-note">' + (E.ios
+            ? "If you are not getting alerts, tap <b>Send a test alert</b>. That also refreshes the connection. Open BLACKOUT from your Home Screen, not from a Safari tab."
+            : "If you are not getting alerts, tap <b>Send a test alert</b>. That also refreshes the connection to this device.") + '</p>'
           + '<div class="bnal-group">' + linkRow("testpush", "Send a test alert") + linkRow("sample", "See a sample") + '</div>'
           + '<div class="bnal-group">' + linkRow("off", "Turn off alerts") + '</div>' + msg);
       } else {
@@ -503,15 +506,46 @@
       } else say("Sample shown below.", "ok");
     }).catch(function () { showSample(box, EXAMPLE); say("Sample shown below.", "ok"); });
   }
+  // Recreate the browser push subscription. iOS can keep accepting pushes on a stale
+  // endpoint that never displays. Only called from a tap (Send a test alert), never on
+  // page load — subscribe is capped at 10 writes/IP/hour.
+  function refreshSubscription(reg, cf, old) {
+    var s = st();
+    function store(sub, j) {
+      save({ on: true, level: (j && j.level) || s.level || "major", cats: (j && j.cats) || s.cats || [],
+             endpoint: sub.endpoint, test: !!(j && j.test) || !!s.test, since: s.since || new Date().toISOString() });
+      return sub;
+    }
+    function upsert(sub) {
+      return post("/api/alerts/resubscribe", { old_endpoint: old.endpoint, sub: sub.toJSON() }).then(function (j) {
+        return store(sub, j);
+      }, function () {
+        return post("/api/alerts/subscribe", { sub: sub.toJSON(), level: s.level || "major", cats: s.cats || [], test: isTest() })
+          .then(function (j) { return store(sub, j); });
+      });
+    }
+    return old.unsubscribe().catch(function () { return false; }).then(function () {
+      return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(cf.vapid_public_key) });
+    }).then(function (sub) { return upsert(sub); }, function () {
+      return reg.pushManager.getSubscription().then(function (sub) { return sub || old; });
+    });
+  }
   // "Send me a test push": a real push from our server through your browser's push service (Apple, Google, Mozilla, Microsoft)
   function testPush(btn) {
     btn.disabled = true; say("Requesting a test push…");
-    getReg().then(function (r) { return r.pushManager.getSubscription(); }).then(function (sub) {
+    Promise.all([getReg(), getCfg()]).then(function (rc) {
+      var reg = rc[0], cf = rc[1];
+      if (!cf.vapid_public_key) throw new Error("Alerts are not available right now. Please try again later.");
+      return reg.pushManager.getSubscription().then(function (sub) {
+        if (!sub) { save(null); render(); throw null; }
+        return refreshSubscription(reg, cf, sub);
+      });
+    }).then(function (sub) {
       if (!sub) { save(null); render(); throw null; }
       return post("/api/alerts/testpush", { endpoint: sub.endpoint });
     }).then(function (j) {
       say(j.queued === false ? "A test push is already on its way. It arrives within about 2 minutes." :
-        "Test push requested. It arrives within about 2 minutes, even if you close this page.", "ok");
+        "Test push requested. It arrives within about 2 minutes, even if you close this page. This also refreshed the connection to this device.", "ok");
       setTimeout(function () { btn.disabled = false; }, 30000);
     }).catch(function (e) { btn.disabled = false; if (e !== null) say((e && e.message) || "Couldn’t request a test push. Please try again.", "err"); });
   }
@@ -568,9 +602,32 @@
     if (e.data && e.data.type === "bn-push") { window.__bnLastPush = e.data; try { document.dispatchEvent(new CustomEvent("bn:push", { detail: e.data })); } catch (er) {} }
   });
 
+  // If this device already allowed notifications but the subscription is gone, recreate it.
+  // No new permission prompt. Skipped in an iOS Safari tab (alerts only work from the Home Screen app).
+  // Does not POST when a subscription already exists (subscribe is capped at 10 writes/IP/hour).
+  function restoreMissingSub() {
+    if (!E.api || Notification.permission !== "granted" || (E.ios && !E.standalone)) return Promise.resolve();
+    var s = st();
+    if (!s.on) return Promise.resolve();
+    return Promise.all([getReg(), getCfg()]).then(function (rc) {
+      var reg = rc[0], cf = rc[1];
+      if (!cf.vapid_public_key) return;
+      return reg.pushManager.getSubscription().then(function (sub) {
+        if (sub) return;
+        return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(cf.vapid_public_key) })
+          .then(function (sub) {
+            return post("/api/alerts/subscribe", { sub: sub.toJSON(), level: s.level || "major", cats: s.cats || [], test: isTest() })
+              .then(function (j) {
+                save({ on: true, level: j.level, cats: j.cats, endpoint: sub.endpoint, test: !!j.test, since: s.since || new Date().toISOString() });
+                paintBell();
+              });
+          });
+      });
+    }).catch(function () {});
+  }
   function init() {
     addButtons();
-    if (st().on) BN.alertsStatus().then(paintBell);
+    if (st().on) restoreMissingSub().then(function () { return BN.alertsStatus(); }).then(paintBell);
     // the top bar may be re-rendered by the dashboard; re-add the bell if it disappears
     try { new MutationObserver(function () { if (!document.querySelector(".bn-top .bnal-bell") && document.querySelector(".bn-top .bn-acts")) addButtons(); })
       .observe(document.body, { childList: true, subtree: false }); } catch (e) {}
