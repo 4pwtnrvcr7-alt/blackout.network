@@ -44,6 +44,26 @@ class Home(unittest.TestCase):
         self.assertNotRegex(h.lower(), r"meshtastic|lora\b|/welcome|verified|before the news|concept preview")
         self.assertIsNone(re.search("[\U0001F000-\U0001FAFF\u2600-\u27BF]", h))
         self.assertIn('<span class="bnt-wm">blackout.network</span>', h)
+    def test_home_header_wordmark_and_menu_only(self):
+        # Matt 11:33 PM ET Nov 27: drop Live map / The Wire / How it ranks / Free brief and Open The Wire; keep wordmark + menu
+        h = theme.home_page()
+        m = re.search(r'<header class="h-nav" id="h_nav">(.*?)</header>', h, re.S)
+        self.assertIsNotNone(m)
+        nav = m.group(1)
+        self.assertIn('<span class="bnt-wm">blackout.network</span>', nav)
+        self.assertIn('class="h-burger"', nav)
+        self.assertIn('data-h-menu', nav)
+        self.assertIn('aria-label="Open menu"', nav)
+        self.assertNotIn('class="h-links"', nav)
+        self.assertNotIn('class="h-go"', nav)
+        self.assertNotIn("Live map", nav)
+        self.assertNotIn("How it ranks", nav)
+        self.assertNotIn("Free brief", nav)
+        self.assertNotIn("Open The Wire", nav)
+        self.assertNotIn("Open dashboard", nav)
+        self.assertIn('id="h_menu"', h)
+        self.assertIn('class="h-burger"', h)
+
     def test_overview(self):
         h = theme.live_overview_html()
         self.assertIn('id="bntl"', h); self.assertIn('/?intro=1', h)

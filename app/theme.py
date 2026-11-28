@@ -412,8 +412,7 @@ def _home_page_raw():
 <a class="h-skip" href="#s6">Skip to the free brief</a>
 <header class="h-nav" id="h_nav">
  <a class="h-wm" href="{lv}" aria-label="BLACKOUT.NETWORK {'The Wire' if lv == '/wire' else 'live dashboard'}">{wm}</a>
- <nav class="h-links" aria-label="Primary"><a href="/map">Live map</a><a href="/wire">The Wire</a><a href="#s3">How it ranks</a><a href="#s6">Free brief</a></nav>
- <div class="h-right"><a class="h-go" href="{lv}">{lvt}</a><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{hx}{m4btn}</button></div>
+ <div class="h-right"><button class="h-burger" type="button" data-h-menu aria-label="Open menu" aria-controls="h_menu" aria-expanded="false">{hx}{m4btn}</button></div>
 </header>
 <ol class="h-pager" id="h_pager" aria-hidden="true"></ol>
 <main id="flow"{snapattr}>
