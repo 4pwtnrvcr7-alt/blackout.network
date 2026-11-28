@@ -41,24 +41,15 @@ class GridMerge(unittest.TestCase):
         self.assertIn('og:title" content="The Grid:', body)
         self.assertNotIn("Network Status", body)
         for s in ('data-k="grid"', 'id="gx_more_btn"', 'id="gx_more"', 'id="gx_card"', 'id="gx_reg"', 'id="gx_kpis"', 'id="nb_grid"',
-                  "/api/netmap/gridlayer.js", "/api/netmap/gridlayer.css", 'id="nx_ldn"', 'class="gx-ldn"'):
+                  "/api/netmap/gridlayer.js", "/api/netmap/gridlayer.css", "Energizing the grid"):
             self.assertIn(s, body)
-        self.assertNotIn("Energizing the grid", body)
         for sid in ("gx-regions", "gx-world", "gx-outages", "gx-weather", "gx-threats", "gx-space", "gx-local", "gx-sources"):
             self.assertEqual(body.count(f'id="{sid}"'), 1, sid)
         for f in ("gridlayer.js", "gridlayer.css"): self.assertEqual(netmap.handle_get("/api/netmap/" + f)[0], 200)
 
     def test_gridlayer_rules(self):
         js = _read("netmap_static", "gridlayer.js"); css = _read("netmap_static", "gridlayer.css")
-        # pt2007u: Refresh yellow/orange/red is approved on the /grid loader only. Strip that block before the yellow ban.
-        ld0, ld1 = css.find("/* ---------- loader:"), css.find(".gx-b,.gx-x{")
-        self.assertGreater(ld0, -1); self.assertGreater(ld1, ld0)
-        loader, rest = css[ld0:ld1], css[:ld0] + css[ld1:]
-        for h in ("#FFE566", "#FF9A1A", "#FF5A3C"):
-            self.assertIn(h, loader)
-        self.assertIn("@keyframes gx-ld-drop", loader)
-        self.assertIn("prefers-reduced-motion", loader)
-        for t in (js.lower(), rest.lower()):
+        for t in (js.lower(), css.lower()):
             self.assertNotIn("yellow", re.sub(r"/\*.*?\*/", "", t, flags=re.S))
             self.assertNotIn("tile.openstreetmap.org", t)
             for c in ("#f5a524", "#ffd", "#ffcc00", "#ffeb3b", "#fde047", "#facc15", "#ffc21a", "#c97b00"): self.assertNotIn(c, t)

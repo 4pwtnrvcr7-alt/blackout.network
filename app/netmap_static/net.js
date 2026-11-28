@@ -185,99 +185,24 @@
   var US = [[-125.5, 23.5], [-66, 50]];
   function PAD() { var m = innerWidth < 768; return m ? { top: 150, bottom: 120, left: 18, right: 18 } : { top: 160, bottom: 90, left: 60, right: 80 }; }
 
-  /* ---------- loader: 100 phosphor blocks tile the viewport, one per real percent, bottom-to-top (Matt pt2022u) ---------- */
+  /* ---------- loader: glowing network built in front of you, progress tracks the real preload ---------- */
   var P = { map: 0, nets: 0, out: 0, dc: 0, rep: 0 }, W8 = { map: 0.3, nets: 0.3, out: 0.1, dc: 0.15, rep: 0.15 }, shown = 0, ldDone = false, t0 = performance.now();
-  var ldN = 0, ldWant = 0, ldOrder = [], ldTimer = 0, ldAfter = null, ldByKey = null;
   function prog() { var p = 0; for (var k in P) p += W8[k] * P[k]; return Math.min(1, p); }
-  function ldCache() {
-    if (ldByKey) return ldByKey;
-    ldByKey = new Array(100);
-    var nodes = document.querySelectorAll("#nx_ldb .gx-ldcell"), i, el;
-    for (i = 0; i < nodes.length; i++) {
-      el = nodes[i];
-      ldByKey[(+el.getAttribute("data-r")) * 10 + (+el.getAttribute("data-c"))] = el;
-    }
-    return ldByKey;
-  }
-  (function buildOrder() {
-    var r, c, i, a, b, tmp, row;
-    for (r = 0; r < 10; r++) {
-      row = [];
-      for (c = 0; c < 10; c++) row.push(r * 10 + c);
-      for (i = row.length - 1; i > 0; i--) { a = (Math.random() * (i + 1)) | 0; tmp = row[i]; row[i] = row[a]; row[a] = tmp; }
-      ldOrder = ldOrder.concat(row);
-    }
-    for (r = 0; r < 9; r++) {   /* scatter a few slots across the current/next row so it still reads bottom-to-top */
-      var nSwap = 2 + ((Math.random() * 2) | 0);
-      for (i = 0; i < nSwap; i++) {
-        a = r * 10 + 7 + ((Math.random() * 3) | 0);
-        b = (r + 1) * 10 + ((Math.random() * 3) | 0);
-        tmp = ldOrder[a]; ldOrder[a] = ldOrder[b]; ldOrder[b] = tmp;
-      }
-    }
-  })();
-  function ldWrite(n) {
-    var pn = $("nx_ldn"), root = $("nx_ld");
-    if (pn) pn.textContent = String(n);
-    if (root) root.setAttribute("aria-valuenow", String(n));
-  }
-  function ldDropOne() {
-    var k = ldOrder[ldN], el = ldCache()[k];
-    if (el) {
-      el.style.setProperty("--fall", ((11 - (k / 10 | 0)) * 2.4) + "vh");
-      el.classList.add("in");
-    }
-    ldN++;
-    ldWrite(ldN);
-  }
-  function ldSnap(n) {
-    n = Math.max(0, Math.min(100, n | 0));
-    while (ldN < n) ldDropOne();
-  }
-  function ldTick() {
-    ldTimer = 0;
-    var want = (ldDone || prog() >= 0.999) ? 100 : ldWant;
-    if (reduce) { ldSnap(want); if (ldN >= 100 && ldAfter) { var cb = ldAfter; ldAfter = null; cb(); } return; }
-    if (ldN < want) {
-      ldDropOne();
-      var gap = want - ldN;
-      var ms = gap > 40 ? 12 : gap > 15 ? 20 : 36;
-      if (ldN < want || (ldDone && ldN < 100)) ldTimer = setTimeout(ldTick, ms);
-      else if (ldN >= 100 && ldAfter) { var cb2 = ldAfter; ldAfter = null; cb2(); }
-    } else if (ldN >= 100 && ldAfter) { var cb3 = ldAfter; ldAfter = null; cb3(); }
-  }
-  function ldChase(n, cb) {
-    ldWant = Math.max(ldWant, Math.max(0, Math.min(100, n)));
-    if (cb) ldAfter = cb;
-    if (!ldTimer) ldTick();
-  }
-  function step(k, v) {
-    P[k] = Math.max(P[k], v);
-    if (ldDone) return;
-    var p = prog();
-    if (p >= 0.999) {
-      ldChase(100);
-      setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0)));
-    } else if (!BOOT) ldChase(Math.round(p * 100));
-  }   /* never a flash: the build shows for at least ~2.6 s; percent is never capped at 99 */
+  function step(k, v) { P[k] = Math.max(P[k], v); if (v >= 1) { var li = document.querySelector('#nx_ld li[data-s="' + k + '"]'); if (li) li.classList.add("on"); } if (!BOOT && !ldDone) { var pn = $("nx_ldn"); if (pn) pn.textContent = ("0" + Math.min(99, Math.round(prog() * 100))).slice(-2) + "%"; } if (prog() >= 0.999) setTimeout(finish, reduce ? 50 : Math.max(650, 2600 - (performance.now() - t0))); }   /* never a flash: the build shows for at least ~2.6 s */
   function finish() {
-    if (ldDone) return; ldDone = true; shown = 1;
+    if (ldDone) return; ldDone = true; shown = 1; if (!BOOT) $("nx_ldn").textContent = "100%";
     var gone = false;
-    function reveal() {   /* blocks have settled at 100%, then the overlay fades into the page */
+    function reveal() {   /* the last parts power on, the board flashes, then it fades into the page */
       if (gone) return; gone = true;
       document.body.classList.add("nx-ready");
       try { window.__nxLoad = Math.round(performance.now() - t0); } catch (e) {}
       setTimeout(function () { if (BOOT) BOOT.stop(); var l = $("nx_ld"); if (l) l.remove(); }, 900);
     }
-    function afterBlocks() {
-      ldWrite(100);
-      if (BOOT) { BOOT.done(reveal); setTimeout(reveal, 3200); } else setTimeout(reveal, reduce ? 0 : 520);
-    }
-    if (ldN >= 100) afterBlocks(); else ldChase(100, afterBlocks);
+    if (BOOT) { BOOT.done(reveal); setTimeout(reveal, 3200); } else setTimeout(reveal, reduce ? 0 : 520);
   }
   setTimeout(function () { if (!ldDone) { var m = $("nx_ldmsg"); if (m) { m.hidden = false; m.textContent = "Some layers are still loading. They finish in the background."; } setTimeout(finish, 900); } }, 25000);
   var BOOT = null;
-  (function loader() {   /* boot.js kept in the repo, no longer loaded; hook stays harmless if a canvas is absent */
+  (function loader() {   /* pt1759u: boot sequence in boot.js; the percentage and every stage follow prog() */
     var cv = $("nx_ldcv"); if (!cv || !window.BNBoot) return;
     BOOT = window.BNBoot({ canvas: cv, panel: $("nx_ldp"), progress: prog, pct: $("nx_ldn"), bar: $("nx_ldbar"), status: $("nx_ldst") });
   })();
