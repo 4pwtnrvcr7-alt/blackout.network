@@ -13,7 +13,7 @@
  --bn-nav-size:17px;--bn-small:13px;
  /* layout */
  --bn-tbar-h:60px;--bn-pad-x:16px;--bn-gap:6px;--bn-tap:44px;--bn-icon-w:36px;--bn-panel-w:86%;
- --bn-radius:12px;--bn-radius-sm:8px;--bn-z-bar:1000;--bn-z-drawer:2600;--bn-z-pop:2700;--bn-speed:.22s;
+ --bn-radius:12px;--bn-radius-sm:8px;--bn-radius-pill:9999px;--bn-z-bar:1000;--bn-z-drawer:2600;--bn-z-pop:2700;--bn-speed:.22s;
  /* palette: brand A "Signal", dark (default) */
  --bn-bg:#0B0D10;--bn-tbar-bg:rgba(11,13,16,.97);--bn-surface-0:#0f1317;--bn-surface:#14181D;--bn-raised:#1B2027;--bn-surface-2:#1d232b;
  --bn-line:#252B33;--bn-line-2:#2f3742;--bn-text:#E6E9EE;--bn-text-2:#c9d0d9;--bn-muted:#8B95A3;
@@ -60,11 +60,11 @@ body header.bn-top::after{content:"";display:block;height:var(--bn-rule-h);backg
 .bn-primary{display:none}
 .bn-acts{margin-left:auto;display:flex;align-items:center;gap:0;flex:none}
 .bn-follows{display:flex;align-items:center}
-body .bn-ib{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--bn-icon-w);height:var(--bn-tap);padding:0;margin:0;border:0;border-radius:var(--bn-radius-sm);
+body .bn-ib{display:inline-flex;align-items:center;justify-content:center;flex:none;width:var(--bn-icon-w);height:var(--bn-tap);padding:0;margin:0;border:0;border-radius:var(--bn-radius-pill);
  background:transparent;color:var(--bn-text);cursor:pointer;text-decoration:none;font:inherit}
 body .bn-ib:hover{background:var(--bn-hover)}
 body header.bn-top a:focus-visible,body header.bn-top button:focus-visible,.bn-drawer a:focus-visible,.bn-drawer button:focus-visible,.bn-drawer summary:focus-visible{outline:2px solid var(--bn-accent);outline-offset:-2px}
-a.bn-follow{display:inline-flex;align-items:center;gap:8px;flex:none;min-width:var(--bn-icon-w);height:var(--bn-tap);padding:0 10px;justify-content:center;border-radius:var(--bn-radius-sm);
+a.bn-follow{display:inline-flex;align-items:center;gap:8px;flex:none;min-width:var(--bn-icon-w);height:var(--bn-tap);padding:0 10px;justify-content:center;border-radius:var(--bn-radius-pill);
  color:var(--bn-text)!important;text-decoration:none!important;font:600 14px/1.2 var(--bn-font-ui);white-space:nowrap;-webkit-tap-highlight-color:transparent}
 a.bn-follow:hover{background:var(--bn-hover)}
 a.bn-follow b{color:inherit;font-weight:700}
@@ -103,7 +103,7 @@ html.bn-js .bn-drawer:target:not(.bn-open){visibility:hidden;pointer-events:none
  min-height:calc(var(--bn-tbar-h) + var(--bn-safe-top));padding:var(--bn-safe-top) max(calc(var(--bn-pad-x) - 8px),env(safe-area-inset-right)) 0 max(var(--bn-pad-x),env(safe-area-inset-left));
  background:var(--bn-surface);border-bottom:1px solid var(--bn-line)}
 .bn-mbar .bn-logo{flex:1 1 auto;min-height:44px}
-.bn-mbar .bn-close{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;min-width:44px;min-height:44px;padding:0 10px;margin:0;border:0;border-radius:var(--bn-radius-sm);
+.bn-mbar .bn-close{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-sizing:border-box;min-width:44px;min-height:44px;padding:0 10px;margin:0;border:0;border-radius:var(--bn-radius-pill);
  background:transparent;color:var(--bn-text);cursor:pointer;text-decoration:none;font:500 14px/1 var(--bn-font-ui)}
 .bn-mbar .bn-close svg{width:20px;height:20px;display:block;flex:none}
 .bn-mbar .bn-close:hover{background:var(--bn-hover)}
@@ -179,7 +179,7 @@ body header.bn-top.bn-f6 .bn-acts .bn-ib.bn-theme-bar{width:44px!important;min-w
 /* t357: "Follow us on" prefix is only shown by the bar fitter (sitenav.js) when it really fits; see the t357 block at the end */
 @media(min-width:1200px){
  .bn-primary{display:flex;align-items:center;gap:2px;margin-left:18px}
- .bn-primary a{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:var(--bn-radius-sm);color:var(--bn-muted)!important;text-decoration:none!important;font:600 14px/1 var(--bn-font-ui)}
+ .bn-primary a{display:inline-flex;align-items:center;height:40px;padding:0 12px;border-radius:var(--bn-radius-pill);color:var(--bn-muted)!important;text-decoration:none!important;font:600 14px/1 var(--bn-font-ui)}
  .bn-primary a:hover{color:var(--bn-text)!important;background:var(--bn-hover)}
  .bn-primary a[aria-current="page"]{color:var(--bn-text)!important;box-shadow:inset 0 -2px 0 var(--bn-brand)}
  .bn-primary{margin-left:auto}
@@ -473,3 +473,26 @@ html.bn-m4.bn-closing .bn-panel{opacity:1!important}
 }
 /* Matt 5:25 PM: old regional heat map tab is retired; Heat Map opens /map */
 nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:none!important}
+
+/* Matt Nov 28 2026: every button-like control is a pill (border-radius 9999px)
+   through --bn-radius-pill. Not cards, panels, images, text fields, map vendor
+   controls, full-width menu/accordion/Wire/water list row headers, or the attached
+   menu-search go button. Story-page .pill typography stays an underline. */
+:is(
+  button,
+  .btn,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  a.btn,a.pri,a.np-btn,a.cta-btn,a.bnt-btn,a.bng-sb,a.bn-follow,a.bn-fbm,
+  .pri[role="button"],
+  .btn-primary,.cta-btn,.bnt-btn,.bnt-mbtn,.bng-sb,.bng-btn,.bn-fbm,
+  .bn-ref,#tl_ref,.bn-ib,.bn-primary a,.bn-mbar .bn-close,
+  .w2-btn,.w2-btn-s,.nl-btn,.nla-btn,.tl-b,.tl-chip,.tl-jb,.tl-top,.tl-newp,.tl-clear,.tl-now,
+  [class*="-chip"]:not([class*="-chips"]),
+  .chip,.pill
+):not(.leaflet-control *,.leaflet-ctrl *,.maplibregl-ctrl-group *,.maplibregl-popup-close-button,.maplibregl-ctrl-attrib-button):not(.nsa-b,.ss-ah,.hm-ah,.ns-row,.bn-mrow,.bn-theme-row,.bns-go,.bna-barday,.tl-hd,.wt-it>button){
+  border-radius:var(--bn-radius-pill, 9999px)!important;
+}
+html body:has(#bn_story) .pill{border-radius:0!important}
