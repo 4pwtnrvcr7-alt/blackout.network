@@ -415,14 +415,20 @@
   function inetCard(p) {
     var r = (INET && INET.places || {})[p.k] || (INET && !INET.all_down ? { name: p.n, level: 0, status: "Normal", signals: [] } : { name: p.n, level: -1, status: "No data", signals: [] }), c = inetCol(r.level);
     var nws = (r.news || []).map(function (h) { return '<li>' + (url(h.url) ? '<a href="' + url(h.url) + '" target="_blank" rel="noopener noreferrer">' + esc(h.t) + '</a>' : esc(h.t)) + (h.src ? ' · ' + esc(h.src) : '') + (h.at ? ' · ' + esc(ago(h.at)) : '') + '</li>'; }).join("");
+    var wires = (r.wire || []).map(function (h) {
+      var href = h.url || (h.id && /^[0-9a-f]{16}$/.test(h.id) ? "/wire/" + h.id : "");
+      return '<li>' + (href ? '<a href="' + href + '">' + esc(h.t) + '</a>' : esc(h.t)) + (h.src ? ' · ' + esc(h.src) : '') + (h.at ? ' · ' + esc(ago(h.at)) : '') + (h.cur ? ' · ongoing' : '') + '</li>';
+    }).join("");
     var sig = (r.signals || []).map(function (s) { return '<li>' + esc(s.name) + ' · ' + (s.pct != null ? (s.live ? 'now ' : '') + esc(s.pct) + '% of normal (' + esc(100 - s.pct) + '% drop)' : 'below normal') + (s.since ? ' · since ' + esc(ago(s.since)) : '') + '</li>'; }).join("");
+    var viaWire = INET && (INET.via === "wire" || (INET.via || "").indexOf("wire") !== -1);
     return '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + esc(r.status) + '</span><h3>' + esc(r.name || p.n) + '</h3>' +
       (r.level < 0 ? '<p>No live internet measurements for this place right now.</p>' :
-       sig ? '<p>Signals below their normal level:</p><ul>' + sig + '</ul>' : nws ? '' : '<p>No problem reported. IODA signals (routing, active probing, network telescope) at normal levels.</p>') +
+       sig ? '<p>Signals below their normal level:</p><ul>' + sig + '</ul>' : (nws || wires) ? '' : '<p>No problem reported' + (viaWire ? ' on The Wire in the last 7 days.' : '. IODA signals (routing, active probing, network telescope) at normal levels.') + '</p>') +
+      (wires ? '<p>On The Wire:</p><ul>' + wires + '</ul>' : '') +
       (nws ? '<p>In the news:</p><ul>' + nws + '</ul>' : '') +
       '<dl>' + (r.since ? '<dt>Since</dt><dd>' + esc(ago(r.since)) + '</dd>' : '') + (r.alerts_24h != null ? '<dt>IODA alerts, 24 h</dt><dd>' + num(r.alerts_24h) + '</dd>' : '') +
-      '<dt>IODA data from</dt><dd>' + esc(ago(INET && INET.generated || r.checked)) + (INET && INET.via === "box-relay" ? ' (relayed)' : '') + '</dd></dl>' +
-      '<div class="acts">' + linkA(r.src || "https://ioda.inetintel.cc.gatech.edu/", "Live IODA dashboard") + '</div><p class="age">Measured by IODA, Georgia Tech. A drop can be a local network problem, a power cut or a shutdown.</p>';
+      '<dt>' + (viaWire && !sig ? 'Wire stories from' : 'IODA data from') + '</dt><dd>' + esc(ago(INET && INET.generated || r.checked)) + (INET && INET.via === "box-relay" ? ' (relayed)' : viaWire ? ' (from The Wire)' : '') + '</dd></dl>' +
+      '<div class="acts">' + linkA(r.src || "https://ioda.inetintel.cc.gatech.edu/", "Live IODA dashboard") + '</div><p class="age">Measured by IODA, Georgia Tech, and listed on The Wire when IODA is the source. A drop can be a local network problem, a power cut or a shutdown.</p>';
   }
   function applyWorld() {
     if (!WORLD || !D || !map.getSource("cty")) return;
@@ -547,7 +553,8 @@
       var o = D.outages.countries[p.i]; c = o.major ? COL.out : COL.deg;
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>Internet · ' + (o.cur ? (o.major ? "Major outage now" : "Outage signal now") : "Outage in the last 24 h") + '</span><h3>' + esc(o.name) + '</h3>' +
         '<dl><dt>Signals</dt><dd>' + esc((o.signals || []).map(function (s) { return { bgp: "Routing (BGP)", "ping-slash24": "Active probing", "merit-nt": "Network telescope", gtr: "Google traffic", "gtr-norm": "Google traffic" }[s] || s; }).join(", ")) + '</dd><dt>Started</dt><dd>' + esc(ago(o.last)) + '</dd></dl>' +
-        '<div class="acts">' + linkA(o.ioda, "Live IODA dashboard") + '</div><p class="age">Measured by IODA, Georgia Tech. A signal can be a local network problem, a power cut or a shutdown.</p>';
+        '<div class="acts">' + (o.href ? linkA(o.href, "Wire story") : '') + linkA(o.ioda, "Live IODA dashboard") + '</div><p class="age">' +
+        (o.src ? esc(o.src) + '. ' : '') + 'Measured by IODA, Georgia Tech, or listed from The Wire when IODA is the source. A signal can be a local network problem, a power cut or a shutdown.</p>';
     } else if (p.kind === "region") {
       var rg = D.outages.us_regions[p.i];
       h = '<span class="st" style="color:' + COL.deg + '"><i style="background:' + COL.deg + '"></i>Internet · outage signal, last 24 h</span><h3>' + esc(rg.name) + '</h3><dl><dt>Events</dt><dd>' + num(rg.events) + '</dd></dl><div class="acts">' + linkA(rg.ioda, "Live IODA dashboard") + '</div>';
@@ -800,6 +807,20 @@
       daily.map(function (v, i) { var hh = Math.max(1.5, 60 * v / mx); return '<rect x="' + (i * bw + 1).toFixed(1) + '" y="' + (64 - hh).toFixed(1) + '" width="' + (bw - 2).toFixed(1) + '" height="' + hh.toFixed(1) + '"' + (v >= mx * 0.6 && v > 40 ? ' class="hi"' : '') + '><title>' + v + ' events</title></rect>'; }).join("") +
       '</svg><div class="ax"><span>30 days ago</span><span>Today</span></div></div>';
     var h = '<div class="nx-kpis"><div class="nx-kpi"><b>' + num(s.ok) + '/' + num(s.networks) + '</b><span>Networks normal</span></div><div class="nx-kpi"><b>' + num(s.countries_now) + '</b><span>Countries with an outage now</span></div><div class="nx-kpi"><b>' + num(s.power_customers) + '</b><span>U.S. power customers out</span></div></div>' + chart;
+    var inetStories = od.wire || [];
+    if (inetStories.length) {
+      h += '<p class="nx-k">Internet outages on the Wire, last 7 days</p>';
+      inetStories.forEach(function (x) {
+        var d = x.href || (/^[0-9a-f]{16}$/.test(x.id || "") ? "/wire/" + x.id : "");
+        var dur = x.hours != null ? (Number(x.hours).toFixed(1).replace(/\.0$/, "") + " h") : "";
+        h += '<div class="nx-gh"><h3>' + esc(x.place || x.title || "") + (x.cur ? ' · ongoing' : '') + '</h3><span>' + esc(ago(x.t)) + '</span></div>';
+        h += '<p style="margin:0 0 10px">' + esc(x.title) + (dur ? ' · ' + esc(dur) : '') + (x.src ? ' · ' + esc(x.src) : '') + (d ? ' · ' + linkA(d, "Story") : '') + '</p>';
+      });
+    } else if (INET && INET.all_down) {
+      h += '<p class="nx-k">Internet outages</p><p style="margin:0 0 14px">Internet outage measurements are unavailable right now, and The Wire has no internet-outage stories in the last 7 days.</p>';
+    } else {
+      h += '<p class="nx-k">Internet outages</p><p style="margin:0 0 14px">No internet outage stories on the Wire in the last 7 days.</p>';
+    }
     var shownGroups = (D.groups || []).filter(function (g) { return g.id === "isp" ? ON.internet : g.id === "mobile" ? ON.mobile : g.id === "sat" ? ON.sat : g.id === "cloud" ? ON.cloud : (g.id === "pay" || g.id === "rails") ? ON.pay : g.id === "apps" ? ON.apps : true; });
     if (!shownGroups.length) shownGroups = D.groups || [];
     shownGroups.forEach(function (g) {
