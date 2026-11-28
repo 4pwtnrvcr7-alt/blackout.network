@@ -501,7 +501,7 @@ function feedHealth(){var el=$("tl_stale");if(!el)return;
 setInterval(feedHealth,30000);
 /* ---------- boot */
 function boot(){syncBar();lastW=list.clientWidth;cw=lastW;measureTop();feedHealth();
-  fetch("/api/wire_tl/meta").then(function(r){return r.json()}).then(function(m){meta=m;total=m.total||0;buildJump();status();var ln=$("tl_line");if(ln&&total&&m.earliest)ln.textContent=total.toLocaleString()+" signals since "+(/T00:00:00Z$/.test(m.earliest)?fUs:fL).format(dt(m.earliest)).replace(/^\w+, /,"")+". Newest at the top."}).catch(function(){buildJump()});
+  fetch("/api/wire_tl/meta").then(function(r){return r.json()}).then(function(m){meta=m;total=m.total||0;buildJump();status()}).catch(function(){buildJump()});
   var hs=(location.hash||"").match(/^#d=(\d{4}-\d{2}-\d{2})$/);
   if(hs)jumpTo(endOfDayET(hs[1]));else loadOlder();
   startPoll();
