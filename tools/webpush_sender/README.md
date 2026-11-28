@@ -4,7 +4,7 @@ Render stores subscriptions (`webpush.db`, Render-owned) and serves the Alerts p
 VAPID private key. The box sends, with `/workspace/blackout/webpush_notifier.py` (unmodified), fed by two local files:
 
 - `bn_webpush_feed.py loop` (every 30 s): pulls Render's `webpush.db` over the signed `GET /internal/sync/pull` (read-only) to
-  `/workspace/webpush_box/render_subs.db`, and builds `live_clusters.db` from the public `/api/state` (rank, high_at, eff_families).
+  `/workspace/webpush_box/render_subs.db`, and builds `live_clusters.db` from the public `/api/alerts/feed` (falls back to `/api/state`; rank, high_at, eff_families, published).
 - `bn_webpush_run.py loop`: imports the notifier and points it at those two files. Rules unchanged: Major = rank 7+ with 2+ source
   families, All = rank 5+, 6 per hour per subscriber, one per story, only stories after signup and after the sender started.
 - `run_webpush_live.sh`: idempotent starter, also called from `/workspace/launch/social/ensure_loops.sh`.

@@ -71,39 +71,61 @@ class NetMap(unittest.TestCase):
         self.assertEqual(netdetail.LVC[1], "#FFA040")
 
     def test_boot_loader(self):
-        """Nov 27 2026 (pt2022u): 100 phosphor blocks tile the full viewport, one per percent, Refresh
-        yellow/orange/red, bottom-to-top. Only the percent is on screen (no label, no stage checklist, no card).
-        boot.js is kept in the repo but not loaded. Progress ids net.js drives are present, reduced motion is honored.
-        Yellow is approved on this loader only."""
+        """Nov 28 2026 (Matt 1:42 AM ET): typographic Grid loader. Real step()/prog() weights,
+        hairline ember track, named steps as they finish. No phosphor tile board. boot.js stays
+        in the repo but is not loaded. The 9 s reports timeout is a safety fallback only.
+        A restrained ember accent is approved on this loader only."""
         import netmap, netpages
         self.assertEqual(netmap.handle_get("/api/netmap/boot.js")[0], 200)
         body = netpages.handle_get("/grid", {})[1]
         self.assertNotIn("/api/netmap/boot.js", body)
         self.assertLess(body.index('class="gx-ld" id="nx_ld"'), body.index("/api/netmap/net.js"))
-        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', 'id="nx_ldb"', 'class="gx-ldboard"', 'class="gx-ldn"', 'role="progressbar"'):
+        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', 'id="nx_ldbar"', 'id="nx_ldsteps"', 'class="gx-ldn"',
+                  'class="gx-ldtrack"', 'class="gx-ldsteps"', 'role="progressbar"', 'data-s="map"',
+                  'data-s="nets"', 'data-s="out"', 'data-s="dc"', 'data-s="rep"'):
             self.assertIn(s, body)
-        for s in ("Energizing the grid", 'class="gx-ldk"', 'class="gx-lds"', 'data-s="map"', 'class="gx-ldsvg"'):
+        self.assertIn(">Map<", body)
+        self.assertIn(">Operators<", body)
+        self.assertIn(">Outages<", body)
+        self.assertIn(">Data centers<", body)
+        self.assertIn(">Reports<", body)
+        for s in ("Energizing the grid", 'class="gx-ldk"', 'class="gx-lds"', 'class="gx-ldsvg"',
+                  'class="gx-ldboard"', 'class="gx-ldcell"', 'id="nx_ldb"'):
             self.assertNotIn(s, body)
-        self.assertEqual(body.count('class="gx-ldcell"'), 100)
+        self.assertEqual(body.count('class="gx-ldcell"'), 0)
         css = open(os.path.join(APP, "netmap_static", "gridlayer.css"), encoding="utf-8").read()
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("body.nx-ready .gx-ld{opacity:0", css)
-        self.assertIn("@keyframes gx-ld-drop", css)
-        self.assertIn(".gx-ldboard{position:absolute;inset:0", css)
+        self.assertIn(".gx-ldtrack", css)
+        self.assertIn("--gx-ember:#CC7A3E", css)
+        self.assertIn("z-index:40", css)
+        self.assertNotIn("z-index:41", css)   # loader covers the header
+        self.assertNotIn("@keyframes gx-ld-drop", css)
+        self.assertNotIn(".gx-ldboard{", css)
+        self.assertNotIn(".gx-ldcell{", css)
         self.assertNotIn("width:min(272px", css)
         self.assertNotIn("Energizing the grid", css)
         self.assertNotIn(".gx-ldk{", css)
         self.assertNotIn(".gx-lds{", css)
-        self.assertNotIn("z-index:41", css)   # loader covers the header; only the percent is visible
         for h in ("#FFE566", "#FF9A1A", "#FF5A3C"):
-            self.assertIn(h, css)
+            self.assertNotIn(h, css)   # no candy tile gradient
         js = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
         self.assertIn("function ldChase", js)
-        self.assertIn("function ldDropOne", js)
+        self.assertIn("function prog()", js)
+        self.assertIn("function step(k, v)", js)
+        self.assertNotIn("function ldDropOne", js)
+        self.assertNotIn("ldOrder", js)
         self.assertNotIn("Math.min(99", js)   # never stall the percent at 99
         self.assertIn("ldDone || prog() >= 0.999) ? 100", js)
         self.assertIn("prefers-reduced-motion", js)
         self.assertIn('pn.textContent = String(n)', js)   # "%" lives in the markup, not the number
+        self.assertIn('W8 = { map: 0.3, nets: 0.3, out: 0.1, dc: 0.15, rep: 0.15 }', js)
+        # 9 s reports timeout is a safety fallback only; board.js still reports via __nxStep
+        self.assertIn('step("rep", 1); }, 9000)', js)
+        self.assertIn("safety fallback only", js)
+        self.assertIn('window.__nxStep = step', js)
+        self.assertIn("25000", js)
+
 
     def test_bars_union_and_bounds(self):
         import netmap

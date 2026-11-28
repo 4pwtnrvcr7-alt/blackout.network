@@ -8,7 +8,7 @@ body.tl{background:#000}
 @media (max-width:760px){:root{--tl-bar:calc(57px + env(safe-area-inset-top,0px))}}  /* the site bar's real height (56 + 1 border), so the server-painted rows do not move when app.js measures it */
 #tl_main{padding:var(--tl-bar) 0 0!important;margin:0!important;max-width:none!important;min-height:100svh}
 .tl-qx[hidden],.tl-clear[hidden],.tl-top[hidden],.tl-jump[hidden],.tl-sheet[hidden],.tl-upd[hidden],.tl-newp[hidden],.tl-fbadge[hidden],.tl-loclab[hidden]{display:none!important}
-.tl-b,.tl-chip,.tl-jb,.tl-top,.tl-newp,.tl-clear,.tl-hd,.tl-search,.tl-now,.tl-loc input,.tl-fbadge{border-radius:0!important}
+.tl-search,.tl-loc input,.tl-hd,.tl-fbadge{border-radius:0!important}
 .tl .w2-foot{background:#000}
 .tl-stale{margin:0;padding:12px var(--w2-gut);font:500 13px/1.45 Inter,sans-serif;color:#A8ADB4;border-bottom:1px solid var(--tl-line);background:#000}
 .tl-stale.is-severe{color:#E5484D}

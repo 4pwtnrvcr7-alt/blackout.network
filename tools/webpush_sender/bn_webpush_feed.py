@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Web Push sender feed (Nov 24 2026). Box only. Keeps two LOCAL files fresh so webpush_notifier.py can send from a box whose own
-blackout.db is stale (the live Wire and the live subscription DB are owned by Render now):
+"""Web Push sender feed (Nov 24 2026, repaired Nov 27). Box only. Keeps two LOCAL files fresh so
+webpush_notifier.py can send from a box whose own blackout.db is stale (the live Wire and the live
+subscription DB are owned by Render now):
   1. render_subs.db     the Render-owned webpush.db, pulled over the signed GET /internal/sync/pull (read-only, hash-checked)
-  2. live_clusters.db   a `clusters` table built from the PUBLIC https://blackout.network/api/state (main feed, rank/high_at/eff_families)
+  2. live_clusters.db   a `clusters` table built from the PUBLIC https://blackout.network/api/alerts/feed
+                        (falls back to /api/state if the slim feed is not live yet)
 Never touches /workspace/blackout, blackout.db, render_mirror, scanner or push.py. Never prints keys, endpoints or secrets.
 Usage: bn_webpush_feed.py once | loop"""
-import os, sys, io, json, time, gzip, sqlite3, urllib.request
+import os, sys, json, time, gzip, sqlite3, urllib.request, urllib.error
 sys.path.insert(0, "/workspace/blackout")
 D = "/workspace/webpush_box"
 SUBS = os.path.join(D, "render_subs.db"); CL = os.path.join(D, "live_clusters.db"); HB = os.path.join(D, "feed_heartbeat.json")
 LOG = os.path.join(D, "feed.log"); SITE = "https://blackout.network"
+# Slim /api/alerts/feed first (small, usually fast). /api/state is a large page and often times out at 40s.
+FEEDS = (("/api/alerts/feed", 25), ("/api/state", 90))
+
 def log(m):
     with open(LOG, "a") as f: f.write(time.strftime("[%Y-%m-%dT%H:%M:%SZ] ", time.gmtime()) + m + "\n")
 def jl(p, d):
@@ -36,23 +41,52 @@ def pull_subs(st):
     os.chmod(tmp, 0o600); os.replace(tmp, SUBS); st["subs_hash"] = h; st["subs_n"] = n
     return True
 
+def _fetch_json(path, timeout):
+    req = urllib.request.Request(SITE + path, headers={"User-Agent": "BLACKOUT.NETWORK webpush feed", "Accept-Encoding": "identity"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        if r.status != 200:
+            raise RuntimeError(f"{path} HTTP {r.status}")
+        return json.loads(r.read()), path
+
+def _load_clusters():
+    last = None
+    for path, timeout in FEEDS:
+        tries = 2 if path.endswith("/feed") else 2
+        for i in range(tries):
+            try:
+                d, used = _fetch_json(path, timeout)
+                rows = [x for x in (d.get("main") or []) if x.get("cluster_id") and not x.get("hidden") and not x.get("watchlist")
+                        and x.get("published", True)]   # skip held/unready items; they reappear here once published
+                if len(rows) < 20:
+                    last = RuntimeError(f"{used} main has only {len(rows)} rows; keeping the previous file")
+                    break
+                return rows, used
+            except Exception as ex:
+                last = ex
+                if i + 1 < tries:
+                    time.sleep(1.5 * (i + 1))
+        # 404 on the slim feed: not shipped yet, try /api/state
+        if path.endswith("/feed") and isinstance(last, urllib.error.HTTPError) and last.code == 404:
+            continue
+        if path.endswith("/feed"):
+            continue
+    raise last if last else RuntimeError("cluster feed failed")
+
 def pull_clusters(st):
-    req = urllib.request.Request(SITE + "/api/state", headers={"User-Agent": "BLACKOUT.NETWORK webpush feed", "Accept-Encoding": "identity"})
-    with urllib.request.urlopen(req, timeout=40) as r: d = json.loads(r.read())
-    rows = [x for x in (d.get("main") or []) if x.get("cluster_id") and not x.get("hidden") and not x.get("watchlist")]
-    if len(rows) < 20: raise RuntimeError(f"/api/state main has only {len(rows)} rows; keeping the previous file")
+    rows, used = _load_clusters()
     tmp = CL + ".tmp"
     if os.path.exists(tmp): os.unlink(tmp)
     c = sqlite3.connect(tmp)
     try:
         c.execute("""CREATE TABLE clusters(cluster_id TEXT PRIMARY KEY, title TEXT, category TEXT, location TEXT, rank INTEGER, score REAL,
-                     eff_families INTEGER, high_at TEXT, updated TEXT, first_seen TEXT, watchlist INTEGER DEFAULT 0)""")
-        c.executemany("INSERT OR REPLACE INTO clusters VALUES(?,?,?,?,?,?,?,?,?,?,0)",
+                     eff_families INTEGER, high_at TEXT, updated TEXT, first_seen TEXT, watchlist INTEGER DEFAULT 0, published INTEGER DEFAULT 1)""")
+        c.executemany("INSERT OR REPLACE INTO clusters VALUES(?,?,?,?,?,?,?,?,?,?,0,?)",
                       [(x["cluster_id"], x.get("title"), x.get("category"), x.get("location"), int(x.get("rank") or 0), x.get("score"),
-                        int(x.get("eff_families") or 0), x.get("high_at"), x.get("updated"), x.get("first_seen")) for x in rows])
+                        int(x.get("eff_families") or 0), x.get("high_at"), x.get("updated"), x.get("first_seen"),
+                        1 if x.get("published", True) else 0) for x in rows])
         c.commit()
     finally: c.close()
-    os.chmod(tmp, 0o600); os.replace(tmp, CL); st["clusters_n"] = len(rows)
+    os.chmod(tmp, 0o600); os.replace(tmp, CL); st["clusters_n"] = len(rows); st["clusters_src"] = used
 
 def once():
     os.makedirs(D, mode=0o700, exist_ok=True)
