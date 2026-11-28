@@ -23,6 +23,9 @@ _OPINION = re.compile(r"\b(ironic|ironically|guess|shouldn't|should have|shouldn
                       r"wake up|sheep|libtard|maga|woke|idiots?|clowns?|stupid|insane|crazy|hellscape|propaganda|billionaires?)\b", re.I)
 _DIGEST = re.compile(r"^\s*\d+/\d*\s|\bnews items\b|\b(?:industrial|daily|weekly|morning|evening)\b[^.]{0,25}\bbrief\b|\bweekly\b|\bround-?up\b|\bstory \d\b|\bnews (?:nov|dec|jan|feb)\w*\.? ?\d|daily (?:digest|roundup|recap|briefing)|top stories|"
                      r"headlines (?:today|roundup)|\bnewsletter\b|\bpodcast\b|\bepisode \d|\bthread\b|\bpart \d+/\d+|\b\d+/\d+ ?(?:\U0001F9F5|:)", re.I)
+# a named source or authority saying it happened (a post with no number must still cite someone)
+_ATTRIB = re.compile(r"\b(confirm(?:s|ed)?|says?|said|announce[sd]?|officials?|police|authorities|according to|disclos\w+|statement|"
+                     r"spokes\w+|ministry|department|agency|cisa|fbi|usgs|noaa|reuters|ap news|bbc)\b", re.I)
 _SPAM = re.compile(r"#trends? today|click/?\s*tap|click here|tap below|follow (?:me|us)|subscribe|giveaway|retweet|\bRT @|#fyp|"
                    r"please provide|the excerpt only|as an ai|latest update for|link in bio|dm me|use code|promo code|free gratis", re.I)
 
@@ -128,8 +131,8 @@ def verdict(text, category=None):
     ents = _entities(raw)
     if not cve and not ents:
         return False, "no-entity"
-    detail = cve or bool(re.search(r"\d", plain))
-    if not detail and len(ents) < 2:
+    detail = cve or bool(re.search(r"\d", plain)) or bool(_ATTRIB.search(plain))
+    if not detail:
         return False, "no-detail"
     return True, "ok"
 
