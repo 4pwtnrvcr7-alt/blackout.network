@@ -47,8 +47,8 @@ class NetMap(unittest.TestCase):
         self.assertGreaterEqual(len(ops), 8)
         for o in ops: self.assertIn(o["g"]["type"], ("Polygon", "MultiPolygon"))
         # the normal internet tint must not wash the lines green while Power grid is on
-        self.assertIn('map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"])', js)
-        self.assertIn("l: l, o: l >= 3", js)
+        self.assertIn('map.setPaintProperty("inet-fill", "fill-opacity", mapOn("grid") ? ["case", [">", ["length", ["get", "band"]], 0], ["get", "o"], ["==", ["get", "l"], 0], 0.06, ["get", "o"]] : ["get", "o"])', js)
+        self.assertIn("o = b ? wireOp(b) : (l >= 3", js)
 
     def test_disruption_dots_match_card_red(self):
         """pt1846u: map disruption (level 2 / deg) is red like the Status cards, not orange.
@@ -59,7 +59,7 @@ class NetMap(unittest.TestCase):
         self.assertIn('out: "#FF3B3B"', js)
         self.assertIn('watch: "#FFA040"', js)
         self.assertIn("function lvCol(l) { return l >= 2 ? COL.out", js)
-        self.assertIn("function inetCol(l) { return l >= 2 ? COL.out", js)
+        self.assertIn("function inetCol(l, band) { return band ? wireCol(band) : (l >= 2 ? COL.out", js)
         self.assertNotIn('deg: "#FF7A1A"', js)
         self.assertIn("--nx-deg:#FF3B3B", css)
         self.assertNotIn("--nx-deg:#FF7A1A", css)
