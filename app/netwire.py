@@ -89,6 +89,37 @@ def is_power(title, src=""):
     return bool(POWER_RX.search(t))
 
 
+def _ioda_from(url):
+    """IODA source URLs carry the outage start as ?from=<unix>."""
+    if not url:
+        return None
+    m = re.search(r"[?&]from=(\d{9,})", str(url))
+    if not m:
+        return None
+    try:
+        return datetime.fromtimestamp(int(m.group(1)), tz=timezone.utc)
+    except Exception:
+        return None
+
+
+def start_t(row):
+    """Event/start time, never Wire activity time (heat t is often updated)."""
+    if not isinstance(row, dict):
+        return None
+    for k in ("et", "event_time"):
+        t = _ts(row.get(k))
+        if t:
+            return t
+    t = _ioda_from(row.get("url") or "")
+    if t:
+        return t
+    for k in ("t", "fs", "first_seen"):
+        t = _ts(row.get(k))
+        if t:
+            return t
+    return None
+
+
 def parse_window(title, t, now=None):
     """Return (start, end, cur, hours) from a Wire headline and its event time."""
     now = now or _now()
@@ -122,7 +153,7 @@ def story_from(row, now=None):
     kind = "internet" if is_internet(title, src) else "power" if is_power(title, src) else None
     if not kind:
         return None
-    t = row.get("t") or row.get("et") or row.get("event_time") or row.get("fs") or row.get("first_seen")
+    t = start_t(row)
     start, end, cur, hours = parse_window(title, t, now)
     if start and start < now - timedelta(days=DAYS) and not cur:
         return None
@@ -183,6 +214,7 @@ def _heat_rows():
             "id": g("id"), "title": g("title"), "lat": g("lat"), "lon": g("lon"),
             "place": g("place"), "cc": g("cc"), "prec": g("prec"), "t": g("t"),
             "src": g("src"), "url": g("url"), "rank": g("rank"), "fs": g("fs"),
+            "event_time": g("event_time") or g("et"), "et": g("et") or g("event_time"),
         })
     return out
 
@@ -201,7 +233,8 @@ def _sql_rows(days=DAYS):
     try:
         q = (
             "SELECT cluster_id AS id, title, location AS place, lat, lon, "
-            "COALESCE(event_time, first_seen) AS t, first_seen AS fs, rank, links "
+            "COALESCE(event_time, first_seen) AS t, event_time AS event_time, "
+            "first_seen AS fs, rank, links "
             "FROM clusters WHERE watchlist IN (0, 1) "
             "AND COALESCE(updated, first_seen) >= ? "
             "AND (title LIKE '%internet outage%' OR title LIKE '%(IODA)%' "
@@ -221,10 +254,15 @@ def _sql_rows(days=DAYS):
 
 
 def load(now=None):
-    """Return {internet, power, ok} or None if the Wire could not be read."""
-    rows = _heat_rows()
+    """Return {internet, power, ok} or None if the Wire could not be read.
+
+    Prefer the SQL path: its t is COALESCE(event_time, first_seen). The heat
+    payload's t is last activity (COALESCE(updated, first_seen)), which made
+    finished IODA outages look current.
+    """
+    rows = _sql_rows()
     if rows is None:
-        rows = _sql_rows()
+        rows = _heat_rows()
     if rows is None:
         return None
     return stories_from_rows(rows, now=now)
