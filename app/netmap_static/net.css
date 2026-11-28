@@ -390,6 +390,6 @@ body.nx-sky .nx-sw,body.nx-sky .nx-ss,.nx-sw,.nx-ss{display:none!important}
  .nx-top .nx-chip{padding:8px 0;gap:0;justify-content:center;overflow:hidden}
  .nx-top .nx-chip #nx_sum{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}   /* dot only when there is no room; the text stays for screen readers */
  .nx-top .bn-ref{padding:0 9px;gap:6px;letter-spacing:.1em}
- .nx-top .bn-ref.busy,.nx-top .bn-ref.is-filling,.nx-top .bn-ref.is-result{min-width:0}   /* the fill/result states must not widen the pill past the bar */
+ .nx-top .bn-ref.busy,.nx-top .bn-ref.is-filling,.nx-top .bn-ref.is-result{min-width:6.2rem}   /* fill/result keep the label box (it goes absolute) at the idle width, not the 7.6rem desktop min that would overflow the bar */
 }
 @media (max-width:370px){.nx-top .nx-chip{display:none}}
