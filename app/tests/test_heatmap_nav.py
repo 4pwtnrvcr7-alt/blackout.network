@@ -28,8 +28,11 @@ class HeatMapNav(unittest.TestCase):
 
     def test_home_live_map_ctas_and_hash_go_to_map(self):
         h = theme.home_page()
-        self.assertIn('href="/map">Live map</a>', h)
-        self.assertIn('href="/map">Open the live map</a>', h)
+        if 'class="ix-p' in h:   # intro v2 (intro_v2.py): the Heat Map panel's one CTA opens /map
+            self.assertIn('href="/map">Open the Heat Map', h)
+        else:
+            self.assertIn('href="/map">Live map</a>', h)
+            self.assertIn('href="/map">Open the live map</a>', h)
         self.assertNotIn("/live#heatmap", h)
         self.assertNotIn("/#heatmap", h)
         self.assertIn("if(h==='#heatmap'||h==='#map'){location.replace('/map'", theme.HEAD_JS)

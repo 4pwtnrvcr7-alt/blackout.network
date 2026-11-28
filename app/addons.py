@@ -97,6 +97,7 @@ ROUTES = {
     "/comms": "comms",            # pt2031u: Comms coming-soon lander (newsletter signup, source=comms)
     "/credits": "theme",            # Nov 17 (Matt 12:07): shared Image credits page fed from theme.CREDITS_LEDGER
     "/bnt": "theme",                # Nov 17 2026 new theme: /bnt/<css|js|json>, /bnt/media/<clip> (Range), /bnt/credits.txt (theme.py)
+    "/api/intro": "intro_v2",       # Nov 27 2026 (pt2029u): /api/intro/live (read-only live overlays for "/") + intro.css / intro.js (intro_v2.py)
     "/api/live": "theme",           # /api/live/summary: read-only numbers for "/" and the /live overview (theme.py)
     "/api/newsletter": "newsletter",
     "/sources": "sources",

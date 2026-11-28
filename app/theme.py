@@ -297,7 +297,7 @@ def credits_page():
     secs = "".join(
         f'<section class="cr-sec" id="{k}"><h2>{html.escape(name)}</h2><ul>'
         + "".join(f'<li><b>{html.escape(a)}</b><span>{html.escape(b)}</span><em>{html.escape(c)}</em></li>' for a, b, c in rows)
-        + "</ul></section>" for k, name, rows in CREDITS_LEDGER)
+        + "</ul></section>" for k, name, rows in _ledger())
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>Image credits | BLACKOUT.NETWORK</title><meta name="description" content="Sources and licences for the images and video used on BLACKOUT.NETWORK.">'
             '<link rel="canonical" href="https://blackout.network/credits">' + _credits_og() +
@@ -492,7 +492,25 @@ def _home_page_raw():
 <script src="/api/newsletter/app.js" defer></script><script src="/api/translate/app.js" defer></script>
 </body></html>'''
 
+def _intro_v2():
+    """Intro v2 (spacex.com-style panels, intro_v2.py). BN_INTRO_V2=0 = the previous intro below, unchanged."""
+    try:
+        import intro_v2
+        return intro_v2 if intro_v2.on() else None
+    except Exception:
+        import traceback; traceback.print_exc(); return None
+
+def _ledger():
+    iv = _intro_v2()
+    if not iv: return CREDITS_LEDGER
+    return [(k, n, (list(iv.CREDITS) if k == "intro" else rows)) for k, n, rows in CREDITS_LEDGER]
+
 def home_page():
+    iv = _intro_v2()
+    if iv:
+        try: return iv.page()
+        except Exception:
+            import traceback; traceback.print_exc()   # any failure falls back to the previous intro
     h = _home_page_raw()
     if credits_page_on():
         h = re.sub(r'<p class="h-credit">[^<]*</p>', "", h)
