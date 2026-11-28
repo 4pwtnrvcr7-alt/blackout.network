@@ -165,7 +165,7 @@ class TestRefreshModes(unittest.TestCase):
         cases = {
             "/wire": "inpage", "/map": "inpage", "/grid": "inpage", "/weather": "inpage", "/markets": "inpage",
             "/people": "header", "/people/ada-lovelace": "header", "/mesh": "header", "/mesh/chat": "header",
-            "/stats": "header", "/sources": "header", "/wire-classic": "header", "/grid/aws": "header",
+            "/stats": "header", "/sources": "header", "/wire-classic": "header", "/grid/aws": "inpage", "/grid/azure": "inpage", "/grid/cloudflare": "inpage",
             "/privacy": "off", "/tos": "off", "/terms": "off", "/cookies": "off", "/privacy-choices": "off",
             "/do-not-sell": "off", "/credits": "off", "/scoring": "off", "/about/scoring": "off",
             "/welcome": "off", "/ready": "off", "/report-status": "off", "/newsletter": "off",
@@ -213,7 +213,7 @@ class TestRefreshModes(unittest.TestCase):
     def test_inpage_pages_do_not_also_get_header_button(self):
         import sitenav
         UI = self.UI
-        for path in ("/wire", "/map", "/grid", "/weather", "/markets"):
+        for path in ("/wire", "/map", "/grid", "/weather", "/markets", "/grid/aws", "/grid/azure"):
             UI.set_page_path(path)
             html = sitenav.header_html()
             self.assertNotIn('id="bn_hdr_ref"', html, path)
@@ -253,6 +253,11 @@ class TestRefreshModes(unittest.TestCase):
         np = _read("netpages.py")
         self.assertIn("np_fetched", np)
         self.assertIn("brief?fresh=1", np)
+        self.assertIn('refresh_fill_btn("np_ref")', np)
+        self.assertIn("NP_REF_JS", np)
+        self.assertIn("tryN<4", np)
+        self.assertIn("/updating/i", np)
+        self.assertIn("BNRefresh.bind", np)
         pe = _read("people.py")
         self.assertIn("/api/people/index?fresh=1", pe)
         self.assertIn("id=\"pf_up\"", pe)
@@ -320,6 +325,23 @@ class TestClickPathFollowUp(unittest.TestCase):
         self.assertIn("el.textContent=j.fetched_et||pulled()", np)
         self.assertIn("window.bnRefreshPage=function()", np)
         self.assertNotIn("if(el&&j.fetched_et)el.textContent=j.fetched_et", np)
+
+    def test_grid_provider_pages_use_inpage_button_not_header(self):
+        import sitenav, sitenav_ui as UI, site_page
+        UI.set_page_path("/grid/aws")
+        hdr = sitenav.header_html()
+        self.assertNotIn('id="bn_hdr_ref"', hdr)
+        self.assertEqual(UI.refresh_mode("/grid/aws"), "inpage")
+        self.assertEqual(UI.refresh_mode("/grid/cloudflare"), "inpage")
+        self.assertEqual(UI.refresh_btn(), "")
+        # site_page must load the shared assets so the button is styled (the header
+        # compact control was unstyled and doubled the Refresh label at mid widths)
+        html = site_page.page("AWS", "desc", "<p>x</p>", "/grid/aws", active="net").decode()
+        self.assertIn("/bn-refresh.css", html)
+        self.assertIn("/bn-refresh.js", html)
+        self.assertIn('class="bn-has-ref"', html)
+        self.assertNotIn('id="bn_hdr_ref"', html)
+        UI.set_page_path("")
 
 
 if __name__ == "__main__":

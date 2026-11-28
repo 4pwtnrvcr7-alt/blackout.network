@@ -161,7 +161,7 @@ _REFRESH_OFF_PREFIX = (
 
 # Live-data pages that get the compact shared button in the top bar.
 _REFRESH_HEADER_EXACT = {"/stats", "/sources", "/wire-classic"}
-_REFRESH_HEADER_PREFIX = ("/people", "/mesh", "/grid/")
+_REFRESH_HEADER_PREFIX = ("/people", "/mesh")
 
 def refresh_mode(path=None):
     """off | inpage | header. Default off: no control unless this page can re-fetch data."""
@@ -181,9 +181,9 @@ def refresh_mode(path=None):
         return "off"
     if p in _REFRESH_HEADER_EXACT or p.startswith("/people") or (p.startswith("/mesh") and p != "/mesh/guide"):
         return "header"
-    # /grid/<slug> provider pages (not /grid itself, which is inpage)
+    # /grid/<slug> provider pages use the in-page #293 button (same as /grid), never a header control
     if p.startswith("/grid/"):
-        return "header"
+        return "inpage"
     return "off"
 
 def refresh_on():
