@@ -6,11 +6,9 @@
 - X and YouTube marks (monochrome SVG) sized to the link text, opening in a new tab.
 - Items rise in (staggered) when the menu opens and fall out on close (the menus' existing open/closing classes drive it);
   a tap on an item zooms through to the page. prefers-reduced-motion: plain fades, no movement.
-- Nov 27 2026 (Matt pt1984u, then the bump-style ship the same evening): the old SVG radar is replaced by a canvas loop
-  (static/pwa/bn-menu-city.js) that paints the approved HERO v3h bump-style Earth behind the links — night lights, the grid
-  going down, a cyan mesh coming online, then the label "blackout.network activated". Lazy-loaded on the first menu open;
-  pointer-events:none, paused when the menu is closed or the tab is hidden, static frame under prefers-reduced-motion.
-  Kill switch: BN_MENU_CITY=0 brings back the SVG radar.
+- Nov 27 2026 (Matt pt1984u): the old SVG radar is replaced by an original code-rendered canvas loop (static/pwa/bn-menu-city.js): a massive night city, the
+  lights go out in waves, then a peer-to-peer mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
+  closed or the tab is hidden, static frame under prefers-reduced-motion. Kill switch: BN_MENU_CITY=0 brings back the SVG radar.
 - "Install on home screen" and "Turn on notifications" buttons open the existing device-aware animated panels
   (static/pwa/install-guide.js: BN.installApp / BN.showNotifyGuide) on tap only. Nothing opens by itself.
 Kill switch: Render env BN_MENU_V5=0 brings back the previous menus unchanged."""
@@ -54,33 +52,10 @@ I_BELL = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d=
 def _city_on():
     return os.environ.get("BN_MENU_CITY", "1") != "0"
 
-_CITY_VER = [None, None]  # (sig, hex8)
 def _city_ver():
-    """Cache-bust the JS and both Earth loops together."""
     try:
         import hashlib
-        base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "pwa")
-        names = ("bn-menu-city.js", "bn-menu-city-m.mp4", "bn-menu-city-d.mp4")
-        sig = []
-        for name in names:
-            path = os.path.join(base, name)
-            if os.path.isfile(path):
-                st = os.stat(path)
-                sig.append((name, st.st_size, int(st.st_mtime)))
-            else:
-                sig.append((name, 0, 0))
-        sig = tuple(sig)
-        if _CITY_VER[0] == sig and _CITY_VER[1]:
-            return _CITY_VER[1]
-        h = hashlib.sha1()
-        for name, size, _ in sig:
-            path = os.path.join(base, name)
-            if size:
-                with open(path, "rb") as f:
-                    h.update(f.read())
-        _CITY_VER[0] = sig
-        _CITY_VER[1] = h.hexdigest()[:8]
-        return _CITY_VER[1]
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "pwa", "bn-menu-city.js"), "rb") as f: return hashlib.sha1(f.read()).hexdigest()[:8]
     except Exception:
         return "0"
 
