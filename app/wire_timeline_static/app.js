@@ -18,6 +18,16 @@ var topCur=null,topEnd=true,botCur=null,botEnd=false,loading={o:0,n:0},gen=0;
 var F={cats:new Set(),regs:new Set(),time:"",sev:"",loc:null,r:25},condensed=false,Q="",meta=null,total=0,tlTop=0,listH=0,padX=0,anim=false,crimeItems=[];
 var NEW={},UPD={},GLOW={},SCANMSG="",pending=0,pollT=0,POLL=12000;
 var SEEN_KEY="bn.wire.ref.v1";
+/* Nov 27 2026 (Matt 11:09 PM ET: NEW on stories he had already seen). NEW now means: the id is not one this browser has already
+   shown (kept in localStorage, survives reloads) AND the Wire first saw it after the previous page load. A story the server
+   re-releases after a restart or re-check is added to the list quietly, never tagged NEW. */
+var VIEW_KEY="bn.wire.view.v1",VIEW={ids:{},ord:[]},VIEW_THR=Date.now(),VIEW_AT=Date.now(),viewT=0;
+(function(){try{var s=JSON.parse(localStorage.getItem(VIEW_KEY)||"");if(s&&typeof s==="object"){if(s.at>0)VIEW_THR=s.at;(s.ids||[]).forEach(function(id){if(!VIEW.ids[id]){VIEW.ids[id]=1;VIEW.ord.push(id)}})}}catch(e){}})();
+function viewSave(){clearTimeout(viewT);viewT=0;try{if(VIEW.ord.length>1500){VIEW.ord.slice(0,VIEW.ord.length-1500).forEach(function(k){delete VIEW.ids[k]});VIEW.ord=VIEW.ord.slice(-1500)}
+  localStorage.setItem(VIEW_KEY,JSON.stringify({at:VIEW_AT,ids:VIEW.ord}))}catch(e){}}
+function viewKnow(id){if(VIEW.ids[id])return;VIEW.ids[id]=1;VIEW.ord.push(id);if(!viewT)viewT=setTimeout(viewSave,1200)}
+function trulyNew(it){if(!it||VIEW.ids[it.id])return false;var f=it.fs?Date.parse(it.fs):NaN;return !isNaN(f)&&f>VIEW_THR}
+viewSave();
 var fS=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",second:"2-digit"});
 /* ---------- time (ET) */
 var fD=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -223,7 +233,7 @@ list.addEventListener("click",function(e){if(e.target.closest("a,.tl-src,.tl-act
 /* ---------- data */
 function api(qs){return fetch("/api/wire_tl?"+qs+(qs?"&":"")+"_="+Date.now(),{credentials:"same-origin",cache:"no-store",headers:{"Cache-Control":"no-store","Pragma":"no-cache"}}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
 function qp(){var p=[];if(Q)p.push("q="+encodeURIComponent(Q));if(F.loc){p.push("lat="+F.loc.lat);p.push("lon="+F.loc.lon);p.push("r="+F.loc.r)}if(F.sev)p.push("sev="+encodeURIComponent(F.sev));if(F.cats.size)p.push("cats="+encodeURIComponent(Array.from(F.cats).join(",")));if(F.regs.size)p.push("regs="+encodeURIComponent(Array.from(F.regs).join(",")));if(F.time)p.push("time="+encodeURIComponent(F.time));return p.join("&")}
-function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){seen[it.id]=1;fresh.push(it)}});measure(fresh,false);
+function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){seen[it.id]=1;viewKnow(it.id);fresh.push(it)}});measure(fresh,false);
   if(where==="top"){items=fresh.concat(items);items.sort(function(a,b){return a.t<b.t?1:a.t>b.t?-1:a.id<b.id?1:a.id>b.id?-1:0})}else items=items.concat(fresh);return fresh.length}
 function lim(){return condensed&&active()?200:100}
 function loadOlder(){
@@ -247,6 +257,7 @@ function paintUpd(){if(!elUpd||!stampAt||Date.now()<msgUntil)return;elUpd.hidden
 function stamp(){stampAt=Date.now();paintUpd()}
 function tick(){var k=dayKey(new Date().toISOString());if(k!==todayK){todayK=k;yK=dayKey(new Date(Date.now()-864e5).toISOString());relabel()}paintUpd()}
 tickT=setInterval(tick,15000);
+W.addEventListener("pagehide",viewSave);d.addEventListener("visibilitychange",function(){if(d.hidden)viewSave()});
 function relabel(){ /* re-render on-screen rows so day labels and times are current */
   if(hold()){setTimeout(relabel,2000);return}
   rebuild();layout();rendered.forEach(function(n){n.remove()});rendered.clear();render()}
@@ -307,6 +318,10 @@ function arrive(arr){
   if(!arr||!arr.length)return 0;
   if(hold()){heldArr=heldArr.concat(arr);return 0}  /* Nov 25 (pt1918u): never shift rows under a finger or an open drawer */
   var fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});if(!fresh.length)return 0;
+  var quiet=fresh.filter(function(it){return !trulyNew(it)});
+  if(quiet.length){fresh=fresh.filter(trulyNew);
+    if(nearTop()){add(quiet,"top");rebuild();layout();render()}else keepAnchor(function(){add(quiet,"top");rebuild()});
+    if(!fresh.length)return 0}
   var t=Date.now();fresh.forEach(function(it){NEW[it.id]=t});
   if(nearTop()&&!RM){fresh.slice().reverse().forEach(function(it){queued[it.id]=1;drip.push(it)});if(!dripT)dripNext();return fresh.length}
   var n=0;
@@ -363,10 +378,11 @@ function refresh(){
     if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
     topEnd=true;todayK=dayKey(new Date().toISOString());yK=dayKey(new Date(Date.now()-864e5).toISOString());
     var n=0;
+    var realNew=newer.filter(trulyNew);
     if(newer.length){
       n=arrive(newer);
-      newer.forEach(function(it){NEW[it.id]=NEW[it.id]||Date.now();GLOW[it.id]=Date.now()});
-      if(n<newer.length)n=newer.length;
+      realNew.forEach(function(it){NEW[it.id]=NEW[it.id]||Date.now();GLOW[it.id]=Date.now()});
+      if(n<realNew.length)n=realNew.length;
     }
     if(updated.length){
       var ids={};updated.forEach(function(it){ids[it.id]=1});
@@ -378,11 +394,11 @@ function refresh(){
       measure(updated,false);
     }
     var scan=(j&&j.scan)||(res&&res.scan)||null;
-    SCANMSG=(!newer.length&&!updated.length)?scanLine(scan):"";
-    if(!newer.length&&!updated.length&&!drip.length)relabel();
+    SCANMSG=(!realNew.length&&!updated.length)?scanLine(scan):"";
+    if(!realNew.length&&!updated.length&&!drip.length)relabel();
     else{rebuild();layout();render()}
     stamp();
-    var first=newer[0]||updated[0];
+    var first=realNew[0]||updated[0];
     if(first)scrollToKey(first.id);else if(SCANMSG)scrollToKey("scan");
     saveSeen();
     var got=0;for(var k in NEW)if(NEW[k]>=t0)got++;
