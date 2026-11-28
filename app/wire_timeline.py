@@ -264,7 +264,8 @@ def _warm_alive():
 _BRIEF_SQL = ("SELECT cid, alias_of, "
               "CASE WHEN json_valid(note) AND json_type(note)='object' THEN 1 ELSE 0 END, "
               "CASE WHEN json_valid(note) AND json_type(note)='object' THEN json_extract(note,'$.file') END, "
-              "CASE WHEN json_valid(note) AND json_type(note)='object' THEN json_extract(note,'$.writer.model') END FROM briefs")
+              "CASE WHEN json_valid(note) AND json_type(note)='object' THEN json_extract(note,'$.writer.model') END, "
+              "CASE WHEN json_valid(note) AND json_type(note)='object' THEN json_extract(note,'$.headline') END FROM briefs")
 
 def _snap_load():
     """One read-only connection, three SELECTs. Raises on a busy database; the caller keeps the previous snapshot."""
@@ -272,12 +273,14 @@ def _snap_load():
     if SW is None:
         return None
     p = SW.cfg()["db"]
-    brief, np, ready = {}, set(), {}
+    brief, np, ready, headlines = {}, set(), {}, {}
     if os.path.exists(p):
         k = sqlite3.connect(f"file:{p}?mode=ro", uri=True, timeout=4)
         try:
-            for cid, alias, isd, f, m in k.execute(_BRIEF_SQL):
+            for cid, alias, isd, f, m, hl in k.execute(_BRIEF_SQL):
                 brief[cid] = (alias, isd, f, m)
+                if hl:
+                    headlines[cid] = str(hl)
             for q, sink in (("SELECT cid FROM needs_paid", "np"), ("SELECT cid, tags FROM ready", "ready")):
                 try:
                     rows = k.execute(q).fetchall()
@@ -291,7 +294,7 @@ def _snap_load():
                     ready = {r[0]: r[1] for r in rows}
         finally:
             k.close()
-    return {"t": time.time(), "gate_on": bool(SW.gate_on()), "np": np, "brief": brief, "ready": ready, "maps": SW._desk_maps()}
+    return {"t": time.time(), "gate_on": bool(SW.gate_on()), "np": np, "brief": brief, "ready": ready, "headlines": headlines, "maps": SW._desk_maps()}
 
 def _snap_refresh(block):
     if not _SNAP_LK.acquire(blocking=block):
@@ -519,8 +522,27 @@ def _xu_for(r, rk, h, title, loc, links, what, dek, hid, compute):
     _XC[cid] = (sig, xu, time.time())
     return xu
 
-def _item(r, archive, warm_budget=None, compute=None):
-    title = _clean(r["title"]); h = headline(title)
+def _note_headline(cid):
+    """Stored template/desk headline, when the warmer has it in the snapshot."""
+    s = _SNAP.get("s") or {}
+    return (s.get("headlines") or {}).get(cid) or ""
+
+def _display_headline(title, cid=None):
+    """Cluster title, or a stored 4+ word source/lead headline when the title is thin."""
+    h = headline(title)
+    try:
+        import wire_check as WC
+        if not WC.thin_headline(h):
+            return WC.headline(h)[0]
+        alt = _note_headline(cid) if cid else ""
+        if alt and not WC.thin_headline(alt):
+            return WC.headline(alt)[0]
+    except Exception:
+        pass
+    return h
+
+def _item(r, archive, warm_budget=None, compute=None, apply_verdict=True):
+    title = _clean(r["title"]); h = _display_headline(title, r["id"] if "id" in r.keys() else None)
     loc = _clean(r["location"])[:90] if r["location"] else ""
     links = _links(r["links"])
     fams = _j(r["families"], [])[:6]
@@ -559,9 +581,16 @@ def _item(r, archive, warm_budget=None, compute=None):
         if "tg" in r.keys() and r["tg"]:
             d["tg"] = [x for x in _j(r["tg"], []) if isinstance(x, str)][:5]
         return d
-    e = _VR.get(r["id"])
+    e = _VR.get(r["id"]) if apply_verdict else None
     if e is not None:          # validator corrections (category, headline, location) for the public row
-        d["k"] = e["k"]; d["h"] = e["h"]; d["loc"] = e["loc"]; d["lat"] = e["lat"]; d["lon"] = e["lon"]
+        d["k"] = e["k"]; d["loc"] = e["loc"]; d["lat"] = e["lat"]; d["lon"] = e["lon"]
+        # Keep a freshly repaired 4+ word headline over a stale thin verdict.
+        try:
+            import wire_check as WC
+            if not WC.thin_headline(e.get("h") or "") or WC.thin_headline(h):
+                d["h"] = e["h"]
+        except Exception:
+            d["h"] = e["h"]
         d["g"] = region_key(e["loc"], title, e["lat"], e["lon"])
     elif _v_on():
         d["k"] = _kfix(r["id"], d["k"], h, what or dek)
@@ -1088,9 +1117,9 @@ def _v_eval(r, now):
     if len(_VT.get(cid) or []) < 3:
         _XC.pop(cid, None)                      # force _xu_build; empty/short tags were cached and never retried
         _VT.pop(cid, None)
-    d = _item(r, False, compute=True)           # fills the validated tags (_VT) through _xu_build
+    d = _item(r, False, compute=True, apply_verdict=False)  # fills tags; check the current headline, not a stale thin verdict
     if not d.get("xu"):
-        _XC.pop(cid, None); d = _item(r, False, compute=True)
+        _XC.pop(cid, None); d = _item(r, False, compute=True, apply_verdict=False)
     choice, has = WC.photo_state(cid)
     v = WC.check(d, choice=choice, has_photo=has, country_names=_country_names())
     why = list(v.get("reasons") or [])
@@ -1192,9 +1221,10 @@ def _warm_validate(rows):
         reasons = [w.split(":")[0] for w in e["why"]]
         quick = all(w in _V_QUICK for w in reasons)
         tag_hold = (not e["ok"]) and any(w == "tags" or w.startswith("tags") for w in reasons)
-        if e["ok"] or (not quick and not tag_hold):
+        thin_hold = (not e["ok"]) and any(w == "thin-headline" or w.startswith("thin-headline") for w in reasons)
+        if e["ok"] or (not quick and not tag_hold and not thin_hold):
             interval = 300.0
-        elif tag_hold:
+        elif tag_hold or thin_hold:
             interval = _V_TAG_RECHECK_S
         else:
             interval = _V_RECHECK_S

@@ -644,6 +644,16 @@ def _invalidate(cid):
             if isinstance(C, dict):
                 for kk in [x for x in list(C) if keyf(x)]: C.pop(kk, None)
         except Exception: pass
+    # Re-run repaired tags/headlines through the publish gate on the next validator pass.
+    try:
+        import wire_timeline as WT
+        WT._VR.pop(cid, None)
+        WT._VT.pop(cid, None)
+        WT._XC.pop(cid, None)
+        if isinstance(getattr(WT, "_PC", None), dict) and isinstance(WT._PC.get("t"), dict):
+            WT._PC["t"]["k"] = 0.0
+    except Exception:
+        pass
 
 def enqueue(k, cid, reason, arrived_at, rank, title):
     if k.execute("SELECT 1 FROM jobs WHERE cid=? AND status IN ('queued','running','deferred')", (cid,)).fetchone(): return False
@@ -836,6 +846,9 @@ def _writer_worker(ready, paused):
             if templates_on():
                 counts = package_pending(max_backfill=0)
                 log(f"free templates: {counts.get('new', 0)} packaged")
+                nfix = repair_packaged(max_n=40)
+                if nfix:
+                    log(f"free repair: {nfix} retagged or reheaded")
             if api_enabled():
                 mt = []
                 for sfx in ("", "-wal"):   # realtime deltas (realtime.py) may commit to the WAL without touching the main file
@@ -860,6 +873,9 @@ def _writer_worker(ready, paused):
                     continue  # drain the paid queue before the slow template/card pass
             if templates_on():
                 package_pending()
+                nfix = repair_packaged(max_n=40)
+                if nfix:
+                    log(f"free repair: {nfix} retagged or reheaded")
                 check_held_alerts()
             if not api_enabled():
                 time.sleep(cfg()["poll_s"]); continue
@@ -881,10 +897,90 @@ def _item_for_tags(r):
             "brief": r.get("brief") or "", "location": r.get("location") or "", "category": r.get("category") or "",
             "rank": r.get("rank") or 0, "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0}
 
-def rule_tags(r):
-    """Rule-based hashtags only. Does not call x_share.hashtags() (that queues the paid tag model)."""
+_TAG_BANNED = {"news", "worldnews", "breaking", "breakingnews", "blackoutnetwork", "blackout",
+               "alerts", "update", "updates", "live"}
+
+def _tag_text(r, al=None):
+    """Title, place, brief, and source titles — the free tagger's only inputs."""
+    parts = [r.get("title") or "", r.get("headline") or "", r.get("location") or "", r.get("brief") or ""]
+    for a in al or []:
+        parts.append((a or {}).get("title") or "")
+    try:
+        raw = json.loads(r.get("links") or "[]") if isinstance(r.get("links"), str) else (r.get("links") or [])
+        for l in raw:
+            if isinstance(l, dict):
+                parts.append(l.get("title") or "")
+    except Exception:
+        pass
+    return " ".join(x for x in parts if x)
+
+def source_headline(r, al=None):
+    """A 4+ word headline from the cluster title, a source title, or the brief lead. Never invents wording."""
+    import wire_check as WC
+    cands = []
+    def add(s):
+        s = _plain(s or "", 220)
+        if s and s not in cands:
+            cands.append(s)
+    add(r.get("title") or "")
+    for a in al or []:
+        add((a or {}).get("title") or "")
+    try:
+        raw = json.loads(r.get("links") or "[]") if isinstance(r.get("links"), str) else (r.get("links") or [])
+        for l in raw:
+            if isinstance(l, dict):
+                add(l.get("title") or "")
+    except Exception:
+        pass
+    bf = brief_fields(r.get("brief") or "")
+    add(bf.get("what") or "")
+    loc = _plain(r.get("location") or "", 80)
+    good = [c for c in cands if not WC.thin_headline(c)]
+    picked = None
+    title = _plain(r.get("title") or "", 220)
+    if title and not WC.thin_headline(title):
+        picked = title
+    elif good:
+        picked = good[0]
+    elif title and loc and not WC.thin_headline(f"{title} in {loc}"):
+        picked = f"{title} in {loc}"
+    elif (bf.get("what") or "") and loc:
+        w = _plain(bf.get("what") or "", 180).rstrip(".")
+        picked = f"{w} in {loc}"
+        if WC.thin_headline(picked):
+            picked = None
+    if not picked:
+        return title
+    if len(picked) <= 110:
+        return WC.headline(picked)[0]
+    return WC.headline(picked[:109].rsplit(" ", 1)[0] + "…")[0]
+
+def rule_tags(r, al=None):
+    """Rule-based hashtags only. Does not call x_share.hashtags() (that queues the paid tag model).
+
+    Always runs the result through wire_check.tags so the stored set is 3-5 tags that already
+    pass the publish gate (short popular words, places, diseases, known entities). Never
+    #News or #BlackoutNetwork.
+    """
     import x_share
-    return list(x_share._entity_first(_item_for_tags(r)) or [])
+    import wire_check as WC
+    item = _item_for_tags(r)
+    raw = []
+    try:
+        raw = list(x_share._entity_first(item) or [])
+    except Exception:
+        traceback.print_exc(); raw = []
+    raw = ["#" + str(t).lstrip("#") for t in raw
+           if str(t).lstrip("#").lower() not in _TAG_BANNED]
+    title = (r.get("title") or r.get("headline") or "")
+    blob = _tag_text(r, al)
+    k = WC.category(r.get("category") or item.get("category") or "", title, blob)
+    try:
+        lt = list(x_share.location_tags(item) or [])
+    except Exception:
+        lt = []
+    out = WC.tags(raw, k, title, lt, text=blob)
+    return out[:5]
 
 def build_card(cid):
     """Render and cache the share card. Returns True when bytes were produced.
@@ -995,7 +1091,7 @@ def build_template(r, al):
         tm = _et(a.get("event_time") or a.get("first_seen"))
         heads.append((src + off, tm, ht))
 
-    headline = title if len(title) <= 110 else (title[:109].rsplit(" ", 1)[0] + "…")
+    headline = source_headline(r, al) or (title if len(title) <= 110 else (title[:109].rsplit(" ", 1)[0] + "…"))
     where_bit = f" in {loc}" if loc else ""
     when_bit = f", {when or ev or first}" if (when or ev or first) else ""
     lead = what or title
@@ -1342,6 +1438,7 @@ def package_one(cid, row=None, al=None, build_card_now=False):
     if has_writeup(cid) and is_packaged(cid):
         if has_paid_article(cid):
             _clear_needs_paid(cid)
+        _repair_packaged(cid, row=row, al=al)
         _clear_held(cid); return True
     if not _backoff_ok(cid):
         return False
@@ -1374,7 +1471,7 @@ def package_one(cid, row=None, al=None, build_card_now=False):
                 _invalidate(cid)
                 kind = "template"
         try:
-            tags = rule_tags(row)
+            tags = rule_tags(row, al=al)
         except Exception:
             traceback.print_exc(); tags = []
         if not tags:
@@ -1422,6 +1519,89 @@ def package_one(cid, row=None, al=None, build_card_now=False):
         _mark_held(cid, f"{type(e).__name__}: {str(e)[:200]}", (row or {}).get("title"), int((row or {}).get("rank") or 0))
         traceback.print_exc()
         return False
+
+def _repair_packaged(cid, row=None, al=None):
+    """Refresh stored tags / a thin template headline so a held row can pass the existing gate.
+
+    Does not loosen tag_ok or thin_headline. Only rewrites a template note's headline, and
+    only replaces ready.tags when the stored set does not already yield 3 validated tags.
+    """
+    import wire_check as WC
+    if not cid:
+        return False
+    if row is None or al is None:
+        try:
+            r, al2 = cluster(cid)
+        except Exception:
+            r, al2 = None, []
+        row = row or r
+        al = al if al is not None else al2
+    if not row:
+        return False
+    changed = False
+    title = source_headline(row, al) or (row.get("title") or "")
+    k = WC.category(row.get("category") or "", row.get("title") or title, _tag_text(row, al))
+    new_tags = []
+    try:
+        new_tags = rule_tags(row, al=al)
+    except Exception:
+        traceback.print_exc()
+    old = _ready_row(cid)
+    old_tags = []
+    if old:
+        try:
+            old_tags = json.loads(old.get("tags") or "[]") if isinstance(old.get("tags"), str) else (old.get("tags") or [])
+        except Exception:
+            old_tags = []
+    valid_old = WC.tags(old_tags, k, title, text=_tag_text(row, al))
+    if len(valid_old) < 3 and len(new_tags) >= 3:
+        with _LK:
+            dbk = db()
+            try:
+                if old:
+                    dbk.execute("UPDATE ready SET tags=? WHERE cid=?", (json.dumps(new_tags), cid))
+                else:
+                    dbk.execute("INSERT OR REPLACE INTO ready(cid, kind, tags, card_ok, ready_at, title, rank) VALUES(?,?,?,?,?,?,?)",
+                                (cid, "template", json.dumps(new_tags), 0, iso(), row.get("title"), int(row.get("rank") or 0)))
+                dbk.commit()
+            finally:
+                dbk.close()
+        changed = True
+    n = note_for(cid)
+    if isinstance(n, dict) and n.get("file") == "story_writer_template":
+        h = n.get("headline") or ""
+        if WC.thin_headline(h) or WC.thin_headline(row.get("title") or ""):
+            new_h = title
+            if new_h and not WC.thin_headline(new_h) and new_h != h:
+                n["headline"] = new_h
+                if isinstance(n.get("story"), dict):
+                    n["story"]["headline"] = new_h
+                with _LK:
+                    dbk = db()
+                    try:
+                        dbk.execute("UPDATE briefs SET note=? WHERE cid=?", (json.dumps(n, ensure_ascii=False), cid))
+                        dbk.commit()
+                    finally:
+                        dbk.close()
+                changed = True
+    if changed:
+        _invalidate(cid)
+    return changed
+
+def repair_packaged(max_n=40):
+    """Re-tag and re-head already packaged live items that would still fail the gate. Free only."""
+    if not templates_on():
+        return 0
+    n = 0
+    for r in live_clusters(hours=cfg()["template_backfill_h"], limit=800):
+        if n >= max_n:
+            break
+        cid = r.get("cluster_id")
+        if not cid or not has_writeup(cid):
+            continue
+        if _repair_packaged(cid, row=r, al=None):
+            n += 1
+    return n
 
 def package_pending(max_new=80, max_backfill=200):
     """Package newly arrived items first, then the visible tip (last activity), templates only. Returns counts."""

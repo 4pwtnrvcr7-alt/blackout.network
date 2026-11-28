@@ -69,6 +69,12 @@ class TagHoldRecheck(unittest.TestCase):
         self.assertGreaterEqual(WT._V_TAG_RECHECK_S, 30)
         self.assertLess(WT._V_TAG_RECHECK_S, 300)
 
+    def test_thin_headline_rechecks_as_fast_as_tags(self):
+        import inspect, wire_timeline as WT
+        src = inspect.getsource(WT._warm_validate)
+        self.assertIn("thin_hold", src)
+        self.assertIn("thin-headline", src)
+
 
 class HazardWeatherAndKnownFills(unittest.TestCase):
     def test_meteoalarm_thunderstorm_stored_hazard_becomes_weather(self):
