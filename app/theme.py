@@ -94,10 +94,21 @@ def _et(s, fmt="%-I:%M %p ET"):
     return d.astimezone(ET).strftime(fmt) if d else ""
 
 _EMO = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F\u200D]")
-def _clean(t): return re.sub(r"\s{2,}", " ", _EMO.sub("", str(t or ""))).strip()
-def _headline(t):
+def _clean(t):
+    try:
+        import headline_clean as HC
+        t = HC.tidy_text(t)
+    except Exception:
+        t = str(t or "")
+    return re.sub(r"\s{2,}", " ", _EMO.sub("", t)).strip()
+def _headline(t, location=None):
     """Nov 17 3 AM: clean short display headline (display only; scanner data/scoring untouched). Mirrors wire_page_static/app.js cleanTitle."""
-    t = _clean(t)
+    try:
+        import headline_clean as HC
+        t = HC.display_headline(t, location=location)
+    except Exception:
+        t = _clean(t)
+    t = re.sub(r"\s{2,}", " ", _EMO.sub("", t or "")).strip()
     g = re.match(r"^(Green|Orange|Red) (?:notification|alert) for (.+?)(?:\.\s|\.$|$)", t, re.I)
     if g:
         ev = re.sub(r"^(an?|the) ", "", g.group(2), flags=re.I); return ev[:1].upper() + ev[1:] + " (" + g.group(1).lower() + " alert)"
@@ -128,7 +139,7 @@ def summary(fresh=False):
     bands = {"calm": sum(1 for x in m if rk(x) <= 3), "elevated": sum(1 for x in m if 4 <= rk(x) <= 6), "high": sum(1 for x in m if rk(x) >= 7)}
     fam = lambda x: int(x.get("n_families") or x.get("eff_families") or len(x.get("families") or []) or 0)
     tops = sorted([x for x in m if fam(x) >= 2], key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:6]
-    top = [{"title": _headline(x.get("title")), "full": _short(_clean(x.get("title")), 400), "loc": _clean(x.get("location"))[:60], "cat": x.get("category") or "", "rank": rk(x),
+    top = [{"title": _headline(x.get("title"), location=x.get("location")), "full": _short(_clean(x.get("title")), 400), "loc": _clean(x.get("location"))[:60], "cat": x.get("category") or "", "rank": rk(x),
             "sources": fam(x), "rising": bool(x.get("rising")), "first_seen_et": _et(x.get("first_seen"), "%b %-d, %-I:%M %p ET"),
             "url": "/wire/" + str(x.get("cluster_id") or "")} for x in tops]
     # Gauge (Matt Nov 17 1:08 AM): average rank of the current top stories, i.e. the rank 7+ items on the main feed
@@ -137,7 +148,7 @@ def summary(fresh=False):
     if len(lead) < 3: lead = sorted(m, key=lambda x: (rk(x), x.get("score") or 0), reverse=True)[:10]
     # Gauge explainer (Matt Nov 17 2:26 AM): just the highest threat right now, the top-ranked active alert on the main feed.
     hx = max(m, key=lambda x: (rk(x), x.get("score") or 0)) if m else None
-    hi = {"title": _headline(hx.get("title")), "rank": rk(hx), "url": "/wire/" + str(hx.get("cluster_id") or "")} if hx else None
+    hi = {"title": _headline(hx.get("title"), location=hx.get("location")), "rank": rk(hx), "url": "/wire/" + str(hx.get("cluster_id") or "")} if hx else None
     vol = {}
     for v in st.get("volume") or []:
         dd = vol.setdefault(v.get("d"), {}); dd[v.get("category")] = dd.get(v.get("category"), 0) + int(v.get("n") or 0)

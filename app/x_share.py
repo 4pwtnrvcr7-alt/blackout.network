@@ -2247,15 +2247,14 @@ def hashtags(item, headline=None):
 
 # --------------------------------------------------------------------------- compose / intent
 def _headline(item, headline=None):
-    h = headline or item.get("headline") or item.get("h")
-    if not h:
-        raw = item.get("title") or ""
-        try:
-            import theme
-            h = theme._headline(raw)
-        except Exception:
-            h = raw
-    h = _norm(h or item.get("title") or "")
+    h = headline or item.get("headline") or item.get("h") or item.get("title") or ""
+    loc = item.get("location") or item.get("loc") or ""
+    try:
+        import headline_clean as HC
+        h = HC.display_headline(h, location=loc)
+    except Exception:
+        h = _norm(h)
+    h = _norm(h or "")
     h = re.sub(r"(?:^|\s)#\w+", " ", h)   # scanner titles can carry their own hashtags; the generator owns the tags
     h = re.sub(r"\s{2,}", " ", h).strip()
     # drop leading emoji / decorative symbols so the composer starts on words
