@@ -22,7 +22,7 @@ KINDS = {
     "roadster": "Spacecraft", "site": "Surface site", "sat": "Satellites", "launch": "Launch",
     "cloud": "Cloud region", "network": "Network status", "outage": "Outage", "weather": "Weather",
     "solar": "Space weather", "page": "BLACKOUT.NETWORK", "dc": "Data center", "cable": "Undersea cable",
-    "power": "Power outage", "grid": "Power grid",
+    "power": "Power outage", "grid": "Power grid", "water": "Water treatment",
 }
 PLANETS = {"sun", "mercury", "venus", "earth", "moon", "mars", "jupiter", "saturn", "uranus", "neptune"}
 # craft photos that are public domain / CC0 only (Aditya, JUICE are CC BY-SA: never on a card)
@@ -38,7 +38,7 @@ KIND_TAGS = {
     "launch": ["#Launch", "#Spaceflight", "#Rocket"], "cloud": ["#Cloud", "#Outage", "#Tech"],
     "network": ["#Outage", "#Internet", "#Tech"], "outage": ["#Outage", "#Internet", "#Tech"],
     "weather": ["#Weather", "#Radar", "#Forecast"], "solar": ["#SpaceWeather", "#Sun", "#Aurora"],
-    "page": ["#BlackoutNetwork"], "dc": ["#DataCenter", "#Cloud", "#Tech"], "cable": ["#UnderseaCables", "#Internet", "#Tech"],
+    "page": ["#Infrastructure", "#Grid"], "water": ["#Water", "#DrinkingWater"], "dc": ["#DataCenter", "#Cloud", "#Tech"], "cable": ["#UnderseaCables", "#Internet", "#Tech"],
     "power": ["#PowerOutage", "#Grid", "#Energy"], "grid": ["#PowerGrid", "#Energy", "#Grid"],
 }
 PROVIDER_TAGS = [
@@ -119,7 +119,7 @@ def tags_for(kind, name="", loc="", detail="", text=""):
             out.append(t)
         if len(out) >= 5:
             break
-    for pad in ("#BlackoutNetwork", "#Space" if kind in ("planet", "moon", "sun", "craft", "roadster", "site", "sat", "launch") else "#News", "#Live"):
+    for pad in ("#Space" if kind in ("planet", "moon", "sun", "craft", "roadster", "site", "sat", "launch") else "#Infrastructure", "#Grid"):
         if len(out) >= 3:
             break
         if pad.lower() not in [x.lower() for x in out]:
