@@ -44,9 +44,10 @@ class HeaderStaysForClose(unittest.TestCase):
         self.assertIn("html.bn-menu-on body.bnm .bnm-head", css)
         self.assertIn("z-index:2700!important", css)
         self.assertIn("transform:none!important", css)
+        # Floating #bnm_mb is the same site menu; hide it when the header (and its X) is pinned.
         self.assertIn("html.bn-menu-on body.bnm .bnm-mb", css)
-        self.assertIn("pointer-events:auto!important", css)
-        self.assertIn("z-index:2700!important", css)
+        self.assertIn("pointer-events:none!important", css)
+        self.assertNotRegex(css, r"html\.bn-menu-on body\.bnm \.bnm-mb\s*,[^{]*\{[^}]*opacity:1!important")
 
 class IpadPanelAboveScrim(unittest.TestCase):
     def test_sitenav_css_panel_stacks_above_scrim(self):

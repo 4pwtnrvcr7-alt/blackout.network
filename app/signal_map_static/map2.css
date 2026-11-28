@@ -16,12 +16,12 @@ body.bnm-hd-on .bnm-head{transform:none}
 html.bn-menu-on body.bnm .bnm-head,
 html.bnm-root:has(#bn-menu.bn-open) .bnm-head,
 html.bnm-root:has(#bn-menu:target) .bnm-head{transform:none!important;z-index:2700!important;will-change:auto;pointer-events:auto!important;visibility:visible!important}
-html.bn-menu-on body.bnm .bnm-x,
-html.bnm-root:has(#bn-menu.bn-open) .bnm-x,
-html.bnm-root:has(#bn-menu:target) .bnm-x{opacity:0!important;pointer-events:none!important}
-html.bn-menu-on body.bnm .bnm-mb,
-html.bnm-root:has(#bn-menu.bn-open) .bnm-mb,
-html.bnm-root:has(#bn-menu:target) .bnm-mb{opacity:1!important;pointer-events:auto!important;z-index:2700!important;transform:none!important;visibility:visible!important}
+/* The floating #bnm_mb is the same site menu as the header burger, shown only while
+   the header is hidden. When the menu is open the header is pinned, so hiding #bnm_mb
+   keeps a single hamburger-to-X. Do not force it visible here. */
+html.bn-menu-on body.bnm .bnm-mb,html.bn-menu-on body.bnm .bnm-x,
+html.bnm-root:has(#bn-menu.bn-open) .bnm-mb,html.bnm-root:has(#bn-menu.bn-open) .bnm-x,
+html.bnm-root:has(#bn-menu:target) .bnm-mb,html.bnm-root:has(#bn-menu:target) .bnm-x{opacity:0!important;pointer-events:none!important}
 .bnm-head .bn-top{position:relative!important;top:auto!important}
 .bnm .bn-follows,.bnm .bn-primary,.bnm .bn-searchbtn{display:none!important}
 .bnm .bnr-fab{display:none!important}
