@@ -21,6 +21,8 @@ _OPINION = re.compile(r"\b(ironic|ironically|guess|shouldn't|should have|shouldn
                       r"probably|maybe|perhaps|seems like|seems pretty|it seems|pretty clear|so sad|sad that|of course|obviously|clearly|"
                       r"hopefully|imagine|thoughts|opinion|in my|agreed|agree|disagree|exactly|exactly this|bad take|hot take|"
                       r"wake up|sheep|libtard|maga|woke|idiots?|clowns?|stupid|insane|crazy|hellscape|propaganda|billionaires?)\b", re.I)
+_DIGEST = re.compile(r"\bstory \d\b|\bnews (?:nov|dec|jan|feb)\w*\.? ?\d|daily (?:digest|roundup|recap|briefing)|top stories|"
+                     r"headlines (?:today|roundup)|\bnewsletter\b|\bpodcast\b|\bepisode \d|\bthread\b|\bpart \d+/\d+|\b\d+/\d+ ?(?:\U0001F9F5|:)", re.I)
 _SPAM = re.compile(r"#trends? today|click/?\s*tap|click here|tap below|follow (?:me|us)|subscribe|giveaway|retweet|\bRT @|#fyp|"
                    r"please provide|the excerpt only|as an ai|latest update for|link in bio|dm me|use code|promo code|free gratis", re.I)
 
@@ -101,6 +103,8 @@ def verdict(text, category=None):
         return False, "reply-or-quote"
     if "?" in raw or "？" in raw:
         return False, "question"
+    if _DIGEST.search(raw):
+        return False, "digest"
     if _SPAM.search(raw):
         return False, "spam"
     if len(re.findall(r"#\w+", raw)) >= 4:

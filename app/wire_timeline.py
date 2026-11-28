@@ -247,6 +247,7 @@ _XC = {}; _XC_MAX = 4000; _XC_TTL = 900.0      # cid -> (sig, xu, built_at); row
 _PC = {"t": {}, "v": {}}; _PC_TTL = 3.0; _PC_LK = threading.Lock()
 _PA = {}                                         # page key -> (args, last_requested)
 _FRESH = {"t": 0.0}
+_PC_HARD = 90.0                                  # never block a visitor on a rebuild when a copy this young exists and the warmer is alive
 _PC_STALE = 20.0                                 # a cached page may be served this long while the warmer rebuilds it
 _WARM = {"thread": None, "rows_at": 0.0, "cursor": 0, "baked": {}, "err": ""}
 _WARM_LK = threading.Lock()
@@ -372,7 +373,12 @@ def _social_junk(r):
         e = _SOCJ.get(cid)
         if e is not None and e[0] == sig:
             return e[1]
-        junk = bool(WS.junk_row(title, r["category"] if "category" in keys else "", lk))
+        raw_cat = r["category"] if "category" in keys else ""
+        try:
+            cat = cat_key(raw_cat, title, False)      # the category the Wire would show: OTHER is dropped for social rows
+        except Exception:
+            cat = raw_cat
+        junk = bool(WS.junk_row(title, cat if cat == "other" else raw_cat, lk))
         if len(_SOCJ) > 20000:
             _SOCJ.clear()
         _SOCJ[cid] = (sig, junk)
@@ -938,6 +944,8 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
             return hit
         if age < _PC_STALE and _warm_alive():
             return hit
+        if age < _PC_HARD and _warm_alive():
+            return hit      # Nov 27 2026: a rebuild under load took 8-22 s and blocked the visitor; the warm thread is already rebuilding it
     start_warm()
     out = _page_build(*args)
     _pstore(key, out)
