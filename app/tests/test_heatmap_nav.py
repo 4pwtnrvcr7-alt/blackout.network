@@ -113,6 +113,20 @@ class FollowAndFooter(unittest.TestCase):
         self.assertRegex(k, r"rgba\(240,240,250|#[89A-Fa-f][0-9A-Fa-f]{5}|#F2F2F4|#C9CDD3")
 
 
+    def test_comms_lander_skips_footer_follow_band(self):
+        """Matt 11:24 / 11:51 PM ET Nov 27: /comms is only Comms + Coming soon; no Follow band."""
+        js = open(os.path.join(os.path.dirname(growth.__file__), "growth_static", "app.js"), encoding="utf-8").read()
+        self.assertIn("function footer(){if(/^\\/comms\\/?$/.test(location.pathname))return;", js)
+        self.assertIn("footer();", js)
+        # The skip is /comms only — other pages still get the footer band from footer().
+        start = js.find("function footer(){")
+        self.assertGreater(start, 0)
+        head = js[start:start + 160]
+        self.assertIn("/comms", head)
+        self.assertNotIn("/newsletter", head)
+        self.assertNotIn("/privacy", head)
+        self.assertNotIn("/wire", head)
+
     def test_home_shows_follow_above_footer(self):
         h = theme.home_page()
         self.assertIn('id="bng_follow"', h)
