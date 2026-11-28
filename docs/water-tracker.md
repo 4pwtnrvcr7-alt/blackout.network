@@ -24,7 +24,7 @@ EPA SDWIS/Envirofacts VIOLATION table (no coordinates; ECHO returns the same sys
 Rollback: nothing is deployed from this branch. Closing the PR and deleting the branch removes it. No stored state, no localStorage keys, no new env vars.
 Tests: `python3 app/tests/test_water.py`. Rebuild centroids: `python3 tools/build_county_centroids.py`.
 
-Share (Nov 28 2026): each item has a permalink at `/water/<id>` and the standard Wire/growth action set (Post on X, Copy link, native share, source link, permalink). Hashtags come from `x_share` (3-5 short popular tags plus place/entity names; never #News or #BlackoutNetwork). The share preview is a typographic `/og/share/water/<id>.png` card — no map or satellite image. The page itself has the same share row and the site Follow band. `og.VERSION` is unchanged.
+Share (Nov 28 2026): each item has a permalink at `/water/<id>` and the standard Wire/growth action set (Post on X, Copy link, native share, source link, permalink). Hashtags come from `x_share` (3-5 short popular tags plus place/entity names; never #News or #BlackoutNetwork). The X link preview is the severity serif-B logo (yellow/orange/red or black), not a unique per-item image card. og:title and og:description carry the violation facts. The page itself has the same share row and the site Follow band. `og.VERSION` is unchanged.
 
 
 ## Grid Water layer (Nov 28 2026)
