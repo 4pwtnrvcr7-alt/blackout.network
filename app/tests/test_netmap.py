@@ -71,7 +71,8 @@ class NetMap(unittest.TestCase):
         self.assertEqual(netdetail.LVC[1], "#FFA040")
 
     def test_boot_loader(self):
-        """Nov 27 2026 (pt2007u): 100 phosphor blocks, one per percent, Refresh yellow/orange/red, bottom-to-top.
+        """Nov 27 2026 (pt2022u): 100 phosphor blocks tile the full viewport, one per percent, Refresh
+        yellow/orange/red, bottom-to-top. Only the percent is on screen (no label, no stage checklist, no card).
         boot.js is kept in the repo but not loaded. Progress ids net.js drives are present, reduced motion is honored.
         Yellow is approved on this loader only."""
         import netmap, netpages
@@ -79,15 +80,21 @@ class NetMap(unittest.TestCase):
         body = netpages.handle_get("/grid", {})[1]
         self.assertNotIn("/api/netmap/boot.js", body)
         self.assertLess(body.index('class="gx-ld" id="nx_ld"'), body.index("/api/netmap/net.js"))
-        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', 'id="nx_ldb"', "Energizing the grid", 'class="gx-ldboard"',
-                  'data-s="map"', 'data-s="nets"', 'data-s="out"', 'data-s="rep"', 'role="progressbar"'):
+        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', 'id="nx_ldb"', 'class="gx-ldboard"', 'class="gx-ldn"', 'role="progressbar"'):
             self.assertIn(s, body)
-        self.assertNotIn('class="gx-ldsvg"', body)
+        for s in ("Energizing the grid", 'class="gx-ldk"', 'class="gx-lds"', 'data-s="map"', 'class="gx-ldsvg"'):
+            self.assertNotIn(s, body)
         self.assertEqual(body.count('class="gx-ldcell"'), 100)
         css = open(os.path.join(APP, "netmap_static", "gridlayer.css"), encoding="utf-8").read()
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("body.nx-ready .gx-ld{opacity:0", css)
         self.assertIn("@keyframes gx-ld-drop", css)
+        self.assertIn(".gx-ldboard{position:absolute;inset:0", css)
+        self.assertNotIn("width:min(272px", css)
+        self.assertNotIn("Energizing the grid", css)
+        self.assertNotIn(".gx-ldk{", css)
+        self.assertNotIn(".gx-lds{", css)
+        self.assertNotIn("z-index:41", css)   # loader covers the header; only the percent is visible
         for h in ("#FFE566", "#FF9A1A", "#FF5A3C"):
             self.assertIn(h, css)
         js = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
@@ -96,6 +103,7 @@ class NetMap(unittest.TestCase):
         self.assertNotIn("Math.min(99", js)   # never stall the percent at 99
         self.assertIn("ldDone || prog() >= 0.999) ? 100", js)
         self.assertIn("prefers-reduced-motion", js)
+        self.assertIn('pn.textContent = String(n)', js)   # "%" lives in the markup, not the number
 
     def test_bars_union_and_bounds(self):
         import netmap

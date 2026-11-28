@@ -185,7 +185,7 @@
   var US = [[-125.5, 23.5], [-66, 50]];
   function PAD() { var m = innerWidth < 768; return m ? { top: 150, bottom: 120, left: 18, right: 18 } : { top: 160, bottom: 90, left: 60, right: 80 }; }
 
-  /* ---------- loader: 100 phosphor blocks, one per real percent, bottom-to-top (Matt pt2007u) ---------- */
+  /* ---------- loader: 100 phosphor blocks tile the viewport, one per real percent, bottom-to-top (Matt pt2022u) ---------- */
   var P = { map: 0, nets: 0, out: 0, dc: 0, rep: 0 }, W8 = { map: 0.3, nets: 0.3, out: 0.1, dc: 0.15, rep: 0.15 }, shown = 0, ldDone = false, t0 = performance.now();
   var ldN = 0, ldWant = 0, ldOrder = [], ldTimer = 0, ldAfter = null, ldByKey = null;
   function prog() { var p = 0; for (var k in P) p += W8[k] * P[k]; return Math.min(1, p); }
@@ -218,13 +218,13 @@
   })();
   function ldWrite(n) {
     var pn = $("nx_ldn"), root = $("nx_ld");
-    if (pn) pn.textContent = (n < 10 ? "0" + n : String(n)) + "%";
+    if (pn) pn.textContent = String(n);
     if (root) root.setAttribute("aria-valuenow", String(n));
   }
   function ldDropOne() {
     var k = ldOrder[ldN], el = ldCache()[k];
     if (el) {
-      el.style.setProperty("--fall", ((11 - (k / 10 | 0)) * 18) + "px");
+      el.style.setProperty("--fall", ((11 - (k / 10 | 0)) * 2.4) + "vh");
       el.classList.add("in");
     }
     ldN++;
@@ -253,7 +253,6 @@
   }
   function step(k, v) {
     P[k] = Math.max(P[k], v);
-    if (v >= 1) { var li = document.querySelector('#nx_ld li[data-s="' + k + '"]'); if (li) li.classList.add("on"); }
     if (ldDone) return;
     var p = prog();
     if (p >= 0.999) {
