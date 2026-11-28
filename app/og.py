@@ -824,12 +824,13 @@ def attr(s):
 
 
 def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og_type="website"):
-    """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id.
+    """Open Graph + Twitter meta tags.
 
-    Story pages (story_id set, no explicit image) use twitter:card=summary and a
-    static serif-B logo whose background follows the story rank (black if unscored,
-    yellow 0-3, orange 4-6, red 7-10) unless BN_STORY_CARDS=1, which restores
-    per-story photo cards.
+    Default (BN_STORY_CARDS off, Matt Nov 27-28 2026): every X link preview uses the
+    static serif-B logo on a severity-colored background (black if unscored, yellow
+    0-3, orange 4-6, red 7-10). An explicit image= or /og/<page>.png is ignored so
+    newsletter, dams, quakes, water, Wire stories and grid items never ship a unique
+    per-item share card. BN_STORY_CARDS=1 restores per-item photo / typographic cards.
     """
     E = attr
     t = title if title else BRAND
@@ -840,7 +841,7 @@ def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og
         cards = WC.story_cards_on()
     except Exception:
         cards = os.environ.get("BN_STORY_CARDS", "0") == "1"
-    if story_id and not image and not cards:
+    if not cards:
         img = story_share_image(rank)
         return (
             f'<meta property="og:type" content="{E(og_type)}">'
