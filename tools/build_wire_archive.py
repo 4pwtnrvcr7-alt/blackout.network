@@ -280,7 +280,8 @@ def fema_items(raw):
     log("fema declarations", len(out)); return out
 
 # ------------------------------------------------------------------ WHO DON
-def who_items(raw):
+def who_items(raw, datefn=None):
+    """datefn(v, url_name) -> ISO time or None: phase 2 passes its own date rule (WHO 2018-2021 backfill); phase 1 uses the URL-date rule below."""
     vals = json.load(open(os.path.join(raw, "who.json")))
     try:
         import x_share
@@ -291,13 +292,17 @@ def who_items(raw):
     for v in vals:
         url_name = v.get("UrlName") or ""
         if not url_name: continue
-        m = re.match(r"^(\d{4})_(\d{2})_(\d{2})", url_name)       # migrated old reports were re-published in 2021: the item's own date is in its URL
-        pdt = (v.get("PublicationDate") or "")[:19] + "Z"
-        if not m:   # no date in the URL: the API date is only trusted when it agrees with the year in the URL and is not a site-migration batch date
-            ym = re.match(r"^(\d{4})", url_name)
-            if (ym and ym.group(1) != pdt[:4]) or ("2021-06-02" <= pdt[:10] <= "2021-06-09") or ("2024-03-05" <= pdt[:10] <= "2024-03-15" and not url_name.startswith("2024")):
-                DROPPED["who_undated"] += 1; continue
-        t = f"{m.group(1)}-{m.group(2)}-{m.group(3)}T00:00:00Z" if m else pdt
+        if datefn:
+            t = datefn(v, url_name)
+            if not t: DROPPED["who_undated"] += 1; continue
+        else:
+            m = re.match(r"^(\d{4})_(\d{2})_(\d{2})", url_name)       # migrated old reports were re-published in 2021: the item's own date is in its URL
+            pdt = (v.get("PublicationDate") or "")[:19] + "Z"
+            if not m:   # no date in the URL: the API date is only trusted when it agrees with the year in the URL and is not a site-migration batch date
+                ym = re.match(r"^(\d{4})", url_name)
+                if (ym and ym.group(1) != pdt[:4]) or ("2021-06-02" <= pdt[:10] <= "2021-06-09") or ("2024-03-05" <= pdt[:10] <= "2024-03-15" and not url_name.startswith("2024")):
+                    DROPPED["who_undated"] += 1; continue
+            t = f"{m.group(1)}-{m.group(2)}-{m.group(3)}T00:00:00Z" if m else pdt
         if len(t) < 20 or not keep_t(t): continue
         try: datetime.strptime(t, "%Y-%m-%dT%H:%M:%SZ")
         except ValueError: continue

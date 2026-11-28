@@ -113,6 +113,7 @@ def cat_key(category, title, archive):
     # Nov 25 2026 (pt1917u): these stored tags are specific, so they win over title words
     # ("Geomagnetic Storm Watch" is space weather, not Weather & fire).
     if c in ("space weather", "space"): return "space"
+    if archive and c == "cyber": return "cyber"   # archive CISA KEV rows: "Memory Corruption Vulnerability" is not a scandal
     if c in ("obituary", "obituaries", "death", "deaths"): return "deaths"
     if c in ("patent", "patents"): return "patents"   # Nov 27 2026 (pt1961u): its own Wire category
     if c in ("wreck", "wrecks", "crash", "crashes", "accident", "transport accident"): return "wreck"

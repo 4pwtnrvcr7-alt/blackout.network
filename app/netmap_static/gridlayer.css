@@ -1,27 +1,48 @@
 /* The Grid, merged (Nov 24 2026, Matt pt1795u): styles for the old /grid page's loader, operator cards and "More about the grid"
-   sheet on /grid. Copied from gridpage_static/grid.css (kept in the repo). Dark only. No yellow: green / orange / red / grey. */
+   sheet on /grid. Copied from gridpage_static/grid.css (kept in the repo). Dark only. Yellow is allowed only on the /grid loader (Refresh palette, pt2007u / pt2022u); elsewhere green / orange / red / grey. */
 :root{--gx-ok:#2FD67B;--gx-strain:#FF7A1A;--gx-out:#FF3B3B;--gx-na:#7C8190;--gx-tx:#F0F0FA;--gx-mu:rgba(240,240,250,.62);--gx-bd:rgba(240,240,250,.12);--gx-bg:#05060a;--gx-ease:cubic-bezier(.2,.7,.2,1)}
-/* ---------- loader: current runs down three feeder lines into a 3x3 grid of nodes that switch on in sequence ---------- */
-.gx-ld{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(55% 45% at 50% 45%,rgba(47,214,123,.07),transparent 70%),var(--gx-bg);transition:opacity .6s var(--gx-ease),visibility .6s}
-body.gx-ready .gx-ld{opacity:0;visibility:hidden;pointer-events:none}
-.gx-ldsvg{width:min(320px,78vw);height:auto;overflow:visible}
-.gx-lines path{fill:none;stroke:rgba(240,240,250,.14);stroke-width:1.4}
-.gx-tow path{fill:none;stroke:rgba(240,240,250,.45);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
-.gx-flow path{fill:none;stroke:var(--gx-ok);stroke-width:2.2;stroke-linecap:round;stroke-dasharray:14 210;filter:drop-shadow(0 0 4px rgba(47,214,123,.9));animation:gx-flow 1.4s linear infinite}
-.gx-flow path:nth-child(2){animation-delay:.35s}.gx-flow path:nth-child(3){animation-delay:.7s}
-@keyframes gx-flow{from{stroke-dashoffset:224}to{stroke-dashoffset:0}}
-.gx-nodes circle{fill:var(--gx-bg);stroke:rgba(240,240,250,.3);stroke-width:1.4;animation:gx-node 1.4s var(--gx-ease) infinite;animation-delay:var(--d)}
-@keyframes gx-node{0%,30%{fill:var(--gx-bg);stroke:rgba(240,240,250,.3)}45%{fill:var(--gx-ok);stroke:var(--gx-ok);filter:drop-shadow(0 0 6px rgba(47,214,123,.9))}80%,100%{fill:rgba(47,214,123,.25);stroke:rgba(47,214,123,.6)}}
-.gx-ldk{display:flex;gap:14px;align-items:baseline;margin:0;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--gx-mu)}
-.gx-ldk b{font:600 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em;color:var(--gx-tx)}
-.gx-lds{display:flex;gap:18px;list-style:none;margin:0;padding:0;font:500 10.5px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:rgba(240,240,250,.32)}
-.gx-lds li{display:flex;align-items:center;gap:6px;transition:color .3s}
-.gx-lds li::before{content:"";width:6px;height:6px;border-radius:50%;border:1px solid currentColor;transition:background .3s}
-.gx-lds li.on{color:var(--gx-tx)}.gx-lds li.on::before{background:var(--gx-ok);border-color:var(--gx-ok)}
-.gx-ldmsg{margin:0;font-size:13px;color:var(--gx-mu)}
-@media (prefers-reduced-motion:reduce){.gx-flow path,.gx-nodes circle{animation:none}.gx-flow path{stroke-dasharray:none;opacity:.6}}
-body.nx-ready .gx-ld{opacity:0;visibility:hidden;pointer-events:none}
-.gx-ld{color:var(--gx-tx);font-family:Inter,system-ui,sans-serif}
+/* ---------- loader: 100 phosphor blocks tile the viewport, one per percent, bottom to top (pt2022u) ---------- */
+.gx-ld{position:fixed;inset:0;z-index:40;overflow:hidden;background:#05060a;color:var(--gx-tx);font-family:Inter,system-ui,sans-serif;transition:opacity .6s var(--gx-ease),visibility .6s;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body.gx-ready .gx-ld,body.nx-ready .gx-ld{opacity:0;visibility:hidden;pointer-events:none}
+.gx-ldboard{position:absolute;inset:0;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(10,1fr);gap:2px;width:100%;height:100%;padding:0;background:#05060a;overflow:hidden}
+.gx-ldcell[data-r="0"]{--gx-ldc:#FFE566}
+.gx-ldcell[data-r="1"]{--gx-ldc:#FFE04A}
+.gx-ldcell[data-r="2"]{--gx-ldc:#FFC83A}
+.gx-ldcell[data-r="3"]{--gx-ldc:#FFB028}
+.gx-ldcell[data-r="4"]{--gx-ldc:#FF9A1A}
+.gx-ldcell[data-r="5"]{--gx-ldc:#FF8D21}
+.gx-ldcell[data-r="6"]{--gx-ldc:#FF8028}
+.gx-ldcell[data-r="7"]{--gx-ldc:#FF742E}
+.gx-ldcell[data-r="8"]{--gx-ldc:#FF6735}
+.gx-ldcell[data-r="9"]{--gx-ldc:#FF5A3C}
+.gx-ldcell{position:relative;border-radius:38% 32% 42% 36%/36% 42% 32% 40%;background:rgba(240,240,250,.045);box-shadow:inset 0 0 0 1px rgba(240,240,250,.07);min-width:0;min-height:0}
+.gx-ldcell:nth-child(3n){border-radius:42% 30% 48% 34%/34% 48% 30% 44%}
+.gx-ldcell:nth-child(3n+1){border-radius:30% 46% 36% 44%/44% 32% 46% 36%}
+.gx-ldcell:nth-child(3n+2){border-radius:48% 36% 30% 42%/38% 42% 36% 48%}
+.gx-ldcell:nth-child(odd){--tilt:-2.4deg}
+.gx-ldcell:nth-child(even){--tilt:1.8deg}
+.gx-ldcell:nth-child(5n){--tilt:-1.1deg}
+.gx-ldcell>b{position:absolute;inset:1px;border-radius:inherit;opacity:0;background:var(--gx-ldc,#FFE566);box-shadow:0 0 14px rgba(255,154,26,.55),0 0 28px rgba(255,90,60,.2),inset 0 1px 1px rgba(255,255,255,.35);pointer-events:none;transform:translateY(calc(-1 * var(--fall,18vh))) scale(.7) rotate(var(--tilt,0deg))}
+.gx-ldcell.in>b{animation:gx-ld-drop .64s cubic-bezier(.14,1.12,.28,1) forwards}
+@keyframes gx-ld-drop{
+  0%{opacity:0;transform:translateY(calc(-1 * var(--fall,18vh))) scale(.68) rotate(var(--tilt,0deg))}
+  74%{opacity:1;transform:translateY(3px) scale(1.07) rotate(var(--tilt,0deg))}
+  100%{opacity:1;transform:translateY(0) scale(1) rotate(var(--tilt,0deg))}
+}
+.gx-ldscan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,transparent 0 2px,rgba(0,0,0,.22) 2px 3px);mix-blend-mode:multiply;opacity:.4;animation:gx-ld-scan 6.5s linear infinite}
+@keyframes gx-ld-scan{from{background-position:0 0}to{background-position:0 12px}}
+.gx-ldn{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:2;margin:0;pointer-events:none;font:200 84px/1 Inter,system-ui,sans-serif;color:#F0F0FA;font-variant-numeric:tabular-nums;letter-spacing:-.03em;text-shadow:0 0 16px #05060a,0 0 36px #05060a,0 2px 6px #05060a,0 0 3px #05060a}
+.gx-ldn small{font-size:26px;font-weight:300;margin-left:4px;color:rgba(240,240,250,.72);vertical-align:top;position:relative;top:14px}
+.gx-ldmsg{position:absolute;left:50%;bottom:12%;transform:translateX(-50%);z-index:2;margin:0;font-size:13px;color:var(--gx-tx);text-align:center;max-width:86vw;text-shadow:0 0 12px #05060a,0 1px 2px #05060a}
+@media (prefers-reduced-motion:reduce){
+  .gx-ldcell.in>b{animation:none;opacity:1;transform:rotate(var(--tilt,0deg))}
+  .gx-ldscan{animation:none}
+}
+@media (max-width:767px){
+  .gx-ldn{font-size:64px}
+  .gx-ldn small{font-size:20px;top:10px}
+}
+
 .gx-b,.gx-x{all:unset;box-sizing:border-box;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;cursor:pointer;background:rgba(5,6,10,.66);border:1px solid var(--gx-bd);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:var(--gx-tx);transition:border-color .2s,transform .2s}
 .gx-b:hover,.gx-x:hover{border-color:rgba(240,240,250,.5)}.gx-b:active{transform:scale(.94)}
 .gx-b:focus-visible,.gx-x:focus-visible,.gx-more-btn:focus-visible,.gx-sec summary:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}
@@ -128,9 +149,7 @@ body.gx-more-on #nx_more_btn{opacity:0;pointer-events:none}
 .nb-gbtn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:11px 18px;border-radius:99px;border:1px solid rgba(240,240,250,.3);font:600 11.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#F0F0FA;transition:border-color .2s,background .2s}
 .nb-gbtn:hover{border-color:rgba(240,240,250,.6);background:rgba(240,240,250,.06)}
 .nb-gbtn:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}
-@media (max-width:767px){.gx-lds{display:grid;grid-template-columns:auto auto;gap:10px 22px;font-size:10px;letter-spacing:.12em}.gx-lds li{white-space:nowrap}.gx-ldmsg{max-width:86vw;text-align:center}}
 html body.nx button#gx_more_btn.gx-more-btn{border-radius:99px!important}
-body.nx:not(.nx-ready) .nx-head{z-index:41}   /* the menu stays usable while the grid loader plays */
 
 /* Nov 24 2026 (Matt): pop-ups clamp inside the screen, scroll inside, drag by the top strip */
 .nx-card,.gx-card{overflow:auto;overscroll-behavior:contain}

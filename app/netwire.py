@@ -35,6 +35,14 @@ CABLE_RX = re.compile(
     re.I,
 )
 DC_RX = re.compile(r"\b(?:data ?cent(?:er|re)s?|colocation|co-location|colo facility)\b", re.I)
+# Mentions of building or investing in data centers are not facility incidents.
+DC_EVT_RX = re.compile(
+    r"\b(?:outage|incident|fire|flood|explosion|evacuat\w*|offline|failure|blackout|"
+    r"disruption|shutdown|damage|collapse|leak|outage|cooling failure|power loss|"
+    r"taken offline|knocked (?:offline|out)|goes dark|went dark|is down|went down|"
+    r"strike|struck|bomb(?:ing|ed)?|attack)\b",
+    re.I,
+)
 TOWER_RX = re.compile(
     r"\b(?:cell towers?|cellular(?: network)?|mobile network|telecom(?:munications?)? outage|"
     r"5G outage|wireless outage|phone network outage)\b",
@@ -58,6 +66,15 @@ LAYER_LABEL = {
     "cable": "cable cuts",
     "towers": "cell and telecom outages",
     "dc": "data-center incidents",
+}
+LAYER_LABEL_ONE = {
+    "internet": "internet outage",
+    "power": "power outage",
+    "hydro": "dam incident",
+    "cloud": "cloud outage",
+    "cable": "cable cut",
+    "towers": "cell and telecom outage",
+    "dc": "data-center incident",
 }
 
 
@@ -127,7 +144,8 @@ def is_cable(title, src=""):
 
 
 def is_dc(title, src=""):
-    return bool(DC_RX.search(title or ""))
+    t = title or ""
+    return bool(DC_RX.search(t) and DC_EVT_RX.search(t))
 
 
 def is_towers(title, src=""):
@@ -368,6 +386,111 @@ def _sql_rows(days=DAYS):
             pass
 
 
+
+_GLOBAL_RX = re.compile(
+    r"^\s*(?:global(?:\s*\(.*\))?|worldwide|earth|the world|unknown(?: location)?)\s*$",
+    re.I,
+)
+
+
+def _valid_ll(lat, lon):
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return False
+    return -90 <= lat <= 90 and -180 <= lon <= 180 and not (lat == 0 and lon == 0)
+
+
+def _lookup_place(place, cc=None):
+    """Resolve a location field to a city/state/country/region centroid. Never reads the title."""
+    place = (place or "").strip()
+    if not place or _GLOBAL_RX.match(place):
+        return None
+    if cc and len(cc) != 2:
+        cc = None
+    try:
+        import signal_place as SP
+        hit = SP._from_text(place, prefer_cc=cc)
+        if hit and _valid_ll(hit.get("lat"), hit.get("lon")):
+            return hit
+    except Exception:
+        pass
+    try:
+        import geo
+        parts = [p.strip() for p in place.split(",") if p.strip()] or [place]
+        ccs = {cc} if cc else None
+        for part in parts:
+            city = geo.cities_named(part, ccs=ccs)
+            if city and _valid_ll(city.get("lat"), city.get("lon")):
+                return dict(lat=city["lat"], lon=city["lon"], precision="city",
+                            cc=city.get("cc") or cc, place=city.get("name") or part)
+        for part in parts:
+            adm = geo.admin_centroid(name=part, cc=cc)
+            if adm and _valid_ll(adm.get("lat"), adm.get("lon")):
+                return adm
+        if ccs:
+            sp = geo.small_place(parts[0], ccs)
+            if sp and _valid_ll(sp.get("lat"), sp.get("lon")):
+                return dict(lat=sp["lat"], lon=sp["lon"], precision="city",
+                            cc=sp.get("cc") or cc, place=sp.get("name") or parts[0])
+    except Exception:
+        pass
+    return None
+
+
+def _lookup_cc(cc):
+    cc = (cc or "").strip().upper()
+    if len(cc) != 2:
+        return None
+    try:
+        import geo
+        hit = geo.admin_centroid(cc=cc)
+        if hit and _valid_ll(hit.get("lat"), hit.get("lon")):
+            return hit
+    except Exception:
+        pass
+    return None
+
+
+def fill_coords(story):
+    """Attach a centroid when the story has a real location field but no coordinates.
+
+    Uses place/cc only. Skips Global/worldwide/empty fields. Does not read the title.
+    Existing lat/lon are left alone.
+    """
+    if not isinstance(story, dict):
+        return story
+    if _valid_ll(story.get("lat"), story.get("lon")):
+        return story
+    place = (story.get("place") or "").strip()
+    cc = (story.get("cc") or "").strip().upper() or None
+    if cc and len(cc) != 2:
+        cc = None
+    if _GLOBAL_RX.match(place or ""):
+        return story
+    hit = _lookup_place(place, cc) if place else None
+    if not hit and not place and cc:
+        hit = _lookup_cc(cc)
+    if not hit:
+        return story
+    story["lat"] = round(float(hit["lat"]), 4)
+    story["lon"] = round(float(hit["lon"]), 4)
+    if not story.get("prec"):
+        story["prec"] = hit.get("precision") or "centroid"
+    if not story.get("cc") and hit.get("cc"):
+        story["cc"] = hit["cc"]
+    return story
+
+
+def apply_centroids(bundle):
+    if not bundle:
+        return bundle
+    for k in KINDS:
+        for s in bundle.get(k) or []:
+            fill_coords(s)
+    return bundle
+
+
 def load(now=None):
     """Return {internet, power, ok} or None if the Wire could not be read.
 
@@ -380,7 +503,7 @@ def load(now=None):
         rows = _heat_rows()
     if rows is None:
         return None
-    return stories_from_rows(rows, now=now)
+    return apply_centroids(stories_from_rows(rows, now=now))
 
 
 def match_keys(story, places):
@@ -600,6 +723,17 @@ def layers(bundle, now=None):
     return {k: layer_stats(bundle.get(k) or [], now) for k in KINDS}
 
 
+def layer_label(kind, n=2):
+    """Singular when n is 1, otherwise the usual plural category label."""
+    if n == 1:
+        return LAYER_LABEL_ONE.get(kind) or LAYER_LABEL.get(kind) or "outage"
+    return LAYER_LABEL.get(kind) or "outages"
+
+
+def countries_phrase(n):
+    return f"{n} country" if n == 1 else f"{n} countries"
+
+
 def pill_text(kinds, layer_counts, mobile=False):
     """Truthful, global summary for the map chip. kinds is the visible layer set."""
     kinds = [k for k in (kinds or KINDS) if k in (layer_counts or {})]
@@ -618,14 +752,15 @@ def pill_text(kinds, layer_counts, mobile=False):
         return "No matching outage stories on the Wire in the last 7 days"
     active24 = [k for k in kinds if layer_counts[k]["n24"]]
     if len(active24) == 1:
-        lab = LAYER_LABEL[active24[0]]
+        lab = layer_label(active24[0], n24)
         m = layer_counts[active24[0]]["countries_24h"]
         if n24:
-            return f"{n24} {lab} in 24 h · {m} countries · {us}"
+            return f"{n24} {lab} in 24 h · {countries_phrase(m)} · {us}"
     if n24 == 0:
         if len(kinds) == 1:
             return f"No {LAYER_LABEL[kinds[0]]} in 24 h · {n7} this week · {us}"
         return f"No outages in 24 h · {n7} this week · {us}"
+    out_lab = "outage" if n24 == 1 else "outages"
     if len(kinds) == 1:
-        return f"{n24} {LAYER_LABEL[kinds[0]]} in 24 h · {countries} countries · {us}"
-    return f"{n24} outages in 24 h · {countries} countries · {us}"
+        return f"{n24} {layer_label(kinds[0], n24)} in 24 h · {countries_phrase(countries)} · {us}"
+    return f"{n24} {out_lab} in 24 h · {countries_phrase(countries)} · {us}"

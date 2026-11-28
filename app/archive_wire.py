@@ -49,7 +49,7 @@ def build(quiet=False):
                 fam = {"USGS ComCat": "USGS", "NOAA NHC HURDAT2": "NOAA", "OpenFEMA": "FEMA", "WHO Disease Outbreak News": "WHO"}.get(r[11], r[11])
                 k = W.cat_key(r[3], r[2], True); g = W.region_key(r[4], r[2], r[5], r[6])
                 rows.append((r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], 0, 1, json.dumps([fam]),
-                             json.dumps([{"source": r[11], "url": r[12]}]), json.dumps([r[11]]), json.dumps(r[10]), r[13], k, g))
+                             json.dumps([{"source": r[11], "url": r[12]}]), json.dumps([r[11]]), json.dumps([t for t in r[10] if t]), r[13], k, g))
         c.executemany("INSERT OR REPLACE INTO stories VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows); n += len(rows)
     c.executescript("CREATE INDEX ix_a_t ON stories(t, id); CREATE INDEX ix_a_k ON stories(k, t); CREATE INDEX ix_a_g ON stories(g, t); CREATE INDEX ix_a_r ON stories(rank, t);")
     c.execute("INSERT INTO meta VALUES('data_id',?)", (data_id(),)); c.execute("INSERT INTO meta VALUES('rows',?)", (str(n),))
