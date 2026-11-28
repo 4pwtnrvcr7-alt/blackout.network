@@ -14,7 +14,7 @@ class MenuCity(unittest.TestCase):
         self.assertNotIn("m5a-sweep", h.split("</style>")[1].split("<script")[0])
         self.assertIn("/bn-menu-city.js?v=", h)
         self.assertNotIn("__CITYV__", h)
-        for label in ("Intro", "The Wire", "Heat Map", "Weather", "The Grid", "Markets", "Comms", "Newsletter"):
+        for label in ("Intro", "The Wire", "Heat Map", "Weather", "The Grid", "Markets", "Comms", "Newsletter", "Install App", "Alerts"):
             self.assertIn(label, h)
         self.assertIn("pointer-events:none", h)
 
@@ -47,28 +47,30 @@ class MenuCity(unittest.TestCase):
         self.assertIn("bAng", s)
 
 class MenuThumbLayout(unittest.TestCase):
-    def test_actions_are_plain_text_at_top(self):
+    def test_install_and_alerts_are_regular_menu_items(self):
         h = menu5.html_block("/wire")
         body = h.split("</style>", 1)[1].split("<script", 1)[0]
-        self.assertIn('class="m5-txt"', body)
-        self.assertNotIn('class="m5-btn"', body)
-        self.assertLess(body.find("m5-acts"), body.find("m5-nav"))
-        self.assertIn("Install on home screen", body)
-        self.assertIn("Turn on notifications", body)
+        self.assertNotIn('class="m5-txt"', body)
+        self.assertNotIn("m5-acts", body)
+        self.assertNotIn("Install on home screen", body)
+        self.assertNotIn("Turn on notifications", body)
+        self.assertIn('href="/setup#install"', body)
+        self.assertIn('href="/setup#notifications"', body)
+        self.assertIn(">Install App</a>", body)
+        self.assertIn(">Alerts</a>", body)
         css = h.split("</style>", 1)[0]
-        self.assertNotIn("border:1px solid rgba(255,255,255,.45)", css)
         self.assertIn("margin-top:auto", css)
         self.assertIn("flex-direction:column", css)
 
-    def test_eight_links_stay_in_order(self):
-        """#314 added Comms; the bottom stack must list all eight page links."""
-        labels = ("Intro", "The Wire", "Heat Map", "Weather", "The Grid", "Markets", "Comms", "Newsletter")
+    def test_ten_links_stay_in_order(self):
+        """#314 added Comms; Nov 28 added Install App and Alerts to /setup."""
+        labels = ("Intro", "The Wire", "Heat Map", "Weather", "The Grid", "Markets", "Comms", "Newsletter", "Install App", "Alerts")
         self.assertEqual([x[1] for x in menu5.ORDER], list(labels))
         h = menu5.html_block("/wire")
         body = h.split("</style>", 1)[1].split("<script", 1)[0]
         for label in labels:
             self.assertIn(">" + label + "</a>", body)
-        self.assertEqual(body.count('<li class="m5-r"'), 8)
+        self.assertEqual(body.count('<li class="m5-r"'), 10)
 
 class MenuBlankShell(unittest.TestCase):
     """Matt 11:44 PM ET Nov 27: empty black menu (Alerts + Report status footer) after a tap."""
@@ -103,8 +105,8 @@ class MenuChrome(unittest.TestCase):
     def test_close_is_icon_only(self):
         css = menu5.html_block("/wire").split("</style>", 1)[0]
         self.assertIn("#bn-menu:has(.m5) .bn-close span{display:none", css)
-        self.assertIn("min-width:44px", css)
-        self.assertIn("min-height:44px", css)
+        self.assertIn("min-width:40px", css)
+        self.assertIn("min-height:40px", css)
 
     def test_nav_sits_on_safe_area(self):
         css = menu5.html_block("/wire").split("</style>", 1)[0]

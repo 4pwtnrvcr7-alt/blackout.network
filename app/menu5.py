@@ -10,9 +10,9 @@
 - Nov 27 2026 (Matt pt1984u): the old SVG radar is replaced by an original code-rendered canvas loop (static/pwa/bn-menu-city.js): a massive night city, the
   lights go out in waves, then a mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
   closed or the tab is hidden, static frame under prefers-reduced-motion. Kill switch: BN_MENU_CITY=0 brings back the SVG radar.
-- "Install on home screen" and "Turn on notifications" sit at the top under the header as small plain text (not boxed
-  buttons) and open the existing device-aware animated panels (static/pwa/install-guide.js: BN.installApp / BN.showNotifyGuide)
-  on tap only. Nothing opens by itself.
+- "Install App" and "Alerts" are regular menu items (same type as Intro / The Wire) and open /setup#install and
+  /setup#notifications. The setup page has the per-OS steps and the working Install / Notifications buttons
+  (static/pwa/install-guide.js: BN.installApp / BN.enableAlerts / BN.showNotifyGuide).
 Kill switch: Render env BN_MENU_V5=0 brings back the previous menus unchanged."""
 import os, html
 
@@ -29,7 +29,9 @@ ORDER = [("intro", "Intro", "/?intro=1"), ("threat", "The Wire", "/wire"), ("hea
          ("net", "The Grid", "/grid"),   # Nov 24 2026 (Matt pt1795u): Network Status merged with The Grid; /grid 302s to /grid
          ("finance", "Markets", "/markets"),
          ("comms", "Comms", "/comms"),  # Nov 27 2026 (Matt 11:24 PM ET): coming-soon /comms on the traffic menu
-         ("newsletter", "Newsletter", "/newsletter")]
+         ("newsletter", "Newsletter", "/newsletter"),
+         ("setup-install", "Install App", "/setup#install"),
+         ("setup-alerts", "Alerts", "/setup#notifications")]
 
 def items(intro_href=None):
     try:
@@ -99,9 +101,9 @@ CSS = ('<style id="bn_m5">'
  '#bn-menu:has(.m5) .bn-ph,#bn-menu:has(.m5) .m3-alerts,#bn-menu:has(.m5) .m3-tools,#bn-menu:has(.m5) .bn-dsearch{display:none!important}'
  '#bn-menu:has(.m5) .bn-mhead{border-bottom:0!important;padding-bottom:8px!important}'
  '#bn-menu:has(.m5) .bn-close span{display:none!important}'
- '#bn-menu:has(.m5) .bn-close{min-width:44px!important;min-height:44px!important;width:44px;height:44px;padding:0!important;gap:0!important;box-sizing:border-box}'
- '#w2_menu:has(.m5) .w2-close{font-size:0!important;letter-spacing:0!important;gap:0!important;min-width:44px;min-height:44px;width:44px;height:44px;padding:0;justify-content:center}'
- 'body:has(#h_menu.open) .h-burger,body:has(#h_menu.open) #h_nav .h-x,body:has(#bn-menu.bn-open) .bn-burger,body:has(#w2_menu:not([hidden])) .w2-mbtn{min-width:44px!important;min-height:44px!important;width:44px;height:44px;padding:0!important;box-sizing:border-box}'
+ '#bn-menu:has(.m5) .bn-close{min-width:40px!important;min-height:40px!important;width:40px;height:40px;padding:0!important;gap:0!important;box-sizing:border-box;border:0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important}'
+ '#w2_menu:has(.m5) .w2-close{font-size:0!important;letter-spacing:0!important;gap:0!important;min-width:40px;min-height:40px;width:40px;height:40px;padding:0;justify-content:center;border:0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important}'
+ 'body:has(#h_menu.open) .h-burger,body:has(#h_menu.open) #h_nav .h-x,body:has(#bn-menu.bn-open) .bn-burger,body:has(#w2_menu:not([hidden])) .w2-mbtn{min-width:40px!important;min-height:40px!important;width:40px;height:40px;padding:0!important;box-sizing:border-box;border:0!important;background:transparent!important;border-radius:0!important;box-shadow:none!important}'
  'body:has(#h_menu.open) .h-burger .bn-bl,body:has(#bn-menu.bn-open) .bn-burger .bn-bl,body:has(#w2_menu:not([hidden])) .w2-mbtn .bn-bl{display:none!important}'
  '#bn-menu:has(.m5) .m5{flex:1 1 auto;min-height:0}'
  '.w2-mnav.w2-m5{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:100%;padding:0!important}'
@@ -214,8 +216,5 @@ def html_block(active_href=None, intro_href=None):
     soc = (f'<div class="m5-soc m5-r" style="--i:{n}">'
            f'<a href="{X_URL}" target="_blank" rel="noopener me" aria-label="BLACKOUT.NETWORK on X, @BlkoutNtw (opens in a new tab)">{I_X}</a>'
            f'<a href="{YT_URL}" target="_blank" rel="noopener me" aria-label="BLACKOUT.NETWORK on YouTube (opens in a new tab)">{I_YT}</a></div>')
-    acts = (f'<div class="m5-acts m5-r" style="--i:0">'
-            f'<button type="button" class="m5-txt" data-m5-act="install">Install on home screen</button>'
-            f'<button type="button" class="m5-txt" data-m5-act="notify">Turn on notifications</button></div>')
-    return (CSS + '<div class="m5" data-m5>' + _art() + acts + '<div class="m5-nav"><ul class="m5-list" aria-label="Pages">' + "".join(li) + '</ul>'
+    return (CSS + '<div class="m5" data-m5>' + _art() + '<div class="m5-nav"><ul class="m5-list" aria-label="Pages">' + "".join(li) + '</ul>'
             + soc + '</div></div>' + JS.replace("__CITYV__", _city_ver()))

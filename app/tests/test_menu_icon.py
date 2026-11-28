@@ -18,8 +18,8 @@ class Markup(unittest.TestCase):
         self.assertEqual(len(BARS.findall(html)), 3)
         self.assertIn('aria-label="Open menu"', html)
         self.assertIn('aria-expanded="false"', html)
-        self.assertIn('class="bn-bl-a">Menu</span>', html)
-        self.assertIn('class="bn-bl-b">Close</span>', html)
+        self.assertNotIn('class="bn-bl-a">Menu</span>', html)
+        self.assertNotIn('class="bn-bl-b">Close</span>', html)
         self.assertNotIn("<path d=\"M3 6h18M3 12h18M3 18h18\"", html)
 
     def test_homepage_burger_not_broken_by_menu_label(self):
@@ -27,8 +27,8 @@ class Markup(unittest.TestCase):
         self.assertRegex(h, HX)
         self.assertEqual(len(BARS.findall(h.split("h-burger")[1].split("</button>")[0])), 3)
         self.assertIn('aria-label="Open menu"', h)
-        self.assertIn('class="bn-bl-a">Menu</span>', h)
-        self.assertIn('class="bn-bl-b">Close</span>', h)
+        self.assertNotIn('class="bn-bl-a">Menu</span>', h)
+        self.assertNotIn('class="bn-bl-b">Close</span>', h)
         # The bug Matt shot: MENU as first child made i:nth-child miss the top bar.
         self.assertNotIn("<i></i><i></i><i></i>", h.split("h-burger")[1].split("</button>")[0])
 
@@ -36,7 +36,7 @@ class Markup(unittest.TestCase):
         html = wire_v2.shell("Wire", "desc", "<p>x</p>", "/wire")
         self.assertRegex(html, HX)
         self.assertIn('aria-label="Open menu"', html)
-        self.assertIn("wire2.css?v=7", html)
+        self.assertIn("wire2.css?v=10", html)
         self.assertIn("wire2.js?v=3", html)
 
 class StylesAndScript(unittest.TestCase):

@@ -151,7 +151,7 @@ _REFRESH_INPAGE = {"/wire", "/map", "/grid", "/weather", "/markets", "/water"}
 _REFRESH_OFF_EXACT = {
     "/privacy", "/privacy-policy", "/tos", "/terms", "/terms-of-service",
     "/cookies", "/cookie-policy", "/privacy-choices", "/do-not-sell",
-    "/credits", "/scoring", "/about/scoring", "/welcome", "/ready",
+    "/credits", "/scoring", "/about/scoring", "/welcome", "/ready", "/setup",
     "/report-status", "/social", "/mesh/guide", "/sources/admin",
 }
 _REFRESH_OFF_PREFIX = (
@@ -219,7 +219,7 @@ def topbar(sn, active="", ctl_html=""):
             f'<a class="bn-ib bn-js-only bn-searchbtn" href="#bn-menu" role="button" aria-label="Search" title="Search (/)">{I_SEARCH}</a>'
             + refresh_btn() + theme_btn("bn-js-only bn-theme-bar") +
             f'<button type="button" class="bn-ib bn-js-only bn-gear" aria-label="Settings and scan status" aria-expanded="false" aria-controls="bn_settings" title="Settings">{I_GEAR}</button>'
-            f'<a class="bn-ib bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">{I_MENU}{BN_BL}</a>'
+            f'<a class="bn-ib bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">{I_MENU}</a>'
             '</div></div>'
             '<div class="bn-pop" id="bn_settings" role="dialog" aria-label="Settings" hidden><div class="bn-pop-h">Settings'
             f'<button type="button" class="bn-pop-x" aria-label="Close settings">{I_CLOSE}</button></div>'
@@ -409,9 +409,9 @@ LOADER = ('<script>addEventListener("load",function(){var d=document,r=d.documen
 M4_LEAD = ('<div class="m4-lead"><a href="/?intro=1">Intro</a><a href="/wire" data-tab="threat">The Wire</a>'
            '<a href="/live">Live</a><a href="/newsletter" data-tab="newsletter">Newsletter</a></div>')
 M4_CSS = ('<style id="bn_m4">'
-  'html .bn-top4 .bn-tbar .bn-burger .bn-bl{display:inline-grid!important;font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;margin:0 10px 0 0!important;width:auto!important;height:auto!important;clip:auto!important;clip-path:none!important;position:static!important;overflow:visible!important;white-space:nowrap;color:#fff!important}'
+  'html .bn-top4 .bn-tbar .bn-burger .bn-bl{display:none!important}'
   'html .bn-top4 .bn-tbar .bn-theme-bar{display:none!important}'
-  'html .bn-top4 .bn-burger{display:inline-flex!important;flex-direction:row-reverse;align-items:center;width:auto!important;padding:0 4px!important;background:none!important;border:0!important;overflow:visible!important}'
+  'html .bn-top4 .bn-burger{display:inline-flex!important;align-items:center;justify-content:center;width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important;padding:0!important;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important}'
   'html .bn-m4 .bn-panel{background:#000!important;border:0!important;box-shadow:none!important}'
   'html .bn-m4 .bn-scrim{background:#000!important;opacity:1!important;z-index:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}'
   'html .bn-m4 .m3-art,html .bn-m4 .bn-gd,html .bn-m4 .m3-pv,html .bn-m4 .m3-n,html .bn-m4 .m3-rule,html .bn-m4 .m3-stamp,html .bn-m4 .m3-cta,html .bn-m4 .bn-theme-row,html .bn-m4 .m3-soon{display:none!important}'

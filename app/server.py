@@ -612,10 +612,10 @@ def version_assets(b):
 # without the shared header/menu (e.g. /newsletter/sample, the HTML 500 page): a fixed MENU button + the shared drawer.
 # Pages with their own menu (shared drawer #bn-menu, the intro h-menu4, Wire v2 #w2_open) or data-bn-nomenu are left alone.
 _FB_SKIP = ("/api/", "/internal/", "/embed", "/wire2/")
-_FB_CSS = (b'<style id="bn_fbm">.bn-fbm{position:fixed;z-index:6900;top:calc(12px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));'
-           b'display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;background:rgba(5,6,10,.82);color:#F2F2F4;border:1px solid rgba(242,242,244,.28);'
-           b'font:600 12px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}'
-           b'.bn-fbm svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}.bn-fbm:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}'
+_FB_CSS = (b'<style id="bn_fbm">.bn-fbm{position:fixed;z-index:6900;top:calc(8px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));'
+           b'display:inline-flex;align-items:center;justify-content:center;gap:0;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;background:transparent;color:#F2F2F4;border:0;border-radius:0;'
+           b'text-decoration:none;box-shadow:none}'
+           b'.bn-fbm:focus-visible{outline:2px solid #F2F2F4;outline-offset:2px}'
            b'body.bn-fbm-on .bntr-float{top:calc(60px + env(safe-area-inset-top))!important}'
            b'body.bn-fbm-on:has(#bn-menu.bn-open) .bn-fbm,body.bn-fbm-on:has(#bn-menu.bn-open) .bntr-float{visibility:hidden}'
            b'body.bn-fbm-on #bn-menu [data-bn-theme]{display:none!important}</style>')
@@ -626,7 +626,7 @@ def menu_fallback(b, path=""):
         if b"<html" not in lo or b'id="bn-menu"' in b or b"h-menu4" in b or b'id="w2_open"' in b or b"data-bn-nomenu" in b[:4000]: return b
         import sitenav as SN, sitenav_ui as UI
         btn = ('<a class="bn-fbm bn-burger" href="#bn-menu" role="button" aria-label="Open menu" aria-controls="bn-menu" aria-expanded="false" aria-haspopup="dialog">'
-               '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></a>')
+               + UI.I_MENU + '</a>')
         body = (btn + UI.drawer(SN, "")).encode("utf-8")
         head = _FB_CSS + (b"" if b"/sitenav.css" in b else b'<link rel="stylesheet" href="/sitenav.css">')
         tail = b"" if b"/sitenav.js" in b else b'<script src="/sitenav.js" defer></script>'
