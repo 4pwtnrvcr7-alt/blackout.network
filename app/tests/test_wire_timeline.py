@@ -140,6 +140,32 @@ class Paging(unittest.TestCase):
         self.assertIn("(hover:hover)", css)
         self.assertIn(".tl-sheet", css)
         self.assertIn(".tl-fbadge", css)
+        self.assertNotIn("signals &middot; since", js)
+        self.assertIn("Promise.all", js)
+        self.assertIn("fresh=1", js)
+        self.assertIn("Cache-Control", js)
+        self.assertIn("Up to date", js)
+        self.assertIn("doneBtn", js)
+        self.assertIn("tl-ref-radar", html)
+        self.assertIn("@keyframes tlradar", css)
+        self.assertIn("@keyframes tlscan", css)
+        self.assertNotIn("yellow", css.lower())
+
+    def test_fresh_bypasses_page_cache(self):
+        first = W.page(limit=5)
+        old_top = first["items"][0]["id"]
+        c = sqlite3.connect(W.DB)
+        c.execute("INSERT INTO clusters VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("ffffffffffffffff", "Brand new signal in Japan", "natural disaster", "Japan", None, None,
+                   None, "2026-12-01T00:00:00Z", None, 10, "High", 1, 1, '["official"]',
+                   '[{"source":"USGS","url":"https://usgs.gov/x"}]', 0, "WHAT: A new quake.", 4))
+        c.commit(); c.close()
+        cached = W.page(limit=5)
+        self.assertEqual(cached["items"][0]["id"], old_top)   # 3s page cache would hide the new row
+        code, body = W.handle_get("/api/wire_tl", {"fresh": ["1"], "limit": ["5"]})
+        self.assertEqual(code, 200)
+        self.assertEqual(body["items"][0]["id"], "ffffffffffffffff")
+        self.assertIn("Brand new signal", body["items"][0]["h"])
 
     def test_flag_off(self):
         os.environ["BN_WIRE_TIMELINE"] = "0"
