@@ -222,13 +222,13 @@ def _network(issue):
     R.append(_row("".join(_summary(x) for x in n.get("lines") or []) + button("Open the outage map", n["url"]), "4px 24px 0 24px"))
     return R
 
-def _weather(issue):
+def _weather_legacy(issue, w=None):
     """Weather forecast + major weather alerts (pt1754u). Rows only for the parts that have data; never an empty section."""
     try:
         import newsletter_wx as X
     except Exception:
         return []
-    w = issue.get("weather")
+    w = w or issue.get("weather")
     if not w: return []
     R = []
     if X.has_forecast(w):
@@ -274,6 +274,169 @@ def _weather(issue):
         R.append(_row(_summary(X.quiet_text(w)) + f'<div style="margin:10px 0 0 0">{_wx_link("All active alerts", X.NWS_ALERTS_PAGE)}</div>', "6px 24px 0 24px"))
     return R
 
+
+# ------------------------------------------------------------------ v5 (Matt, Nov 27 2026): photo section headers + the 24-hour weather strip
+_SPOOL = None
+def sec_pool():
+    """Header photos for Weather (storm/rain/snow/clouds/clear) and Crime near you, from newsletter_sections_pool.json."""
+    global _SPOOL
+    if _SPOOL is None:
+        try:
+            import json
+            d = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "newsletter_sections_pool.json")))
+            _SPOOL = {}
+            for im in d.get("images") or []: _SPOOL.setdefault(im["topic"], []).append(im)
+        except Exception:
+            _SPOOL = {}
+    return _SPOOL
+
+def sec_pick(kind, issue, c):
+    P = sec_pool().get(kind) or sec_pool().get("clouds") or []
+    if not P: return None
+    im = P[issue_no(issue) % len(P)]
+    return f"{V2._base(c)}/bnt/media/{im['name']}"
+
+def _gap(px): return f'<tr><td style="font-size:0;line-height:{px}px;height:{px}px">&nbsp;</td></tr>'
+
+def _photo_header(kind, label, title, sub, issue, c):
+    """Section header: a real photograph that fades into the email's black, with the label, place and one line of context set as live
+    text on the fade (so it reads in dark mode, with images off, and with a screen reader)."""
+    src = sec_pick(kind, issue, c)
+    out = _gap(56)
+    if src:
+        out += (f'<tr><td style="padding:0;background:{BG}"><img src="{E(src)}" width="{W}" alt="" style="display:block;width:100%;max-width:{W}px;'
+                f'height:auto;border:0;outline:none;background:{BG}"></td></tr>')
+    pad = "0 24px 6px 24px" if src else "0 24px 6px 24px"
+    out += _row(f'<div class="bnm" style="font:600 12px/18px {FACE};letter-spacing:2.4px;color:{MU}">{E(label.upper())}</div>'
+                f'<div class="bnt" style="font:600 30px/36px {FACE};letter-spacing:-0.3px;color:{TX};margin:6px 0 0 0">{E(title)}</div>'
+                + (f'<div class="bnx" style="font:400 15px/22px {FACE};color:{BODY};margin:6px 0 0 0">{E(sub)}</div>' if sub else ""), pad)
+    return out
+
+def _stat(label, big, small):
+    return (f'<td valign="top" width="50%" style="padding:16px 12px 16px 0;border-top:1px solid {LINE};text-align:left">'
+            f'<div class="bnm" style="font:600 11px/16px {FACE};letter-spacing:1.8px;color:{MU}">{E(label)}</div>'
+            f'<div class="bnt" style="font:600 28px/34px {FACE};letter-spacing:-0.3px;color:{TX};margin-top:4px">{E(big)}</div>'
+            f'<div class="bnm" style="font:400 13px/19px {FACE};color:{MU};margin-top:2px">{E(small)}</div></td>')
+
+def _verdict_row(v):
+    """The storm answer, always shown: either the named warning with its NWS time window, or 'No major storms ...'."""
+    bar = RED if v.get("red") else (TX if v["state"] == "storm" else "#3A3C40")
+    head = E(v["line"])
+    if v["state"] == "storm":
+        pre, _, ev = v["line"].partition(": ")
+        head = f'{E(pre)}: <span style="color:{RED if v.get("red") else TX}">{E(ev)}</span>'
+    det = (f'<a href="{E(v["url"])}" class="bnm" style="color:{MU};text-decoration:none">{E(v["detail"])}</a>' if v.get("detail") else "")
+    ah = (f'<div class="bnm" style="font:400 13px/19px {FACE};color:{MU};margin-top:6px">{E(v["ahead"])}</div>' if v.get("ahead") else "")
+    return _row('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:18px 0 0 0"><tr>'
+                f'<td width="3" bgcolor="{bar}" style="width:3px;background:{bar};font-size:0;line-height:0">&nbsp;</td>'
+                f'<td style="padding:2px 0 2px 16px;text-align:left"><div class="bnm" style="font:600 11px/16px {FACE};letter-spacing:1.8px;color:{MU}">STORM CHECK</div>'
+                f'<div class="bnt" style="font:600 20px/28px {FACE};color:{TX};margin-top:4px">{head}</div>'
+                f'<div class="bnm" style="font:400 13px/19px {FACE};color:{MU};margin-top:4px">{det}</div>{ah}</td></tr></table>', "0 24px")
+
+def weather_facts(w, X):
+    """The 24-hour numbers as text (used for the stat tiles, the image alt text and the plain-text part)."""
+    hr = w.get("hourly"); o = X.outlook(hr); lab = lambda t: X.hour_label(t)
+    rain = (f"{o['pop']}%", f"most likely around {lab(o['pop_t'])}") if o["pop"] >= 20 else \
+           ("Dry", f"chance stays under {max(o['pop'], 1)}%" if o["pop"] else "no rain in the forecast")
+    wl, wh = o["wind_lo"], o["wind_hi"]
+    wind = ("Calm", "light air") if (wh or 0) == 0 else ((f"up to {wh} mph" if not wl else f"{wl}-{wh} mph") if wl != wh else f"{wh} mph", (f"from the {o['dir']} right now" if o["dir"] else "variable direction"))
+    hum = (f"{o['rh0']}%", f"{o['rh_lo']}-{o['rh_hi']}% over the day") if o["rh0"] is not None else None
+    return {"o": o, "temp": (f"{o['now']}°", f"high {o['hi']}° around {lab(o['hi_t'])}, low {o['lo']}° around {lab(o['lo_t'])}"),
+            "rain": rain, "wind": wind, "hum": hum, "tz": hr.get("tzname") or "ET"}
+
+def _weather(issue, c=None):
+    """Weather section (v5). Local US reader with an hourly forecast: photo header, storm verdict, four live-text tiles, the 24-hour strip.
+    Anything else (national overview, non-US, hourly feed down) keeps the previous layout under a photo header, never an empty section."""
+    try:
+        import newsletter_wx as X
+    except Exception:
+        return []
+    w = issue.get("weather")
+    if not w: return []
+    c = c or {}
+    hr = w.get("hourly")
+    v = None
+    if hr and w.get("scope") == "local":
+        try: v = X.storm_verdict(w, w.get("lat"), w.get("lon"))
+        except Exception: v = None
+    if not (hr and v and X.has_forecast(w)):
+        body = _weather_legacy(issue, w)
+        if not body: return []
+        kind = X.sky_kind(hr, w.get("alerts") or []) if hr else ("storm" if X.has_alerts(w) else "clouds")
+        return [_photo_header(kind, "Weather", w["label"] if w.get("scope") == "local" else "Across the United States",
+                              "Forecast and major alerts from the National Weather Service", issue, c)] + body
+    F = weather_facts(w, X)
+    kind = X.sky_kind(hr, w.get("alerts") or [])
+    R = [_photo_header(kind, "Weather", w["label"], f"Next 24 hours · National Weather Service · times in {F['tz']}", issue, c)]
+    R.append(_verdict_row(v))
+    tiles = [("TEMPERATURE", *F["temp"]), ("CHANCE OF RAIN", *F["rain"]), ("WIND", *F["wind"])] + ([("HUMIDITY", *F["hum"])] if F["hum"] else [])
+    rows = ""
+    for i in range(0, len(tiles), 2):
+        pair = tiles[i:i + 2]
+        rows += "<tr>" + "".join(_stat(*t) for t in pair) + ("" if len(pair) == 2 else '<td width="50%">&nbsp;</td>') + "</tr>"
+    R.append(_row(f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 0 0;table-layout:fixed">{rows}</table>', "0 24px"))
+    try:
+        import nlwx
+        ser = nlwx.series_from_hours(hr, w.get("alerts") or [])
+        u = nlwx.url(ser, V2._base(c)) or (c.get("_wx_preview_url") if isinstance(c, dict) else None)
+    except Exception:
+        u = None
+    if u:
+        o = F["o"]; alt = (f"Hour-by-hour chart for the next 24 hours in {w['label']}: {F['temp'][0]} now, {F['temp'][1]}; chance of rain {F['rain'][0]} ({F['rain'][1]}); "
+                           f"wind {F['wind'][0]}, {F['wind'][1]}; humidity {F['hum'][1] if F['hum'] else 'n/a'}.")
+        R.append(_row(f'<img src="{E(u)}" width="{W - 48}" alt="{E(alt)}" style="display:block;width:100%;max-width:{W - 48}px;height:auto;border:0;outline:none;'
+                      f'background:{SURF};border-radius:10px;margin:18px 0 0 0;color:{MU};font:400 14px/20px {FACE}">', "0 24px"))
+    R.append(_row(f'<div style="margin:14px 0 0 0">{_wx_link("Full forecast from " + hr["src"], hr["url"])}</div>', "0 24px"))
+    if w.get("nat_alerts") or w.get("storms"):
+        R.append(_section("Elsewhere in the US"))
+        R.append(_gap(10))
+        for g in w.get("nat_alerts") or []:
+            ev = f'<span style="color:{RED}">{E(g["event"])}</span>' if g.get("red") else E(g["event"])
+            R.append(_row(f'<a href="{E(X.NWS_ALERTS_PAGE)}" class="bnt" style="display:block;padding:14px 0;border-top:1px solid {LINE};text-decoration:none">'
+                          f'<span style="display:block;font:500 16px/23px {FACE};color:{TX}">{ev}</span>'
+                          f'<span class="bnm" style="display:block;font:400 13px/19px {FACE};color:{MU};margin-top:4px">{E(X.nat_line(g))} &middot; National Weather Service</span></a>', "0 24px"))
+        for st in w.get("storms") or []:
+            R.append(_line(st["name"], st["url"], E((f"{st['mph']} mph winds &middot; " if st.get("mph") else "")) + "National Hurricane Center"))
+    return R
+
+def _crime_rates(rt):
+    """Violent and property crime per 100,000 as two small native bar groups (county, state, US). Real FBI figures from crime.brief_for only."""
+    if not rt: return ""
+    out = ""
+    for key, lab in (("v", "VIOLENT CRIME"), ("p", "PROPERTY CRIME")):
+        rows = [(r["name"], r.get(key)) for r in rt if r.get(key) is not None]
+        if len(rows) < 2: continue
+        mx = max(v for _, v in rows) or 1
+        cells = ""
+        for i, (nm, val) in enumerate(rows):
+            wpx = max(3, int(round(100 * val / mx)))
+            col = TX if i == 0 else ("#8E8E93" if i == 1 else "#5B5E64")
+            cells += (f'<tr><td width="34%" style="padding:5px 10px 5px 0;font:500 13px/18px {FACE};color:{BODY};text-align:left" class="bnx">{E(nm)}</td>'
+                      f'<td style="padding:5px 0;text-align:left"><table role="presentation" width="{wpx}%" cellpadding="0" cellspacing="0" border="0"><tr>'
+                      f'<td height="10" bgcolor="{col}" style="height:10px;background:{col};font-size:0;line-height:0;border-radius:5px">&nbsp;</td></tr></table></td>'
+                      f'<td width="58" style="padding:5px 0 5px 8px;font:600 13px/18px {FACE};color:{TX};text-align:right" class="bnt">{val:,.0f}</td></tr>')
+        out += (f'<div class="bnm" style="font:600 11px/16px {FACE};letter-spacing:1.8px;color:{MU};margin:20px 0 6px 0">{lab} &middot; PER 100,000 PEOPLE</div>'
+                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed">{cells}</table>')
+    return out
+
+def _crime(issue, c, N):
+    cr = issue["crime"]
+    yr = ((cr.get("rates") or [{}])[0].get("year"))
+    R = [_photo_header("crime", "Crime near you", cr["label"], "Local police and news reports" + (f", plus FBI figures for {yr}" if yr else ""), issue, c)]
+    its = [x for x in (cr.get("items") or []) if x.get("title") and x.get("url")][:5]   # real local police / news headlines (crime_news), links to the source
+    if its:
+        R.append(_gap(12))
+        try:
+            import crime_news as _CN; _d = _CN.fmt_date
+        except Exception:
+            _d = lambda x: str(x)[:10]
+        for x in its:
+            R.append(_line(N._cut(x["title"], 140), x["url"], f'{E(_d(x.get("date")))} &middot; {E(x.get("place") or "")} &middot; {E(x.get("source") or "")}'))
+    rates = _crime_rates(cr.get("rates"))
+    lines = "".join(_summary(x) for x in cr["lines"][:(0 if rates else 2 if its else 3)])
+    R.append(_row(rates + lines + button("See the numbers", cr["url"]), "14px 24px 0 24px"))
+    return R
+
 def render(issue, links, c):
     """-> (subject, html, text), same contract as newsletter.render."""
     N = _N(); subj = N.subject_for(issue); camp = f"{issue.get('slot') or 'brief'}-{issue['end'].astimezone(N.ET).strftime('%Y-%m-%d')}"
@@ -309,23 +472,13 @@ def render(issue, links, c):
             seen.add(it.get("cluster_id"))
             if f_: B.append(story(it, c, refs, url=url, head=f_["title"], text=f_.get("text") or "", first=k == 0, big=gi == 0 and k == 0))
             else: B.append(story(it, c, refs, url=url, first=k == 0, big=gi == 0 and k == 0))
-    try: B.extend(_weather(issue))
+    try: B.extend(_weather(issue, c))
     except Exception as ex: N.log(f"weather section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
     try: B.extend(_network(issue))
     except Exception as ex: N.log(f"network section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
     if issue.get("crime"):
-        cr = issue["crime"]
-        B.append(_section(f"Crime near you · {cr['label']}"))
-        its = [x for x in (cr.get("items") or []) if x.get("title") and x.get("url")][:5]   # real local police / news headlines (crime_news), links to the source
-        if its:
-            B.append('<tr><td style="font-size:0;line-height:10px;height:10px">&nbsp;</td></tr>')
-            try:
-                import crime_news as _CN; _d = _CN.fmt_date
-            except Exception:
-                _d = lambda x: str(x)[:10]
-            for x in its:
-                B.append(_line(N._cut(x["title"], 140), x["url"], f'{E(_d(x.get("date")))} &middot; {E(x.get("place") or "")} &middot; {E(x.get("source") or "")}'))
-        B.append(_row("".join(_summary(x) for x in cr["lines"][:2 if its else 3]) + button("See the numbers", cr["url"]), "14px 24px 0 24px"))
+        try: B.extend(_crime(issue, c, N))
+        except Exception as ex: N.log(f"crime section skipped: {type(ex).__name__}: {ex}"[:300], "qa")
     others = [it for it in issue.get("developing") or [] if not it.get("lead") and it.get("cluster_id") and it.get("cluster_id") not in seen]
     wl = [it for it in (issue.get("watchlist") or []) if it.get("cluster_id")]
     if others or wl:
