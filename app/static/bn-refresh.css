@@ -1,0 +1,50 @@
+/* Shared Refresh button (PR #293). Yellow is allowed on this button only.
+   Fill L→R with a yellow–orange–red blend and a moving sheen. Dark #0B0D10 text
+   is clipped to the fill (WCAG ≥6.28:1 on every stop); white text is clipped to
+   the unfilled dark remainder. Used on /wire, /map, /grid, /weather and /markets. */
+.bn-ref,#tl_ref{all:unset;box-sizing:border-box;cursor:pointer;position:relative;overflow:hidden;
+  display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;flex:none;
+  border:1px solid rgba(255,255,255,.55);color:#fff;background:transparent;
+  font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;
+  white-space:nowrap;isolation:isolate;--tl-ref-p:0%;--bn-ref-p:var(--tl-ref-p);
+  transition:background .18s,color .18s,border-color .18s,opacity .18s}
+.bn-ref svg,#tl_ref svg{width:16px;height:16px;flex:none}
+.bn-ref:focus-visible,#tl_ref:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.bn-ref:disabled,#tl_ref:disabled{opacity:.32;cursor:default}
+@media (hover:hover) and (pointer:fine){
+  .bn-ref:hover,#tl_ref:hover{background:#fff;color:#000;border-color:#fff}
+  .bn-ref.busy:hover,.bn-ref.is-filling:hover,#tl_ref.busy:hover,#tl_ref.is-filling:hover{background:transparent;color:#fff;border-color:#fff}
+}
+.bn-ref .bn-ref-fill,.bn-ref .tl-ref-fill,#tl_ref .tl-ref-fill,#tl_ref .bn-ref-fill{
+  display:none;position:absolute;inset:0 auto 0 0;width:var(--tl-ref-p);max-width:100%;
+  background:linear-gradient(90deg,#FFE566 0%,#FF9A1A 55%,#FF5A3C 100%);pointer-events:none;z-index:0;
+  transition:width .28s cubic-bezier(.22,.8,.24,1)}
+.bn-ref .bn-ref-sheen,.bn-ref .tl-ref-sheen,#tl_ref .tl-ref-sheen,#tl_ref .bn-ref-sheen{
+  position:absolute;top:0;bottom:0;left:0;width:42%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
+  animation:tlsheen .9s linear infinite;pointer-events:none}
+.bn-ref.busy .bn-ref-fill,.bn-ref.is-filling .bn-ref-fill,.bn-ref.busy .tl-ref-fill,.bn-ref.is-filling .tl-ref-fill,
+#tl_ref.busy .tl-ref-fill,#tl_ref.is-filling .tl-ref-fill,#tl_ref.busy .bn-ref-fill,#tl_ref.is-filling .bn-ref-fill{display:block}
+.bn-ref.busy,.bn-ref.is-filling,.bn-ref.is-result,#tl_ref.busy,#tl_ref.is-filling,#tl_ref.is-result{border-color:#fff;min-width:7.6rem}
+.bn-ref.busy svg,.bn-ref.is-filling svg,#tl_ref.busy svg,#tl_ref.is-filling svg{opacity:0;width:0;margin:0;overflow:hidden;animation:none}
+.bn-ref .bn-ref-lab,.bn-ref .tl-ref-lab,#tl_ref .tl-ref-lab,#tl_ref .bn-ref-lab{position:relative;z-index:1;display:inline-grid;align-items:center;justify-items:center}
+.bn-ref .bn-ref-lab-a,.bn-ref .bn-ref-lab-b,.bn-ref .tl-ref-lab-a,.bn-ref .tl-ref-lab-b,
+#tl_ref .tl-ref-lab-a,#tl_ref .tl-ref-lab-b,#tl_ref .bn-ref-lab-a,#tl_ref .bn-ref-lab-b{grid-area:1/1;white-space:nowrap}
+.bn-ref .bn-ref-lab-a,.bn-ref .tl-ref-lab-a,#tl_ref .tl-ref-lab-a,#tl_ref .bn-ref-lab-a{color:#fff}
+.bn-ref .bn-ref-lab-b,.bn-ref .tl-ref-lab-b,#tl_ref .tl-ref-lab-b,#tl_ref .bn-ref-lab-b{display:none;color:#0B0D10;clip-path:inset(0 calc(100% - var(--tl-ref-p)) 0 0)}
+.bn-ref.busy .bn-ref-lab-a,.bn-ref.is-filling .bn-ref-lab-a,.bn-ref.busy .tl-ref-lab-a,.bn-ref.is-filling .tl-ref-lab-a,
+#tl_ref.busy .tl-ref-lab-a,#tl_ref.is-filling .tl-ref-lab-a,#tl_ref.busy .bn-ref-lab-a,#tl_ref.is-filling .bn-ref-lab-a{clip-path:inset(0 0 0 var(--tl-ref-p))}
+.bn-ref.busy .bn-ref-lab-b,.bn-ref.is-filling .bn-ref-lab-b,.bn-ref.busy .tl-ref-lab-b,.bn-ref.is-filling .tl-ref-lab-b,
+#tl_ref.busy .tl-ref-lab-b,#tl_ref.is-filling .tl-ref-lab-b,#tl_ref.busy .bn-ref-lab-b,#tl_ref.is-filling .bn-ref-lab-b{display:block}
+.bn-ref.is-result,#tl_ref.is-result{background:rgba(255,255,255,.08)}
+.bn-ref.is-result .bn-ref-fill,.bn-ref.is-result .tl-ref-fill,#tl_ref.is-result .tl-ref-fill,#tl_ref.is-result .bn-ref-fill{display:none}
+@keyframes tlsheen{0%{transform:translateX(-120%)}100%{transform:translateX(280%)}}
+@media (prefers-reduced-motion:reduce){
+  .bn-ref .bn-ref-sheen,.bn-ref .tl-ref-sheen,#tl_ref .tl-ref-sheen,#tl_ref .bn-ref-sheen{animation:none;display:none}
+  .bn-ref .bn-ref-fill,.bn-ref .tl-ref-fill,#tl_ref .tl-ref-fill,#tl_ref .bn-ref-fill{transition:none}
+}
+/* Pages that carry the in-page #293 button hide the older header icon so there is only one Refresh. */
+.bn-has-ref .bn-tbar .bn-refresh,
+.bn-has-ref .m3-tl.bn-rf-row,
+.bn-has-ref .bn-pop-rows [data-bn-refresh],
+.bn-has-ref .bn-rf-st{display:none!important}
