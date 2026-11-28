@@ -503,7 +503,7 @@ def _home_page_raw():
 </body></html>'''
 
 def _pulse_v2():
-    """Pulse intro (live instrument, pulse_v2.py). BN_INTRO_PULSE=0 = the previous intro below, unchanged."""
+    """Pulse intro (live instrument, pulse_v2.py). Default off (BN_INTRO_PULSE=1 enables); off serves the previous intro below, unchanged."""
     try:
         import pulse_v2
         return pulse_v2 if pulse_v2.on() else None

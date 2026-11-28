@@ -7,7 +7,8 @@ def _read(n):
     with open(os.path.join(pulse_v2.STATIC, n), encoding="utf-8") as f: return f.read()
 
 class PulseHome(unittest.TestCase):
-    def setUp(self): os.environ.pop("BN_INTRO_PULSE", None)
+    def setUp(self): os.environ["BN_INTRO_PULSE"] = "1"
+    def tearDown(self): os.environ.pop("BN_INTRO_PULSE", None)
 
     def test_home_is_the_instrument_with_menu_brief_follow_and_footer(self):
         h = theme.home_page()
@@ -29,6 +30,11 @@ class PulseHome(unittest.TestCase):
             h = theme.home_page()
             self.assertNotIn('class="pl"', h); self.assertIn('id="s2"', h); self.assertIn("home.js", h)
         finally: os.environ.pop("BN_INTRO_PULSE", None)
+
+    def test_default_is_the_previous_intro(self):
+        os.environ.pop("BN_INTRO_PULSE", None)
+        h = theme.home_page()
+        self.assertNotIn('class="pl"', h); self.assertIn('id="s2"', h); self.assertIn("home.js", h)
 
     def test_markup_drift_falls_back_to_previous_intro(self):
         orig = pulse_v2.transform
