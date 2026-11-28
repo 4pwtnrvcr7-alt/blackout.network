@@ -257,9 +257,9 @@ def page(qs):
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
 <meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/map.png?v=5"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(title)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/map.png?v=5"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">
-<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/leaflet.css"><link rel="stylesheet" href="/api/signal/app.css">
-<script src="/sitenav.js" defer></script>
+<script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
 </head><body>
 <a class="bn-sig-skip" href="#bn_sig_map">Skip to the map</a>
 {top}
@@ -498,9 +498,11 @@ def page2(qs):
         import sitenav, sitenav_ui
         top = sitenav.header_html("")
         theme = sitenav_ui.THEME_SCRIPT
+        ref_btn = sitenav_ui.refresh_fill_btn("bnm_ref")
     except Exception:
         top = '<header class="bn-top"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bnt-wm">blackout.network</span></a></div></header>'
         theme = ""
+        ref_btn = ""
     title = "Heat map | BLACKOUT.NETWORK"
     desc = "Full-screen live heat map of ranked alerts from the last 7 days: conflicts, weather and quakes, outbreaks, outages and unrest."
     import json as _json
@@ -515,10 +517,10 @@ def page2(qs):
 <meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/map.png?v=5"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(title)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/map.png?v=5"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
-<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={_v("maplibre-gl.css")}"><link rel="stylesheet" href="/api/signal/map2.css?v={_v("map2.css")}">
-<script src="/sitenav.js" defer></script>
-</head><body class="bnm" data-bn-map2="1">
+<script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
+</head><body class="bnm bn-has-ref" data-bn-map2="1">
 <a class="skip" href="#bnm_map">Skip to the map</a>
 <div class="bnm-head" id="bnm_head">{top}</div>
 <button type="button" class="bnm-x" id="bnm_x" aria-label="Close the map and go back" title="Close map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -532,7 +534,7 @@ def page2(qs):
 <p class="bnl-k" aria-hidden="true"><span>Signal acquisition</span><span id="bnl_brg">BRG 000&deg;</span></p>
 <ol aria-hidden="true"><li data-s="link"><b>01</b><span>Wire feed</span><em>connecting</em></li><li data-s="exact"><b>02</b><span>Exact places</span><em>waiting</em></li><li data-s="approx"><b>03</b><span>Approximate</span><em>waiting</em></li><li data-s="region"><b>04</b><span>Region only</span><em>waiting</em></li><li data-s="global"><b>05</b><span>No location</span><em>waiting</em></li><li data-s="base"><b>06</b><span>Basemap</span><em>loading</em></li></ol>
 <div class="bnl-bar" aria-hidden="true"><i></i></div><p class="bnl-msg" id="bnl_msg" role="status" hidden></p></div></div>
-<div class="bnm-top"><div class="bnm-chip" id="bnm_chip"><i></i><span id="bnm_count" aria-live="polite">Loading alerts…</span></div><span class="bnm-rt" id="bnm_rt" hidden aria-live="polite"></span><span class="bnm-upw" id="bnm_up"></span></div>
+<div class="bnm-top"><div class="bnm-chip" id="bnm_chip"><i></i><span id="bnm_count" aria-live="polite">Loading alerts…</span></div><span class="bnm-rt" id="bnm_rt" hidden aria-live="polite"></span><span class="bnm-upw" id="bnm_up"></span>{ref_btn}</div>
 <div class="bnm-ctl" id="bnm_ctl">
 <button type="button" class="bnm-b" id="bnm_zin" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
 <button type="button" class="bnm-b" id="bnm_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
@@ -583,10 +585,19 @@ def _drop_unplaced(body):
     body["rows"] = [r for r in body["rows"] if r[i_lat] is not None and r[i_lon] is not None]
     return body
 
-def heat_payload():
+def heat_payload(force=False):
     """Stale-while-revalidate: a cached body is returned at once and a stale one is rebuilt in the background (one build at a time).
-    Only the very first request after boot waits for a build."""
+    Only the very first request after boot waits for a build. force=True (Refresh / ?fresh=1) marks the slot stale,
+    bumps the generation, and waits for a new build so a tap is never served a 60 s-old copy."""
     import time
+    if force:
+        with _HLOCK:
+            _HEAT["t"] = 0
+            _HEAT["g"] = _HEAT.get("g", 0) + 1
+        _heat_rebuild()
+        with _HLOCK:
+            if _HEAT["v"] is not None:
+                return _HEAT["v"]
     with _HLOCK:
         v, fresh = _HEAT["v"], time.time() - _HEAT["t"] < 60
     if v is not None:
@@ -670,7 +681,8 @@ def handle_get(path, qs):
             return 200, page2(qs or {}), "text/html"
         return 200, page(qs or {}), "text/html"
     if path == "/api/signal/heat":
-        return 200, heat_payload()
+        force = str((qs or {}).get("fresh", [""])[0]).lower() in ("1", "true", "yes")
+        return 200, heat_payload(force=force)
     if path == "/api/signal/points":
         return 200, points_payload()
     if path == "/api/signal/places-status":

@@ -781,8 +781,9 @@ def page(qs=None):
     try:
         import sitenav, sitenav_ui
         top = sitenav.header_html("weather"); theme = sitenav_ui.THEME_SCRIPT
+        ref_btn = sitenav_ui.refresh_fill_btn("wx_ref")
     except Exception:
-        top = '<header class="bn-top"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bnt-wm">blackout.network</span></a></div></header>'; theme = ""
+        top = '<header class="bn-top"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bnt-wm">blackout.network</span></a></div></header>'; theme = ""; ref_btn = ""
     try:
         import signal_map
         mlv = signal_map._v("maplibre-gl.js"); mlc = signal_map._v("maplibre-gl.css")
@@ -803,10 +804,10 @@ def page(qs=None):
 <meta property="og:url" content="https://blackout.network/weather"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/weather.png">
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preconnect" href="https://mesonet.agron.iastate.edu" crossorigin><link rel="preconnect" href="https://gibs.earthdata.nasa.gov" crossorigin><link rel="preconnect" href="https://view.eumetsat.int" crossorigin>
-<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/wxmap/wx.css?v={_v("wx.css")}">
-<script src="/sitenav.js" defer></script>
-</head><body class="wx">
+<script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
+</head><body class="wx bn-has-ref">
 <a class="skip" href="#wx_tl">Skip to the timeline</a>
 <div class="wx-head">{top}</div>
 <script>(function(){{var m=document.getElementById("bn-menu");if(m&&m.parentNode!==document.body)document.body.appendChild(m)}})()</script>
@@ -814,7 +815,7 @@ def page(qs=None):
 <h1 class="wx-vh">Weather: live radar, forecast and storms</h1>
 <div id="wx_map" class="wx-map" role="region" aria-label="Weather map. Drag to pan, pinch or scroll to zoom, tap for details."></div>
 {LOADER}
-<div class="wx-top">
+<div class="wx-top">{ref_btn}
 <form class="wx-search" id="wx_search" role="search" autocomplete="off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
 <input id="wx_q" type="search" inputmode="search" placeholder="City or ZIP code" aria-label="Search a city or ZIP code" enterkeyhint="search"><ul id="wx_hits" role="listbox" hidden></ul></form>
 <div class="wx-modes" id="wx_modes" role="group" aria-label="Map layer"><button type="button" data-m="radar" aria-pressed="true">Radar</button><button type="button" data-m="temp" aria-pressed="false">Temp</button><button type="button" data-m="rain" aria-pressed="false">Rain</button><button type="button" data-m="snow" aria-pressed="false">Snow</button></div>

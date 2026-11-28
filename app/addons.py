@@ -56,6 +56,8 @@ ROUTES = {
     "/theme.css": "static_files",
     "/bn-progress.js": "static_files",       # shared search progress bar (t480)
     "/bn-progress.css": "static_files",
+    "/bn-refresh.js": "static_files",        # shared #293 Refresh fill button
+    "/bn-refresh.css": "static_files",
     "/bn-ga-events.js": "static_files",  # GA4 event module, loaded only with the GA tag (analyst, Nov 2)
     "/sitenav.js": "sitenav",       # shared tab bar + per-page/tab SEO (t301/t302)
     "/sitenav.css": "sitenav",

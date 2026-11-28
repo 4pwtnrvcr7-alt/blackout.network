@@ -377,3 +377,7 @@ body.nx-sky .nx-sw,body.nx-sky .nx-ss,.nx-sw,.nx-ss{display:none!important}
 
 .nx-leg-mini{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:99px;background:rgba(5,6,10,.78);border:1px solid rgba(240,240,250,.28);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .nx-leg-mini i{width:10px;height:10px;border-radius:50%}
+
+/* Shared #293 Refresh, next to the status chip */
+.nx-top .bn-ref{background:rgba(5,6,10,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);flex:none}
+@media (max-width:700px){.nx-top .bn-ref{padding:0 10px;min-width:0;height:36px}}

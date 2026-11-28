@@ -246,7 +246,7 @@ def head_html(page, path=None):
                 f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{SITE}/og/{page}.png?v=5"><meta name="twitter:site" content="{HANDLE}">'
                 f'<meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">')
     return (UI.THEME_SCRIPT + scroll_script() + f'<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
-            + meta + '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
+            + meta + '<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>')
 
 def data():
     t = []

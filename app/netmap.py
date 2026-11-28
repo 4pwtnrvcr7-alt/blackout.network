@@ -64,9 +64,9 @@ def pts(s):
 
 # ---------------------------------------------------------------- tiny SWR cache
 _C = {}; _BUSY = set(); _L = threading.Lock()
-def swr(key, ttl, fn, wait=True):
+def swr(key, ttl, fn, wait=True, force=False):
     hit = _C.get(key)
-    if hit and time.time() - hit[0] < ttl: return hit[1]
+    if hit and (not force) and time.time() - hit[0] < ttl: return hit[1]
     def job():
         try: _C[key] = (time.time(), fn())
         except Exception:
@@ -76,9 +76,17 @@ def swr(key, ttl, fn, wait=True):
     with _L:
         run = key not in _BUSY
         if run: _BUSY.add(key)
-    if hit:
+    if hit and not force:
         if run: threading.Thread(target=job, daemon=True, name="nm-" + key).start()
         return hit[1]
+    if force:
+        if run: job()
+        elif wait:
+            for _ in range(450):
+                if key in _C and _C[key][0] >= (hit[0] if hit else 0) and (key not in _BUSY):
+                    break
+                time.sleep(0.1)
+        h = _C.get(key); return h[1] if h else (hit[1] if hit else None)
     if run: job()
     elif wait:
         for _ in range(450):   # up to 45 s for the very first build after a deploy
@@ -565,13 +573,13 @@ def _build_and_keep():
         import netboard as NB; NB.save_snapshot("netmap:data", json.dumps(d, separators=(",", ":")))
     except Exception: pass
     return d
-def data():
+def data(force=False):
     if "data" not in _C:
         try:
             import netboard as NB; snap = NB.load_snapshot("netmap:data")
             if snap and "data" not in _C: _C["data"] = (0.0, json.loads(snap))   # stale on purpose: served now, rebuilt in the background (single flight)
         except Exception: pass
-    return swr("data", 300, _build_and_keep)
+    return swr("data", 300, _build_and_keep, force=force)
 
 # ---------------------------------------------------------------- data centers (PeeringDB, daily, disk cache)
 def _dc_path():
@@ -663,8 +671,9 @@ def page(qs=None):
     try:
         import sitenav, sitenav_ui
         top = sitenav.header_html("net"); theme = sitenav_ui.THEME_SCRIPT
+        ref_btn = sitenav_ui.refresh_fill_btn("nx_ref")
     except Exception:
-        top = '<header class="bn-top"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bnt-wm">blackout.network</span></a></div></header>'; theme = ""
+        top = '<header class="bn-top"><div class="bn-tbar"><a class="bn-logo" href="/"><span class="bnt-wm">blackout.network</span></a></div></header>'; theme = ""; ref_btn = ""
     try:
         import signal_map
         mlv = signal_map._v("maplibre-gl.js"); mlc = signal_map._v("maplibre-gl.css")
@@ -687,11 +696,11 @@ def page(qs=None):
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link rel="preload" href="/api/netmap/data" as="fetch" crossorigin>
-<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/netmap/net.css?v={_v("net.css")}">
-<script src="/sitenav.js" defer></script>
+<script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
 <link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}"><link rel="stylesheet" href="/api/netmap/gridlayer.css?v={_v("gridlayer.css")}">
-</head><body class="nx">
+</head><body class="nx bn-has-ref">
 <script>(function(){{if(location.hash==="#status"){{document.body.classList.add("nx-board");}}}})()</script>
 <a class="skip" href="#nb_q">Skip to the outage search</a>
 <div class="nx-head">{top}</div>
@@ -701,7 +710,7 @@ def page(qs=None):
 <div id="nx_map" class="nx-map" role="region" aria-label="Map of the power grid and network outages. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
 {LOADER}
 {BOARD.replace('id="nb"', 'id="nb" data-logos="/api/netmap/logos.svg?v=' + _v("logos.svg") + '"', 1)}
-<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-units" id="nx_units" role="group" aria-label="Units"><button type="button" data-u="imperial" aria-pressed="true">mi</button><button type="button" data-u="metric" aria-pressed="false">km</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div></div>
+<div class="nx-top"><div class="nx-mode" id="nx_mode" role="group" aria-label="View"><button type="button" data-m="status" aria-pressed="false">Status</button><button type="button" data-m="map" aria-pressed="true">Map</button><button type="button" data-m="sky" aria-pressed="false">Sky</button></div><div class="nx-units" id="nx_units" role="group" aria-label="Units"><button type="button" data-u="imperial" aria-pressed="true">mi</button><button type="button" data-u="metric" aria-pressed="false">km</button></div><div class="nx-chip" id="nx_chip"><i></i><span id="nx_sum" aria-live="polite">Checking networks…</span></div>{ref_btn}</div>
 <div class="nx-f" id="nx_f" role="group" aria-label="Show networks">{chips}</div>
 <div class="nx-f nx-sf" id="nx_sf" role="group" aria-label="Show constellations" hidden>{skychips}</div>
 <aside class="nx-sw" id="nx_sw" hidden aria-live="polite"></aside>
@@ -746,7 +755,8 @@ def handle_get(path, qs=None, headers=None):
     if m: return detail_page(m.group(1))
     if p == "/api/netmap/data":
         try:
-            d = data()
+            force = str((qs or {}).get("fresh", [""])[0]).lower() in ("1", "true", "yes")
+            d = data(force=force)
             return (200, d) if d else (503, {"error": "network data is still loading"})
         except Exception as ex: return 503, {"error": "network data unavailable", "detail": type(ex).__name__}
     if p == "/api/netmap/dc":

@@ -53,11 +53,17 @@ function render(){var m=D.markets||{};renderDebt();
   renderYields(m.yields);
   var st=$("#mk_stat");if(st){var u=m.updated?new Date(m.updated):null;st.textContent=(u?"Prices updated "+u.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZoneName:"short"})+". ":"")+(m.stale?"Some sources are slow; showing the last good data. ":"")+"Delayed quotes; this page refreshes every minute."}}
 var busy=false;
-function load(force){if(busy)return;busy=true;var b=$("#mk_ref");if(b)b.setAttribute("aria-busy","true");
-  fetch("/api/markets/data"+(force?"?t="+Date.now():""),{cache:"no-store"}).then(function(r){return r.json()}).then(function(j){D=j;D._skew=j.server_time?j.server_time-Date.now()/1000:0;render()})
-  .catch(function(){var st=$("#mk_stat");if(st)st.textContent="Could not reach the server. Retrying in a minute."}).then(function(){busy=false;if(b)b.removeAttribute("aria-busy")})}
+function load(force, fromBtn){if(busy)return Promise.resolve();busy=true;var b=$("#mk_ref");var R=window.BNRefresh;
+  if(b&&R&&fromBtn){R.busy(b,true);R.stage(b,12)}else if(b)b.setAttribute("aria-busy","true");
+  if(b&&R&&fromBtn)R.stage(b,28);
+  return fetch("/api/markets/data"+(force?"?t="+Date.now():""),{cache:"no-store"}).then(function(r){if(b&&R&&fromBtn)R.stage(b,72);return r.json()}).then(function(j){D=j;D._skew=j.server_time?j.server_time-Date.now()/1000:0;if(b&&R&&fromBtn)R.stage(b,92);render();
+    if(b&&R&&fromBtn){R.stage(b,100);setTimeout(function(){R.busy(b,false);R.done(b,"Updated")},220)}} )
+  .catch(function(){var st=$("#mk_stat");if(st)st.textContent="Could not reach the server. Retrying in a minute.";if(b&&R&&fromBtn){R.stage(b,100);R.busy(b,false)}})
+  .then(function(){busy=false;if(b&&!(R&&fromBtn))b.removeAttribute("aria-busy")})}
 function syncBar(){var b=d.getElementById("w2_bar");if(b)d.documentElement.style.setProperty("--mk-bar",b.offsetHeight+"px")}syncBar();W.addEventListener("resize",syncBar);
-var rb=$("#mk_ref");if(rb)rb.addEventListener("click",function(){load(true)});
+window.bnRefreshPage=function(){return load(true,true)};
+if(window.BNRefresh){var rb=$("#mk_ref");if(rb)BNRefresh.bind(rb,function(){return load(true,true)})}
+else{var rb=$("#mk_ref");if(rb)rb.addEventListener("click",function(){load(true,true)})}
 load(false);setInterval(function(){if(!d.hidden)load(false)},60000);setInterval(tickDebt,RM?1000:100);
 /* full-screen loop on desktop/tablet only; phones, reduced motion and Save-Data keep the still */
 (function(){var v=d.querySelector(".mk-vid"),n=navigator.connection||{};if(!v||W.innerWidth<=700||RM||n.saveData)return;
