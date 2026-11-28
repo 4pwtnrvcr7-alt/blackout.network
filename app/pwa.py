@@ -19,10 +19,19 @@ def _read(name):
     if name in ("bn-menu-city-m.mp4", "bn-menu-city-d.mp4"):
         if name in _LOOP_CACHE:
             return _LOOP_CACHE[name]
-        b64 = os.path.join(D, name + ".b64")
-        if os.path.isfile(b64):
-            with open(b64, "r", encoding="ascii") as fh:
-                data = base64.b64decode("".join(fh.read().split()))
+        parts, i, base = [], 0, os.path.join(D, name + ".b64")
+        while True:
+            path = base if i == 0 else f"{base}.{i:02d}"
+            if not os.path.isfile(path):
+                break
+            parts.append(path)
+            i += 1
+        if parts:
+            buf = []
+            for path in parts:
+                with open(path, "r", encoding="ascii") as fh:
+                    buf.append(fh.read())
+            data = base64.b64decode("".join("".join(buf).split()))
         else:
             with open(os.path.join(D, name), "rb") as fh:
                 data = fh.read()
