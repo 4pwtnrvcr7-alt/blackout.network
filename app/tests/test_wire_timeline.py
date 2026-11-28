@@ -161,6 +161,8 @@ class Paging(unittest.TestCase):
         self.assertIn("bn.wire.ref.v1", js)
         self.assertIn("scanLine", js)
         self.assertIn("new signals in review", js)
+        self.assertIn("Scanned at ", js)
+        self.assertNotIn(" sources at ", js)
         self.assertIn("refStage", js)
         self.assertIn("ask scanner", js)
         self.assertIn("scanner pull", js)

@@ -258,9 +258,9 @@ function loadSeen(){try{var s=JSON.parse(localStorage.getItem(SEEN_KEY)||"");ret
 function saveSeen(){try{if(!items.length)return;var map={};items.slice(0,120).forEach(function(it){map[it.id]={t:it.t,n:it.n||0,f:it.f||0,h:it.h||""}});
   localStorage.setItem(SEEN_KEY,JSON.stringify({top:items[0].t+"|"+items[0].id,at:new Date().toISOString(),map:map}))}catch(e){}}
 function scanLine(s){
-  var r=(s&&s.in_review!=null?s.in_review:0),src=(s&&s.sources!=null?s.sources:0);
-  var rs=Number(r).toLocaleString(),ss=Number(src).toLocaleString();
-  if(s&&s.last_scan){return "Scanned "+ss+" sources at "+fT.format(dt(s.last_scan))+" ET · "+rs+" new signals in review"}
+  var r=(s&&s.in_review!=null?s.in_review:0);
+  var rs=Number(r).toLocaleString();
+  if(s&&s.last_scan){return "Scanned at "+fT.format(dt(s.last_scan))+" ET · "+rs+" new signals in review"}
   return "Scan complete · "+rs+" new signals in review";
 }
 function scrollToKey(key){
