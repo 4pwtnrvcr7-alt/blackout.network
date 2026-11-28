@@ -124,7 +124,6 @@ class Paging(unittest.TestCase):
         self.assertIn("aria-label=\"Type\"", html)
         css=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.css"), encoding="utf-8").read()
         self.assertIn(".tl-newp", css)
-        self.assertNotIn("#FFC", css)
         js=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
         self.assertNotIn("tl_line", js)
         self.assertNotIn("signals since", js)
@@ -147,10 +146,28 @@ class Paging(unittest.TestCase):
         self.assertIn("Cache-Control", js)
         self.assertIn("Up to date", js)
         self.assertIn("doneBtn", js)
-        self.assertIn("tl-ref-radar", html)
-        self.assertIn("@keyframes tlradar", css)
-        self.assertIn("@keyframes tlscan", css)
-        self.assertNotIn("yellow", css.lower())
+        self.assertIn("tl-ref-fill", html)
+        self.assertIn("tl-ref-sheen", html)
+        self.assertIn("tl-ref-lab-a", html)
+        self.assertIn("@keyframes tlsheen", css)
+        self.assertIn("linear-gradient(90deg,#FFE566", css)
+        self.assertIn("#FF9A1A", css)
+        self.assertIn("#FF5A3C", css)
+        self.assertIn("--tl-ref-p", css)
+        self.assertIn("#0B0D10", css)
+        self.assertIn("#tl_ref .tl-ref-fill", css)
+        self.assertNotIn("tl-ref-radar", html)
+        self.assertIn('content:"Updated"', css)
+        self.assertIn("bn.wire.ref.v1", js)
+        self.assertIn("scanLine", js)
+        self.assertIn("new signals in review", js)
+        self.assertIn("refStage", js)
+        self.assertIn("ask scanner", js)
+        self.assertIn("scanner pull", js)
+        self.assertIn("fetch fresh", js)
+        self.assertIn("Never stuck at 99", js)
+        self.assertIn("localStorage", js)
+        self.assertIn("prefers-reduced-motion", css)
 
     def test_fresh_bypasses_page_cache(self):
         first = W.page(limit=5)
@@ -167,6 +184,45 @@ class Paging(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(body["items"][0]["id"], "ffffffffffffffff")
         self.assertIn("Brand new signal", body["items"][0]["h"])
+        self.assertIn("scan", body)
+        self.assertIn("in_review", body["scan"])
+        self.assertIn("sources", body["scan"])
+
+    def test_scan_stats_from_scans_table_and_holds(self):
+        self.assertEqual(W.scan_stats()["sources"], 0)
+        c = sqlite3.connect(W.DB)
+        c.execute("""CREATE TABLE IF NOT EXISTS scans(id INTEGER PRIMARY KEY AUTOINCREMENT, started TEXT, finished TEXT, trigger TEXT,
+                     fetched INTEGER, new_items INTEGER, ok_sources INTEGER, failed_sources INTEGER, error TEXT)""")
+        c.execute("INSERT INTO scans(started,finished,trigger,fetched,new_items,ok_sources,failed_sources) VALUES(?,?,?,?,?,?,?)",
+                  ("2026-11-28T01:15:00Z","2026-11-28T01:21:00Z","manual",900,4,1040,2))
+        c.commit(); c.close()
+        st = W.scan_stats()
+        self.assertEqual(st["last_scan"], "2026-11-28T01:21:00Z")
+        self.assertEqual(st["ok_sources"], 1040)
+        self.assertEqual(st["failed_sources"], 2)
+        self.assertEqual(st["sources"], 1042)
+        self.assertEqual(st["new_items"], 4)
+        self.assertEqual(st["fetched"], 900)
+        prev = dict(W._QAH)
+        try:
+            W._QAH.clear(); W._QAH["abc"] = "photo"
+            self.assertEqual(W.scan_stats()["in_review"], 1)
+        finally:
+            W._QAH.clear(); W._QAH.update(prev)
+        item = W.page(limit=1)["items"][0]
+        self.assertIn("u", item)
+
+    def test_item_exposes_updated_field(self):
+        c = sqlite3.connect(W.DB)
+        c.execute("INSERT INTO clusters VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  ("updatedfield00001", "Updated-field probe", "political", "Ohio", None, None,
+                   None, "2026-11-28T02:00:00Z", "2026-11-28T02:05:00Z", 10, "High", 3, 1, '[]',
+                   '[{"source":"AP","url":"https://apnews.com/x"}]', 0, "WHAT: An update.", 4))
+        c.commit(); c.close()
+        W._reset_caches()
+        it = {x["id"]: x for x in W.page(limit=5)["items"]}["updatedfield00001"]
+        self.assertEqual(it["u"], "2026-11-28T02:05:00Z")
+        self.assertEqual(it["n"], 3)
 
     def test_flag_off(self):
         os.environ["BN_WIRE_TIMELINE"] = "0"
