@@ -3,6 +3,7 @@ GET  /sw.js                    service worker (root scope): shows pushed alerts,
 GET  /alerts.js, /alerts.css   the bell button + Alerts panel (also window.BN.enableAlerts() for the add-to-home-screen pop-up)
 GET  /alerts/badge.png, /alerts/icon.png   notification badge (monochrome BN) and icon (BN tile)
 GET  /api/alerts/config        VAPID PUBLIC key, levels, categories, whether public sending is switched on
+GET  /api/alerts/feed          slim public cluster list for the box sender (same visibility as /api/state main; few fields)
 POST /api/alerts/subscribe     {sub:{endpoint,keys:{p256dh,auth}}, level:"major"|"all", cats:[...], test:bool} (upsert = change prefs)
 POST /api/alerts/unsubscribe   {endpoint}
 POST /api/alerts/testpush      {endpoint}  'Send me a test push' (t399): stamps subs.test_req; the box notifier sends one test push
@@ -105,6 +106,30 @@ def _parse_sub(s):
     if not _ok_endpoint(ep) or not _ok_key(k.get("p256dh"), 80, 100) or not _ok_key(k.get("auth"), 16, 32): return None
     return ep, k["p256dh"], k["auth"]
 
+
+FEED_KEYS = ("cluster_id", "title", "category", "location", "rank", "score", "eff_families",
+             "high_at", "updated", "first_seen", "watchlist", "published")
+
+def alerts_feed():
+    """Slim public cluster list for the box web-push sender. Same visibility and publish gate as
+    /api/state main, but only the fields the sender needs — no geo, sources, scans or full row blobs.
+    /api/state is often too large and times out, which leaves the sender on a stale cluster file."""
+    import server as S
+    now = S.scanner.now()
+    cut = S.scanner.iso(S.et_days.et_window_start(7, now))
+    # families/links are required by clusters_out; other heavy columns are omitted on purpose.
+    rows = S.clusters_out(S.q(
+        """SELECT cluster_id, title, category, location, rank, score, eff_families, high_at, updated, first_seen,
+                  watchlist, families, links FROM clusters
+           WHERE watchlist=0 AND COALESCE(event_time, first_seen)>=?
+           ORDER BY score DESC, event_time DESC LIMIT 400""", (cut,)))[:150]
+    main = []
+    for r in rows:
+        if r.get("hidden") or r.get("watchlist"):
+            continue
+        main.append({k: r.get(k) for k in FEED_KEYS})
+    return {"generated": S.scanner.iso(now), "main": main}
+
 def public_config():
     c = cfg()
     try: pub = _read("vapid_public.txt").decode().strip()
@@ -127,6 +152,8 @@ def handle_get(path, qs):
                 finally: c.close()
             except Exception: pass
         return 200, public_config()
+    if path == "/api/alerts/feed":
+        return 200, alerts_feed()
     return 404, {"error": "not found"}
 
 def handle_post(path, d, ip=None, qs=None, headers=None, raw=b""):
