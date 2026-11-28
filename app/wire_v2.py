@@ -140,13 +140,13 @@ def menu_html():
         if menu5.on():
             foot = "".join(f'<a href="{h}">{t}</a>' for h, t in (("/scoring", "How we score"), ("/sources", "Sources"), ("/privacy", "Privacy"), ("/tos", "Terms")) if not deactivated.is_off(h))
             return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
-                    '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
+                    '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu"><i></i></button></div>'
                     '<nav class="w2-mnav w2-m5" aria-label="Site">' + menu5.html_block("/wire") + '</nav>'
                     '<div class="w2-mfoot">' + foot + '</div></div>')
     except Exception:
         import traceback; traceback.print_exc()
     return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
-            '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
+            '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu"><i></i></button></div>'
             '<nav class="w2-mnav"><div class="w2-mlead"><a href="/?intro=1">Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>'
             f'<div class="w2-mgrid">{cols}</div></nav>'
             '<div class="w2-mfoot"><a href="/scoring">How we score</a><a href="/sources">Sources</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a>'
