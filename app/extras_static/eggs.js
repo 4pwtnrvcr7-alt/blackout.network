@@ -1,7 +1,7 @@
 /* BLACKOUT.NETWORK easter eggs (t347). Discreet, on-brand, no layout shift (fixed-position only), no network calls, no tracking,
    prefers-reduced-motion respected, never while typing, never on top of the sidebar, dialogs or alerts.
    1. Konami code (up up down down left right left right B A): the 10-segment meter sweeps to "all clear" with a short note.
-   2. Seven quick clicks on the small BN tile at the start of the page footer: a hidden "Global threat monitoring" card.
+   2. Removed 27 Nov 2026 (Matt): the small footer BN tile no longer appears, so Privacy / Terms / Image credits stay centered.
    3. Developers: a short greeting in the browser console.
    4. The 404 page: about 1 visit in 20 shows a quiet extra line.
    5. Seasonal: on New Year's Day and on the solstice/equinox days the tri-color rule under the top bar shimmers once. */
@@ -15,7 +15,6 @@
   ".bn-egg .m{display:flex;gap:3px;margin:2px 0 8px}.bn-egg .m i{width:12px;height:18px;border-radius:2px;background:var(--bn-seg-off,#252B33);transition:background .12s}"+
   ".bn-egg .x{position:absolute;top:6px;right:6px;width:32px;height:32px;border:0;background:none;color:var(--bn-muted,#8B95A3);font-size:18px;cursor:pointer;border-radius:8px}"+
   ".bn-egg .x:focus-visible{outline:2px solid var(--bn-brand,#FF4D4F)}"+
-  ".bn-ftile{display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:6px;cursor:default;-webkit-tap-highlight-color:transparent}"+
   "@keyframes bnShimmer{0%{filter:none}50%{filter:brightness(1.6) saturate(1.3)}100%{filter:none}}"+
   "html.bn-shimmer body header.bn-top::after{animation:bnShimmer 2.4s ease-in-out 1}"+
   "@media (prefers-reduced-motion: reduce){.bn-egg{transition:none}.bn-egg .m i{transition:none}html.bn-shimmer body header.bn-top::after{animation:none}}";d.head.appendChild(s)}
@@ -33,16 +32,11 @@
   if(RM){seg.forEach(function(s){s.style.background="var(--bn-sev-lo,#6B7076)"});return}
   seg.forEach(function(s,i){setTimeout(function(){s.style.background=col(i)},90*i)});
   setTimeout(function(){seg.forEach(function(s,i){setTimeout(function(){s.style.background="var(--bn-sev-lo,#6B7076)"},60*(9-i))})},1200)});
- // 2. seven quick clicks on the footer BN tile -> hidden card
- function tile(){var f=d.querySelector("#site_foot,body>footer,footer.ft");if(!f||f.querySelector(".bn-ftile"))return;css();
-  var t=d.createElementNS("http://www.w3.org/2000/svg","svg");t.setAttribute("class","bn-ftile");t.setAttribute("aria-hidden","true");
-  t.setAttribute("viewBox","0 0 16 16");t.innerHTML='<rect width="16" height="16" rx="3" fill="#0B0D10"/><path fill="#FFFFFF" d="M3 4h3v1h-3zM8 4h3v1h-3zM13 4h2v1h-2zM5 5h2v1h-2zM8 5h3v1h-3zM13 5h2v1h-2zM5 6h2v1h-2zM8 6h4v1h-4zM13 6h2v1h-2zM3 7h3v1h-3zM8 7h2v1h-2zM11 7h1v1h-1zM13 7h2v1h-2zM5 8h2v1h-2zM8 8h2v1h-2zM11 8h1v1h-1zM13 8h2v1h-2zM5 9h2v1h-2zM8 9h2v1h-2zM11 9h4v1h-4zM5 10h2v1h-2zM8 10h2v1h-2zM12 10h3v1h-3zM3 11h3v1h-3zM8 11h2v1h-2zM12 11h3v1h-3z"/><path fill="#C8102E" d="M1 4h2v1h-2zM1 5h2v1h-2z"/><path fill="#F2F2F4" d="M1 7h2v1h-2zM1 8h2v1h-2z"/><path fill="#6B7076" d="M1 10h2v1h-2zM1 11h2v1h-2z"/>';   // logo V2-final, 16 px pixel-fitted master
-  f.insertBefore(t,f.firstChild);var n=0,tm=0;t.addEventListener("click",function(){n++;clearTimeout(tm);tm=setTimeout(function(){n=0},2500);if(n>=7){n=0;if(!busy())card("<b>Global threat monitoring</b>Who says so? How do they know? What would change your mind? Every alert on this site links to its sources, so you can check.",12000)}})}
  // 3. console greeting
  try{console.log("%cBLACKOUT.NETWORK%c  Global threat monitoring\nEvery rank is explained at "+location.origin+"/scoring \u2014 and every alert links to its sources.","font:800 14px Montserrat,system-ui,sans-serif;color:#FF4D4F","font:500 12px Inter,system-ui,sans-serif;color:inherit")}catch(e){}
  // 5. seasonal shimmer (one per day, once)
  function seasonal(){var t=new Date(),m=t.getMonth()+1,day=t.getDate(),key="bn_season_"+t.toISOString().slice(0,10);
   var hit=(m===1&&day===1)||(m===3&&day===20)||(m===6&&day===21)||(m===9&&day===22)||(m===12&&day===21);if(!hit||RM)return;
   try{if(localStorage.getItem(key))return;localStorage.setItem(key,"1")}catch(e){}css();d.documentElement.classList.add("bn-shimmer");setTimeout(function(){d.documentElement.classList.remove("bn-shimmer")},2600)}
- function go(){tile();seasonal();setTimeout(tile,4000)}
+ function go(){seasonal()}
  if(d.readyState==="loading")d.addEventListener("DOMContentLoaded",go);else go()})();
