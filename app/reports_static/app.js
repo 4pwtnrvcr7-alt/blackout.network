@@ -79,10 +79,8 @@
   dlg.appendChild(el("div",{"class":"bnr-row"},[cp,st,cl]));show();st.focus()}
  function open(it,from){trig=from||document.activeElement;item=it||null;opened=Date.now();
   loadCfg().then(function(){form(null)}).catch(function(){head("Report a problem");dlg.appendChild(el("p",{text:"The report form could not load. Please try again in a moment."}));show()})}
- // ---------- floating button
- function fab(){if(document.querySelector(".bnr-fab"))return;var b=el("button",{type:"button","class":"bnr-fab","aria-haspopup":"dialog",title:"Report a problem with this page",
-   style:"position:fixed;left:12px;bottom:12px;z-index:4900;display:inline-flex;align-items:center;gap:6px;max-width:220px;font:500 12px/1.2 Inter,system-ui,sans-serif"});   /* t347: inline basics so it stays small even if app.css fails to load */
-  b.innerHTML=FLAG+'<span class="bnr-fab-t">Report a problem</span><span class="bnr-sr"> with this page</span>';b.onclick=function(){open(null,b)};document.body.appendChild(b)}
+ // ---------- floating button removed (Matt 11:33 PM ET Nov 27): no site-wide flag FAB
+ function fab(){}
  // ---------- flag control on alert cards (The Wire, Watchlist, Timeline)
  function itemFor(card){var cid=card.getAttribute("data-cid")||"",d=null,kind="card";
   try{if(typeof S!="undefined"&&S){d=(S.main||[]).find(function(c){return c.cluster_id==cid});if(d)kind="wire";else{d=(S.watchlist||[]).find(function(c){return c.cluster_id==cid});if(d)kind="watchlist"}}}catch(e){}
@@ -93,7 +91,7 @@
   var t=c.querySelector("b"),b=el("button",{type:"button","class":"bnr-flag","aria-haspopup":"dialog",title:"Report a problem with this item","aria-label":"Report a problem with: "+clip(t?t.textContent:"this item",80)});
   b.innerHTML=FLAG;b.onclick=function(e){e.preventDefault();e.stopPropagation();open(itemFor(c),b)};c.classList.add("bnr-has-flag");c.appendChild(b)})}
  var pend=0;function sched(){if(pend)return;pend=setTimeout(function(){pend=0;flags()},150)}
- function init(){fab();flags();new MutationObserver(sched).observe(document.body,{childList:true,subtree:true})}
+ function init(){flags();new MutationObserver(sched).observe(document.body,{childList:true,subtree:true})}
  window.BNReport={open:open,ids:ids,last:function(){return LAST},_context:context};
  if(document.readyState=="loading")document.addEventListener("DOMContentLoaded",init);else init();
 })();
