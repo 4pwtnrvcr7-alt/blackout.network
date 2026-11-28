@@ -297,7 +297,7 @@ def credits_page():
     secs = "".join(
         f'<section class="cr-sec" id="{k}"><h2>{html.escape(name)}</h2><ul>'
         + "".join(f'<li><b>{html.escape(a)}</b><span>{html.escape(b)}</span><em>{html.escape(c)}</em></li>' for a, b, c in rows)
-        + "</ul></section>" for k, name, rows in CREDITS_LEDGER)
+        + "</ul></section>" for k, name, rows in _ledger())
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             '<title>Image credits | BLACKOUT.NETWORK</title><meta name="description" content="Sources and licences for the images and video used on BLACKOUT.NETWORK.">'
             '<link rel="canonical" href="https://blackout.network/credits">' + _credits_og() +
@@ -491,8 +491,28 @@ def _home_page_raw():
 <script src="/api/newsletter/app.js" defer></script><script src="/api/translate/app.js" defer></script>
 </body></html>'''
 
+def _pulse_v2():
+    """Pulse intro (live instrument, pulse_v2.py). BN_INTRO_PULSE=0 = the previous intro below, unchanged."""
+    try:
+        import pulse_v2
+        return pulse_v2 if pulse_v2.on() else None
+    except Exception:
+        import traceback; traceback.print_exc(); return None
+
+def _ledger():
+    pv = _pulse_v2()
+    if not pv: return CREDITS_LEDGER
+    row = [("Intro instrument", "Original graphic drawn by BLACKOUT.NETWORK from live public data: scanner Wire, USGS earthquakes, EIA-930 grid demand, NOAA SWPC Kp. No third-party imagery.", "Original work")]
+    return [(k, n, (row if k == "intro" else rows)) for k, n, rows in CREDITS_LEDGER]
+
 def home_page():
     h = _home_page_raw()
+    pv = _pulse_v2()
+    if pv:
+        try: h = pv.transform(h)
+        except Exception:
+            import traceback; traceback.print_exc()   # any failure serves the previous intro
+            h = _home_page_raw()
     if credits_page_on():
         h = re.sub(r'<p class="h-credit">[^<]*</p>', "", h)
         h = h.replace('<a href="/bnt/credits.txt">Footage credits</a>', '<a href="/credits#intro">Image credits</a>')
