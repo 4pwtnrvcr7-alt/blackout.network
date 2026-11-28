@@ -457,7 +457,7 @@
     var S = this.S, nodes = S.nodes, E = S.E, u = S.u, i, j, ma = t > MESHEND ? 1 - sm((t - MESHEND) / 1.1) : 1, n = nodes.length, px = S.px, py = S.py, nd, o = S.o, W = S.W, H = S.H;
     // a cool wash and a ring when the network comes online
     if (t > BOOM - .05 && t < BOOM + 2.2) {
-      var bq = (t - BOOM) / 2.2; nodePos(nodes[S.seed], t, o);
+      var bq = Math.max(0, (t - BOOM) / 2.2); nodePos(nodes[S.seed], t, o);
       ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = .1 * (1 - sm(bq * 1.2)); ctx.fillStyle = "rgb(80,190,255)"; ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = (1 - bq) * (1 - bq) * .55; ctx.strokeStyle = "rgba(170,235,255,1)"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(o.x, o.y, 6 + bq * W * .95, 0, TAU); ctx.stroke();
       ctx.globalAlpha = (1 - bq) * (1 - bq) * .18; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(o.x, o.y, 6 + bq * W * .95, 0, TAU); ctx.stroke();
