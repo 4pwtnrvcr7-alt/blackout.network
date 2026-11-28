@@ -57,7 +57,7 @@ def _title_tag(title):
     t = title if BRAND in title else f"{title} | {BRAND}"
     return t
 
-def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=None, og_type="article", script=False):
+def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=None, og_type="article", script=False, rank=None):
     t = _title_tag(title); url = SITE + path
     try:
         import og, re as _re
@@ -65,7 +65,7 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
         if m:
             # Pass story_id, not a pre-built /og/wire/<id>.png URL, so og.tags can
             # use the static logo when photo cards are off (or warm a card when on).
-            meta = og.tags(title=t, desc=desc, url=url, story_id=m.group(1), og_type=og_type)
+            meta = og.tags(title=t, desc=desc, url=url, story_id=m.group(1), rank=rank, og_type=og_type)
         else:
             key = (path or "/").strip("/").split("/")[0] or "home"
             img = image or og.image_url(key)
@@ -73,7 +73,11 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
     except Exception:
         is_wire = bool(re.match(r"/wire/([0-9a-f]{16})", path or ""))
         if is_wire:
-            img = f"{SITE}/img/share-logo-1200.png"
+            try:
+                import og as _og
+                img = _og.story_share_image(rank)
+            except Exception:
+                img = f"{SITE}/img/share-logo-1200.png"
             meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
                     f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
                     f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200"><meta property="og:image:alt" content="{E(BRAND)}">'
