@@ -77,5 +77,45 @@ class T(unittest.TestCase):
         self.assertEqual(out["places"]["C:FR"]["status"], "Normal")
         self.assertEqual(out["places"]["C:MW"]["wire"][0]["url"], "/wire/bbbbbbbbbbbbbbbb")
 
+
+    def test_prefers_event_time_over_activity_t(self):
+        # heat t is last activity; 61.3 h from that would still look current
+        s = netwire.story_from(row(
+            t="2026-11-26T12:04:48Z",
+            event_time="2026-11-23T22:47:00Z",
+            title="Tashkent, Uzbekistan: internet outage, 61.3 h (IODA)",
+            place="Tashkent, Uzbekistan", cc="UZ",
+        ), now=NOW)
+        self.assertFalse(s["cur"])
+        self.assertEqual(s["t"], "2026-11-23T22:47:00Z")
+        self.assertEqual(s["end"], "2026-11-26T12:05:00Z")
+
+    def test_ioda_url_from_beats_activity_t(self):
+        s = netwire.story_from(row(
+            t="2026-11-26T12:04:48Z",
+            title="Tashkent, Uzbekistan: internet outage, 61.3 h (IODA)",
+            place="Tashkent, Uzbekistan", cc="UZ",
+            url="https://ioda.inetintel.cc.gatech.edu/region/4473?from=1795470420&until=1795481683",
+        ), now=NOW)
+        self.assertFalse(s["cur"])
+        self.assertEqual(s["t"], "2026-11-23T21:47:00Z")
+
+    def test_load_prefers_sql_event_time(self):
+        heat = [row(t="2026-11-26T12:04:48Z",
+                    title="Tashkent, Uzbekistan: internet outage, 61.3 h (IODA)",
+                    place="Tashkent, Uzbekistan", cc="UZ")]
+        sql = [row(t="2026-11-23T22:47:00Z", event_time="2026-11-23T22:47:00Z",
+                   title="Tashkent, Uzbekistan: internet outage, 61.3 h (IODA)",
+                   place="Tashkent, Uzbekistan", cc="UZ")]
+        orig_sql, orig_heat = netwire._sql_rows, netwire._heat_rows
+        try:
+            netwire._sql_rows = lambda days=7: sql
+            netwire._heat_rows = lambda: heat
+            b = netwire.load(now=NOW)
+        finally:
+            netwire._sql_rows, netwire._heat_rows = orig_sql, orig_heat
+        self.assertFalse(b["internet"][0]["cur"])
+        self.assertEqual(b["internet"][0]["t"], "2026-11-23T22:47:00Z")
+
 if __name__ == "__main__":
     unittest.main()
