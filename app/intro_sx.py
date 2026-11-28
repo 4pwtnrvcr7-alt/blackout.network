@@ -109,8 +109,11 @@ def panels_html(items, mv):
     return "\n".join(_panel(i, href, lab, mv) for i, (href, lab) in enumerate(items)), f'<nav class="sx-rail" aria-label="Sections"><ol>{rail}</ol></nav>'
 
 def transform(h):
-    """Take the previous intro's full HTML (head, header, menu, scripts, footer, brief signup) and swap its video sections for one
-    panel per menu item. Everything outside <main> stays exactly as the previous intro built it."""
+    """Take the previous intro's full HTML (head, header, menu, scripts, footer) and swap its video sections for one
+    panel per menu item. Everything outside <main> stays exactly as the previous intro built it.
+    Matt 9:06 AM ET Nov 28: do not keep the bottom Stay connected / email signup section on "/".
+    The 07 Newsletter / The brief panel already links to /newsletter. Section s6 stays in the raw
+    previous-intro markup so the fallback (BN_INTRO_SX=0) and the structural check stay intact."""
     m_main = re.search(r'<main id="flow"[^>]*>.*?</main>', h, re.S)
     s6 = re.search(r'<section class="h-sec"[^>]*id="s6"[^>]*>.*?</section>', h, re.S)
     foot = re.search(r'<footer class="h-foot".*?</footer>', h, re.S)
@@ -119,15 +122,13 @@ def transform(h):
     items = menu_items(h)
     if len(items) < 2: raise ValueError("menu not readable")
     panels, rail = panels_html(items, mv)
-    brief = re.sub(r'<p class="h-credit">[^<]*</p>', "", s6.group(0))
-    brief = brief.replace(' data-clip="email"', "").replace('class="h-sec"', 'class="h-sec sx-brief"', 1).replace('id="s6"', 'id="brief"', 1)
-    main = f'<main id="flow">\n{panels}\n{brief}\n{foot.group(0)}\n</main>\n{rail}'
+    main = f'<main id="flow">\n{panels}\n{foot.group(0)}\n</main>\n{rail}'
     h = h[:m_main.start()] + main + h[m_main.end():]
     d0, m0 = PANELS[items[0][0]][5][0], PANELS[items[0][0]][5][1]
     h = re.sub(r'<link rel="preload" as="image" href="/bnt/media/hero-d\.jpg[^>]*>', f'<link rel="preload" as="image" href="/bnt/media/{d0}?v={mv}" media="(min-width:701px)">', h, 1)
     h = re.sub(r'<link rel="preload" as="image" href="/bnt/media/hero-m\.jpg[^>]*>', f'<link rel="preload" as="image" href="/bnt/media/{m0}?v={mv}" media="(max-width:700px)">', h, 1)
     h = re.sub(r'<ol class="h-pager"[^>]*></ol>\n?', "", h)
-    h = h.replace('href="#s6"', 'href="#brief"')
+    h = h.replace('href="#s6"', 'href="/newsletter"')
     h = h.replace('<body class="bnt-home"', '<body class="bnt-home sx-body"', 1).replace('<html lang="en" data-bnt-home', '<html lang="en" data-bnt-home data-sx', 1)
     h = re.sub(r'(<link rel="stylesheet" href="[^"]*home\.css[^"]*">)', r'\1<link rel="stylesheet" href="/api/intro/intro.css?v=' + _v("intro.css") + '">', h, 1)
     h, n = re.subn(r'<script src="[^"]*home\.js[^"]*" defer></script>', '<script src="/api/intro/intro.js?v=' + _v("intro.js") + '" defer></script>', h)
