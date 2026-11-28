@@ -435,7 +435,7 @@ class FullStoryTap(unittest.TestCase):
         self.assertEqual(w2.count(".w2-btn:hover"), 1)
         css = read("wire_timeline_static", "app.css")
         self.assertIn(".tl-go{min-height:42px;padding:12px 20px;touch-action:manipulation", css)
-        self.assertIn("wire2.css?v=7", read("wire_timeline.py"))
+        self.assertIn("wire2.css?v=10", read("wire_timeline.py"))
         growth = read("growth_static", "app.css")
         self.assertIn("@media (hover:hover) and (pointer:fine){.bng-sb:hover", growth)
         self.assertNotIn(".bng-sb:hover{", growth.split("@media (hover:hover) and (pointer:fine){.bng-sb:hover")[0])
