@@ -1,0 +1,106 @@
+/* Intro v2 (Matt Nov 27 2026 10:49 PM ET): spacex.com-style stacked full-viewport panels. Dark, no yellow (loader blocks excepted, as on The Grid).
+   Silky scroll (Matt 10:50 PM): native scrolling, no snap; panels are paint-contained; only transform/opacity animate; no backdrop blur. */
+html.bnt-homepage{scroll-behavior:auto}
+body.ix-body{background:#000;color:#F0F0FA;overflow-x:hidden}
+html.ix-loading,html.ix-loading body{overflow:hidden;height:100%}
+.ix-nav,.ix-nav.solid{background:linear-gradient(to bottom,rgba(0,0,0,.55),rgba(0,0,0,0));border-bottom-color:transparent;transition:background-color .35s ease,border-color .35s ease}
+.ix-nav.solid{background:#05060a;border-bottom-color:rgba(240,240,250,.08)}
+.ix-flow{display:block}
+.ix-p{position:relative;height:100vh;height:100svh;min-height:540px;overflow:hidden;background:#000}
+.ix-bg{position:absolute;inset:0;z-index:0}
+.ix-bg img,.ix-bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.ix-bg video{opacity:0;transition:opacity .8s ease}
+.ix-bg video.on{opacity:1}
+.ix-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.82) 0%,rgba(0,0,0,.38) 42%,rgba(0,0,0,.08) 70%,rgba(0,0,0,.38) 100%)}
+.ix-c{z-index:1;position:absolute;left:clamp(20px,6.4vw,104px);right:clamp(20px,6.4vw,104px);bottom:clamp(48px,11vh,128px);max-width:660px}
+.ix-hero .ix-c{bottom:clamp(150px,24vh,230px);max-width:980px}
+.ix-k{margin:0 0 14px;font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:rgba(240,240,250,.72)}
+.ix-h{margin:0 0 22px;font:800 clamp(40px,6.4vw,92px)/.96 Montserrat,Inter,system-ui,sans-serif;letter-spacing:.005em;text-transform:uppercase;color:#fff;text-wrap:balance}
+.ix-cta{display:inline-flex;align-items:center;gap:12px;margin-top:6px;padding:15px 26px;min-height:48px;box-sizing:border-box;border:2px solid #F0F0FA;color:#F0F0FA!important;font:700 13px/1 Inter,system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;transition:background-color .25s ease,color .25s ease;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ix-cta svg{width:18px;height:18px}
+@media (hover:hover){.ix-cta:hover{background:#F0F0FA;color:#000!important}}
+.ix-cta:focus-visible{outline:2px solid #fff;outline-offset:4px}
+/* reveal (opacity/transform only) */
+.ix-c>*{opacity:0;transform:translate3d(0,18px,0);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+.ix-p.in .ix-c>*{opacity:1;transform:none}
+.ix-p.in .ix-c>*:nth-child(2){transition-delay:.06s}.ix-p.in .ix-c>*:nth-child(3){transition-delay:.12s}.ix-p.in .ix-c>*:nth-child(4){transition-delay:.18s}.ix-p.in .ix-c>*:nth-child(5){transition-delay:.24s}
+/* empty live slots take no room until real data arrives */
+[data-f]:empty{display:none}
+/* hero live strip (the spacex.com mission bar) */
+.ix-strip{z-index:1;position:absolute;left:clamp(20px,6.4vw,104px);right:clamp(20px,6.4vw,104px);bottom:clamp(28px,6vh,56px);margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid rgba(240,240,250,.28);opacity:0;transition:opacity .8s ease .3s}
+.ix-p.in .ix-strip{opacity:1}
+.ix-strip>div{padding:14px 18px 0 0;min-width:0}
+.ix-strip>div[hidden]{display:none}
+.ix-strip dt{font:600 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,240,250,.6);margin:0 0 6px}
+.ix-strip dd{margin:0;font:600 clamp(17px,1.6vw,22px)/1.2 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ix-strip dd small{display:block;font:500 12px/1.3 Inter,system-ui,sans-serif;color:rgba(240,240,250,.62);letter-spacing:.04em;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
+.ix-strip dd small:empty{display:none}
+/* lists */
+.ix-list,.ix-rows{list-style:none;margin:0 0 22px;padding:0;max-width:620px}
+.ix-list li,.ix-rows li{border-top:1px solid rgba(240,240,250,.16)}
+.ix-list a>div{min-width:0}
+.ix-list a{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;align-items:start;padding:13px 0;color:#F0F0FA!important;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.ix-list b{font:700 15px/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:center;padding:7px 0;border:1px solid currentColor;border-radius:2px}
+.ix-list .r3{color:#4CC38A}.ix-list .r6{color:#FF8A3D}.ix-list .r10{color:#E5484D}
+.ix-list span{font:600 16px/1.35 Inter,system-ui,sans-serif;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ix-list small{display:block;margin-top:3px;font:500 12px/1.3 Inter,system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:rgba(240,240,250,.58)}
+@media (hover:hover){.ix-list a:hover span{text-decoration:underline;text-underline-offset:3px}}
+.ix-rows li{display:flex;justify-content:space-between;gap:16px;padding:11px 0;font:500 15px/1.35 Inter,system-ui,sans-serif}
+.ix-rows li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ix-rows li em{font-style:normal;color:rgba(240,240,250,.62);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* big numerals */
+.ix-nums{display:grid;grid-template-columns:repeat(4,max-content);gap:12px 40px;margin:0 0 22px}
+.ix-nums div{min-width:0}
+.ix-nums b{display:block;font:300 clamp(36px,4.6vw,64px)/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:#fff}
+.ix-nums span{display:block;margin-top:6px;font:600 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:rgba(240,240,250,.62)}
+.ix-nums .hi b{color:#FF6369}
+/* market ticker */
+.ix-tick{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;margin:0 0 22px;border-top:1px solid rgba(240,240,250,.16)}
+.ix-tick div{padding:12px 14px 0 0;min-width:0}
+.ix-tick span{display:block;font:600 11px/1.2 Inter,system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(240,240,250,.62)}
+.ix-tick b{display:block;margin-top:6px;font:500 clamp(16px,1.5vw,20px)/1.2 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:#fff;white-space:nowrap}
+.ix-tick i{display:block;margin-top:3px;font:600 13px/1.2 Inter,system-ui,sans-serif;font-style:normal;font-variant-numeric:tabular-nums}
+.ix-tick .up{color:#4CC38A}.ix-tick .dn{color:#E5484D}
+.ix-note{display:block;margin:-12px 0 20px;font:500 11px/1.4 Inter,system-ui,sans-serif;letter-spacing:.06em;color:rgba(240,240,250,.5)}
+/* footer */
+body.ix-body #ix_foot{position:relative;left:auto;right:auto;bottom:auto;display:block;text-align:left;text-transform:none;letter-spacing:0;background:#05060a;padding:28px clamp(20px,6.4vw,104px) calc(36px + env(safe-area-inset-bottom));border-top:1px solid rgba(240,240,250,.08);font:500 12px/1.6 Inter,system-ui,sans-serif;color:rgba(240,240,250,.55)}
+body.ix-body #ix_foot nav{display:flex;flex-wrap:wrap;gap:6px 22px;margin-bottom:10px}
+body.ix-body #ix_foot a{color:rgba(240,240,250,.8)!important;letter-spacing:.12em;text-transform:uppercase;font-size:11px;padding:6px 0}
+body.ix-body #ix_foot p{margin:0}
+/* phones */
+@media (max-width:700px){
+ .ix-c{bottom:calc(40px + env(safe-area-inset-bottom))}
+ .ix-hero .ix-c{bottom:calc(178px + env(safe-area-inset-bottom))}
+ .ix-h{font-size:clamp(36px,11vw,52px);margin-bottom:16px}
+ .ix-strip{grid-template-columns:repeat(2,minmax(0,1fr));bottom:calc(22px + env(safe-area-inset-bottom))}
+ .ix-strip>div{padding-top:10px}
+ .ix-strip dd{font-size:16px}
+ .ix-list a{grid-template-columns:38px minmax(0,1fr);gap:12px;padding:11px 0}
+ .ix-list span{font-size:15px}
+ .ix-list,.ix-rows,.ix-nums,.ix-tick{margin-bottom:18px}
+ .ix-nums{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}
+ .ix-nums b{font-size:clamp(24px,7.4vw,32px)}
+ .ix-nums span{letter-spacing:.14em;font-size:10px}
+ .ix-tick{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .ix-tick div:nth-child(n+4){padding-top:10px}
+ .ix-cta{width:100%;justify-content:center}
+}
+@media (max-height:640px) and (max-width:700px){.ix-list li:nth-child(3),.ix-rows li:nth-child(3){display:none}}
+/* full-screen loader: The Grid loader family (100 blocks, real progress, percent only) */
+.ix-ld{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#05060a;transition:opacity .55s ease,visibility .55s}
+html.ix-ready .ix-ld{opacity:0;visibility:hidden;pointer-events:none}
+.ix-ldb{position:absolute;inset:0;display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(10,1fr);gap:2px}
+.ix-ldc{position:relative;border-radius:38% 32% 42% 36%/36% 42% 32% 40%;background:rgba(240,240,250,.045);box-shadow:inset 0 0 0 1px rgba(240,240,250,.07);min-width:0;min-height:0}
+.ix-ldc:nth-child(3n){border-radius:42% 30% 48% 34%/34% 48% 30% 44%}.ix-ldc:nth-child(3n+1){border-radius:30% 46% 36% 44%/44% 32% 46% 36%}
+.ix-ldc[data-r="0"]{--c:#FFE566}.ix-ldc[data-r="1"]{--c:#FFE04A}.ix-ldc[data-r="2"]{--c:#FFC83A}.ix-ldc[data-r="3"]{--c:#FFB028}.ix-ldc[data-r="4"]{--c:#FF9A1A}
+.ix-ldc[data-r="5"]{--c:#FF8D21}.ix-ldc[data-r="6"]{--c:#FF8028}.ix-ldc[data-r="7"]{--c:#FF742E}.ix-ldc[data-r="8"]{--c:#FF6735}.ix-ldc[data-r="9"]{--c:#FF5A3C}
+.ix-ldc>b{position:absolute;inset:1px;border-radius:inherit;opacity:0;background:var(--c);box-shadow:0 0 14px rgba(255,154,26,.5),inset 0 1px 1px rgba(255,255,255,.35);transform:translate3d(0,-14vh,0) scale(.7)}
+.ix-ldc.in>b{animation:ix-drop .5s cubic-bezier(.14,1.12,.28,1) forwards}
+@keyframes ix-drop{0%{opacity:0;transform:translate3d(0,-14vh,0) scale(.7)}60%{opacity:1}100%{opacity:1;transform:none}}
+.ix-ldn{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);z-index:2;margin:0;pointer-events:none;font:200 84px/1 Inter,system-ui,sans-serif;color:#F0F0FA;font-variant-numeric:tabular-nums;letter-spacing:-.03em;text-shadow:0 0 16px #05060a,0 0 36px #05060a,0 2px 6px #05060a}
+.ix-ldn small{font-size:26px;font-weight:300;margin-left:4px;color:rgba(240,240,250,.72);vertical-align:top;position:relative;top:14px}
+@media (prefers-reduced-motion:reduce){
+ .ix-c>*,.ix-strip{transition:none;opacity:1;transform:none}
+ .ix-ldc.in>b{animation:none;opacity:1;transform:none}
+ .ix-bg video{display:none}
+}
