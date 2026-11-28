@@ -1154,7 +1154,8 @@ def _subscriber_crime(sub):
     try:
         import crime as _crime
         return _crime.brief_for(dict(sub))
-    except Exception:
+    except Exception as ex:
+        log(f"crime section failed: {type(ex).__name__}: {ex}"[:300], "qa")
         return None
 
 def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
@@ -1292,7 +1293,14 @@ def build_issue(sub, at=None, since=None, slot="morning", conn=None, c=None):
     issue["crime"] = _subscriber_crime(sub)   # only when they opted in AND saved an area; never invents a default place
     try:   # pt1754u: weather forecast + major weather alerts (local with a saved area, else US overview); None on any failure
         import newsletter_wx as _WX; issue["weather"] = _WX.for_sub(sub, c)
-    except Exception: issue["weather"] = None
+    except Exception as ex:
+        issue["weather"] = None; log(f"weather section failed: {type(ex).__name__}: {ex}"[:300], "qa")
+    try:   # Nov 28: a missing local section is never silent again (events table), only for readers who asked for it and have an area
+        _who = f"subscriber #{(sub or {}).get('id')}"
+        if (sub or {}).get("id") and str((sub or {}).get("loc_label") or "").strip():
+            if not issue.get("weather"): log(f"weather section empty for {_who} (area saved, no forecast/alerts came back)", "qa")
+            if _row_get(sub, "crime_brief", 0) and not issue.get("crime"): log(f"crime section empty for {_who} (opted in, area saved, no data came back)", "qa")
+    except Exception: pass
     try:   # pt1755u: network outage report (only for readers who opted in); None on any failure = no section
         import newsletter_net as _NET; issue["network"] = _NET.for_sub(sub, c)
     except Exception: issue["network"] = None
@@ -3174,6 +3182,46 @@ def admin_ok(d):
 def mask_email(e):
     l, _, d = (e or "").partition("@")
     return (l[:2] + "•" * max(1, min(6, len(l) - 2))) + "@" + d
+
+def probe_subscriber(email, slot=None):
+    """Read-only dry run for ONE active subscriber, through the same audience -> build_issue -> render -> qa_gate path a scheduled send uses.
+    Never sends, never writes a send/sent_items/mail_log row. -> dict of facts (no address, no HTML) so a missing weather or crime section
+    can be explained from the live node. Box-signed /internal/newsletter/status only (probe_email)."""
+    em = str(email or "").strip().lower(); c = cfg()
+    sub = next((s for s in audience(c).values() if str(s.get("email") or "").lower() == em), None)
+    if not sub: return {"found": False}
+    at = now(); slot = slot if slot in ("morning", "evening") else next_slots(at, 1, c)[0]["slot"]
+    out = {"found": True, "id": sub["id"], "slot": slot, "area": sub.get("loc_label"), "loc_kind": sub.get("loc_kind"), "loc_cc": sub.get("loc_cc"),
+           "has_latlon": sub.get("loc_lat") is not None and sub.get("loc_lon") is not None, "crime_brief": int(_row_get(sub, "crime_brief", 0) or 0),
+           "weather_env_off": os.environ.get("BN_NL_WEATHER", "").strip() == "0", "weather_cfg_off": c.get("weather_section", True) is False,
+           "v4_env_off": os.environ.get("BN_NL_V4", "").strip() == "0", "template": c.get("template"), "crime_news_env": os.environ.get("BN_CRIME_NEWS")}
+    try:
+        import newsletter_wx as WX, time as _t
+        t0 = _t.time(); lat, lon = sub.get("loc_lat"), sub.get("loc_lon")
+        if lat is not None and lon is not None:
+            for nm, fn in (("nws_days", lambda: WX._nws_days(float(lat), float(lon))), ("nws_alerts", lambda: WX._local_alerts(float(lat), float(lon)))):
+                try: v = fn(); out["wx_" + nm] = "none" if v is None else ("ok:%d" % len(v.get("days", v) if isinstance(v, dict) else v))
+                except Exception as ex: out["wx_" + nm] = f"EXC {type(ex).__name__}: {ex}"[:160]
+        out["wx_probe_s"] = round(_t.time() - t0, 2)
+    except Exception as ex: out["wx_probe"] = f"EXC {type(ex).__name__}: {ex}"[:160]
+    try:
+        import crime as CR
+        lab = str(sub.get("loc_label") or ""); q = lab.split(" ")[-1] if sub.get("loc_kind") == "zip" else lab
+        d = CR.lookup(q) if q else None
+        out["crime_lookup_ok"] = bool(d and d.get("ok")); out["crime_county"] = bool(d and d.get("county")); out["crime_feed"] = bool(d and d.get("feed"))
+    except Exception as ex: out["crime_lookup"] = f"EXC {type(ex).__name__}: {ex}"[:160]
+    issue = build_issue(dict(sub), at=at, slot=slot, c=c)
+    w = issue.get("weather"); cr = issue.get("crime")
+    out["issue_weather"] = None if not w else {"scope": w.get("scope"), "label": w.get("label"), "forecast_days": len((w.get("fc") or {}).get("days") or []),
+                                               "alerts": len(w.get("alerts") or []), "nat_alerts": len(w.get("nat_alerts") or []), "storms": len(w.get("storms") or [])}
+    out["issue_crime"] = None if not cr else {"label": cr.get("label"), "lines": len(cr.get("lines") or []), "items": len(cr.get("items") or [])}
+    L = links_for(sub, c); L["_row"] = sub; subj, hb, tx = render(issue, L, c)
+    out["html_bytes"] = len(hb.encode()); out["html_has_weather"] = hb.upper().count("WEATHER · ") + hb.upper().count("WEATHER &MIDDOT; ")
+    out["html_has_weather_alerts"] = hb.upper().count("MAJOR WEATHER ALERTS"); out["html_has_crime"] = hb.upper().count("CRIME NEAR YOU")
+    out["text_has_weather"] = "WEATHER" in tx.upper().split("MAJOR WEATHER")[0] and "WEATHER ·" in tx.upper(); out["text_has_crime"] = "CRIME NEAR YOU" in tx.upper()
+    out["stories_main"] = len(issue.get("main") or []); out["layout"] = "v4" if (lambda m: m.on(c))(__import__("newsletter_v4")) else "v2/v1"
+    qa = qa_gate(issue, subj, hb, tx, c); out["qa_ok"] = None if qa is None else bool(qa["ok"]); out["qa_blockers"] = [] if not qa else qa["blockers"][:3]
+    return out
 
 def preview_issue(at=None, c=None):
     """The next issue as a 'twice daily, all categories' subscriber with no send history would get it."""

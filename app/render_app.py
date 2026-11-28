@@ -942,6 +942,9 @@ class RH(server.H):
             except Exception: d = {}
             if path.endswith("/status"):
                 st = NL.admin_stats()
+                if d.get("probe_email"):   # Nov 28: read-only per-subscriber dry run (no send, no writes to sends/mail_log); box-signed only
+                    try: return self.send(200, {"probe": NL.probe_subscriber(d.get("probe_email"), d.get("slot"))})
+                    except Exception as ex: traceback.print_exc(); return self.send(200, {"probe": {"error": f"{type(ex).__name__}: {ex}"[:300]}})
                 return self.send(200, {"counts": st["counts"], "sender": st["sender"], "next_slots": st["next_slots"], "runs": st["runs"][:6],
                                        "mail": st["mail"][:8], "render_scheduler": bool(NL.cfg().get("render_scheduler")), "restored": SYNC["restored"], "held": dict(NL.HELD),
                                        "lookup": _nl_lookup(NL, d.get("email")), "active_by_frequency": st.get("active_by_frequency"),
