@@ -47,6 +47,61 @@ def _save(im: Image.Image, path: Path) -> None:
     im.convert("RGB").save(path, "PNG", optimize=True)
 
 
+# Refresh-button fill stops from PR #293. Used only on story share logos
+# (Matt, Nov 27 8:47 PM ET): background behind the B, dark ink for WCAG AA.
+SHARE_YELLOW = (255, 229, 102)  # #FFE566
+SHARE_ORANGE = (255, 154, 26)   # #FF9A1A
+SHARE_RED = (255, 90, 60)       # #FF5A3C
+SHARE_INK = (11, 13, 16)        # #0B0D10
+# Luma snap: letter body (>=200) is solid ink, field (<=16) is solid fill,
+# anti-aliased edge pixels stay in between so the B shape is unchanged.
+_SHARE_MASK_FLOOR = 16
+_SHARE_MASK_CEIL = 200
+SHARE_SEVERITY = {
+    "yellow": SHARE_YELLOW,
+    "orange": SHARE_ORANGE,
+    "red": SHARE_RED,
+}
+
+
+def share_letter_mask(share: Image.Image) -> Image.Image:
+    """Luminance mask of the serif B from the committed 1200x1200 white-on-black master."""
+    gray = share.convert("L")
+
+    def _x(v: int) -> int:
+        if v <= _SHARE_MASK_FLOOR:
+            return 0
+        if v >= _SHARE_MASK_CEIL:
+            return 255
+        return int(round((v - _SHARE_MASK_FLOOR) * 255 / (_SHARE_MASK_CEIL - _SHARE_MASK_FLOOR)))
+
+    return gray.point(_x)
+
+
+def recolor_share_logo(share: Image.Image, bg: tuple[int, int, int], ink: tuple[int, int, int] = SHARE_INK) -> Image.Image:
+    """Same B shape and framing as share-logo-1200.png, on a solid background."""
+    canvas = Image.new("RGB", share.size, bg)
+    letter = Image.new("RGB", share.size, ink)
+    return Image.composite(letter, canvas, share_letter_mask(share))
+
+
+def write_severity_share_logos(share: Image.Image | None = None) -> dict[str, Path]:
+    """Write /img/share-logo-1200-{yellow,orange,red}.png next to the black master."""
+    if share is None:
+        if not SHARE_B64.is_file():
+            raise FileNotFoundError(SHARE_B64)
+        raw = base64.b64decode("".join(SHARE_B64.read_text().split()))
+        share = Image.open(BytesIO(raw)).convert("RGB")
+        if share.size != (1200, 1200):
+            share = share.resize((1200, 1200), Image.Resampling.LANCZOS)
+    written = {}
+    for name, bg in SHARE_SEVERITY.items():
+        dest = IMG / f"share-logo-1200-{name}.png"
+        _save(recolor_share_logo(share, bg), dest)
+        written[name] = dest
+    return written
+
+
 def install() -> None:
     if not B64.is_file():
         raise SystemExit(f"missing {B64}")
@@ -78,6 +133,7 @@ def install() -> None:
         if share.size != (1200, 1200):
             share = share.resize((1200, 1200), Image.Resampling.LANCZOS)
         _save(share, IMG / "share-logo-1200.png")
+        write_severity_share_logos(share)
     print(f"install_white_b_icons: wrote mark and icons under {IMG} and {PWA}", flush=True)
 
 

@@ -23,9 +23,23 @@ TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
 # Static square logo for /wire/<id> share tags when photo cards are off (Matt, Nov 27 2026).
 # New filename rather than a ?v= bump of og.VERSION.
+# Severity colours (Matt, Nov 27 8:47 PM ET): background behind the B uses the
+# Refresh-button fill stops from PR #293. Per-severity filenames bust the X cache
+# without bumping VERSION.
 STORY_SHARE_IMAGE = f"{SITE}/img/share-logo-1200.png"
 STORY_SHARE_SIZE = 1200
-VERSION = "25"  # do not bump for the white-B mark swap (card DB already wiped on the prior restart; mark only map-like cards stale)
+# Exact #293 Refresh fill stops: yellow, orange, red.
+SHARE_YELLOW = (255, 229, 102)  # #FFE566
+SHARE_ORANGE = (255, 154, 26)   # #FF9A1A
+SHARE_RED = (255, 90, 60)       # #FF5A3C
+SHARE_INK = (11, 13, 16)        # #0B0D10 — dark B on the three fills (WCAG AA)
+STORY_SHARE_BY_TIER = {
+    "black": STORY_SHARE_IMAGE,
+    "yellow": f"{SITE}/img/share-logo-1200-yellow.png",
+    "orange": f"{SITE}/img/share-logo-1200-orange.png",
+    "red": f"{SITE}/img/share-logo-1200-red.png",
+}
+VERSION = "25"  # do not bump; per-severity image URLs bust the X cache instead
 W, H = 1200, 630
 
 BASE = Path(__file__).resolve().parent
@@ -751,6 +765,34 @@ ALIASES = {
     "cookie-policy": "cookies", "do-not-sell": "privacy-choices",
 }
 
+
+def story_share_tier(rank=None):
+    """Map a story rank to a share-logo background tier.
+
+    Existing site bands (story.band): 0-3 lower, 4-6 mid, 7-10 highest.
+    Unscored (None, missing, or not an integer) stays black — the current logo.
+    Yellow / orange / red are the Refresh-button fill stops from PR #293.
+    """
+    if rank is None or rank == "":
+        return "black"
+    try:
+        r = int(rank)
+    except (TypeError, ValueError):
+        return "black"
+    if r < 0:
+        return "black"
+    if r <= 3:
+        return "yellow"
+    if r <= 6:
+        return "orange"
+    return "red"
+
+
+def story_share_image(rank=None):
+    """Absolute og:image URL for a story when photo cards are off."""
+    return STORY_SHARE_BY_TIER[story_share_tier(rank)]
+
+
 def image_url(key="home", story_id=None, title=None, rank=None):
     if story_id:
         path = f"{SITE}/og/wire/{story_id}.png"
@@ -784,8 +826,10 @@ def attr(s):
 def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og_type="website"):
     """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id.
 
-    Story pages (story_id set, no explicit image) use twitter:card=summary and the
-    static white-B logo unless BN_STORY_CARDS=1, which restores per-story photo cards.
+    Story pages (story_id set, no explicit image) use twitter:card=summary and a
+    static serif-B logo whose background follows the story rank (black if unscored,
+    yellow 0-3, orange 4-6, red 7-10) unless BN_STORY_CARDS=1, which restores
+    per-story photo cards.
     """
     E = attr
     t = title if title else BRAND
@@ -797,7 +841,7 @@ def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og
     except Exception:
         cards = os.environ.get("BN_STORY_CARDS", "0") == "1"
     if story_id and not image and not cards:
-        img = STORY_SHARE_IMAGE
+        img = story_share_image(rank)
         return (
             f'<meta property="og:type" content="{E(og_type)}">'
             f'<meta property="og:site_name" content="{BRAND}">'

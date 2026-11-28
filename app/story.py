@@ -281,7 +281,7 @@ def render(cid, since=""):
           {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "The Wire", "item": f"{S.SITE}/wire"},
                                                           {"@type": "ListItem", "position": 2, "name": title[:110], "item": f"{S.SITE}/wire/{cid}"}]}]}
     noindex = (watch != 0 or rank < 3) and not desk_story   # t1330u: desk stories are written up in full, so they stay indexable
-    return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short))
+    return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short), rank=rank)
 
 
 def brief_page(cid):
@@ -318,7 +318,7 @@ def brief_page(cid):
             + (f'<p class="meta">{S.E(loc)} · Rank {rank} of 10</p>' if True else "")
             + (f'<section class="card"><h2>Sources</h2><ul>{src}</ul></section>' if src else "")
             + (f'<p class="share">{share}</p>' if share else ""))
-    return 200, S.page(_short(title), what or title, body, f"/wire/{cid}", "threat")
+    return 200, S.page(_short(title), what or title, body, f"/wire/{cid}", "threat", rank=rank)
 
 
 def handle_get(path, qs, headers=None):
