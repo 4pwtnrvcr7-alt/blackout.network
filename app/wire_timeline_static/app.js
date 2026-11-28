@@ -270,34 +270,11 @@ function scrollToKey(key){
   W.scrollTo({top:Math.max(0,top),behavior:RM?"auto":"smooth"});
 }
 var refP=0,refTgt=0,refRAF=0,refBusy=0;
-function refApply(p){
-  if(!bRef)return;
-  p=Math.max(0,Math.min(100,p));
-  if(refTgt>=100&&p>=99)p=100;
-  refP=p;var shown=Math.round(p);if(refTgt>=100&&shown>=99)shown=100;
-  bRef.style.setProperty("--tl-ref-p",shown+"%");
-  var lab=(refBusy&&shown<100)?("Refresh "+shown+"%"):"Refresh";
-  var a=bRef.querySelector(".tl-ref-lab-a"),b=bRef.querySelector(".tl-ref-lab-b");
-  if(a)a.textContent=lab;if(b)b.textContent=lab;
-  if(refBusy){bRef.setAttribute("aria-label","Refreshing, "+shown+" percent");bRef.setAttribute("aria-valuenow",String(shown))}
-}
-function refTick(){refRAF=0;var d=refTgt-refP;if(Math.abs(d)<0.4){refApply(refTgt);return}
-  var step=RM?d:(refTgt>=100?Math.max(4,d*0.4):Math.max(0.6,d*0.22));
-  refApply(refP+step);refRAF=requestAnimationFrame(refTick)}
-function refStage(p){refTgt=Math.max(refTgt,Math.min(100,p));if(refTgt>=100)refTgt=100;if(RM){refApply(refTgt);return}if(!refRAF)refRAF=requestAnimationFrame(refTick)}
-function busy(on){if(!bRef)return;
-  if(on){refBusy=1;refP=0;refTgt=0;if(refRAF){cancelAnimationFrame(refRAF);refRAF=0}refApply(0);
-    bRef.classList.remove("is-result");bRef.classList.add("is-filling");
-    bRef.setAttribute("role","progressbar");bRef.setAttribute("aria-valuemin","0");bRef.setAttribute("aria-valuemax","100");
-    bRef.setAttribute("aria-label","Refreshing, 0 percent")}
-  else{refBusy=0;if(refRAF){cancelAnimationFrame(refRAF);refRAF=0};bRef.classList.remove("is-filling");
-    bRef.removeAttribute("role");bRef.removeAttribute("aria-valuemin");bRef.removeAttribute("aria-valuemax");bRef.removeAttribute("aria-valuenow");
-    bRef.style.removeProperty("--tl-ref-p")}
-  bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
-function doneBtn(lab){if(!bRef)return;var a=bRef.querySelector(".tl-ref-lab-a"),b=bRef.querySelector(".tl-ref-lab-b");clearTimeout(bRef._doneT);
-  if(!lab){bRef.classList.remove("is-result");if(a)a.textContent="Refresh";if(b)b.textContent="Refresh";bRef.setAttribute("aria-label","Refresh");return}
-  bRef.classList.add("is-result");if(a)a.textContent=lab;if(b)b.textContent=lab;bRef.setAttribute("aria-label",lab);
-  bRef._doneT=setTimeout(function(){doneBtn("")},2600)}
+function _refBtn(){return bRef}
+function refApply(p){if(W.BNRefresh)return BNRefresh.apply(bRef,p);}
+function refStage(p){if(W.BNRefresh)return BNRefresh.stage(bRef,p);refTgt=Math.max(refTgt,p)}
+function busy(on){if(W.BNRefresh){BNRefresh.busy(bRef,on);refBusy=on?1:0;return} }
+function doneBtn(lab){if(W.BNRefresh)return BNRefresh.done(bRef,lab);}
 /* ---------- arrivals: near the top, new items slide in one at a time (oldest first, newest ends on top) */
 var drip=[],queued={},dripT=0;
 /* Nov 25 2026 (pt1918u): Full story needed 3-4 taps on iPhone because arrivals re-laid the list mid-tap. */
@@ -366,7 +343,7 @@ function refresh(){
      Never stuck at 99. Always surface something real: (a) stories newer than the last-seen top, (b) stories
      corroborated or rewritten since the last refresh, marked UPDATED and moved to the top, or (c) a live scan
      line from scanner stats. Never invent a story or bypass the publish gate. */
-  if(bRef&&(bRef.classList.contains("busy")||refBusy))return Promise.resolve();
+  if(bRef&&((W.BNRefresh&&BNRefresh.isBusy(bRef))||bRef.classList.contains("busy")||refBusy))return Promise.resolve();
   busy(true);refStage(6);var g=gen,t0=Date.now(),prev=loadSeen()||{};
   function mergeItem(old,nu){["h","s","d","n","f","l","src","u","r","c","loc"].forEach(function(k){if(nu[k]!=null)old[k]=nu[k]});return old}
   function applyPage(j,res){

@@ -1486,8 +1486,8 @@ def page_html():
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/wire">
 {ogmeta}<meta name="theme-color" content="#000">
 <!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->
-<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}"></head>
-<body class="w2 tl"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
+<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}"></head>
+<body class="w2 tl bn-has-ref"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu}
 <div class="tl-bg" aria-hidden="true"><canvas class="tl-scanbg" id="tl_scanbg"></canvas><i class="tl-veil"></i></div>
@@ -1503,7 +1503,7 @@ def page_html():
   <button type="button" class="tl-b" id="tl_filt" aria-expanded="false" aria-controls="tl_sheet" aria-label="Filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span>Filters</span><b class="tl-fbadge" id="tl_fbadge" hidden></b></button>
   <button type="button" class="tl-b" id="tl_when" aria-expanded="false" aria-controls="tl_jump"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 10h16M9 3.5v4M15 3.5v4" stroke="currentColor" stroke-width="1.4"/></svg><span>Date</span></button>
   <button type="button" class="tl-b tl-cond" id="tl_cond" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6m0 0-3-3m3 3 3-3M12 21v-6m0 0-3 3m3-3 3 3M4 12h16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="tl-cl">Condense</span></button>
-  <button type="button" class="tl-b tl-ref" id="tl_ref" aria-label="Refresh"><i class="tl-ref-fill" aria-hidden="true"><i class="tl-ref-sheen"></i></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span class="tl-ref-lab"><span class="tl-ref-lab-a">Refresh</span><span class="tl-ref-lab-b" aria-hidden="true">Refresh</span></span></button>
+  <button type="button" class="tl-b tl-ref bn-ref" id="tl_ref" aria-label="Refresh"><i class="tl-ref-fill" aria-hidden="true"><i class="tl-ref-sheen"></i></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span class="tl-ref-lab"><span class="tl-ref-lab-a">Refresh</span><span class="tl-ref-lab-b" aria-hidden="true">Refresh</span></span></button>
  </div>
  <div class="tl-sheet" id="tl_sheet" hidden>
   <div class="tl-sheet-h"><span>Filters</span><button type="button" class="tl-clear" id="tl_fclear">Clear all</button></div>
@@ -1526,7 +1526,7 @@ def page_html():
 </main>
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
 <script>window.BN_TL={json.dumps(cfg)};</script>
-<script src="{w2}/wire2.js?v=3" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/scan-bg.js?v={v_bg}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
+<script src="{w2}/wire2.js?v=3" defer></script><script src="/bn-refresh.js" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/scan-bg.js?v={v_bg}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
 
 # ------------------------------------------------------------------ location (keyless) + local crime
 _ZIP = None

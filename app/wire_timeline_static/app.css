@@ -57,28 +57,8 @@ body.tl{background:#000}
 .tl-upd{flex:none;color:var(--tl-mu);white-space:nowrap;letter-spacing:.08em}
 .tl-b.busy svg{animation:tlspin .8s linear infinite;transform-origin:50% 50%}
 @keyframes tlspin{to{transform:rotate(360deg)}}
-/* Refresh (Matt 8:18 PM ET Nov 27): fill L→R with a yellow–orange–red blend and a moving sheen.
-   Yellow is allowed on this button only. Dark #0B0D10 text is clipped to the fill (WCAG ≥6.28:1 on
-   every stop); white text is clipped to the unfilled dark remainder. */
-#tl_ref{position:relative;overflow:hidden;--tl-ref-p:0%;isolation:isolate}
-#tl_ref .tl-ref-fill{display:none;position:absolute;inset:0 auto 0 0;width:var(--tl-ref-p);max-width:100%;
-  background:linear-gradient(90deg,#FFE566 0%,#FF9A1A 55%,#FF5A3C 100%);pointer-events:none;z-index:0;
-  transition:width .28s cubic-bezier(.22,.8,.24,1)}
-#tl_ref .tl-ref-sheen{position:absolute;top:0;bottom:0;left:0;width:42%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);
-  animation:tlsheen .9s linear infinite;pointer-events:none}
-#tl_ref.busy .tl-ref-fill,#tl_ref.is-filling .tl-ref-fill{display:block}
-#tl_ref.busy,#tl_ref.is-filling,#tl_ref.is-result{border-color:#fff;min-width:7.6rem}
-#tl_ref.busy svg,#tl_ref.is-filling svg{opacity:0;width:0;margin:0;overflow:hidden;animation:none}
-#tl_ref .tl-ref-lab{position:relative;z-index:1;display:inline-grid;align-items:center;justify-items:center}
-#tl_ref .tl-ref-lab-a,#tl_ref .tl-ref-lab-b{grid-area:1/1;white-space:nowrap}
-#tl_ref .tl-ref-lab-a{color:#fff}
-#tl_ref .tl-ref-lab-b{display:none;color:#0B0D10;clip-path:inset(0 calc(100% - var(--tl-ref-p)) 0 0)}
-#tl_ref.busy .tl-ref-lab-a,#tl_ref.is-filling .tl-ref-lab-a{clip-path:inset(0 0 0 var(--tl-ref-p))}
-#tl_ref.busy .tl-ref-lab-b,#tl_ref.is-filling .tl-ref-lab-b{display:block}
-#tl_ref.is-result{background:rgba(255,255,255,.08)}
-#tl_ref.is-result .tl-ref-fill{display:none}
-@keyframes tlsheen{0%{transform:translateX(-120%)}100%{transform:translateX(280%)}}
+/* Refresh fill: shared /bn-refresh.css (PR #293 component). #tl_ref selectors live there so this
+   file no longer forks the yellow–orange–red fill, sheen, or --tl-ref-p rules. */
 .tl-it.updated .tl-h::before{content:"Updated";display:inline-block;margin:0 8px 0 0;padding:1px 6px;border:1px solid rgba(255,255,255,.55);font:600 9px/1.2 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#fff;vertical-align:1px}
 .tl-it.glow{box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),0 0 18px rgba(255,255,255,.22);animation:tlglow 2.4s ease-out both}
 @keyframes tlglow{0%{box-shadow:inset 0 0 0 1px rgba(255,255,255,.8),0 0 22px rgba(255,255,255,.35)}100%{box-shadow:inset 0 0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}

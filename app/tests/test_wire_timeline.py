@@ -123,6 +123,8 @@ class Paging(unittest.TestCase):
         self.assertIn("aria-label=\"Severity\"", html)
         self.assertIn("aria-label=\"Type\"", html)
         css=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.css"), encoding="utf-8").read()
+        shared=open(os.path.join(os.path.dirname(W.__file__), "static", "bn-refresh.css"), encoding="utf-8").read()
+        css = css + "\n" + shared
         self.assertIn(".tl-newp", css)
         js=open(os.path.join(os.path.dirname(W.__file__), "wire_timeline_static", "app.js"), encoding="utf-8").read()
         self.assertNotIn("tl_line", js)
