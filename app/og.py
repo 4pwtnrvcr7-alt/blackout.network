@@ -21,6 +21,10 @@ BRAND = "BLACKOUT.NETWORK"
 WORDMARK = "blackout.network"
 TAGLINE = "Global threat monitoring"
 HANDLE = "@BlkoutNtw"
+# Static square logo for /wire/<id> share tags when photo cards are off (Matt, Nov 27 2026).
+# New filename rather than a ?v= bump of og.VERSION.
+STORY_SHARE_IMAGE = f"{SITE}/img/share-logo-1200.png"
+STORY_SHARE_SIZE = 1200
 VERSION = "25"  # do not bump for the white-B mark swap (card DB already wiped on the prior restart; mark only map-like cards stale)
 W, H = 1200, 630
 
@@ -780,8 +784,8 @@ def attr(s):
 def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og_type="website"):
     """Open Graph + Twitter meta tags. image wins; otherwise built from key / story_id.
 
-    Story pages (story_id set, no explicit image) omit og:image and twitter:image and
-    use twitter:card=summary unless BN_STORY_CARDS=1, so X does not show a stale or stub card.
+    Story pages (story_id set, no explicit image) use twitter:card=summary and the
+    static white-B logo unless BN_STORY_CARDS=1, which restores per-story photo cards.
     """
     E = attr
     t = title if title else BRAND
@@ -793,13 +797,20 @@ def tags(*, title, desc, url, image=None, key=None, story_id=None, rank=None, og
     except Exception:
         cards = os.environ.get("BN_STORY_CARDS", "0") == "1"
     if story_id and not image and not cards:
+        img = STORY_SHARE_IMAGE
         return (
             f'<meta property="og:type" content="{E(og_type)}">'
             f'<meta property="og:site_name" content="{BRAND}">'
             f'<meta property="og:title" content="{E(t)}">'
             f'<meta property="og:description" content="{E(d)}">'
             f'<meta property="og:url" content="{E(url)}">'
+            f'<meta property="og:image" content="{E(img)}">'
+            f'<meta property="og:image:width" content="{STORY_SHARE_SIZE}">'
+            f'<meta property="og:image:height" content="{STORY_SHARE_SIZE}">'
+            f'<meta property="og:image:alt" content="{E(BRAND)}">'
             f'<meta name="twitter:card" content="summary">'
+            f'<meta name="twitter:image" content="{E(img)}">'
+            f'<meta name="twitter:image:alt" content="{E(BRAND)}">'
             f'<meta name="twitter:site" content="{HANDLE}">'
             f'<meta name="twitter:title" content="{E(t)}">'
             f'<meta name="twitter:description" content="{E(d)}">'

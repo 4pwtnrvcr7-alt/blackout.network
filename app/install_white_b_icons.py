@@ -12,6 +12,7 @@ from PIL import Image, ImageFilter
 
 BASE = Path(__file__).resolve().parent
 B64 = BASE / "static" / "brand" / "white_b_master.b64"
+SHARE_B64 = BASE / "static" / "brand" / "share-logo-1200.b64"
 IMG = BASE / "static" / "img"
 PWA = BASE / "static" / "pwa"
 SOC = BASE / "static" / "social"
@@ -71,6 +72,12 @@ def install() -> None:
         _save(_resize(master, size, sharp), path)
     _save(_maskable(master), PWA / "icon-maskable-512.png")
     _save(_resize(master, 168, False), SOC / "white_b_168.png")
+    if SHARE_B64.is_file():
+        raw = base64.b64decode("".join(SHARE_B64.read_text().split()))
+        share = Image.open(BytesIO(raw)).convert("RGB")
+        if share.size != (1200, 1200):
+            share = share.resize((1200, 1200), Image.Resampling.LANCZOS)
+        _save(share, IMG / "share-logo-1200.png")
     print(f"install_white_b_icons: wrote mark and icons under {IMG} and {PWA}", flush=True)
 
 
