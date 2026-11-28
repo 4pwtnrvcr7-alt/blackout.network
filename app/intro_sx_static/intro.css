@@ -1,0 +1,91 @@
+/* Homepage intro (intro_sx.py), Matt's brief Nov 28 2026: spacex.com style. One full-screen panel per menu section, big footage,
+   thin uppercase type, hairline pill buttons. White and greys only (no yellow), red only as the rank 7+ dot. Pills, single tap. */
+html[data-sx]{scroll-snap-type:y mandatory;scroll-behavior:smooth;background:#000}
+html[data-sx] body.sx-body{background:#000;color:#F0F0FA}
+.sx-body{--ink:#F0F0FA;--ink8:rgba(240,240,250,.82);--ink6:rgba(240,240,250,.62);--ink4:rgba(240,240,250,.42);--line:rgba(240,240,250,.16);--sx:"Inter","Helvetica Neue",Arial,sans-serif}
+.sx{position:relative;box-sizing:border-box;height:100vh;height:100svh;min-height:560px;overflow:hidden;display:flex;align-items:flex-end;background:#000;scroll-snap-align:start;scroll-snap-stop:always;isolation:isolate}
+.sx-bg{position:absolute;inset:0;z-index:0;background:#000}
+.sx-bg picture,.sx-bg img,.sx-bg video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.sx-bg img,.sx-bg video{filter:grayscale(1) contrast(1.06) brightness(.9)}
+.sx-bg img{transform:scale(1.06);transition:transform 2.4s cubic-bezier(.2,.7,.2,1),opacity 1.2s ease;opacity:.0}
+.sx-bg video{opacity:0;transition:opacity 1.4s ease}
+.sx-bg video.on{opacity:1}
+.sx.sx-in .sx-bg img,.no-js .sx-bg img{transform:none;opacity:1}
+.sx::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+ background:linear-gradient(0deg,rgba(0,0,0,.86) 0%,rgba(0,0,0,.5) 34%,rgba(0,0,0,0) 64%),linear-gradient(90deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,0) 55%),linear-gradient(180deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,0) 16%)}
+.sx-c{position:relative;z-index:2;box-sizing:border-box;width:100%;max-width:820px;padding:0 clamp(22px,6.5vw,110px) clamp(64px,11vh,120px)}
+.sx-c>*{opacity:0;transform:translateY(16px);transition:opacity .9s ease,transform .9s cubic-bezier(.2,.7,.2,1)}
+.sx.sx-in .sx-c>*,.no-js .sx-c>*{opacity:1;transform:none}
+.sx.sx-in .sx-c>*:nth-child(2){transition-delay:.08s}.sx.sx-in .sx-c>*:nth-child(3){transition-delay:.16s}.sx.sx-in .sx-c>*:nth-child(4){transition-delay:.24s}.sx.sx-in .sx-c>*:nth-child(5){transition-delay:.32s}
+.sx-eb{display:flex;align-items:center;gap:14px;margin:0 0 16px;font:500 12px/1 var(--sx);letter-spacing:.24em;text-transform:uppercase;color:var(--ink8)}
+.sx-n{color:var(--ink4);font-variant-numeric:tabular-nums}
+.sx-live{display:inline-flex;align-items:center;gap:7px;margin-left:4px;padding-left:14px;border-left:1px solid var(--line);color:var(--ink6)}
+.sx-live[hidden]{display:none}
+.sx-live i{width:5px;height:5px;border-radius:50%;background:#F0F0FA;animation:sx-b 2.6s ease-in-out infinite}
+.sx-live b{font-weight:500}
+@keyframes sx-b{0%,100%{opacity:.25}50%{opacity:1}}
+.sx-h{margin:0 0 14px;font:700 clamp(40px,5.4vw,76px)/1.0 var(--sx);letter-spacing:.01em;text-transform:uppercase;color:#fff;text-wrap:balance}
+.sx-l{margin:0 0 26px;max-width:520px;font:400 clamp(15px,1.15vw,17px)/1.55 Inter,"Helvetica Neue",Arial,sans-serif;color:var(--ink8)}
+/* live strip: hairline rows, no boxes */
+.sx-d{margin:0 0 30px;max-width:560px;border-top:1px solid var(--line);font:400 14px/1.4 Inter,"Helvetica Neue",Arial,sans-serif;color:var(--ink8);font-variant-numeric:tabular-nums}
+.sx-d[hidden]{display:none}
+.sx-kv{display:flex;gap:0;border-bottom:1px solid var(--line)}
+.sx-kv>div{flex:1 1 0;min-width:0;padding:12px 14px 12px 0}
+.sx-kv>div+div{padding-left:14px;border-left:1px solid var(--line)}
+.sx-kv b{display:block;font:300 clamp(24px,2.3vw,32px)/1.05 var(--sx);color:#fff;letter-spacing:.01em;white-space:nowrap}
+.sx-kv span{display:block;margin-top:6px;font:500 10px/1.25 var(--sx);letter-spacing:.18em;text-transform:uppercase;color:var(--ink6)}
+.sx-r{display:flex;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--line);color:var(--ink8)}
+a.sx-r{transition:color .25s}
+a.sx-r:hover,a.sx-r:focus-visible{color:#fff}
+.sx-r .rk{flex:none;display:inline-flex;align-items:center;gap:7px;width:76px;white-space:nowrap;font:500 10px/1 var(--sx);letter-spacing:.18em;text-transform:uppercase;color:var(--ink6)}
+.sx-r .rk i{width:5px;height:5px;border-radius:50%;background:rgba(240,240,250,.55)}
+.sx-r .rk i.h{background:#FF4D4F}
+.sx-r .tx{flex:1;min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sx-r .tx em{font-style:normal;color:var(--ink4)}
+.sx-r .tm{flex:none;font:500 10px/1 var(--sx);letter-spacing:.14em;text-transform:uppercase;color:var(--ink4)}
+.sx-r .v{flex:none;font:400 14px/1 var(--sx);color:#fff;letter-spacing:.02em}
+.sx-r .c{flex:none;width:64px;text-align:right;font:400 13px/1 var(--sx);color:var(--ink6)}
+.sx-r .c.up{color:#fff}
+.sx-src{margin:9px 0 0;font:500 9.5px/1.3 var(--sx);letter-spacing:.16em;text-transform:uppercase;color:var(--ink4)}
+/* hairline pill button (spacex.com) */
+.sx-btn{display:inline-flex;align-items:center;gap:14px;height:50px;padding:0 26px 0 30px;border:1px solid rgba(240,240,250,.85);border-radius:999px;color:#fff;font:500 12px/1 var(--sx);letter-spacing:.24em;text-transform:uppercase;text-decoration:none;background:rgba(0,0,0,.08);-webkit-tap-highlight-color:transparent;transition:background .35s ease,color .35s ease,border-color .35s ease}
+.sx-btn svg{width:16px;height:16px;transition:transform .35s ease}
+.sx-btn:hover,.sx-btn:focus-visible{background:#F0F0FA;color:#000;border-color:#F0F0FA}
+.sx-btn:hover svg{transform:translateX(3px)}
+.sx-btn:focus-visible{outline:1px solid #fff;outline-offset:4px}
+body.bnt-home a.sx-btn{color:#fff}body.bnt-home a.sx-btn:hover,body.bnt-home a.sx-btn:focus-visible{color:#000}
+/* section rail (desktop) */
+.sx-rail{position:fixed;right:clamp(14px,2.4vw,36px);top:50%;transform:translateY(-50%);z-index:40}
+.sx-rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.sx-rail a{display:flex;align-items:center;justify-content:flex-end;gap:12px;height:26px;color:var(--ink4)}
+.sx-rail a span{font:500 10px/1 var(--sx);letter-spacing:.2em;text-transform:uppercase;opacity:0;transform:translateX(6px);transition:opacity .3s,transform .3s;white-space:nowrap}
+.sx-rail a::after{content:"";width:18px;height:1px;background:currentColor;transition:width .3s,background .3s}
+.sx-rail a.on{color:#fff}.sx-rail a.on::after{width:34px}
+.sx-rail:hover a span,.sx-rail a:focus-visible span,.sx-rail a.on span{opacity:1;transform:none}
+.sx-rail.off{opacity:0;pointer-events:none}
+.sx-rail{transition:opacity .4s}
+/* brief signup + footer, restyled to the panel language */
+.sx-brief{min-height:auto;height:auto;padding-top:96px;padding-bottom:40px;background:#030304;scroll-snap-align:start}
+.sx-brief::after{display:none}
+.sx-brief .h-copy>*{opacity:1;transform:none}
+.sx-body .h-copy .bnt-eyebrow::before{background:#F0F0FA}
+.sx-body .h-links a:hover,.sx-body .h-links a:focus-visible{border-color:#F0F0FA}
+.sx-body .h-menu li a:hover,.sx-body .h-menu li a:focus-visible,.sx-body .h-menu .h-mlive:hover,.sx-body .h-menu .h-mlive:focus-visible,.sx-body .h-extras button:hover{color:#fff}
+.sx-body .h-skipbox input{accent-color:#F0F0FA}
+.sx-body footer.h-foot{position:relative;bottom:auto;padding:28px 20px 48px;background:#030304;scroll-snap-align:end}
+@media (max-width:900px){
+ .sx-rail{display:none}
+ .sx-c{padding:0 22px max(48px,calc(env(safe-area-inset-bottom) + 34px))}
+ .sx-h{font-size:clamp(34px,10.4vw,48px);margin-bottom:12px}
+ .sx-l{font-size:15px;margin-bottom:20px}
+ .sx-eb{font-size:11px;margin-bottom:14px}
+ .sx-d{margin-bottom:22px;font-size:13.5px}
+ .sx-r{padding:10px 0}
+ .sx-r .tm{display:none}
+ .sx-kv>div{padding:10px 10px 10px 0}.sx-kv>div+div{padding-left:10px}
+ .sx-kv b{font-size:24px}.sx-kv span{font-size:9px;letter-spacing:.14em}
+ .sx-btn{height:48px}
+ .sx::after{background:linear-gradient(0deg,rgba(0,0,0,.92) 0%,rgba(0,0,0,.62) 42%,rgba(0,0,0,.08) 72%),linear-gradient(180deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,0) 18%)}
+}
+@media (max-height:640px){.sx-d .sx-r:nth-of-type(n+3){display:none}.sx-l{display:none}}
+@media (prefers-reduced-motion:reduce){html[data-sx]{scroll-behavior:auto}.sx-c>*,.sx-bg img{opacity:1;transform:none;transition:none}.sx-bg video{display:none}.sx-live i{animation:none}}
