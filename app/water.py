@@ -14,7 +14,7 @@ Layers (each its own kind):
   news       news reports of water-plant failures and boil notices (Google News RSS); listed, never pinned (no reliable place).
 Cache: in memory per source, stale-while-revalidate. Refresh (?fresh=1) re-pulls every source older than 60 s, in parallel.
 Never touches scanner.py, scoring, push.py, jets.py, aviation_watch.py, config.json, blackout.db, the newsletter or the QA gate.
-Routes: /water (page), /api/water/data, /api/water/app.js, /api/water/app.css."""
+Routes: /water (page), /water/<id> (item permalink + OG share card), /api/water/data, /api/water/app.js, /api/water/app.css."""
 import os, re, json, time, html as _html, hashlib, threading, urllib.request, urllib.parse
 import xml.etree.ElementTree as ET
 import email.utils
@@ -25,6 +25,21 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "water_static")
 FILES = {"app.js": "application/javascript", "app.css": "text/css"}
 UA = "BlackoutNetwork-water/1.0 (+https://blackout.network/water; cached, polite)"
+SITE = "https://blackout.network"
+ITEM_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9._-]{3,40}$")
+# Popular topic tags only. Never #News / #BlackoutNetwork, never source acronyms (SDWIS, NPDES, ICIS, ECHO, DEC).
+LEVEL_TAGS = {
+    "dnd": ["#DoNotDrink", "#DrinkingWater"],
+    "boil": ["#BoilWater", "#DrinkingWater"],
+    "viol": ["#DrinkingWater", "#WaterQuality"],
+    "serious": ["#DrinkingWater", "#WaterQuality"],
+    "snc": ["#Wastewater", "#Sewage"],
+    "news": ["#DrinkingWater"],
+    "dw": ["#DrinkingWater", "#WaterQuality"],
+    "ww": ["#Wastewater", "#WaterQuality"],
+}
+PAGE_TAGS = ["#BoilWater", "#DoNotDrink", "#DrinkingWater", "#Wastewater", "#WaterQuality"]
+PAGE_HEADLINE = "Water treatment status"
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 ECHO = "https://echodata.epa.gov/echo"
 NEWS_MAX_AGE_D = 5
@@ -266,21 +281,45 @@ def _kick(ids):
         t = threading.Thread(target=_run, args=(sid,), daemon=True, name="water-" + sid); t.start(); th.append(t)
     return th
 
-def data(force=False, budget=18.0):
+def data(force=False, budget=18.0, deco=True):
     due = []
     for sid, _l, _k, _u, ttl in SOURCES:
         e = _C.get(sid); age = time.time() - (e["t"] if e else 0)
         if not e or not e["t"] or age > ttl or (force and age > MIN_REFRESH_S): due.append(sid)
     threads = _kick(due)
     cold = [sid for sid in due if not (_C.get(sid) or {}).get("ok_t")]
-    if threads and (force or cold):                      # first load or a Refresh tap waits for the pull; a routine expiry serves the stale copy
+    warm = any((_C.get(sid) or {}).get("ok_t") for sid, *_ in SOURCES)
+    if threads and (force or (cold and not warm)):                      # first load or a Refresh tap waits for the pull; a routine expiry serves the stale copy
         end = time.time() + budget
         for t in threads:
             t.join(max(0.1, end - time.time()))
-    r = snapshot(); r["pulled"] = [t.name[6:] for t in threads]
+    if force or threads: _SNAP[1] = None
+    r = dict(snapshot() if deco else _snapshot(False)); r["pulled"] = [t.name[6:] for t in threads]
     return r
 
+def _kick_refresh():
+    """Start any due source refresh in the background and return at once (stale-while-revalidate)."""
+    due = [sid for sid, _l, _k, _u, ttl in SOURCES if (time.time() - ((_C.get(sid) or {}).get("t") or 0)) > ttl]
+    _kick(due)
+    return {"counts": {}, "sources": []}
+
+def raw_items():
+    """Undecorated cached items (cheap). Decoration builds hashtags per item, so only decorate what a response actually returns."""
+    out = []
+    for sid, *_ in SOURCES:
+        for it in (_C.get(sid) or {}).get("items") or []:
+            out.append({k: v for k, v in it.items() if v is not None and k != "by"})
+    return out
+
+_SNAP = [0.0, None]
 def snapshot():
+    if _SNAP[1] is not None and time.time() - _SNAP[0] < 20:
+        return _SNAP[1]
+    r = _snapshot()
+    _SNAP[0], _SNAP[1] = time.time(), r
+    return r
+
+def _snapshot(deco=True):
     items, srcs = [], []
     for sid, label, kind, url, ttl in SOURCES:
         e = _C.get(sid) or {"items": [], "ok_t": None, "err": None, "busy": False}
@@ -291,7 +330,8 @@ def snapshot():
     for it in items:
         counts[it["kind"]] = counts.get(it["kind"], 0) + 1
         pubs[it["src"]] = it.get("by")
-        slim.append({k: v for k, v in it.items() if v is not None and k != "by"})     # the page needs only what is set; publisher sits once per source
+        clean = {k: v for k, v in it.items() if v is not None and k != "by"}
+        slim.append(decorate(clean) if deco else clean)
     return dict(generated=iso(now()), counts=counts, sources=srcs, pubs=pubs, items=slim)
 
 # ---------------------------------------------------------------- page
@@ -309,54 +349,303 @@ def _v(name):
         _V[name] = (k, v); return v
     except OSError: return "0"
 
-def page():
-    import sitenav, sitenav_ui
+
+
+# ---------------------------------------------------------------- share / permalinks (reuse Wire x_share + growth share row)
+def permalink(it, for_x=False):
+    """Share-ready item URL. ?s=x busts X's card cache the same way /wire/<id>?s=x does."""
+    cid = str((it or {}).get("id") or "")
+    if not cid or not ITEM_ID_RE.match(cid):
+        u = SITE + "/water"
+        return u + ("?s=x" if for_x else "")
+    u = f"{SITE}/water/{cid}"
+    return u + ("?s=x" if for_x else "")
+
+
+def share_headline(it):
+    name = ((it or {}).get("name") or "").strip()
+    place = ((it or {}).get("place") or "").strip()
+    label = ((it or {}).get("label") or "Water treatment status").strip()
+    if (it or {}).get("kind") == "news":
+        return name or label
+    loc = f" at {name}" if name else ""
+    if place and place.lower() not in (name or "").lower():
+        loc = (loc + f", {place}") if loc else f" in {place}"
+    return f"{label}{loc}".strip()
+
+
+def share_item(it):
+    """Shape a water row for x_share so Post on X uses the same tag rules as The Wire."""
+    h = share_headline(it)
+    return {
+        "id": (it or {}).get("id"),
+        "cluster_id": (it or {}).get("id"),
+        "title": h,
+        "headline": h,
+        "location": (it or {}).get("place") or "",
+        "brief": (it or {}).get("note") or "",
+        "category": "infrastructure",
+    }
+
+
+# Obscure source-agency acronyms that x_share may lift from a note or publisher name.
+TAG_BAN = {t.lower() for t in (
+    "#DEC", "#SDWIS", "#NPDES", "#ICIS", "#ECHO", "#CWA", "#PWS", "#PWSID", "#GSDW",
+    "#AWW", "#NL", "#MB", "#AKDEC", "#DND", "#PWS", "#WSER", "#WWTP", "#STP", "#EPA", "#USGS", "#INGV", "#JMA", "#GDACS",
+)}
+
+
+def _clean_tags(seed, generated):
+    """Keep intentional topic seeds (e.g. #DoNotDrink) even if the Wire filler heuristic flags the camel-case phrase.
+    Drop banned fluff, official FILLER, source-feed acronyms, and obscure agency acronyms."""
+    import x_share
+    out, seen = [], set()
+    for t in list(seed or []) + list(generated or []):
+        if not t:
+            continue
+        if not str(t).startswith("#"):
+            t = "#" + str(t).lstrip("#")
+        key = t.lower()
+        if key in seen or key in TAG_BAN:
+            continue
+        name = t.lstrip("#").lower()
+        if name in x_share.FILLER or name in x_share.SOURCE_FEEDS:
+            continue
+        out.append(t)
+        seen.add(key)
+        if len(out) >= 5:
+            break
+    if len(out) < 3:
+        for t in ("#DrinkingWater", "#WaterQuality", "#BoilWater"):
+            if t.lower() not in seen:
+                out.append(t)
+                seen.add(t.lower())
+            if len(out) >= 3:
+                break
+    return out[:5]
+
+
+def item_tags(it):
+    """3-5 short popular tags plus place/entity names. Rule-based only (no LLM)."""
+    import x_share
+    si = share_item(it)
+    h = share_headline(it)
+    seed = list(LEVEL_TAGS.get((it or {}).get("level") or "", ["#DrinkingWater"]))
+    places = x_share.location_tags(si, headline=h)
+    entities = x_share.entity_tags(si, headline=h)
+    return _clean_tags(seed, x_share.finalize_tags(seed + places + entities, si, h))
+
+
+def item_intent(it):
+    import x_share
+    return x_share.intent_url(share_item(it), url=permalink(it, for_x=True), tags=item_tags(it))
+
+
+def page_intent():
+    import x_share
+    dummy = {"id": "page", "title": PAGE_HEADLINE, "headline": PAGE_HEADLINE, "location": "United States", "brief": "", "category": "infrastructure"}
+    return x_share.intent_url(dummy, url=SITE + "/water?s=x", tags=_clean_tags(list(PAGE_TAGS), x_share.finalize_tags(list(PAGE_TAGS), dummy, PAGE_HEADLINE)))
+
+
+def decorate(it):
+    """Add permalink, Post on X intent, and tags to a slim item. Never raises."""
+    out = dict(it or {})
+    try:
+        out["permalink"] = permalink(out)
+        out["tags"] = item_tags(out)
+        out["xu"] = item_intent(out)
+    except Exception:
+        out.setdefault("permalink", permalink(out))
+        out.setdefault("tags", list(LEVEL_TAGS.get(out.get("level") or "", ["#DrinkingWater"])))
+        out.setdefault("xu", "")
+    return out
+
+
+def plant_item(cid):
+    """A treatment plant from the cited inventory (waterdb), shaped like an advisory item so share / permalink / card code is shared."""
+    try:
+        import waterdb
+        c, d = waterdb.detail({"id": cid})[:2]
+    except Exception:
+        return None
+    if c != 200 or not isinstance(d, dict):
+        return None
+    ww = d.get("kind") == "ww"
+    place = d.get("st") if d.get("cc") == "US" and d.get("st") else (d.get("cc") or "")
+    it = dict(id=d["id"], kind="wastewater" if ww else "plant", level="ww" if ww else "dw",
+              label="Wastewater treatment plant" if ww else "Drinking-water treatment plant",
+              name=d["name"], place=place, lat=d["lat"], lon=d["lon"], precision="point",
+              note=d.get("note") or "", src=d["src"], url=d.get("url") or "")
+    return decorate(it)
+
+
+def item_by_id(cid):
+    if not cid or not ITEM_ID_RE.match(str(cid)):
+        return None
+    for it in raw_items():
+        if it.get("id") == cid:
+            return decorate(it)
+    return plant_item(cid)
+
+
+def card_spec(it):
+    """Typographic share-card item for share_card.render. Never a map or photo."""
+    level = (it or {}).get("level") or ""
+    colors = {
+        "dnd": (255, 77, 79),
+        "boil": (240, 240, 250),
+        "viol": (110, 168, 254),
+        "serious": (110, 168, 254),
+        "snc": (183, 156, 255),
+        "news": (142, 151, 166),
+        "dw": (110, 168, 254),
+        "ww": (183, 156, 255),
+    }
+    place = ((it or {}).get("place") or "").strip()
+    note = ((it or {}).get("note") or "").strip()
+    fact = note or place
+    if note and place and place.lower() not in note.lower():
+        fact = (place + ". " + note)
+    fact = fact[:180]
+    title = (it or {}).get("name") or (it or {}).get("label") or PAGE_HEADLINE
+    kicker = ((it or {}).get("label") or "WATER TREATMENT").upper()
+    return dict(
+        kind="water", id=(it or {}).get("id") or "page", title=title, kicker=kicker,
+        color=colors.get(level, (240, 240, 250)), stats=[],
+        fact=fact, lines=[], tags=(it or {}).get("tags") or [], loc=(it or {}).get("place") or "",
+        deep=permalink(it).replace(SITE, "") or "/water", art=("type",), credit="",
+        desc=fact, status=kicker,
+    )
+
+
+def page_card_spec():
+    return dict(
+        kind="water", id="page", title=PAGE_HEADLINE, kicker="BLACKOUT.NETWORK",
+        color=(240, 240, 250), stats=[],
+        fact="Active boil-water and do-not-drink notices, EPA drinking-water violations, and sewage-plant noncompliance. Every item links to its source.",
+        lines=[], tags=list(PAGE_TAGS), loc="United States", deep="/water", art=("type",), credit="", desc="",
+        status="WATER TREATMENT STATUS",
+    )
+
+
+def page(item=None):
+    import sitenav, sitenav_ui, og, growth
     try:
         import signal_map
         mlv, mlc = signal_map._v("maplibre-gl.js"), signal_map._v("maplibre-gl.css")
-    except Exception: mlv = mlc = "0"
-    title = "Water treatment status | BLACKOUT.NETWORK"
+    except Exception:
+        mlv = mlc = "0"
     desc = ("Active boil-water and do-not-drink notices from state and provincial agencies, U.S. drinking water systems with current EPA health-based violations, "
             "sewage plants in significant noncompliance, and news reports. Every item links to its source.")
+    if item:
+        title = f"{item.get('name') or item.get('label') or PAGE_HEADLINE} | BLACKOUT.NETWORK"
+        idesc = share_headline(item)
+        if item.get("place") and item.get("place") not in idesc:
+            idesc = idesc + " — " + item["place"]
+        if item.get("note"):
+            idesc = (idesc + ". " + str(item["note"]))[:240]
+        url = permalink(item)
+        img = SITE + "/og/share/water/" + item["id"] + ".png?v=" + (item["id"][:10])
+        canon = url
+        boot = f'<script>window.WT_OPEN={json.dumps(item["id"])};</script>'
+    else:
+        title = "Water treatment status | BLACKOUT.NETWORK"
+        idesc = desc
+        url = SITE + "/water"
+        img = SITE + "/og/share/water/page.png?v=1"
+        canon = url
+        boot = ""
+    # og:title must contain BLACKOUT.NETWORK or server.pwa_head rewrites it
+    og_tags = og.tags(title=title, desc=idesc, url=url + "?s=x", image=img)
     chips = [("advisory", "Boil and do-not-drink notices"), ("violation", "EPA health violations"), ("wastewater", "Sewage plant noncompliance"), ("news", "In the news")]
     chip_html = "".join(f'<button type="button" class="wt-chip" data-k="{k}" aria-pressed="true"><i class="wt-dot wt-{k}"></i><span>{E(t)}</span><b data-n="{k}">0</b></button>' for k, t in chips)
-    return f'''<!doctype html><html lang="en" class="wt-root"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{sitenav_ui.THEME_SCRIPT}
-<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/water">
-<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#05060a">
-<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preload" href="/api/water/data" as="fetch" crossorigin>
-<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
-<link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/water/app.css?v={_v("app.css")}">
-<script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
-<link rel="icon" href="/favicon.ico?v=5" sizes="any"></head>
-<body class="wt bn-has-ref"><a class="skip" href="#wt_list">Skip to the list</a>
-{sitenav.header_html("")}
-<div id="wt_main" role="main">
-<section class="wt-map-wrap" aria-label="Map of water treatment status"><div id="wt_map" class="wt-map" role="region" aria-label="Map of boil notices, violations and plant noncompliance. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>
-<div class="wt-leg" aria-hidden="true"><span><i class="wt-dot wt-dnd"></i>Do not drink</span><span><i class="wt-dot wt-boil"></i>Boil notice</span><span><i class="wt-dot wt-viol"></i>EPA violation, county</span><span><i class="wt-dot wt-snc"></i>Sewage plant</span></div></section>
-<section class="wt-panel" aria-label="Status list">
-<div class="wt-head"><div><h1>Water treatment status</h1><p class="wt-sub" id="wt_sub">Loading live data</p></div>{sitenav_ui.refresh_fill_btn("wt_ref")}</div>
-<div class="wt-chips" id="wt_chips" role="group" aria-label="Show">{chip_html}</div>
-<label class="wt-search"><span class="wt-vh">Search by system, place or state</span><input id="wt_q" type="search" placeholder="Search system, place or state" autocomplete="off" enterkeyhint="search"></label>
-<div id="wt_list" class="wt-list" aria-live="polite"><p class="wt-empty">Loading</p></div>
-<button type="button" class="wt-more" id="wt_more" hidden>Show more</button>
-<div class="wt-src" id="wt_src"></div>
-<p class="wt-foot">Research only. BLACKOUT.NETWORK is not an official warning service. Follow your local water utility and health department. Notices come from the agencies named on each item and can change faster than this page updates. "EPA violation" means a compliance finding in EPA's records, not that the water is unsafe to drink today.</p>
-<p class="wt-foot wt-credit">{CREDITS}</p>
-</section></div>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/water/app.js?v={_v("app.js")}" defer></script>
-</body></html>'''
+    try:
+        page_share = growth.share_html(SITE + "/water", PAGE_HEADLINE, campaign="water", intent=page_intent())
+    except Exception:
+        page_share = ""
+    try:
+        follow = growth.follow_html()
+    except Exception:
+        follow = ""
+    disc = ("Research only. BLACKOUT.NETWORK is not an official warning service. Follow your local water utility and health department. "
+            "Notices come from the agencies named on each item and can change faster than this page updates. "
+            '"EPA violation" means a compliance finding in EPA\'s records, not that the water is unsafe to drink today.')
+    return (
+        '<!doctype html><html lang="en" class="wt-root"><head><meta charset="utf-8">'
+        f'<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{sitenav_ui.THEME_SCRIPT}'
+        f'<title>{E(title)}</title><meta name="description" content="{E(idesc)}"><link rel="canonical" href="{E(canon)}">'
+        f'<meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#05060a">'
+        f'{og_tags}'
+        f'<link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin><link rel="preload" href="/api/water/data" as="fetch" crossorigin>'
+        f'<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">'
+        f'<link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/water/app.css?v={_v("app.css")}">'
+        f'<script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>'
+        f'<link rel="icon" href="/favicon.ico?v=5" sizes="any"></head>'
+        f'<body class="wt bn-has-ref"><a class="skip" href="#wt_list">Skip to the list</a>'
+        f'{sitenav.header_html("")}'
+        f'<div id="wt_main" role="main">'
+        f'<section class="wt-map-wrap" aria-label="Map of water treatment status"><div id="wt_map" class="wt-map" role="region" aria-label="Map of boil notices, violations and plant noncompliance. Drag to pan, pinch or scroll to zoom, tap a point for details."></div>'
+        f'<div class="wt-leg" aria-hidden="true"><span><i class="wt-dot wt-dnd"></i>Do not drink</span><span><i class="wt-dot wt-boil"></i>Boil notice</span><span><i class="wt-dot wt-viol"></i>EPA violation, county</span><span><i class="wt-dot wt-snc"></i>Sewage plant</span></div></section>'
+        f'<section class="wt-panel" aria-label="Status list">'
+        f'<div class="wt-head"><div><h1>Water treatment status</h1><p class="wt-sub" id="wt_sub">Loading live data</p></div>{sitenav_ui.refresh_fill_btn("wt_ref")}</div>'
+        f'<div class="wt-page-share" aria-label="Share this page">{page_share}</div>'
+        f'<div class="wt-chips" id="wt_chips" role="group" aria-label="Show">{chip_html}</div>'
+        f'<label class="wt-search"><span class="wt-vh">Search by system, place or state</span><input id="wt_q" type="search" placeholder="Search system, place or state" autocomplete="off" enterkeyhint="search"></label>'
+        f'<div id="wt_list" class="wt-list" aria-live="polite"><p class="wt-empty">Loading</p></div>'
+        f'<button type="button" class="wt-more" id="wt_more" hidden>Show more</button>'
+        f'<div class="wt-src" id="wt_src"></div>'
+        f'<p class="wt-foot">{E(disc)}</p>'
+        f'<p class="wt-foot wt-credit">{CREDITS}</p>'
+        f'{follow}'
+        f'</section></div>'
+        f'{boot}'
+        f'<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/water/app.js?v={_v("app.js")}" defer></script>'
+        f'</body></html>'
+    )
+
 
 def handle_get(path, qs=None, headers=None):
     p = (path or "").rstrip("/") or "/"
-    if p == "/water": return 200, page(), "text/html"
+    if p == "/water":
+        return 301, b"", "text/html", {"Location": "/grid/water"}
+    m = ITEM_ID_RE.fullmatch((p[7:] if p.startswith("/water/") else ""))
+    if p.startswith("/water/") and m:
+        return 301, b"", "text/html", {"Location": "/grid/water/" + m.group(0)}
     if p == "/api/water/data":
         try:
-            f = str(((qs or {}).get("fresh") or [""])[0] if isinstance((qs or {}).get("fresh"), list) else (qs or {}).get("fresh") or "").lower() in ("1", "true", "yes")
-            return 200, data(force=f), "application/json"
-        except Exception as ex: return 503, {"error": "water data unavailable", "detail": type(ex).__name__}
+            def q1(k):
+                v = (qs or {}).get(k)
+                return str((v[0] if isinstance(v, list) and v else v) or "")
+            f = q1("fresh").lower() in ("1", "true", "yes")
+            if q1("limit").isdigit():   # panel list: most severe first, paged; decorate only the rows returned
+                d = data(force=f, budget=12.0, deco=False) if (f or not raw_items()) else _kick_refresh()
+                rank = {"dnd": 0, "boil": 1, "serious": 2, "viol": 3, "snc": 4, "news": 5}
+                items = sorted(raw_items(), key=lambda it: (rank.get(it.get("level"), 9), -(it.get("pop") or 0)))
+                lim = max(1, min(100, int(q1("limit")))); off = int(q1("offset")) if q1("offset").isdigit() else 0
+                return 200, dict(generated=iso(now()), counts=d.get("counts"), sources=d.get("sources"), items=[decorate(it) for it in items[off:off + lim]], total=len(items), offset=off), "application/json"
+            d = data(force=f)
+            return 200, d, "application/json"
+        except Exception as ex:
+            return 503, {"error": "water data unavailable", "detail": type(ex).__name__}
+    if p == "/api/water/item":   # one decorated item (advisory or plant): permalink, Post on X intent, tags
+        v = (qs or {}).get("id"); cid = str((v[0] if isinstance(v, list) and v else v) or "")
+        it = item_by_id(cid)
+        return (200, it, "application/json") if it else (404, {"error": "not found"})
+    if p == "/api/water/map":   # slim status dots for the Grid layer: [id, lon, lat, level, name]
+        try:
+            if not raw_items(): data(budget=12.0, deco=False)
+            else: _kick_refresh()
+            its = raw_items()
+            counts = {}
+            for it in its: counts[it["kind"]] = counts.get(it["kind"], 0) + 1
+            rows = [[it["id"], round(it["lon"], 4), round(it["lat"], 4), it.get("level") or "", (it.get("name") or "")[:60]]
+                    for it in its if it.get("lat") is not None and it.get("lon") is not None]
+            return 200, {"generated": iso(now()), "counts": counts, "r": rows}, "application/json"
+        except Exception as ex:
+            return 503, {"error": "water data unavailable", "detail": type(ex).__name__}
     if p.startswith("/api/water/"):
         n = p[len("/api/water/"):]
         if n in FILES:
-            with open(os.path.join(STATIC, n), "rb") as fh: return 200, fh.read(), FILES[n]
+            with open(os.path.join(STATIC, n), "rb") as fh:
+                return 200, fh.read(), FILES[n]
     return 404, {"error": "not found"}

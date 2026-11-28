@@ -3273,6 +3273,16 @@ def item_for_share(kind, ident, qs=None):
                               fact=_q(qs, "d") or f"Internet outage signal in {c['name']}, measured by IODA (Georgia Tech).", lines=[], tags=[], loc=c["name"],
                               deep="/grid", art=("map", c["lon"], c["lat"], 40), credit="Data: IODA, Georgia Tech", desc="")
                     break
+    elif kind == "water":
+        try:
+            import water as WT
+            if ident == "page":
+                it = WT.page_card_spec()
+            else:
+                rec = WT.item_by_id(ident)
+                it = WT.card_spec(rec) if rec else WT.page_card_spec()
+        except Exception:
+            it = None
     if it:
         return it
     # unknown id: typographic card from the client-supplied name / detail (sanitised, capped); never a 5xx

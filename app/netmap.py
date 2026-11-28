@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(BASE, "netmap_static")
-FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json", "hydro.json": "application/json", "inet_ents.json": "application/json", "launches.js": "application/javascript", "solar3d.js": "application/javascript", "three147.js": "application/javascript", "skytrack.js": "application/javascript", "planets3d.js": "application/javascript", "chase3d.js": "application/javascript", "bnshare.js": "application/javascript"}
+FILES = {"gridlayer.js": "application/javascript", "gridlayer.css": "text/css", "net.js": "application/javascript", "net.css": "text/css", "boot.js": "application/javascript", "board.js": "application/javascript", "board.css": "text/css", "cables.json": "application/json", "towers.json": "application/json", "grid.json": "application/json", "gridops.json": "application/json", "logos.svg": "image/svg+xml", "inet.json": "application/json", "hydro.json": "application/json", "inet_ents.json": "application/json", "launches.js": "application/javascript", "solar3d.js": "application/javascript", "three147.js": "application/javascript", "skytrack.js": "application/javascript", "planets3d.js": "application/javascript", "chase3d.js": "application/javascript", "bnshare.js": "application/javascript", "waterlayer.js": "application/javascript", "waterlayer.css": "text/css"}
 E = lambda s: _html.escape(str(s if s is not None else ""), quote=True)
 UA = "BlackoutNetwork-status/2.0 (+https://blackout.network/grid; cached, polite)"
 IODA = "https://api.ioda.inetintel.cc.gatech.edu/v2"; IODA_UI = "https://ioda.inetintel.cc.gatech.edu"
@@ -680,9 +680,9 @@ SKY_CHIPS = [("iss", "ISS", "#FFFFFF"), ("starlink", "Starlink", "#E8ECF5"), ("g
              ("beidou", "BeiDou", "#FF8FB1"), ("iridium", "Iridium", "#9DB4FF"), ("oneweb", "OneWeb", "#FFA270"), ("goes", "GOES", "#FF7AE0"), ("debris", "Debris", "#8A94A8"),
              ("ss", "Solar system", "#F0E6D2"), ("sw", "Space weather", "#7FD4FF")]
 # Nov 24 2026 (Matt): one "Power grid" chip (outages + operators + 230 kV+ lines); chips with no map items (Mobile, Satellite, Payments, Apps) live on Status only
-CHIPS = [("internet", "Internet"), ("grid", "Power grid"), ("hydro", "Hydro dams"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers")]
+CHIPS = [("internet", "Internet"), ("grid", "Power grid"), ("water", "Water"), ("hydro", "Hydro dams"), ("cloud", "Cloud"), ("sea", "Undersea cables"), ("towers", "Cell towers"), ("dc", "Data centers")]
 
-def page(qs=None):
+def page(qs=None, water_id=None):
     try:
         import sitenav, sitenav_ui
         top = sitenav.header_html("net"); theme = sitenav_ui.THEME_SCRIPT
@@ -697,24 +697,49 @@ def page(qs=None):
     title = "The Grid: live status of power, internet, mobile, cloud and apps | BLACKOUT.NETWORK"
     desc = ("The Grid: live status of the power grid and the networks that run on it. Grid operators colored by status, outages by state, weather threats, "
             "plus plain-English verdicts for internet providers, mobile carriers, AWS, Cloudflare, payments, apps and government services, an incident log and a satellite globe.")
+    water_open = bool(water_id) or (qs or {}).get("_water") == 1
+    water_item = None
+    og_url = "https://blackout.network/grid"
+    og_img = "https://blackout.network/og/grid.png"
+    follow = ""
+    page_share = ""
+    if water_open:
+        try:
+            import water as WT, growth
+            water_item = WT.item_by_id(water_id) if water_id else None
+            if water_item:
+                title = (water_item.get("name") or "Water treatment") + " | BLACKOUT.NETWORK"
+                desc = water_item.get("note") or water_item.get("label") or "Water treatment status."
+                og_url = WT.permalink(water_item)
+                og_img = f"https://blackout.network/og/share/water/{water_item['id']}.png"
+            else:
+                title = "Water treatment plants and advisories | BLACKOUT.NETWORK"
+                desc = "Drinking-water and wastewater treatment plants, plus boil-water, do-not-drink and compliance advisories, on The Grid."
+                og_url = "https://blackout.network/water"
+                og_img = "https://blackout.network/og/share/water/page.png"
+            follow = growth.follow_html()
+            page_share = growth.share_html(og_url, title.split(" |")[0], campaign="water", intent=WT.page_intent() if not water_item else WT.item_intent(water_item))
+        except Exception:
+            follow = page_share = ""
     # pt1832u: restore #128 defaults — constellation chips on; debris, solar system and space weather stay off
     _sky_off = {"debris", "ss", "sw"}
     skychips = "".join(f'<button type="button" data-g="{g}" aria-pressed="{"false" if g in _sky_off else "true"}"><i style="background:{c};border-color:{c}"></i><span>{E(t)}</span></button>' for g, t, c in SKY_CHIPS)
-    chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="true"><i></i>{E(t)}</button>' for k, t in CHIPS)
+    chips = "".join(f'<button type="button" data-k="{k}" aria-pressed="{"false" if k == "water" else "true"}"><i></i>{E(t)}</button>' for k, t in CHIPS)
     return f'''<!doctype html><html lang="en" class="nx-root"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">{theme}
 <title>{E(title)}</title><meta name="description" content="{E(desc)}">
-<link rel="canonical" href="https://blackout.network/grid">
+<link rel="canonical" href="{E(og_url)}">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
-<meta property="og:url" content="https://blackout.network/grid"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/grid.png">
+<meta property="og:url" content="{E(og_url)}"><meta property="og:type" content="website"><meta property="og:image" content="{E(og_img)}">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{E(og_img)}">
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link rel="preload" href="/api/netmap/data" as="fetch" crossorigin>
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/maplibre-gl.css?v={mlc}"><link rel="stylesheet" href="/api/netmap/net.css?v={_v("net.css")}">
 <script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
-<link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}"><link rel="stylesheet" href="/api/netmap/gridlayer.css?v={_v("gridlayer.css")}">
+<link rel="stylesheet" href="/api/netmap/board.css?v={_v("board.css")}"><link rel="stylesheet" href="/api/netmap/gridlayer.css?v={_v("gridlayer.css")}"><link rel="stylesheet" href="/api/netmap/waterlayer.css?v={_v("waterlayer.css")}">
 </head><body class="nx bn-has-ref">
 <script>(function(){{if(location.hash==="#status"){{document.body.classList.add("nx-board");}}}})()</script>
 <a class="skip" href="#nb_q">Skip to the outage search</a>
@@ -735,10 +760,15 @@ def page(qs=None):
 <button type="button" class="nx-b" id="nx_zout" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
 <button type="button" class="nx-b" id="nx_world" aria-label="Show the world"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg></button>
 <button type="button" class="nx-b" id="nx_home" aria-label="Show the whole U.S."><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button></div>
-<div class="nx-leg" id="nx_leg" aria-label="Legend"><div class="nx-leg-mini" id="nx_wire_mini" aria-label="Wire recency: last 6 hours or current, 6 to 24 hours, 1 to 7 days"><i class="s-6h"></i><i class="s-24h"></i><i class="s-7d"></i></div><button type="button" class="nx-leg-btn" id="nx_leg_btn" aria-expanded="false" aria-controls="nx_leg_body">Key</button><div class="nx-leg-body" id="nx_leg_body" hidden><p class="nx-k" id="nx_wire_leg_h">On The Wire</p><ul id="nx_wire_leg" aria-label="Wire outage recency"><li><i class="s-6h"></i>Last 6 hours or current</li><li><i class="s-24h"></i>6–24 hours</li><li><i class="s-7d"></i>1–7 days</li></ul><p class="nx-live" id="nx_wire_leg_n"></p><ul data-leg="internet"><li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li style="display:none"><i class="s-na" style="background:#7C8190"></i>No data</li></ul><ul data-leg="dc"><li><i class="s-dc"></i>Data center</li></ul><ul class="nx-shapes" id="gx_leg" hidden><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul><ul class="nx-lnk" data-leg="grid" aria-label="Power lines, coloured by their grid operator&#39;s live status"><li><i class="ln" style="background:#2FD67B"></i>Lines normal</li><li><i class="ln" style="background:#F5D547"></i>Strained</li><li><i class="ln" style="background:#FF3B3B"></i>Outage</li><li><i class="ln" style="background:#7C8190"></i>No live feed</li></ul><p class="nx-live" data-leg="grid" id="gx_live">Live: U.S., Europe, GB, Nordic</p><ul class="nx-lnk" data-leg="hydro" aria-label="Hydro dams by reservoir level"><li><i style="width:8px;height:8px;border-radius:50%;background:#2FD67B"></i>Dam level OK</li><li><i style="width:8px;height:8px;border-radius:50%;background:#FF7A1A"></i>Low water</li><li><i style="width:8px;height:8px;border-radius:50%;background:#FF3B3B"></i>Very low water</li><li><i style="width:8px;height:8px;border-radius:50%;background:rgba(124,129,144,.6)"></i>No level data</li></ul></div></div>
+<div class="nx-leg" id="nx_leg" aria-label="Legend"><div class="nx-leg-mini" id="nx_wire_mini" aria-label="Wire recency: last 6 hours or current, 6 to 24 hours, 1 to 7 days"><i class="s-6h"></i><i class="s-24h"></i><i class="s-7d"></i></div><button type="button" class="nx-leg-btn" id="nx_leg_btn" aria-expanded="false" aria-controls="nx_leg_body">Key</button><div class="nx-leg-body" id="nx_leg_body" hidden><p class="nx-k" id="nx_wire_leg_h">On The Wire</p><ul id="nx_wire_leg" aria-label="Wire outage recency"><li><i class="s-6h"></i>Last 6 hours or current</li><li><i class="s-24h"></i>6–24 hours</li><li><i class="s-7d"></i>1–7 days</li></ul><p class="nx-live" id="nx_wire_leg_n"></p><ul data-leg="internet"><li><i class="s-ok"></i>Normal</li><li><i class="s-deg"></i>Disruption</li><li><i class="s-out"></i>Major</li><li style="display:none"><i class="s-na" style="background:#7C8190"></i>No data</li></ul><ul data-leg="dc"><li><i class="s-dc"></i>Data center</li></ul><ul class="nx-shapes" id="gx_leg" hidden><li><i class="sh-ring"></i>Grid operator</li><li><i class="sh-dia"></i>Weather or grid alert</li></ul><ul class="nx-lnk" data-leg="grid" aria-label="Power lines, coloured by their grid operator&#39;s live status"><li><i class="ln" style="background:#2FD67B"></i>Lines normal</li><li><i class="ln" style="background:#F5D547"></i>Strained</li><li><i class="ln" style="background:#FF3B3B"></i>Outage</li><li><i class="ln" style="background:#7C8190"></i>No live feed</li></ul><p class="nx-live" data-leg="grid" id="gx_live">Live: U.S., Europe, GB, Nordic</p><ul class="nx-lnk" data-leg="water" aria-label="Water treatment plants and advisories"><li><i style="width:8px;height:8px;border-radius:50%;background:#FF4D4F"></i>Do not drink</li><li><i style="width:8px;height:8px;border-radius:50%;background:#F0F0FA;border:1px solid #8E97A6"></i>Boil water</li><li><i style="width:8px;height:8px;border-radius:50%;background:#6EA8FE"></i>Drinking-water plant or violation</li><li><i style="width:8px;height:8px;border-radius:50%;background:#B79CFF"></i>Wastewater plant or noncompliance</li></ul><ul class="nx-lnk" data-leg="hydro" aria-label="Hydro dams by reservoir level"><li><i style="width:8px;height:8px;border-radius:50%;background:#2FD67B"></i>Dam level OK</li><li><i style="width:8px;height:8px;border-radius:50%;background:#FF7A1A"></i>Low water</li><li><i style="width:8px;height:8px;border-radius:50%;background:#FF3B3B"></i>Very low water</li><li><i style="width:8px;height:8px;border-radius:50%;background:rgba(124,129,144,.6)"></i>No level data</li></ul></div></div>
 <button type="button" class="nx-more-btn" id="nx_more_btn" aria-controls="nx_more" aria-expanded="false"><span id="nx_more_lbl">All networks</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <button type="button" class="gx-more-btn" id="gx_more_btn" aria-controls="gx_more" aria-expanded="false"><span class="gx-ml">More about the grid</span><span class="gx-ms">Grid details</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
 <aside class="nx-card" id="nx_card" hidden aria-live="polite"></aside>
+<button type="button" class="nx-water-btn" id="nx_water_btn" aria-controls="nx_water" aria-expanded="false" hidden>Water</button>
+<section class="nx-water" id="nx_water" aria-label="Water treatment" hidden>
+<div class="nx-mh"><div><p class="nx-k">The Grid</p><h2>Water</h2></div><button type="button" class="nx-x" id="nx_water_x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="nx-scroll" id="nx_water_scroll"><div id="nx_water_share">{page_share}</div><div id="nx_water_list"><p class="nx-empty">Loading water data…</p></div><div id="nx_water_follow">{follow}</div></div></section>
+
 {GRID_MORE}
 <section class="nx-more" id="nx_more" aria-label="All networks" hidden>
 <div class="nx-grab" aria-hidden="true"></div>
@@ -746,7 +776,7 @@ def page(qs=None):
 <div class="nx-scroll" id="nx_scroll"><div id="nx_list"><p class="nx-empty">Loading…</p></div></div></section>
 <noscript><p class="nx-nojs">The network map needs JavaScript. <a href="/grid/providers">Cloud provider pages</a></p></noscript>
 </main>
-<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/bnshare.js?v={_v("bnshare.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script src="/api/netmap/gridlayer.js?v={_v("gridlayer.js")}" defer></script><script src="/api/netmap/launches.js?v={_v("launches.js")}" defer></script><script src="/api/netmap/skytrack.js?v={_v("skytrack.js")}" defer></script><script>window.BN_SATJS={json.dumps(list(SATJS))};window.BN_SOLAR3D=["/api/netmap/three147.js?v={_v("three147.js")}","/api/netmap/solar3d.js?v={_v("solar3d.js")}"];window.BN_PLANETS3D="/api/netmap/planets3d.js?v={_v("planets3d.js")}";window.BN_CHASE3D=["/api/netmap/three147.js?v={_v("three147.js")}","/api/netmap/chase3d.js?v={_v("chase3d.js")}"];</script>
+<script src="/api/signal/maplibre-gl.js?v={mlv}" defer></script><script src="/api/netmap/bnshare.js?v={_v("bnshare.js")}" defer></script><script src="/api/netmap/net.js?v={_v("net.js")}" defer></script><script src="/api/netmap/waterlayer.js?v={_v("waterlayer.js")}" defer></script><script src="/api/netmap/board.js?v={_v("board.js")}" defer></script><script src="/api/netmap/gridlayer.js?v={_v("gridlayer.js")}" defer></script><script src="/api/netmap/launches.js?v={_v("launches.js")}" defer></script><script src="/api/netmap/skytrack.js?v={_v("skytrack.js")}" defer></script><script>window.BN_WATER={json.dumps({"open": bool(water_open), "id": water_id or "", "item": (water_item or None)}).replace("</", "<\\/")};window.BN_SATJS={json.dumps(list(SATJS))};window.BN_SOLAR3D=["/api/netmap/three147.js?v={_v("three147.js")}","/api/netmap/solar3d.js?v={_v("solar3d.js")}"];window.BN_PLANETS3D="/api/netmap/planets3d.js?v={_v("planets3d.js")}";window.BN_CHASE3D=["/api/netmap/three147.js?v={_v("three147.js")}","/api/netmap/chase3d.js?v={_v("chase3d.js")}"];</script>
 </body></html>'''
 
 def detail_page(sid):
@@ -766,6 +796,10 @@ def detail_page(sid):
 def handle_get(path, qs=None, headers=None):
     p = path.rstrip("/") or "/"
     if p in ("/grid", "/network"): return 200, page(qs or {}), "text/html"
+    if p == "/grid/water":
+        return 200, page(dict(qs or {}, _water=1), water_id=None), "text/html"
+    m = re.fullmatch(r"/grid/water/([A-Za-z][A-Za-z0-9._-]{3,40})", p)
+    if m: return 200, page(dict(qs or {}, _water=1), water_id=m.group(1)), "text/html"
     m = re.fullmatch(r"/grid/status/([a-z0-9]+)", p)
     if m: return detail_page(m.group(1))
     if p == "/api/netmap/data":
@@ -873,6 +907,12 @@ def handle_get(path, qs=None, headers=None):
             return 200, netsky.cad()
         except Exception as ex:
             return 503, {"error": "close-approach data unavailable right now", "detail": type(ex).__name__}
+    if p in ("/api/netmap/water", "/api/netmap/water_plant"):   # Water layer: viewport clusters / points and one-plant detail from the read-only SQLite store
+        import waterdb
+        try:
+            return waterdb.view(qs or {}) if p == "/api/netmap/water" else waterdb.detail(qs or {})
+        except Exception as ex:
+            return 503, {"error": "plant inventory unavailable", "detail": type(ex).__name__}
     mt = re.fullmatch(r"/api/netmap/gridtiles/(\d{1,2})/(\d{1,4})/(\d{1,4})\.pbf", p)
     if mt:
         import netinfra
