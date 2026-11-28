@@ -26,11 +26,12 @@ CACHE = os.path.join(HERE, "sources_registry_cache.json")
 HEALTH = os.path.join(HERE, "sources_registry_health.json")
 NAME = "Registry feeds (worldwide, site-hosted)"
 UA = "Mozilla/5.0 (compatible; BlackoutNetworkBot/1.0; +https://blackout.network)"
-WORKERS = int(os.environ.get("BN_REG_WORKERS", "24") or 24)
+WORKERS = int(os.environ.get("BN_REG_WORKERS", "12") or 12)
 TIMEOUT = float(os.environ.get("BN_REG_TIMEOUT", "8") or 8)
 REFRESH_REMOTE_S = 600
 DRAIN_MAX = int(os.environ.get("BN_REG_DRAIN_MAX", "250") or 250)
 PENDING_MAX_AGE_H = 24
+PENDING_MAX = int(os.environ.get("BN_REG_PENDING_MAX", "2000") or 2000)
 MAX_BYTES = 3_000_000
 DEFAULT_IV = {"news": 300, "official": 300, "social": 180}
 
@@ -67,12 +68,12 @@ def _safe_url(u):
             ip = ipaddress.ip_address(h)
             return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved)
         except ValueError:
-            return not any(x in h for x in ("x.com", "twitter.com", "facebook.com", "instagram.com", "news.google.com"))
+            return not any(x in h for x in ("x.com", "twitter.com", "facebook.com", "instagram.com"))
     except Exception:
         return False
 
 def _valid_feed(f):
-    return isinstance(f, dict) and f.get("id") and f.get("url") and _safe_url(f["url"]) and (f.get("type") or "rss") in ("rss", "bsky", "mastodon", "telegram", "statuspage", "kev")
+    return isinstance(f, dict) and f.get("id") and f.get("url") and _safe_url(f["url"]) and (f.get("type") or "rss") in ("rss", "bsky", "mastodon", "telegram", "statuspage", "kev", "gdelt2", "ll2", "jetstream")
 
 # ---------------------------------------------------------------- registry load (remote -> cache -> bundled)
 def _read(path):
@@ -157,6 +158,19 @@ def _domain(u):
     try:
         d = urlparse(u).netloc.lower(); return d[4:] if d.startswith("www.") else d
     except Exception: return ""
+
+
+def _enqueue(items):
+    """Newest items into the pending drain queue; cap so a firehose cannot grow memory without bound."""
+    if not items: return
+    now = time.time()
+    with _lock:
+        for it in items:
+            _state["pending"][it["id"]] = (now, it)
+        if len(_state["pending"]) > PENDING_MAX:
+            extra = sorted(_state["pending"].items(), key=lambda kv: kv[1][0])
+            for k,_ in extra[:len(_state["pending"]) - PENDING_MAX]:
+                _state["pending"].pop(k, None)
 
 # ---------------------------------------------------------------- adapters
 def _a_rss(f, body):
@@ -289,10 +303,187 @@ def _a_telegram(f, body=None):
             if it and not _dedupe_title(body_t[:200]): out.append(it)
     return out
 
+
+# CAMEO root-code labels for GDELT 2.0 event titles (English, generated; the export file has no headlines)
+_CAMEO = {"13":"threatens","14":"protest","15":"military posture","16":"reduces relations","17":"coercion","18":"assault","19":"fight","20":"mass violence",
+          "10":"demand","11":"disapproves","12":"rejects","18":"assault"}
+_CAMEO_CAT = {"14":"political","17":"war/conflict","18":"war/conflict","19":"war/conflict","20":"war/conflict","13":"war/conflict","15":"war/conflict"}
+
+def _a_gdelt2(f, body=None):
+    """GDELT 2.0 15-minute event export (no API key, one zip ~30 KB). Titles are built from CAMEO codes + actors."""
+    import zipfile, io
+    raw = body if body and b"export.CSV.zip" in (body if isinstance(body, bytes) else b"") else _http(f, f["url"], "text/plain")
+    if not raw: return []
+    text = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
+    export = None
+    for ln in text.splitlines():
+        if "export.CSV.zip" in ln:
+            export = ln.split()[-1].replace("http://", "https://"); break
+    if not export or not _safe_url(export): return []
+    zbody = _http(f, export, "application/zip")
+    if not zbody or zbody[:2] != b"PK": return []
+    z = zipfile.ZipFile(io.BytesIO(zbody)); rows = z.read(z.namelist()[0]).decode("utf-8", "replace").splitlines()
+    cap = int(f.get("cap", 60)); out = []; scored = []
+    for ln in rows:
+        p = ln.split("\t")
+        if len(p) < 61: continue
+        root, url = p[28], p[60]
+        try:
+            ns, nm, gs = int(float(p[32] or 0)), int(float(p[31] or 0)), float(p[30] or 0)
+        except Exception:
+            continue
+        space = bool(re.search(r"iss|astronaut|spacecraft|satellite|re-?entr|launch|spacex|nasa|debris|conjunction", url, re.I))
+        if not (root in ("13","14","15","16","17","18","19","20") or ns >= 4 or gs <= -5 or space):
+            continue
+        scored.append((ns, -gs, p))
+    scored.sort(reverse=True)
+    now = S.now()
+    for ns, _ngs, p in scored:
+        actor1, actor2 = (p[6] or "").title(), (p[16] or "").title()
+        geo = p[53] or p[36] or ""
+        verb = _CAMEO.get(p[28], "event")
+        title = " ".join(x for x in (actor1, verb, actor2) if x).strip() or "GDELT event"
+        if geo: title = f"{title} — {geo}"
+        title = (title + " (GDELT)").replace("  ", " ")
+        if _dedupe_title(title) or _dedupe_title(p[60]): continue
+        t = S.parse_t(re.sub(r"^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)$", r"\1-\2-\3T\4:\5:\6Z", p[59] or "")) or now
+        cat = "space" if re.search(r"iss|astronaut|spacecraft|satellite|re-?entr|launch|spacex|nasa|debris", p[60]+title, re.I) else _CAMEO_CAT.get(p[28]) or S.classify(title, "other")
+        if cat == "other": cat = "political"
+        out.append(S.item("GDELT 2.0 events", "GDELT", p[0], title[:280], cat, p[60], t,
+                          location=geo, base=int(f.get("base", 8)), official=False,
+                          extra={"tier": "aggregate", "goldstein": p[30], "sources": p[32], "root": p[28], "registry": f["id"]}))
+        if len(out) >= cap: break
+    return out
+
+def _a_ll2(f, body=None):
+    """Launch Library 2 public API (thespacedevs), no key. Upcoming + recent launches only."""
+    out = []; cap = int(f.get("cap", 20)); seen = 0
+    for path in ("launch/upcoming/?limit=15&mode=list", "launch/previous/?limit=15&mode=list"):
+        try:
+            r = requests.get("https://ll.thespacedevs.com/2.2.0/" + path, headers={"User-Agent": UA, "Accept": "application/json"}, timeout=(5, 20))
+            r.raise_for_status(); j = r.json()
+        except Exception:
+            continue
+        for L in j.get("results") or []:
+            t = S.parse_t(L.get("net") or L.get("window_start"))
+            if not t: continue
+            # upcoming within 7 days, or happened in the last 3 days
+            if t > S.now() + timedelta(days=7) or t < S.now() - timedelta(days=3): continue
+            st_obj = L.get("status")
+            st = (st_obj.get("name") if isinstance(st_obj, dict) else (st_obj or "")).strip() if st_obj else ""
+            name = L.get("name") or "Launch"
+            pad = L.get("pad") or L.get("location") or ""
+            if isinstance(pad, dict):
+                loc = pad.get("location")
+                pad = (loc.get("name") if isinstance(loc, dict) else None) or pad.get("name") or ""
+            pad = pad if isinstance(pad, str) else ""
+            title = f"Launch {st.lower() or 'update'}: {name}" + (f" — {pad}" if pad else "")
+            if _dedupe_title(title): continue
+            url = L.get("url") or L.get("news_url") or "https://thespacedevs.com/"
+            out.append(S.item("Launch Library 2", "LaunchLibrary", str(L.get("id") or title), title[:280], "space", url, t,
+                              location=pad, base=int(f.get("base", 12)), official=False,
+                              extra={"tier": "aggregate", "status": st, "registry": f["id"]}))
+            seen += 1
+            if seen >= cap: return out
+    return out
+
+# ---------------------------------------------------------------- Bluesky Jetstream (public websocket, no account). Keyword-filtered only.
+_JS_HOSTS = ("jetstream2.us-east.bsky.network", "jetstream1.us-east.bsky.network", "jetstream2.us-west.bsky.network")
+_JS_PATH = "/subscribe?wantedCollections=app.bsky.feed.post"
+_JS_RX = re.compile(THREAT + r"|\b(iss\b|astronaut|spacex|starship|falcon 9|soyuz|shenzhou|ariane|re-?entr|orbital debris|conjunction|eva\b|spacewalk|docking)\b", re.I)
+
+def _js_recv(sock, buf):
+    """Minimal RFC 6455 client reader. Returns (opcode, payload) or raises."""
+    def need(n):
+        nonlocal buf
+        while len(buf) < n:
+            c = sock.recv(65536)
+            if not c: raise ConnectionError("closed")
+            buf += c
+        return True
+    need(2)
+    b1, b2 = buf[0], buf[1]; buf = buf[2:]
+    opcode, masked, ln = b1 & 0x0F, b2 & 0x80, b2 & 0x7F
+    if ln == 126:
+        need(2); ln = int.from_bytes(buf[:2], "big"); buf = buf[2:]
+    elif ln == 127:
+        need(8); ln = int.from_bytes(buf[:8], "big"); buf = buf[8:]
+    if masked:
+        need(4); mask = buf[:4]; buf = buf[4:]
+    need(ln); data, buf = buf[:ln], buf[ln:]
+    if masked:
+        data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+    if ln > 1_000_000: raise ValueError("frame too big")
+    return opcode, data, buf
+
+def _js_connect(host):
+    import ssl, os, base64, socket
+    raw = socket.create_connection((host, 443), timeout=15)
+    ss = ssl.create_default_context().wrap_socket(raw, server_hostname=host)
+    key = base64.b64encode(os.urandom(16)).decode()
+    req = (f"GET {_JS_PATH} HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+           f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nUser-Agent: {UA}\r\n\r\n")
+    ss.sendall(req.encode()); ss.settimeout(30)
+    buf = b""
+    while b"\r\n\r\n" not in buf:
+        c = ss.recv(4096)
+        if not c: raise ConnectionError("upgrade closed")
+        buf += c
+    head, rest = buf.split(b"\r\n\r\n", 1)
+    if b" 101 " not in head.split(b"\r\n", 1)[0]: raise ConnectionError(head.split(b"\r\n", 1)[0].decode("latin1")[:120])
+    ss.settimeout(60)
+    return ss, rest
+
+def _jetstream_loop():
+    import sources_ext as X
+    if os.environ.get("BN_JETSTREAM", "1") == "0":
+        print("registry: jetstream off (BN_JETSTREAM=0)", flush=True); return
+    print("registry: jetstream starting", flush=True)
+    hi = 0; backoff = 5
+    while True:
+        host = _JS_HOSTS[hi % len(_JS_HOSTS)]; hi += 1
+        try:
+            sock, buf = _js_connect(host)
+            print(f"registry: jetstream connected {host}", flush=True)
+            backoff = 5; n_min = 0; window = time.time(); kept = 0
+            while True:
+                op, data, buf = _js_recv(sock, buf)
+                if op == 0x8: break
+                if op == 0x1:
+                    try: ev = json.loads(data)
+                    except Exception: continue
+                    rec = ((ev.get("commit") or {}).get("record")) or {}
+                    if rec.get("$type") not in (None, "app.bsky.feed.post"): 
+                        if rec.get("$type") and "feed.post" not in rec.get("$type",""): continue
+                    text = rec.get("text") or ""
+                    if len(text) < 20 or not _JS_RX.search(text): continue
+                    nowm = time.time()
+                    if nowm - window >= 60: n_min = 0; window = nowm
+                    if n_min >= 40: continue          # cap 40 kept posts/min so the firehose cannot flood ingest
+                    did = ev.get("did") or ""
+                    rkey = ((ev.get("commit") or {}).get("rkey")) or ev.get("time_us") or str(int(nowm))
+                    uri = f"at://{did}/app.bsky.feed.post/{rkey}"
+                    handle = did[:20]
+                    t = S.parse_t(rec.get("createdAt")) or S.now()
+                    it = X.social_item(f"Bluesky firehose", uri, text[:280], f"https://bsky.app/profile/{did}/post/{rkey}", t, [], text,
+                                       extra={"tier": "social", "via": "jetstream"})
+                    if it and not _dedupe_title(text[:200]):
+                        _enqueue([it]); n_min += 1; kept += 1
+                        if kept % 100 == 1:
+                            print(f"registry: jetstream kept {kept} on {host}", flush=True)
+            try: sock.close()
+            except Exception: pass
+        except Exception as ex:
+            print(f"registry: jetstream {host} {type(ex).__name__}: {ex}"[:200], flush=True)
+            time.sleep(backoff); backoff = min(300, backoff * 2)
+
+
 def _fetch_feed(f):
     ty = f.get("type") or "rss"
-    if ty in ("bsky", "mastodon", "telegram"):
-        return {"bsky": _a_bsky, "mastodon": _a_mastodon, "telegram": _a_telegram}[ty](f)
+    if ty in ("bsky", "mastodon", "telegram", "ll2", "gdelt2"):
+        return {"bsky": _a_bsky, "mastodon": _a_mastodon, "telegram": _a_telegram, "ll2": _a_ll2, "gdelt2": _a_gdelt2}[ty](f)
+    if ty == "jetstream":
+        return []          # the jetstream thread runs on its own; the feed row is a marker
     body = _http(f, f["url"])
     if body is None: return None
     if ty == "statuspage": return _a_statuspage(f, body)
@@ -308,8 +499,7 @@ def _do(f):
         st.update(ok=True, fails=0, err=None, last_ok=now, next=now + float(f.get("iv") or DEFAULT_IV.get(f.get("tier", "news"), 300)))
         if items is None: st["n"] = st.get("n", 0); return 0, True
         st["n"] = len(items); st["last_items"] = now if items else st.get("last_items")
-        with _lock:
-            for it in items: _state["pending"][it["id"]] = (now, it)
+        _enqueue(items)
         return len(items), True
     except Exception as ex:
         fails = st.get("fails", 0) + 1
@@ -351,6 +541,7 @@ def start():
         if _state["started"]: return
         _state["started"] = True
     threading.Thread(target=_loop, name="registry-feeds", daemon=True).start()
+    threading.Thread(target=_jetstream_loop, name="registry-jetstream", daemon=True).start()
 
 def f_registry():
     """Scanner source: hands over parsed registry items in capped batches (newest first); never waits on the network."""
