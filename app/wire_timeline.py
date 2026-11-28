@@ -13,7 +13,8 @@ GET /api/wire_tl/xu?id=         Post-on-X URL (3-5 entity tags) for one live row
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
 GET /api/wire_tl/geo?q=        keyless ZIP/place geocode (US Census ZCTA table + offline gazetteer).
 GET /api/wire_tl/crime?q=      local crime headlines for a US place when BN_CRIME_NEWS is on (cached).
-GET /api/wire_tl/app.js|app.css|scan-bg.js
+GET /api/wire_tl/app.js|app.css|loader.js
+GET /api/wire_tl/pulse        recent located signals (same public gate as the list) + total, for the loading screen globe (cached, rebuilt every 5 min).
 
 Data: blackout.db clusters (live scanner) + trends_history.db stories (archive backfill), both opened read-only
 (file:...?mode=ro), the same sources /api/wire_history merges. Display-only grouping (category colours, regions) is
@@ -24,7 +25,7 @@ from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "blackout.db"); HDB = os.path.join(BASE, "trends_history.db")
-STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css", "scan-bg.js": "application/javascript"}
+STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css", "loader.js": "application/javascript"}
 MAXL = 200
 _CUR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(\|[A-Za-z0-9_.:\-]{1,80})?$")
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -1476,6 +1477,63 @@ def meta_cached():
         threading.Thread(target=run, daemon=True).start()
     return d or {}
 
+# ------------------------------------------------------------------ loading-screen pulses
+_PULSE = {"t": 0.0, "data": None}
+def _pulse_place(loc):
+    loc = re.sub(r"\s+", " ", str(loc or "")).strip()
+    if not loc: return ""
+    last = loc.split(",")[-1].strip()
+    return last[:26]
+
+def _pulse_pack(got):
+    by = {}
+    for g in got: by.setdefault(g["k"], []).append(dict(g))
+    sig = []
+    while len(sig) < 24 and any(by.values()):
+        for k in sorted(by, key=lambda k: by[k][0]["t"] if by[k] else "", reverse=True):
+            if by[k] and len(sig) < 24: sig.append(by[k].pop(0))
+    sig.sort(key=lambda g: g["t"], reverse=True)
+    try: total = (meta_cached() or {}).get("total")
+    except Exception: total = None
+    return {"signals": sig, "total": total, "built": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+_PBG = {"on": False}
+def _pulse_build():
+    """Walks the newest rows (page(), so the same public gate, location corrections and verdicts as the timeline) and keeps
+    the live ones that carry coordinates. Publishes after every page so a cold first request still gets something."""
+    try:
+        got, seen, cur, t0 = [], set(), None, time.time()
+        for _ in range(8):
+            out = page(cur, None, 200, "", False, None, None, None, "", "", "", "")
+            for it in out.get("items") or []:
+                la, lo = it.get("lat"), it.get("lon")
+                if la is None or lo is None or it.get("a") or it["id"] in seen: continue
+                if not (-90 <= la <= 90 and -180 <= lo <= 180) or (abs(la) < 0.01 and abs(lo) < 0.01): continue
+                seen.add(it["id"])
+                got.append({"t": it["t"], "k": it["k"], "r": it.get("r"), "lat": round(la, 2), "lon": round(lo, 2), "p": _pulse_place(it.get("loc"))})
+            with _LK: _PULSE.update(t=time.time(), data=_pulse_pack(got))
+            cur = out.get("next")
+            if len(got) >= 48 or out.get("end") or not cur or time.time() - t0 > 12: break
+            time.sleep(0.15)       # yield: the page builder shares the GIL with live requests
+    except Exception:
+        pass
+    finally:
+        _PBG["on"] = False
+
+def pulse():
+    """Stale-while-revalidate: always answers from memory (refreshed every 5 minutes), rebuilding in a daemon thread. A cold start waits
+    up to about 2 s for the first page and then answers with whatever exists, possibly no signals (the globe then draws none)."""
+    with _LK: data, age = _PULSE["data"], time.time() - _PULSE["t"]
+    if (data is None or age >= 300) and not _PBG["on"]:
+        _PBG["on"] = True
+        threading.Thread(target=_pulse_build, daemon=True).start()
+    if data is None:
+        end = time.time() + 2.0
+        while data is None and time.time() < end:
+            time.sleep(0.05)
+            with _LK: data = _PULSE["data"]
+    return data or {"signals": [], "total": None, "built": None}
+
 # ------------------------------------------------------------------ page
 _FILE = {}
 def _file(name):
@@ -1502,7 +1560,7 @@ def page_html():
     except Exception:
         menu = ""; w2 = "/wire2/static"
     cfg = {"cats": [{"k": k, "label": l, "color": col} for k, l, col in CATS], "regions": [{"k": k, "label": l} for k, l in REGIONS]}
-    v_css, v_js, v_bg = _ver("app.css"), _ver("app.js"), _ver("scan-bg.js")
+    v_css, v_js, v_ld = _ver("app.css"), _ver("app.js"), _ver("loader.js")
     title = "The Wire: live threat feed | BLACKOUT.NETWORK"
     desc = "Every signal BLACKOUT.NETWORK has collected, in one timeline."
     try:
@@ -1513,16 +1571,16 @@ def page_html():
     return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2 data-bn-tl><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/wire">
 {ogmeta}<meta name="theme-color" content="#000">
+<script>document.documentElement.classList.add("tl-ld");setTimeout(function(){{document.documentElement.classList.remove("tl-ld")}},9500);window.BN_PULSE=fetch("/api/wire_tl/pulse",{{credentials:"same-origin"}}).then(function(r){{return r.ok?r.json():null}}).catch(function(){{return null}})</script>
+<style>#tl_ld{{display:none}}html.tl-ld #tl_ld{{display:block;position:fixed;inset:0;z-index:2147483000;background:#000;overflow:hidden;touch-action:none}}</style>
 <!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->
 <link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}"></head>
-<body class="w2 tl bn-has-ref"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
+<body class="w2 tl bn-has-ref"><div id="tl_ld" aria-hidden="true"><canvas id="tl_ldc"></canvas><span class="ld-wm" id="tl_ldw">blackout.network</span><div class="ld-ct" id="tl_ldct"><span class="ld-lb" id="tl_ldl">The Wire</span><span class="ld-n" id="tl_ldn"></span></div><i class="ld-pg" id="tl_ldp"></i></div>
+<header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu}
-<div class="tl-bg" aria-hidden="true"><canvas class="tl-scanbg" id="tl_scanbg"></canvas><i class="tl-veil"></i></div>
 <main id="tl_main">
-<section class="tl-hero" aria-label="The Wire"><div class="tl-hc"><p class="w2-eb">The Wire &middot; Timeline</p><h1 class="w2-ht">Every signal</h1>
-<p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
-<a class="tl-cue" href="#tl_start" aria-label="Scroll to the timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></a></section>
+<p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p>
 <div id="tl_start"></div>
 <div class="tl-ctl" id="tl_ctl">
  <div class="tl-row1">
@@ -1554,7 +1612,7 @@ def page_html():
 </main>
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
 <script>window.BN_TL={json.dumps(cfg)};</script>
-<script src="{w2}/wire2.js?v=3" defer></script><script src="/bn-refresh.js" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/scan-bg.js?v={v_bg}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
+<script src="{w2}/wire2.js?v=3" defer></script><script src="/bn-refresh.js" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/loader.js?v={v_ld}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
 
 # ------------------------------------------------------------------ location (keyless) + local crime
 _ZIP = None
@@ -1634,6 +1692,9 @@ def handle_get(path, qs):
             return (200, b, FILES[n]) if b is not None else (404, {"error": "not found"})
         if n == "meta":
             try: return 200, meta()
+            except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
+        if n == "pulse":
+            try: return 200, pulse()
             except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
         if n == "vstatus":
             return 200, validator_status()

@@ -11,7 +11,7 @@ var list=$("tl_list"),foot=$("tl_foot"),ctl=$("tl_ctl"),pill=$("tl_now"),stat=$(
     bar=$("w2_bar"),bRef=$("tl_ref"),bNew=$("tl_new"),elUpd=$("tl_upd");
 if(!list)return;
 var CAT={},REG={};CFG.cats.forEach(function(c){CAT[c.k]=c});CFG.regions.forEach(function(r){REG[r.k]=r});
-var DAYH=52,BUF=1.25,DBG={};
+var DAYH=60,BUF=1.25,DBG={};
 /* ---------- state */
 var items=[],seen={},rows=[],rendered=new Map(),Hc={},He={},exp=new Set();
 var topCur=null,topEnd=true,botCur=null,botEnd=false,loading={o:0,n:0},gen=0;
@@ -248,10 +248,18 @@ function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){s
 function lim(){return condensed&&active()?200:100}
 function loadOlder(){
   if(loading.o||botEnd)return Promise.resolve();loading.o=1;var g=gen;footState();
-  return api((botCur?"before="+encodeURIComponent(botCur)+"&":"")+"limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
+  return api((botCur?"before="+encodeURIComponent(botCur)+"&":"")+"limit="+lim()+"&"+qp()).then(loaderGate).then(function(j){if(g!==gen)return;
     botCur=j.next;botEnd=!!j.end;if(!items.length&&j.items[0]){topCur=j.items[0].t+"|"+j.items[0].id;topEnd=true}
-    add(j.items,"bot");rebuild();layout();render();if(!loadSeen()||!loadSeen().top)saveSeen();}).catch(function(){}).then(function(){if(g!==gen)return;loading.o=0;footState();status();stamp();check()});
+    add(j.items,"bot");rebuild();layout();render();if(!loadSeen()||!loadSeen().top)saveSeen();}).catch(function(){}).then(function(){if(g!==gen){tlReady();return}loading.o=0;footState();status();stamp();check();tlReady()});
 }
+/* the loading screen owns the first ~2 s: the first page is fetched at once but built and measured only when the screen starts to leave, so the animation never shares a frame with list layout */
+function loaderGate(j){
+  if(W.BN_TL_READY||!d.documentElement.classList.contains("tl-ld"))return j;
+  tlReady();
+  return new Promise(function(res){var done=false;function go(){if(done)return;done=true;res(j)}
+    d.addEventListener("bn-tl-loader-exit",go,{once:true});d.addEventListener("bn-tl-loader-done",go,{once:true});setTimeout(go,5200)});
+}
+function tlReady(){if(W.BN_TL_READY)return;W.BN_TL_READY=1;try{d.dispatchEvent(new Event("bn-tl-ready"))}catch(e){}}
 function loadNewer(){
   if(loading.n||topEnd||!topCur)return Promise.resolve();loading.n=1;var g=gen;
   return api("after="+encodeURIComponent(topCur)+"&limit=100&"+qp()).then(function(j){if(g!==gen)return;
