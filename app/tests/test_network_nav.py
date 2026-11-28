@@ -64,5 +64,37 @@ class BriefButtonContrast(unittest.TestCase):
         self.assertIn(".nb .bng-btn", board)
         self.assertIn("color:#F2F2F4!important", board)
 
+    def test_follow_hover_inks_label_on_fine_pointers_only(self):
+        """Desktop invert-hover used to leave span/svg at #F2F2F4 on a #F2F2F4 fill (contrast 1).
+        Hover stays gated so a phone tap still follows the link on the first tap. No yellow."""
+        apple = _read("static", "bn-apple.css")
+        growth = _read("growth_static", "app.css")
+        board = _read("netmap_static", "board.css")
+        gate = "@media (hover:hover) and (pointer:fine)"
+        ink = "color:#05060a!important;fill:currentColor"
+        self.assertIn("html .bng-btn:hover span", apple)
+        self.assertIn("html .bng-btn:hover svg", apple)
+        self.assertIn("html .bng-foot .bng-btn:hover span", growth)
+        self.assertIn("html .bng-foot .bng-btn:hover svg", growth)
+        self.assertIn(".nb .bng-btn:hover span", board)
+        self.assertIn(".nb .bng-btn:hover svg", board)
+        for css, label in ((apple, "apple"), (growth, "growth"), (board, "board")):
+            self.assertIn(gate, css, label)
+            self.assertIn(ink, css, label)
+            i = css.find(".bng-btn:hover span")
+            self.assertGreaterEqual(i, 0, label)
+            media = css.rfind(gate, 0, i)
+            self.assertGreaterEqual(media, 0, f"{label} hover span is not after a fine-pointer gate")
+            chunk = css[media:i+220]
+            self.assertIn("#05060a", chunk, label)
+            self.assertNotRegex(chunk, r"#FFC21A|#ffc21a|\byellow\b", label)
+        pre, sep, post = board.partition(gate)
+        self.assertTrue(sep, "board hover must be pointer-gated")
+        self.assertNotIn(".nb .bng-btn:hover", pre)
+        self.assertIn(".nb .bng-btn:hover span", post)
+        self.assertIn('html:not([data-theme="light"]) .bng-btn span', apple)
+        self.assertIn("color:#F2F2F4!important", apple)
+
+
 if __name__ == "__main__":
     unittest.main()
