@@ -228,7 +228,7 @@
   function card(it) {
     var meta = [it.place, it.src || it.by].filter(Boolean).join(" · ");
     var note = it.note ? "<p>" + esc(it.note) + "</p>" : "";
-    var prec = it.precision === "county" ? '<p class="k">Map dot is at the centre of the county served. The source does not publish this system's exact location.</p>' : "";
+    var prec = it.precision === "county" ? '<p class="k">Map dot is at the centre of the county served. The source does not publish an exact location.</p>' : "";
     var cls = it.level === "dnd" ? "dnd" : it.kind === "advisory" ? "boil" : (it.kind || "plant");
     var open = sel === it.id;
     return '<article class="wt-it' + (open ? " open sel" : "") + '" data-id="' + esc(it.id) + '"><button type="button" aria-expanded="' + open + '">' +
