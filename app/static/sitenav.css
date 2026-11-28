@@ -477,7 +477,11 @@ nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:non
 /* Matt Nov 28 2026: every button-like control is a pill (border-radius 9999px)
    through --bn-radius-pill. Not cards, panels, images, text fields, map vendor
    controls, full-width menu/accordion/Wire/water list row headers, or the attached
-   menu-search go button. Story-page .pill typography stays an underline. */
+   menu-search go button. Story-page .pill typography stays an underline.
+   Matt 7:41 AM ET Nov 28: not status cards, tiles, panels, legends or containers
+   (e.g. .nb-t provider cards, .nb-key / .wx-leg / .nx-leg legends, .h-chip). Those
+   keep their own 12-16px corners. The broad [class*="-chip"] list was retired so
+   card classes cannot be swept in. */
 :is(
   button,
   .btn,
@@ -490,9 +494,9 @@ nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:non
   .btn-primary,.cta-btn,.bnt-btn,.bnt-mbtn,.bng-sb,.bng-btn,.bn-fbm,
   .bn-ref,#tl_ref,.bn-ib,.bn-primary a,.bn-mbar .bn-close,
   .w2-btn,.w2-btn-s,.nl-btn,.nla-btn,.tl-b,.tl-chip,.tl-jb,.tl-top,.tl-newp,.tl-clear,.tl-now,
-  [class*="-chip"]:not([class*="-chips"]),
-  .chip,.pill
-):not(.leaflet-control *,.leaflet-ctrl *,.maplibregl-ctrl-group *,.maplibregl-popup-close-button,.maplibregl-ctrl-attrib-button):not(.nsa-b,.ss-ah,.hm-ah,.ns-row,.bn-mrow,.bn-theme-row,.bns-go,.bna-barday,.tl-hd,.wt-it>button){
+  .nx-chip,.bnm-chip,.tl-chip
+)
+:not(.leaflet-control *,.leaflet-ctrl *,.maplibregl-ctrl-group *,.maplibregl-popup-close-button,.maplibregl-ctrl-attrib-button):not(.nsa-b,.ss-ah,.hm-ah,.ns-row,.bn-mrow,.bn-theme-row,.bns-go,.bna-barday,.tl-hd,.wt-it>button,.nb-t,.nb-sug button,.h-chip,.nb-key,.wx-leg,.nx-leg,.nx-leg-body,.nx-leg-mini,.nx-card,.gx-card,.gx-leg,.nb-v,.nb-d,.nb-q,.nb-pulse,.nl-card,.nlx-card){
   border-radius:var(--bn-radius-pill, 9999px)!important;
 }
 html body:has(#bn_story) .pill{border-radius:0!important}
