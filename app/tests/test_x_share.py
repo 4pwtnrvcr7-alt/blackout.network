@@ -337,6 +337,52 @@ class Tags(unittest.TestCase):
         self.assertIn("hashtags=FinCEN,Cybersecurity,Breach", html)
         self.assertIn('target="_blank"', html)
 
+    def test_intent_drops_source_agency_acronyms(self):
+        """Matt Nov 28: source/reporting-agency acronyms never become Share to X tags."""
+        banned = ("INGV", "JMA", "EMSC", "USGS", "GFZ", "GDACS", "GEOFON", "HANS", "IODA")
+        cases = [
+            ("INGV: M5.9 earthquake Mexico [Sea]", "Mexico",
+             ["#Earthquake", "#Mexico", "#INGV"]),
+            ("JMA: M5.5 earthquake - Adjacent Sea of Chichijima Island, max seismic intensity 2", "Japan",
+             ["#Earthquake", "#Japan", "#JMA"]),
+            ("EMSC: M5.4 earthquake Central Peru", "Peru",
+             ["#Earthquake", "#Peru", "#EMSC"]),
+            ("GEOFON: M5.0 earthquake Off East Coast of Kamchatka", "Kamchatka, Russia",
+             ["#Earthquake", "#Kamchatka", "#GEOFON"]),
+            ("USGS: M6.1 earthquake near Anchorage, Alaska", "Anchorage, Alaska",
+             ["#Earthquake", "#Alaska", "#USGS"]),
+            ("GDACS: Forest fire in Australia (green alert)", "Australia",
+             ["#Wildfire", "#Australia", "#GDACS"]),
+        ]
+        for title, loc, stored in cases:
+            it = _mk(title, location=loc, category="natural disaster", rank=4)
+            href = X.intent_url(it, tags=stored)
+            q = parse_qs(urlparse(href).query)
+            hs = [t for t in (q.get("hashtags") or [""])[0].split(",") if t]
+            self.assertTrue(3 <= len(hs) <= 5, (title, hs))
+            for b in banned:
+                self.assertNotIn(b, hs, (title, hs))
+                self.assertNotIn("#" + b, q["text"][0], (title, q["text"][0]))
+            self.assertTrue(
+                any(t in hs for t in ("Earthquake", "Tsunami", "Seismic", "Quake", "Wildfire", "Fire")),
+                (title, hs),
+            )
+        # well-known entities stay
+        it = _mk("Trump wanted Jensen Huang back as the CEO of Nvidia.",
+                 location="Pennsylvania", category="politics", rank=4,
+                 brief="Nvidia CEO Jensen Huang met with the president.")
+        href = X.intent_url(it, tags=["#Nvidia", "#Pennsylvania", "#JensenHuang"])
+        hs = parse_qs(urlparse(href).query)["hashtags"][0].split(",")
+        self.assertEqual(hs, ["Nvidia", "Pennsylvania", "JensenHuang"])
+        # generated tags from a JMA headline also drop the agency
+        tags = X.hashtags(_mk(
+            "JMA: M5.5 earthquake - Adjacent Sea of Chichijima Island, max seismic intensity 2",
+            location="Japan", category="natural disaster", rank=4,
+        ))
+        self.assertNotIn("#JMA", tags)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertIn("#Earthquake", tags)
+
 
 class ShareTextReport(unittest.TestCase):
     """Prints the composed share text for the live stories (assertion keeps them in the log)."""

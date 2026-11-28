@@ -1245,6 +1245,8 @@ def entity_tags(item, headline=None):
 
     def add(label, tag=None):
         tg = tag or to_tag(label)
+        if tg and (tg.lstrip("#").lower() in SOURCE_FEEDS):
+            return
         if tg and len(tg) > 2 and tg.lower() not in seen and tg.lower() not in known_loc:
             seen.add(tg.lower()); out.append(tg)
 
@@ -1605,6 +1607,7 @@ def with_body(item, alerts=None, extra=""):
 # (#War, #Nuclear, #Ebola, #Iran, #Earthquake, #Wildfire, #Hurricane, #Gaza, #Ukraine, #Tesla, #NVIDIA)
 # plus common short entity names. Never long run-together strings. Popular topic words are good.
 # Still banned: #News, #WorldNews, #Breaking, #BlackoutNetwork, #Alerts, #Update and similar fluff.
+# Source-feed acronyms (#INGV, #JMA, #EMSC, #USGS, #GFZ, #GDACS and similar) are never tags.
 # 3-5 tags, each at most ~12 characters or one well-known name, topic word first, then place/person/company.
 FILLER = {t.lower() for t in (
     "News", "WorldNews", "Breaking", "BreakingNews", "BlackoutNetwork", "Alerts", "Alert", "Wire", "Live",
@@ -1617,6 +1620,13 @@ FILLER = {t.lower() for t in (
     "Forces", "Affairs", "Category", "Guide", "Minutes",
     "EST", "EDT", "CST", "CDT", "MST", "MDT", "PST", "PDT", "AKST", "AKDT", "HST", "ET", "PT", "PM", "AM", "UTC", "GMT", "IP", "MMI", "AV", "ID",
     "WHAT", "WHY", "WHERE", "WHEN", "HOW", "Some", "Several", "Many", "Another", "Other")}
+# Source / reporting-agency acronyms and feed names are not search tags
+# (Matt, Nov 28 2026: no obscure acronyms; #INGV, #JMA, #EMSC, #USGS, #GFZ, #GDACS and similar feeds).
+SOURCE_FEEDS = {t.lower() for t in (
+    "INGV", "JMA", "EMSC", "USGS", "GFZ", "GDACS", "GEOFON", "HANS", "IODA",
+    "PTWC", "FDSN", "NEIC", "GCMT", "IRIS", "CESMD", "GeoNet", "GEONET",
+    "LastQuake", "MeteoAlarm", "Meteoalarm", "BMKG", "PHIVOLCS", "PAGASA",
+    "SWPC", "SDO", "SOHO", "EONET", "PAGER")}
 # Popular topic/search words people actually type (slightly over 12 chars is ok for these).
 POPULAR = {t.lower() for t in (
     "War", "Nuclear", "Ebola", "Iran", "Earthquake", "Wildfire", "Hurricane", "Gaza", "Ukraine", "Tesla", "Nvidia", "NVIDIA",
@@ -1625,7 +1635,7 @@ POPULAR = {t.lower() for t in (
     "Conflict", "Weather", "Health", "Politics", "Stocks", "Markets", "Economy", "Energy", "Crime", "Space",
     "Fire", "Quake", "Rain", "Snow", "Blizzard", "Tsunami", "Eruption", "Landslide", "Heatwave", "Freeze",
     "Airstrike", "Drone", "Israel", "Hamas", "Hezbollah", "Houthis", "Russia", "China", "Taiwan", "Korea",
-    "CVE", "Breach", "Covid", "Mpox", "Vaccine", "NATO", "UN", "WHO", "FEMA", "NWS", "USGS", "NASA", "NOAA",
+    "CVE", "Breach", "Covid", "Mpox", "Vaccine", "NATO", "UN", "WHO", "FEMA", "NWS", "NASA", "NOAA",
     "Military", "Defense", "Climate", "Finance", "Business", "Science", "Tech", "Technology", "Environment",
     "Security", "Ice", "Hail", "Flooding")}
 _ID_RX = re.compile(r"\b([A-Z]{2,5}\d{0,2}-\d{2,4}(?:-\d{2,5})?)\b")
@@ -1671,7 +1681,7 @@ def _camel_words(tag):
     return words
 
 
-_ACRO_OK = {"NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "NOAA", "FEMA", "NATO", "NASA", "OPEC", "USGS", "GDACS", "SPACEX", "OPENAI"}
+_ACRO_OK = {"NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "NOAA", "FEMA", "NATO", "NASA", "OPEC", "SPACEX", "OPENAI"}
 
 def _shorten_tag(tag):
     """Drop long run-togethers; reduce #NuclearThreat to #Nuclear. Keep short tags and well-known names."""
@@ -1710,7 +1720,7 @@ def _shorten_tag(tag):
 
 def _is_filler(tag):
     t = (tag or "").lstrip("#").lower()
-    if not t or t in FILLER:
+    if not t or t in FILLER or t in SOURCE_FEEDS:
         return True
     words = [w.lower() for w in _camel_words(tag)]
     if len(words) == 2 and words[0] == words[1]:
@@ -1742,7 +1752,7 @@ def _source_orgs(item):
         if not nm or re.search(r"@|youtube|telegram|bluesky|reddit|twitter|facebook|rss|http|\.", nm, re.I):
             continue
         m = re.match(r"^([A-Z]{3,8})(?:\b|\s)", nm)
-        if m and m.group(1) not in out:
+        if m and m.group(1) not in out and m.group(1).lower() not in SOURCE_FEEDS:
             out.append(m.group(1))
     return out
 
@@ -2002,6 +2012,31 @@ def finalize_tags(tags, item=None, headline=None, topics=True):
                 keep.append(tg)
             if len(keep) >= MIN_TAGS:
                 break
+    # When a source-feed acronym was dropped and the list is still short, pad with
+    # a related popular word already earned by a kept topic (#Earthquake -> #Seismic).
+    if len(keep) < MIN_TAGS:
+        _SYN = {
+            "earthquake": ("#Seismic", "#Quake"),
+            "quake": ("#Earthquake", "#Seismic"),
+            "wildfire": ("#Fire",),
+            "hurricane": ("#Storm",),
+            "cyclone": ("#Storm",),
+            "typhoon": ("#Storm",),
+            "flood": ("#Flooding",),
+            "tsunami": ("#Earthquake",),
+            "volcano": ("#Eruption",),
+        }
+        have = {k.lstrip("#").lower() for k in keep}
+        extras = []
+        for k in list(have):
+            extras.extend(_SYN.get(k, ()))
+        for s in extras:
+            if len(keep) >= MIN_TAGS:
+                break
+            sl = s.lstrip("#").lower()
+            if sl not in have:
+                keep.append(s)
+                have.add(sl)
     # Prefer a popular topic in the set (search/engagement) when one is earned; pad short lists from the item's category.
     _CAT_TOPIC = {"markets": "#Markets", "financial": "#Finance", "cyber": "#Cybersecurity",
                   "weather": "#Weather", "disease": "#Health", "war/conflict": "#War",
@@ -2106,18 +2141,19 @@ def weighted_len(text, url):
 
 
 def _clean_stored(tags):
-    """Drop banned fluff and duplicates. Does not pad or run the heuristic filler test.
+    """Drop banned fluff, source-feed acronyms, and duplicates. Does not pad or
+    run the heuristic filler test.
 
     Baked-in / validator tags already passed the publish gate. The heuristic
     _is_filler() falsely flags some good entity names (e.g. #NewZealand, because
-    "new" is a stop word). Only the explicit FILLER set is removed here
-    (#News, #WorldNews, #Breaking, #BlackoutNetwork, #Alerts, ...).
+    "new" is a stop word). Only the explicit FILLER set and SOURCE_FEEDS
+    (#INGV, #JMA, #USGS, #GDACS, …) are removed here.
     """
     out = []
     for t in tags or []:
         t = "#" + str(t).lstrip("#")
         name = t.lstrip("#")
-        if not name or name.lower() in FILLER:
+        if not name or name.lower() in FILLER or name.lower() in SOURCE_FEEDS:
             continue
         if any(t.lower() == k.lower() for k in out):
             continue
@@ -2179,7 +2215,7 @@ def compose_intent(item, url=None, headline=None, tags=None):
 
     Returns (href, headline, tags). Tags stay out of `text` so the composer does not
     duplicate them when the hashtags param is present. A baked-in set of 3-5 tags
-    (after dropping #News / #BlackoutNetwork and other FILLER) is used as-is.
+    (after dropping #News / #BlackoutNetwork, other FILLER, and source-feed acronyms) is used as-is.
     """
     page = url if url is not None else story_url(item)
     h, tags = _fit_parts(_headline(item, headline), resolve_tags(item, headline, tags), page)
