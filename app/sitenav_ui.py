@@ -7,7 +7,7 @@ Works without JavaScript: the menu button is a link to #bn-menu and the sidebar 
 <details>. With JavaScript (/sitenav.js) the sidebar becomes a modal dialog (focus trap, Escape, scrim tap, scroll lock).
 Look and feel: every color, font, size and radius is a CSS custom property at the top of static/sitenav.css (design tokens).
 The logo is ONE element (LOGO_HTML below): swap it there (e.g. for an <img>) and every page follows."""
-import html, re
+import contextvars, html, re
 
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 
@@ -113,13 +113,78 @@ _REF_FILL_SVG = ('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 
                  'fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg>')
 def refresh_fill_assets():
     return '<link rel="stylesheet" href="/bn-refresh.css"><script src="/bn-refresh.js" defer></script>'
-def refresh_fill_btn(id="bn_ref", extra_class=""):
-    cls = ("bn-ref " + (extra_class or "")).strip()
+def refresh_fill_btn(id="bn_ref", extra_class="", compact=False):
+    cls = ("bn-ref " + ("bn-ref-sm " if compact else "") + (extra_class or "")).strip()
     return (f'<button type="button" class="{E(cls)}" id="{E(id)}" aria-label="Refresh">'
             '<i class="tl-ref-fill bn-ref-fill" aria-hidden="true"><i class="tl-ref-sheen bn-ref-sheen"></i></i>'
             + _REF_FILL_SVG +
             '<span class="tl-ref-lab bn-ref-lab"><span class="tl-ref-lab-a bn-ref-lab-a">Refresh</span>'
             '<span class="tl-ref-lab-b bn-ref-lab-b" aria-hidden="true">Refresh</span></span></button>')
+
+# Request path for this HTML render (set at the start of do_GET). A refresh
+# control is only offered where a tap truly re-fetches that page's data.
+_PAGE_PATH = contextvars.ContextVar("bn_page_path", default="")
+
+def set_page_path(path):
+    try:
+        _PAGE_PATH.set(path or "")
+    except Exception:
+        pass
+
+def page_path():
+    try:
+        return _PAGE_PATH.get() or ""
+    except Exception:
+        return ""
+
+def _norm_path(path=None):
+    p = (path if path is not None else page_path()) or ""
+    p = p.split("?")[0].split("#")[0]
+    if len(p) > 1:
+        p = p.rstrip("/")
+    return p or "/"
+
+# Pages that already have the full in-page #293 button (header icon stays off).
+_REFRESH_INPAGE = {"/wire", "/map", "/grid", "/weather", "/markets"}
+
+# Static or legal pages: no live data to re-fetch. No refresh control at all.
+_REFRESH_OFF_EXACT = {
+    "/privacy", "/privacy-policy", "/tos", "/terms", "/terms-of-service",
+    "/cookies", "/cookie-policy", "/privacy-choices", "/do-not-sell",
+    "/credits", "/scoring", "/about/scoring", "/welcome", "/ready",
+    "/report-status", "/social", "/mesh/guide", "/sources/admin",
+}
+_REFRESH_OFF_PREFIX = (
+    "/newsletter", "/story", "/welcome", "/credits", "/privacy", "/tos",
+    "/terms", "/cookies", "/social",
+)
+
+# Live-data pages that get the compact shared button in the top bar.
+_REFRESH_HEADER_EXACT = {"/stats", "/sources", "/wire-classic"}
+_REFRESH_HEADER_PREFIX = ("/people", "/mesh", "/grid/")
+
+def refresh_mode(path=None):
+    """off | inpage | header. Default off: no control unless this page can re-fetch data."""
+    if not refresh_on():
+        return "off"
+    p = _norm_path(path)
+    if p in _REFRESH_INPAGE:
+        return "inpage"
+    # /wire/<id> is a published story, not the live listing
+    if p.startswith("/wire/"):
+        return "off"
+    if p in _REFRESH_OFF_EXACT or any(p == pre or p.startswith(pre + "/") for pre in _REFRESH_OFF_PREFIX):
+        return "off"
+    if p.startswith("/mesh/guide"):
+        return "off"
+    if p.startswith("/sources/admin"):
+        return "off"
+    if p in _REFRESH_HEADER_EXACT or p.startswith("/people") or (p.startswith("/mesh") and p != "/mesh/guide"):
+        return "header"
+    # /grid/<slug> provider pages (not /grid itself, which is inpage)
+    if p.startswith("/grid/"):
+        return "header"
+    return "off"
 
 def refresh_on():
     try:
@@ -129,20 +194,19 @@ def refresh_on():
         return False
 
 def refresh_btn():
-    """Top-bar "Refresh data" button (sitenav.js runs it; BN_REFRESH_ALL=0 = not rendered). The tip is a real element so it shows
-    on hover/focus on desktop; the status pill ("Updated just now") is announced politely to screen readers."""
-    if not refresh_on(): return ""
-    return ('<button type="button" class="bn-ib bn-js-only bn-refresh" data-bn-refresh aria-label="Refresh data">'
-            f'{I_REFRESH}<span class="bn-rf-tip" aria-hidden="true">Refresh data</span></button>'
-            '<span class="bn-rf-st" id="bn_rf_st" role="status" aria-live="polite"></span>')
+    """Compact shared #293 Refresh in the top bar, only on pages that truly re-fetch live data.
+    Pages with an in-page button, and static/legal pages, get no header control."""
+    if refresh_mode() != "header":
+        return ""
+    return refresh_fill_btn("bn_hdr_ref", compact=True)
 
 def settings_rows():
     """Rows every page's Settings panel shows (Nov 13: the menu's Settings item opened a nearly empty panel on most pages):
     theme and "Refresh data". Page-specific controls (dashboard scan status, refresh interval) and the language picker follow in .ctl."""
-    rf = ('<button type="button" class="bn-pop-btn" data-bn-refresh>' + I_REFRESH + '<span>Refresh data</span></button>') if refresh_on() else ""
+    # Refresh lives on the shared #293 button (in-page or compact header), never as a Settings row.
     return ('<div class="bn-pop-rows">'
             '<button type="button" class="bn-pop-btn bn-pop-theme" data-bn-theme aria-label="Switch to light mode">' + I_SUN + I_MOON +
-            '<span class="bn-tl">Light mode</span></button>' + rf + '</div>')
+            '<span class="bn-tl">Light mode</span></button></div>')
 
 def topbar(sn, active="", ctl_html=""):
     """<header class="bn-top"> for every page. ctl_html = page-specific controls for the settings popover (dashboard: scan status,
@@ -273,7 +337,7 @@ def drawer(sn, active=""):
            '<div class="bn-ph">'
            '<div class="bn-dsearch bn-js-only" id="bn_dsearch"></div>'
            '<div class="m3-tools"><button type="button" class="m3-tl m3-alerts bn-js-only">Alerts</button>'
-           + (('<button type="button" class="m3-tl bn-rf-row bn-js-only" data-bn-refresh aria-label="Refresh data" title="Refresh data">' + I_REFRESH + '</button>') if refresh_on() else '')
+           + ''
            + theme_btn("bn-js-only bn-theme-row m3-tl") +
            '<button type="button" class="m3-tl bn-gear-row bn-js-only" aria-controls="bn_settings">Settings</button>'
            '<a class="bn-cta m3-cta" href="/newsletter">Free brief</a></div></div></div>'

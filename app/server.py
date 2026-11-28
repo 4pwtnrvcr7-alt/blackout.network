@@ -842,6 +842,11 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path); qs = parse_qs(u.query)
         try:
+            import sitenav_ui
+            sitenav_ui.set_page_path(u.path)
+        except Exception:
+            pass
+        try:
             try:
                 import deactivated; _rn = deactivated.renamed(u.path, u.query)   # Nov 24 2026: /network(/...) -> /grid(/...) (The Grid's canonical URL)
             except Exception: _rn = None

@@ -109,5 +109,31 @@
     });
     return btn;
   }
-  W.BNRefresh = { apply: apply, stage: stage, busy: busy, done: done, isBusy: isBusy, bind: bind };
+  function headerRun(btn, fn) {
+    if (!btn || isBusy(btn)) return Promise.resolve();
+    busy(btn, true); stage(btn, 10);
+    return Promise.resolve()
+      .then(function () { stage(btn, 28); return fn(); })
+      .then(function (lab) {
+        stage(btn, 100);
+        var wait = RM ? 0 : 220;
+        setTimeout(function () { busy(btn, false); done(btn, lab || "Updated"); }, wait);
+        return lab;
+      })
+      .catch(function () {
+        stage(btn, 100); busy(btn, false); done(btn, "Couldn't refresh");
+      });
+  }
+  function bindHeader() {
+    var btn = document.getElementById("bn_hdr_ref");
+    if (!btn) return;
+    bind(btn, function () {
+      var fn = W.bnRefreshPage;
+      if (typeof fn === "function") return headerRun(btn, fn);
+      return Promise.resolve();
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindHeader);
+  else bindHeader();
+  W.BNRefresh = { apply: apply, stage: stage, busy: busy, done: done, isBusy: isBusy, bind: bind, headerRun: headerRun };
 })(window);
