@@ -15,7 +15,9 @@ html body.solo .solo-main .pn,html body.solo .solo-main>section,html body.solo .
 .solo-main .meta{color:var(--mu)}
 .solo-main a{color:#fff;text-decoration:underline;text-decoration-color:#5b6069;text-underline-offset:3px}
 .solo-main a:hover{text-decoration-color:#fff}
-html body.solo .solo-main button:not([class*=card]):not([class*=tile]),html body.solo .solo-main .btn,html body.solo .solo-main select{background:transparent;color:#fff;border:1px solid #3a3f46;border-radius:0;
+html body.solo .solo-main button:not([class*=card]):not([class*=tile]),html body.solo .solo-main .btn{background:transparent;color:#fff;border:1px solid #3a3f46;border-radius:var(--bn-radius-pill, 9999px);
+ font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:11px 14px;min-height:38px;cursor:pointer;box-shadow:none}
+html body.solo .solo-main select{background:transparent;color:#fff;border:1px solid #3a3f46;border-radius:0;
  font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:11px 14px;min-height:38px;cursor:pointer;box-shadow:none}
 html body.solo .solo-main button:not([class*=card]):hover,html body.solo .solo-main select:hover{border-color:#fff}
 html body.solo .solo-main button.on,html body.solo .solo-main button[aria-pressed=true],html body.solo .solo-main button.active,html body.solo .solo-main button.sel,html body.solo .solo-main .chip.on{background:#fff!important;color:#000!important;border-color:#fff!important}
@@ -35,14 +37,14 @@ html body.solo .solo-main button.on,html body.solo .solo-main button[aria-presse
 html body.solo .solo-main .gm-card{background:#0a0b0d!important;border:1px solid #23262b!important;border-radius:2px!important;text-transform:none;letter-spacing:0}
 html body.solo .solo-main .gm-card:hover{border-color:#fff!important}
 html body.solo .solo-main [style*='#3fb950'],html body.solo .solo-main .pp-start{border-left-color:#fff!important}
-html body.solo .solo-main [class*=chip],html body.solo .solo-main .pill{border-radius:0!important}
+html body.solo .solo-main [class*=chip],html body.solo .solo-main .pill{border-radius:var(--bn-radius-pill, 9999px)!important}
 .w2-foot{border-top:1px solid #16181b}
 @media(max-width:700px){.solo-hero{padding:96px 22px 30px}.solo-main{padding:20px 18px 48px}.solo-main button,.solo-main select{min-height:44px}}
 @media print{.w2-bar,.w2-foot,.solo-hero,#w2_menu{display:none!important}.solo,.solo-main{background:#fff;color:#000}}
 html body.solo #tab-preppers .pp-72{border-left:3px solid #fff!important}
 html body.solo #tab-preppers [class^=pp-],html body.solo #tab-preppers [class*=" pp-"]{border-radius:2px}
-html body.solo #tab-preppers button,html body.solo #tab-games button:not(.gm-card){border-radius:0!important}
+html body.solo #tab-preppers button,html body.solo #tab-games button:not(.gm-card){border-radius:var(--bn-radius-pill, 9999px)!important}
 html body.solo .solo-hero .w2-hl{display:block!important;-webkit-line-clamp:unset!important;line-clamp:unset!important;overflow:visible!important;max-height:none!important;white-space:normal!important}
 html body.solo .solo-main .gd .toc,html body.solo .solo-main .gd .warn,html body.solo .solo-main .gd section,html body.solo .solo-main .gd [class^=bv-]{border-radius:2px!important}
 /* Disclaimer chips are not a "degraded" status — don't use amber/yellow as a brand accent. */
-html body.solo .gl-tag,html body.solo .solo-main [class$="-tag"]:not([class*="rank"]){color:#c4c8ce!important;border-color:#2e3238!important;background:#0a0b0d!important;border-radius:0!important}
+html body.solo .gl-tag,html body.solo .solo-main [class$="-tag"]:not([class*="rank"]){color:#c4c8ce!important;border-color:#2e3238!important;background:#0a0b0d!important;border-radius:var(--bn-radius-pill, 9999px)!important}

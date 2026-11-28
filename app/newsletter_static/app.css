@@ -26,7 +26,7 @@
 .nl-form input[type=email],.nl-form input[type=password],.nl-form input[type=text],.nl-form input[type=time],.nl-form input[type=number],.nl-form select{
  background:var(--pn2);border:1px solid var(--bd2);border-radius:8px;color:var(--tx);padding:9px 11px;font-size:15px}
 .nl-form input[aria-invalid=true]{border-color:var(--hi)}
-.nl-form button.pri,.nl-btn,.nla-btn{background:var(--ac);color:var(--bn-bg,#0b0d10);border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block}
+.nl-form button.pri,.nl-btn,.nla-btn{background:var(--ac);color:var(--bn-bg,#0b0d10);border:0;border-radius:var(--bn-radius-pill, 9999px);padding:9px 16px;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;display:inline-block}
 .nl-form button.pri[disabled]{opacity:.6;cursor:wait}
 .nl-btn-ghost,.nla-ghost{background:transparent;color:var(--tx);border:1px solid var(--bd2);border-radius:8px;padding:8px 14px;cursor:pointer;font-size:13px}
 .nla-danger{background:transparent;color:#ff7875;border:1px solid #5c2223;border-radius:8px;padding:5px 10px;cursor:pointer;font-size:12px}
@@ -75,7 +75,7 @@
 .nlx-form .nl-row{gap:8px;flex-wrap:nowrap}
 .nlx-form .nl-row input[type=email]{flex:1 1 auto;min-width:0;height:48px;background:#0d0f12;border:1px solid #2a2f37;border-radius:10px;font-size:16px;padding:0 14px;color:#fff}
 .nlx-form input[type=email]:focus,.nlx-form .nl-loc:focus{border-color:#fff;outline:none}
-.nlx-form button.pri{flex:none;height:48px;padding:0 22px;border-radius:10px;background:#fff;color:#000;font-weight:700;font-size:15px;letter-spacing:.02em;border:1px solid #fff;transition:background .15s,color .15s}
+.nlx-form button.pri{flex:none;height:48px;padding:0 22px;border-radius:var(--bn-radius-pill, 9999px);background:#fff;color:#000;font-weight:700;font-size:15px;letter-spacing:.02em;border:1px solid #fff;transition:background .15s,color .15s}
 .nlx-form button.pri:hover{background:transparent;color:#fff}
 .nlx-segs{display:grid!important;grid-template-columns:1.4fr 1fr 1fr;gap:0!important;border:1px solid #2a2f37!important;border-radius:10px!important;padding:3px!important;background:#0d0f12}
 .nlx-seg{position:relative;cursor:pointer;display:block}
@@ -136,7 +136,7 @@
 .nlx-res .nlx-lede{margin:0 0 20px}
 .nlx-res form{margin:0 0 6px}
 .nlx-res-l{margin:22px 0 0;display:flex;gap:22px;font-size:13px}.nlx-res-l a{color:#9aa3ad;text-decoration:none;border-bottom:1px solid #3a4049;padding-bottom:2px}
-.nl-page .nlx-res a.nl-btn,.nl-page .nlx-res button.nl-btn,.nl-page .nl-card a.nl-btn,.nl-page .nl-card button.nl-btn,.nl-page #nl_manage button.pri{background:#fff;color:#000;border:1px solid #fff;border-radius:10px;padding:13px 22px;font-weight:700;font-size:15px;display:inline-block;text-decoration:none;cursor:pointer}
+.nl-page .nlx-res a.nl-btn,.nl-page .nlx-res button.nl-btn,.nl-page .nl-card a.nl-btn,.nl-page .nl-card button.nl-btn,.nl-page #nl_manage button.pri{background:#fff;color:#000;border:1px solid #fff;border-radius:var(--bn-radius-pill, 9999px);padding:13px 22px;font-weight:700;font-size:15px;display:inline-block;text-decoration:none;cursor:pointer}
 .nl-page .nlx-res a:not(.nl-btn){color:#d6dae0}
 .nl-page .nlx-res .nl-btn-ghost{background:transparent;color:#fff;border:1px solid #4a515b;border-radius:10px;padding:12px 18px;font-size:14px;cursor:pointer}
 .nl-page .nl-card{background:#0b0c0e;border:1px solid #1c2026;border-radius:16px;padding:22px 22px}
