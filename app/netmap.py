@@ -424,7 +424,34 @@ def outages():
             if not p: continue
             regions.append(dict(name=ent.get("name"), st=st, lon=p[0], lat=p[1], events=r.get("event_cnt"), ioda=f"{IODA_UI}/region/{ent.get('code')}"))
     except Exception: pass
-    return dict(countries=countries, us_regions=regions, daily=daily)
+    # Nov 27 2026: when IODA events are empty (Render cannot reach IODA), fill
+    # countries and the 30-day chart from The Wire's internet-outage stories.
+    bundle = None
+    try:
+        import netwire
+        bundle = netwire.load(now=n)
+    except Exception:
+        bundle = None
+    wire_stories = list((bundle or {}).get("internet") or []) if bundle else []
+    if bundle:
+        extra = netwire.countries(wire_stories, centroids=cen, alias=ALIAS, small=SMALL, now=n)
+        by_cc = {c["cc"]: c for c in countries if c.get("cc")}
+        by_name = {(c.get("name") or "").lower(): c for c in countries}
+        for c in extra:
+            hit = (by_cc.get(c["cc"]) if c.get("cc") else None) or by_name.get((c.get("name") or "").lower())
+            if hit:
+                hit["href"] = hit.get("href") or c.get("href")
+                hit["src"] = hit.get("src") or c.get("src")
+                hit["stories"] = c.get("stories") or []
+                hit["cur"] = bool(hit.get("cur") or c.get("cur"))
+                if c.get("lat") is not None and hit.get("lat") is None:
+                    hit["lat"], hit["lon"] = c.get("lat"), c.get("lon")
+            else:
+                countries.append(c)
+        countries.sort(key=lambda x: (not x.get("major"), not x.get("cur"), x.get("name") or ""))
+        if not any(daily) and wire_stories:
+            daily = netwire.daily_from(wire_stories, DAYS, n)
+    return dict(countries=countries, us_regions=regions, daily=daily, wire=wire_stories, wire_ok=bundle is not None)
 
 def power():
     try:
@@ -605,7 +632,7 @@ GRID_MORE = ('<section class="gx-more" id="gx_more" aria-label="More about the g
   '<div class="gx-reg" id="gx_reg" role="group" aria-label="Show a region on the map"><span>Show on map</span><button type="button" data-r="us">U.S.</button><button type="button" data-r="eu">Europe</button><button type="button" data-r="apac">Asia-Pacific</button><button type="button" data-r="world">World</button></div>'
   '<div class="gx-kpis" id="gx_kpis"></div>'
   + _gsec("gx-regions", "Grid operators", "Status, demand and the last 36 hours for each operator region")
-  + _gsec("gx-world", "Worldwide", "Operators outside the U.S. and grid or blackout alerts on the Wire")
+  + _gsec("gx-world", "Worldwide", "Operators outside the U.S., internet outages, and grid or blackout alerts on the Wire")
   + _gsec("gx-outages", "Outages by state", "Utility outage counts reported to DOE / ORNL ODIN")
   + _gsec("gx-weather", "Weather threats to power", "Ranked weather alerts with grid and infrastructure checks")
   + _gsec("gx-threats", "Grid threats", "Physical, cyber and reliability threats to U.S. power")
