@@ -38,13 +38,46 @@
     var out = [];
     list.slice(0, SHOWN).forEach(function (it) { out.push(card(it)); });
     box.innerHTML = out.join("");
+    revealShare();
     var more = $("wt_more"); more.hidden = list.length <= SHOWN; more.textContent = "Show more (" + (list.length - SHOWN) + " left)";
+  }
+  function shareRow(it) {
+    var url = it.permalink || ("https://blackout.network/water/" + it.id);
+    var text = it.name || "Water treatment status";
+    var intent = it.xu || ("https://x.com/intent/post?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(url + "?s=x"));
+    var src = '<a class="bng-sb" href="' + href(it.url) + '" target="_blank" rel="noopener">Source</a>";
+    var perm = '<a class="bng-sb" href="' + esc(url) + '">Permalink</a>';
+    var map = it.lat != null ? '<button type="button" class="bng-sb" data-show="' + esc(it.id) + '">Show on map</button>' : "";
+    return '<div class="bng-share" data-url="' + esc(url) + '" data-text="' + esc(text) + '"><span class="bng-share-l">Share</span>' +
+      '<a class="bng-sb" href="' + esc(intent) + '" target="_blank" rel="noopener">Post on X</a>' +
+      '<button type="button" class="bng-sb bng-copy">Copy link</button>' +
+      '<button type="button" class="bng-sb bng-native" hidden>Share…</button>' +
+      src + perm + map + "</div>";
+  }
+  function revealShare() {
+    document.querySelectorAll(".bng-share .bng-native[hidden]").forEach(function (b) { if (navigator.share) b.hidden = false; });
+  }
+  function bootId() {
+    if (window.WT_OPEN) return window.WT_OPEN;
+    var m = location.pathname.match(/^\/water\/([A-Za-z][A-Za-z0-9._-]{3,40})\/?$/);
+    if (m) return m[1];
+    try { var q = new URLSearchParams(location.search).get("id"); if (q) return q; } catch (e) {}
+    var h = (location.hash || "").replace(/^#/, "");
+    return h || "";
+  }
+  function openBoot() {
+    var id = bootId(); if (!id) return;
+    var it = byId(id); if (!it) return;
+    if (!KINDS[it.kind]) { KINDS[it.kind] = true; var c = document.querySelector('.wt-chip[data-k="' + it.kind + '"]'); if (c) c.setAttribute("aria-pressed", "true"); }
+    select(id, window.innerWidth >= 900);
+    var el = document.querySelector('.wt-it[data-id="' + id + '"]');
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   }
   function card(it) {
     var meta = [it.place, pop(it), when(it)].filter(Boolean).join(" · ");
     var note = it.note ? "<p>" + esc(it.note) + "</p>" : "";
     var prec = it.precision === "county" ? '<p class="k">Map dot is at the centre of the county served. EPA does not publish this system\'s exact location.</p>' : "";
-    var acts = '<div class="acts"><a href="' + href(it.url) + '" target="_blank" rel="noopener">Source: ' + esc(it.src) + '</a>' + (it.lat != null ? '<button type="button" data-show="' + esc(it.id) + '">Show on map</button>' : "") + "</div>";
+    var acts = shareRow(it);
     var pb = D && D.pubs && D.pubs[it.src];
     var by = it.kind === "news" || !pb ? "" : '<p class="k">Published by ' + esc(pb) + "</p>";
     var why = it.kind === "violation" ? '<p class="k">EPA lists a current health-based violation for this system. This is a compliance finding, not a boil-water notice.</p>' :
@@ -107,6 +140,7 @@
   function select(id, fly) {
     var it = byId(id); if (!it) return;
     SEL = id;
+    try { history.replaceState(null, "", "/water/" + encodeURIComponent(id)); } catch (e) {}
     var idx = sorted(ITEMS.filter(vis)).findIndex(function (x) { return x.id === id; });
     if (idx >= SHOWN) SHOWN = idx + 1;
     render();
@@ -130,7 +164,7 @@
     }).then(function (j) {
       D = j; ITEMS = j.items || [];
       if (btn && R) R.stage(btn, 85);
-      counts(); sub(); render(); mapData();
+      counts(); sub(); render(); mapData(); openBoot();
       if (btn && R) { R.stage(btn, 100); setTimeout(function () { R.busy(btn, false); R.done(btn, (fresh && j.pulled && !j.pulled.length) ? "Already current" : "Updated"); }, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 220); }
       return (fresh && j.pulled && !j.pulled.length) ? "Already current" : "Updated";
     }).catch(function () {
@@ -158,7 +192,7 @@
       var s = e.target.closest("[data-show]"); if (s) { select(s.getAttribute("data-show"), true); if (window.innerWidth < 900) { var mp = $("wt_map"); if (mp) window.scrollTo({ top: 0, behavior: "smooth" }); } return; }
       var b = e.target.closest(".wt-it > button"); if (!b || e.target.closest("a")) return;
       var id = b.parentNode.getAttribute("data-id");
-      if (SEL === id) { SEL = null; closePop(); if (MAP && READY) MAP.setFilter("wt-sel", ["==", ["get", "id"], ""]); render(); }
+      if (SEL === id) { SEL = null; closePop(); if (MAP && READY) MAP.setFilter("wt-sel", ["==", ["get", "id"], ""]); try { history.replaceState(null, "", "/water"); } catch (x) {} render(); }
       else { var it = byId(id); if (it && it.lat != null) select(id, window.innerWidth >= 900); else { SEL = id; render(); } }
     });
     var rb = $("wt_ref");
