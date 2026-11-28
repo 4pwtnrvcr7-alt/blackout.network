@@ -194,7 +194,7 @@ class TestRefreshModes(unittest.TestCase):
             "/stats": "header", "/sources": "header", "/wire-classic": "header", "/grid/aws": "inpage", "/grid/azure": "inpage", "/grid/cloudflare": "inpage",
             "/privacy": "off", "/tos": "off", "/terms": "off", "/cookies": "off", "/privacy-choices": "off",
             "/do-not-sell": "off", "/credits": "off", "/scoring": "off", "/about/scoring": "off",
-            "/welcome": "off", "/ready": "off", "/report-status": "off", "/newsletter": "off",
+            "/welcome": "off", "/ready": "off", "/setup": "off", "/report-status": "off", "/newsletter": "off",
             "/newsletter/sample": "off", "/social": "off", "/story/x": "off", "/mesh/guide": "off",
             "/sources/admin": "off", "/wire/deadbeefdeadbeef": "off", "/": "off", "/figures": "off",
         }

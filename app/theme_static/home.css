@@ -19,7 +19,8 @@ body.bnt-home > footer.h-foot,body.bnt-home .bng-foot + footer.h-foot,footer.h-f
 .h-right{display:flex;align-items:center;gap:16px}
 .h-go{font:700 11.5px/1 var(--bnt-hd);letter-spacing:.14em;text-transform:uppercase;border:1.5px solid var(--bnt-ink-80);padding:10px 16px;border-radius:2px;transition:.2s}
 .h-go:hover,.h-go:focus-visible{background:var(--bnt-ink);color:#000}
-.h-burger{width:auto;min-width:44px;height:44px;position:relative;display:inline-flex;flex-direction:row-reverse;align-items:center;gap:10px;background:none;border:0;cursor:pointer;color:#fff;margin-right:-8px;padding:0 4px;overflow:visible}
+.h-burger{width:40px;min-width:40px;height:40px;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:0;background:none;border:0;border-radius:0;box-shadow:none;cursor:pointer;color:#fff;margin-right:-8px;padding:0;overflow:visible}
+.h-burger .bn-bl{display:none!important}
 /* slide-out menu (accordion groups) */
 .h-menu{box-sizing:border-box;position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);z-index:2600;background:rgba(8,9,12,.97);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transform:translateX(100%);visibility:hidden;transition:transform .45s var(--bnt-ease),visibility 0s .45s;padding:76px 30px 40px;overflow:auto;border-left:1px solid var(--bnt-ink-08)}
 .h-menu.open,.h-menu.h-closing{transform:none;visibility:visible;transition:transform .45s var(--bnt-ease)}
