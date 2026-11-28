@@ -291,6 +291,7 @@ def fetch_sdw():
         place = ", ".join(x for x in (_title(re.sub(r"\s*\([A-Z]{1,3}\)", "", str(w.get("CitiesServed") or "").split(",")[0])), c[2], w.get("StateCode")) if x)
         out.append(dict(id="sd" + str(w.get("PWSId")), kind="violation", level="serious" if serious else "viol", label="Serious violator" if serious else "Health-based violation",
                         name=_title(w.get("PWSName")), place=place, cc="US", st=str(w.get("StateCode") or "").upper()[:2], lat=c[0], lon=c[1], precision="county", pop=pop, since=None, note=" ".join(bits),
+                        rules=cont[:5], quarters=q, serious=serious,
                         by="U.S. EPA, Safe Drinking Water Information System (SDWIS)", src="EPA ECHO, SDWIS", url=w.get("DfrUrl") or "https://echo.epa.gov/"))
     out.sort(key=lambda x: (-(x["level"] == "serious"), -(x["pop"] or 0)))
     return out
@@ -589,16 +590,222 @@ def permalink(it, for_x=False):
     return u + ("?s=x" if for_x else "")
 
 
-def share_headline(it):
-    name = ((it or {}).get("name") or "").strip()
+def clip_words(s, n):
+    """Cut at a word boundary so share/OG text never ends mid-word (e.g. 'serious viol')."""
+    s = re.sub(r"\s+", " ", str(s or "")).strip()
+    if len(s) <= n:
+        return s
+    cut = s[:n].rsplit(" ", 1)[0] if " " in s[:n] else s[:n]
+    return cut.rstrip(" ,;:.-—–")
+
+
+SHARE_RANK = {
+    "dnd": 8, "serious": 8,
+    "boil": 5, "viol": 5, "snc": 5,
+    "news": 2, "dw": 2, "ww": 2,
+}
+
+
+def share_rank(it):
+    """Map a water level to the site severity bands used by the B share logo."""
+    return SHARE_RANK.get(((it or {}).get("level") or "").lower())
+
+
+def _rules(it):
+    raw = (it or {}).get("rules")
+    if isinstance(raw, (list, tuple)):
+        return [str(x).strip() for x in raw if str(x).strip()]
+    note = (it or {}).get("note") or ""
+    m = re.search(r"Rules or contaminants in current violation:\s*([^.]+)", note, re.I)
+    if not m:
+        return []
+    return [x.strip() for x in m.group(1).split(",") if x.strip()]
+
+
+def _quarters(it):
+    q = (it or {}).get("quarters")
+    if q is not None:
+        try:
+            return int(q)
+        except (TypeError, ValueError):
+            pass
+    m = re.search(r"Violations in (\d+) of the last 12 quarters", (it or {}).get("note") or "", re.I)
+    return int(m.group(1)) if m else None
+
+
+def _is_serious(it):
+    if (it or {}).get("level") == "serious" or (it or {}).get("serious") is True:
+        return True
+    return "serious violator" in ((it or {}).get("note") or "").lower()
+
+
+def _place_short(it):
+    """Compact 'City, ST' when we have a US state; otherwise the recorded place."""
     place = ((it or {}).get("place") or "").strip()
-    label = ((it or {}).get("label") or "Water treatment status").strip()
-    if (it or {}).get("kind") == "news":
-        return name or label
-    loc = f" at {name}" if name else ""
-    if place and place.lower() not in (name or "").lower():
-        loc = (loc + f", {place}") if loc else f" in {place}"
-    return f"{label}{loc}".strip()
+    st = str((it or {}).get("st") or "").upper()[:2]
+    if not place:
+        return st
+    if st and re.search(r",\s*" + re.escape(st) + r"\s*$", place, re.I):
+        city = re.sub(r",\s*[^,]+,\s*" + re.escape(st) + r"\s*$", "", place, flags=re.I).strip()
+        if city and city.lower() != place.lower():
+            return f"{city}, {st}"
+        return re.sub(r",\s*" + re.escape(st) + r"\s*$", f", {st}", place, flags=re.I)
+    return place
+
+
+def _item_loc(it, name):
+    """Name plus a compact place, without repeating the city (City of Jackson + Jackson, MS)."""
+    loc = (name or "").strip()
+    place = _place_short(it)
+    if not place:
+        return loc
+    city = place.split(",")[0].strip()
+    st = str((it or {}).get("st") or "").upper()[:2]
+    if city and loc and city.lower() in loc.lower():
+        if st and st not in loc.upper():
+            return f"{loc}, {st}"
+        return loc
+    if place.lower() in loc.lower():
+        return loc
+    return f"{loc}, {place}" if loc else place
+
+
+def _advice(it):
+    """One short why-it-matters / what-to-do line from known fields only. Never invent a fact about this system."""
+    level = ((it or {}).get("level") or "").lower()
+    hay = " ".join(_rules(it) + [(it or {}).get("note") or "", (it or {}).get("label") or ""]).lower()
+    if level == "dnd" or "do not drink" in hay or "do not use" in hay:
+        return "Do not drink or use this water until the utility says it is safe."
+    if level == "boil" or "boil water" in hay or "boil advisory" in hay:
+        return "Boil water as the utility directs before drinking or cooking."
+    if re.search(r"\blead\b", hay):
+        return "Lead is a health risk — use a certified filter and check the utility notice."
+    if re.search(r"\barsenic\b", hay):
+        return "Arsenic in drinking water is a health risk. Check the utility notice."
+    if level == "snc" or (it or {}).get("kind") == "wastewater":
+        return "See the EPA facility report and check local notices."
+    if (it or {}).get("kind") == "violation" or level in ("viol", "serious"):
+        return "Check the utility notice for what to do."
+    return ""
+
+
+def _pop_phrase(it):
+    pop = (it or {}).get("pop")
+    try:
+        pop = int(pop)
+    except (TypeError, ValueError):
+        return ""
+    if pop <= 0:
+        return ""
+    return f"Serves {pop:,} people."
+
+
+def share_facts(it, limit=None):
+    """Concrete, source-backed share/OG sentences. Drops later clauses if a character budget is set."""
+    it = it or {}
+    kind = it.get("kind") or ""
+    level = (it.get("level") or "").lower()
+    name = (it.get("name") or "").strip()
+    place = _place_short(it)
+    rules = _rules(it)
+    rule = ", ".join(rules) if rules else ""
+    q = _quarters(it)
+    bits = []
+    if kind == "news":
+        bits.append((name or it.get("label") or "Water treatment report").rstrip("."))
+        if place and place.lower() not in (name or "").lower():
+            bits[-1] += f", {place}"
+        bits[-1] += "."
+    elif kind == "wastewater" or level == "snc":
+        head = name or "Sewage treatment plant"
+        if place:
+            head += f", {place}"
+        if q:
+            bits.append(f"{head} is a major sewage treatment plant in significant noncompliance for {q} of the last 12 quarters.")
+        else:
+            bits.append(f"{head} is a major sewage treatment plant in significant noncompliance.")
+    elif kind == "violation" or level in ("viol", "serious"):
+        what = f"{rule} violation" if rule else "Health-based drinking-water violation"
+        if rule and "violation" in rule.lower():
+            what = rule
+        loc = _item_loc(it, name or "A drinking-water system")
+        if q:
+            bits.append(f"{what} at {loc}, in {q} of the last 12 quarters.")
+        else:
+            bits.append(f"{what} at {loc}.")
+        pop_n = None
+        try:
+            pop_n = int(it.get("pop"))
+            if pop_n <= 0:
+                pop_n = None
+        except (TypeError, ValueError):
+            pop_n = None
+        if _is_serious(it) and pop_n:
+            bits.append(f"EPA serious violator serving {pop_n:,} people.")
+        elif _is_serious(it):
+            bits.append("EPA serious violator.")
+        elif pop_n:
+            bits.append(f"Serves {pop_n:,} people.")
+    else:
+        label = (it.get("label") or "Water treatment status").strip()
+        loc = f" at {name}" if name else ""
+        raw_place = (it.get("place") or "").strip()
+        if raw_place and raw_place.lower() not in (name or "").lower():
+            loc = (loc + f", {raw_place}") if loc else f" in {raw_place}"
+        bits.append(f"{label}{loc}.".replace("..", "."))
+        note = (it.get("note") or "").strip()
+        if note and note.lower() not in bits[0].lower():
+            bits.append(note if note.endswith(".") else note + ".")
+    pop = _pop_phrase(it)
+    if pop and "people" not in " ".join(bits).lower() and "served" not in " ".join(bits).lower():
+        bits.append(pop)
+    tip = _advice(it)
+    if tip:
+        bits.append(tip)
+    text = " ".join(b.strip() for b in bits if b and b.strip())
+    if limit:
+        kept, acc = [], ""
+        for b in bits:
+            b = b.strip()
+            if not b:
+                continue
+            nxt = (acc + " " + b).strip()
+            if len(nxt) <= limit:
+                kept.append(b)
+                acc = nxt
+            else:
+                # Never start a clause we cannot finish. Mid-word cuts like "serious viol" are banned.
+                break
+        text = " ".join(kept)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def share_headline(it):
+    """Tweet body: facts first (contaminant/rule, duration, population, place, what to do)."""
+    return share_facts(it, limit=210) or ((it or {}).get("name") or (it or {}).get("label") or PAGE_HEADLINE)
+
+
+def og_title(it):
+    name = ((it or {}).get("name") or "").strip()
+    place = _place_short(it)
+    rules = _rules(it)
+    rule = rules[0] if rules else ""
+    if rule:
+        head = f"{rule} violation"
+        loc = _item_loc(it, name)
+        if loc:
+            head += f" at {loc}"
+    else:
+        label = ((it or {}).get("label") or PAGE_HEADLINE).strip()
+        head = _item_loc(it, name) if name else label
+        if label and name and label.lower() not in (head or "").lower():
+            head = f"{label} at {head}" if head else label
+    head = clip_words(head, 70)
+    return f"{head} | BLACKOUT.NETWORK"
+
+
+def og_desc(it):
+    return clip_words(share_facts(it, limit=300), 300)
 
 
 def share_item(it):
@@ -618,8 +825,9 @@ def share_item(it):
 # Obscure source-agency acronyms that x_share may lift from a note or publisher name.
 TAG_BAN = {t.lower() for t in (
     "#DEC", "#SDWIS", "#NPDES", "#ICIS", "#ECHO", "#CWA", "#PWS", "#PWSID", "#GSDW",
-    "#AWW", "#NL", "#MB", "#AKDEC", "#DND", "#PWS", "#WSER", "#WWTP", "#STP", "#EPA", "#USGS", "#INGV", "#JMA", "#GDACS",
+    "#AWW", "#NL", "#MB", "#AKDEC", "#DND", "#PWS", "#WSER", "#WWTP", "#STP", "#USGS", "#INGV", "#JMA", "#GDACS",
 )}
+# #EPA is allowed on EPA violation / wastewater shares (Matt, Nov 28 2026). Still banned: #News, #BlackoutNetwork.
 
 
 def _clean_tags(seed, generated):
@@ -652,15 +860,61 @@ def _clean_tags(seed, generated):
     return out[:5]
 
 
+def _contaminant_tags(it):
+    hay = " ".join(_rules(it) + [(it or {}).get("note") or "", (it or {}).get("label") or ""])
+    if re.search(r"\blead\b", hay, re.I):
+        return ["#Lead"]
+    for rx, tag in (
+        (r"\barsenic\b", "#Arsenic"),
+        (r"\bnitrate", "#Nitrate"),
+        (r"\bcoliform\b|e\.\s*coli", "#Coliform"),
+        (r"\bradium\b", "#Radium"),
+        (r"\bfluoride\b", "#Fluoride"),
+        (r"haloacetic|\bhaa5\b", "#HAA5"),
+        (r"\btthm\b|trihalomethane", "#TTHM"),
+    ):
+        if re.search(rx, hay, re.I):
+            return [tag]
+    return []
+
+
+def _epa_share(it):
+    src = " ".join(str((it or {}).get(k) or "") for k in ("src", "by", "url"))
+    return (it or {}).get("kind") in ("violation", "wastewater") or "epa" in src.lower()
+
+
+def _city_tags(it):
+    """City from 'City of X' or the first clause of place (e.g. Jackson, Hinds County, MS)."""
+    import x_share
+    out, seen = [], set()
+    name = ((it or {}).get("name") or "").strip()
+    m = re.match(r"(?i)(?:city|town|village|borough|township)\s+of\s+([A-Za-z][A-Za-z .'-]+)$", name)
+    city = m.group(1).strip() if m else ""
+    if not city:
+        city = ((it or {}).get("place") or "").split(",")[0].strip()
+    if city and 2 <= len(city) <= 40 and len(city.split()) <= 3:
+        tag = x_share.to_tag(city)
+        if tag and tag.lower() not in seen:
+            out.append(tag)
+            seen.add(tag.lower())
+    return out
+
+
 def item_tags(it):
-    """3-5 short popular tags plus place/entity names. Rule-based only (no LLM)."""
+    """3-5 short popular tags plus place/entity names. Rule-based only (no LLM).
+    Violation example: #Lead #Water #Jackson #Mississippi #EPA. Never #News or #BlackoutNetwork."""
     import x_share
     si = share_item(it)
     h = share_headline(it)
-    seed = list(LEVEL_TAGS.get((it or {}).get("level") or "", ["#DrinkingWater"]))
+    # Order: contaminant, #Water, city, state, #EPA. Level tags only fill if under 5.
+    seed = _contaminant_tags(it) + ["#Water"] + _city_tags(it)
     places = x_share.location_tags(si, headline=h)
+    if _epa_share(it):
+        seed = seed + places + ["#EPA"]
+        places = []
     entities = x_share.entity_tags(si, headline=h)
-    return _clean_tags(seed, x_share.finalize_tags(seed + places + entities, si, h))
+    fill = list(LEVEL_TAGS.get((it or {}).get("level") or "", ["#DrinkingWater"]))
+    return _clean_tags(seed + places + fill, x_share.finalize_tags(seed + places + fill + entities, si, h))
 
 
 def item_intent(it, tags=None):
@@ -729,11 +983,7 @@ def card_spec(it):
         "ww": (183, 156, 255),
     }
     place = ((it or {}).get("place") or "").strip()
-    note = ((it or {}).get("note") or "").strip()
-    fact = note or place
-    if note and place and place.lower() not in note.lower():
-        fact = (place + ". " + note)
-    fact = fact[:180]
+    fact = share_facts(it, limit=180) or place
     title = (it or {}).get("name") or (it or {}).get("label") or PAGE_HEADLINE
     kicker = ((it or {}).get("label") or "WATER TREATMENT").upper()
     return dict(
@@ -765,25 +1015,22 @@ def page(item=None):
     desc = ("Active boil-water and do-not-drink notices from state and provincial agencies, U.S. drinking water systems with current EPA health-based violations, "
             "sewage plants in significant noncompliance, and news reports. Every item links to its source.")
     if item:
-        title = f"{item.get('name') or item.get('label') or PAGE_HEADLINE} | BLACKOUT.NETWORK"
-        idesc = share_headline(item)
-        if item.get("place") and item.get("place") not in idesc:
-            idesc = idesc + " — " + item["place"]
-        if item.get("note"):
-            idesc = (idesc + ". " + str(item["note"]))[:240]
+        title = og_title(item)
+        idesc = og_desc(item)
         url = permalink(item)
-        img = SITE + "/og/share/water/" + item["id"] + ".png?v=" + (item["id"][:10])
         canon = url
         boot = f'<script>window.WT_OPEN={json.dumps(item["id"])};</script>'
+        og_rank = share_rank(item)
     else:
         title = "Water treatment status | BLACKOUT.NETWORK"
         idesc = desc
         url = SITE + "/water"
-        img = SITE + "/og/share/water/page.png?v=1"
         canon = url
         boot = ""
-    # og:title must contain BLACKOUT.NETWORK or server.pwa_head rewrites it
-    og_tags = og.tags(title=title, desc=idesc, url=url + "?s=x", image=img)
+        og_rank = None
+    # og:title must contain BLACKOUT.NETWORK or server.pwa_head rewrites it.
+    # og:image is the severity B logo (og.tags default); do not pass a unique card.
+    og_tags = og.tags(title=title, desc=idesc, url=url + "?s=x", rank=og_rank)
     chips = [("advisory", "Boil and do-not-drink notices"), ("violation", "EPA health violations"), ("wastewater", "Sewage plant noncompliance"), ("news", "In the news")]
     chip_html = "".join(f'<button type="button" class="wt-chip" data-k="{k}" aria-pressed="true"><i class="wt-dot wt-{k}"></i><span>{E(t)}</span><b data-n="{k}">0</b></button>' for k, t in chips)
     try:

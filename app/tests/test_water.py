@@ -126,9 +126,11 @@ class Water(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertIn("text/html", ctype)
         self.assertIn("og:image", body)
-        self.assertIn("/og/share/water/akabc123defg.png", body)
+        self.assertIn("https://blackout.network/img/share-logo-1200-orange.png", body)  # boil advisory → mid band
+        self.assertNotIn("/og/share/water/akabc123defg.png", body)
         self.assertIn("twitter:card", body)
-        self.assertIn("summary_large_image", body)
+        self.assertIn('name="twitter:card" content="summary"', body)
+        self.assertNotIn("summary_large_image", body)
         self.assertIn("BLACKOUT.NETWORK", body)
         self.assertIn("akabc123defg", body)
         self.assertIn("window.BN_WATER", body)
@@ -138,10 +140,68 @@ class Water(unittest.TestCase):
         self.assertNotIn('id="nx_water"', body)
         code, home, _ = netmap.handle_get("/grid/water")
         self.assertEqual(code, 200)
-        self.assertIn("/og/share/water/page.png", home)
+        self.assertIn("https://blackout.network/img/share-logo-1200.png", home)
+        self.assertNotIn("/og/share/water/page.png", home)
         self.assertIn('data-k="water"', home)
         self.assertIn("bnshare.js", home)
         self.assertNotIn("nx_water_btn", home)
+
+
+    def test_jackson_share_is_useful(self):
+        row = it(id="sdMS0250008", kind="violation", level="serious", label="Serious violator",
+                 name="City of Jackson", place="Jackson, Hinds County, MS", st="MS", pop=189673,
+                 rules=["Lead and Copper Rule"], quarters=12, serious=True,
+                 note="Rules or contaminants in current violation: Lead and Copper Rule. Violations in 12 of the last 12 quarters. Flagged by EPA as a serious violator.",
+                 src="EPA ECHO, SDWIS", url="https://echo.epa.gov/detailed-facility-report?fid=110013008501")
+        text = W.share_headline(row)
+        self.assertIn("Lead and Copper Rule", text)
+        self.assertIn("12 of the last 12 quarters", text)
+        self.assertIn("189,673", text)
+        self.assertIn("Jackson", text)
+        self.assertIn("MS", text)
+        self.assertRegex(text, r"serious violator", )
+        self.assertIn("filter", text.lower())
+        self.assertFalse(text.endswith("viol"), text)
+        self.assertNotIn("…", text)
+        tags = W.item_tags(row)
+        joined = " ".join(tags)
+        for need in ("#Lead", "#Water", "#Jackson", "#Mississippi", "#EPA"):
+            self.assertIn(need, tags, joined)
+        self.assertNotIn("#BlackoutNetwork", tags)
+        self.assertNotIn("#News", tags)
+        href = W.item_intent(row)
+        from urllib.parse import parse_qs, urlparse, unquote
+        q = parse_qs(urlparse(href).query)
+        body = unquote(q["text"][0])
+        self.assertIn("Lead and Copper Rule", body)
+        self.assertIn("12 of the last 12 quarters", body)
+        self.assertIn("189,673", body)
+        self.assertNotIn("…", body)
+        hashes = (q.get("hashtags") or [""])[0].split(",")
+        self.assertIn("Lead", hashes)
+        self.assertIn("Water", hashes)
+        self.assertIn("Jackson", hashes)
+        self.assertIn("Mississippi", hashes)
+        self.assertIn("EPA", hashes)
+        self.assertNotIn("BlackoutNetwork", hashes)
+        self.assertNotIn("News", hashes)
+        import x_share
+        self.assertLessEqual(x_share.weighted_len(body, q["url"][0]) + len(" " + " ".join("#"+h for h in hashes if h)), 280)
+        title = W.og_title(row)
+        desc = W.og_desc(row)
+        self.assertIn("BLACKOUT.NETWORK", title)
+        self.assertIn("Lead and Copper Rule", title)
+        self.assertIn("City of Jackson", title)
+        self.assertIn("Lead and Copper Rule", desc)
+        self.assertIn("12 of the last 12 quarters", desc)
+        self.assertIn("189,673", desc)
+        self.assertFalse(desc.endswith("viol"), desc)
+        self.assertNotIn("viol ", desc.split("violator")[0][-5:] if "violator" in desc else desc)
+        self.assertEqual(W.share_rank(row), 8)
+        # Typographic card fact, if still rendered, must not clip mid-word
+        fact = W.card_spec(row)["fact"]
+        self.assertFalse(fact.endswith("viol"), fact)
+        self.assertIn("Lead and Copper Rule", fact)
 
     def test_share_card_is_typographic_not_a_map(self):
         import share_card

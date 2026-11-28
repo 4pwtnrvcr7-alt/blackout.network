@@ -256,7 +256,7 @@ def page(qs):
 <link rel="canonical" href="https://blackout.network/map">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
-<meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/map.png?v=5"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(title)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/map.png?v=5"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">
+<meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/img/share-logo-1200.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200"><meta property="og:image:alt" content="BLACKOUT.NETWORK"><meta name="twitter:card" content="summary"><meta name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/api/signal/leaflet.css"><link rel="stylesheet" href="/api/signal/app.css">
 <script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>
@@ -514,7 +514,7 @@ def page2(qs):
 <link rel="canonical" href="https://blackout.network/map">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta property="og:title" content="{E(title)}"><meta property="og:description" content="{E(desc)}">
-<meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/og/map.png?v=5"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(title)}"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/map.png?v=5"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">
+<meta property="og:url" content="https://blackout.network/map"><meta property="og:type" content="website"><meta property="og:image" content="https://blackout.network/img/share-logo-1200.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200"><meta property="og:image:alt" content="BLACKOUT.NETWORK"><meta name="twitter:card" content="summary"><meta name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">
 <meta name="theme-color" content="#05060a">
 <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
 <link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/theme.css">

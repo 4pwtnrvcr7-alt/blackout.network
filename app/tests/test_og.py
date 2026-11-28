@@ -81,12 +81,14 @@ class OgImages(unittest.TestCase):
     def test_tags_include_required_fields(self):
         h = og.tags(title="Crime map | BLACKOUT.NETWORK", desc="Look up crime.",
                     url="https://blackout.network/crime", key="crime")
-        self.assertIn(f'property="og:image" content="https://blackout.network/og/crime.png?v={og.VERSION}"', h)
+        self.assertIn(f'property="og:image" content="{og.STORY_SHARE_IMAGE}"', h)
         self.assertIn('property="og:title" content="Crime map | BLACKOUT.NETWORK"', h)
         self.assertIn('property="og:url" content="https://blackout.network/crime"', h)
         self.assertIn('property="og:description" content="Look up crime."', h)
-        self.assertIn('name="twitter:card" content="summary_large_image"', h)
-        self.assertIn(f'name="twitter:image" content="https://blackout.network/og/crime.png?v={og.VERSION}"', h)
+        self.assertIn('name="twitter:card" content="summary"', h)
+        self.assertNotIn("summary_large_image", h)
+        self.assertIn(f'name="twitter:image" content="{og.STORY_SHARE_IMAGE}"', h)
+        self.assertNotIn("/og/crime.png", h)
         self.assertIn("og:image:width", h)
         self.assertNotIn("icon-og-v2-1200x630", h)
 
@@ -130,27 +132,35 @@ class OgImages(unittest.TestCase):
 
     def test_sitenav_and_theme_and_credits_use_new_images(self):
         import sitenav
+        logo = "https://blackout.network/img/share-logo-1200.png"
         crime = sitenav.head_html("crime")
-        self.assertIn("https://blackout.network/og/crime.png?v=", crime)
+        self.assertIn(logo, crime)
         self.assertIn('og:url" content="https://blackout.network/crime"', crime)
         self.assertNotIn("icon-og-v2", crime)
+        self.assertNotIn("/og/crime.png", crime)
         sources = sitenav.head_html("sources")
-        self.assertIn("/og/sources.png?v=", sources)
+        self.assertIn(logo, sources)
+        self.assertNotIn("/og/sources.png", sources)
         import theme
         home = theme.home_page()
-        self.assertIn("https://blackout.network/og/home.png?v=", home)
+        self.assertIn(logo, home)
         self.assertNotIn("icon-og-v2-1200x630", home)
+        self.assertNotIn("/og/home.png", home)
         cred = theme.credits_page()
-        self.assertIn("https://blackout.network/og/credits.png?v=", cred)
+        self.assertIn(logo, cred)
+        self.assertNotIn("/og/credits.png", cred)
         self.assertIn('og:url" content="https://blackout.network/credits"', cred)
 
     def test_map_and_wire_shell_have_og_image(self):
         import signal_map, wire_v2
+        logo = "https://blackout.network/img/share-logo-1200.png"
         html = signal_map.page2({}) if hasattr(signal_map, "page2") else signal_map.page({})
-        self.assertIn("https://blackout.network/og/map.png?v=", html)
+        self.assertIn(logo, html)
+        self.assertNotIn("/og/map.png", html)
         self.assertIn('og:url" content="https://blackout.network/map"', html)
         shell = wire_v2.shell("The Wire: live threat feed | BLACKOUT.NETWORK", "Live threats.", "<p>x</p>", "/wire")
-        self.assertIn("https://blackout.network/og/wire.png?v=", shell)
+        self.assertIn(logo, shell)
+        self.assertNotIn("/og/wire.png", shell)
         story = wire_v2.shell("A headline | BLACKOUT.NETWORK", "Dek.", "<p>x</p>", "/wire/6727e7f2ac056676", rank=8)
         self.assertNotIn("/og/wire/6727e7f2ac056676.png", story)
         red = "https://blackout.network/img/share-logo-1200-red.png"
@@ -165,7 +175,8 @@ class OgImages(unittest.TestCase):
         self.assertTrue(og.is_crawler("facebookexternalhit/1.1"))
         self.assertFalse(og.is_crawler("Mozilla/5.0 (iPad; CPU OS 18_0)"))
         html = og.share_page("solar").decode()
-        self.assertIn(f"/og/solar.png?v={og.VERSION}", html)
+        self.assertIn("https://blackout.network/img/share-logo-1200.png", html)
+        self.assertNotIn("/og/solar.png", html)
         self.assertIn('og:url" content="https://blackout.network/solar"', html)
         self.assertIn("Solar &amp; Seismic", html)
         self.assertNotIn('http-equiv="refresh"', html.lower())

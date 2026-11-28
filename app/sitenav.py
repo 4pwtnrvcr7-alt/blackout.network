@@ -247,9 +247,9 @@ def head_html(page, path=None):
         meta = og.tags(title=title, desc=desc, url=url, key=page, og_type="website")
     except Exception:
         meta = (f'<meta property="og:type" content="website"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(title)}">'
-                f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{SITE}/og/{page}.png?v=5">'
-                f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
-                f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="{SITE}/og/{page}.png?v=5"><meta name="twitter:site" content="{HANDLE}">'
+                f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{SITE}/img/share-logo-1200.png">'
+                f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200">'
+                f'<meta name="twitter:card" content="summary"><meta name="twitter:image" content="{SITE}/img/share-logo-1200.png"><meta name="twitter:site" content="{HANDLE}">'
                 f'<meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}">')
     return (UI.THEME_SCRIPT + scroll_script() + f'<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             + meta + '<link rel="stylesheet" href="/sitenav.css"><link rel="stylesheet" href="/bn-refresh.css"><script src="/sitenav.js" defer></script><script src="/bn-refresh.js" defer></script>')

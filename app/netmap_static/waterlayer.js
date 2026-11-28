@@ -44,11 +44,17 @@
   }
 
   function shareFor(it) {
+    /* Prefer the server-built intent (facts, place tags, no #BlackoutNetwork). */
+    if (it && it.xu) {
+      return '<div class="nx-xs"><a class="bn-x" href="' + esc(it.xu) + '" target="_blank" rel="noopener">Post on X</a></div>';
+    }
     var S = window.BNShare; if (!S || !it) return "";
     try {
       var n = it.name || "Water treatment", place = it.place || "", url = it.permalink || ("https://blackout.network/water/" + it.id);
-      var t = (it.label || LABEL[it.level] || "Water treatment plant") + " at " + n + (place ? ", " + place : "") + ".";
-      return '<div class="nx-xs">' + S.html({ k: "page", i: it.id, n: n, t: t, d: String(it.note || "").slice(0, 140), l: place, p: url }) + "</div>";
+      var t = it.note ? (n + (place ? ", " + place : "") + ". " + String(it.note)) : ((it.label || LABEL[it.level] || "Water treatment plant") + " at " + n + (place ? ", " + place : "") + ".");
+      t = String(t).replace(/\s+/g, " ").trim();
+      if (t.length > 280) t = t.slice(0, 279).replace(/\s+\S*$/, "").replace(/[,;:\-\u2013 ]+$/, "") + ".";
+      return '<div class="nx-xs">' + S.html({ k: "water", i: it.id, n: n, t: t, d: String(it.note || t).slice(0, 200), l: place, p: url }) + "</div>";
     } catch (e) { return ""; }
   }
 

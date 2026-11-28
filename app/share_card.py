@@ -661,7 +661,7 @@ def tag_list(it):
     for t in pool:
         if t and t not in tags and t.lower() not in [x.lower() for x in tags]:
             tags.append(t)
-    for d in ("#Space", "#BlackoutNetwork") if it["kind"] in ("planet", "craft", "sat", "launch", "site") else ("#Internet", "#Outage", "#Weather"):
+    for d in ("#Space", "#Astronomy") if it["kind"] in ("planet", "craft", "sat", "launch", "site") else ("#Internet", "#Outage", "#Weather"):
         if len(tags) >= 3:
             break
         if d.lower() not in [x.lower() for x in tags]:
