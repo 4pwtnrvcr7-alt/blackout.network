@@ -52,7 +52,7 @@ function match(it){
 function itemHTML(it,open){
   var c=CAT[it.k]||CAT.other||{color:"#777",label:"Other"};
   var h='<button type="button" class="tl-hd" aria-expanded="'+(open?"true":"false")+'"><span class="tl-tm">'+(it["do"]?'<abbr title="Dated by day only">&mdash;</abbr>':esc(tm(seenAt(it))))+'</span><span class="tl-nd" aria-hidden="true"></span>'+
-    '<span class="tl-tx"><span class="tl-h">'+hl(it.h)+'</span><span class="tl-s"><b class="tl-k">'+esc(c.label)+"</b>"+(it.s?hl(it.s):"")+"</span></span>"+
+    '<span class="tl-tx"><span class="tl-h">'+hl(it.h)+'</span><span class="tl-s"><b class="tl-k">'+esc(c.label)+"</b>"+(it.a?'<b class="tl-ar">Archive</b>':"")+(it.s?hl(it.s):"")+"</span></span>"+
     '<span class="tl-rk '+rkc(it.r)+'" title="Rank '+(it.r==null?"n/a":it.r)+'">'+(it.r==null?"&ndash;":it.r)+"</span></button>";
   if(open)h+=drawerHTML(it);
   return h;
@@ -66,7 +66,7 @@ function drawerHTML(it){
   var r=it.r,cnt={},src=(it.l||[]).map(function(l){var nm=l.s||l.u.replace(/^https?:\/\/(www\.)?/,"").split("/")[0];cnt[nm]=(cnt[nm]||0)+1;if(cnt[nm]>1)nm+=" ("+cnt[nm]+")";return'<li><a href="'+esc(l.u)+'" target="_blank" rel="noopener nofollow">'+esc(nm)+'<span aria-hidden="true"> &#8599;</span></a></li>'}).join("");
   var when=it["do"]?fU.format(dt(seenAt(it)))+" (date only)":fF.format(dt(seenAt(it)))+" ET";
   var go=!it.a?'<a class="w2-btn tl-go" href="/wire/'+esc(it.id)+'">Full story <span aria-hidden="true">&rarr;</span></a>':
-        ((it.l&&it.l[0])?'<a class="w2-btn tl-go" href="'+esc(it.l[0].u)+'" target="_blank" rel="noopener nofollow">Original report <span aria-hidden="true">&#8599;</span></a>':"");
+        ((it.l&&it.l[0])?'<a class="w2-btn tl-go" href="'+esc(it.l[0].u)+'" target="_blank" rel="noopener nofollow">View source record <span aria-hidden="true">&#8599;</span></a>':"");
   var xshare=(!it.a&&it.xu)?'<a class="w2-btn tl-go" href="'+esc(it.xu)+'" target="_blank" rel="noopener">Post on X</a>':
     (!it.a?'<a class="w2-btn tl-go" data-xid="'+esc(it.id)+'" href="/wire/'+esc(it.id)+'?s=x" target="_blank" rel="noopener">Post on X</a>'+lazyXu(it):"");
   return'<div class="tl-dr"><div class="tl-dri">'+(it.d?'<p class="tl-d">'+hl(it.d)+"</p>":"")+
@@ -74,9 +74,10 @@ function drawerHTML(it){
     (it.c?"<div><dt>Confidence</dt><dd>"+esc(it.c)+"</dd></div>":"")+
     "<div><dt>"+(it.a?"Recorded":"Seen")+"</dt><dd>"+esc(when)+"</dd></div>"+
     (it.loc?"<div><dt>Where</dt><dd>"+esc(it.loc)+"</dd></div>":"<div><dt>Region</dt><dd>"+esc((REG[it.g]||{}).label||"")+"</dd></div>")+
-    "<div><dt>Reports</dt><dd>"+(it.n||1)+" report"+((it.n||1)===1?"":"s")+(it.f?" &middot; "+it.f+" source famil"+(it.f===1?"y":"ies"):"")+"</dd></div></dl>"+
+    (it.a?"":"<div><dt>Reports</dt><dd>"+(it.n||1)+" report"+((it.n||1)===1?"":"s")+(it.f?" &middot; "+it.f+" source famil"+(it.f===1?"y":"ies"):"")+"</dd></div>")+"</dl>"+
+    (it.a&&it.tg&&it.tg.length?'<p class="tl-tg">'+it.tg.map(esc).join(" ")+"</p>":"")+
     (src?'<p class="tl-sl">Sources</p><ul class="tl-src">'+src+"</ul>":"")+
-    '<div class="tl-act">'+go+xshare+(it.a?'<span class="tl-arch">From the archive backfill</span>':"")+"</div></div></div>";
+    '<div class="tl-act">'+go+xshare+(it.a?'<span class="tl-arch">Archive record</span>':"")+"</div></div></div>";
 }
 /* ---------- rows model */
 function rebuild(){
@@ -468,10 +469,14 @@ function isoPlus(t,ms){return new Date(new Date(t).getTime()+ms).toISOString().s
 var QJ=[["Latest",0],["24 hours ago",1],["1 week ago",7],["1 month ago",30],["6 months ago",182],["1 year ago",365],["Beginning",-1]];
 function buildJump(){
   var h=QJ.map(function(x){return'<button type="button" class="tl-jb" data-d="'+x[1]+'">'+x[0]+"</button>"}).join("");
-  if(meta&&meta.months&&meta.months.length){var mx=Math.max.apply(null,meta.months.map(function(m){return m[1]}));
-    h+='<div class="tl-hist" role="group" aria-label="Jump to a month">'+meta.months.map(function(m){var y=m[0].slice(0,4),mo=+m[0].slice(5,7);
-      var lab=new Date(Date.UTC(+y,mo-1,15)).toLocaleString("en-US",{month:"short",timeZone:"UTC"})+" "+y;
-      return'<button type="button" class="tl-hb" data-m="'+m[0]+'" title="'+lab+": "+m[1].toLocaleString()+' signals" aria-label="'+lab+'"><i style="height:'+Math.max(6,Math.round(100*Math.sqrt(m[1]/mx)))+'%"></i>'+(mo===1||m===meta.months[0]?"<b>"+y+"</b>":"")+"</button>"}).join("")+"</div>";}
+  if(meta&&meta.months&&meta.months.length){
+    /* months before 2023 collapse into one bar per year (the archive reaches back to 2000); a year bar jumps to Dec 31 of that year */
+    var bars=[],yr={};meta.months.forEach(function(m){if(m[0]<"2023-01"){var y=m[0].slice(0,4);if(!yr[y]){yr[y]={key:y+"-12",y:y,n:0,year:1};bars.push(yr[y])}yr[y].n+=m[1]}else bars.push({key:m[0],y:m[0].slice(0,4),n:m[1],mo:+m[0].slice(5,7)})});
+    var mx=Math.max.apply(null,bars.map(function(b){return b.year?b.n/12:b.n}));
+    h+='<div class="tl-hist" role="group" aria-label="Jump to a month or year">'+bars.map(function(b,i){
+      var lab=b.year?b.y:new Date(Date.UTC(+b.y,b.mo-1,15)).toLocaleString("en-US",{month:"short",timeZone:"UTC"})+" "+b.y;
+      var v=b.year?b.n/12:b.n,show=b.year?(+b.y%5===0||i===0):(b.mo===1);
+      return'<button type="button" class="tl-hb" data-m="'+b.key+'" title="'+lab+": "+b.n.toLocaleString()+' signals" aria-label="'+lab+'"><i style="height:'+Math.max(6,Math.round(100*Math.sqrt(v/mx)))+'%"></i>'+(show?"<b>"+b.y+"</b>":"")+"</button>"}).join("")+"</div>";}
   jq.innerHTML=h;
   if(meta&&meta.earliest){dIn.min=dayKey(meta.earliest);dIn.max=todayK}
 }

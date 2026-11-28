@@ -212,3 +212,6 @@ body.tl{background:#000}
 .tl-it.fresh{background:linear-gradient(90deg,rgba(240,240,250,.075),rgba(240,240,250,0) 70%);animation:tlarrive .55s ease both,tlfade 90s linear forwards}
 @keyframes tlfade{0%{background-color:rgba(240,240,250,.04)}100%{background-color:rgba(240,240,250,0)}}
 @media (prefers-reduced-motion:reduce){.tl-live{animation:none;opacity:.8}.tl-it.fresh{animation:none}}
+/* archive rows (2000-2024 records, Nov 27 2026): grey outlined label, hashtags in the drawer */
+.tl-ar{font:600 9px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9AA0A8;border:1px solid #4A4F57;padding:2px 5px 2px;margin-right:8px;vertical-align:1px}
+.tl-tg{margin:10px 0 14px;font:500 12px/1.5 Inter,sans-serif;color:#8A9098;word-spacing:6px}
