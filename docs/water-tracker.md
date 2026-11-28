@@ -23,3 +23,40 @@ EPA SDWIS/Envirofacts VIOLATION table (no coordinates; ECHO returns the same sys
 
 Rollback: nothing is deployed from this branch. Closing the PR and deleting the branch removes it. No stored state, no localStorage keys, no new env vars.
 Tests: `python3 app/tests/test_water.py`. Rebuild centroids: `python3 tools/build_county_centroids.py`.
+
+Share (Nov 28 2026): each item has a permalink at `/water/<id>` and the standard Wire/growth action set (Post on X, Copy link, native share, source link, permalink). Hashtags come from `x_share` (3-5 short popular tags plus place/entity names; never #News or #BlackoutNetwork). The share preview is a typographic `/og/share/water/<id>.png` card — no map or satellite image. The page itself has the same share row and the site Follow band. `og.VERSION` is unchanged.
+
+
+## Grid Water layer (Nov 28 2026)
+
+
+The water view of /grid opens on the lower 48 (same US box as the rest of The Grid), with padding so the Water panel does not hide the United States. The advisory list is ordered by severity, then US first, then recency. Official US advisory sources currently wired: Alaska DEC, Oregon Health Authority (ArcGIS, yourwater.oregon.gov), Florida Department of Health (statewide boil-water table; rows without a system or county are dropped). EPA ECHO SDWIS current health-based violations and ICIS-NPDES significant noncompliance remain as findings, not boil notices. Texas TCEQ, California SWRCB, New York, North Carolina, Louisiana, Mississippi and West Virginia do not publish a machine-readable current statewide boil-water feed that this box can read; they will be added when an official open feed is available. Every item still has a source link. Plant counts in the panel come from the shipped SQLite inventory so they cannot drift from docs/water-plants-coverage.md.
+
+At city zoom, plants are teardrop markers (teal drinking-water, violet wastewater), not the same circles the other layers use, with a legend on the map. No yellow.
+
+
+`/water` permanently redirects (301) to `/grid/water`. `/water/<id>` redirects to `/grid/water/<id>`, which opens The Grid with the Water layer and panel, scrolls to that item, and keeps the typographic share card at `/og/share/water/<id>.png`.
+
+The Water panel reuses the site share set (Post on X, Copy link, native share, Source, Permalink, Follow). Buttons are pills. No yellow except the shared #293 Refresh fill on The Grid.
+
+### Plant inventory (worldwide) and how it is served
+
+Sources, each row cites its own:
+- U.S.: EPA ECHO / Facility Registry Service, active SIC 4941 (water supply) and SIC 4952 (sewerage), EPA coordinates; U.S. territories carry their own country code.
+- Canada: Environment and Climate Change Canada WSER reported data (Open Government Licence - Canada). The point is the reported final discharge point, and the row says so.
+- Australia: Geoscience Australia National Wastewater Treatment Facilities 2026 (CC BY 4.0).
+- Everywhere else, and gap fill in all of the above: OpenStreetMap `man_made=water_works` / `wastewater_plant` (ODbL), from Geofabrik country and U.S. state extracts (nodes and ways; multipolygon relations are skipped). Authoritative rows win; an OSM plant within 400 m (1.5 km in Canada) of an authoritative one is dropped.
+- EEA Waterbase UWWTD (CC BY 4.0) is supported by the builder but `sdi.eea.europa.eu` is not reachable from the build box, so EU coverage is OSM only in this build.
+
+Plant coordinates are never estimated; a system without a published point is not drawn as a plant.
+
+Delivery: the inventory is one read-only SQLite file shipped as zipped base64 parts (`water.db.b64.N`, the same pattern as `gridtiles.b64.N`). `app/waterdb.py` decodes it once to a temp file and opens it `mode=ro&immutable=1`; requests read only the pages for their viewport.
+- `/api/netmap/water?w&s&e&n&z` returns precomputed clusters below zoom 9 and up to 2,500 points at zoom 9+, with an LRU of encoded responses.
+- `/api/water/item?id=` returns one decorated plant or advisory (permalink, Post on X, tags).
+- `/api/water/map` is the slim advisory dot feed; `/api/water/data?limit=30&offset=N` pages the panel list, most severe first.
+
+Rebuild: `tools/fetch_water_national.py` (Canada, Australia), Geofabrik extraction into the cache, then `tools/build_water_db.py --ship app/netmap_static`. Coverage is written to `docs/water-plants-coverage.md`.
+
+Advisories (boil water, do not drink, compliance) come only from the live feeds — never invented.
+
+The typographic Grid loader weights (`W8`) are unchanged. Nothing from the Water layer loads until the Water chip is on or `/grid/water[/id]` is opened.

@@ -922,6 +922,9 @@ def handle_get(path, qs, headers=None):
     if p == "/grid" and os.environ.get("BN_NETMAP", "1") != "0":   # Nov 23 2026 (pt1755u): full-screen Network Status map (netmap.py); BN_NETMAP=0 = old hub
         import netmap
         return netmap.handle_get(p, qs)
+    if p == "/grid/water" or (p.startswith("/grid/water/") and p[12:]):
+        import netmap
+        return netmap.handle_get(p, qs)
     if re.fullmatch(r"/grid/status/[a-z0-9]+", p):   # pt1785u: per-service detail pages behind the board's tiles
         import netmap
         return netmap.handle_get(p, qs)
