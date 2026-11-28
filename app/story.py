@@ -267,7 +267,11 @@ def render(cid, since=""):
             f'<p class="crumb"><a href="/wire">The Wire</a> › Story</p>'
             f'<div><span class="pill{" pill-hi" if rank >= 7 else ""}">RANK {rank}/10 · {tname.upper()}</span>'
             f'<span class="pill">{S.E((r.get("category") or "").upper())}</span>' + ('<span class="pill">WATCHLIST</span>' if watch == 1 else "") + '</div>'
-            + _h1(S.clean_title(dek_note).rstrip(". ") if dek_note else title, what if not dek_note else "", r.get("location") or "")
+            # H1 is the same first-pass clean title as the document title / share text.
+            # A desk/template dek_note must not replace it: that path dropped Mexico's
+            # [Sea] cue ("in Mexico") and, on a second display_headline pass, glued
+            # Japan's raw "Adjacent Sea of Chichijima Island" back onto the H1.
+            + _h1(title, what, r.get("location") or "")
             + f'<p class="meta">{S.E(conf)} · First seen {S.E(et(r.get("first_seen") or ""))} · Updated {S.E(et(r.get("updated") or ""))}'
             + (f' · {S.E(loc)}' if loc else "") + '</p>'
             + g_ppl + g_share + upd + report + breakdown + (g_short if report else (g_short or g_loc))
