@@ -44,3 +44,6 @@ body.nx-water-on .wt-mapleg{bottom:calc(58dvh + 12px)}
   body.nx-water-on .wt-mapleg{left:16px;bottom:24px}
 }
 body.nx-sky .wt-mapleg{display:none!important}
+
+/* Nov 28 2026 hotfix: no floating Water button. Water is a normal toggle in the layer row (the WATER chip), like Internet, Power Grid and Dams. */
+.nx-water-btn,#nx_water_btn{display:none!important}
