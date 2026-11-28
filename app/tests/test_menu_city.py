@@ -97,6 +97,7 @@ class MenuChrome(unittest.TestCase):
         css = menu5.html_block("/wire").split("</style>", 1)[0]
         self.assertIn("#bn-menu:has(.m5) .m3-alerts", css)
         self.assertIn("#bn-menu:has(.m5) .bn-ph", css)
+        self.assertIn("#bn-menu:has(.m5) .m3-grid", css)
         self.assertIn("border-bottom:0", css)
 
     def test_close_is_icon_only(self):
@@ -110,6 +111,11 @@ class MenuChrome(unittest.TestCase):
         self.assertIn("max(8px,env(safe-area-inset-bottom,0px))", css)
         self.assertNotIn("padding-bottom:max(20px,2vh)", css)
         self.assertNotIn("max(16px,env(safe-area-inset-bottom,0px))", css)
+
+    def test_desktop_legacy_grid_hidden_so_stack_can_fill(self):
+        css = menu5.html_block("/wire").split("</style>", 1)[0]
+        self.assertIn("#bn-menu:has(.m5) .m3-grid", css)
+        self.assertIn("flex:1 1 0%", css)
 
 
 if __name__ == "__main__":
