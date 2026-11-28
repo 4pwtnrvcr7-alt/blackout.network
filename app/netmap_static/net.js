@@ -273,7 +273,7 @@
   }
   window.__bnPlace = function (c, pt) { dragCard(c); placeCard(c, pt); };
   addEventListener("resize", function () { ["nx_card", "gx_card"].forEach(function (id) { var c = document.getElementById(id); if (c && !c.hidden) { var r = c.getBoundingClientRect(); clampCard(c, r.left, r.top); } }); });
-  var ON = { internet: true, power: true, ops: true, cloud: true, dc: true, mobile: true, sat: true, pay: true, apps: true, hydro: true, sea: true, towers: true, grid: true };   /* pt1787u: opens with every layer on */
+  var ON = { internet: false, power: true, ops: true, cloud: false, dc: false, mobile: false, sat: false, pay: false, apps: false, hydro: false, sea: false, towers: false, grid: true, water: !!(window.BN_WATER && window.BN_WATER.open) };   /* Nov 28 2026 (Matt): /grid opens with only the Power grid layer on */
   var MAPR = { show: {}, timer: 0, seq: 0 };
   var MAP_ORDER = ["internet", "grid", "sea", "dc", "towers", "hydro", "cloud"];   /* pt1833u: Map layers in one at a time, ~400 ms apart */
   function mapOn(k) {
@@ -424,6 +424,7 @@
         sf.sort(function (a, b) { var pa = map.project(a.geometry.coordinates), pb = map.project(b.geometry.coordinates); return Math.hypot(pa.x - e.point.x, pa.y - e.point.y) - Math.hypot(pb.x - e.point.x, pb.y - e.point.y); });
         if (sf.length) satCard(sf[0].properties.i, e.point); else clearSat(); return; }
       if (window.__gxWxHit && window.__gxWxHit(e.point)) { hideCard(true); return; }   /* a grid alert diamond on top: gridlayer.js shows its card */
+      if (window.__wtHit && window.__wtHit(e)) return;   /* Water layer points use the shared #nx_card, same as dams */
       /* follow-up pt1810u: inside an Internet region (chip on), other items win only on a tight 3 px hit; otherwise the region card opens */
       var inetHit = ON.internet && INET && map.getLayer("inet-fill") && map.getLayoutProperty("inet-fill", "visibility") !== "none" ? map.queryRenderedFeatures(e.point, { layers: ["inet-fill"] })[0] : null,
         T = inetHit ? 3 : 8, T9 = inetHit ? 3 : 9;
