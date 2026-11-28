@@ -1,16 +1,18 @@
 """Main menu v5 (Matt, voice, Nov 24 2026 12:25 AM ET): one menu body for every overlay on the site
 (sitenav drawer #bn-menu, the "/" intro menu #h_menu, the Wire/story menu #w2_menu).
 
-- Remaining pages only (deactivated.py removes the rest), as large bold uppercase links, right-aligned and vertically centred,
-  in the same type as the old lead links (Intro / The Wire / Live / Newsletter: Inter 700, clamp(30px,4.2vw,52px)/1.1, .02em).
-- X and YouTube marks (monochrome SVG) sized to the link text, opening in a new tab.
+- Remaining pages only (deactivated.py removes the rest), as large bold uppercase links, right-aligned and stacked at the
+  bottom of the screen (right-thumb zone on phones) so the city graphic stays clear in the middle. Type is Inter 700,
+  sized so eight page links plus X/YouTube fit at 390 px without overflow. Desktop links also sit off the city, at the bottom.
+- X and YouTube marks (monochrome SVG) sized to the link text, opening in a new tab, stay with the main list at the bottom.
 - Items rise in (staggered) when the menu opens and fall out on close (the menus' existing open/closing classes drive it);
   a tap on an item zooms through to the page. prefers-reduced-motion: plain fades, no movement.
 - Nov 27 2026 (Matt pt1984u): the old SVG radar is replaced by an original code-rendered canvas loop (static/pwa/bn-menu-city.js): a massive night city, the
-  lights go out in waves, then a peer-to-peer mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
+  lights go out in waves, then a mesh comes online. Lazy-loaded on the first menu open; pointer-events:none, paused when the menu is
   closed or the tab is hidden, static frame under prefers-reduced-motion. Kill switch: BN_MENU_CITY=0 brings back the SVG radar.
-- "Install on home screen" and "Turn on notifications" buttons open the existing device-aware animated panels
-  (static/pwa/install-guide.js: BN.installApp / BN.showNotifyGuide) on tap only. Nothing opens by itself.
+- "Install on home screen" and "Turn on notifications" sit at the top under the header as small plain text (not boxed
+  buttons) and open the existing device-aware animated panels (static/pwa/install-guide.js: BN.installApp / BN.showNotifyGuide)
+  on tap only. Nothing opens by itself.
 Kill switch: Render env BN_MENU_V5=0 brings back the previous menus unchanged."""
 import os, html
 
@@ -26,6 +28,7 @@ YT_URL = "https://www.youtube.com/@blkoutntw"
 ORDER = [("intro", "Intro", "/?intro=1"), ("threat", "The Wire", "/wire"), ("heatmap", "Heat Map", "/map"), ("weather", "Weather", "/weather"),
          ("net", "The Grid", "/grid"),   # Nov 24 2026 (Matt pt1795u): Network Status merged with The Grid; /grid 302s to /grid
          ("finance", "Markets", "/markets"),
+         ("comms", "Comms", "/comms"),  # Nov 27 2026 (Matt 11:24 PM ET): coming-soon /comms on the traffic menu
          ("newsletter", "Newsletter", "/newsletter")]
 
 def items(intro_href=None):
@@ -84,10 +87,17 @@ def _art_svg():
             '</svg>')
 
 CSS = ('<style id="bn_m5">'
- '.m5{position:relative;box-sizing:border-box;width:100%;flex:1 0 auto;display:flex;align-items:center;justify-content:flex-end;'
- 'min-height:0;padding:20px max(20px,3vw) 20px;overflow:hidden;grid-column:1/-1;isolation:isolate}'
- '#h_menu .m5{min-height:calc(100vh - 124px);min-height:calc(100dvh - 124px);padding-left:0;padding-right:0}#h_menu.h-menu4:has(.m5)>.h-wm{display:none!important}'
- '.w2-mnav.w2-m5{display:flex;flex-direction:column;padding:0!important}.w2-m5 .m5{padding-left:0;padding-right:0}'
+ '.m5{position:relative;box-sizing:border-box;width:100%;flex:1 1 auto;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;'
+ 'min-height:0;padding:0;overflow:hidden;grid-column:1/-1;isolation:isolate}'
+ '#h_menu.h-menu4:has(.m5){display:flex!important;flex-direction:column;grid-template-columns:none;align-content:stretch;overflow:hidden;'
+ 'padding:88px 0 max(10px,env(safe-area-inset-bottom,0px));box-sizing:border-box}'
+ '#h_menu .m5{flex:1 1 auto;min-height:0;height:100%;padding:0}'
+ '#h_menu.h-menu4:has(.m5)>.h-wm{display:none!important}'
+ '#bn-menu.bn-m4:has(.m5) .bn-panel{overflow:hidden!important}'
+ '#bn-menu:has(.m5) .m3-foot{display:none!important}'
+ '#bn-menu:has(.m5) .m5{flex:1 1 auto;min-height:0}'
+ '.w2-mnav.w2-m5{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:100%;padding:0!important}'
+ '.w2-m5 .m5{flex:1 1 auto;min-height:0;height:100%;padding:0}'
  '.m5 .m5-art{position:absolute;z-index:-1;pointer-events:none;left:max(-120px,-12vw);top:50%;width:min(92vw,620px);height:auto;transform:translateY(-50%);opacity:.38}'
  '@media (min-width:900px){.m5 .m5-art{left:4vw;width:min(46vw,640px);opacity:.9}}'
  '.m5a-ring{fill:none;stroke:#E8EEF4;stroke-width:1}.m5a-tick{stroke:#AEBBC8;stroke-width:1.2;opacity:.45}.m5a-axis{stroke:#AEBBC8;stroke-width:.8;opacity:.18;fill:none}'
@@ -97,23 +107,30 @@ CSS = ('<style id="bn_m5">'
  '.m5a-pulse{fill:none;stroke:#E8EEF4;stroke-width:1.4;transform-origin:376px 300px;animation:m5pulse 2.8s ease-out infinite paused}.m5a-p2{animation-delay:1.4s}'
  ':is(#bn-menu.bn-open,#h_menu.open,#w2_menu:not([hidden])) .m5 :is(.m5a-sweep,.m5a-pulse){animation-play-state:running}'
  '@keyframes m5sweep{to{transform:rotate(360deg)}}@keyframes m5pulse{0%{transform:scale(.6);opacity:.9}100%{transform:scale(4.2);opacity:0}}'
- '.m5-nav{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:0;max-width:100%}'
+ '.m5-nav{display:flex;flex-direction:column;align-items:flex-end;text-align:right;gap:0;max-width:100%;margin-top:auto;position:relative;z-index:1;'
+ 'padding:0 max(20px,3vw) max(16px,env(safe-area-inset-bottom,0px));box-sizing:border-box}'
  '.m5-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;align-items:flex-end}'
  '.m5-list li{margin:0;padding:0;border:0;list-style:none}'
- '.m5 .m5-list a,.m5 .m5-soc{font:700 clamp(30px,4.2vw,52px)/1.1 Inter,system-ui,sans-serif!important;letter-spacing:.02em!important;text-transform:uppercase}'
- '.m5 .m5-list a{display:inline-block;color:#fff!important;text-decoration:none!important;padding:2px 0!important;background:none!important;border:0!important;'
- 'white-space:nowrap;max-width:100%;transform-origin:right center;transition:color .15s}'
+ '.m5 .m5-list a,.m5 .m5-soc{font:700 clamp(22px,5.6vw,32px)/1.08 Inter,system-ui,sans-serif!important;letter-spacing:.02em!important;text-transform:uppercase}'
+ '.m5 .m5-list a{display:inline-flex;align-items:center;color:#fff!important;text-decoration:none!important;padding:3px 0!important;background:none!important;border:0!important;'
+ 'white-space:nowrap;max-width:100%;min-height:36px;box-sizing:border-box;transform-origin:right center;transition:color .15s}'
  '.m5 .m5-list a,.m5 .m5-soc a{text-shadow:0 1px 16px rgba(0,0,0,.85),0 0 3px rgba(0,0,0,.55)}'
  '.m5 .m5-list a:hover,.m5 .m5-list a:focus-visible{color:#C9CDD3!important}.m5 .m5-list a[aria-current]{color:#C9CDD3!important}'
- '.m5 .m5-list a:focus-visible,.m5 .m5-soc a:focus-visible,.m5 .m5-btn:focus-visible{outline:2px solid #fff;outline-offset:4px}'
- '.m5 .m5-soc{display:flex;gap:.55em;align-items:center;justify-content:flex-end;margin:.34em 0 0;line-height:1}'
- '.m5 .m5-soc a{display:inline-flex;align-items:center;color:#fff!important;text-decoration:none!important;height:1.1em;transition:color .15s,transform .15s}'
+ '.m5 .m5-list a:focus-visible,.m5 .m5-soc a:focus-visible,.m5 .m5-txt:focus-visible{outline:2px solid #fff;outline-offset:4px}'
+ '.m5 .m5-soc{display:flex;gap:.55em;align-items:center;justify-content:flex-end;margin:.2em 0 0;line-height:1}'
+ '.m5 .m5-soc a{display:inline-flex;align-items:center;color:#fff!important;text-decoration:none!important;height:1.1em;min-height:36px;transition:color .15s,transform .15s}'
  '.m5 .m5-soc a:hover{color:#C9CDD3!important}.m5 .m5-ico{display:block;height:.74em;width:auto}.m5 .m5-ico-yt{height:.74em}'
- '.m5 .m5-acts{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:22px}'
- '.m5 .m5-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;background:none;border:1px solid rgba(255,255,255,.45);border-radius:0;color:#fff;'
- 'font:600 11px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:background .15s,border-color .15s}'
- '.m5 .m5-btn:hover{background:rgba(255,255,255,.08);border-color:#fff}.m5 .m5-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}'
- '@media (max-width:420px){.m5 .m5-list a,.m5 .m5-soc{font-size:30px!important}.m5 .m5-btn{padding:0 12px;min-height:40px;letter-spacing:.1em}.m5 .m5-acts{gap:8px;margin-top:16px}}'
+ '.m5 .m5-acts{display:flex;flex-wrap:wrap;gap:0 22px;justify-content:flex-end;align-items:center;margin:0;padding:4px max(20px,3vw) 0;position:relative;z-index:1;box-sizing:border-box;flex:0 0 auto}'
+ '.m5 .m5-txt{display:inline-flex;align-items:center;min-height:36px;padding:6px 0;background:none!important;border:0!important;border-radius:0;color:rgba(230,232,235,.88)!important;'
+ 'font:500 11px/1.2 Inter,system-ui,sans-serif!important;letter-spacing:.08em!important;text-transform:uppercase;cursor:pointer;'
+ 'text-shadow:0 1px 10px rgba(0,0,0,.85);transition:color .15s}'
+ '.m5 .m5-txt:hover,.m5 .m5-txt:focus-visible{color:#fff!important}'
+ '@media (max-width:899px){.m5 .m5-acts{flex-direction:column;align-items:flex-end;gap:0;padding-top:2px}.m5 .m5-txt{min-height:32px;padding:4px 0}'
+ '.m5 .m5-list a,.m5 .m5-soc{font-size:clamp(22px,7.2vw,28px)!important;line-height:1.05!important}'
+ '.m5 .m5-list a{padding:2px 0!important;min-height:36px}.m5 .m5-soc{margin:.12em 0 0}.m5 .m5-soc a{min-height:36px}}'
+ '@media (max-width:420px){.m5 .m5-list a,.m5 .m5-soc{font-size:26px!important;line-height:1.05!important}}'
+ '@media (min-width:900px){.m5 .m5-list a,.m5 .m5-soc{font:700 clamp(24px,2.4vw,32px)/1.08 Inter,system-ui,sans-serif!important}'
+ '.m5 .m5-list a{min-height:38px;padding:4px 0!important}.m5-nav{padding-bottom:max(20px,2vh)}}'
  # entrance: rise in (staggered); exit: fall (existing menus' open / closing classes)
  ':is(#bn-menu.bn-open:not(.bn-closing),#h_menu.open:not(.h-closing),#w2_menu.open:not(.w2-closing)) .m5 .m5-r{animation:m5rise .55s cubic-bezier(.16,.84,.28,1) both;animation-delay:calc(var(--i,0)*45ms + 60ms)}'
  ':is(#bn-menu.bn-open:not(.bn-closing),#h_menu.open:not(.h-closing),#w2_menu.open:not(.w2-closing)) .m5 .m5-art{animation:m5art .9s ease both}'
@@ -178,8 +195,8 @@ def html_block(active_href=None, intro_href=None):
     soc = (f'<div class="m5-soc m5-r" style="--i:{n}">'
            f'<a href="{X_URL}" target="_blank" rel="noopener me" aria-label="BLACKOUT.NETWORK on X, @BlkoutNtw (opens in a new tab)">{I_X}</a>'
            f'<a href="{YT_URL}" target="_blank" rel="noopener me" aria-label="BLACKOUT.NETWORK on YouTube (opens in a new tab)">{I_YT}</a></div>')
-    acts = (f'<div class="m5-acts m5-r" style="--i:{n + 1}">'
-            f'<button type="button" class="m5-btn" data-m5-act="install">{I_PHONE}<span>Install on home screen</span></button>'
-            f'<button type="button" class="m5-btn" data-m5-act="notify">{I_BELL}<span>Turn on notifications</span></button></div>')
-    return (CSS + '<div class="m5" data-m5>' + _art() + '<div class="m5-nav"><ul class="m5-list" aria-label="Pages">' + "".join(li) + '</ul>'
-            + soc + acts + '</div></div>' + JS.replace("__CITYV__", _city_ver()))
+    acts = (f'<div class="m5-acts m5-r" style="--i:0">'
+            f'<button type="button" class="m5-txt" data-m5-act="install">Install on home screen</button>'
+            f'<button type="button" class="m5-txt" data-m5-act="notify">Turn on notifications</button></div>')
+    return (CSS + '<div class="m5" data-m5>' + _art() + acts + '<div class="m5-nav"><ul class="m5-list" aria-label="Pages">' + "".join(li) + '</ul>'
+            + soc + '</div></div>' + JS.replace("__CITYV__", _city_ver()))
