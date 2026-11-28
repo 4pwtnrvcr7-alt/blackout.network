@@ -153,7 +153,7 @@ and situational awareness only; it is not an official warning service. Follow of
 - [How we score]({SITE}/scoring): the 0-100 severity score and the 0-10 rank, explained factor by factor
 - [Sources]({SITE}/sources): every source we use, with item counts and a 0-10 confidence rating
 - [Newsletter]({SITE}/newsletter): the free 7 AM / 7 PM ET email brief, double opt-in
-- [Comms]({SITE}/comms): coming soon. Communications that work when the grid does not. Sign up on the page to hear when it is released.
+- [Comms]({SITE}/comms): Comms — coming soon.
 - [Crime]({SITE}/crime): crime statistics by U.S. ZIP code, city, county or state, or by country
 - [Off-grid network map]({SITE}/mesh): live map of public off-grid mesh radios, network chat from your own radio ({SITE}/mesh/chat), and an off-grid setup guide ({SITE}/mesh/guide)
 ## Dashboard tabs

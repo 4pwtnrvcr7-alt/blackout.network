@@ -183,8 +183,8 @@ PAGES = {
              "A brief overview of BLACKOUT.NETWORK: a free early-warning threat monitor, what we are trying to do, and the tools on this site. Not official alerts.",
              "A brief overview of this site, what we are trying to do, and the tools you can use."),
  "comms": ("", "Comms | BLACKOUT.NETWORK",
-           "Comms is coming soon from BLACKOUT.NETWORK: communications that work when the grid does not. Sign up for the brief to hear when it is released.",
-           "Communications that work when the grid does not. Coming soon."),
+           "Comms — coming soon.",
+           "Comms — coming soon."),
 }
 
 def tabs():
