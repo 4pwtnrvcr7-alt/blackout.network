@@ -151,7 +151,12 @@ i.d-ok{background:var(--g)}i.d-minor{background:var(--mi)}i.d-deg{background:var
 
 /* Nov 23 2026 (pt1763ua0): Follow-block brief button must match the bright X and YouTube buttons. */
 .nb .bng-btn,.nb .bng-btn span,.nb .bng-btn.bng-p,.nb .bng-btn.bng-p span{color:#F2F2F4!important;border-color:#F2F2F4!important;background:none!important}
-.nb .bng-btn:hover,.nb .bng-btn:focus-visible,.nb .bng-btn.bng-p:hover,.nb .bng-btn.bng-p:focus-visible{background:#F2F2F4!important;color:#05060a!important}
+.nb .bng-btn:focus-visible,.nb .bng-btn.bng-p:focus-visible{background:#F2F2F4!important;color:#05060a!important}
+.nb .bng-btn:focus-visible span,.nb .bng-btn:focus-visible svg,.nb .bng-btn.bng-p:focus-visible span,.nb .bng-btn.bng-p:focus-visible svg{color:#05060a!important;fill:currentColor}
+@media (hover:hover) and (pointer:fine){
+ .nb .bng-btn:hover,.nb .bng-btn.bng-p:hover{background:#F2F2F4!important;color:#05060a!important}
+ .nb .bng-btn:hover span,.nb .bng-btn:hover svg,.nb .bng-btn.bng-p:hover span,.nb .bng-btn.bng-p:hover svg{color:#05060a!important;fill:currentColor}
+}
 
 /* Nov 24 2026 (Matt): status cards open an inline accordion (no flip, no navigation). One colour per state for label, dot, border, bars:
    green Normal, amber Minor issue, red Disruption / outage (deg and out share red). White mark top-right. */

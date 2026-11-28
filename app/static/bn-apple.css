@@ -364,6 +364,16 @@ html[data-theme="light"] .fin-card .fin-nm b{color:#1D1D1F!important}html[data-t
 /* Promo buttons in dark mode: ink text leaked onto dark/yellow buttons */
 html:not([data-theme="light"]) .bng-btn,html:not([data-theme="light"]) .bng-btn span,html:not([data-theme="light"]) .bng-btn svg,
 html:not([data-theme="light"]) .bng-btn.bng-p,html:not([data-theme="light"]) .bng-btn.bng-p span,html:not([data-theme="light"]) .bng-btn.bng-p svg{color:#F2F2F4!important;fill:currentColor;border-color:#F2F2F4!important}
+/* Invert hover/focus fills the button #F2F2F4; label+icon must go ink or they vanish (span/svg color was pinned above).
+   Hover only on fine pointers so a phone tap follows the link on the first tap. No yellow. */
+html .bng-btn:focus-visible span,html .bng-btn:focus-visible svg,
+html .bng-foot .bng-btn:focus-visible span,html .bng-foot .bng-btn:focus-visible svg,
+html .bng-follow-card .bng-btn:focus-visible span,html .bng-follow-card .bng-btn:focus-visible svg{color:#05060a!important;fill:currentColor}
+@media (hover:hover) and (pointer:fine){
+ html .bng-btn:hover span,html .bng-btn:hover svg,
+ html .bng-foot .bng-btn:hover span,html .bng-foot .bng-btn:hover svg,
+ html .bng-follow-card .bng-btn:hover span,html .bng-follow-card .bng-btn:hover svg{color:#05060a!important;fill:currentColor}
+}
 /* ---------- Phase 3b+: folded panels and long lists (Apple-style accordions and "Show all") ---------- */
 html.bna-pg .bna-fold>h2{cursor:pointer;display:flex!important;align-items:center;gap:12px;min-height:44px;margin:0!important;-webkit-user-select:none;user-select:none}
 html.bna-pg .bna-fold>h2:focus-visible{outline:2px solid var(--a-lk);outline-offset:4px;border-radius:8px}
