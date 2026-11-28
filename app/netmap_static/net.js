@@ -176,8 +176,14 @@
       '<div class="acts">' + (href ? linkA(href, "Open story") : "") + '</div>' +
       (p.src ? '<p class="age">' + esc(p.src) + (p.t ? " · " + esc(ago(p.t)) : "") + '</p>' : "");
   }
-  var PROV = { aws: "#9DB4FF", azure: "#4FC3F7", gcp: "#B39DFF" };
-  var PNAME = { aws: "AWS", azure: "Microsoft Azure", gcp: "Google Cloud" };
+  var PROV = { aws: "#9DB4FF", azure: "#4FC3F7", gcp: "#B39DFF", oci: "#E0A4A4", cloudflare: "#F2F3F7" };   /* provider tint: the thin ring only; the fill is the live status */
+  var PNAME = { aws: "AWS", azure: "Microsoft Azure", gcp: "Google Cloud", oci: "Oracle Cloud", cloudflare: "Cloudflare" };
+  /* pt2098u: cloud regions, Cloudflare edge cities, data centers and cell towers use the same status palette as the dams and the power grid:
+     green operational, orange degraded, red outage, grey no live status. Grey is never a claim that a site is fine. */
+  var SCOL = { ok: "#2FD67B", strain: "#FF7A1A", out: "#FF3B3B", na: "#7C8190" };
+  function sKey(l) { return l >= 2 ? "out" : l === 1 ? "strain" : l === 0 ? "ok" : "na"; }
+  function sCol(l) { return SCOL[sKey(l)]; }
+  function sWord(l) { return l >= 2 ? "Outage" : l === 1 ? "Degraded" : l === 0 ? "Operational" : "No live status"; }
   function lvCol(l) { return l >= 2 ? COL.out : l === 1 ? COL.watch : l === 0 ? COL.ok : COL.na; }
   function lvName(l) { return l >= 3 ? "Major outage" : l === 2 ? "Disruption" : l === 1 ? "Minor issue" : l === 0 ? "Normal" : "No live data"; }
   var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -394,9 +400,9 @@
     map.addLayer({ id: "inet-fill", type: "fill", source: "inet", paint: { "fill-color": ["get", "c"], "fill-opacity": ["get", "o"] } }, "admin-state");
     map.addLayer({ id: "inet-line", type: "line", source: "inet", paint: { "line-color": ["get", "c"], "line-opacity": 0.45, "line-width": 0.6 } }, "admin-state");
     map.addSource("dc", { type: "geojson", data: EMPTY });
-    map.addLayer({ id: "dc-glow", type: "circle", source: "dc", layout: { visibility: "none" }, paint: { "circle-color": COL.dc, "circle-blur": 1, "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.14, 6, 0.3],
+    map.addLayer({ id: "dc-glow", type: "circle", source: "dc", layout: { visibility: "none" }, paint: { "circle-color": SCOL.na, "circle-blur": 1, "circle-opacity": ["interpolate", ["linear"], ["zoom"], 1, 0.14, 6, 0.3],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["+", 2, ["*", 0.04, ["min", ["get", "n"], 200]]], 8, ["+", 6, ["*", 0.08, ["min", ["get", "n"], 200]]]] } });
-    map.addLayer({ id: "dc", type: "circle", source: "dc", layout: { visibility: "none" }, paint: { "circle-color": COL.dc, "circle-opacity": 0.9,
+    map.addLayer({ id: "dc", type: "circle", source: "dc", layout: { visibility: "none" }, paint: { "circle-color": SCOL.na, "circle-opacity": 0.9,
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 0.9, 5, 1.8, 10, 3.6] } });
     map.addSource("pts", { type: "geojson", data: EMPTY });
     map.addLayer({ id: "glow", type: "circle", source: "pts", paint: { "circle-color": ["get", "c"], "circle-blur": 1, "circle-opacity": ["case", ["get", "hot"], 0.45, 0.2],
@@ -404,7 +410,7 @@
     map.addLayer({ id: "pulse", type: "circle", source: "pts", filter: ["==", ["get", "hot"], true], paint: { "circle-color": "rgba(0,0,0,0)", "circle-stroke-color": ["get", "c"], "circle-stroke-width": 1.3, "circle-radius": 10, "circle-stroke-opacity": 0.6 } });
     map.addLayer({ id: "pt", type: "circle", source: "pts", paint: { "circle-color": ["get", "fill"], "circle-stroke-color": ["get", "c"], "circle-stroke-width": ["get", "sw"],
       "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, ["*", 0.55, ["get", "r"]], 8, ["get", "r"]] } });
-    map.addLayer({ id: "pt-lbl", type: "symbol", source: "pts", filter: ["any", ["==", ["get", "hot"], true], ["==", ["get", "kind"], "cloud"]], minzoom: 2, layout: { "text-field": ["get", "label"], "text-font": FB, "text-size": 10, "text-letter-spacing": 0.14, "text-transform": "uppercase", "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true },
+    map.addLayer({ id: "pt-lbl", type: "symbol", source: "pts", filter: ["any", ["==", ["get", "hot"], true], ["all", ["==", ["get", "kind"], "cloud"], ["!=", ["get", "edge"], true]]], minzoom: 2, layout: { "text-field": ["get", "label"], "text-font": FB, "text-size": 10, "text-letter-spacing": 0.14, "text-transform": "uppercase", "text-offset": [0, 1.3], "text-anchor": "top", "text-optional": true },
       paint: { "text-color": "rgba(240,240,250,.82)", "text-halo-color": "rgba(5,6,10,.9)", "text-halo-width": 1.2 } });
   }
   function startPulse() {
@@ -503,8 +509,8 @@
       f.push(feat(s.lon, s.lat, { kind: "power", i: i, c: big ? COL.deg : "#C9CCD6", fill: big ? COL.deg : "rgba(201,204,214,.35)", sw: 1.2, r: Math.min(12, 3.5 + Math.log10(s.outages + 1) * 2), hot: big, label: s.name, layer: "power" }));
     });
     (D.cloud || []).forEach(function (c, i) {
-      var l = c.level, ring = l >= 2 ? lvCol(l) : PROV[c.p] || COL.minor;
-      f.push(feat(c.lon, c.lat, { kind: "cloud", i: i, c: ring, fill: PROV[c.p] || COL.minor, sw: l >= 2 ? 3 : 1.6, r: 6.5, hot: l >= 2, label: (PNAME[c.p] ? PNAME[c.p] + " · " : "") + c.name, layer: "cloud" }));
+      var l = c.level, sc = sCol(l);   /* fill = live status; thin ring = provider; Cloudflare edge cities are the small dots */
+      f.push(feat(c.lon, c.lat, { kind: "cloud", i: i, c: l >= 2 ? sc : c.edge ? "#05060a" : PROV[c.p] || COL.minor, fill: l < 0 ? "rgba(124,129,144,.55)" : sc, sw: l >= 2 ? 3 : c.edge ? 0.8 : 1.6, r: c.edge ? 3.6 : 6.5, hot: l >= 1 && !c.edge || l >= 2, edge: !!c.edge, label: (c.edge ? "Cloudflare · " : PNAME[c.p] ? PNAME[c.p] + " · " : "") + c.name, layer: "cloud" }));
     });
     var LBL = { internet: "Internet", power: "Power", hydro: "Dam", cloud: "Cloud", cable: "Cable", towers: "Cell", dc: "Data center" };
     var layers = wireLayers();
@@ -609,7 +615,7 @@
       if (p.kind === "cloud") {
         var cl = D.cloud[p.i], nn = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {};
         k = cl.level >= 2 ? "outage" : "cloud"; i = cl.p + "-" + cl.name; n = (PNAME[cl.p] || cl.p) + " " + cl.name; pp = nn.detail || (nn.page || ""); l = cl.name;
-        t = n + ": " + lvName(cl.level).toLowerCase() + (nn.status ? ". " + String(nn.status).slice(0, 110) : "") + "."; dd = String(nn.status || "").slice(0, 140);
+        t = n + ": " + sWord(cl.level).toLowerCase() + (cl.status ? ". " + String(cl.status).slice(0, 110) : "") + "."; dd = String(cl.status || "").slice(0, 140);
       } else if (p.kind === "country") {
         o = D.outages.countries[p.i]; k = "outage"; i = "ioda-" + o.name; n = o.name + " internet outage"; l = o.name;
         t = "Internet " + (o.cur ? (o.major ? "major outage" : "outage signal") : "outage in the last 24 h") + " in " + o.name + ", measured by IODA (Georgia Tech). Started " + ago(o.last) + ".";
@@ -637,8 +643,8 @@
     var p = ft.properties, h = "", c;
     if (p.kind === "dc") {
       var ix = {}; (DC.cols || []).forEach(function (k, i) { ix[k] = i; }); var r = DC.rows[p.i];
-      h = '<span class="st" style="color:' + COL.dc + '"><i style="background:' + COL.dc + '"></i>Data center</span><h3>' + esc(r[ix.name]) + '</h3><dl><dt>Operator</dt><dd>' + esc(r[ix.org]) + '</dd><dt>Location</dt><dd>' + esc([r[ix.city], r[ix.cc]].filter(Boolean).join(", ")) +
-        '</dd><dt>Networks</dt><dd>' + num(r[ix.nets]) + '</dd><dt>Exchanges</dt><dd>' + num(r[ix.ixs]) + '</dd></dl><div class="acts">' + linkA("https://www.peeringdb.com/fac/" + r[ix.id], "PeeringDB record") + '</div>';
+      h = '<span class="st" style="color:' + SCOL.na + '"><i style="background:' + SCOL.na + '"></i>Data center · No live status</span><h3>' + esc(r[ix.name]) + '</h3><dl><dt>Operator</dt><dd>' + esc(r[ix.org]) + '</dd><dt>Location</dt><dd>' + esc([r[ix.city], r[ix.cc]].filter(Boolean).join(", ")) +
+        '</dd><dt>Networks</dt><dd>' + num(r[ix.nets]) + '</dd><dt>Exchanges</dt><dd>' + num(r[ix.ixs]) + '</dd></dl><div class="acts">' + linkA("https://www.peeringdb.com/fac/" + r[ix.id], "PeeringDB record") + '</div><p class="age">' + esc((D.infra && D.infra.notes && D.infra.notes.dc) || "No free live status feed exists for individual data centers.") + '</p>';
     } else if (p.kind === "country") {
       var o = D.outages.countries[p.i]; c = o.major ? COL.out : COL.deg;
       c = o.band ? wireCol(o.band) : c;
@@ -660,9 +666,10 @@
     } else if (p.kind === "inet") { h = inetCard(p);
     } else if (p.kind === "wire") { h = wireCard(p);
     } else if (p.kind === "cloud") {
-      var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = lvCol(cl.level);
-      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p]) + ' · ' + esc(lvName(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(n.status || "") + '</p>' +
-        '<div class="acts">' + linkA(n.status_url, "Official status") + linkA(n.page, "Full analysis") + linkA(n.support, "Support") + '</div>';
+      var cl = D.cloud[p.i], n = (D.nets || []).filter(function (x) { return x.id === cl.p; })[0] || {}; c = sCol(cl.level);
+      h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + esc(PNAME[cl.p] || cl.p) + (cl.edge ? " edge city" : " region") + ' · ' + esc(sWord(cl.level)) + '</span><h3>' + esc(cl.name) + '</h3><p>' + esc(cl.status || (cl.level < 0 ? "No live status for this site right now." : n.status || "")) + '</p>' +
+        '<div class="acts">' + linkA(cl.url || n.status_url, "Official status") + linkA(n.page, "Full analysis") + linkA(n.support, "Support") + '</div>' +
+        '<p class="age">' + (cl.level < 0 ? "Grey: the provider\'s status feed could not be read just now, so nothing is claimed about this site. " : "") + 'Source: ' + esc(cl.src || "provider status feed") + ', refreshed about every 5 minutes. ' + (cl.edge ? "Cloudflare reports one status per city." : "The provider reports status per region; individual zones and services can differ.") + '</p>';
     }
     h += shareFor(p);
     card.innerHTML = h + '<button type="button" class="nx-cx" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
@@ -754,7 +761,7 @@
   }
   function hydroLevels() { getJSON("/api/netmap/reservoirs").then(function (j) { HLV = j.levels || {}; hydroData(); }, function () {}); }
   INF_K.forEach(function (k) { INF_L = INF_L.concat(INF[k].L); });
-  var TWC = "#9FB4FF";
+  var TWC = "#7C8190";   /* pt2098u: grey = no live status (FCC registration only) */
   /* Nov 24 2026 (Matt): 230 kV+ lines coloured by the live status of the U.S. operator/BA area they sit in (no public per-line status exists).
      green normal, yellow strained/warning, red outage/emergency, grey = crosses operator areas or outside them. */
   var LCOL = { ok: "#2FD67B", strain: "#F5D547", out: "#FF3B3B", na: "#7C8190" }, LWORD = { ok: "Normal", strain: "Strained or warning", out: "Outage or emergency", na: "No live status" };
@@ -782,7 +789,7 @@
     map.addSource("tw", { type: "geojson", data: EMPTY, cluster: true, clusterRadius: 46, clusterMaxZoom: 10, maxzoom: 12 });
     function L(o) { o.layout = o.layout || {}; o.layout.visibility = "none"; map.addLayer(o, "glow"); }
     L({ id: "tw-cl", type: "circle", source: "tw", filter: ["has", "point_count"],
-      paint: { "circle-color": "rgba(159,180,255,.16)", "circle-stroke-color": TWC, "circle-stroke-width": 1, "circle-stroke-opacity": 0.6,
+      paint: { "circle-color": "rgba(124,129,144,.16)", "circle-stroke-color": TWC, "circle-stroke-width": 1, "circle-stroke-opacity": 0.6,
         "circle-radius": ["step", ["get", "point_count"], 9, 100, 13, 1000, 17, 5000, 22] } });
     L({ id: "tw-cnt", type: "symbol", source: "tw", filter: ["has", "point_count"], layout: { "text-field": ["get", "point_count_abbreviated"], "text-font": FB, "text-size": 10, "text-allow-overlap": true },
       paint: { "text-color": "rgba(240,240,250,.9)" } });
@@ -847,10 +854,10 @@
         '<p class="age">Plant data: WRI Global Power Plant Database (2021), CC BY 4.0. Plants of 25 MW and up.</p>';
     } else if (p.kind === "tw") {
       var d = INF.towers.d, r = d.p[p.i];
-      h = '<span class="st" style="color:' + TWC + '"><i style="background:' + TWC + '"></i>Registered antenna structure</span><h3>' + esc(d.owners[r[2]]) + '</h3><dl>' +
+      h = '<span class="st" style="color:' + TWC + '"><i style="background:' + TWC + '"></i>Registered antenna structure · No live status</span><h3>' + esc(d.owners[r[2]]) + '</h3><dl>' +
         '<dt>Type</dt><dd>' + esc(d.tnames[d.types[r[4]]] || d.types[r[4]]) + '</dd><dt>Height</dt><dd>' + (r[3] ? window.BNUnits.fmtLenM(r[3]) : "–") + '</dd></dl>' +
         '<div class="acts">' + linkA("https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistration.jsp?regKey=" + r[5], "FCC registration record") + '</div>' +
-        '<p class="age">FCC Antenna Structure Registration, data as of ' + esc(d.asof) + '. The owner registered the structure; the FCC file does not list which carriers use it. Shorter sites and rooftop or small cells are usually not registered.</p>';
+        '<p class="age">' + esc((D.infra && D.infra.notes && D.infra.notes.towers) || "No live status feed for individual towers.") + ' FCC Antenna Structure Registration, data as of ' + esc(d.asof) + '. The owner registered the structure; the FCC file does not list which carriers use it. Shorter sites and rooftop or small cells are usually not registered.</p>';
     } else if (p.kind === "gl" || p.kind === "ss") {
       var f = p, oa = map && LASTPT ? opAt(map.unproject([LASTPT.x, LASTPT.y])) : null, os = oa ? opSt(oa.id) : "na"; c = LCOL[os];
       h = '<span class="st" style="color:' + c + '"><i style="background:' + c + '"></i>' + (p.kind === "ss" ? "Substation" : "Transmission line") + ' · ' + esc(LWORD[os]) + '</span><h3>' + esc(f.n || (p.kind === "ss" ? "Substation" : "Transmission line")) + '</h3><dl>' +
