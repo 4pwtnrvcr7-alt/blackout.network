@@ -22,19 +22,33 @@ class SpaceX(unittest.TestCase):
         css = SR.CSS.lower()
         for bad in ("#ffc21a", "#3fa66a", "#c97b00"): self.assertNotIn(bad, css)
 
-    def test_file_hero_shows_full_image_on_tablet_desktop(self):
+    def test_file_hero_floats_so_text_wraps_on_tablet_desktop(self):
         css = SR.CSS
-        self.assertIn(".sr2 .sr-fig.sr-file img{", css)
         self.assertNotIn("object-fit:cover;object-position:50% 25%;max-height:380px", css)
-        # The file-photo rule itself must contain, not cover, so portraits are not sliced.
+        self.assertNotIn("max-height:min(70vh,720px)", css)
+        self.assertIn("@media(min-width:768px)", css)
+        self.assertIn("float:right;width:40%;max-width:420px", css)
+        self.assertIn("float:right;width:50%;max-width:520px", css)
+        self.assertIn(".sr2 .sr-fig.sr-file img{width:100%;height:auto;max-height:none", css)
         start = css.find(".sr2 .sr-fig.sr-file img{")
         end = css.find("}", start)
         rule = css[start:end+1]
-        self.assertIn("object-fit:contain", rule)
         self.assertNotIn("object-fit:cover", rule)
-        self.assertIn("object-position:50% 20%", rule)
-        self.assertIn("max-height:min(70vh,720px)", rule)
-        self.assertIn("@media(max-width:767px){.sr2 .sr-fig.sr-file img{", css)
+        self.assertNotIn("object-fit:contain", rule)
+
+    def test_file_figure_gets_orientation_class(self):
+        port = SR.figure({"src": "https://example.org/p.jpg", "link": "https://example.org/p",
+                          "w": 960, "h": 1280, "kind": "person", "alt": "A", "caption": "A",
+                          "credit": "C", "license": "Public domain"}, True)
+        self.assertIn('class="sr-fig sr-lead sr-file sr-port"', port)
+        land = SR.figure({"src": "https://example.org/l.jpg", "link": "https://example.org/l",
+                          "w": 1200, "h": 800, "kind": "place", "alt": "B", "caption": "B",
+                          "credit": "C", "license": "Public domain"}, True)
+        self.assertIn('class="sr-fig sr-lead sr-file sr-land"', land)
+        wide = SR.figure({"src": "https://example.org/w.jpg", "link": "https://example.org/w",
+                          "w": 2000, "h": 800, "kind": "place", "alt": "C", "caption": "C",
+                          "credit": "C", "license": "Public domain"}, True)
+        self.assertIn('class="sr-fig sr-lead sr-file sr-wide"', wide)
 
 if __name__ == "__main__":
     unittest.main()
