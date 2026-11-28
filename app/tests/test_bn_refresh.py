@@ -97,6 +97,7 @@ class TestPagesUseSharedButton(unittest.TestCase):
         self.assertIn("loadAlerts()", js)
         self.assertIn("loadStorms()", js)
         self.assertIn("BNRefresh.bind", js)
+        self.assertIn("function raced(p, ms)", js)
 
     def test_markets_replaces_old_button(self):
         html_src = _read("markets.py")
@@ -164,7 +165,7 @@ class TestRefreshModes(unittest.TestCase):
         cases = {
             "/wire": "inpage", "/map": "inpage", "/grid": "inpage", "/weather": "inpage", "/markets": "inpage",
             "/people": "header", "/people/ada-lovelace": "header", "/mesh": "header", "/mesh/chat": "header",
-            "/stats": "header", "/sources": "header", "/wire-classic": "header", "/grid/aws": "header",
+            "/stats": "header", "/sources": "header", "/wire-classic": "header", "/grid/aws": "inpage", "/grid/azure": "inpage", "/grid/cloudflare": "inpage",
             "/privacy": "off", "/tos": "off", "/terms": "off", "/cookies": "off", "/privacy-choices": "off",
             "/do-not-sell": "off", "/credits": "off", "/scoring": "off", "/about/scoring": "off",
             "/welcome": "off", "/ready": "off", "/report-status": "off", "/newsletter": "off",
@@ -212,7 +213,7 @@ class TestRefreshModes(unittest.TestCase):
     def test_inpage_pages_do_not_also_get_header_button(self):
         import sitenav
         UI = self.UI
-        for path in ("/wire", "/map", "/grid", "/weather", "/markets"):
+        for path in ("/wire", "/map", "/grid", "/weather", "/markets", "/grid/aws", "/grid/azure"):
             UI.set_page_path(path)
             html = sitenav.header_html()
             self.assertNotIn('id="bn_hdr_ref"', html, path)
@@ -252,10 +253,95 @@ class TestRefreshModes(unittest.TestCase):
         np = _read("netpages.py")
         self.assertIn("np_fetched", np)
         self.assertIn("brief?fresh=1", np)
+        self.assertIn('refresh_fill_btn("np_ref")', np)
+        self.assertIn("NP_REF_JS", np)
+        self.assertIn("tryN<4", np)
+        self.assertIn("/updating/i", np)
+        self.assertIn("BNRefresh.bind", np)
         pe = _read("people.py")
         self.assertIn("/api/people/index?fresh=1", pe)
         self.assertIn("id=\"pf_up\"", pe)
 
+
+
+class TestClickPathFollowUp(unittest.TestCase):
+    def test_people_index_script_is_valid_javascript(self):
+        src = _read("people.py")
+        self.assertIn("PEOPLE_INDEX_JS", src)
+        start = src.find("PEOPLE_INDEX_JS = r")
+        a = src.find("<script>", start) + len("<script>")
+        b = src.find("</script>", a)
+        js = src[a:b]
+        self.assertIn('class="pp-av"', js)
+        self.assertNotIn('class="pp-av" src=""', js.replace('src="\'+String(p.avatar)', ""))
+        import subprocess, tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(js)
+            path = fh.name
+        try:
+            r = subprocess.run(["node", "--check", path], capture_output=True, text=True)
+        finally:
+            os.unlink(path)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_bind_header_delegates_on_document_capture(self):
+        js = _read("static", "bn-refresh.js")
+        self.assertIn('document.addEventListener("click", headerClick, true)', js)
+        self.assertIn("e.target.closest(\"#bn_hdr_ref\")", js)
+        self.assertIn('Promise.reject(new Error("no hook"))', js)
+        self.assertIn("_bnHdrBound", js)
+
+    def test_weather_fill_cannot_hang_on_one_loader(self):
+        js = _read("wxmap_static", "wx.js")
+        self.assertIn("function raced(p, ms)", js)
+        self.assertIn("raced(loadFrames(false), 15000)", js)
+        self.assertIn("raced(loadGrids(), 15000)", js)
+        self.assertIn('fin("Updated")', js)
+        self.assertIn('fin("Couldn\'t refresh")', js)
+
+    def test_classic_hook_updates_stamp_and_keeps_stale_on_timeout(self):
+        w2 = _read("wire_v2.py")
+        self.assertIn("WC_REF_JS", w2)
+        self.assertIn('getElementById("wc_up")', w2)
+        self.assertIn("stale = _C.pop(key, None)", w2)
+        self.assertIn("return 200, stale[1], \"text/html\"", w2)
+        self.assertIn("timeout=20", w2)
+        start = w2.find("WC_REF_JS = r")
+        a = w2.find("<script>", start) + len("<script>")
+        b = w2.find("</script>", a)
+        js = w2[a:b]
+        import subprocess, tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(js)
+            path = fh.name
+        try:
+            r = subprocess.run(["node", "--check", path], capture_output=True, text=True)
+        finally:
+            os.unlink(path)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_netpages_stamp_falls_back_when_fetched_et_missing(self):
+        np = _read("netpages.py")
+        self.assertIn("el.textContent=j.fetched_et||pulled()", np)
+        self.assertIn("window.bnRefreshPage=function()", np)
+        self.assertNotIn("if(el&&j.fetched_et)el.textContent=j.fetched_et", np)
+
+    def test_grid_provider_pages_use_inpage_button_not_header(self):
+        import sitenav, sitenav_ui as UI, site_page
+        UI.set_page_path("/grid/aws")
+        hdr = sitenav.header_html()
+        self.assertNotIn('id="bn_hdr_ref"', hdr)
+        self.assertEqual(UI.refresh_mode("/grid/aws"), "inpage")
+        self.assertEqual(UI.refresh_mode("/grid/cloudflare"), "inpage")
+        self.assertEqual(UI.refresh_btn(), "")
+        # site_page must load the shared assets so the button is styled (the header
+        # compact control was unstyled and doubled the Refresh label at mid widths)
+        html = site_page.page("AWS", "desc", "<p>x</p>", "/grid/aws", active="net").decode()
+        self.assertIn("/bn-refresh.css", html)
+        self.assertIn("/bn-refresh.js", html)
+        self.assertIn('class="bn-has-ref"', html)
+        self.assertNotIn('id="bn_hdr_ref"', html)
+        UI.set_page_path("")
 
 
 if __name__ == "__main__":

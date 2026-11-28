@@ -95,15 +95,25 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
             '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')
     head += '<meta name="robots" content="noindex,nofollow">' if noindex else '<meta name="robots" content="index,follow,max-image-preview:large">'   # seo/batch-1
     if jsonld: head += '<script type="application/ld+json">' + json.dumps(jsonld, ensure_ascii=False).replace("</", "<\\/") + '</script>'
+    body_cls = ""
+    try:
+        import sitenav_ui as _UI
+        if _UI.refresh_mode(path) in ("inpage", "header"):
+            if "/bn-refresh.css" not in head:
+                head += _UI.refresh_fill_assets()
+            body_cls = "bn-has-ref"
+    except Exception:
+        pass
     top = ""
     if sitenav is not None:
         try: top = sitenav.header_html(active)
         except Exception: top = ""
     if not top:
         top = '<header class="bn-hd"><h1><a href="/" style="color:inherit;text-decoration:none">BLACKOUT.<b style="color:#c8102e">NETWORK</b></a></h1></header>'
+    body_attr = f' class="{body_cls}"' if body_cls else ""
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + head +
             '<link rel="stylesheet" href="/theme.css"><link rel="icon" href="/favicon.ico?v=5" sizes="any">'
-            f'<style>{CSS}</style></head><body><a class="skip" href="#main">Skip to content</a>{top}<main class="wrap" id="main">{body}</main>'
+            f'<style>{CSS}</style></head><body{body_attr}><a class="skip" href="#main">Skip to content</a>{top}<main class="wrap" id="main">{body}</main>'
             '<footer class="ft">Research only: BLACKOUT.NETWORK is not an official warning service. Always follow official instructions from local authorities. · '
             '<a href="/wire">The Wire</a> · <a href="/newsletter">Newsletter</a> · <a href="/scoring">How we score</a> · '
             '<a href="/sources">Sources</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></footer>'

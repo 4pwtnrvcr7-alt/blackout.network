@@ -124,16 +124,21 @@
         stage(btn, 100); busy(btn, false); done(btn, "Couldn't refresh");
       });
   }
-  function bindHeader() {
-    var btn = document.getElementById("bn_hdr_ref");
+  function headerClick(e) {
+    var btn = e.target && e.target.closest && e.target.closest("#bn_hdr_ref");
     if (!btn) return;
-    bind(btn, function () {
-      var fn = W.bnRefreshPage;
-      if (typeof fn === "function") return headerRun(btn, fn);
-      return Promise.resolve();
-    });
+    e.preventDefault();
+    e.stopPropagation();
+    var fn = W.bnRefreshPage;
+    if (typeof fn === "function") headerRun(btn, fn);
+    else headerRun(btn, function () { return Promise.reject(new Error("no hook")); });
+  }
+  function bindHeader() {
+    if (W._bnHdrBound) return;
+    W._bnHdrBound = 1;
+    document.addEventListener("click", headerClick, true);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindHeader);
   else bindHeader();
-  W.BNRefresh = { apply: apply, stage: stage, busy: busy, done: done, isBusy: isBusy, bind: bind, headerRun: headerRun };
+  W.BNRefresh = { apply: apply, stage: stage, busy: busy, done: done, isBusy: isBusy, bind: bind, headerRun: headerRun, bindHeader: bindHeader };
 })(window);

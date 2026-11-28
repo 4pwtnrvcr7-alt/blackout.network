@@ -247,6 +247,7 @@ _XC = {}; _XC_MAX = 4000; _XC_TTL = 900.0      # cid -> (sig, xu, built_at); row
 _PC = {"t": {}, "v": {}}; _PC_TTL = 3.0; _PC_LK = threading.Lock()
 _PA = {}                                         # page key -> (args, last_requested)
 _FRESH = {"t": 0.0}
+_PC_HARD = 90.0                                  # never block a visitor on a rebuild when a copy this young exists and the warmer is alive
 _PC_STALE = 20.0                                 # a cached page may be served this long while the warmer rebuilds it
 _WARM = {"thread": None, "rows_at": 0.0, "cursor": 0, "baked": {}, "err": ""}
 _WARM_LK = threading.Lock()
@@ -364,7 +365,7 @@ def _social_junk(r):
         import wire_social as WS
         keys = r.keys()
         lk = r["links"] if "links" in keys else None
-        if not lk or "luesky" not in str(lk):
+        if not lk or ("luesky" not in str(lk) and "astodon" not in str(lk)):
             return False
         cid = r["id"] if "id" in keys else r["cluster_id"]
         title = r["title"] if "title" in keys else ""
@@ -372,14 +373,19 @@ def _social_junk(r):
         e = _SOCJ.get(cid)
         if e is not None and e[0] == sig:
             return e[1]
-        junk = bool(WS.junk_row(title, r["category"] if "category" in keys else "", lk))
+        raw_cat = r["category"] if "category" in keys else ""
+        try:
+            cat = cat_key(raw_cat, title, False)      # the category the Wire would show: OTHER is dropped for social rows
+        except Exception:
+            cat = raw_cat
+        junk = bool(WS.junk_row(title, cat if cat == "other" else raw_cat, lk))
         if len(_SOCJ) > 20000:
             _SOCJ.clear()
         _SOCJ[cid] = (sig, junk)
         return junk
     except Exception:
         try:
-            return "luesky" in str(r["links"])     # fail closed for Bluesky rows
+            return "luesky" in str(r["links"]) or "astodon" in str(r["links"])     # fail closed for social rows
         except Exception:
             return False
 
@@ -524,19 +530,9 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
     return x_share.intent_url(x_share.with_body(item))
 
 def _vt_intent(x_share, body, vt):
-    """X intent URL with exactly the validated tags (3-5), trimmed to fit 280 the way share_text does."""
-    from urllib.parse import quote
-    url = x_share.story_url(body)
-    h = x_share._headline(body, None)
-    tags = list(vt)[:5]
-    text = x_share._join(h, tags)
-    while len(tags) > min(3, len(vt)) and x_share.weighted_len(text, url) > 280:
-        tags = tags[:-1]; text = x_share._join(h, tags)
-    if x_share.weighted_len(text, url) > 280:
-        budget = max(8, 280 - (1 + x_share.TCO) - len(" " + " ".join(tags)))
-        cut = h[: budget - 1].rsplit(" ", 1)[0].rstrip(",;:-\u2014\u2013 ") if " " in h[:budget] else h[: budget - 1]
-        text = x_share._join(cut + "\u2026", tags)
-    return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(url, safe='')}", tags
+    """X intent URL with exactly the validated tags (3-5). text + url + hashtags, one tap."""
+    href, _h, tags = x_share.compose_intent(body, tags=list(vt)[:5])
+    return href, tags
 
 def _xu_for(r, rk, h, title, loc, links, what, dek, hid, compute):
     cid = r["id"]
@@ -938,6 +934,8 @@ def page(before=None, after=None, limit=100, q="", bg=False, lat=None, lon=None,
             return hit
         if age < _PC_STALE and _warm_alive():
             return hit
+        if age < _PC_HARD and _warm_alive():
+            return hit      # Nov 27 2026: a rebuild under load took 8-22 s and blocked the visitor; the warm thread is already rebuilding it
     start_warm()
     out = _page_build(*args)
     _pstore(key, out)

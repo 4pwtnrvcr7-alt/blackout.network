@@ -584,6 +584,8 @@ CSS = """
 .np-tpl{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px;background:rgba(0,0,0,.25)}.np-tpl b{font-size:13px}.np-tpl p{font-size:13px;margin:6px 0 0;color:var(--bn-text-2,#c9d1db);white-space:pre-wrap;overflow-wrap:anywhere}
 .np-btn{display:inline-flex;align-items:center;gap:6px;font:700 13px/1.1 var(--bn-font-ui,Montserrat,sans-serif);border-radius:9px;padding:9px 12px;border:1px solid var(--bd2,#2f3742);color:var(--tx,#e6e9ee);background:var(--bn-surface,#161b21);text-decoration:none;cursor:pointer}
 .np-btn.p{background:#c8102e;border-color:#c8102e;color:#fff}.np-btns{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;position:relative;z-index:1}
+.np-btns .bn-ref{flex:none;align-self:center;z-index:1}.np-pulled{margin:10px 0 0;position:relative;z-index:1}
+
 .np-links{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));column-gap:20px}.np-links li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);font-size:14px;overflow-wrap:anywhere;min-width:0}
 .np-links .np-ic{color:var(--hot);margin-top:1px}.np-links small{display:block;color:var(--mu,#8a94a3);font-size:12px}
 .np-note{font-size:12.5px;color:var(--mu,#8a94a3);border:1px dashed #2f3742;border-radius:10px;padding:8px 10px;margin:10px 0 0;position:relative;z-index:1}
@@ -618,6 +620,15 @@ def inc_card(i, active=False):
             + (f'<div class="np-tags">{tags}' + (f'<span class="np-tag">+{more} more services</span>' if more > 0 else "") + '</div>' if tags else "")
             + (f'<p>{E(i["summary"][:420])}{"…" if len(i["summary"]) > 420 else ""}</p>' if i.get("summary") else "") + '</div>')
 
+
+def _provider_refresh_btn():
+    """Full shared #293 Refresh in the page body (never the header) on /grid/<slug>."""
+    try:
+        import sitenav_ui
+        return sitenav_ui.refresh_fill_btn("np_ref")
+    except Exception:
+        return ""
+
 def _x_button(slug, p, lv, act, d):
     """Post on X for a provider page: crafted text + 3-5 tags + per-provider card (share_cards.py)."""
     try:
@@ -629,6 +640,37 @@ def _x_button(slug, p, lv, act, d):
         return share_cards.button_html("network" if lv < 2 else "outage", slug, t, name=f"{p['name']} status", detail=t[:140], loc="United States", path=f"/grid/{slug}", cls="np-btn")
     except Exception:
         return ""
+
+
+NP_REF_JS = r"""
+<script>
+(function(){
+  function pulled(){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){return "Updated"}}
+  function updating(r,j){var m=((j&&j.error)||"")+" "+(r&&r.status);return (r&&r.status===503)||/updating/i.test(m)}
+  function load(tryN){
+    var slug=location.pathname.split("/").filter(Boolean).pop();
+    return fetch("/api/network/"+encodeURIComponent(slug)+"/brief?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){
+      return r.text().then(function(t){
+        var j=null;try{j=JSON.parse(t)}catch(e){}
+        if(updating(r,j)&&tryN<4)return new Promise(function(ok){setTimeout(function(){ok(load(tryN+1))},800*tryN)});
+        if(!r.ok)throw new Error(r.status);
+        if(!j)throw new Error("bad json");
+        return j;
+      });
+    });
+  }
+  window.bnRefreshPage=function(){
+    return load(1).then(function(j){
+      var el=document.getElementById("np_fetched");
+      if(el)el.textContent=j.fetched_et||pulled();
+      return "Updated";
+    });
+  };
+  function bind(){var b=document.getElementById("np_ref");if(window.BNRefresh&&b)window.BNRefresh.bind(b,window.bnRefreshPage)}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind);else bind();
+})();
+</script>
+"""
 
 def render(slug):
     p = P[slug]; d = data(slug); mon = monitor(p["src"]); lv = level_of(d, mon)
@@ -642,12 +684,13 @@ def render(slug):
             + (f'<span>Our check: {E((mon.get("latest") or {}).get("status", ""))}</span>' if (mon.get("latest") or {}).get("level") else "") + '</div>'
             f'<div class="np-kpi"><b>{len(act)}</b><span>active incidents now</span></div><div class="np-kpi"><b>{n90}</b><span>incidents in the last 90 days (official feed)</span></div>'
             f'<div class="np-kpi"><b>{k_mon}</b><span>of our 5-minute checks with no degraded or major status, last 7 days</span></div></div>'
-            f'<div class="np-btns"><a class="np-btn p" href="{E(p["status"][1])}" target="_blank" rel="noopener">{ic("link", "np-ic sm")}Official status page</a>{_x_button(slug, p, lv, act, d)}'
+            f'<div class="np-btns">{_provider_refresh_btn()}'
+            f'<a class="np-btn p" href="{E(p["status"][1])}" target="_blank" rel="noopener">{ic("link", "np-ic sm")}Official status page</a>{_x_button(slug, p, lv, act, d)}'
             f'<a class="np-btn" href="{E(p["console"][0][1])}" target="_blank" rel="noopener">{ic("eye", "np-ic sm")}{E(p["console"][0][0])}</a><a class="np-btn" href="#checklist">{ic("check", "np-ic sm")}If your business runs on {E(p["name"])}</a></div>'
+            f'<p class="np-mu np-pulled">Checked <span id="np_fetched">{E(fmt_et(pdt(d.get("fetched"))) if d.get("fetched") else "—")}</span> · official feed, refreshed every 10 minutes</p>'
             + (f'<p class="np-note">The official feed could not be reached just now ({E(d["error"])}); figures below use our stored checks.</p>' if d.get("error") else "")
             + (f'<p class="np-note">Showing the last good copy of the official feed (refresh failed: {E(d["stale"])}).</p>' if d.get("stale") else "") + '</section>')
-    live = "".join(inc_card(i, True) for i in act) or (f'<div class="np-act" style="--c:{LVC[0]}"><h3>No active incidents reported by {E(p["name"])}</h3><div class="m">Checked '
-                                                     f'<span id="np_fetched">{E(fmt_et(pdt(d.get("fetched"))) if d.get("fetched") else "—")}</span> · official feed, refreshed every 10 minutes</div></div>')
+    live = "".join(inc_card(i, True) for i in act) or (f'<div class="np-act" style="--c:{LVC[0]}"><h3>No active incidents reported by {E(p["name"])}</h3><div class="m">No active incidents in the official feed.</div></div>')
     comp = ""
     if d.get("groups"):
         tiles = []
@@ -730,15 +773,7 @@ def render(slug):
               {"@type": "Question", "name": f"Is {p['name']} down right now?", "acceptedAnswer": {"@type": "Answer", "text": (f"{p['name']} reports {len(act)} active incident(s)." if act else f"{p['name']}'s official feed shows no active incidents.") + f" Latest status: {p['status'][1]}"}},
               {"@type": "Question", "name": f"Where do I check {p['name']} status for my own account?", "acceptedAnswer": {"@type": "Answer", "text": f"{p['console'][0][0]}: {p['console'][0][1]}"}},
               {"@type": "Question", "name": f"What caused past {p['name']} outages?", "acceptedAnswer": {"@type": "Answer", "text": " ".join(f"{n['date']}: {n['title']} ({CAT_NAME[n['cat']]})." for n in p["notable"][:3])}}]}]
-    body += (
-        '<script>(function(){function go(){var R=window.BNRefresh,b=document.getElementById("bn_hdr_ref");'
-        'window.bnRefreshPage=function(){var slug=location.pathname.split("/").filter(Boolean).pop();'
-        'return fetch("/api/network/"+encodeURIComponent(slug)+"/brief?fresh=1&_="+Date.now(),{cache:"no-store"})'
-        '.then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){'
-        'var el=document.getElementById("np_fetched");if(el&&j.fetched_et)el.textContent=j.fetched_et;'
-        'return "Updated"})};'
-        '}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();</script>'
-    )
+    body += NP_REF_JS
     return site_page.page(title, desc, body, f"/grid/{slug}", active="net", jsonld=ld, og_type="website")
 
 HUBCSS = """

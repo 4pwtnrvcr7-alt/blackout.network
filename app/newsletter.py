@@ -3387,34 +3387,42 @@ def _hm(v):
     except Exception: return str(v)
 
 def form_html(mode="page"):
-    """Server-rendered signup form (works without JavaScript; app.js enhances it in place). Same field names as before (t1754u redesign)."""
-    c = cfg(); sl = c["slots"]; uid = "nlp" if mode == "page" else "nlc"
+    """Server-rendered signup form (works without JavaScript; app.js enhances it in place). Same field names as before (t1754u redesign).
+    mode='comms' is the slim /comms lander: email + button only, source stored as signup_source='comms'."""
+    c = cfg(); sl = c["slots"]; slim = (mode == "comms")
+    uid = "nlp" if mode == "page" else ("nlcm" if slim else "nlc")
+    btn = "Notify me" if slim else "Get the brief"
     am, pm = _hm(sl["morning"]), _hm(sl["evening"])
-    cats = "".join(f'<label class="nl-chk"><input type="checkbox" name="interests" value="{E(x)}" checked> {E(x)}</label>' for x in CATEGORIES)
-    seg = "".join(f'<label class="nlx-seg"><input type="radio" name="frequency" value="{k}"{" checked" if k == "twice" else ""}><span>{E(v)}</span></label>'
-                  for k, v in (("twice", f"{am} + {pm}"), ("morning", am), ("evening", pm)))
-    tog = lambda n, t: (f'<label class="nlx-tog"><input type="checkbox" name="{n}" value="1"><span class="nlx-sw" aria-hidden="true"></span><span>{E(t)}</span></label>')
+    extras = ""
+    if slim:
+        extras = '<input type="hidden" name="next" value="/comms">'
+    else:
+        cats = "".join(f'<label class="nl-chk"><input type="checkbox" name="interests" value="{E(x)}" checked> {E(x)}</label>' for x in CATEGORIES)
+        seg = "".join(f'<label class="nlx-seg"><input type="radio" name="frequency" value="{k}"{" checked" if k == "twice" else ""}><span>{E(v)}</span></label>'
+                      for k, v in (("twice", f"{am} + {pm}"), ("morning", am), ("evening", pm)))
+        tog = lambda n, t: (f'<label class="nlx-tog"><input type="checkbox" name="{n}" value="1"><span class="nlx-sw" aria-hidden="true"></span><span>{E(t)}</span></label>')
+        extras = (f'<fieldset class="nlx-segs"><legend class="nlx-vh">When (Eastern Time)</legend>{seg}</fieldset>'
+                  f'<label for="{uid}_loc" class="nl-loc-l nlx-vh">Your area (optional)</label>'
+                  f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="ZIP or city (optional)">'
+                  '<div class="nl-crime nlx-togs">' + tog("crime_brief", "Local crime report") + tog("crime_alerts", "Crime alerts near me") + tog("net_brief", "Network outage report") + '</div>'
+                  f'<details class="nl-cats-d"><summary>Topics: all</summary><div class="nl-cats">{cats}</div></details>')
     return (f'<form method="post" action="/api/newsletter/subscribe" class="nl-form nlx-form" data-nl-form novalidate>'
-            f'<input type="hidden" name="csrf" value="{E(csrf_token())}"><input type="hidden" name="source" value="{E(mode)}">'
+            f'<input type="hidden" name="csrf" value="{E(csrf_token())}"><input type="hidden" name="source" value="{E(mode)}">{extras}'
             f'<label for="{uid}_email" class="nlx-vh">Email address</label>'
             f'<div class="nl-row"><input id="{uid}_email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" placeholder="Your email" aria-describedby="{uid}_msg">'
-            '<button class="pri" type="submit">Get the brief</button></div>'
-            f'<fieldset class="nlx-segs"><legend class="nlx-vh">When (Eastern Time)</legend>{seg}</fieldset>'
-            f'<label for="{uid}_loc" class="nl-loc-l nlx-vh">Your area (optional)</label>'
-            f'<input id="{uid}_loc" class="nl-loc" type="text" name="location" maxlength="80" autocomplete="postal-code" placeholder="ZIP or city (optional)">'
-            '<div class="nl-crime nlx-togs">' + tog("crime_brief", "Local crime report") + tog("crime_alerts", "Crime alerts near me") + tog("net_brief", "Network outage report") + '</div>'
-            f'<details class="nl-cats-d"><summary>Topics: all</summary><div class="nl-cats">{cats}</div></details>'
+            f'<button class="pri" type="submit">{E(btn)}</button></div>'
             f'<div class="nl-trk" hidden><label class="nl-chk"><input type="checkbox" name="track_consent" value="1"> {E(TRACK_CONSENT_LABEL)}</label></div>'
             '<div class="nl-hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>'
             f'<p class="nl-msg" id="{uid}_msg" role="status" aria-live="polite"></p>'
-            f'<p class="nl-sm nl-priv">{consent_line()}</p></form>')
+            f'<p class="nl-sm nl-priv">{consent_line(btn, release=("Comms" if slim else ""))}</p></form>')
 
-def consent_line():
+def consent_line(action="Get the brief", release=""):
     """Signup consent wording (Compliance global-legal-gap K, CASL-grade): names the sender and its contact details and says consent can be withdrawn.
-    The 'Get the brief' button itself is the express action; no pre-ticked box."""
+    The submit button itself is the express action; no pre-ticked box. release= names an extra product update (e.g. Comms) when used off /newsletter."""
     c = cfg(); frm = E(c.get("from_email") or "hello@blackout.network"); addr = E((c.get("mailing_address") or DEFAULTS["mailing_address"]).strip())
-    return (f'By tapping <b>Get the brief</b>, you agree to get the BLACKOUT.NETWORK brief and, if you choose, breaking alerts by email from BLACKOUT.NETWORK '
-            f'({frm}, {addr}). We\'ll send a confirmation email first, and nothing else arrives until you confirm. You can withdraw consent and '
+    extra = f" We will also use this subscription to tell you when {E(release)} is released." if release else ""
+    return (f'By tapping <b>{E(action)}</b>, you agree to get the BLACKOUT.NETWORK brief and, if you choose, breaking alerts by email from BLACKOUT.NETWORK '
+            f'({frm}, {addr}). We\'ll send a confirmation email first, and nothing else arrives until you confirm.{extra} You can withdraw consent and '
             'unsubscribe at any time with the link in every email. We count opens and clicks to improve the newsletter; in the EEA, UK and Switzerland '
             'only if you tick the box. See our <a href="/privacy#email-tracking">Privacy Policy</a> and <a href="/tos">Terms</a>.')
 
@@ -3698,8 +3706,10 @@ def handle_post(path, d, ip=None, qs=None, headers=None, raw=None):
     if path == "/api/newsletter/subscribe":
         code, body = subscribe(d, ip or "", headers)
         if html_mode:
+            nxt = str(d.get("next") or "")
+            if nxt not in ("/comms", "/newsletter"): nxt = "/newsletter"
             return code, result_page("Check your inbox" if body.get("ok") else "Couldn't subscribe", body["message"], bool(body.get("ok")),
-                                     "" if body.get("ok") else '<p><a class="nl-btn" href="/newsletter">Try again</a></p>'), "text/html"
+                                     "" if body.get("ok") else f'<p><a class="nl-btn" href="{E(nxt)}">Try again</a></p>'), "text/html"
         return code, body
     if not origin_ok(headers): return 403, {"ok": False, "message": "Cross-site request blocked."}
     if path == "/newsletter/confirm": return _confirm_result((qs.get("token") or [""])[0] or d.get("token"))

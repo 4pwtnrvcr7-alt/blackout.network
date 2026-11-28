@@ -296,17 +296,92 @@ class Tags(unittest.TestCase):
         q = parse_qs(urlparse(href).query)
         text = q["text"][0]
         url = q["url"][0]
+        hs = [t for t in (q.get("hashtags") or [""])[0].split(",") if t]
         self.assertTrue(url.endswith("/wire/5932fb61c94775cd?s=x"))
-        self.assertIn("#Ebola", text)
-        self.assertIn("#DRC", text)
-        self.assertNotIn("#Kenya", text)
+        self.assertIn("text", q)
+        self.assertIn("url", q)
+        self.assertIn("hashtags", q)
+        self.assertIn("Ebola", hs)
+        self.assertIn("DRC", hs)
+        self.assertNotIn("Kenya", hs)
+        self.assertNotIn("#Ebola", text)  # tags live in the hashtags param, not in text
+        self.assertNotIn("#DRC", text)
         html = X.button_html(it)
         self.assertIn("Post on X", html)
         self.assertIn('target="_blank"', html)
         self.assertNotIn("#Ebola", html)
         self.assertNotIn("#DRC", html)
-        self.assertIn("%23Ebola", html)
-        self.assertLessEqual(X.weighted_len(text, url), 280)
+        self.assertIn("hashtags=", html)
+        self.assertIn("Ebola", html)
+        self.assertLessEqual(X.weighted_len(X._join(text, ["#" + t for t in hs]), url), 280)
+
+    def test_intent_uses_baked_in_tags_and_drops_banned(self):
+        """Story pages pass ready.tags; banned fluff is dropped; 3-5 remain in the hashtags param."""
+        it = _mk("Hackers breach FinCEN, prompting systems shutdown",
+                 location="Washington", category="cyber", rank=5, brief="FinCEN systems were taken offline after a breach.")
+        href = X.intent_url(it, tags=["#FinCEN", "#Cybersecurity", "#Breach", "#News", "#BlackoutNetwork", "#Breaking"])
+        q = parse_qs(urlparse(href).query)
+        self.assertIn("text", q)
+        self.assertIn("url", q)
+        hs = [t for t in q["hashtags"][0].split(",") if t]
+        self.assertTrue(3 <= len(hs) <= 5, hs)
+        self.assertIn("FinCEN", hs)
+        self.assertIn("Cybersecurity", hs)
+        self.assertIn("Breach", hs)
+        for banned in ("News", "WorldNews", "Breaking", "BlackoutNetwork"):
+            self.assertNotIn(banned, hs)
+            self.assertNotIn("#" + banned, q["text"][0])
+        # one-tap button: complete href, no follow-up fetch
+        html = X.button_html(it, tags=["#FinCEN", "#Cybersecurity", "#Breach"])
+        self.assertIn('href="https://x.com/intent/post?', html)
+        self.assertIn("hashtags=FinCEN,Cybersecurity,Breach", html)
+        self.assertIn('target="_blank"', html)
+
+    def test_intent_drops_source_agency_acronyms(self):
+        """Matt Nov 28: source/reporting-agency acronyms never become Share to X tags."""
+        banned = ("INGV", "JMA", "EMSC", "USGS", "GFZ", "GDACS", "GEOFON", "HANS", "IODA")
+        cases = [
+            ("INGV: M5.9 earthquake Mexico [Sea]", "Mexico",
+             ["#Earthquake", "#Mexico", "#INGV"]),
+            ("JMA: M5.5 earthquake - Adjacent Sea of Chichijima Island, max seismic intensity 2", "Japan",
+             ["#Earthquake", "#Japan", "#JMA"]),
+            ("EMSC: M5.4 earthquake Central Peru", "Peru",
+             ["#Earthquake", "#Peru", "#EMSC"]),
+            ("GEOFON: M5.0 earthquake Off East Coast of Kamchatka", "Kamchatka, Russia",
+             ["#Earthquake", "#Kamchatka", "#GEOFON"]),
+            ("USGS: M6.1 earthquake near Anchorage, Alaska", "Anchorage, Alaska",
+             ["#Earthquake", "#Alaska", "#USGS"]),
+            ("GDACS: Forest fire in Australia (green alert)", "Australia",
+             ["#Wildfire", "#Australia", "#GDACS"]),
+        ]
+        for title, loc, stored in cases:
+            it = _mk(title, location=loc, category="natural disaster", rank=4)
+            href = X.intent_url(it, tags=stored)
+            q = parse_qs(urlparse(href).query)
+            hs = [t for t in (q.get("hashtags") or [""])[0].split(",") if t]
+            self.assertTrue(3 <= len(hs) <= 5, (title, hs))
+            for b in banned:
+                self.assertNotIn(b, hs, (title, hs))
+                self.assertNotIn("#" + b, q["text"][0], (title, q["text"][0]))
+            self.assertTrue(
+                any(t in hs for t in ("Earthquake", "Tsunami", "Seismic", "Quake", "Wildfire", "Fire")),
+                (title, hs),
+            )
+        # well-known entities stay
+        it = _mk("Trump wanted Jensen Huang back as the CEO of Nvidia.",
+                 location="Pennsylvania", category="politics", rank=4,
+                 brief="Nvidia CEO Jensen Huang met with the president.")
+        href = X.intent_url(it, tags=["#Nvidia", "#Pennsylvania", "#JensenHuang"])
+        hs = parse_qs(urlparse(href).query)["hashtags"][0].split(",")
+        self.assertEqual(hs, ["Nvidia", "Pennsylvania", "JensenHuang"])
+        # generated tags from a JMA headline also drop the agency
+        tags = X.hashtags(_mk(
+            "JMA: M5.5 earthquake - Adjacent Sea of Chichijima Island, max seismic intensity 2",
+            location="Japan", category="natural disaster", rank=4,
+        ))
+        self.assertNotIn("#JMA", tags)
+        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertIn("#Earthquake", tags)
 
 
 class ShareTextReport(unittest.TestCase):

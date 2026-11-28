@@ -1,7 +1,7 @@
 """Strict publish gate for social-only Wire rows (Bluesky firehose and Bluesky accounts).
 
 Nov 27 2026 (Matt 11:09-11:10 PM ET): "Lots of BS coming through on Bluesky firehose."  A row whose sources are ALL social
-(Bluesky, with or without Mastodon) reaches the public Wire only when its text clearly reports a concrete event: an event
+(Bluesky and/or Mastodon) reaches the public Wire only when its text clearly reports a concrete event: an event
 word AND a named entity AND a hard detail (CVE id, number, record count...). Replies, opinion, first-person chatter,
 questions, trend spam, hashtag spam and short posts are dropped. When unsure, drop. A row that also has a non-social
 source (news site, agency feed) is not touched. Nothing is deleted: the row is only hidden from the public Wire.
@@ -21,6 +21,11 @@ _OPINION = re.compile(r"\b(ironic|ironically|guess|shouldn't|should have|shouldn
                       r"probably|maybe|perhaps|seems like|seems pretty|it seems|pretty clear|so sad|sad that|of course|obviously|clearly|"
                       r"hopefully|imagine|thoughts|opinion|in my|agreed|agree|disagree|exactly|exactly this|bad take|hot take|"
                       r"wake up|sheep|libtard|maga|woke|idiots?|clowns?|stupid|insane|crazy|hellscape|propaganda|billionaires?)\b", re.I)
+_DIGEST = re.compile(r"^\s*\d+/\d*\s|\bnews items\b|\b(?:industrial|daily|weekly|morning|evening)\b[^.]{0,25}\bbrief\b|\bweekly\b|\bround-?up\b|\bstory \d\b|\bnews (?:nov|dec|jan|feb)\w*\.? ?\d|daily (?:digest|roundup|recap|briefing)|top stories|"
+                     r"headlines (?:today|roundup)|\bnewsletter\b|\bpodcast\b|\bepisode \d|\bthread\b|\bpart \d+/\d+|\b\d+/\d+ ?(?:\U0001F9F5|:)", re.I)
+# a named source or authority saying it happened (a post with no number must still cite someone)
+_ATTRIB = re.compile(r"\b(confirm(?:s|ed)?|says?|said|announce[sd]?|officials?|police|authorities|according to|disclos\w+|statement|"
+                     r"spokes\w+|ministry|department|agency|cisa|fbi|usgs|noaa|reuters|ap news|bbc)\b", re.I)
 _SPAM = re.compile(r"#trends? today|click/?\s*tap|click here|tap below|follow (?:me|us)|subscribe|giveaway|retweet|\bRT @|#fyp|"
                    r"please provide|the excerpt only|as an ai|latest update for|link in bio|dm me|use code|promo code|free gratis", re.I)
 
@@ -56,7 +61,7 @@ def _mode():
     return "hide" if m == "hide" else "strict"
 
 def social_only(links_raw):
-    """True when the row has at least one Bluesky source and every source is Bluesky or Mastodon."""
+    """True when every source of the row is Bluesky or Mastodon (a post network, not a newsroom or agency feed)."""
     try:
         ls = json.loads(links_raw) if isinstance(links_raw, str) else (links_raw or [])
     except Exception:
@@ -67,8 +72,7 @@ def social_only(links_raw):
             names.append(str(x.get("source") or "").strip().lower())
     if not names:
         return False
-    bsky = any(n.startswith("bluesky") for n in names)
-    return bsky and all(n.startswith("bluesky") or n.startswith("mastodon") for n in names)
+    return all(n.startswith("bluesky") or n.startswith("mastodon") for n in names)
 
 def _entities(text):
     t = _URLISH.sub(" ", text)
@@ -101,6 +105,8 @@ def verdict(text, category=None):
         return False, "reply-or-quote"
     if "?" in raw or "？" in raw:
         return False, "question"
+    if _DIGEST.search(raw):
+        return False, "digest"
     if _SPAM.search(raw):
         return False, "spam"
     if len(re.findall(r"#\w+", raw)) >= 4:
@@ -125,8 +131,8 @@ def verdict(text, category=None):
     ents = _entities(raw)
     if not cve and not ents:
         return False, "no-entity"
-    detail = cve or bool(re.search(r"\d", plain))
-    if not detail and len(ents) < 2:
+    detail = cve or bool(re.search(r"\d", plain)) or bool(_ATTRIB.search(plain))
+    if not detail:
         return False, "no-detail"
     return True, "ok"
 

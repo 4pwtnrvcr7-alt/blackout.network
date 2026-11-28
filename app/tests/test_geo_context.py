@@ -179,6 +179,61 @@ class T(unittest.TestCase):
         r = run("Russians attack Kryvyi Rih and Kharkiv overnight", category="war/conflict")
         self.assertIn(r["precision"], ("state", "country"))
 
+
+    # --- v13 (Nov 27 2026): IATA airport codes in FAA ground-stop / delay items
+    def test_faa_ground_stop_ord_is_ohare(self):
+        r = run("FAA Ground stop: ORD (equipment outage)", "ORD, US", category="other")
+        self.assertEqual(r["located"], 1, r)
+        self.assertEqual(r["method"], "iata")
+        self.assertEqual(r["country"], "US")
+        self.assertEqual(r["admin1_code"], "US.IL")
+        self.assertTrue(41.9 < r["lat"] < 42.05 and -88.0 < r["lon"] < -87.8, (r["lat"], r["lon"]))
+        self.assertRegex(r["place"], r"O.?Hare")
+        self.assertNotRegex(r["place"], r"Nebraska|Ord,")
+
+    def test_faa_ground_stop_lex_is_lexington_ky(self):
+        r = run("FAA Ground stop: LEX (disabled aircraft on the runway)", "LEX, US", category="other")
+        self.assertEqual(r["located"], 1, r)
+        self.assertEqual(r["method"], "iata")
+        self.assertEqual(r["admin1_code"], "US.KY")
+        self.assertTrue(37.9 < r["lat"] < 38.2 and -84.8 < r["lon"] < -84.4, (r["lat"], r["lon"]))
+        self.assertNotRegex(r["place"], r"West Virginia|Lex,")
+
+    def test_faa_ground_stop_other_codes(self):
+        cases = [
+            ("FAA Ground stop: JFK (weather)", "JFK, US", "US.NY", 40.5, 40.8, -73.9, -73.7),
+            ("FAA Ground delay: LAX (volume)", "LAX, US", "US.CA", 33.8, 34.1, -118.5, -118.3),
+            ("FAA Airport closure: MDW (airfield)", "MDW, US", "US.IL", 41.7, 41.9, -87.85, -87.65),
+            ("FAA Ground stop: ATL (staffing)", "ATL, US", "US.GA", 33.5, 33.8, -84.6, -84.3),
+        ]
+        for title, loc, a1, la0, la1, lo0, lo1 in cases:
+            r = run(title, loc, category="other")
+            self.assertEqual(r.get("admin1_code"), a1, (title, r))
+            self.assertTrue(la0 < r["lat"] < la1 and lo0 < r["lon"] < lo1, (title, r["lat"], r["lon"]))
+
+    def test_ord_nebraska_town_is_unchanged_without_aviation_context(self):
+        r = run("Ord, Nebraska evacuates after flash flooding", "Ord, Nebraska, United States")
+        if r.get("located"):
+            self.assertNotEqual(r.get("method"), "iata", r)
+            # Must not jump to O'Hare
+            self.assertFalse(41.9 < (r.get("lat") or 0) < 42.05 and -88.0 < (r.get("lon") or 0) < -87.8, r)
+
+    def test_place_label_faa_ord_is_ohare(self):
+        lab = geo.place_label("FAA Ground stop: ORD (equipment outage)", "ORD, US")
+        self.assertRegex(lab, r"O.?Hare")
+        self.assertNotRegex(lab, r"^ORD, US$|Nebraska")
+
+    def test_place_label_faa_lex_is_lexington_ky(self):
+        lab = geo.place_label("FAA Ground stop: LEX (disabled aircraft on the runway)", "LEX, US")
+        self.assertRegex(lab, r"Blue Grass|Lexington")
+        self.assertNotRegex(lab, r"^LEX, US$|West Virginia")
+
+    def test_place_label_ord_nebraska_town_unchanged(self):
+        lab = geo.place_label("Ord, Nebraska evacuates after flash flooding", "Ord, Nebraska, United States")
+        self.assertIn("Ord", lab)
+        self.assertNotRegex(lab, r"O.?Hare")
+
+
 if __name__ == "__main__": unittest.main()
 
 class StoryPage(unittest.TestCase):

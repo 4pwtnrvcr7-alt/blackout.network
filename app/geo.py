@@ -18,7 +18,7 @@ UA = "blackout.network-heatmap/1.0 (+https://blackout.network; research dashboar
 NOM_URL = "https://nominatim.openstreetmap.org/search"
 NOM_BUDGET = 150            # max Nominatim requests per worker pass (cached forever, so each query is asked once)
 WINDOW_DAYS = 7
-VERSION = 12                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u; 11: headline place + state, reject mayor surnames such as Depew, pt1761u; 12: corpus-common must not drop Iowa/Alaska/Kyiv, Census places/counties, Nov 23 pt1767u)
+VERSION = 13                # bump to re-geocode everything after rule changes (9: Nov 21 2026 contextual rules, pt1682u; 10: weak-town and headline-country guards, pt1686u; 11: headline place + state, reject mayor surnames such as Depew, pt1761u; 12: corpus-common must not drop Iowa/Alaska/Kyiv, Census places/counties, Nov 23 pt1767u; 13: IATA airport codes in FAA ground-stop/delay items, Nov 27 2026)
 _lock = threading.RLock()
 _nom_lock = threading.Lock()
 _last_nom = [0.0]
@@ -127,7 +127,108 @@ def strip_nws_office(text):
 US_POSTAL = {}
 US_POSTAL_KEYS = set()
 METHOD_LABEL = {"source_coords": "Coordinates in the source data", "location_field": "Alert's location field", "gazetteer": "Place name in the text (offline gazetteer)",
-                "nominatim": "OpenStreetMap Nominatim lookup"}
+                "nominatim": "OpenStreetMap Nominatim lookup", "iata": "IATA airport code (offline OurAirports table)"}
+
+# IATA airport codes (OurAirports cache already in jetdata/airports.csv; read-only, shared with jets.py).
+# FAA NAS items arrive as "FAA Ground stop: ORD (…)" with location "ORD, US". Without this, Nominatim
+# and the gazetteer resolve ORD to Ord, Nebraska and LEX to Lex, West Virginia.
+_IATA_CSV = os.path.join(BASE, "jetdata", "airports.csv")
+_IATA = None
+_IATA_TYPE_RANK = {"large_airport": 4, "medium_airport": 3, "small_airport": 2, "seaplane_base": 1, "heliport": 0}
+_AV_IATA_TITLE = re.compile(
+    r"(?i)\b(?:FAA\s+)?(?:Ground\s+stop|Ground\s+delay(?:\s+program)?|Airport\s+closure)\s*:\s*([A-Z]{3})\b")
+_AV_IATA_LOC = re.compile(r"^([A-Z]{3})(?:\s*,\s*US(?:A)?)?$")
+_AV_CONTEXT = re.compile(
+    r"(?i)\b(?:FAA|ground\s+stop|ground\s+delay|airport\s+closure|disabled\s+aircraft|"
+    r"air\s+traffic(?:\s+control)?|nasstatus)\b")
+_IATA_WORD = re.compile(r"\b([A-Z]{3})\b")
+# Agency names and English words that also exist as IATA codes; never take these from free text.
+_IATA_SKIP = {"FAA", "NAS", "NWS", "USA", "THE", "AND", "FOR", "STA", "NOT", "NEW", "ALL", "ANY",
+              "WAS", "HAS", "ARE", "BUT", "NOW", "WHO", "WHAT", "WHY", "HOW", "ITS", "OUR", "OUT"}
+
+def _iata_better(a, b):
+    if a["scheduled"] != b["scheduled"]:
+        return a["scheduled"]
+    return _IATA_TYPE_RANK.get(a["type"], 0) > _IATA_TYPE_RANK.get(b["type"], 0)
+
+def _iata_airports():
+    """code -> best airport row. Lazy, process-local."""
+    global _IATA
+    if _IATA is not None:
+        return _IATA
+    out = {}
+    if not os.path.isfile(_IATA_CSV):
+        _IATA = {}
+        return _IATA
+    import csv
+    with open(_IATA_CSV, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            code = (row.get("iata_code") or "").strip().upper()
+            if len(code) != 3 or not code.isalpha():
+                continue
+            try:
+                lat, lon = float(row["latitude_deg"]), float(row["longitude_deg"])
+            except (TypeError, ValueError):
+                continue
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
+                continue
+            rec = {"code": code, "name": (row.get("name") or "").strip(), "lat": lat, "lon": lon,
+                   "cc": (row.get("iso_country") or "").strip().upper() or None,
+                   "region": (row.get("iso_region") or "").strip().upper(),
+                   "municipality": (row.get("municipality") or "").strip(),
+                   "type": row.get("type") or "",
+                   "scheduled": (row.get("scheduled_service") or "") == "yes"}
+            prev = out.get(code)
+            if prev is None or _iata_better(rec, prev):
+                out[code] = rec
+    _IATA = out
+    return _IATA
+
+def iata_airport(code):
+    if not code:
+        return None
+    return _iata_airports().get(str(code).strip().upper())
+
+def aviation_iata_codes(title, loc=""):
+    """IATA codes from FAA ground-stop/delay/closure copy, or a location field that is just the code in that context."""
+    found = []
+    def add(c):
+        c = (c or "").upper()
+        if c in _IATA_SKIP or c in found:
+            return
+        if iata_airport(c):
+            found.append(c)
+    for m in _AV_IATA_TITLE.finditer(title or ""):
+        add(m.group(1))
+    m = _AV_IATA_LOC.match((loc or "").strip())
+    if m and (_AV_CONTEXT.search(title or "") or _AV_IATA_TITLE.search(title or "") or m.group(1) in (title or "")):
+        add(m.group(1))
+    if not found and _AV_CONTEXT.search(title or ""):
+        for w in _IATA_WORD.finditer(title or ""):
+            add(w.group(1))
+    return found
+
+def iata_place(code):
+    """Offline airport pin for an IATA code, or None."""
+    rec = iata_airport(code)
+    if not rec:
+        return None
+    a1 = None
+    region = rec.get("region") or ""
+    if "-" in region:
+        a1 = region.replace("-", ".", 1)
+    G = gaz()
+    if a1 and a1 not in G.admin1:
+        a1 = None
+    stn = (G.admin1.get(a1) or {}).get("name", "")
+    cn = (G.countries.get(rec["cc"]) or {}).get("name", rec["cc"] or "")
+    ap = rec["name"]
+    muni = rec["municipality"]
+    mid = muni if muni and muni.lower() not in ap.lower() else ""
+    place = ", ".join(p for p in (ap, mid, stn, cn) if p)
+    return {"lat": rec["lat"], "lon": rec["lon"], "cc": rec["cc"], "a1": a1,
+            "place": place, "city": muni or ap, "name": ap, "code": rec["code"]}
+
 REASON_LABEL = {"no_place": "No place mentioned", "nationality_only": "Only nationality words or flags, no place named", "ambiguous": "Ambiguous place name",
                 "multi_place": "Several equally weighted places", "non_geo": "Non-geographic topic", "global": "Source marks it as global",
                 "not_found": "Place not found in gazetteer or geocoder", "broad_region": "Only a multi-country or very broad region named", "geocoder_error": "Geocoder error (will retry)", "pending": "Waiting for online geocoder (next pass)"}
@@ -946,6 +1047,15 @@ def place_label(title, loc, max_len=90):
     """A readable place for story pages: never a raw NWS zone dump ('Inland Volusia; Orange; ...')."""
     loc = (loc or "").strip()
     if not loc: return ""
+    # v13 follow-up: FAA IATA items must show the airport, not the raw "ORD, US" location field
+    try:
+        codes = aviation_iata_codes(title or "", loc)
+        if codes:
+            ap = iata_place(codes[0])
+            if ap and ap.get("place"):
+                return ap["place"][:max_len]
+    except Exception:
+        pass
     # v10 (pt1686u): the headline names one country and the location field another (a merged GDACS cluster: "Forest fire in Australia",
     # location "Brazil") -> the headline's country
     if ";" not in loc and "," not in loc:
@@ -1086,6 +1196,14 @@ def geocode(cl, members, budget):
         nc = G.nearest_city(la, lo)
         pc, _pa = G.pip(la, lo)
         return fill(la, lo, pc or (nc or {}).get("cc"), None, "point", "source_coords", "scanner brief (source coordinates)", "high", m.group(1), city=nc["name"] if nc else None, evidence=m.group(0)[:200])
+    # 2a0) IATA airport codes in FAA ground-stop / delay / closure items (ORD is O'Hare, not Ord, Nebraska)
+    iata_codes = aviation_iata_codes(title, (locs[0] if locs else cl.get("location") or "") or "")
+    if iata_codes:
+        hit = iata_place(iata_codes[0])
+        if hit:
+            return fill(hit["lat"], hit["lon"], hit["cc"], hit["a1"], "point", "iata",
+                        f"IATA airport code {hit['code']}", "high", hit["place"], city=hit["city"],
+                        evidence=f"IATA {hit['code']} → {hit['name']}")
     # 2a) the alert's existing location field
     for loc in locs:
         if loc.startswith("Global"):
@@ -1600,8 +1718,10 @@ def place_contradicts_headline(title, place, precision=None, a1=None, texts=()):
     prec = (precision or "").lower()
     if subj and city and key_of(city) != key_of(subj):
         if prec not in ("county", "state", "country", "region"):
-            # "LA County declares a state of emergency at Castaic's landfill": the county declares, the city it names is where it is.
-            if re.search(r"\b(?:county|parish|borough)$", subj, re.I) and re.search(r"(?<![A-Za-z])" + re.escape(city) + r"(?![A-Za-z])", title or "", re.I):
+            # The headline names the pin city as the event place: "Libya declares state of emergency in Tripoli"
+            # pinned to Tripoli is right (the subject is the country, the city is in the headline). Same for
+            # "LA County declares a state of emergency at Castaic's landfill".
+            if city and re.search(r"(?<![A-Za-z])" + re.escape(city) + r"(?![A-Za-z])", title or "", re.I):
                 return False
             return True
     named = named_admin1_codes([title] + list(texts or []))
@@ -1609,6 +1729,15 @@ def place_contradicts_headline(title, place, precision=None, a1=None, texts=()):
         same = {x for x in named if x.split(".")[0] == str(a1).split(".")[0]}
         if same and a1 not in same:
             return True
+    # FAA "Ground stop: ORD" pinned to the town of Ord, Nebraska (same three letters) is wrong.
+    codes = aviation_iata_codes(title, "")
+    if codes and city:
+        hit = iata_place(codes[0])
+        if hit and key_of(city) == key_of(codes[0]):
+            ap = key_of(hit.get("name") or "")
+            mun = key_of(hit.get("city") or "")
+            if key_of(city) != mun and key_of(city) not in ap.split():
+                return True
     return False
 
 def place_from(ch, out, fill, method, detail, text):

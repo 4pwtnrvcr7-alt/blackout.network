@@ -195,6 +195,23 @@ def _story_texts(item):
         pass
     return [x for x in texts if x]
 
+def _iata_airport_pin(item):
+    """FAA ground-stop/delay items: resolve the IATA code as the airport, even if geo.db stored a same-named town."""
+    try:
+        import geo
+        title = item.get("title") or ""
+        loc = item.get("loc") or item.get("location") or ""
+        if not geo.aviation_iata_codes(title, loc):
+            return None
+        sg = _server_geocode(item)
+        if sg and _ok(sg.get("lat"), sg.get("lon")):
+            sg = dict(sg, how="IATA airport code")
+            return sg
+    except Exception:
+        return None
+    return None
+
+
 def _drop_bad_stored(item, g, base):
     """Clear a stored geo.db pin that is a different city than the headline, or the wrong state."""
     if not g or not g.get("located") or base.get("how") != "geo":
@@ -302,6 +319,9 @@ def place(item, g):
         except Exception:
             return base
         return base
+    iata_pin = _iata_airport_pin(item)
+    if iata_pin:
+        return iata_pin
     g, base = _drop_bad_stored(item, g, base)
     pin = _headline_pin(item)
     if pin:
@@ -521,6 +541,13 @@ def _sibling_hints(items, places, fresh=None):
                 out[i] = pin
     return out
 
+def _pin_far(a, b, deg=0.01):
+    """True when two pins are farther apart than about 1 km (or either is missing coordinates)."""
+    try:
+        return abs(float(a["lat"]) - float(b["lat"])) > deg or abs(float(a["lon"]) - float(b["lon"])) > deg
+    except (TypeError, ValueError, KeyError):
+        return True
+
 def _stored_places(items, geo_rows):
     """Nov 23 2026 (Matt pt1781u): each story is placed once and stored (story_places.db); requests never re-geocode it.
     The position this module computes is memoised by input signature; a new story's AI-read place (story_places LLM thread) fills in
@@ -536,7 +563,13 @@ def _stored_places(items, geo_rows):
         g = geo_rows.get(it["id"])
         sig = SPL.sig_of(it, g); sigs[i] = sig
         p = SPL.memo_get(it["id"], sig)
-        if p is None:
+        # story_places.db memos a pin forever when the title/loc/geo.db signature is unchanged.
+        # A wrong same-named-town pin (ORD -> Ord, NE) would otherwise survive an IATA geocoder fix.
+        iata = _iata_airport_pin(it)
+        if iata and (p is None or _pin_far(iata, p)):
+            p = iata
+            fresh.add(i)
+        elif p is None:
             p = place(it, g); fresh.add(i)
         out.append(p)
     if fresh:

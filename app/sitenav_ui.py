@@ -161,7 +161,7 @@ _REFRESH_OFF_PREFIX = (
 
 # Live-data pages that get the compact shared button in the top bar.
 _REFRESH_HEADER_EXACT = {"/stats", "/sources", "/wire-classic"}
-_REFRESH_HEADER_PREFIX = ("/people", "/mesh", "/grid/")
+_REFRESH_HEADER_PREFIX = ("/people", "/mesh")
 
 def refresh_mode(path=None):
     """off | inpage | header. Default off: no control unless this page can re-fetch data."""
@@ -181,9 +181,9 @@ def refresh_mode(path=None):
         return "off"
     if p in _REFRESH_HEADER_EXACT or p.startswith("/people") or (p.startswith("/mesh") and p != "/mesh/guide"):
         return "header"
-    # /grid/<slug> provider pages (not /grid itself, which is inpage)
+    # /grid/<slug> provider pages use the in-page #293 button (same as /grid), never a header control
     if p.startswith("/grid/"):
-        return "header"
+        return "inpage"
     return "off"
 
 def refresh_on():
@@ -333,7 +333,7 @@ def drawer(sn, active=""):
     out = [(M4_CSS if m4 else "") + '<div class="bn-drawer bn-m3' + (' bn-m4' if m4 else '') + '" id="bn-menu"><a class="bn-scrim" href="#_" tabindex="-1" aria-hidden="true"></a>'
            '<nav class="bn-panel" aria-label="Site menu"><div class="bn-mhead"><div class="bn-mbar">'
            f'<a class="bn-logo" href="/" aria-label="{E(sn.BRAND)} home">{logo_html()}</a>'
-           f'<a class="bn-close m3-close" href="#_" role="button" aria-label="Close menu">{I_CLOSE}<span>Close</span></a></div>'
+           f'<a class="bn-close m3-close" href="#_" role="button" aria-label="Close menu">{I_CLOSE}</a></div>'
            '<div class="bn-ph">'
            '<div class="bn-dsearch bn-js-only" id="bn_dsearch"></div>'
            '<div class="m3-tools"><button type="button" class="m3-tl m3-alerts bn-js-only">Alerts</button>'

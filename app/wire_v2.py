@@ -140,17 +140,39 @@ def menu_html():
         if menu5.on():
             foot = "".join(f'<a href="{h}">{t}</a>' for h, t in (("/scoring", "How we score"), ("/sources", "Sources"), ("/privacy", "Privacy"), ("/tos", "Terms")) if not deactivated.is_off(h))
             return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
-                    '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
+                    '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu"><i></i></button></div>'
                     '<nav class="w2-mnav w2-m5" aria-label="Site">' + menu5.html_block("/wire") + '</nav>'
                     '<div class="w2-mfoot">' + foot + '</div></div>')
     except Exception:
         import traceback; traceback.print_exc()
     return ('<div class="w2-menu" id="w2_menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden>'
-            '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu">CLOSE<i></i></button></div>'
+            '<div class="w2-mtop"><a class="w2-wm" href="/?intro=1">blackout.network</a><button type="button" class="w2-close" id="w2_close" aria-label="Close menu"><i></i></button></div>'
             '<nav class="w2-mnav"><div class="w2-mlead"><a href="/?intro=1">Intro</a><a href="/wire">The Wire</a><a href="/live">Live</a><a href="/newsletter">Newsletter</a></div>'
             f'<div class="w2-mgrid">{cols}</div></nav>'
             '<div class="w2-mfoot"><a href="/scoring">How we score</a><a href="/sources">Sources</a><a href="/privacy">Privacy</a><a href="/tos">Terms</a>'
             '<a href="https://x.com/BlkoutNtw" rel="noopener" target="_blank">X</a><a href="https://www.youtube.com/@blkoutntw" rel="noopener" target="_blank">YouTube</a></div></div>')
+
+
+WC_REF_JS = r"""
+<script>
+(function(){
+  function pulled(){try{return "Updated "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){return "Updated"}}
+  window.bnRefreshPage=function(){
+    return fetch("/wire-classic?fresh=1&_="+Date.now(),{cache:"no-store"}).then(function(r){
+      if(!r.ok)throw new Error(r.status);return r.text();
+    }).then(function(html){
+      var doc=new DOMParser().parseFromString(html,"text/html");
+      var neu=doc.getElementById("w2_main"),cur=document.getElementById("w2_main");
+      if(neu&&cur)cur.innerHTML=neu.innerHTML;
+      var st=document.getElementById("wc_up");
+      var neuSt=doc.getElementById("wc_up");
+      if(st)st.textContent=(neuSt&&neuSt.textContent.trim())||pulled();
+      return "Updated";
+    });
+  };
+})();
+</script>
+"""
 
 def shell(title, desc, body, path, rank=None, noindex=False):
     try:
@@ -179,13 +201,7 @@ def shell(title, desc, body, path, rank=None, noindex=False):
                 ".w2-bar .bn-ref-sm{flex:none}</style>"
             )
             btn = sitenav_ui.refresh_fill_btn("bn_hdr_ref", compact=True)
-            extra_js = (
-                '<script>window.bnRefreshPage=function(){return fetch("/wire-classic?fresh=1&_="+Date.now(),{cache:"no-store"})'
-                ".then(function(r){if(!r.ok)throw new Error(r.status);return r.text()}).then(function(html){"
-                'var doc=new DOMParser().parseFromString(html,"text/html");'
-                'var neu=doc.getElementById("w2_main"),cur=document.getElementById("w2_main");'
-                "if(neu&&cur)cur.innerHTML=neu.innerHTML;return \"Updated\"})};</script>"
-            )
+            extra_js = WC_REF_JS
         except Exception:
             btn = ""
         bar_end = f'<div class="w2-bar-end">{btn}{menu_btn}</div>'
@@ -450,19 +466,19 @@ def handle(path, qs=None, headers=None):
         oldfut = _INFL.get(key)
         if oldfut is not None:
             try:
-                oldfut.result(timeout=8)
+                oldfut.result(timeout=20)
             except Exception:
                 pass
-        _C.pop(key, None)
+        stale = _C.pop(key, None)
         fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
         try:
-            body = fut.result(timeout=8)
+            body = fut.result(timeout=20)
         except Exception:
-            hit = _C.get(key)
-            if hit:
-                return 200, hit[1], "text/html"
-            return None
+            body = None
         if not body:
+            if stale:
+                _C[key] = stale
+                return 200, stale[1], "text/html"
             return None
         return 200, body, "text/html"
     hit = _C.get(key)
