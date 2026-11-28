@@ -33,7 +33,7 @@ Env (all optional except the key):
   BN_WRITER_DB              default <app>/story_writer.db (a Render-owned DB: handed to the next instance on every deploy)
 """
 from __future__ import annotations
-import hashlib, html, ipaddress, json, os, re, socket, sqlite3, sys, threading, time, traceback, urllib.error, urllib.parse, urllib.request
+import base64, hashlib, html, ipaddress, json, os, re, socket, sqlite3, sys, threading, time, traceback, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from concurrent.futures import ThreadPoolExecutor
@@ -287,12 +287,141 @@ def _rewrite(u):
     if m: return f"https://earthquake.usgs.gov/earthquakes/feed/v1.0/detail/{m.group(1)}.geojson"
     return u
 
-def fetch(u):
-    """{url, final, ok, text, label, err}. Never raises."""
+# Google News RSS/article links do not redirect to the publisher (the id no longer
+# embeds the URL). Resolve via the splash signature + Fbv4je batchexecute call, then
+# fetch the publisher (or its AMP twin if the canonical page is blocked).
+_GNEWS_HOST = "news.google."
+_GNEWS_COOKIE = "CONSENT=YES+cb; SOCS=CAI"   # skips the EU consent interstitial; not a secret
+_GNEWS_UA = "Mozilla/5.0"
+_GNEWS_CACHE = {}            # article id -> {"pub", "amp", "err"}
+_GNEWS_AMP = {}              # publisher url -> amp url
+_GNEWS_LK = threading.Lock()
+_GNEWS_GATE = threading.Semaphore(2)   # Google rate-limits the resolve path
+
+def _is_google_news(u):
+    host = (urllib.parse.urlsplit(u or "").hostname or "").lower()
+    return _GNEWS_HOST in host
+
+def _gnews_id(u):
+    parts = urllib.parse.urlsplit(u or "").path.rstrip("/").split("/")
+    if len(parts) >= 2 and parts[-2] in ("articles", "read") and parts[-1]:
+        return parts[-1]
+    return ""
+
+def _gnews_embedded_url(u):
+    """Fast path for older article ids that still carry an http URL in the base64 payload."""
+    gid = _gnews_id(u)
+    if not gid:
+        return ""
+    try:
+        raw = base64.urlsafe_b64decode(gid + "=" * ((4 - len(gid) % 4) % 4))
+    except Exception:
+        return ""
+    for b in re.findall(rb"https?://[^\x00-\x1f\x7f-\xff]{12,500}", raw):
+        try:
+            s = b.decode("ascii")
+        except Exception:
+            continue
+        if s.startswith(("http://", "https://")) and _GNEWS_HOST not in (urllib.parse.urlsplit(s).hostname or ""):
+            return s
+    return ""
+
+def _parse_garturlres(raw):
+    raw = (raw or "").lstrip("\ufeff").lstrip()
+    if raw.startswith(")]}'"):
+        raw = raw.split("\n", 1)[-1]
+    data = json.loads(raw)
+    rows = data if isinstance(data, list) else [data]
+    for row in rows:
+        if not (isinstance(row, list) and len(row) >= 3 and row[1] == "Fbv4je"):
+            continue
+        payload = row[2]
+        if not payload:
+            return "", "", "google news wrapper"
+        parsed = json.loads(payload) if isinstance(payload, str) else payload
+        if not (isinstance(parsed, list) and len(parsed) > 1 and parsed[0] == "garturlres"):
+            return "", "", "google news wrapper"
+        pub = str(parsed[1] or "").strip()
+        amp = str(parsed[3] or "").strip() if len(parsed) > 3 else ""
+        if pub.startswith(("http://", "https://")) and not _is_google_news(pub):
+            return pub, (amp if amp.startswith(("http://", "https://")) else ""), ""
+        return "", "", "google news wrapper"
+    return "", "", "google news wrapper"
+
+def resolve_google_news(u):
+    """Return (publisher_url, amp_url, err). Cache by article id. Never raises."""
+    if not _is_google_news(u):
+        return (u or ""), "", ""
+    embedded = _gnews_embedded_url(u)
+    if embedded:
+        return embedded, "", ""
+    gid = _gnews_id(u)
+    if not gid:
+        return "", "", "google news wrapper"
+    with _GNEWS_LK:
+        hit = _GNEWS_CACHE.get(gid)
+    if hit is not None:
+        return hit.get("pub") or "", hit.get("amp") or "", hit.get("err") or ""
+    err = "google news wrapper"
+    pub = amp = ""
+    try:
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(u).query)
+        hl = (q.get("hl") or ["en-US"])[0]
+        gl = (q.get("gl") or ["US"])[0]
+        ceid = (q.get("ceid") or ["US:en"])[0]
+        splash = f"https://news.google.com/rss/articles/{gid}?hl={urllib.parse.quote(hl)}&gl={urllib.parse.quote(gl)}&ceid={urllib.parse.quote(ceid)}"
+        req = urllib.request.Request(splash, headers={"User-Agent": _GNEWS_UA, "Cookie": _GNEWS_COOKIE, "Accept": "text/html"})
+        with _GNEWS_GATE:
+            with _OPENER.open(req, timeout=FETCH_TIMEOUT) as r:
+                final = r.geturl()
+                html_body = r.read(MAX_BYTES).decode("utf-8", "replace")
+            if not _is_google_news(final) and (final or "").startswith(("http://", "https://")):
+                pub, amp, err = final, "", ""
+            else:
+                sg = re.search(r'data-n-a-sg="([^"]+)"', html_body)
+                ts = re.search(r'data-n-a-ts="([^"]+)"', html_body)
+                aid = re.search(r'data-n-a-id="([^"]+)"', html_body)
+                if not sg or not ts:
+                    err = "google news wrapper"
+                else:
+                    use_id = (aid.group(1) if aid else gid)
+                    inner = (
+                        '["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,'
+                        'null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],'
+                        f'"{use_id}",{ts.group(1)},"{sg.group(1)}"]'
+                    )
+                    body = urllib.parse.urlencode({"f.req": json.dumps([[["Fbv4je", inner, None, "generic"]]])}).encode()
+                    preq = urllib.request.Request(
+                        "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
+                        data=body,
+                        headers={"User-Agent": _GNEWS_UA, "Cookie": _GNEWS_COOKIE,
+                                 "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
+                    )
+                    raw = _OPENER.open(preq, timeout=FETCH_TIMEOUT).read(200_000).decode("utf-8", "replace")
+                    pub, amp, err = _parse_garturlres(raw)
+    except urllib.error.HTTPError as e:
+        err = f"google news HTTP {e.code}"
+        pub = amp = ""
+    except Exception as e:
+        err = f"google news {type(e).__name__}"
+        pub = amp = ""
+    with _GNEWS_LK:
+        _GNEWS_CACHE[gid] = {"pub": pub, "amp": amp, "err": err}
+        if pub and amp:
+            _GNEWS_AMP[pub] = amp
+        # cap the cache so a long-running node cannot grow without bound
+        if len(_GNEWS_CACHE) > 4000:
+            for k in list(_GNEWS_CACHE)[:2000]:
+                _GNEWS_CACHE.pop(k, None)
+    return pub, amp, err
+
+def _fetch_http(u):
+    """Fetch a non-wrapper URL and extract text. {url, final, ok, text, label, err}. Never raises."""
     out = {"url": u, "final": u, "ok": False, "text": "", "label": "", "err": ""}
     try:
         fu = _rewrite(u)
-        if not _public_host(fu): out["err"] = "host not allowed"; return out
+        if not _public_host(fu):
+            out["err"] = "host not allowed"; return out
         req = urllib.request.Request(fu, headers={"User-Agent": UA, "Accept": "text/html,application/json,application/geo+json,application/xml;q=0.8,*/*;q=0.5",
                                                   "Accept-Language": "en-US,en;q=0.8"})
         with _OPENER.open(req, timeout=FETCH_TIMEOUT) as r:
@@ -303,7 +432,8 @@ def fetch(u):
         if "json" in ct or body.lstrip()[:1] in ("{", "["):
             try:
                 parts = []; _json_text(json.loads(body), parts); text = "\n".join(dict.fromkeys(parts))
-            except Exception: text = ""
+            except Exception:
+                text = ""
             label = host
         elif "html" in ct or "<html" in body[:2000].lower():
             p = _Text(); p.feed(body); p.close()
@@ -316,21 +446,96 @@ def fetch(u):
         else:
             out["err"] = f"unsupported type {ct[:40]}"; return out
         text = html.unescape(text)
-        if "news.google." in host: out["err"] = "google news wrapper"; return out
-        if len(text) < 200: out["err"] = "too little text"; out["text"] = text[:PER_SOURCE_CHARS]; return out
+        if _GNEWS_HOST in host:
+            out["err"] = "google news wrapper"; return out
+        if len(text) < 200:
+            out["err"] = "too little text"; out["text"] = text[:PER_SOURCE_CHARS]; return out
         out.update(ok=True, text=text[:PER_SOURCE_CHARS], label=label[:80])
-    except urllib.error.HTTPError as e: out["err"] = f"HTTP {e.code}"
-    except Exception as e: out["err"] = type(e).__name__
+    except urllib.error.HTTPError as e:
+        out["err"] = f"HTTP {e.code}"
+    except Exception as e:
+        out["err"] = type(e).__name__
+    return out
+
+def fetch(u):
+    """{url, final, ok, text, label, err}. Resolves Google News wrappers first. Never raises."""
+    if _is_google_news(u):
+        pub, amp, err = resolve_google_news(u)
+        if not pub:
+            return {"url": u, "final": u, "ok": False, "text": "", "label": "", "err": err or "google news wrapper"}
+        out = _fetch_http(pub)
+        out["url"] = pub
+        if out["ok"]:
+            return out
+        if amp and amp != pub and amp != out.get("final"):
+            alt = _fetch_http(amp)
+            if alt["ok"]:
+                alt["url"] = pub or amp
+                return alt
+            # keep the more specific error if both failed
+            if not out.get("err"):
+                out["err"] = alt.get("err") or err or "google news wrapper"
+        if not out.get("err"):
+            out["err"] = err or "google news wrapper"
+        return out
+    out = _fetch_http(u)
+    if (not out["ok"]) and (out.get("err") or "").startswith("HTTP 403"):
+        with _GNEWS_LK:
+            amp = _GNEWS_AMP.get(u) or _GNEWS_AMP.get(out.get("final") or "")
+        if amp and amp != u:
+            alt = _fetch_http(amp)
+            if alt["ok"]:
+                alt["url"] = u
+                return alt
     return out
 
 def fetch_all(urls):
-    urls = urls[:MAX_SOURCES * 2]
-    with ThreadPoolExecutor(max_workers=6) as ex: res = list(ex.map(fetch, urls))
+    """Fetch cluster source URLs. Non-Google-News links first; wrappers are resolved and
+    other corroborating sources are still tried when one URL is unreadable."""
+    seen, direct, gnews = set(), [], []
+    for u in urls or []:
+        u = (u or "").strip()
+        if not u or u in seen:
+            continue
+        seen.add(u)
+        (gnews if _is_google_news(u) else direct).append(u)
+    # Resolve wrappers with tight concurrency before the main fetch so a burst of
+    # Google News links does not 429, and so we can prefer already-direct publishers.
+    resolved = []
+    if gnews:
+        def _res(u):
+            pub, amp, err = resolve_google_news(u)
+            return u, pub, amp, err
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            for u, pub, amp, err in ex.map(_res, gnews):
+                if pub and pub not in seen:
+                    seen.add(pub)
+                    resolved.append(pub)
+                elif not pub:
+                    # keep a stub so the deferred error lists the wrapper reason
+                    resolved.append(u)
+    to_fetch = (direct + [u for u in resolved if not _is_google_news(u)])[:MAX_SOURCES * 2]
+    # If every direct URL failed and we still have unresolved wrappers, include a few
+    # so fetch() records their errors (already resolved failures stay in `tried`).
+    if not to_fetch:
+        to_fetch = gnews[:MAX_SOURCES * 2]
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        res = list(ex.map(fetch, to_fetch))
+    # If all direct fetches failed, try remaining resolved publishers we trimmed off.
+    if not any(f["ok"] for f in res):
+        extra = [u for u in resolved if not _is_google_news(u) and u not in to_fetch][:MAX_SOURCES]
+        if extra:
+            with ThreadPoolExecutor(max_workers=6) as ex:
+                res.extend(ex.map(fetch, extra))
     good, total = [], 0
     for f in res:
-        if not f["ok"]: continue
-        if total >= TOTAL_CHARS or len(good) >= MAX_SOURCES: break
-        f["text"] = f["text"][:max(800, TOTAL_CHARS - total)]; total += len(f["text"]); good.append(f)
+        if not f["ok"]:
+            continue
+        if total >= TOTAL_CHARS or len(good) >= MAX_SOURCES:
+            break
+        f["text"] = f["text"][:max(800, TOTAL_CHARS - total)]
+        total += len(f["text"])
+        good.append(f)
     return good, res
 
 # ---------------------------------------------------------------- prompt

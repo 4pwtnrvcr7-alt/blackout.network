@@ -14,6 +14,8 @@ os.environ["BN_STORY_REPORTS"] = os.path.join(TMP, "story_reports.json")
 os.environ["BN_STORY_V3_BRIEFS"] = os.path.join(TMP, "nov3.json")
 os.environ["XAI_API_KEY"] = "test-not-a-key"
 import story_writer as SW
+_REAL_FETCH, _REAL_FETCH_ALL = SW.fetch, SW.fetch_all
+_REAL_RESOLVE, _REAL_HTTP = SW.resolve_google_news, SW._fetch_http
 PATHS = {k: os.environ[k] for k in ("BN_WRITER_DB", "BN_WRITER_SOURCE_DB", "BN_STORY_REPORTS", "BN_STORY_V3_BRIEFS")}
 
 def iso(d): return d.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -445,6 +447,173 @@ class SpendLedger(Base):
         self.assertTrue(WC.thin_headline("Maybe"))
         self.assertTrue(WC.thin_headline("Fire"))
         self.assertFalse(WC.thin_headline("Warehouse fire spreads through Miami"))
+
+
+
+class TestGoogleNewsResolve(unittest.TestCase):
+    def setUp(self):
+        SW._GNEWS_CACHE.clear(); SW._GNEWS_AMP.clear()
+        SW.fetch, SW.fetch_all = _REAL_FETCH, _REAL_FETCH_ALL
+        SW.resolve_google_news, SW._fetch_http = _REAL_RESOLVE, _REAL_HTTP
+    def tearDown(self):
+        SW.fetch, SW.fetch_all = _REAL_FETCH, _REAL_FETCH_ALL
+        SW.resolve_google_news, SW._fetch_http = _REAL_RESOLVE, _REAL_HTTP
+
+    def test_embedded_id_still_decodes_without_network(self):
+        import base64
+        url = "https://www.example.com/story-about-a-quake-in-banda-sea"
+        gid = base64.urlsafe_b64encode(b"\x08\x13" + url.encode("ascii")).decode("ascii").rstrip("=")
+        gn = "https://news.google.com/rss/articles/" + gid
+        self.assertEqual(SW._gnews_embedded_url(gn), url)
+        pub, amp, err = SW.resolve_google_news(gn)
+        self.assertEqual(pub, url)
+        self.assertEqual(amp, "")
+        self.assertEqual(err, "")
+
+    def test_parse_garturlres(self):
+        raw = ")]}'\n" + json.dumps([
+            ["wrb.fr", "Fbv4je", json.dumps(["garturlres",
+                                             "https://www.wnct.com/top-stories/north-topsail-beach-declares-state-of-emergency/",
+                                             1,
+                                             "https://www.wnct.com/top-stories/north-topsail-beach-declares-state-of-emergency/amp/"]),
+             None, None, None, "generic"],
+            ["di", 11],
+        ])
+        pub, amp, err = SW._parse_garturlres(raw)
+        self.assertEqual(err, "")
+        self.assertTrue(pub.startswith("https://www.wnct.com/"))
+        self.assertIn("/amp/", amp)
+        # empty payload is a 200-with-no-URL from Google
+        raw2 = ")]}'\n" + json.dumps([["wrb.fr", "Fbv4je", None, None, None, [3], "generic"]])
+        pub2, amp2, err2 = SW._parse_garturlres(raw2)
+        self.assertEqual((pub2, amp2, err2), ("", "", "google news wrapper"))
+
+    def test_resolve_uses_splash_signature(self):
+        gid = "CBMiiAFBTESTARTICLEID0000000000000000000000000000000000"
+        gn = "https://news.google.com/rss/articles/" + gid
+        splash = (
+            '<div data-n-a-id="%s" data-n-a-ts="1795838886" data-n-a-sg="AdwtTESTSIG">'
+            "</div>" % gid
+        )
+        rpc = ")]}'\n" + json.dumps([["wrb.fr", "Fbv4je",
+            json.dumps(["garturlres", "https://www.wect.com/2026/11/26/north-topsail/", 1,
+                        "https://www.wect.com/2026/11/26/north-topsail/?outputType=amp"]),
+            None, None, None, "generic"]])
+        calls = []
+        class _R:
+            def __init__(self, body, url):
+                self._body = body.encode("utf-8") if isinstance(body, str) else body
+                self._url = url
+                self.headers = {"Content-Type": "text/html"}
+            def read(self, n=-1):
+                return self._body[:n] if n and n > 0 else self._body
+            def geturl(self):
+                return self._url
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        def fake_open(req, timeout=9):
+            url = req.full_url if hasattr(req, "full_url") else req.get_full_url()
+            calls.append(url)
+            if "batchexecute" in url:
+                return _R(rpc, url)
+            return _R(splash, url)
+        orig = SW._OPENER.open
+        SW._OPENER.open = fake_open
+        try:
+            pub, amp, err = SW.resolve_google_news(gn)
+        finally:
+            SW._OPENER.open = orig
+        self.assertEqual(err, "")
+        self.assertEqual(pub, "https://www.wect.com/2026/11/26/north-topsail/")
+        self.assertIn("outputType=amp", amp)
+        self.assertTrue(any("rss/articles/" in u for u in calls))
+        self.assertTrue(any("batchexecute" in u for u in calls))
+        # cache hits do not call the network again
+        calls.clear()
+        pub2, amp2, err2 = SW.resolve_google_news(gn)
+        self.assertEqual((pub2, amp2, err2), (pub, amp, err))
+        self.assertEqual(calls, [])
+
+    def test_fetch_wrapper_then_amp_on_403(self):
+        gn = "https://news.google.com/rss/articles/CBMifakeidxxxxxxxxxxxxxxxxxxxx"
+        pub = "https://www.wnct.com/story"
+        amp = "https://www.wnct.com/story/amp/"
+        article = ("<html><head><meta property='og:title' content='Town declares a state of emergency after the nor'easter'>"
+                   "<meta property='og:site_name' content='WNCT'></head><body>" +
+                   ("<p>North Topsail Beach declared a state of emergency and set a townwide curfew after the Thanksgiving nor'easter. "
+                    "Officials said water was over the dunes and some streets were closed to all traffic except emergency crews.</p>") * 4
+                   + "</body></html>")
+        def fake_resolve(u):
+            return pub, amp, ""
+        def fake_http(u):
+            if u == pub:
+                return {"url": u, "final": u, "ok": False, "text": "", "label": "", "err": "HTTP 403"}
+            if u == amp:
+                return {"url": u, "final": u, "ok": True, "text": "Town declared a state of emergency. " * 20,
+                        "label": "WNCT", "err": ""}
+            return {"url": u, "final": u, "ok": False, "text": "", "label": "", "err": "unexpected"}
+        orig_r, orig_h = SW.resolve_google_news, SW._fetch_http
+        SW.resolve_google_news, SW._fetch_http = fake_resolve, fake_http
+        try:
+            out = SW.fetch(gn)
+        finally:
+            SW.resolve_google_news, SW._fetch_http = orig_r, orig_h
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(out["url"], pub)
+        self.assertGreater(len(out["text"]), 200)
+
+    def test_fetch_all_falls_back_to_other_cluster_sources(self):
+        gn = "https://news.google.com/rss/articles/CBMibad"
+        good = "https://earthquake.usgs.gov/earthquakes/eventpage/us6000test"
+        def fake_fetch(u):
+            if "news.google" in u or u.endswith("unreadable"):
+                return {"url": u, "final": u, "ok": False, "text": "", "label": "", "err": "google news wrapper"}
+            return {"url": u, "final": u, "ok": True, "text": TEXT1 * 3, "label": "USGS", "err": ""}
+        def fake_resolve(u):
+            return "", "", "google news wrapper"
+        orig_f, orig_r = SW.fetch, SW.resolve_google_news
+        SW.fetch, SW.resolve_google_news = fake_fetch, fake_resolve
+        try:
+            ok, tried = SW.fetch_all([gn, good])
+        finally:
+            SW.fetch, SW.resolve_google_news = orig_f, orig_r
+        self.assertEqual(len(ok), 1, tried)
+        self.assertEqual(ok[0]["url"], good)
+        self.assertTrue(any(f.get("err") == "google news wrapper" for f in tried) or ok)
+
+
+class TestDeskBriefSkipIsPaidEquivalent(Base):
+    """A pushed desk / Story v3 brief satisfies the publish gate; a free template does not."""
+    def test_has_paid_article_true_for_desk_false_for_template(self):
+        with open(PATHS["BN_STORY_REPORTS"], "w") as _f: _f.write(json.dumps({"notes": {"desk1": {"headline": "Desk", "what_happened": "A full desk brief."}}}))
+        import story_report as SR; SR._RC.update(mt=None, v={})
+        self.assertTrue(SW.desk_covered("desk1"))
+        self.assertTrue(SW.has_paid_article("desk1"))
+        self.assertFalse(SW.has_paid_article("missing"))
+        # a stored free template is not a paid article
+        mkdb([("tpl1", "A warehouse fire spreads through a Miami industrial district", 7)])
+        k = SW.db()
+        note = {"headline": "Fire", "file": "story_writer_template", "writer": {"model": "template"}, "edition": "BLACKOUT.NETWORK write-up"}
+        k.execute("INSERT INTO briefs(cid, note, written_at, model, src_urls, alias_of, tokens_in, tokens_out, usd, rank, title) VALUES(?,?,?,?,?,NULL,0,0,0,?,?)",
+                  ("tpl1", json.dumps(note), SW.iso(), "template", "[]", 7, "Fire"))
+        k.commit(); k.close()
+        SW._NC["t"] = 0
+        self.assertFalse(SW.has_paid_article("tpl1"))
+        self.assertTrue(SW.has_writeup("tpl1"))
+
+    def test_write_one_skips_when_desk_brief_arrived(self):
+        with open(PATHS["BN_STORY_REPORTS"], "w") as _f: _f.write(json.dumps({"notes": {"c1": {"headline": "Desk write-up", "what_happened": "Analysts filed a full brief."}}}))
+        import story_report as SR; SR._RC.update(mt=None, v={})
+        mkdb([("c1", "A magnitude 6.8 earthquake struck the Banda Sea", 7)])
+        k = SW.db()
+        SW.enqueue(k, "c1", "new", iso(NOW), 7, "quake")
+        k.commit(); job = dict(k.execute("SELECT * FROM jobs").fetchone()); k.close()
+        st = SW.write_one(job, api=self.api(good()))
+        self.assertEqual(st, "skipped")
+        k = SW.db(); err = k.execute("SELECT err FROM jobs WHERE cid='c1'").fetchone()[0]; k.close()
+        self.assertEqual(err, "desk brief arrived")
+        self.assertEqual(self.calls, [])
+
 
 
 if __name__ == "__main__":
