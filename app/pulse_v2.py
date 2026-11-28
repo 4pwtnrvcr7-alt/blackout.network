@@ -11,7 +11,7 @@ Centre readout: threat level = average rank of the stories ranked 7 and up (summ
 /api/pulse/live is a compact, 45 s stale-while-revalidate roll-up of those three reads. Each section is built on its own thread:
 one slow or failed source hides only its own ring (no placeholder number is ever drawn), and a section older than 10 minutes is
 dropped rather than shown. The page itself keeps the previous menu, follow band, footer and the free-brief signup (theme.py).
-Kill switch: Render env BN_INTRO_PULSE=0 serves the previous intro (theme._home_page_raw) unchanged.
+Default OFF since Nov 28 5:40 AM ET (Matt): the previous intro (theme._home_page_raw) is served unchanged. Render env BN_INTRO_PULSE=1 turns Pulse v2 on.
 No scanner, scoring or write path is touched; everything here is read-only."""
 import hashlib, html, json, os, re, threading, time
 from datetime import datetime, timezone
@@ -22,7 +22,7 @@ E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
 FILES = {"pulse.css": "text/css; charset=utf-8", "pulse.js": "application/javascript; charset=utf-8"}
 MAX_AGE = 600   # a section older than this is hidden, not shown
 
-def on(): return os.environ.get("BN_INTRO_PULSE", "1").strip() != "0"
+def on(): return os.environ.get("BN_INTRO_PULSE", "0").strip() == "1"   # HOLD (Matt 5:40 AM ET Nov 28): previous intro is the default; BN_INTRO_PULSE=1 turns Pulse v2 back on
 
 def _v(n):
     try:
