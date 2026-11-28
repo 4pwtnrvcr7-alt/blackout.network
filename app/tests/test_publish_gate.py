@@ -229,12 +229,30 @@ class Gate(unittest.TestCase):
         self.assertTrue(SW.has_paid_article("bbbbbbbbbbbbbbbb"))
         self.assertTrue(SW.allow("bbbbbbbbbbbbbbbb"))
 
+
+    def test_boot_gate_turns_on_before_tip_templates(self):
+        """The paid writer must not wait on a 800-item tip pass after a deploy."""
+        mkdb([("aaaabbbbccccdddd", "Flood warning in Jakarta Indonesia", 4)])
+        def blocked(*a, **k):
+            raise AssertionError("boot_gate must not package tip templates before returning")
+        orig = SW.package_one
+        SW.package_one = blocked
+        try:
+            SW.boot_gate()
+        finally:
+            SW.package_one = orig
+        self.assertTrue(SW.STATE.get("gate_booted"))
+        self.assertTrue(SW.gate_on())
+        self.assertTrue(SW.allow("aaaabbbbccccdddd"))  # grandfathered even without a new template this boot
+
     def test_rank_rise_keeps_template_visible(self):
         mkdb([("cccccccccccccc11", "Forest fire in Ghana (green alert)", 2)])
         SW.boot_gate()
         SW.STATE["gate_on"] = True; SW.STATE["gate_booted"] = True
         self.assertTrue(SW.allow("cccccccccccccc11") or SW.has_writeup("cccccccccccccc11"))
         self.assertTrue(SW.allow("cccccccccccccc11"))
+        # tip templates now continue in package_pending / package_one, not inside boot_gate
+        self.assertTrue(SW.package_one("cccccccccccccc11", build_card_now=False))
         k = sqlite3.connect(os.environ["BN_WRITER_SOURCE_DB"])
         k.execute("UPDATE clusters SET rank=7 WHERE cluster_id=?", ("cccccccccccccc11",))
         k.commit(); k.close()
