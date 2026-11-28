@@ -71,24 +71,31 @@ class NetMap(unittest.TestCase):
         self.assertEqual(netdetail.LVC[1], "#FFA040")
 
     def test_boot_loader(self):
-        """Nov 24 2026 (pt1795u): the loader is the old /grid "Energizing the grid" animation (boot.js kept in the repo, no longer loaded).
-        Progress ids net.js drives are present, reduced motion is honored, no yellow or red neon."""
-        import colorsys, netmap, netpages
+        """Nov 27 2026 (pt2007u): 100 phosphor blocks, one per percent, Refresh yellow/orange/red, bottom-to-top.
+        boot.js is kept in the repo but not loaded. Progress ids net.js drives are present, reduced motion is honored.
+        Yellow is approved on this loader only."""
+        import netmap, netpages
         self.assertEqual(netmap.handle_get("/api/netmap/boot.js")[0], 200)
         body = netpages.handle_get("/grid", {})[1]
         self.assertNotIn("/api/netmap/boot.js", body)
         self.assertLess(body.index('class="gx-ld" id="nx_ld"'), body.index("/api/netmap/net.js"))
-        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', "Energizing the grid", 'class="gx-ldsvg"', 'data-s="map"', 'data-s="nets"', 'data-s="out"', 'data-s="rep"'): self.assertIn(s, body)
+        for s in ('id="nx_ldn"', 'id="nx_ldmsg"', 'id="nx_ldb"', "Energizing the grid", 'class="gx-ldboard"',
+                  'data-s="map"', 'data-s="nets"', 'data-s="out"', 'data-s="rep"', 'role="progressbar"'):
+            self.assertIn(s, body)
+        self.assertNotIn('class="gx-ldsvg"', body)
+        self.assertEqual(body.count('class="gx-ldcell"'), 100)
         css = open(os.path.join(APP, "netmap_static", "gridlayer.css"), encoding="utf-8").read()
         self.assertIn("prefers-reduced-motion", css)
         self.assertIn("body.nx-ready .gx-ld{opacity:0", css)
-        for f in ("gridlayer.css",):
-            t = open(os.path.join(APP, "netmap_static", f), encoding="utf-8").read()
-            t = t[t.index(".gx-ld"):t.index(".gx-ld") + 4000]
-            for h in set(re.findall(r"#([0-9A-Fa-f]{6})\b", t)):
-                r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
-                hue, l, sat = colorsys.rgb_to_hls(r, g, b)
-                if sat > 0.4 and l > 0.25: self.assertFalse(hue < 0.06 or 0.97 < hue or 0.08 < hue < 0.2, f + " #" + h)
+        self.assertIn("@keyframes gx-ld-drop", css)
+        for h in ("#FFE566", "#FF9A1A", "#FF5A3C"):
+            self.assertIn(h, css)
+        js = open(os.path.join(APP, "netmap_static", "net.js"), encoding="utf-8").read()
+        self.assertIn("function ldChase", js)
+        self.assertIn("function ldDropOne", js)
+        self.assertNotIn("Math.min(99", js)   # never stall the percent at 99
+        self.assertIn("ldDone || prog() >= 0.999) ? 100", js)
+        self.assertIn("prefers-reduced-motion", js)
 
     def test_bars_union_and_bounds(self):
         import netmap
