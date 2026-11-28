@@ -68,6 +68,18 @@ CONTRADICTION_FIXTURES = [
      "title": "White House says Russia struck Kyiv",
      "place": "Kyiv, Ukraine", "cc": "UA",
      "expect_conflict": False},
+    {"id": "libya-soe-in-tripoli-agrees",
+     "title": "Libya declares state of emergency in Tripoli",
+     "place": "Tripoli, Tripoli, Libya", "cc": "LY",
+     "expect_conflict": False},
+    {"id": "ord-not-ord-nebraska",
+     "title": "FAA Ground stop: ORD (equipment outage)",
+     "place": "Ord, Valley County, Nebraska, 68862, United States", "cc": "US", "admin1_code": "US.NE",
+     "expect_conflict": True},
+    {"id": "lex-not-lex-west-virginia",
+     "title": "FAA Ground stop: LEX (disabled aircraft on the runway)",
+     "place": "Lex, McDowell County, West Virginia, 24817, United States", "cc": "US", "admin1_code": "US.WV",
+     "expect_conflict": True},
 ]
 
 
