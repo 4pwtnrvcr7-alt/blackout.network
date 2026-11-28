@@ -69,7 +69,9 @@
     var id = bootId(); if (!id) return;
     var it = byId(id); if (!it) return;
     if (!KINDS[it.kind]) { KINDS[it.kind] = true; var c = document.querySelector('.wt-chip[data-k="' + it.kind + '"]'); if (c) c.setAttribute("aria-pressed", "true"); }
-    select(id, true);
+    select(id, window.innerWidth >= 900);
+    var el = document.querySelector('.wt-it[data-id="' + id + '"]');
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   }
   function card(it) {
     var meta = [it.place, pop(it), when(it)].filter(Boolean).join(" · ");
