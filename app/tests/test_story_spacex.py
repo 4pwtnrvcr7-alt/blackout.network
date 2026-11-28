@@ -22,5 +22,19 @@ class SpaceX(unittest.TestCase):
         css = SR.CSS.lower()
         for bad in ("#ffc21a", "#3fa66a", "#c97b00"): self.assertNotIn(bad, css)
 
+    def test_file_hero_shows_full_image_on_tablet_desktop(self):
+        css = SR.CSS
+        self.assertIn(".sr2 .sr-fig.sr-file img{", css)
+        self.assertNotIn("object-fit:cover;object-position:50% 25%;max-height:380px", css)
+        # The file-photo rule itself must contain, not cover, so portraits are not sliced.
+        start = css.find(".sr2 .sr-fig.sr-file img{")
+        end = css.find("}", start)
+        rule = css[start:end+1]
+        self.assertIn("object-fit:contain", rule)
+        self.assertNotIn("object-fit:cover", rule)
+        self.assertIn("object-position:50% 20%", rule)
+        self.assertIn("max-height:min(70vh,720px)", rule)
+        self.assertIn("@media(max-width:767px){.sr2 .sr-fig.sr-file img{", css)
+
 if __name__ == "__main__":
     unittest.main()
