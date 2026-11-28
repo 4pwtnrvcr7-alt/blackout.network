@@ -31,6 +31,7 @@ class SocialGate(unittest.TestCase):
             ("I think it is China that is hacking all of these government networks again and again.", "cyber"),
             ("Ironic all these hacks happen after trump meets with the others within the axis of evil.", "cyber"),
             ("Hacked", "cyber"),
+            ("Now that Black Friday's passed, the last line of defense has been breached... Mariah Carrey is here.", "cyber"),
             ("Industrial Cyber Brief, Saturday 28 November: 6 news items. Critical: Bosch MATRIX trusts", "cyber"),
             ("8/ Ukrainian forces struck Russian oil and energy infrastructure and a military airfield on Friday", "conflict"),
             ("AI NEWS Nov.27.26 Story 1: LA schools block Google AI features Story 2: OpenAI fixes GPT-6.2 billing error", "cyber"),
