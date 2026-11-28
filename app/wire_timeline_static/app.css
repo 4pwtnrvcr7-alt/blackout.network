@@ -156,8 +156,6 @@ body.tl{background:#000}
 @media (max-width:420px){
  :root{--tl-tc:56px;--tl-g:9px}
  .tl-b span{display:none}.tl-b{padding:0 11px}
- #tl_ref.busy .tl-ref-lab,#tl_ref.is-filling .tl-ref-lab,#tl_ref.is-result .tl-ref-lab,
- #tl_ref.busy .tl-ref-lab span,#tl_ref.is-filling .tl-ref-lab span,#tl_ref.is-result .tl-ref-lab span{display:inline-grid}
  #tl_ref.busy svg,#tl_ref.is-filling svg,#tl_ref.is-result svg,#tl_ref.is-result .tl-ref-fill{display:none}
  .tl-tm{font-size:11px}
  .tl-h{-webkit-line-clamp:3}
@@ -182,7 +180,6 @@ body.tl{background:#000}
 .tl-loclab.err{color:#D0D4DA}
 @media (max-width:520px){
   .tl-row1 .tl-b>span{display:none}
-  .tl-row1 #tl_ref.busy>.tl-ref-lab,.tl-row1 #tl_ref.is-filling>.tl-ref-lab,.tl-row1 #tl_ref.is-result>.tl-ref-lab{display:inline-grid}
   .tl-row1 #tl_ref.busy svg,.tl-row1 #tl_ref.is-filling svg,.tl-row1 #tl_ref.is-result svg{display:none}
   #tl_filt>span{display:inline}
   .tl-row1 .tl-b{padding:0 9px;gap:6px}
