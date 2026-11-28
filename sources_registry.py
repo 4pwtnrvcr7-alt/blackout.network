@@ -335,6 +335,10 @@ def _cycle():
     except Exception: pass
 
 def _loop():
+    print("registry: feed thread started", flush=True)
+    for _ in range(45):                      # let the scanner finish importing before the first cycle
+        if hasattr(S, "scan"): break
+        time.sleep(1)
     while True:
         try:
             if enabled(): _cycle()
@@ -390,5 +394,6 @@ def apply(ext_sources, ext_failed):
         ext_sources.append((NAME, REMOTE, f_registry))
         ext_failed.append(("Reddit public RSS (multireddit, 404 from long URL)", "https://www.reddit.com/r/worldnews+news/new/.rss", "replaced by per-sub registry feeds"))
         ext_failed.append(("Bluesky public search API (old adapter, NoneType crash)", "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts", "replaced by registry bsky adapter"))
+        start()                              # fetch thread runs independently of the scan, so the first slow scan cannot delay it
     except Exception as ex:
         ext_failed.append(("[registry] sources_registry module", "sources_registry.py", f"apply failed: {type(ex).__name__}: {ex}"[:300]))
