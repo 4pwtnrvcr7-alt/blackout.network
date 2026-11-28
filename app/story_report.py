@@ -737,7 +737,11 @@ html:not([data-theme="light"]) .sr a:not([class]){color:#F2F2F4}
 .sr-more summary::-webkit-details-marker{display:none}.sr-more[open] summary{margin-bottom:14px}
 .sr2 .sr-fig.sr-lead{margin-bottom:24px}.sr2 .sr-fig img{max-height:420px}
 .sr-gfx{background:transparent!important}.sr-glance{display:block;width:100%;height:auto;color:var(--sr-ink)}
-.sr2 .sr-fig.sr-file img{object-fit:cover;object-position:50% 25%;max-height:380px;background:#0d0e10}
+/* File portraits (person/place): show the whole image on tablet and desktop.
+   The previous cover crop at max-height 380px sliced tall portraits down to hair and eyes. */
+.sr2 .sr-fig.sr-file>a{background:#0d0e10}
+.sr2 .sr-fig.sr-file img{width:100%;height:auto;max-height:min(70vh,720px);object-fit:contain;object-position:50% 20%;background:#0d0e10}
+@media(max-width:767px){.sr2 .sr-fig.sr-file img{max-height:min(56vh,480px);object-fit:contain;object-position:50% 20%}}
 @media(max-width:600px){.sr-if{grid-template-columns:1fr}.sr-share{grid-template-columns:1fr}.sr-share img{max-height:200px}.sr p.sr-bline-p{font-size:17px}.sr-ul li,.sr-ol li{font-size:15.5px}}
 
 
