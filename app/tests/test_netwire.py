@@ -153,7 +153,8 @@ class T(unittest.TestCase):
         self.assertEqual(layers["internet"]["n7"], 2)
         self.assertEqual(netwire.pill_text(["hydro"], layers), "No dam incidents on the Wire in the last 7 days")
         txt = netwire.pill_text(["internet"], layers)
-        self.assertIn("internet outages in 24 h", txt)
+        self.assertIn("1 internet outage in 24 h", txt)
+        self.assertIn("1 country", txt)
         self.assertIn("U.S.: none major", txt)
 
     def test_apply_inet_sets_band_for_ended_story(self):
@@ -163,6 +164,92 @@ class T(unittest.TestCase):
         out = netwire.apply_inet(dead, b, now=NOW)
         self.assertEqual(out["places"]["C:MW"]["band"], "7d")
         self.assertIn(out["places"]["C:MW"]["wire"][0]["band"], ("7d",))
+
+
+    def test_dc_requires_a_facility_incident(self):
+        fire = netwire.story_from(row(title="Fire at a Dallas data center takes websites offline", place="Dallas", cc="US", t="2026-11-27T18:00:00Z"), now=NOW)
+        self.assertEqual(fire["kind"], "dc")
+        mentions = [
+            "Jared Kushner on Egypt: If we can get Gaza solved, let's build data centers and energy together",
+            "Concern about data centres go from zero to 100 ahead of state election",
+            "Trump Threatens Major Sanctions on US Tech Firms Building Data Centers Abroad",
+        ]
+        for t in mentions:
+            s = netwire.story_from(row(title=t, src="Reuters", url="https://example.com", place="", cc=None, lat=None, lon=None, t="2026-11-26T12:00:00Z"), now=NOW)
+            self.assertTrue(s is None or s.get("kind") != "dc", t)
+
+    def test_pill_singular_grammar(self):
+        b = netwire.stories_from_rows([
+            row(title="More than 424,000 are without power from New York to North Carolina",
+                src="Telegram @CIG_telegram", place="United States", cc="US",
+                t="2026-11-27T18:03:29Z", lat=None, lon=None, id="aaaaaaaaaaaaaaaa"),
+        ], now=NOW)
+        layers = netwire.layers(b, now=NOW)
+        self.assertEqual(layers["power"]["n24"], 1)
+        self.assertEqual(layers["power"]["countries_24h"], 1)
+        self.assertEqual(netwire.pill_text(["power"], layers),
+                         "1 power outage in 24 h · 1 country · U.S.: none major")
+        self.assertEqual(netwire.countries_phrase(1), "1 country")
+        self.assertEqual(netwire.countries_phrase(2), "2 countries")
+        self.assertEqual(netwire.layer_label("power", 1), "power outage")
+        self.assertEqual(netwire.layer_label("power", 2), "power outages")
+
+    def test_centroid_from_place_and_skip_without_location(self):
+        us = netwire.story_from(row(
+            title="More than 424,000 are without power from New York to North Carolina",
+            src="Telegram @CIG_telegram", place="United States", cc="US",
+            t="2026-11-27T18:03:29Z", lat=None, lon=None,
+        ), now=NOW)
+        netwire.fill_coords(us)
+        self.assertIsNotNone(us["lat"])
+        self.assertIsNotNone(us["lon"])
+        self.assertTrue(-90 <= us["lat"] <= 90)
+        self.assertEqual(us.get("prec"), "country")
+
+        ohio = netwire.story_from(row(
+            title="Cellular outage hits cell towers across Ohio",
+            place="Ohio", cc="US", t="2026-11-27T18:00:00Z", lat=None, lon=None,
+            id="cccccccccccccccc",
+        ), now=NOW)
+        netwire.fill_coords(ohio)
+        self.assertAlmostEqual(ohio["lat"], 40.0924, places=3)
+        self.assertAlmostEqual(ohio["lon"], -82.6719, places=3)
+        self.assertEqual(ohio.get("prec"), "state")
+
+        dallas = netwire.story_from(row(
+            title="Fire at a Dallas data center takes websites offline",
+            place="Dallas", cc="US", t="2026-11-27T18:00:00Z", lat=None, lon=None,
+            id="dddddddddddddddd",
+        ), now=NOW)
+        netwire.fill_coords(dallas)
+        self.assertAlmostEqual(dallas["lat"], 32.7831, places=3)
+        self.assertAlmostEqual(dallas["lon"], -96.8067, places=3)
+        self.assertEqual(dallas.get("prec"), "city")
+
+        glob = netwire.story_from(row(
+            title="Anthropic outage: Degraded performance for Claude Fable 5.2 (major impact, monitoring)",
+            src="Anthropic status (major/critical incidents)", place="Global (internet)", cc=None,
+            lat=None, lon=None, id="eeeeeeeeeeeeeeee",
+        ), now=NOW)
+        netwire.fill_coords(glob)
+        self.assertIsNone(glob["lat"])
+        self.assertIsNone(glob["lon"])
+
+        # Title names a country, but there is no location field: do not invent a pin.
+        bare = netwire.story_from(row(
+            title="BREAKING: A major cyberattack targets Israel's electrical grid as power outages hit several cities",
+            place="", cc=None, t="2026-11-26T20:55:20Z", lat=None, lon=None,
+            id="ffffffffffffffff",
+        ), now=NOW)
+        netwire.fill_coords(bare)
+        self.assertIsNone(bare["lat"])
+        self.assertIsNone(bare["lon"])
+
+        # Existing coordinates stay put.
+        mw = netwire.story_from(row(), now=NOW)
+        netwire.fill_coords(mw)
+        self.assertEqual(mw["lat"], -13.4)
+        self.assertEqual(mw["lon"], 33.6)
 
 
 if __name__ == "__main__":
