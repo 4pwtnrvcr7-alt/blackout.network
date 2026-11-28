@@ -359,7 +359,7 @@ class Tags(unittest.TestCase):
             href = X.intent_url(it, tags=stored)
             q = parse_qs(urlparse(href).query)
             hs = [t for t in (q.get("hashtags") or [""])[0].split(",") if t]
-            self.assertTrue(3 <= len(hs) <= 5, (title, hs))
+            self.assertTrue(2 <= len(hs) <= 5, (title, hs))
             for b in banned:
                 self.assertNotIn(b, hs, (title, hs))
                 self.assertNotIn("#" + b, q["text"][0], (title, q["text"][0]))
@@ -380,8 +380,65 @@ class Tags(unittest.TestCase):
             location="Japan", category="natural disaster", rank=4,
         ))
         self.assertNotIn("#JMA", tags)
-        self.assertGreaterEqual(len(tags), 3, tags)
+        self.assertGreaterEqual(len(tags), 2, tags)
         self.assertIn("#Earthquake", tags)
+
+    def test_intent_drops_direction_and_place_filler(self):
+        """Matt Nov 28 12:20 AM: no direction/filler third tags; 2 good tags beat junk."""
+        junk = ("Sea", "AdjacentSea", "Northwest", "Northeast", "Southeast", "Southwest",
+                "North", "South", "East", "West", "Region", "Coast", "EastCoast",
+                "Coastal", "Ocean", "Area", "Zone", "Island", "Islands", "Central",
+                "Adjacent", "Offshore", "Near", "NorthwestKuril", "AdjacentSeaOf")
+        cases = [
+            ("INGV: M5.9 earthquake Mexico [Sea]", "Mexico",
+             ["#Earthquake", "#Mexico", "#Sea"]),
+            ("JMA: M5.5 earthquake - Adjacent Sea of Chichijima Island, max seismic intensity 2", "Japan",
+             ["#Earthquake", "#Japan", "#JMA"]),
+            ("GEOFON: M4.5 earthquake Northwest of Kuril Islands", "Kuril Islands",
+             ["#Earthquake", "#KurilIslands", "#Northwest"]),
+        ]
+        for title, loc, stored in cases:
+            it = _mk(title, location=loc, category="natural disaster", rank=4)
+            href = X.intent_url(it, tags=stored)
+            q = parse_qs(urlparse(href).query)
+            hs = [t for t in (q.get("hashtags") or [""])[0].split(",") if t]
+            self.assertTrue(2 <= len(hs) <= 5, (title, hs))
+            for b in junk:
+                self.assertNotIn(b, hs, (title, hs))
+            self.assertIn("Earthquake", hs, (title, hs))
+            # a real place remains; a third is a place or #Seismic, never junk
+            self.assertTrue(any(t in hs for t in ("Mexico", "Japan", "Chichijima", "KurilIslands", "Russia")), (title, hs))
+            if len(hs) >= 3:
+                self.assertTrue(any(t in hs for t in ("Seismic", "Quake", "Mexico", "Japan", "Chichijima", "KurilIslands", "Russia")), (title, hs))
+        # leftover #Kuril (from stripping #NorthwestKuril) must not sit next to #KurilIslands
+        it = _mk(cases[2][0], location=cases[2][1], category="natural disaster", rank=4)
+        href = X.intent_url(it, tags=cases[2][2])
+        hs = [t for t in parse_qs(urlparse(href).query).get("hashtags", [""])[0].split(",") if t]
+        self.assertEqual(hs, ["Earthquake", "KurilIslands", "Seismic"], hs)
+        self.assertNotIn("Kuril", hs)
+        # better two tags than a junk third, and no #Tsunami unless mentioned
+        it = _mk("Earthquake in the northwest region of the sea", category="natural disaster", rank=4)
+        href = X.intent_url(it)
+        hs = [t for t in parse_qs(urlparse(href).query).get("hashtags", [""])[0].split(",") if t]
+        self.assertTrue(2 <= len(hs) <= 5, hs)
+        for b in junk:
+            self.assertNotIn(b, hs, hs)
+        self.assertIn("Earthquake", hs)
+        self.assertNotIn("Tsunami", hs)
+        # #Tsunami only when the story mentions one
+        it = _mk("M 7.2 earthquake off Japan, tsunami warning issued", location="Japan", category="natural disaster", rank=4)
+        href = X.intent_url(it)
+        hs = [t for t in parse_qs(urlparse(href).query).get("hashtags", [""])[0].split(",") if t]
+        self.assertIn("Tsunami", hs, hs)
+        self.assertIn("Japan", hs, hs)
+        for b in junk:
+            self.assertNotIn(b, hs, hs)
+        # well-known compound places that contain a filler word still stand
+        it = _mk("Tensions rise on the West Bank after a raid in East Jerusalem", location="West Bank", category="war/conflict", rank=5)
+        href = X.intent_url(it, tags=["#WestBank", "#EastJerusalem", "#Israel"])
+        hs = parse_qs(urlparse(href).query)["hashtags"][0].split(",")
+        self.assertIn("WestBank", hs)
+        self.assertIn("EastJerusalem", hs)
 
 
 class ShareTextReport(unittest.TestCase):
