@@ -355,12 +355,42 @@ def _gate_ok(cid):
         return False
     return bool(desk or note is not None)
 
+_SOCJ = {}      # cid -> (signature, junk?) so the regex gate runs once per row version
+
+def _social_junk(r):
+    """True when a row whose sources are all Bluesky/Mastodon fails the strict social gate (wire_social). Soft hide only: the
+    row stays in the database, and it shows again if a non-social source corroborates it (then it is no longer social-only)."""
+    try:
+        import wire_social as WS
+        keys = r.keys()
+        lk = r["links"] if "links" in keys else None
+        if not lk or "luesky" not in str(lk):
+            return False
+        cid = r["id"] if "id" in keys else r["cluster_id"]
+        title = r["title"] if "title" in keys else ""
+        sig = (title, lk, r["category"] if "category" in keys else "", WS._mode())
+        e = _SOCJ.get(cid)
+        if e is not None and e[0] == sig:
+            return e[1]
+        junk = bool(WS.junk_row(title, r["category"] if "category" in keys else "", lk))
+        if len(_SOCJ) > 20000:
+            _SOCJ.clear()
+        _SOCJ[cid] = (sig, junk)
+        return junk
+    except Exception:
+        try:
+            return "luesky" in str(r["links"])     # fail closed for Bluesky rows
+        except Exception:
+            return False
+
 def _public_row(r, archive, strict=True):
     """Live clusters are held until story_writer has a write-up, tags and card. Archive items stay visible.
     strict (every public path): the item must also have passed the pre-publish validator (wire_check) with its photo card built.
     strict=False is only for the warm thread, which prepares held rows (tags, card, verdict)."""
     if archive:
         return True
+    if _social_junk(r):       # Nov 27 2026 (Matt): Bluesky-only rows reach the Wire only when they clearly report a concrete event
+        return False
     if strict and _QAH:
         cid0 = r["id"] if "id" in r.keys() else r["cluster_id"]
         if cid0 in _QAH:          # held by the box's post-publish QA sweep (wire_qa.py)
