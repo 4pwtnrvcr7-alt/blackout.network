@@ -51,6 +51,7 @@ CATS = [  # key, label, colour (muted; red is reserved for rank 7+, no yellow)
     ("crime", "Crime", "#8A8E9A"),
     ("deaths", "Obituaries", "#7A8490"),
     ("people", "People", "#8B8FA3"),
+    ("patents", "Patents", "#7F9CB0"),
     ("disease", "Health alerts", "#6FA88C"),
     ("quake", "Quakes & volcanoes", "#9A86C4"),
     ("weather", "Weather & fire", "#5E95C8"),
@@ -78,7 +79,7 @@ _PEOPLE = re.compile(r"\b(assassina\w*|assassination attempt)\b", re.I)
 _RW = re.compile(r"^[^:]{2,60}:\s*(.+?)\s+-\s+[A-Z][a-z]{2} \d{4}$")   # ReliefWeb "Country: Floods - Aug 2026"
 _STORED = {"war/conflict": "conflict", "disease": "disease", "space weather": "space", "cyber": "cyber",
            "financial": "markets", "political": "politics", "ufo/uap": "uap", "spiritual/religious": "faith",
-           "crime": "crime", "people": "people"}
+           "crime": "crime", "people": "people", "patent": "patents", "patents": "patents", "obituary": "deaths"}
 
 def cat_key(category, title, archive):
     """Display category. Title rules run first so a stored war/conflict tag on a quake (or similar mislabel) is corrected."""
@@ -103,6 +104,7 @@ def cat_key(category, title, archive):
     # ("Geomagnetic Storm Watch" is space weather, not Weather & fire).
     if c in ("space weather", "space"): return "space"
     if c in ("obituary", "obituaries", "death", "deaths"): return "deaths"
+    if c in ("patent", "patents"): return "patents"   # Nov 27 2026 (pt1961u): its own Wire category
     if c in ("wreck", "wrecks", "crash", "crashes", "accident", "transport accident"): return "wreck"
     if c == "people":   # scanner [people] layer (sources_layers.py): keep it under People; its death notices go to Obituaries
         return "deaths" if (_OBIT.search(t) or t.startswith("Death: ")) else "people"
