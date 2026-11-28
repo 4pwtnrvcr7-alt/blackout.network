@@ -510,7 +510,17 @@ def _pulse_v2():
     except Exception:
         import traceback; traceback.print_exc(); return None
 
+def _intro_sx():
+    """Panel intro (intro_sx.py, Matt's spacex.com brief Nov 28 2026). On by default (BN_INTRO_SX=0 turns it off); wins over Pulse."""
+    try:
+        import intro_sx
+        return intro_sx if intro_sx.on() else None
+    except Exception:
+        import traceback; traceback.print_exc(); return None
+
 def _ledger():
+    sx = _intro_sx()
+    if sx: return [(k, n, (sx.credit_rows() if k == "intro" else rows)) for k, n, rows in CREDITS_LEDGER]
     pv = _pulse_v2()
     if not pv: return CREDITS_LEDGER
     row = [("Intro instrument", "Original graphic drawn by BLACKOUT.NETWORK from live public data: scanner Wire, USGS earthquakes, EIA-930 grid demand, NOAA SWPC Kp. No third-party imagery.", "Original work")]
@@ -518,7 +528,13 @@ def _ledger():
 
 def home_page():
     h = _home_page_raw()
-    pv = _pulse_v2()
+    sx = _intro_sx()
+    pv = None if sx else _pulse_v2()
+    if sx:
+        try: h = sx.transform(h)
+        except Exception:
+            import traceback; traceback.print_exc()   # any failure serves the previous intro
+            h = _home_page_raw()
     if pv:
         try: h = pv.transform(h)
         except Exception:

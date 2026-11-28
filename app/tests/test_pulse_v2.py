@@ -7,8 +7,8 @@ def _read(n):
     with open(os.path.join(pulse_v2.STATIC, n), encoding="utf-8") as f: return f.read()
 
 class PulseHome(unittest.TestCase):
-    def setUp(self): os.environ["BN_INTRO_PULSE"] = "1"
-    def tearDown(self): os.environ.pop("BN_INTRO_PULSE", None)
+    def setUp(self): os.environ["BN_INTRO_PULSE"] = "1"; os.environ["BN_INTRO_SX"] = "0"   # the panel intro (intro_sx) wins when on
+    def tearDown(self): os.environ.pop("BN_INTRO_PULSE", None); os.environ.pop("BN_INTRO_SX", None)
 
     def test_home_is_the_instrument_with_menu_brief_follow_and_footer(self):
         h = theme.home_page()
