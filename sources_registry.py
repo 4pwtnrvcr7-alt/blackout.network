@@ -7,8 +7,9 @@ per host at a time, ETag/Last-Modified), parsed into scanner items, and handed t
 never waits on them. Public RSS/Atom/JSON/HTML previews only: no keys, no logins, no scraping behind bot checks, no X.
 
 Feed types: rss (RSS/Atom/RDF, YouTube/Mastodon tag RSS), bsky, mastodon, telegram, statuspage, kev, gdelt2, ll2, jetstream.
-v5.1: same as v5, plus cycle start/progress logs, Jetstream 30s heartbeat and kept-every-10 (v5 only logged at 1 and 100,
-so a live socket looked stuck), wait for the first scan lock before the first 600-feed cycle, reject oversized WS frames before reading.
+v5.2: v5.1, plus the feed cycle waits for SCAN_LOCK (1s poll, 180s timeout) instead of skip-and-sleep-15s, which
+starved every cycle when scans ran back-to-back and left only a short gap. After the timeout the cycle still runs (it
+only fills the in-memory pending queue; the scan drains it). First-scan wait is also bounded to 180s.
 Modes: all (forced category; obituaries, patents), threat (news: threat keywords + classifier), classify (official), crime.
 Kill switches: env BN_SOURCES_REGISTRY=0, file `sources_registry_off`, `off: true` on a feed, or ids in sources_registry_disabled.json.
 Does not touch scoring, ingest_items, push.py, jets.py or config.json. GNews items use news_item-like base 15; other news stays 6 unless BOOST_RX.
@@ -204,11 +205,42 @@ def _headline_from_url(url):
 def _scan_busy():
     lk = getattr(S, "SCAN_LOCK", None)
     if lk is None: return False
+    locked = getattr(lk, "locked", None)
+    if callable(locked):
+        try: return bool(locked())
+        except Exception: pass
     got = lk.acquire(blocking=False)
     if got:
         try: lk.release()
         except Exception: pass
         return False
+    return True
+
+SCAN_WAIT_S = float(os.environ.get("BN_REG_SCAN_WAIT_S", "180") or 180)
+
+def _wait_scan(timeout=None, *, waiting="", still="", done="", timedout="", idle=""):
+    """Block until SCAN_LOCK is free, or timeout. Returns True if the lock is free."""
+    if timeout is None:
+        timeout = SCAN_WAIT_S
+    if not _scan_busy():
+        if idle:
+            print(idle, flush=True)
+        return True
+    if waiting:
+        print(waiting, flush=True)
+    t0 = last = time.time()
+    while _scan_busy():
+        if time.time() - t0 >= timeout:
+            if timedout:
+                print(timedout, flush=True)
+            return False
+        if time.time() - last >= 20:
+            msg = still or "registry: still waiting for the scan to finish"
+            print(f"{msg} ({time.time() - t0:.0f}s)", flush=True)
+            last = time.time()
+        time.sleep(1)
+    if done:
+        print(done, flush=True)
     return True
 
 def _a_rss(f, body):
@@ -670,9 +702,18 @@ def _do(f):
 def _cycle():
     # Rotation is intended: only feeds whose interval has elapsed are fetched, capped at 600, so later
     # cycles show 36-117 of ~1298. First fill takes a few cycles (next=0 for not-yet-fetched feeds).
+    # Do not skip-and-return: the 15s loop sleep can miss a short gap between back-to-back scans and
+    # starve every cycle. Wait for SCAN_LOCK (1s poll, 180s cap), then run. If the lock never drops
+    # (overlapping scans), run anyway — fetch only fills the in-memory pending queue; the scan drains it.
     if _scan_busy():
-        print("registry cycle: skipped (scan in progress)", flush=True)
-        return
+        free = _wait_scan(
+            waiting="registry cycle: scan in progress; waiting for it to finish",
+            still="registry cycle: still waiting for the scan",
+            done="registry cycle: scan finished; starting",
+            timedout="registry cycle: scan still running after 180s; starting anyway (pending queue only, no DB writes)",
+        )
+        if free:
+            time.sleep(0.5)
     reg = _load_registry(); feeds = reg["feeds"]; now = time.time()
     due = [f for f in feeds if _state["feeds"].get(f["id"], {}).get("next", 0) <= now]
     due.sort(key=lambda f: _state["feeds"].get(f["id"], {}).get("next", 0))
@@ -711,19 +752,20 @@ def _loop():
         time.sleep(1)
     # After a restart the first scan grabs SCAN_LOCK a moment later. If we start a 600-feed
     # first pass in that gap, the cycle log only prints at the end (often 4-8 min) and it
-    # contends with the scan. Wait for that first scan, with a liveness line every 20 s.
+    # contends with the scan. Wait for that first scan (bounded: v5.1 waited forever if
+    # scans overlapped and never released the lock), with a liveness line every 20 s.
     deadline = time.time() + 90
     saw = False
     while time.time() < deadline:
         if _scan_busy():
             saw = True
-            print("registry: waiting for the current scan to finish before the first cycle", flush=True)
-            last = time.time()
-            while _scan_busy():
-                if time.time() - last >= 20:
-                    print("registry: still waiting for the scan to finish", flush=True); last = time.time()
-                time.sleep(2)
-            print("registry: scan finished; starting feed cycles", flush=True)
+            _wait_scan(
+                timeout=SCAN_WAIT_S,
+                waiting="registry: waiting for the current scan to finish before the first cycle",
+                still="registry: still waiting for the scan to finish",
+                done="registry: scan finished; starting feed cycles",
+                timedout="registry: first scan still running after 180s; starting feed cycles anyway",
+            )
             break
         time.sleep(0.5)
     if not saw:
