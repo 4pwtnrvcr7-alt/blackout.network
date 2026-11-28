@@ -445,6 +445,22 @@ class ArchiveWire(unittest.TestCase):
         cls.AW = AW
         if not os.path.exists(AW.DBF): AW.build(quiet=True)
 
+    def test_phase3_sources_categories_and_links(self):
+        """Phase 3: Storm Events / NVD / Wikipedia current events / WHO gap fill all have source links; categories stay put."""
+        c = sqlite3.connect(f"file:{self.AW.DBF}?mode=ro", uri=True)
+        want = {"NOAA Storm Events": None, "NVD": "cyber", "Wikipedia Current Events": "other", "WHO Disease Outbreak News": "disease"}
+        for src, k in want.items():
+            n, badlink = c.execute("SELECT COUNT(*), SUM(links NOT LIKE '%\"url\": \"http%') FROM stories WHERE sources LIKE ?", (f'%"{src}"%',)).fetchone()
+            self.assertGreater(n, 100 if src != "NOAA Storm Events" else 50, src)
+            self.assertEqual(badlink, 0, src)
+            if k:
+                wrong = c.execute("SELECT COUNT(*) FROM stories WHERE sources LIKE ? AND k != ?", (f'%"{src}"%', k)).fetchone()[0]
+                self.assertEqual(wrong, 0, src)
+        # Storm Events pages are the modern per-event URL, never a yearly CSV
+        storm_bad = c.execute("SELECT COUNT(*) FROM stories WHERE sources LIKE '%Storm Events%' AND links NOT LIKE '%/event-details/%'").fetchone()[0]
+        self.assertEqual(storm_bad, 0)
+        self.assertGreater(c.execute("SELECT COUNT(*) FROM stories WHERE sources LIKE '%WHO%' AND t >= '2000-01-01' AND t < '2001-01-01'").fetchone()[0], 100)
+
     def test_phase2_sources_categories_and_tags(self):
         """Phase 2 shards: CISA KEV stays Cyber (title words like 'Corruption' must not make it a scandal), NTSB is Wrecks, solar is Space; no empty tags."""
         c = sqlite3.connect(f"file:{self.AW.DBF}?mode=ro", uri=True)
