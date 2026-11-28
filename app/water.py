@@ -362,6 +362,8 @@ def _run(sid):
         with _L:
             old = _C.get(sid) or {}
             _C[sid] = {"t": time.time(), "ok_t": old.get("ok_t"), "items": old.get("items") or [], "err": type(ex).__name__, "busy": False, "ms": int((time.time() - t0) * 1000)}
+    _rebuild()
+    _persist()
 
 def _kick(ids):
     """Start a background pull for each source that is not already being pulled. Returns the started thread list."""
@@ -457,6 +459,107 @@ def _snapshot(deco=True):
         clean = {k: v for k, v in it.items() if v is not None and k != "by"}
         slim.append(decorate(clean) if deco else clean)
     return dict(generated=iso(now()), counts=counts, sources=srcs, pubs=pubs, items=slim)
+
+
+# ---------------------------------------------------------------- fast advisory payload (never block the map)
+# In-memory snapshot of the last good list + map rows, plus a /tmp copy so a new boot can answer in under 2 s.
+_DISK = os.environ.get("BN_WATER_CACHE") or "/tmp/bn_water_advisories.json"
+_PAY = {"t": 0, "items": None, "map": None, "list_meta": None}
+
+def _loading():
+    return any(bool((_C.get(sid) or {}).get("busy")) and not (_C.get(sid) or {}).get("ok_t") for sid, *_ in SOURCES)
+
+def _sources_meta():
+    srcs = []
+    for sid, label, kind, url, ttl in SOURCES:
+        e = _C.get(sid) or {"items": [], "ok_t": None, "err": None, "busy": False}
+        srcs.append(dict(id=sid, label=label, kind=kind, url=url, count=len(e.get("items") or []),
+                         updated=iso(datetime.fromtimestamp(e["ok_t"], timezone.utc)) if e.get("ok_t") else None,
+                         ok=bool(e.get("ok_t")) and not e.get("err"), loading=bool(e.get("busy")) and not e.get("ok_t"), error=e.get("err")))
+    return srcs
+
+def _rebuild():
+    items = sort_items(raw_items())
+    counts, rows = {}, []
+    for it in items:
+        counts[it["kind"]] = counts.get(it["kind"], 0) + 1
+        if it.get("lat") is not None and it.get("lon") is not None:
+            rows.append([it["id"], round(it["lon"], 4), round(it["lat"], 4), it.get("level") or "", (it.get("name") or "")[:60]])
+    _PAY["items"] = items
+    _PAY["list_meta"] = dict(generated=iso(now()), counts=counts, sources=_sources_meta(),
+                             by_state=us_advisory_counts(items), total=len(items), loading=_loading())
+    _PAY["map"] = dict(generated=iso(now()), counts=counts, r=rows, loading=_loading())
+    _PAY["t"] = time.time()
+
+def _persist():
+    try:
+        blob = {"v": 1, "t": time.time(), "src": {}}
+        for sid, *_ in SOURCES:
+            e = _C.get(sid) or {}
+            if e.get("items"):
+                blob["src"][sid] = {"ok_t": e.get("ok_t") or time.time(), "items": e["items"]}
+        if not blob["src"]:
+            return
+        tmp = _DISK + ".tmp"
+        with open(tmp, "w") as fh:
+            json.dump(blob, fh, separators=(",", ":"), default=str)
+        os.replace(tmp, _DISK)
+    except Exception:
+        pass
+
+def _load_disk():
+    try:
+        with open(_DISK) as fh:
+            blob = json.load(fh)
+        if not isinstance(blob, dict) or blob.get("v") != 1:
+            return
+        for sid, rec in (blob.get("src") or {}).items():
+            if sid not in SRC or not isinstance(rec, dict) or not rec.get("items"):
+                continue
+            if (_C.get(sid) or {}).get("items"):
+                continue
+            with _L:
+                _C[sid] = {"t": rec.get("ok_t") or time.time(), "ok_t": rec.get("ok_t") or time.time(),
+                           "items": rec["items"], "err": None, "busy": False}
+        if raw_items():
+            _rebuild()
+    except Exception:
+        pass
+
+def _wait_items(budget=2.0):
+    """First request after a cold start may wait up to 2 s for the first source. Never the old 12 s."""
+    if raw_items():
+        return
+    end = time.time() + budget
+    while time.time() < end and not raw_items():
+        time.sleep(0.05)
+
+def warm_once():
+    """Boot hook: restore the last good snapshot, then refresh every source in the background."""
+    _load_disk()
+    _kick([sid for sid, *_ in SOURCES])
+
+def _list_payload(lim, off):
+    if _PAY.get("items") is None:
+        _rebuild()
+    items = _PAY["items"] or []
+    meta = dict(_PAY.get("list_meta") or {})
+    # The Grid no longer renders a list panel. Return slim rows with a permalink; full tags and
+    # Post-on-X intent stay on /api/water/item (one decorate, used by the shared map card).
+    slim = []
+    for it in items[off:off + lim]:
+        row = dict(it)
+        row["permalink"] = permalink(row)
+        slim.append(row)
+    meta.update(items=slim, offset=off, total=len(items), loading=_loading())
+    return meta
+
+def _map_payload():
+    if _PAY.get("map") is None:
+        _rebuild()
+    d = dict(_PAY["map"] or {"generated": iso(now()), "counts": {}, "r": [], "loading": _loading()})
+    d["loading"] = _loading()
+    return d
 
 # ---------------------------------------------------------------- page
 CREDITS = ('<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">© OpenMapTiles</a> '
@@ -560,9 +663,9 @@ def item_tags(it):
     return _clean_tags(seed, x_share.finalize_tags(seed + places + entities, si, h))
 
 
-def item_intent(it):
+def item_intent(it, tags=None):
     import x_share
-    return x_share.intent_url(share_item(it), url=permalink(it, for_x=True), tags=item_tags(it))
+    return x_share.intent_url(share_item(it), url=permalink(it, for_x=True), tags=tags if tags is not None else item_tags(it))
 
 
 def page_intent():
@@ -577,7 +680,7 @@ def decorate(it):
     try:
         out["permalink"] = permalink(out)
         out["tags"] = item_tags(out)
-        out["xu"] = item_intent(out)
+        out["xu"] = item_intent(out, tags=out["tags"])
     except Exception:
         out.setdefault("permalink", permalink(out))
         out.setdefault("tags", list(LEVEL_TAGS.get(out.get("level") or "", ["#DrinkingWater"])))
@@ -741,15 +844,27 @@ def handle_get(path, qs=None, headers=None):
                 v = (qs or {}).get(k)
                 return str((v[0] if isinstance(v, list) and v else v) or "")
             f = q1("fresh").lower() in ("1", "true", "yes")
-            if q1("limit").isdigit():   # panel list: severity, then US first, then recency; decorate only the rows returned
-                d = data(force=f, budget=12.0, deco=False) if (f or not raw_items()) else _kick_refresh()
-                items = sort_items(raw_items())
+            if q1("limit").isdigit():
+                if f or not raw_items():
+                    due = [sid for sid, _l, _k, _u, ttl in SOURCES]
+                    if not f:
+                        due = [sid for sid, _l, _k, _u, ttl in SOURCES if not (_C.get(sid) or {}).get("ok_t")]
+                    _kick(due)
+                    if not raw_items():
+                        _wait_items(2.0)
+                else:
+                    _kick_refresh()
                 lim = max(1, min(100, int(q1("limit")))); off = int(q1("offset")) if q1("offset").isdigit() else 0
-                return 200, dict(generated=iso(now()), counts=d.get("counts"), sources=d.get("sources"),
-                                 items=[decorate(it) for it in items[off:off + lim]], total=len(items), offset=off,
-                                 by_state=us_advisory_counts(items)), "application/json"
-            d = data(force=f)
-            return 200, d, "application/json"
+                return 200, _list_payload(lim, off), "application/json"
+            # Unpaged snapshot: never wait more than 2 s on the request path.
+            if f or not raw_items():
+                _kick([sid for sid, *_ in SOURCES])
+                _wait_items(2.0)
+            else:
+                _kick_refresh()
+            if _PAY.get("items") is None:
+                _rebuild()
+            return 200, (snapshot() if raw_items() else dict(generated=iso(now()), counts={}, sources=_sources_meta(), pubs={}, items=[], loading=_loading())), "application/json"
         except Exception as ex:
             return 503, {"error": "water data unavailable", "detail": type(ex).__name__}
     if p == "/api/water/item":   # one decorated item (advisory or plant): permalink, Post on X intent, tags
@@ -758,14 +873,12 @@ def handle_get(path, qs=None, headers=None):
         return (200, it, "application/json") if it else (404, {"error": "not found"})
     if p == "/api/water/map":   # slim status dots for the Grid layer: [id, lon, lat, level, name]
         try:
-            if not raw_items(): data(budget=12.0, deco=False)
-            else: _kick_refresh()
-            its = raw_items()
-            counts = {}
-            for it in its: counts[it["kind"]] = counts.get(it["kind"], 0) + 1
-            rows = [[it["id"], round(it["lon"], 4), round(it["lat"], 4), it.get("level") or "", (it.get("name") or "")[:60]]
-                    for it in its if it.get("lat") is not None and it.get("lon") is not None]
-            return 200, {"generated": iso(now()), "counts": counts, "r": rows}, "application/json"
+            if not raw_items():
+                _kick([sid for sid, *_ in SOURCES])
+            else:
+                _kick_refresh()
+            # The map must never wait on upstream feeds. Serve the cache, even if it is still empty.
+            return 200, _map_payload(), "application/json"
         except Exception as ex:
             return 503, {"error": "water data unavailable", "detail": type(ex).__name__}
     if p.startswith("/api/water/"):

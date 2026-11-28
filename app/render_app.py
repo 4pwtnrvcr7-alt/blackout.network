@@ -1043,6 +1043,9 @@ if __name__ == "__main__":
     try:   # Nov 22 2026 (pt1745u): during the handoff (before we bind) the weather map takes the old instance's Open-Meteo grids, so a deploy never refills them
         threading.Thread(target=lambda: server._addon_mod("wxmap").warm_once(), name="wxmap-boot", daemon=True).start()
     except Exception: traceback.print_exc()
+    try:   # Water advisories: restore last snapshot and refresh in the background so /api/water/map never blocks the map
+        threading.Thread(target=lambda: server._addon_mod("water").warm_once(), name="water-boot", daemon=True).start()
+    except Exception: traceback.print_exc()
     wait_before_bind()
     try:
         try:
