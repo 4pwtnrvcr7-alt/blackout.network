@@ -509,7 +509,7 @@ html body:has(#bn_story) .pill{border-radius:0!important}
 :root{--bn-pill-h:40px;--bn-pill-px:14px;--bn-pill-fs:11px;--bn-pill-ls:.14em;--bn-pill-bd:rgba(255,255,255,.55)}
 @media (max-width:430px){:root{--bn-pill-px:12px}}
 html:not(#bn_pill) body :where(
-  .bnt-btn,.bng-btn,.bng-sb,.w2-btn,.np-btn,.bnt-mbtn,.bnt-rf,.bnt-foldb,.bnm-fbtn,.bnm-chip,
+  .bnt-btn,.sx-btn,.bng-btn,.bng-sb,.w2-btn,.np-btn,.bnt-mbtn,.bnt-rf,.bnt-foldb,.bnm-fbtn,.bnm-chip,
   .nx-more-btn,.gx-more-btn,.nx-leg-btn,.nx-chip,.nx-f button,.nx-sf button,.wx-reg button,
   .tl-b,.w2-mbtn,#w2_open,a.bn-burger,.h-burger,button.pri,.nl-btn,.nla-btn,.rs-row button,
   .m5-txt,#h_install,#h_moreopt,.h-extras button,.bn-ref,#tl_ref
