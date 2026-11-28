@@ -11,7 +11,7 @@ var list=$("tl_list"),foot=$("tl_foot"),ctl=$("tl_ctl"),pill=$("tl_now"),stat=$(
     bar=$("w2_bar"),bRef=$("tl_ref"),bNew=$("tl_new"),elUpd=$("tl_upd");
 if(!list)return;
 var CAT={},REG={};CFG.cats.forEach(function(c){CAT[c.k]=c});CFG.regions.forEach(function(r){REG[r.k]=r});
-var DAYH=52,BUF=1.25,DBG={};
+var DAYH=60,BUF=1.25,DBG={};
 /* ---------- state */
 var items=[],seen={},rows=[],rendered=new Map(),Hc={},He={},exp=new Set();
 var topCur=null,topEnd=true,botCur=null,botEnd=false,loading={o:0,n:0},gen=0;
@@ -246,11 +246,56 @@ function qp(){var p=[];if(Q)p.push("q="+encodeURIComponent(Q));if(F.loc){p.push(
 function add(arr,where){var fresh=[];arr.forEach(function(it){if(!seen[it.id]){seen[it.id]=1;viewKnow(it.id);fresh.push(it)}});measure(fresh,false);
   if(where==="top"){items=fresh.concat(items);items.sort(function(a,b){return a.t<b.t?1:a.t>b.t?-1:a.id<b.id?1:a.id>b.id?-1:0})}else items=items.concat(fresh);return fresh.length}
 function lim(){return condensed&&active()?200:100}
+function firstPayload(){
+  var P=W.BN_TL_FIRST;W.BN_TL_FIRST=null;
+  if(P&&!botCur&&!Q&&!active())return Promise.resolve(P).then(function(j){return (j&&j.items)?j:api("limit="+lim()+"&"+qp())});
+  return api((botCur?"before="+encodeURIComponent(botCur)+"&":"")+"limit="+lim()+"&"+qp());
+}
 function loadOlder(){
   if(loading.o||botEnd)return Promise.resolve();loading.o=1;var g=gen;footState();
-  return api((botCur?"before="+encodeURIComponent(botCur)+"&":"")+"limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
+  return firstPayload().then(function(j){if(g!==gen)return;
     botCur=j.next;botEnd=!!j.end;if(!items.length&&j.items[0]){topCur=j.items[0].t+"|"+j.items[0].id;topEnd=true}
-    add(j.items,"bot");rebuild();layout();render();if(!loadSeen()||!loadSeen().top)saveSeen();}).catch(function(){}).then(function(){if(g!==gen)return;loading.o=0;footState();status();stamp();check()});
+    add(j.items,"bot");rebuild();layout();render();if(!loadSeen()||!loadSeen().top)saveSeen();
+    if(j.scan)paintBootScan(j.scan);if(items.length){paintBootRows(items.length);dropBoot()}
+  }).catch(function(){var n=$("tb_note"),b=$("tb_retry");if(n){n.hidden=false;n.textContent="The first page did not load."}if(b)b.hidden=false}).then(function(){if(g!==gen)return;loading.o=0;footState();status();stamp();check()});
+}
+/* Nov 28 2026 (Matt 12:24 AM ET: "greeted with live data, no more loading time"): the server already painted the newest rows into #tl_ssr
+   and embedded the same rows as BN_TL_BOOT. They become this list's first page with no request; the flow markup is swapped for the
+   windowed rows in one task (same row markup and CSS, so nothing moves), then anything newer is fetched in place. add() records every
+   adopted row as already shown, so none of them can ever be tagged New. */
+var FLOOR=null; /* "t|id" of the last row the server embedded; rows below it are the rest of the first page, not arrivals */
+function adoptBoot(B){
+  var j=B&&B.page;if(!j||!j.items||!j.items.length)return false;
+  loading.o=1;botCur=j.next;botEnd=!!j.end;topCur=j.items[0].t+"|"+j.items[0].id;topEnd=true;
+  if(!botEnd)FLOOR=botCur;
+  add(j.items,"bot");rebuild();layout();render();
+  var s=$("tl_ssr");if(s)s.remove();dropBoot();
+  if(!loadSeen()||!loadSeen().top)saveSeen();
+  loading.o=0;footState();status();stampAt=Date.now()-Math.max(0,B.age||0);paintUpd();check();
+  pollNewer(false);
+  return true;
+}
+function dropSsr(){var s=$("tl_ssr");if(s)s.remove()}
+function dropBoot(){var el=$("tl_boot");if(el)el.remove();W.BN_TL_FIRST=null}
+function fmtN(n){return Number(n).toLocaleString("en-US")}
+function paintBootScan(s){
+  if(!s||!$("tl_boot"))return;
+  if(s.last_scan){try{$("tb_scan").textContent=fT.format(dt(s.last_scan))+" ET"}catch(e){}}
+  if(s.sources){var t=fmtN(s.ok_sources||0)+" of "+fmtN(s.sources);if(s.failed_sources)t+="  ·  "+fmtN(s.failed_sources)+" failed";$("tb_src").textContent=t}
+  if(s.fetched!=null)$("tb_fetch").textContent=fmtN(s.fetched);
+  if(s.in_review!=null)$("tb_rev").textContent=fmtN(s.in_review);
+}
+function paintBootRows(n){var el=$("tb_rows");if(el&&n!=null)el.textContent=fmtN(n)}
+/* Nov 28 2026 (Matt 1:06 AM ET): typographic status on black when the cached first page is missing. Real scan/feed figures and the arriving row count only; no fake progress, no globe. Never called on the SSR path. */
+function startBootStatus(){
+  if(!$("tl_boot"))return;
+  fetch("/api/wire_tl/scan?_="+Date.now(),{credentials:"same-origin",cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(paintBootScan).catch(function(){});
+  fetch("/api/signal/feed-health",{cache:"no-store"}).then(function(r){return r.json()}).then(function(H){
+    if(!H||!$("tl_boot"))return;
+    if(H.last_scan_et){var el=$("tb_scan");if(el)el.textContent=H.last_scan_et+(/ET$/.test(H.last_scan_et)?"":" ET")}
+    if(H.stale&&H.notice){var n=$("tb_note");if(n){n.hidden=false;n.textContent=H.notice}}
+  }).catch(function(){});
+  var b=$("tb_retry");if(b&&!b._on){b._on=1;b.addEventListener("click",function(){b.hidden=true;var n=$("tb_note");if(n)n.hidden=true;loadOlder()})}
 }
 function loadNewer(){
   if(loading.n||topEnd||!topCur)return Promise.resolve();loading.n=1;var g=gen;
@@ -346,7 +391,14 @@ function pollNewer(manual){
   /* Nov 25 2026 (pt1925u): read the top of the Wire, not "after the top row". A story is dated by its event time, so one that
      finished its write-up/card a few minutes later sorts just under the current top and an after= cursor never returned it. */
   return api("limit=100&"+qp()).then(function(j){if(g!==gen)return;
-    var arr=(j.items||[]).filter(function(it){return !seen[it.id]&&!queued[it.id]});
+    var all=j.items||[];
+    if(FLOOR){ /* the first page was embedded in part: its remaining rows join the bottom quietly (never New); only rows above the edge are arrivals */
+      var fl=FLOOR,rest=all.filter(function(it){return !seen[it.id]&&it.t+"|"+it.id<=fl});
+      all=all.filter(function(it){return it.t+"|"+it.id>fl});
+      if(botCur===fl){if(rest.length){add(rest,"bot");botCur=j.next;botEnd=!!j.end;rebuild();layout();render()}FLOOR=null}
+      else FLOOR=null;
+    }
+    var arr=all.filter(function(it){return !seen[it.id]&&!queued[it.id]});
     if(j.items&&j.items[0]&&(!topCur||j.items[0].t+"|"+j.items[0].id>topCur))topCur=j.items[0].t+"|"+j.items[0].id;
     topEnd=true;
     if(arr.length)got=arrive(arr);
@@ -562,7 +614,7 @@ qIn.addEventListener("keydown",function(e){if(e.key==="Enter"){clearTimeout(qT);
 qX.addEventListener("click",function(){qIn.value="";setQ("")});
 d.addEventListener("keydown",function(e){if(e.key==="/"&&d.activeElement!==qIn&&!/input|textarea/i.test((d.activeElement||{}).tagName||"")){e.preventDefault();scrollToList();qIn.focus()}});
 /* ---------- jump to date */
-function reset(){gen++;items=[];seen={};rows=[];rendered.forEach(function(n){n.remove()});rendered.clear();exp.clear();
+function reset(){gen++;FLOOR=null;dropSsr();dropBoot();items=[];seen={};rows=[];rendered.forEach(function(n){n.remove()});rendered.clear();exp.clear();
   topCur=null;topEnd=true;botCur=null;botEnd=false;loading={o:0,n:0};padX=0;NEW={};pending=0;drip=[];queued={};clearTimeout(dripT);dripT=0;showPill();layout();footState()}
 function scrollToList(){measureTop();var tgt=tlTop-(ctl.offsetHeight+barH())-4;if(W.scrollY<tgt-2||W.scrollY>tgt+2)W.scrollTo(0,tgt)}
 function barH(){return bar?bar.getBoundingClientRect().height:0}
@@ -644,7 +696,8 @@ setInterval(feedHealth,30000);
 function boot(){syncBar();lastW=list.clientWidth;cw=lastW;measureTop();feedHealth();
   fetch("/api/wire_tl/meta?_="+Date.now(),{credentials:"same-origin",cache:"no-store",headers:{"Cache-Control":"no-store","Pragma":"no-cache"}}).then(function(r){return r.json()}).then(function(m){meta=m;total=m.total||0;buildJump();status()}).catch(function(){buildJump()});
   var hs=(location.hash||"").match(/^#d=(\d{4}-\d{2}-\d{2})$/);
-  if(hs)jumpTo(endOfDayET(hs[1]));else loadOlder();
+  var B=W.BN_TL_BOOT;W.BN_TL_BOOT=null;
+  if(hs){dropSsr();dropBoot();jumpTo(endOfDayET(hs[1]))}else if(!(B&&adoptBoot(B))){dropSsr();startBootStatus();loadOlder()}
   startPoll();
   frame();
 }
