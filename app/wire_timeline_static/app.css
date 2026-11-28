@@ -3,12 +3,11 @@
 html[data-bn-tl]{scroll-behavior:auto;overflow-anchor:none}
 body.tl{background:#000}
 .tl .w2-bar.up{transform:none}
-/* background: one fixed looping clip (still on phones) behind everything, darkened as you enter the timeline */
+/* background: original canvas scan globe (scan-bg.js); still frame when reduced-motion */
 .tl-bg{position:fixed;inset:0;z-index:0;overflow:hidden;background:#000;pointer-events:none}
-.tl-bg img,.tl-vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.tl-vid{opacity:0;transition:opacity 1.2s ease}.tl-vid.on{opacity:1}
-.tl-veil{position:absolute;inset:0;background:#000;opacity:.35;will-change:opacity}
-.tl-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.5) 0,rgba(0,0,0,0) 24%,rgba(0,0,0,0) 50%,rgba(0,0,0,.7) 100%)}
+.tl-scanbg{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.tl-veil{position:absolute;inset:0;background:#000;opacity:.42;pointer-events:none}
+.tl-bg::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.38) 0,rgba(0,0,0,.46) 28%,rgba(0,0,0,.58) 52%,rgba(0,0,0,.78) 100%),radial-gradient(ellipse at 50% 40%,rgba(0,0,0,.08) 0,rgba(0,0,0,.42) 72%,rgba(0,0,0,.7) 100%)}
 #tl_main,.tl .w2-foot{position:relative;z-index:1}
 #tl_main{padding:0!important;margin:0!important;max-width:none!important}
 .tl-qx[hidden],.tl-clear[hidden],.tl-top[hidden],.tl-jump[hidden],.tl-sheet[hidden],.tl-upd[hidden],.tl-newp[hidden],.tl-fbadge[hidden],.tl-loclab[hidden]{display:none!important}

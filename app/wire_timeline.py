@@ -13,7 +13,7 @@ GET /api/wire_tl/xu?id=         Post-on-X URL (3-5 entity tags) for one live row
 GET /api/wire_tl/meta          totals, earliest/latest, per-category and per-region counts, per-month histogram.
 GET /api/wire_tl/geo?q=        keyless ZIP/place geocode (US Census ZCTA table + offline gazetteer).
 GET /api/wire_tl/crime?q=      local crime headlines for a US place when BN_CRIME_NEWS is on (cached).
-GET /api/wire_tl/app.js|app.css
+GET /api/wire_tl/app.js|app.css|scan-bg.js
 
 Data: blackout.db clusters (live scanner) + trends_history.db stories (archive backfill), both opened read-only
 (file:...?mode=ro), the same sources /api/wire_history merges. Display-only grouping (category colours, regions) is
@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(BASE, "blackout.db"); HDB = os.path.join(BASE, "trends_history.db")
-STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css"}
+STATIC = os.path.join(BASE, "wire_timeline_static"); FILES = {"app.js": "application/javascript", "app.css": "text/css", "scan-bg.js": "application/javascript"}
 MAXL = 200
 _CUR = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z(\|[A-Za-z0-9_.:\-]{1,80})?$")
 E = lambda s: html.escape(str(s if s is not None else ""), quote=True)
@@ -1349,7 +1349,7 @@ def page_html():
     except Exception:
         menu = ""; w2 = "/wire2/static"
     cfg = {"cats": [{"k": k, "label": l, "color": col} for k, l, col in CATS], "regions": [{"k": k, "label": l} for k, l in REGIONS]}
-    v_css, v_js = _ver("app.css"), _ver("app.js")
+    v_css, v_js, v_bg = _ver("app.css"), _ver("app.js"), _ver("scan-bg.js")
     title = "The Wire: live threat feed | BLACKOUT.NETWORK"
     desc = "Every signal BLACKOUT.NETWORK has collected, in one timeline."
     try:
@@ -1361,13 +1361,11 @@ def page_html():
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/wire">
 {ogmeta}<meta name="theme-color" content="#000">
 <!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->
-<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}">
-<link rel="preload" as="image" href="/bnt/media/wthero-m.jpg?v=1" media="(max-width:700px)"><link rel="preload" as="image" href="/bnt/media/wtvid-d.jpg?v=1" media="(min-width:701px)"></head>
+<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/api/wire_tl/app.css?v={v_css}"></head>
 <body class="w2 tl"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu}
-<div class="tl-bg" aria-hidden="true"><picture><source media="(max-width:700px)" srcset="/bnt/media/wthero-m.jpg?v=1"><img src="/bnt/media/wtvid-d.jpg?v=1" alt="" decoding="async" fetchpriority="high"></picture>
-<video class="tl-vid" muted loop playsinline preload="none" disablepictureinpicture tabindex="-1" data-webm="/bnt/media/wtvid-d.webm?v=1" data-mp4="/bnt/media/wtvid-d.mp4?v=1"></video><i class="tl-veil"></i></div>
+<div class="tl-bg" aria-hidden="true"><canvas class="tl-scanbg" id="tl_scanbg"></canvas><i class="tl-veil"></i></div>
 <main id="tl_main">
 <section class="tl-hero" aria-label="The Wire"><div class="tl-hc"><p class="w2-eb">The Wire &middot; Timeline</p><h1 class="w2-ht">Every signal</h1>
 <p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
@@ -1403,7 +1401,7 @@ def page_html():
 </main>
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
 <script>window.BN_TL={json.dumps(cfg)};</script>
-<script src="{w2}/wire2.js?v=3" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
+<script src="{w2}/wire2.js?v=3" defer></script><script src="/api/rt/client.js?v={_rt_ver()}" defer></script><script src="/api/wire_tl/scan-bg.js?v={v_bg}" defer></script><script src="/api/wire_tl/app.js?v={v_js}" defer></script></body></html>'''
 
 # ------------------------------------------------------------------ location (keyless) + local crime
 _ZIP = None
