@@ -60,9 +60,10 @@
       var bottom = onp ? Math.min(Math.round(innerHeight * 0.58) + 16, innerHeight - 150 - 200) : 120;
       return { top: 150, bottom: Math.max(80, bottom), left: 18, right: 18 };
     }
-    var left = onp ? Math.min(520, innerWidth) + 24 : 60;
-    left = Math.min(left, Math.max(60, innerWidth - 400));
-    return { top: 160, bottom: 90, left: left, right: 80 };
+    /* the Water panel is a right-hand sheet on desktop, so pad the right, not the left */
+    var right = onp ? Math.min(520, innerWidth) + 24 : 80;
+    right = Math.min(right, Math.max(80, innerWidth - 400));
+    return { top: 160, bottom: 90, left: 60, right: right };
   }
   function accountForPanel() {
     if (!map || bootId()) return;
