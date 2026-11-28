@@ -142,7 +142,8 @@
   function load(fresh) {
     /* first load: the loader (map2_loader.js) already started the request, streams it with real progress and retries on failure */
     var L = window.BNML, first = !loadedAt && L && L.feed;
-    return (first ? L.feed() : fetch("/api/signal/heat", { cache: "no-store" }).then(function (r) { return r.json(); })).then(function (j) {
+    var heatUrl = "/api/signal/heat" + (fresh ? "?fresh=1&_=" + Date.now() : "");
+    return (first ? L.feed() : fetch(heatUrl, { cache: "no-store", credentials: "same-origin", headers: { "Cache-Control": "no-store", "Pragma": "no-cache" } }).then(function (r) { return r.json(); })).then(function (j) {
       var cols = j.cols || [], ix = {}; cols.forEach(function (c, i) { ix[c] = i; });
       var before = loadedAt ? onMapIds() : null;
       rows = (j.rows || []).map(function (a, i) { return parseRow(a, ix, i); }).filter(keepRow);
@@ -222,13 +223,32 @@
       upsert(ev); stamp();
     });
   }
-  function refreshNow() {   /* the refresh button: server drops caches and asks the scanner for anything newer, then the map re-fetches */
-    var t0 = Date.now();
-    return (window.BNRT ? BNRT.refresh() : Promise.resolve({})).then(function () { return load(true); }).then(function () {
+  function refreshNow(btn) {   /* the refresh button: server drops caches and asks the scanner for anything newer, then the map re-fetches */
+    var t0 = Date.now(), R = window.BNRefresh, b = btn || $("bnm_ref");
+    if (b && R && R.isBusy(b)) return Promise.resolve(0);
+    if (b && R) { R.busy(b, true); R.stage(b, 8); }
+    function fin(lab, n) {
+      if (b && R) { R.stage(b, 100); var wait = (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) ? 0 : 220;
+        setTimeout(function () { R.busy(b, false); R.done(b, lab); }, wait); }
+      return n;
+    }
+    return (window.BNRT ? (R && b && R.stage(b, 22), BNRT.refresh()) : Promise.resolve({})).then(function () {
+      if (b && R) R.stage(b, 55);
+      return load(true);
+    }).then(function () {
+      if (b && R) R.stage(b, 92);
       var n = 0; for (var k in ARR) if (ARR[k] >= t0) n++;   /* pins that dropped in during the refresh, by the stream or the re-read */
-      rtLine(n ? n + " new pin" + (n === 1 ? "" : "s") : "Up to date"); return n;
+      var lab = n ? (n + " new") : "Updated";
+      rtLine(n ? n + " new pin" + (n === 1 ? "" : "s") : "Up to date");
+      stamp();
+      return fin(lab, n);
+    }).catch(function () {
+      rtLine("Could not refresh the map");
+      if (b && R) { R.stage(b, 100); R.busy(b, false); }
+      return 0;
     });
   }
+  window.bnRefreshPage = function () { return refreshNow($("bnm_ref")); };
   function stamp() {
     var el = $("bnm_up"); if (!el || !window.BNT || !BNT.up) return;
     var at = Date.parse(meta.generated || "") || loadedAt, nx = loadedAt + 300000;
@@ -414,6 +434,6 @@
     d.addEventListener("keydown", function (e) { if (e.key === "Escape") { closePanel(); $("bnm_card").hidden = true; } });
     head(true);
   }
-  function start() { wire(); paintSeg(); boot(); load(false); setInterval(function () { if (!d.hidden && Date.now() - loadedAt > 300000) load(false); }, 60000); }
+  function start() { wire(); paintSeg(); boot(); load(false); if (window.BNRefresh && $("bnm_ref")) BNRefresh.bind($("bnm_ref"), function () { return refreshNow($("bnm_ref")); }); setInterval(function () { if (!d.hidden && Date.now() - loadedAt > 300000) load(false); }, 60000); }
   if (d.readyState === "loading") d.addEventListener("DOMContentLoaded", start); else start();
 })();

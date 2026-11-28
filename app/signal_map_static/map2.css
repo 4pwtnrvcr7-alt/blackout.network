@@ -220,3 +220,7 @@ html.bnm-js .bnl{display:block;position:fixed;inset:0;z-index:15;pointer-events:
 .bnm-new.still .f,.bnm-new.still .r2,.bnm-new.still .r3,.bnm-new.still .h{display:none}
 .bnm-new.still .r1{opacity:.9;transform:scale(1.6)}
 @media (prefers-reduced-motion:reduce){.bnm-new i{animation:none!important}.bnm-new .f,.bnm-new .r2,.bnm-new .r3,.bnm-new .h{display:none}.bnm-new .r1{opacity:.9;transform:scale(1.6)}.bnm-rt i{animation:none;opacity:.8}}
+
+/* Shared #293 Refresh: keep the outlined fill button next to the count chip */
+.bnm-top .bn-ref{background:rgba(5,6,10,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);flex:none}
+@media (max-width:700px){.bnm-top .bn-ref{min-width:0}}

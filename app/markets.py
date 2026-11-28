@@ -133,9 +133,9 @@ def page_html():
     return f'''<!doctype html><html lang="en" data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network/markets">
 {ogmeta}<meta name="theme-color" content="#000">
-<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/api/markets/app.css?v={_ver("app.css")}">
+<link rel="stylesheet" href="{w2}/wire2.css?v=7"><link rel="stylesheet" href="/bn-refresh.css"><link rel="stylesheet" href="/api/markets/app.css?v={_ver("app.css")}">
 <link rel="preload" as="image" href="/bnt/media/mkhero-m.jpg?v=1" media="(max-width:700px)"><link rel="preload" as="image" href="/bnt/media/mkvid-d.jpg?v=1" media="(min-width:701px)"></head>
-<body class="w2 mk"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
+<body class="w2 mk bn-has-ref"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
 <button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
 {menu}
 <div class="mk-bg" aria-hidden="true"><picture><source media="(max-width:700px)" srcset="/bnt/media/mkhero-m.jpg?v=1"><img src="/bnt/media/mkvid-d.jpg?v=1" alt="" decoding="async" fetchpriority="high"></picture>
@@ -147,7 +147,7 @@ def page_html():
 <p class="mk-ds" id="mk_ds">&nbsp;</p></div>
 <a class="w2-btn" href="#mk_start">See every market <span aria-hidden="true">&darr;</span></a></div></section>
 <div id="mk_start"></div>
-<nav class="mk-nav" aria-label="Sections"><div class="mk-navi">{nav}</div><button type="button" class="mk-ref" id="mk_ref"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span>Refresh</span></button></nav>
+<nav class="mk-nav" aria-label="Sections"><div class="mk-navi">{nav}</div><button type="button" class="bn-ref mk-ref" id="mk_ref" aria-label="Refresh"><i class="tl-ref-fill bn-ref-fill" aria-hidden="true"><i class="tl-ref-sheen bn-ref-sheen"></i></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span class="tl-ref-lab bn-ref-lab"><span class="tl-ref-lab-a bn-ref-lab-a">Refresh</span><span class="tl-ref-lab-b bn-ref-lab-b" aria-hidden="true">Refresh</span></span></button></nav>
 <p class="mk-stat" id="mk_stat" aria-live="polite"></p>
 <section class="mk-sec" id="debt" aria-labelledby="h_debt"><div class="mk-sh"><p class="w2-eb">01</p><h2 id="h_debt">U.S. debt clock</h2></div><div class="mk-body" data-sec="debt"><div class="mk-load">Loading</div></div></section>
 {secs}
@@ -157,7 +157,7 @@ U.S. Treasury (daily par yield curve; Debt to the Penny; interest expense), U.S.
 Informational only, not financial advice.</p></section>
 </main>
 <footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
-<script src="{w2}/wire2.js?v=3" defer></script><script src="/api/markets/app.js?v={_ver("app.js")}" defer></script></body></html>'''
+<script src="{w2}/wire2.js?v=3" defer></script><script src="/bn-refresh.js" defer></script><script src="/api/markets/app.js?v={_ver("app.js")}" defer></script></body></html>'''
 
 def handle_get(path, qs):
     if not on(): return 404, {"error": "not found"}
