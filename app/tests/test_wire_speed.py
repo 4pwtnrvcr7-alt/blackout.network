@@ -168,10 +168,15 @@ class Speed(unittest.TestCase):
         self.assertTrue(got)
         import urllib.parse
         for x in got:
-            text = urllib.parse.parse_qs(urllib.parse.urlparse(x["xu"]).query)["text"][0]
-            tags = [t for t in text.split() if t.startswith("#")]
-            self.assertTrue(3 <= len(tags) <= 5, text)
-            self.assertFalse({t.lower() for t in tags} & {"#news", "#blackoutnetwork", "#alerts", "#update"}, text)
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(x["xu"]).query)
+            self.assertIn("text", q)
+            self.assertIn("url", q)
+            if q.get("hashtags"):
+                tags = ["#" + t for t in q["hashtags"][0].split(",") if t]
+            else:
+                tags = [t for t in q["text"][0].split() if t.startswith("#")]
+            self.assertTrue(3 <= len(tags) <= 5, (x["xu"], tags))
+            self.assertFalse({t.lower() for t in tags} & {"#news", "#blackoutnetwork", "#alerts", "#update"}, tags)
 
     def test_client_fetches_xu_for_rows_without_one(self):
         js = open(os.path.join(W.STATIC, "app.js"), encoding="utf-8").read()
