@@ -424,7 +424,7 @@
     $("bnm_zin").onclick = function () { map && map.zoomIn({ duration: reduce ? 0 : 300 }); };
     $("bnm_zout").onclick = function () { map && map.zoomOut({ duration: reduce ? 0 : 300 }); };
     $("bnm_x").onclick = back;
-    $("bnm_report").onclick = function () { var f = d.querySelector(".bnr-fab"); if (f) f.click(); else location.href = (window.BN_OFF && BN_OFF.on && (BN_OFF.prefixes || []).indexOf("/sources") >= 0) ? "/report-status" : "/sources"; };
+    $("bnm_report").onclick = function () { if (window.BNReport && typeof BNReport.open === "function") BNReport.open(null, this); else location.href = (window.BN_OFF && BN_OFF.on && (BN_OFF.prefixes || []).indexOf("/sources") >= 0) ? "/report-status" : "/sources"; };
     $("bnm_edge").addEventListener("mouseenter", function () { head(true); });
     $("bnm_edge").addEventListener("click", function () { head(true); });
     var hd = $("bnm_head");
