@@ -1443,6 +1443,27 @@ def _ready_row(cid):
         finally:
             k.close()
 
+def ready_tags(cid):
+    """Baked-in Share-to-X hashtags for this story, or []. Never raises."""
+    if not cid:
+        return []
+    try:
+        row = _ready_row(cid)
+    except Exception:
+        return []
+    if not row:
+        return []
+    raw = row.get("tags")
+    if not raw or raw in ("[]", "null"):
+        return []
+    try:
+        v = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return []
+    if not isinstance(v, list):
+        return []
+    return ["#" + str(t).lstrip("#") for t in v if t]
+
 def has_paid_article(cid):
     """True when a desk brief or a paid API article (not a free template) is stored."""
     if not cid: return False

@@ -296,17 +296,46 @@ class Tags(unittest.TestCase):
         q = parse_qs(urlparse(href).query)
         text = q["text"][0]
         url = q["url"][0]
+        hs = [t for t in (q.get("hashtags") or [""])[0].split(",") if t]
         self.assertTrue(url.endswith("/wire/5932fb61c94775cd?s=x"))
-        self.assertIn("#Ebola", text)
-        self.assertIn("#DRC", text)
-        self.assertNotIn("#Kenya", text)
+        self.assertIn("text", q)
+        self.assertIn("url", q)
+        self.assertIn("hashtags", q)
+        self.assertIn("Ebola", hs)
+        self.assertIn("DRC", hs)
+        self.assertNotIn("Kenya", hs)
+        self.assertNotIn("#Ebola", text)  # tags live in the hashtags param, not in text
+        self.assertNotIn("#DRC", text)
         html = X.button_html(it)
         self.assertIn("Post on X", html)
         self.assertIn('target="_blank"', html)
         self.assertNotIn("#Ebola", html)
         self.assertNotIn("#DRC", html)
-        self.assertIn("%23Ebola", html)
-        self.assertLessEqual(X.weighted_len(text, url), 280)
+        self.assertIn("hashtags=", html)
+        self.assertIn("Ebola", html)
+        self.assertLessEqual(X.weighted_len(X._join(text, ["#" + t for t in hs]), url), 280)
+
+    def test_intent_uses_baked_in_tags_and_drops_banned(self):
+        """Story pages pass ready.tags; banned fluff is dropped; 3-5 remain in the hashtags param."""
+        it = _mk("Hackers breach FinCEN, prompting systems shutdown",
+                 location="Washington", category="cyber", rank=5, brief="FinCEN systems were taken offline after a breach.")
+        href = X.intent_url(it, tags=["#FinCEN", "#Cybersecurity", "#Breach", "#News", "#BlackoutNetwork", "#Breaking"])
+        q = parse_qs(urlparse(href).query)
+        self.assertIn("text", q)
+        self.assertIn("url", q)
+        hs = [t for t in q["hashtags"][0].split(",") if t]
+        self.assertTrue(3 <= len(hs) <= 5, hs)
+        self.assertIn("FinCEN", hs)
+        self.assertIn("Cybersecurity", hs)
+        self.assertIn("Breach", hs)
+        for banned in ("News", "WorldNews", "Breaking", "BlackoutNetwork"):
+            self.assertNotIn(banned, hs)
+            self.assertNotIn("#" + banned, q["text"][0])
+        # one-tap button: complete href, no follow-up fetch
+        html = X.button_html(it, tags=["#FinCEN", "#Cybersecurity", "#Breach"])
+        self.assertIn('href="https://x.com/intent/post?', html)
+        self.assertIn("hashtags=FinCEN,Cybersecurity,Breach", html)
+        self.assertIn('target="_blank"', html)
 
 
 class ShareTextReport(unittest.TestCase):
