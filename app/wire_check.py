@@ -46,6 +46,7 @@ EV = {
     "infra": _W(r"\b(power|outages?|blackouts?|grid|substation|water main|boil[- ]water|pipeline|bridge|dam|internet|fiber|gas leak|sewage|runway|ports?|rail|transformer|nuclear (?:plant|power)|reactor|electric\w*|utility|utilities|telecom|cable|ioda)\b"),
     "space": _W(r"\b(solar|geomagnetic|cme|coronal|sunspot|aurora|space weather|kp ?\d|radio blackout|swpc|flare)\b"),
     "deaths": _W(r"\b(dies|died|death|dead|obituar\w*|passed away|funeral)\b"),
+    "patents": _W(r"\b(patents?|patented|invention|inventions|inventors?|uspto|wipo|epo)\b"),
     "uap": _W(r"\b(ufo|uap|unidentified|alien\w*|sighting\w*)\b"),
     "faith": _W(r"\b(church\w*|pope|vatican|mosque|temple|synagogue|bishop|priest|religio\w*|faith|christian\w*|muslim\w*|jewish|hindu|catholic\w*|clergy)\b"),
     "people": _W(r"."),
@@ -91,7 +92,7 @@ def category(k, title, text=""):
         return "other"
     if k == "conflict" and _ACCIDENT.search(t) and not _HARD_MIL.search(full):
         return "wreck"
-    if k in ("people", "deaths", "scandal", "infra"):
+    if k in ("people", "deaths", "scandal", "infra", "patents"):
         return k
     if k == "hazard":
         # Display-only: a stored "hazard" used to return immediately, so MeteoAlarm
@@ -130,7 +131,7 @@ _PHOTO_OK = {   # topic photo hazard keys a display category may carry
     "infra": {"grid", "aviation", "cyber"},
     "wreck": {"aviation"},
     "hazard": {"wildfire", "flood", "grid"},
-    "crime": set(), "deaths": set(), "people": set(), "faith": set(), "uap": set(), "scandal": {"government"}, "other": {"economy", "aviation"},
+    "crime": set(), "deaths": set(), "patents": set(), "people": set(), "faith": set(), "uap": set(), "scandal": {"government"}, "other": {"economy", "aviation"},
 }
 _HAZ_K = {"weather", "quake", "disease", "space", "hazard"}
 
@@ -200,7 +201,7 @@ _ACRO = {"NATO", "UN", "EU", "US", "UK", "WHO", "CDC", "FBI", "CIA", "NSA", "DHS
          "OPEC", "IAEA", "CISA", "UAE", "DRC", "GOP", "SEC", "IMF", "ICE", "ATF", "DOJ", "DOD", "UAP", "UFO", "AI", "CVE", "H5N1", "MPOX",
          "NVIDIA", "NASDAQ", "COVID", "UNICEF", "INTERPOL", "SPACEX", "OPENAI", "BBC", "CNN", "NYC", "LA", "DC", "EV", "FIFA", "NFL", "NBA", "F1", "BNP",
          "CENTCOM", "EUCOM", "INDOPACOM", "NORTHCOM", "AFRICOM", "SOCOM", "IRGC", "IAF", "GEOFON", "SAP"}
-_EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScotia", "NewBrunswick", "Newfoundland", "Yukon", "Nunavut",
+_EXTRA = {"Obituary", "RIP", "Death", "Technology", "Patent", "Patents", "USPTO", "WIPO", "Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScotia", "NewBrunswick", "Newfoundland", "Yukon", "Nunavut",
           "Queensland", "Victoria", "Tasmania", "NewSouthWales", "WesternAustralia", "SouthAustralia", "Scotland", "Wales", "England",
           "Earthquake", "Volcano", "Eruption", "VolcanicAsh", "Tsunami", "Flood", "Flooding", "Storm", "WinterStorm", "Hurricane", "Typhoon", "Cyclone", "Tornado",
           "Wildfire", "Weather", "Snow", "Rain", "Heatwave", "HeatWave", "Drought", "Landslide", "Avalanche", "Blizzard", "HighWind",
@@ -217,7 +218,7 @@ _EXTRA = {"Alberta", "Ontario", "Quebec", "Manitoba", "Saskatchewan", "NovaScoti
           "Ethereum", "Seismic", "ISIL", "FinCEN", "Cybercrime", "GeoNet", "Interpol", "Europol", "Hezbollah", "Vatican", "Pope", "Moscow", "Kyiv", "Tehran", "Beijing", "Jerusalem", "Sanaa", "Cairo", "RedSea", "Hormuz", "Strait", "GEOFON", "Kamchatka", "MeteoAlarm", "Lukoil", "Bolsonaro", "Walmart", "Melenchon", "Melanchon", "EasyJet", "Attack", "Assassination", "Refinery", "Tanker", "Banks"}
 _CAT_TAG = {"conflict": "Conflict", "weather": "Weather", "quake": "Earthquake", "disease": "Health", "cyber": "Cybersecurity",
             "politics": "Politics", "markets": "Markets", "crime": "Crime", "unrest": "Protest", "wreck": "Accident", "infra": "Outage",
-            "space": "SpaceWeather", "hazard": "Emergency", "deaths": "Obituary", "uap": "UAP", "faith": "Religion", "scandal": "Politics"}
+            "space": "SpaceWeather", "hazard": "Emergency", "deaths": "Obituary", "patents": "Patent", "uap": "UAP", "faith": "Religion", "scandal": "Politics"}
 _BAD = {"news", "worldnews", "breaking", "breakingnews", "blackoutnetwork", "blackout", "update", "updates", "live", "watch", "read", "video",
         "maybe", "mass", "gentlemen", "princess", "fascist", "stagecoup", "alert", "alerts", "report", "reports", "warning", "advisory",
         "today", "now", "urgent", "world", "global", "latest", "developing", "story", "storm" + "ing", "storms" + "ed", "storm" + "ed"}
@@ -365,7 +366,8 @@ def tags(raw, k, title="", loc_tags=()):
 _CAT_TAG2 = {"quake": ("Earthquake", "Seismic"), "weather": ("Weather", "Storm"), "cyber": ("Cybersecurity", "Hacking"),
              "markets": ("Markets", "Economy"), "disease": ("Health", "Outbreak"), "politics": ("Politics",),
              "conflict": ("Conflict", "Military"), "space": ("SpaceWeather", "Solar"), "wreck": ("Accident",), "unrest": ("Protest",),
-             "hazard": ("Emergency", "Disaster"), "infra": ("Outage", "Emergency")}
+             "hazard": ("Emergency", "Disaster"), "infra": ("Outage", "Emergency"),
+             "deaths": ("Obituary", "RIP", "Death"), "patents": ("Patent", "Technology")}
 _TOPIC_FILL = ("Fire", "Flood", "Strike", "Explosion", "Sanctions", "Banking", "Banks",
                "Refinery", "Tanker", "Attack", "Storm", "Earthquake", "Emergency", "Disaster")
 _GENTILE = ((r"\bisraeli", "Israel"), (r"\bukrainian", "Ukraine"), (r"\brussian", "Russia"),

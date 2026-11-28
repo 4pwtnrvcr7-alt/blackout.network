@@ -48,7 +48,10 @@ class Display(unittest.TestCase):
         self.assertEqual(W.cat_key("", "Protesters clash with police after curfew", False), "unrest")
         self.assertEqual(W.cat_key("", "Two arrested after a shooting in Orlando", False), "crime")
         self.assertEqual(W.cat_key("war/conflict", "Shooting in Gaza leaves 12 dead", False), "conflict")
+        self.assertEqual(W.cat_key("patent", "US 12345678 B2: Battery pack cooling system (Acme Corp)", False), "patents")
+        self.assertEqual(W.cat_key("obituary", "Jane Roe, jazz pianist, dies at 91", False), "deaths")
         labels = {k: lab for k, lab, _ in W.CATS}
+        self.assertEqual(labels["patents"], "Patents")
         for k in ("crime", "deaths", "people", "scandal", "unrest", "wreck", "infra", "markets", "disease"):
             self.assertIn(k, labels)
         self.assertEqual(labels["markets"], "Finance")
