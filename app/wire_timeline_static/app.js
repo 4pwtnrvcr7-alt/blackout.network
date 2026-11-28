@@ -16,7 +16,8 @@ var DAYH=52,BUF=1.25,DBG={};
 var items=[],seen={},rows=[],rendered=new Map(),Hc={},He={},exp=new Set();
 var topCur=null,topEnd=true,botCur=null,botEnd=false,loading={o:0,n:0},gen=0;
 var F={cats:new Set(),regs:new Set(),time:"",sev:"",loc:null,r:25},condensed=false,Q="",meta=null,total=0,tlTop=0,listH=0,padX=0,anim=false,crimeItems=[];
-var NEW={},pending=0,pollT=0,POLL=12000;
+var NEW={},UPD={},GLOW={},SCANMSG="",pending=0,pollT=0,POLL=12000;
+var SEEN_KEY="bn.wire.ref.v1";
 var fS=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit",second:"2-digit"});
 /* ---------- time (ET) */
 var fD=new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit"});
@@ -81,8 +82,14 @@ function drawerHTML(it){
 }
 /* ---------- rows model */
 function rebuild(){
-  var out=[],last=null,day=null;
-  for(var i=0;i<items.length;i++){var it=items[i],k=dayKey(seenAt(it));
+  var out=[],last=null,day=null,i,it,k,pins=[],rest=[];
+  if(SCANMSG)out.push({key:"scan",scan:1,day:0,k:"scan",label:SCANMSG,n:0,m:0,top:0,hid:false});
+  for(i=0;i<items.length;i++){if(items[i]._pin)pins.push(items[i]);else rest.push(items[i])}
+  if(pins.length){
+    day={key:"d:pin",day:1,k:"pin",label:"Updated",n:pins.length,m:0,top:0,hid:false,pin:1};out.push(day);
+    for(i=0;i<pins.length;i++){day.n++;out.push({key:pins[i].id,it:pins[i],top:0,hid:false,day:0})}
+  }
+  for(i=0;i<rest.length;i++){it=rest[i];k=dayKey(seenAt(it));
     if(k!==last){day={key:"d:"+k,day:1,k:k,label:dayLabel(k,seenAt(it)),n:0,m:0,top:0,hid:false};out.push(day);last=k}
     day.n++;out.push({key:it.id,it:it,top:0,hid:false,day:0});}
   rows=out;flags();
@@ -90,11 +97,12 @@ function rebuild(){
 function flags(){ /* match + hidden */
   var a=active(),day=null;
   for(var i=0;i<rows.length;i++){var r=rows[i];
+    if(r.scan){r.hid=false;r.mt=true;continue}
     if(r.day){day=r;r.m=0;continue}
-    r.mt=!a||match(r.it);if(r.mt)day.m++;r.hid=condensed&&a&&!r.mt;}
+    r.mt=!a||match(r.it);if(day&&r.mt)day.m++;r.hid=condensed&&a&&!r.mt;}
   for(i=0;i<rows.length;i++){r=rows[i];if(r.day)r.hid=condensed&&a&&r.m===0}
 }
-function hOf(r){if(r.day)return DAYH;return exp.has(r.key)?(He[r.key]||Hc[r.key]||96):(Hc[r.key]||est(r.it))}
+function hOf(r){if(r.scan)return 48;if(r.day)return DAYH;return exp.has(r.key)?(He[r.key]||Hc[r.key]||96):(Hc[r.key]||est(r.it))}
 var cw=360;
 function est(it){var cpl=Math.max(18,(cw-130)/8.6);return 34+Math.min(2,Math.ceil(it.h.length/cpl))*22+20}
 function layout(){var y=0;for(var i=0;i<rows.length;i++){var r=rows[i];r.top=y;if(!r.hid)y+=hOf(r)}listH=y;setH()}
@@ -115,14 +123,20 @@ function rowAt(y){var i=idxAt(y);while(i<rows.length&&rows[i].hid)i++;return i}
 function nodeFor(r){
   var n=rendered.get(r.key);if(n)return n;
   n=d.createElement("div");
-  if(r.day){n.className="tl-day";n.innerHTML='<span>'+esc(r.label)+"</span>"}
+  if(r.scan){n.className="tl-scanline";n.setAttribute("role","status");n.innerHTML="<span>"+esc(r.label)+"</span>"}
+  else if(r.day){n.className="tl-day";n.innerHTML='<span>'+esc(r.label)+"</span>"}
   else{var c=CAT[r.it.k]||{color:"#777"};n.className="tl-it"+(exp.has(r.key)?" open":"");n.setAttribute("role","listitem");n.style.setProperty("--c",c.color);
     n.innerHTML=itemHTML(r.it,exp.has(r.key));n._r=r}
   n._k=r.key;list.appendChild(n);rendered.set(r.key,n);return n;
 }
 function isNew(id){return !!(NEW[id]&&Date.now()-NEW[id]<90000)}
-function paint(n,r){n.style.top=r.top+"px";n._r=r;if(!r.day){var dim=!condensed&&!r.mt;if(n._dim!==dim){n._dim=dim;n.classList.toggle("dim",dim)}
-    var nw=isNew(r.it.id);if(n._new!==nw){n._new=nw;n.classList.toggle("fresh",nw)}}else{var dd=active()&&!condensed&&r.m===0;if(n._dim!==dd){n._dim=dd;n.classList.toggle("dim",dd)}}}
+function isUpdated(id){return !!(UPD[id]&&Date.now()-UPD[id]<90000)}
+function isGlow(id){return !!(GLOW[id]&&Date.now()-GLOW[id]<2600)}
+function paint(n,r){n.style.top=r.top+"px";n._r=r;if(r.scan)return;if(!r.day){var dim=!condensed&&!r.mt;if(n._dim!==dim){n._dim=dim;n.classList.toggle("dim",dim)}
+    var nw=isNew(r.it.id),up=!nw&&isUpdated(r.it.id),gl=isGlow(r.it.id);
+    if(n._new!==nw){n._new=nw;n.classList.toggle("fresh",nw)}
+    if(n._upd!==up){n._upd=up;n.classList.toggle("updated",up)}
+    if(n._glow!==gl){n._glow=gl;n.classList.toggle("glow",gl)}}else{var dd=active()&&!condensed&&r.m===0;if(n._dim!==dd){n._dim=dd;n.classList.toggle("dim",dd)}}}
 function render(keep){
   var sy=W.scrollY,vh=W.innerHeight,y0=sy-tlTop-vh*BUF,y1=sy-tlTop+vh*(1+BUF),want=new Set();
   if(rows.length){for(var i=idxAt(Math.max(0,y0));i<rows.length&&rows[i].top<=y1;i++){var r=rows[i];if(r.hid)continue;want.add(r.key);paint(nodeFor(r),r)}}
@@ -215,7 +229,7 @@ function loadOlder(){
   if(loading.o||botEnd)return Promise.resolve();loading.o=1;var g=gen;footState();
   return api((botCur?"before="+encodeURIComponent(botCur)+"&":"")+"limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return;
     botCur=j.next;botEnd=!!j.end;if(!items.length&&j.items[0]){topCur=j.items[0].t+"|"+j.items[0].id;topEnd=true}
-    add(j.items,"bot");rebuild();layout();render();}).catch(function(){}).then(function(){if(g!==gen)return;loading.o=0;footState();status();stamp();check()});
+    add(j.items,"bot");rebuild();layout();render();if(!loadSeen()||!loadSeen().top)saveSeen();}).catch(function(){}).then(function(){if(g!==gen)return;loading.o=0;footState();status();stamp();check()});
 }
 function loadNewer(){
   if(loading.n||topEnd||!topCur)return Promise.resolve();loading.n=1;var g=gen;
@@ -240,8 +254,49 @@ function flash(txt,ms){if(!elUpd)return;elUpd.hidden=false;elUpd.textContent=txt
   if(stat)stat.style.visibility="hidden";clearTimeout(noneT);noneT=setTimeout(function(){msgUntil=0;if(stat)stat.style.visibility="";paintUpd()},ms||3200)}
 function showNone(){flash("Up to date · nothing new since "+sinceLabel()+" ET")}
 function showPill(){if(!bNew)return;bNew.hidden=pending<=0;if(pending>0)bNew.textContent=pending+" new"}
-function busy(on){if(!bRef)return;if(on){bRef.classList.remove("is-result");var sp=bRef.querySelector(".tl-ref-lab");if(sp)sp.textContent="Refresh";bRef.setAttribute("aria-label","Refresh")}bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
-function doneBtn(lab){if(!bRef)return;var sp=bRef.querySelector(".tl-ref-lab");clearTimeout(bRef._doneT);if(!lab){bRef.classList.remove("is-result");if(sp)sp.textContent="Refresh";bRef.setAttribute("aria-label","Refresh");return}bRef.classList.add("is-result");if(sp)sp.textContent=lab;bRef.setAttribute("aria-label",lab);bRef._doneT=setTimeout(function(){doneBtn("")},2200)}
+function loadSeen(){try{var s=JSON.parse(localStorage.getItem(SEEN_KEY)||"");return s&&typeof s==="object"?s:null}catch(e){return null}}
+function saveSeen(){try{if(!items.length)return;var map={};items.slice(0,120).forEach(function(it){map[it.id]={t:it.t,n:it.n||0,f:it.f||0,h:it.h||""}});
+  localStorage.setItem(SEEN_KEY,JSON.stringify({top:items[0].t+"|"+items[0].id,at:new Date().toISOString(),map:map}))}catch(e){}}
+function scanLine(s){
+  var r=(s&&s.in_review!=null?s.in_review:0),src=(s&&s.sources!=null?s.sources:0);
+  var rs=Number(r).toLocaleString(),ss=Number(src).toLocaleString();
+  if(s&&s.last_scan){return "Scanned "+ss+" sources at "+fT.format(dt(s.last_scan))+" ET · "+rs+" new signals in review"}
+  return "Scan complete · "+rs+" new signals in review";
+}
+function scrollToKey(key){
+  var r=null;for(var i=0;i<rows.length;i++)if(rows[i].key===key){r=rows[i];break}
+  if(!r)return;var top=r.top+tlTop-Math.max(8,ctlH()+8);
+  W.scrollTo({top:Math.max(0,top),behavior:RM?"auto":"smooth"});
+}
+var refP=0,refTgt=0,refRAF=0,refBusy=0;
+function refApply(p){
+  if(!bRef)return;
+  p=Math.max(0,Math.min(100,p));
+  if(refTgt>=100&&p>=99)p=100;
+  refP=p;var shown=Math.round(p);if(refTgt>=100&&shown>=99)shown=100;
+  bRef.style.setProperty("--tl-ref-p",shown+"%");
+  var lab=(refBusy&&shown<100)?("Refresh "+shown+"%"):"Refresh";
+  var a=bRef.querySelector(".tl-ref-lab-a"),b=bRef.querySelector(".tl-ref-lab-b");
+  if(a)a.textContent=lab;if(b)b.textContent=lab;
+  if(refBusy){bRef.setAttribute("aria-label","Refreshing, "+shown+" percent");bRef.setAttribute("aria-valuenow",String(shown))}
+}
+function refTick(){refRAF=0;var d=refTgt-refP;if(Math.abs(d)<0.4){refApply(refTgt);return}
+  var step=RM?d:(refTgt>=100?Math.max(4,d*0.4):Math.max(0.6,d*0.22));
+  refApply(refP+step);refRAF=requestAnimationFrame(refTick)}
+function refStage(p){refTgt=Math.max(refTgt,Math.min(100,p));if(refTgt>=100)refTgt=100;if(RM){refApply(refTgt);return}if(!refRAF)refRAF=requestAnimationFrame(refTick)}
+function busy(on){if(!bRef)return;
+  if(on){refBusy=1;refP=0;refTgt=0;if(refRAF){cancelAnimationFrame(refRAF);refRAF=0}refApply(0);
+    bRef.classList.remove("is-result");bRef.classList.add("is-filling");
+    bRef.setAttribute("role","progressbar");bRef.setAttribute("aria-valuemin","0");bRef.setAttribute("aria-valuemax","100");
+    bRef.setAttribute("aria-label","Refreshing, 0 percent")}
+  else{refBusy=0;if(refRAF){cancelAnimationFrame(refRAF);refRAF=0};bRef.classList.remove("is-filling");
+    bRef.removeAttribute("role");bRef.removeAttribute("aria-valuemin");bRef.removeAttribute("aria-valuemax");bRef.removeAttribute("aria-valuenow");
+    bRef.style.removeProperty("--tl-ref-p")}
+  bRef.classList.toggle("busy",!!on);bRef.setAttribute("aria-busy",on?"true":"false")}
+function doneBtn(lab){if(!bRef)return;var a=bRef.querySelector(".tl-ref-lab-a"),b=bRef.querySelector(".tl-ref-lab-b");clearTimeout(bRef._doneT);
+  if(!lab){bRef.classList.remove("is-result");if(a)a.textContent="Refresh";if(b)b.textContent="Refresh";bRef.setAttribute("aria-label","Refresh");return}
+  bRef.classList.add("is-result");if(a)a.textContent=lab;if(b)b.textContent=lab;bRef.setAttribute("aria-label",lab);
+  bRef._doneT=setTimeout(function(){doneBtn("")},2600)}
 /* ---------- arrivals: near the top, new items slide in one at a time (oldest first, newest ends on top) */
 var drip=[],queued={},dripT=0;
 /* Nov 25 2026 (pt1918u): Full story needed 3-4 taps on iPhone because arrivals re-laid the list mid-tap. */
@@ -306,44 +361,101 @@ if(W.BNRT){
 }
 function refresh(){
   /* Real refresh: fetch the top of the Wire immediately with fresh=1 (no cache), in parallel with asking the
-     scanner for anything newer. New items are rendered at the top. Do not wait for the scanner (up to 6 s)
-     before the first read, or a story already on the server would not appear on a single tap. */
-  if(bRef&&bRef.classList.contains("busy"))return Promise.resolve();
-  busy(true);var g=gen,t0=Date.now();
-  function applyPage(j){
-    if(g!==gen||!j)return 0;
-    var arr=j.items||[],fresh=arr.filter(function(it){return !seen[it.id]&&!queued[it.id]});
+     scanner for anything newer. Progress (0-100%) tracks real stages: ask scanner, scanner pull, fetch fresh, render.
+     Never stuck at 99. Always surface something real: (a) stories newer than the last-seen top, (b) stories
+     corroborated or rewritten since the last refresh, marked UPDATED and moved to the top, or (c) a live scan
+     line from scanner stats. Never invent a story or bypass the publish gate. */
+  if(bRef&&(bRef.classList.contains("busy")||refBusy))return Promise.resolve();
+  busy(true);refStage(6);var g=gen,t0=Date.now(),prev=loadSeen()||{};
+  function mergeItem(old,nu){["h","s","d","n","f","l","src","u","r","c","loc"].forEach(function(k){if(nu[k]!=null)old[k]=nu[k]});return old}
+  function applyPage(j,res){
+    if(g!==gen||!j)return {n:0,u:0,scan:""};
+    var arr=j.items||[];
+    var lastTop=prev.top||(items[0]?items[0].t+"|"+items[0].id:"");
+    var lastMap=prev.map||{};
+    items.forEach(function(it){it._pin=0});
+    var newer=[],updated=[],seenUp={};
+    arr.forEach(function(it){
+      var cur=it.t+"|"+it.id;
+      if(lastTop&&cur>lastTop){newer.push(it);return}
+      if(!lastTop&&!seen[it.id]&&!lastMap[it.id]){newer.push(it);return}
+      var was=lastMap[it.id];
+      if(was&&((it.n||0)>(was.n||0)||(it.f||0)>(was.f||0)||(it.h&&was.h&&it.h!==was.h)))updated.push(it);
+    });
     if(arr[0])topCur=arr[0].t+"|"+arr[0].id;
     topEnd=true;todayK=dayKey(new Date().toISOString());yK=dayKey(new Date(Date.now()-864e5).toISOString());
-    if(!fresh.length&&!drip.length)relabel();
-    if(fresh.length)arrive(fresh);stamp();
-    var n=0;for(var k in NEW)if(NEW[k]>=t0)n++;
-    return n;
+    var n=0;
+    if(newer.length){
+      n=arrive(newer);
+      newer.forEach(function(it){NEW[it.id]=NEW[it.id]||Date.now();GLOW[it.id]=Date.now()});
+      if(n<newer.length)n=newer.length;
+    }
+    if(updated.length){
+      var ids={};updated.forEach(function(it){ids[it.id]=1});
+      items.forEach(function(it){if(ids[it.id]){var nu=updated.filter(function(u){return u.id===it.id})[0];if(nu)mergeItem(it,nu);it._pin=1;UPD[it.id]=Date.now();GLOW[it.id]=Date.now();seenUp[it.id]=1}});
+      var missing=updated.filter(function(u){return !seenUp[u.id]});
+      missing.forEach(function(it){it._pin=1;UPD[it.id]=Date.now();GLOW[it.id]=Date.now();if(!seen[it.id]){seen[it.id]=1;items.unshift(it)}});
+      var pins=items.filter(function(it){return it._pin}),rest=items.filter(function(it){return !it._pin});
+      items=pins.concat(rest);
+      measure(updated,false);
+    }
+    var scan=(j&&j.scan)||(res&&res.scan)||null;
+    SCANMSG=(!newer.length&&!updated.length)?scanLine(scan):"";
+    if(!newer.length&&!updated.length&&!drip.length)relabel();
+    else{rebuild();layout();render()}
+    stamp();
+    var first=newer[0]||updated[0];
+    if(first)scrollToKey(first.id);else if(SCANMSG)scrollToKey("scan");
+    saveSeen();
+    var got=0;for(var k in NEW)if(NEW[k]>=t0)got++;
+    return {n:got||n,u:updated.length,scan:SCANMSG,obj:scan};
   }
   function loadFresh(){
-    if(!topEnd){reset();scrollToList();return loadOlder().then(function(){return -1})}
+    if(!topEnd){reset();scrollToList();return loadOlder().then(function(){return {n:-1,u:0,scan:""}})}
     loading.n=1;
-    return api("fresh=1&limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return 0;return applyPage(j)});
+    return api("fresh=1&limit="+lim()+"&"+qp()).then(function(j){if(g!==gen)return {n:0,u:0,scan:""};refStage(78);return j});
   }
   function loadMeta(){
     return fetch("/api/wire_tl/meta?_="+Date.now(),{credentials:"same-origin",cache:"no-store",headers:{"Cache-Control":"no-store","Pragma":"no-cache"}}).then(function(r){return r.json()}).then(function(m){if(m&&m.total!=null){meta=m;total=m.total;status()}}).catch(function(){});
   }
-  var srv=W.BNRT?BNRT.refresh():Promise.resolve({});
+  function askScanner(){
+    refStage(18);
+    var p=W.BNRT?BNRT.refresh():Promise.resolve({});
+    return p.then(function(res){refStage(48);return res},function(){refStage(48);return {}});
+  }
   loadMeta();
-  return Promise.all([loadFresh(),srv]).then(function(pair){
+  return Promise.all([loadFresh(),askScanner()]).then(function(pair){
     if(g!==gen)return pair[0];
-    var n=pair[0]||0,res=pair[1]||{};
-    if(res&&res.pulled_new>0)return loadFresh().then(function(n2){return (n2||0)>n?n2:n});
-    return n;
-  }).then(function(n){
+    var page=pair[0],res=pair[1]||{};
+    if(page&&page.items){ /* first fetch resolved to raw page; apply after we know scanner result */ }
+    if(res&&res.pulled_new>0){
+      refStage(58);
+      return api("fresh=1&limit="+lim()+"&"+qp()).then(function(j2){refStage(88);return {j:j2||page,res:res}});
+    }
+    refStage(88);
+    return {j:page,res:res};
+  }).then(function(pack){
     if(g!==gen)return;
-    var wait=Math.max(0,700-(Date.now()-t0));
+    refStage(92);
+    var j=pack&&pack.j,res=pack&&pack.res||{};
+    /* loadFresh may have returned a raw page (has items) or a counted result if we jumped through loadOlder */
+    if(j&&j.n===-1)return {n:-1,u:0,scan:""};
+    if(j&&j.items)return applyPage(j,res);
+    if(j&&(j.n!=null||j.u!=null))return j;
+    return applyPage(j,res);
+  }).then(function(out){
+    if(g!==gen)return;
+    refStage(100);
+    var wait=RM?0:Math.max(220,320-(Date.now()-t0));
     setTimeout(function(){
+      var n=out&&out.n||0,u=out&&out.u||0;
+      busy(false);
       if(n===-1){doneBtn("Latest");flash("Showing the latest stories")}
-      else if(n){doneBtn(n+" new");flash(n+" new stor"+(n===1?"y":"ies"))}
-      else{doneBtn("Up to date");flash("Up to date",2200)}
+      else if(n){doneBtn(n+" new");flash(n+" new stor"+(n===1?"y":"ies"));}
+      else if(u){doneBtn(u+" updated");flash(u+" updated stor"+(u===1?"y":"ies"))}
+      else{doneBtn("Scanned");flash(out&&out.scan||scanLine(out&&out.obj),4200)}
     },wait);
-  }).catch(function(){flash("Could not reach the server. Try again in a moment.")}).then(function(){if(g!==gen)return;loading.n=0;busy(false);status();check()});
+  }).catch(function(){flash("Could not reach the server. Try again in a moment.")}).then(function(){if(g!==gen)return;loading.n=0;if(refBusy){refStage(100);setTimeout(function(){busy(false)},RM?0:200)}status();check()});
 }
 var chk=0;
 function check(){if(chk)return;chk=requestAnimationFrame(function(){chk=0;if(anim)return;

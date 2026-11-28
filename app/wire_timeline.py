@@ -552,7 +552,8 @@ def _item(r, archive, warm_budget=None, compute=None):
             "n": int(r["n_items"] or 0), "f": len(fams), "src": srcs, "l": links, "a": 1 if archive else 0,
             "w": r["watchlist"] or 0, "et": r["event_time"] if not archive else None,
             "do": 1 if ("dof" in r.keys() and r["dof"]) else 0,  # dated by day only: no time is shown
-            "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs}
+            "lat": _ll(r["lat"]), "lon": _ll(r["lon"]), "fs": fs,
+            "u": (r["u"] if "u" in r.keys() else None)}
     if archive:
         d["xu"] = ""          # the timeline shows no Post on X for archive rows
         if "tg" in r.keys() and r["tg"]:
@@ -609,11 +610,11 @@ _TCOL = (f"(CASE WHEN {_E} GLOB '{_TS_FULL}' AND {_E} <= {_F} THEN "
          f"(CASE WHEN substr({_E},12)='00:00:00Z' THEN (CASE WHEN substr({_E},1,10)||'T05:00:00Z' <= {_F} THEN substr({_E},1,10)||'T05:00:00Z' ELSE {_F} END) ELSE {_E} END) "
          f"WHEN {_E} GLOB '{_TS_DAY}' AND substr({_E},1,10)||'T05:00:00Z' <= {_F} THEN substr({_E},1,10)||'T05:00:00Z' "
          f"ELSE {_F} END)")
-_LIVE_COLS = (f"cluster_id id, {_TCOL} t, {_DOF_SQL} dof, first_seen fs, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
+_LIVE_COLS = (f"cluster_id id, {_TCOL} t, {_DOF_SQL} dof, first_seen fs, updated u, event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, "
               "n_items, families, links, brief, NULL sources")
 # archive rows dated by day only (t at midnight UTC) are placed at 00:00 ET of that date, so they group under that date
 _ATCOL = "(CASE WHEN substr(t,12)='00:00:00Z' THEN substr(t,1,10)||'T05:00:00Z' ELSE t END)"
-_ARCH_COLS = (f"id, {_ATCOL} t, (substr(t,12)='00:00:00Z') dof, t fs, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
+_ARCH_COLS = (f"id, {_ATCOL} t, (substr(t,12)='00:00:00Z') dof, t fs, NULL u, NULL event_time, title, category, location, lat, lon, score, rank, confidence, watchlist, n_items, families, links, "
               "NULL brief, sources")
 
 # the 2000-2024 archive (archive_wire.py) adds its precomputed display category/region (ak, ag) and hashtags (tg)
@@ -1290,6 +1291,37 @@ def bust_pages():
         s["t"] = 0.0
     bust_meta()
 
+def scan_stats():
+    """Real last-scan counts for the Refresh fallback line. Never invents rows or bypasses the publish gate."""
+    out = {"last_scan": None, "sources": 0, "ok_sources": 0, "failed_sources": 0, "fetched": 0, "new_items": 0, "in_review": 0}
+    try:
+        c = _ro(DB)
+        try:
+            r = c.execute("SELECT finished, started, fetched, new_items, ok_sources, failed_sources FROM scans "
+                          "WHERE finished IS NOT NULL ORDER BY id DESC LIMIT 1").fetchone()
+        finally:
+            c.close()
+        if r:
+            out["last_scan"] = r["finished"]
+            ok = int(r["ok_sources"] or 0)
+            bad = int(r["failed_sources"] or 0)
+            out["ok_sources"] = ok
+            out["failed_sources"] = bad
+            out["sources"] = ok + bad
+            out["fetched"] = int(r["fetched"] or 0)
+            out["new_items"] = int(r["new_items"] or 0)
+    except Exception:
+        pass
+    held = 0
+    h = _V_STATS.get("held") or {}
+    if isinstance(h, dict):
+        held += sum(int(v or 0) for v in h.values())
+    elif isinstance(h, (int, float)):
+        held += int(h)
+    held += len(_QAH)
+    out["in_review"] = held
+    return out
+
 def count(q="", bg=False):
     words = [w for w in re.split(r"\s+", (q or "").strip()) if w][:6]
     lists = (0, 1, 2) if bg else (0, 1)
@@ -1440,7 +1472,7 @@ def page_html():
   <button type="button" class="tl-b" id="tl_filt" aria-expanded="false" aria-controls="tl_sheet" aria-label="Filters"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 2v-8.5L4 5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span>Filters</span><b class="tl-fbadge" id="tl_fbadge" hidden></b></button>
   <button type="button" class="tl-b" id="tl_when" aria-expanded="false" aria-controls="tl_jump"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M4 10h16M9 3.5v4M15 3.5v4" stroke="currentColor" stroke-width="1.4"/></svg><span>Date</span></button>
   <button type="button" class="tl-b tl-cond" id="tl_cond" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v6m0 0-3-3m3 3 3-3M12 21v-6m0 0-3 3m3-3 3 3M4 12h16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="tl-cl">Condense</span></button>
-  <button type="button" class="tl-b tl-ref" id="tl_ref" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><i class="tl-ref-radar" aria-hidden="true"></i><span class="tl-ref-lab">Refresh</span></button>
+  <button type="button" class="tl-b tl-ref" id="tl_ref" aria-label="Refresh"><i class="tl-ref-fill" aria-hidden="true"><i class="tl-ref-sheen"></i></i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="miter"/></svg><span class="tl-ref-lab"><span class="tl-ref-lab-a">Refresh</span><span class="tl-ref-lab-b" aria-hidden="true">Refresh</span></span></button>
  </div>
  <div class="tl-sheet" id="tl_sheet" hidden>
   <div class="tl-sheet-h"><span>Filters</span><button type="button" class="tl-clear" id="tl_fclear">Clear all</button></div>
@@ -1592,6 +1624,8 @@ def handle_get(path, qs):
             try:
                 args = (before, after, lim, q, g("bg") == "1", lat, lon, rmi, sev, cats, regs, time_win)
                 out = _page_build(*args); _pstore(_pkey(*args), out); _PA[_pkey(*args)] = (args, time.time())
+                try: out["scan"] = scan_stats()
+                except Exception: pass
                 return 200, out
             except sqlite3.Error as ex: return 503, {"error": "database busy: " + str(ex)[:160]}
         try: return 200, page(before, after, lim, q, g("bg") == "1", lat, lon, rmi, sev, cats, regs, time_win)
