@@ -48,3 +48,11 @@
 .bn-has-ref .m3-tl.bn-rf-row,
 .bn-has-ref .bn-pop-rows [data-bn-refresh],
 .bn-has-ref .bn-rf-st{display:none!important}
+
+/* Compact header variant: icon-only when idle, same fill and percent/result when running. */
+.bn-ref.bn-ref-sm{min-width:40px;height:40px;padding:0 10px;gap:0;flex:none}
+.bn-ref.bn-ref-sm:not(.busy):not(.is-filling):not(.is-result) .bn-ref-lab,
+.bn-ref.bn-ref-sm:not(.busy):not(.is-filling):not(.is-result) .tl-ref-lab{display:none}
+.bn-ref.bn-ref-sm.busy,.bn-ref.bn-ref-sm.is-filling,.bn-ref.bn-ref-sm.is-result{
+  min-width:7.6rem;height:auto;min-height:40px;padding:0 14px;gap:8px}
+.bn-tbar .bn-ref.bn-ref-sm{align-self:center}

@@ -63,13 +63,13 @@ def get(url, timeout=9):
     b = r.read(4_000_000)
     if b[:2] in (b"\xff\xfe", b"\xfe\xff"): return b.decode("utf-16")
     return b.decode("utf-8-sig", "replace")
-def cached(key, fn, ttl=TTL):
+def cached(key, fn, ttl=TTL, force=False):
     hit = _C.get(key)
-    if hit and time.time() - hit[0] < ttl: return hit[1]
+    if not force and hit and time.time() - hit[0] < ttl: return hit[1]
     with _L: kl = _KL.setdefault(key, threading.Lock())
     with kl:
         hit = _C.get(key)
-        if hit and time.time() - hit[0] < ttl: return hit[1]
+        if not force and hit and time.time() - hit[0] < ttl: return hit[1]
         try:
             v = fn(); _C[key] = (time.time(), v); return v
         except Exception as e:
@@ -388,8 +388,8 @@ P = {
 ORDER = ["aws", "azure", "m365", "gcp", "workspace", "cloudflare", "akamai"]
 SRC2SLUG = {P[s]["src"]: s for s in ORDER}
 
-def data(slug):
-    try: return cached("np:" + slug, P[slug]["fetch"])
+def data(slug, force=False):
+    try: return cached("np:" + slug, P[slug]["fetch"], force=force)
     except Exception as e: return dict(active=[], history=[], components=[], regions=[], coverage="", error=f"{type(e).__name__}: feed unreachable right now", fetched=None)
 
 # ---------------------------------------------------------------- our own 5-minute checks (netstatus.db, read-only)
@@ -446,8 +446,8 @@ def when(i): return fmt_et(i.get("start"), dateonly=bool(i.get("dateonly")))
 def jsonable(i):
     j = {k: v for k, v in i.items()}; j["start"] = iso(i.get("start")); j["end"] = iso(i.get("end")); j["start_et"] = when(i); j["end_et"] = fmt_et(i.get("end")) if i.get("end") else None; return j
 
-def brief(slug):
-    p = P[slug]; d = data(slug); mon = monitor(p["src"]); allinc = d.get("active", []) + d.get("history", [])
+def brief(slug, force=False):
+    p = P[slug]; d = data(slug, force=force); mon = monitor(p["src"]); allinc = d.get("active", []) + d.get("history", [])
     latest = sorted([i for i in allinc if i.get("start")], key=lambda i: i["start"], reverse=True)
     pick = (d.get("active") or latest or [None])[0]; lv = level_of(d, mon)
     nl = sum(1 for i in d.get("active", []) if i.get("longrun"))
@@ -647,7 +647,7 @@ def render(slug):
             + (f'<p class="np-note">The official feed could not be reached just now ({E(d["error"])}); figures below use our stored checks.</p>' if d.get("error") else "")
             + (f'<p class="np-note">Showing the last good copy of the official feed (refresh failed: {E(d["stale"])}).</p>' if d.get("stale") else "") + '</section>')
     live = "".join(inc_card(i, True) for i in act) or (f'<div class="np-act" style="--c:{LVC[0]}"><h3>No active incidents reported by {E(p["name"])}</h3><div class="m">Checked '
-                                                     f'{E(fmt_et(pdt(d.get("fetched"))) if d.get("fetched") else "—")} · official feed, refreshed every 10 minutes</div></div>')
+                                                     f'<span id="np_fetched">{E(fmt_et(pdt(d.get("fetched"))) if d.get("fetched") else "—")}</span> · official feed, refreshed every 10 minutes</div></div>')
     comp = ""
     if d.get("groups"):
         tiles = []
@@ -730,6 +730,15 @@ def render(slug):
               {"@type": "Question", "name": f"Is {p['name']} down right now?", "acceptedAnswer": {"@type": "Answer", "text": (f"{p['name']} reports {len(act)} active incident(s)." if act else f"{p['name']}'s official feed shows no active incidents.") + f" Latest status: {p['status'][1]}"}},
               {"@type": "Question", "name": f"Where do I check {p['name']} status for my own account?", "acceptedAnswer": {"@type": "Answer", "text": f"{p['console'][0][0]}: {p['console'][0][1]}"}},
               {"@type": "Question", "name": f"What caused past {p['name']} outages?", "acceptedAnswer": {"@type": "Answer", "text": " ".join(f"{n['date']}: {n['title']} ({CAT_NAME[n['cat']]})." for n in p["notable"][:3])}}]}]
+    body += (
+        '<script>(function(){function go(){var R=window.BNRefresh,b=document.getElementById("bn_hdr_ref");'
+        'window.bnRefreshPage=function(){var slug=location.pathname.split("/").filter(Boolean).pop();'
+        'return fetch("/api/network/"+encodeURIComponent(slug)+"/brief?fresh=1&_="+Date.now(),{cache:"no-store"})'
+        '.then(function(r){if(!r.ok)throw new Error(r.status);return r.json()}).then(function(j){'
+        'var el=document.getElementById("np_fetched");if(el&&j.fetched_et)el.textContent=j.fetched_et;'
+        'return "Updated"})};'
+        '}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",go);else go()})();</script>'
+    )
     return site_page.page(title, desc, body, f"/grid/{slug}", active="net", jsonld=ld, og_type="website")
 
 HUBCSS = """
@@ -897,7 +906,9 @@ def handle_get(path, qs, headers=None):
     if m and m.group(1) in P: return 200, render(m.group(1)), "text/html"
     if p == "/api/network/accordion.js": return 200, acc_js(), "application/javascript; charset=utf-8"
     m = re.fullmatch(r"/api/network/([a-z0-9]+)/brief", p)
-    if m and m.group(1) in P: return 200, brief(m.group(1))
+    if m and m.group(1) in P:
+        force = str((qs or {}).get("fresh", [""])[0] or "").lower() in ("1", "true", "yes")
+        return 200, brief(m.group(1), force=force)
     m = re.fullmatch(r"/api/network/([a-z0-9]+)", p)
     if m and m.group(1) in P:
         d = data(m.group(1))

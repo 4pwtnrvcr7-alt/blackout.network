@@ -62,18 +62,19 @@ if(DL&&$("sd_q")){
   nums.forEach(x=>{if(x-last>1)h+=`<span class="mu">…</span>`;h+=`<button type="button" data-p="${x}" ${x==p?'aria-current="page" class="on"':""}>${x.toLocaleString()}</button>`;last=x});
   P.innerHTML=h+`<button type="button" data-p="${p+1}" ${p>=n?"disabled":""}>Next ›</button>`}
  const prm=()=>{const p=new URLSearchParams({q:$("sd_q").value,cat:$("sd_cat").value,cc:ccSel.value,reg:$("sd_reg").value,page:st.page,per:50,voter:SDvoter});if($("sd_rated").checked)p.set("rated","1");return p};
- async function dload(scroll){$("sd_count").textContent="Loading…";if(ctl)ctl.abort();ctl=new AbortController();
-  try{const r=await fetch(API+"directory?"+prm(),{cache:"no-store",signal:ctl.signal}),j=await r.json();
+ async function dload(scroll,fresh){$("sd_count").textContent="Loading…";if(ctl)ctl.abort();ctl=new AbortController();
+  try{const r=await fetch(API+"directory?"+prm()+(fresh?"&fresh=1":"")+"&_="+Date.now(),{cache:"no-store",signal:ctl.signal}),j=await r.json();
    if(!r.ok){$("sd_count").textContent=j.error||"Couldn't load the directory.";return}
    DL.innerHTML=j.items.map(drow).join("");const a=(j.page-1)*j.per;
    $("sd_count").textContent=j.total?`Showing ${(a+1).toLocaleString()}–${(a+j.items.length).toLocaleString()} of ${j.total.toLocaleString()} directory sources`:"No directory sources match these filters.";
-   pager(j);if(scroll)$("directory").scrollIntoView({behavior:"smooth",block:"start"})}
+   pager(j);var u=$("sc_up");if(u){try{u.textContent="Last pulled "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){u.textContent="Updated"}}if(scroll)$("directory").scrollIntoView({behavior:"smooth",block:"start"})}
   catch(e){if(e.name!="AbortError")$("sd_count").textContent="Couldn't load the directory. Try again in a moment."}}
  document.querySelectorAll(".sd-cats button[data-cat]").forEach(b=>b.addEventListener("click",()=>{$("sd_cat").value=b.dataset.cat;st.page=1;dload(true)}));
  ["sd_cat","sd_reg","sd_rated"].forEach(i=>$(i).addEventListener("change",()=>{st.page=1;dload()}));ccSel.addEventListener("change",()=>{st.page=1;dload()});
  $("sd_q").addEventListener("input",()=>{clearTimeout(tm);tm=setTimeout(()=>{st.page=1;dload()},300)});
  $("sd_pager").addEventListener("click",e=>{const b=e.target.closest("button[data-p]");if(!b||b.disabled)return;st.page=+b.dataset.p;dload(true)});
  dload();
+ window.bnRefreshPage=function(){return dload(false,true).then(function(){return "Updated"})};
 }
 const L=$("sc_list");
 if(L){

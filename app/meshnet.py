@@ -33,10 +33,10 @@ WEB_CLIENT = "https://client.meshtastic.org/"
 D = "https://meshtastic.org/docs"
 
 _C = {"mt": None, "v": None}
-def data():
+def data(force=False):
     try: mt = os.path.getmtime(DATA)
     except OSError: return None
-    if _C["mt"] != mt:
+    if force or _C["mt"] != mt:
         try:
             with open(DATA, encoding="utf-8") as f: v = json.load(f)
             _C.update(mt=mt, v=v if isinstance(v, dict) else None)
@@ -67,12 +67,12 @@ def _clean(t):
     t = re.sub(r"[\x00-\x1f\x7f]", " ", str(t or ""))[:240]
     for rx, rep in _MASK: t = rx.sub(rep, t)
     return t.strip()
-def public_feed():
+def public_feed(force=False):
     mode = os.environ.get("BN_MESH_PUBLIC_FEED", "").strip().lower()
     if mode != "liamcottle":
         return {"enabled": False, "messages": [], "note": "The public read-only feed is switched off while we confirm permission to use it. Connect your own radio to read and send."}
     with _FL:
-        if _F["v"] is not None and time.time() - _F["t"] < 30: return _F["v"]
+        if not force and _F["v"] is not None and time.time() - _F["t"] < 30: return _F["v"]
         out = {"enabled": True, "messages": [], "source": "Public mesh map by Liam Cottle, default LongFast channel",
                "source_url": "https://meshtastic.liamcottle.net/", "note": "Public default-channel broadcasts uplinked to the public MQTT server. Read-only. Not stored."}
         try:
@@ -281,12 +281,13 @@ def handle_get(path, qs=None):
     if p == "/mesh": return 200, map_page(), "text/html; charset=utf-8"
     if p == "/mesh/chat": return 200, chat_page(), "text/html; charset=utf-8"
     if p == "/mesh/guide": return 200, guide_page(), "text/html; charset=utf-8"
+    force = str(((qs or {}).get("fresh") or [""])[0] or "").lower() in ("1", "true", "yes")
     if p == "/api/mesh/nodes":
-        d = data()
+        d = data(force=force)
         return (200, d) if d else (200, {"ok": False, "waiting": True, "nodes": [], "hw": [], "regions": [], "signals": []})
     if p == "/api/mesh/summary": return 200, summary()
     if p == "/api/mesh/signal": return 200, signal()
-    if p == "/api/mesh/chat": return 200, public_feed()
+    if p == "/api/mesh/chat": return 200, public_feed(force=force)
     if p.startswith("/api/mesh/"):
         name = p.rsplit("/", 1)[-1]
         if name in FILES: return _file(name)

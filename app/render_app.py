@@ -818,6 +818,11 @@ class RH(server.H):
         return self.headers.get("CF-Connecting-IP") or (self.headers.get("X-Forwarded-For") or "").split(",")[0].strip() or self.client_address[0]
     def do_GET(self):
         path = self.path.split("?", 1)[0]
+        try:
+            import sitenav_ui
+            sitenav_ui.set_page_path(path)
+        except Exception:
+            pass
         if path == "/healthz":
             r = public_ready()
             ps = {}

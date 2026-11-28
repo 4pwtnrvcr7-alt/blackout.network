@@ -34,10 +34,11 @@ function render(){var L=M.filter(function(m){return m.type==="direct"||m.channel
  if(!L.length){ol.innerHTML='<li class="mx-mu mx-empty">No messages on this channel yet.</li>';return}
  ol.innerHTML=L.slice(-80).map(function(m){return '<li class="mx-m'+(m.mine?" mine":"")+'"><span class="mx-who">'+esc(m.fromName)+(m.type==="direct"?' <em>direct</em>':"")+'</span><span class="mx-when">'+esc(hm(m.t))+'</span><p>'+esc(m.text)+'</p></li>'}).join("");
  ol.scrollTop=ol.scrollHeight}
-async function pub(){var note=$("#mx_pub_note"),ol=$("#mx_pub_msgs");try{var r=await fetch("/api/mesh/chat",{cache:"no-store"});var d=await r.json();
+async function pub(){var note=$("#mx_pub_note"),ol=$("#mx_pub_msgs");try{var r=await fetch("/api/mesh/chat?fresh=1&_="+Date.now(),{cache:"no-store"});var d=await r.json();
  if(!d.enabled){note.textContent=d.note||"The public feed is off.";ol.innerHTML="";return}
  note.innerHTML=esc(d.note)+' Source: <a href="'+esc(d.source_url)+'" target="_blank" rel="noopener">'+esc(d.source)+'</a>'+(d.error?" · "+esc(d.error):"");
  ol.innerHTML=(d.messages||[]).map(function(m){return '<li class="mx-m"><span class="mx-who">'+esc(m.from)+(m.ch?' · '+esc(m.ch):"")+'</span><span class="mx-when">'+esc(hm(new Date(m.t)))+'</span><p>'+esc(m.text)+'</p></li>'}).join("")||'<li class="mx-mu mx-empty">No public messages right now.</li>'}
  catch(e){note.textContent="The public feed is unavailable right now."}}
+window.bnRefreshPage=function(){return pub().then(function(){var n=document.getElementById("mx_pub_note");if(n){try{n.setAttribute("data-pulled","Last pulled "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET");if(!document.getElementById("mx_pub_up")){var s=document.createElement("span");s.id="mx_pub_up";s.className="mx-mu mx-small";n.after(s)}var u=document.getElementById("mx_pub_up");if(u)u.textContent=n.getAttribute("data-pulled")}catch(e){}}return "Updated"})};
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();
 })();

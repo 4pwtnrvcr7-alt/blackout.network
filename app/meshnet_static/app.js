@@ -63,8 +63,9 @@ function panels(){var d=S.d||{};var reg={};(d.regions||[]).forEach(function(r){r
   :'<p class="mx-ok">No region flagged right now.</p>';
  h+='<details class="mx-det"><summary>Quietest regions</summary>'+rows.map(function(r){return '<div class="mx-wr"><b>'+esc(r.name)+'</b><span>'+r.silent+' of '+r.regular+' regular nodes quiet ('+Math.round((r.silent_pct||0)*100)+'%)</span></div>'}).join("")+'</details>';
  wl.innerHTML=h}
-async function load(){try{var r=await fetch("/api/mesh/nodes",{cache:"no-store"});S.d=await r.json()}catch(e){S.d=S.d||{}}
- panels();if(S.map&&S.map.isStyleLoaded())layers(S.map)}
+function meshPulled(){var host=document.getElementById("mx_fresh");if(!host)return;var el=document.getElementById("mx_pulled");if(!el){el=document.createElement("span");el.id="mx_pulled";host.appendChild(document.createTextNode(" "));host.appendChild(el)}try{el.textContent="Last pulled "+new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"}).format(new Date())+" ET"}catch(e){el.textContent="Updated"}}
+async function load(){try{var r=await fetch("/api/mesh/nodes?fresh=1&_="+Date.now(),{cache:"no-store"});S.d=await r.json()}catch(e){S.d=S.d||{}}
+ panels();if(S.map&&S.map.isStyleLoaded())layers(S.map);meshPulled()}window.bnRefreshPage=function(){return load().then(function(){return "Updated"})};
 document.addEventListener("click",function(e){var b=e.target.closest&&e.target.closest(".mx-seg button");if(b)view(b.dataset.view)});
 async function start(){load();var ok=await lib();if(!ok){var el=$("#mx_map");if(el)el.innerHTML='<p class="mx-mu" style="padding:16px">The map library could not load. The counts and watch list below still update.</p>';return}
  mk();setInterval(load,300000)}

@@ -23,9 +23,12 @@ class Routes(unittest.TestCase):
     def test_not_linked_or_indexed(self):
         app = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         # Menus, sitemap and the shared theme must not link the preview URL or the hidden classic listing.
-        for needle in ("/wire-next", "/wire-classic"):
-            for f in ("sitenav.py", "sitenav_ui.py", "growth.py", "theme.py"):
-                self.assertNotIn(needle, open(os.path.join(app, f), encoding="utf-8").read(), f"{f} {needle}")
+        # Path strings may appear as refresh-mode keys; the ban is on href / navigation links.
+        for f in ("sitenav.py", "sitenav_ui.py", "growth.py", "theme.py"):
+            src = open(os.path.join(app, f), encoding="utf-8").read()
+            self.assertNotIn("/wire-next", src, f)
+            self.assertNotIn('href="/wire-classic"', src, f)
+            self.assertNotIn("href='/wire-classic'", src, f)
         # The v2 menu (used on story pages and the classic listing) still points at /wire, not the hidden path or old preview.
         w2 = open(os.path.join(app, "wire_v2.py"), encoding="utf-8").read()
         self.assertNotIn("/wire-next", w2)
