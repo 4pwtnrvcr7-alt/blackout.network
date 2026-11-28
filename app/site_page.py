@@ -63,19 +63,29 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
         import og, re as _re
         m = _re.match(r"/wire/([0-9a-f]{16})", path or "")
         if m:
-            img = og.image_url("wire", story_id=m.group(1), title=t)
-            meta = og.tags(title=t, desc=desc, url=url, image=img, og_type=og_type)
+            # Pass story_id, not a pre-built /og/wire/<id>.png URL, so og.tags can
+            # use the static logo when photo cards are off (or warm a card when on).
+            meta = og.tags(title=t, desc=desc, url=url, story_id=m.group(1), og_type=og_type)
         else:
             key = (path or "/").strip("/").split("/")[0] or "home"
             img = image or og.image_url(key)
             meta = og.tags(title=t, desc=desc, url=url, image=img, key=key, og_type=og_type)
     except Exception:
-        img = image or f"{SITE}/og/home.png?v=5"
-        meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
-                f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
-                f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(t)}">'
-                f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'
-                f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">')
+        is_wire = bool(re.match(r"/wire/([0-9a-f]{16})", path or ""))
+        if is_wire:
+            img = f"{SITE}/img/share-logo-1200.png"
+            meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
+                    f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
+                    f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200"><meta property="og:image:alt" content="{E(BRAND)}">'
+                    f'<meta name="twitter:card" content="summary"><meta name="twitter:site" content="@BlkoutNtw">'
+                    f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">')
+        else:
+            img = image or f"{SITE}/og/home.png?v=5"
+            meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
+                    f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
+                    f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(t)}">'
+                    f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'
+                    f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">')
     head = ((sitenav.UI.THEME_SCRIPT if sitenav is not None else "") + (sitenav.scroll_script() if sitenav is not None else "") + f'<title>{E(t)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             + meta + '<meta property="og:locale" content="en_US">'
             '<link rel="stylesheet" href="/sitenav.css"><script src="/sitenav.js" defer></script>')

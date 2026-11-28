@@ -58,9 +58,11 @@ class NoStubForHumans(unittest.TestCase):
             self.assertIsNotNone(r)
             self.assertEqual(r[0], 200)
             body = r[1]
-            self.assertNotIn("og:image", body)
-            self.assertNotIn("twitter:image", body)
+            self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200.png"', body)
+            self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"', body)
             self.assertIn('name="twitter:card" content="summary"', body)
+            self.assertNotIn("/og/wire/", body)
+            self.assertNotIn("summary_large_image", body)
             self.assertIn("Loading the full story", body)
             self.assertIn(f"/wire/{CID}?full=1", body)
             self.assertIn("content=\"3;url=", body)
@@ -85,10 +87,11 @@ class CardAndShare(unittest.TestCase):
         cid = "e2ca47e325c5b8e1"
         html = og.tags(title="Bessent Iran sanctions", desc="d", url="https://blackout.network/wire/"+cid,
                        story_id=cid, rank=7, og_type="article")
-        self.assertNotIn("twitter:image", html)
-        self.assertNotIn("og:image", html)
+        self.assertIn('name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"', html)
+        self.assertIn('property="og:image" content="https://blackout.network/img/share-logo-1200.png"', html)
         self.assertNotIn("/og/wire/%s.png" % cid, html)
         self.assertIn('name="twitter:card" content="summary"', html)
+        self.assertNotIn("summary_large_image", html)
 
     def test_share_url_has_s_param(self):
         import x_share as X

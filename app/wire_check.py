@@ -23,8 +23,8 @@ def story_cards_on():
     """Wire story photo cards, og:image, and the photo-card publish hold.
 
     Off by default (Matt, 11:44 AM ET Nov 27 2026): stories publish without a
-    share card; story pages use twitter:card=summary and no og:image. Newsletter
-    images, /bnt/media, and non-story /og/<page>.png cards are unrelated and stay on.
+    photo card; story pages use twitter:card=summary and the static white-B logo.
+    Newsletter images, /bnt/media, and non-story /og/<page>.png cards are unrelated and stay on.
     Set BN_STORY_CARDS=1 to restore the old photo-card gate and generation.
     """
     return os.environ.get("BN_STORY_CARDS", "0") == "1"
