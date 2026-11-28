@@ -45,7 +45,7 @@
     var url = it.permalink || ("https://blackout.network/water/" + it.id);
     var text = it.name || "Water treatment status";
     var intent = it.xu || ("https://x.com/intent/post?text=" + encodeURIComponent(text) + "&url=" + encodeURIComponent(url + "?s=x"));
-    var src = '<a class="bng-sb" href="' + href(it.url) + '" target="_blank" rel="noopener">Source: ' + esc(it.src) + "</a>";
+    var src = '<a class="bng-sb" href="' + href(it.url) + '" target="_blank" rel="noopener">Source</a>";
     var perm = '<a class="bng-sb" href="' + esc(url) + '">Permalink</a>';
     var map = it.lat != null ? '<button type="button" class="bng-sb" data-show="' + esc(it.id) + '">Show on map</button>' : "";
     return '<div class="bng-share" data-url="' + esc(url) + '" data-text="' + esc(text) + '"><span class="bng-share-l">Share</span>' +

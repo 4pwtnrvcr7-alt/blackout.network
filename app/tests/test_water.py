@@ -155,7 +155,7 @@ class Water(unittest.TestCase):
         self.assertIn("bng-copy", js)
         self.assertIn("bng-native", js)
         self.assertIn("Permalink", js)
-        self.assertIn("Source:", js)
+        self.assertIn("Source", js)
         self.assertIn("x.com/intent/post", js)
         self.assertNotIn("peer-to-peer", js.lower())
         self.assertNotIn("meshtastic", js.lower())
