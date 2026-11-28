@@ -294,9 +294,9 @@ def _credits_og():
                 '<meta property="og:title" content="Image credits | BLACKOUT.NETWORK">'
                 '<meta property="og:description" content="Sources and licences for the images and video used on BLACKOUT.NETWORK.">'
                 '<meta property="og:url" content="https://blackout.network/credits">'
-                '<meta property="og:image" content="https://blackout.network/og/credits.png?v=5">'
-                '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'
-                '<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/credits.png?v=5">'
+                '<meta property="og:image" content="https://blackout.network/img/share-logo-1200.png">'
+                '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200">'
+                '<meta name="twitter:card" content="summary"><meta name="twitter:image" content="https://blackout.network/img/share-logo-1200.png">'
                 '<meta name="twitter:title" content="Image credits | BLACKOUT.NETWORK">')
 
 def credits_page():
@@ -411,8 +411,8 @@ def _home_page_raw():
 <link rel="canonical" href="https://blackout.network/">
 <meta property="og:type" content="website"><meta property="og:site_name" content="BLACKOUT.NETWORK"><meta property="og:title" content="Global threat monitoring | BLACKOUT.NETWORK">
 <meta property="og:description" content="{E(DESC)}"><meta property="og:url" content="https://blackout.network/">
-<meta property="og:image" content="https://blackout.network/og/home.png?v=5"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Global threat monitoring | BLACKOUT.NETWORK">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://blackout.network/og/home.png?v=5"><meta name="twitter:site" content="@BlkoutNtw">
+<meta property="og:image" content="https://blackout.network/img/share-logo-1200.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200"><meta property="og:image:alt" content="BLACKOUT.NETWORK">
+<meta name="twitter:card" content="summary"><meta name="twitter:image" content="https://blackout.network/img/share-logo-1200.png"><meta name="twitter:site" content="@BlkoutNtw">
 <meta name="twitter:title" content="Global threat monitoring | BLACKOUT.NETWORK"><meta name="twitter:description" content="{E(DESC)}">
 <link rel="preload" href="/fonts/montserrat-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" as="image" href="/bnt/media/hero-d.jpg?v={mv}" media="(min-width:901px)"><link rel="preload" as="image" href="/bnt/media/hero-m.jpg?v={mv}" media="(max-width:900px)">

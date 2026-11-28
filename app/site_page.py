@@ -84,11 +84,11 @@ def page(title, desc, body, path, active="", noindex=False, image=None, jsonld=N
                     f'<meta name="twitter:card" content="summary"><meta name="twitter:site" content="@BlkoutNtw">'
                     f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">')
         else:
-            img = image or f"{SITE}/og/home.png?v=5"
+            img = f"{SITE}/img/share-logo-1200.png"
             meta = (f'<meta property="og:type" content="{og_type}"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{E(t)}">'
                     f'<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{E(url)}"><meta property="og:image" content="{E(img)}">'
-                    f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(t)}">'
-                    f'<meta name="twitter:card" content="summary_large_image"><meta name="twitter:site" content="@BlkoutNtw">'
+                    f'<meta property="og:image:width" content="1200"><meta property="og:image:height" content="1200"><meta property="og:image:alt" content="{E(BRAND)}">'
+                    f'<meta name="twitter:card" content="summary"><meta name="twitter:site" content="@BlkoutNtw">'
                     f'<meta name="twitter:title" content="{E(t)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(img)}">')
     head = ((sitenav.UI.THEME_SCRIPT if sitenav is not None else "") + (sitenav.scroll_script() if sitenav is not None else "") + f'<title>{E(t)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="{E(url)}">'
             + meta + '<meta property="og:locale" content="en_US">'
