@@ -210,13 +210,9 @@ def render(cid, since=""):
         share_text = f"{title} (rank {rank}/10) via BLACKOUT.NETWORK"
         x_intent = None
         try:
-            import x_share
-            x_intent = x_share.intent_url(x_share.with_body({
-                "cluster_id": cid, "title": title, "headline": title,
-                "location": r.get("location") or "", "category": r.get("category") or "",
-                "brief": r.get("brief") or "", "rank": rank,
-                "watchlist": watch, "hidden": r.get("hidden") or 0,
-            }, alerts=rows or al, extra=what))
+            x_intent = _story_intent(cid, title, r.get("location") or "", r.get("category") or "",
+                                     r.get("brief") or "", rank, watch, r.get("hidden") or 0,
+                                     rows or al, what)
         except Exception:
             x_intent = None
         g_share = G.share_html(share_url, share_text, "story", intent=x_intent)
@@ -284,6 +280,27 @@ def render(cid, since=""):
     return 200, S.page(_short(title), desc, body, f"/wire/{cid}", "threat", noindex=noindex, jsonld=ld, image=g_img, script=bool(g_short), rank=rank)
 
 
+def _story_intent(cid, title, loc, category, brief, rank, watch, hidden, alerts, extra):
+    """Post on X intent for a story page: baked-in ready.tags when present, else generated.
+
+    The href already includes text, url and hashtags, so the button is one tap.
+    """
+    import x_share
+    body = x_share.with_body({
+        "cluster_id": cid, "title": title, "headline": title,
+        "location": loc or "", "category": category or "",
+        "brief": brief or "", "rank": rank,
+        "watchlist": watch or 0, "hidden": hidden or 0,
+    }, alerts=alerts, extra=extra)
+    tags = None
+    try:
+        import story_writer as SW
+        tags = SW.ready_tags(cid) or None
+    except Exception:
+        tags = None
+    return x_share.intent_url(body, tags=tags)
+
+
 def brief_page(cid):
     """Title + brief + share button from the DB only (no growth/people/report extras). Used when the full render fails."""
     r, al = _known_row(cid)
@@ -299,12 +316,19 @@ def brief_page(cid):
     share = ""
     try:
         import x_share
-        share = x_share.button_html(x_share.with_body({
+        body = x_share.with_body({
             "cluster_id": cid, "title": title, "headline": title,
             "location": loc, "category": r.get("category") or "",
             "brief": r.get("brief") or "", "rank": rank,
             "watchlist": r.get("watchlist") or 0, "hidden": r.get("hidden") or 0,
-        }, alerts=al, extra=what))
+        }, alerts=al, extra=what)
+        tags = None
+        try:
+            import story_writer as SW
+            tags = SW.ready_tags(cid) or None
+        except Exception:
+            tags = None
+        share = x_share.button_html(body, tags=tags)
     except Exception:
         share = ""
     src = ""

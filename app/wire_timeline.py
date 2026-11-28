@@ -524,19 +524,9 @@ def _xu_build(r, rk, h, title, loc, links, what, dek, hid):
     return x_share.intent_url(x_share.with_body(item))
 
 def _vt_intent(x_share, body, vt):
-    """X intent URL with exactly the validated tags (3-5), trimmed to fit 280 the way share_text does."""
-    from urllib.parse import quote
-    url = x_share.story_url(body)
-    h = x_share._headline(body, None)
-    tags = list(vt)[:5]
-    text = x_share._join(h, tags)
-    while len(tags) > min(3, len(vt)) and x_share.weighted_len(text, url) > 280:
-        tags = tags[:-1]; text = x_share._join(h, tags)
-    if x_share.weighted_len(text, url) > 280:
-        budget = max(8, 280 - (1 + x_share.TCO) - len(" " + " ".join(tags)))
-        cut = h[: budget - 1].rsplit(" ", 1)[0].rstrip(",;:-\u2014\u2013 ") if " " in h[:budget] else h[: budget - 1]
-        text = x_share._join(cut + "\u2026", tags)
-    return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(url, safe='')}", tags
+    """X intent URL with exactly the validated tags (3-5). text + url + hashtags, one tap."""
+    href, _h, tags = x_share.compose_intent(body, tags=list(vt)[:5])
+    return href, tags
 
 def _xu_for(r, rk, h, title, loc, links, what, dek, hid, compute):
     cid = r["id"]

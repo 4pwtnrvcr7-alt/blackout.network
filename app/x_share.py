@@ -1,8 +1,8 @@
 """Hashtags for the manual Share-to-X button on The Wire and story pages.
 
-Tags are added only to the prefilled composer text (x.com/intent/post). They are
-never printed on the page. This module does not post, schedule, or call any
-social API.
+The intent URL is a plain x.com/intent/post link with text, url and hashtags
+query params, so one tap opens the composer already filled. Tags are never
+printed on the page. This module does not post, schedule, or call any social API.
 """
 from __future__ import annotations
 import html
@@ -2105,16 +2105,47 @@ def weighted_len(text, url):
     return n
 
 
-def share_text(item, url=None, headline=None, tags=None):
-    """Headline + hashtags, trimmed so headline + tags + t.co link fit in 280.
+def _clean_stored(tags):
+    """Drop banned fluff and duplicates. Does not pad or run the heuristic filler test.
 
-    Drops the lowest-priority tag first when over budget, but never below MIN_TAGS;
-    the headline is shortened instead.
+    Baked-in / validator tags already passed the publish gate. The heuristic
+    _is_filler() falsely flags some good entity names (e.g. #NewZealand, because
+    "new" is a stop word). Only the explicit FILLER set is removed here
+    (#News, #WorldNews, #Breaking, #BlackoutNetwork, #Alerts, ...).
     """
-    url = url if url is not None else story_url(item)
-    h = _headline(item, headline)
-    # Always apply the public tag rule, including when a caller passes stored tags.
-    tags = finalize_tags(list(tags) if tags else hashtags(item, headline=headline), item, headline)
+    out = []
+    for t in tags or []:
+        t = "#" + str(t).lstrip("#")
+        name = t.lstrip("#")
+        if not name or name.lower() in FILLER:
+            continue
+        if any(t.lower() == k.lower() for k in out):
+            continue
+        out.append(t)
+        if len(out) >= MAX_TAGS:
+            break
+    return out
+
+
+def resolve_tags(item, headline=None, tags=None):
+    """Prefer a caller-supplied (baked-in) set of 3-5 tags after dropping banned ones.
+
+    Does not run entity_fill padding on a valid stored set — that used to replace
+    checked tags with junk. Falls back to the generator when fewer than MIN_TAGS remain.
+    """
+    if tags:
+        cleaned = _clean_stored(tags)
+        if len(cleaned) >= MIN_TAGS:
+            return cleaned[:MAX_TAGS]
+        if cleaned:
+            return finalize_tags(cleaned, item, headline)
+    return hashtags(item, headline=headline)
+
+
+def _fit_parts(headline, tags, url):
+    """Trim tags (never below MIN_TAGS) then the headline so headline+tags+t.co fit in 280."""
+    h = headline or ""
+    tags = list(tags or [])
     text = _join(h, tags)
     while len(tags) > MIN_TAGS and weighted_len(text, url) > 280:
         tags = tags[:-1]
@@ -2122,26 +2153,50 @@ def share_text(item, url=None, headline=None, tags=None):
     if weighted_len(text, url) > 280:
         budget = 280 - (1 + TCO if url else 0)
         if tags:
-            tail = " " + " ".join(tags)
-            budget -= len(tail)
-        else:
-            tail = ""
+            budget -= len(" " + " ".join(tags))
         budget = max(8, budget)
         cut = h[: budget - 1].rsplit(" ", 1)[0].rstrip(",;:-—– ") if " " in h[:budget] else h[: budget - 1]
         h = cut + "…"
         text = _join(h, tags)
-    return text
+    return h, tags
+
+
+def share_text(item, url=None, headline=None, tags=None):
+    """Headline + hashtags, trimmed so headline + tags + t.co link fit in 280.
+
+    Drops the lowest-priority tag first when over budget, but never below MIN_TAGS;
+    the headline is shortened instead. Always runs finalize_tags, including when a
+    caller passes a stored set, so junk (#Toward, #Canadian) is still cleaned.
+    """
+    url = url if url is not None else story_url(item)
+    tags = finalize_tags(list(tags) if tags else hashtags(item, headline=headline), item, headline)
+    h, tags = _fit_parts(_headline(item, headline), tags, url)
+    return _join(h, tags)
+
+
+def compose_intent(item, url=None, headline=None, tags=None):
+    """Build the X Web Intent: text (headline only), url, and hashtags (comma-separated, no #).
+
+    Returns (href, headline, tags). Tags stay out of `text` so the composer does not
+    duplicate them when the hashtags param is present. A baked-in set of 3-5 tags
+    (after dropping #News / #BlackoutNetwork and other FILLER) is used as-is.
+    """
+    page = url if url is not None else story_url(item)
+    h, tags = _fit_parts(_headline(item, headline), resolve_tags(item, headline, tags), page)
+    href = f"https://x.com/intent/post?text={quote(h, safe='')}&url={quote(page, safe='')}"
+    if tags:
+        href += f"&hashtags={quote(','.join(t.lstrip('#') for t in tags), safe=',')}"
+    return href, h, tags
 
 
 def intent_url(item, url=None, headline=None, tags=None):
-    page = url if url is not None else story_url(item)
-    text = share_text(item, url=page, headline=headline, tags=tags)
-    return f"https://x.com/intent/post?text={quote(text, safe='')}&url={quote(page, safe='')}"
+    """x.com/intent/post with text, url and hashtags. Ready on a single tap."""
+    return compose_intent(item, url=url, headline=headline, tags=tags)[0]
 
 
-def button_html(item, headline=None, cls="w2-btn-s", label="Post on X"):
+def button_html(item, headline=None, cls="w2-btn-s", label="Post on X", tags=None):
     """Compact Post on X control in the existing Wire button style. Tags live only in href."""
-    href = intent_url(item, headline=headline)
+    href = intent_url(item, headline=headline, tags=tags)
     klass = "w2-btn " + (cls or "")
     return (
         f'<a class="{E(klass.strip())}" href="{E(href)}" target="_blank" rel="noopener">'
