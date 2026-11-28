@@ -229,3 +229,27 @@ body.tl{background:#000}
 .tl-ar{font:600 9px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#9AA0A8;border:1px solid #4A4F57;padding:2px 5px 2px;margin-right:8px;vertical-align:1px}
 .tl-tg{margin:10px 0 14px;font:500 12px/1.5 Inter,sans-serif;color:#8A9098;word-spacing:6px}
 @media (max-width:520px){.tl-sa{-webkit-line-clamp:2}}
+
+/* Major alerts, rank 7+ (Nov 27 2026, Matt): vintage incandescent warning lamp + faint left-edge glow.
+   Pseudos only so the Refresh .tl-it.glow white flash (box-shadow on the row) can still play on top. */
+.tl-it.major{--tl-lamp:#E5484D}
+.tl-it.major::before{
+  content:"";position:absolute;left:2px;top:18px;width:7px;height:7px;border-radius:50%;pointer-events:none;z-index:2;
+  background:radial-gradient(circle at 32% 28%,#f5b8ae 0%,#e56a5a 38%,#c43838 72%,#6a1616 100%);
+  box-shadow:inset 0 -1px 1px rgba(80,8,8,.55),0 0 3px 1px rgba(229,72,77,.45),0 0 10px 2px rgba(229,72,77,.2);
+  animation:tllamp 3.6s ease-in-out infinite
+}
+.tl-it.major::after{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:10px;pointer-events:none;z-index:1;
+  background:linear-gradient(90deg,rgba(229,72,77,.22),rgba(229,72,77,.08) 45%,rgba(229,72,77,0));
+  box-shadow:-1px 0 10px 0 rgba(229,72,77,.16);
+  animation:tledge 3.6s ease-in-out infinite
+}
+@keyframes tllamp{0%,100%{opacity:.62;filter:brightness(.9)}50%{opacity:.95;filter:brightness(1.12)}}
+@keyframes tledge{0%,100%{opacity:.4}50%{opacity:.75}}
+.tl-it.dim.major::before,.tl-it.dim.major::after{opacity:.18;animation:none;filter:none}
+@media (prefers-reduced-motion:reduce){
+  .tl-it.major::before,.tl-it.major::after{animation:none}
+  .tl-it.major::before{opacity:.8;filter:none}
+  .tl-it.major::after{opacity:.55}
+}

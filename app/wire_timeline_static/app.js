@@ -125,7 +125,7 @@ function nodeFor(r){
   n=d.createElement("div");
   if(r.scan){n.className="tl-scanline";n.setAttribute("role","status");n.innerHTML="<span>"+esc(r.label)+"</span>"}
   else if(r.day){n.className="tl-day";n.innerHTML='<span>'+esc(r.label)+"</span>"}
-  else{var c=CAT[r.it.k]||{color:"#777"};n.className="tl-it"+(exp.has(r.key)?" open":"");n.setAttribute("role","listitem");n.style.setProperty("--c",c.color);
+  else{var c=CAT[r.it.k]||{color:"#777"};n.className="tl-it"+(exp.has(r.key)?" open":"")+(r.it.r>=7?" major":"");n.setAttribute("role","listitem");n.style.setProperty("--c",c.color);
     n.innerHTML=itemHTML(r.it,exp.has(r.key));n._r=r}
   n._k=r.key;list.appendChild(n);rendered.set(r.key,n);return n;
 }
@@ -133,10 +133,11 @@ function isNew(id){return !!(NEW[id]&&Date.now()-NEW[id]<90000)}
 function isUpdated(id){return !!(UPD[id]&&Date.now()-UPD[id]<90000)}
 function isGlow(id){return !!(GLOW[id]&&Date.now()-GLOW[id]<2600)}
 function paint(n,r){n.style.top=r.top+"px";n._r=r;if(r.scan)return;if(!r.day){var dim=!condensed&&!r.mt;if(n._dim!==dim){n._dim=dim;n.classList.toggle("dim",dim)}
-    var nw=isNew(r.it.id),up=!nw&&isUpdated(r.it.id),gl=isGlow(r.it.id);
+    var nw=isNew(r.it.id),up=!nw&&isUpdated(r.it.id),gl=isGlow(r.it.id),hi=r.it.r>=7;
     if(n._new!==nw){n._new=nw;n.classList.toggle("fresh",nw)}
     if(n._upd!==up){n._upd=up;n.classList.toggle("updated",up)}
-    if(n._glow!==gl){n._glow=gl;n.classList.toggle("glow",gl)}}else{var dd=active()&&!condensed&&r.m===0;if(n._dim!==dd){n._dim=dd;n.classList.toggle("dim",dd)}}}
+    if(n._glow!==gl){n._glow=gl;n.classList.toggle("glow",gl)}
+    if(n._major!==hi){n._major=hi;n.classList.toggle("major",hi)}}else{var dd=active()&&!condensed&&r.m===0;if(n._dim!==dd){n._dim=dd;n.classList.toggle("dim",dd)}}}
 function render(keep){
   var sy=W.scrollY,vh=W.innerHeight,y0=sy-tlTop-vh*BUF,y1=sy-tlTop+vh*(1+BUF),want=new Set();
   if(rows.length){for(var i=idxAt(Math.max(0,y0));i<rows.length&&rows[i].top<=y1;i++){var r=rows[i];if(r.hid)continue;want.add(r.key);paint(nodeFor(r),r)}}
