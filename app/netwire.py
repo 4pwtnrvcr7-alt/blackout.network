@@ -28,8 +28,37 @@ POWER_RX = re.compile(
     re.I,
 )
 SHUTDOWN_RX = re.compile(r"\b(?:shutdown|blackout|nationwide)\b", re.I)
+HYDRO_RX = re.compile(r"\b(?:hydroelectric|\bdam\b|dams\b|reservoir|spillway)\b", re.I)
+CABLE_RX = re.compile(
+    r"\b(?:undersea cable|submarine cable|subsea cable|cable cut|fiber cut|fibre cut|"
+    r"undersea fibre|undersea fiber)\b",
+    re.I,
+)
+DC_RX = re.compile(r"\b(?:data ?cent(?:er|re)s?|colocation|co-location|colo facility)\b", re.I)
+TOWER_RX = re.compile(
+    r"\b(?:cell towers?|cellular(?: network)?|mobile network|telecom(?:munications?)? outage|"
+    r"5G outage|wireless outage|phone network outage)\b",
+    re.I,
+)
+CLOUD_RX = re.compile(
+    r"\b(?:AWS|Amazon Web Services|Azure|Google Cloud|\bGCP\b|Cloudflare|Anthropic|OpenAI|"
+    r"Microsoft 365|status(?: page)?)\b",
+    re.I,
+)
+CLOUD_EVT_RX = re.compile(r"\b(?:outage|degraded|incident|disruption|downtime|major impact)\b", re.I)
 DAYS = 7
 CUR_GRACE = timedelta(minutes=75)
+KINDS = ("internet", "power", "hydro", "cloud", "cable", "towers", "dc")
+BAND_RANK = {"6h": 3, "24h": 2, "7d": 1}
+LAYER_LABEL = {
+    "internet": "internet outages",
+    "power": "power outages",
+    "hydro": "dam incidents",
+    "cloud": "cloud outages",
+    "cable": "cable cuts",
+    "towers": "cell and telecom outages",
+    "dc": "data-center incidents",
+}
 
 
 def _now():
@@ -89,6 +118,52 @@ def is_power(title, src=""):
     return bool(POWER_RX.search(t))
 
 
+def is_hydro(title, src=""):
+    return bool(HYDRO_RX.search(title or ""))
+
+
+def is_cable(title, src=""):
+    return bool(CABLE_RX.search(title or ""))
+
+
+def is_dc(title, src=""):
+    return bool(DC_RX.search(title or ""))
+
+
+def is_towers(title, src=""):
+    return bool(TOWER_RX.search(title or ""))
+
+
+def is_cloud(title, src=""):
+    t, s = title or "", src or ""
+    if STATUS_RX.search(t):
+        return True
+    blob = t + " " + s
+    if CLOUD_RX.search(blob) and CLOUD_EVT_RX.search(blob):
+        return True
+    return False
+
+
+def kind_of(title, src=""):
+    """One layer kind, most specific first. Status-page incidents are cloud, not internet."""
+    t, s = title or "", src or ""
+    if is_cable(t, s):
+        return "cable"
+    if is_hydro(t, s):
+        return "hydro"
+    if is_dc(t, s):
+        return "dc"
+    if is_towers(t, s):
+        return "towers"
+    if is_cloud(t, s):
+        return "cloud"
+    if is_internet(t, s):
+        return "internet"
+    if is_power(t, s):
+        return "power"
+    return None
+
+
 def _ioda_from(url):
     """IODA source URLs carry the outage start as ?from=<unix>."""
     if not url:
@@ -138,6 +213,34 @@ def parse_window(title, t, now=None):
     return start, end, cur, hours
 
 
+def band_of(start, end, cur, now=None):
+    """Recency band: 6h (or still current), 24h, or 7d. None if older."""
+    now = now or _now()
+    if cur:
+        return "6h"
+    ref = end if end is not None and end <= now else start
+    if ref is None:
+        return None
+    age = now - ref
+    if age <= timedelta(hours=6):
+        return "6h"
+    if age <= timedelta(hours=24):
+        return "24h"
+    if age <= timedelta(days=DAYS):
+        return "7d"
+    return None
+
+
+def best_band(stories):
+    best, rank = None, 0
+    for s in stories or []:
+        b = s.get("band") if isinstance(s, dict) else s
+        r = BAND_RANK.get(b) or 0
+        if r > rank:
+            best, rank = b, r
+    return best
+
+
 def story_from(row, now=None):
     """Normalize a heat_payload or SQL row into a grid outage story, or None."""
     now = now or _now()
@@ -150,12 +253,13 @@ def story_from(row, now=None):
     url = row.get("url") or ""
     if not src:
         src, url = _src_url(row.get("links") or row.get("l") or [])
-    kind = "internet" if is_internet(title, src) else "power" if is_power(title, src) else None
+    kind = kind_of(title, src)
     if not kind:
         return None
     t = start_t(row)
     start, end, cur, hours = parse_window(title, t, now)
-    if start and start < now - timedelta(days=DAYS) and not cur:
+    band = band_of(start, end, cur, now)
+    if not band:
         return None
     cid = row.get("id") or row.get("cluster_id") or ""
     href = f"/wire/{cid}" if re.fullmatch(r"[0-9a-f]{16}", str(cid)) else ""
@@ -174,6 +278,7 @@ def story_from(row, now=None):
         end=_iso(end),
         cur=bool(cur),
         hours=hours,
+        band=band,
         src=src,
         url=url,
         href=href,
@@ -183,18 +288,19 @@ def story_from(row, now=None):
 
 def stories_from_rows(rows, now=None):
     now = now or _now()
-    internet, power = [], []
+    bags = {k: [] for k in KINDS}
     seen = set()
     for row in rows or []:
         s = story_from(row, now)
         if not s or s["id"] in seen:
             continue
         seen.add(s["id"])
-        (internet if s["kind"] == "internet" else power).append(s)
-    key = lambda x: (not x["cur"], -( _ts(x["t"]).timestamp() if _ts(x["t"]) else 0))
-    internet.sort(key=key)
-    power.sort(key=key)
-    return {"internet": internet, "power": power, "ok": True}
+        bags.setdefault(s["kind"], []).append(s)
+    key = lambda x: (-(BAND_RANK.get(x.get("band")) or 0), not x["cur"], -(_ts(x["t"]).timestamp() if _ts(x["t"]) else 0))
+    for k in bags:
+        bags[k].sort(key=key)
+    bags["ok"] = True
+    return bags
 
 
 def _heat_rows():
@@ -240,8 +346,17 @@ def _sql_rows(days=DAYS):
             "AND (title LIKE '%internet outage%' OR title LIKE '%(IODA)%' "
             "OR title LIKE '%internet shutdown%' OR title LIKE '%internet blackout%' "
             "OR title LIKE '%without power%' OR title LIKE '%power outage%' "
-            "OR title LIKE '%blackout%') "
-            "ORDER BY t DESC LIMIT 400"
+            "OR title LIKE '%blackout%' "
+            "OR title LIKE '%data center%' OR title LIKE '%datacenter%' OR title LIKE '%data centre%' "
+            "OR title LIKE '%undersea%' OR title LIKE '%submarine cable%' OR title LIKE '%cable cut%' "
+            "OR title LIKE '%fiber cut%' OR title LIKE '%fibre cut%' "
+            "OR title LIKE '%cell tower%' OR title LIKE '%cellular%' OR title LIKE '%telecom%' "
+            "OR title LIKE '%mobile network%' "
+            "OR title LIKE '%hydroelectric%' OR title LIKE '% dam%' OR title LIKE '%dam %' "
+            "OR title LIKE '%reservoir%' "
+            "OR title LIKE '%(major impact%' OR title LIKE '%AWS%' OR title LIKE '%Azure%' "
+            "OR title LIKE '%Google Cloud%' OR title LIKE '%Cloudflare%') "
+            "ORDER BY t DESC LIMIT 800"
         )
         return [dict(r) for r in c.execute(q, [cut])]
     except Exception:
@@ -339,7 +454,8 @@ def apply_inet(payload, bundle, now=None):
     for s in stories:
         entry = dict(
             t=s["title"], src=s.get("src") or "The Wire", url=s.get("href") or s.get("url"),
-            at=s.get("t"), shutdown=bool(s.get("shutdown")), cur=bool(s.get("cur")), id=s.get("id"),
+            at=s.get("t"), shutdown=bool(s.get("shutdown")), cur=bool(s.get("cur")),
+            id=s.get("id"), band=s.get("band"),
         )
         for k in match_keys(s, places):
             p = places[k]
@@ -347,10 +463,15 @@ def apply_inet(payload, bundle, now=None):
             if not any(x.get("id") == entry["id"] for x in w):
                 w.append(entry)
             p["wire"] = w[:5]
+            b = best_band(p["wire"])
+            if b:
+                p["band"] = b
             if s.get("cur"):
                 lvl = 3 if s.get("shutdown") or (s.get("hours") or 0) >= 6 else 2
                 if lvl > p.get("level", -1):
                     p.update(level=lvl, status="Outage" if lvl >= 3 else "Degraded", since=s.get("t"))
+            elif b and (p.get("status") in (None, "Normal", "No data") or p.get("level", 0) <= 0):
+                p["status"] = {"6h": "In the last 6 hours", "24h": "In the last 24 hours", "7d": "In the last 7 days"}[b]
     lv = [p.get("level", -1) for p in places.values()]
     out["counts"] = dict(
         places=len(lv),
@@ -399,14 +520,15 @@ def countries(stories, centroids=None, alias=None, small=None, now=None):
         top = o["stories"][0]
         out.append(dict(
             cc=o["cc"], name=o["name"], geo=geo, lon=lon, lat=lat,
-            cur=o["cur"], major=bool(o["cur"] and (o["hours"] or 0) >= 6),
+            cur=o["cur"], band=best_band(o["stories"]),
+            major=bool(o["cur"] and (o["hours"] or 0) >= 6),
             signals=["wire"], last=o["last"],
             ioda=f"https://ioda.inetintel.cc.gatech.edu/country/{o['cc']}" if len(o["cc"]) == 2 else None,
             src=top.get("src") or "The Wire",
             href=top.get("href") or "",
             stories=[{"id": s["id"], "title": s["title"], "t": s["t"], "end": s.get("end"),
                       "cur": s["cur"], "src": s.get("src"), "href": s.get("href"),
-                      "hours": s.get("hours")} for s in o["stories"][:5]],
+                      "hours": s.get("hours"), "band": s.get("band")} for s in o["stories"][:5]],
         ))
     out.sort(key=lambda x: (not x["cur"], x["name"] or ""))
     return out
@@ -424,3 +546,86 @@ def daily_from(stories, days=30, now=None):
         if 0 <= k < days:
             daily[days - 1 - k] += 1
     return daily
+
+
+def _is_us(s):
+    cc = (s.get("cc") or "").upper()
+    if cc == "US":
+        return True
+    place = (s.get("place") or "") + " " + (s.get("title") or "")
+    return bool(re.search(r"\b(?:united states|\bUSA\b|\bU\.S\.\b)\b", place, re.I))
+
+
+def _is_major(s):
+    return bool(s.get("shutdown") or (s.get("hours") or 0) >= 6 or re.search(r"\bmajor\b", s.get("title") or "", re.I))
+
+
+def slim_story(s):
+    return {k: s.get(k) for k in (
+        "id", "title", "t", "end", "cur", "band", "place", "cc", "lat", "lon",
+        "href", "src", "kind", "hours", "shutdown", "prec",
+    )}
+
+
+def layer_stats(stories, now=None):
+    """Counts and a U.S. line for one layer's Wire stories (already band-filtered)."""
+    n6 = n24 = n7 = 0
+    ccs24 = set()
+    us_major = 0
+    for s in stories or []:
+        b = s.get("band")
+        if not b:
+            continue
+        n7 += 1
+        if b in ("6h", "24h"):
+            n24 += 1
+            if s.get("cc"):
+                ccs24.add(s["cc"].upper())
+            elif s.get("place"):
+                ccs24.add((s["place"].split(",")[-1] if "," in s["place"] else s["place"]).strip())
+        if b == "6h":
+            n6 += 1
+        if _is_us(s) and b in ("6h", "24h") and _is_major(s):
+            us_major += 1
+    us = f"U.S.: {us_major} major" if us_major else "U.S.: none major"
+    return dict(
+        n6=n6, n24=n24, n7=n7, countries_24h=len(ccs24), us=us,
+        stories=[slim_story(s) for s in (stories or [])],
+    )
+
+
+def layers(bundle, now=None):
+    if not bundle:
+        return None
+    return {k: layer_stats(bundle.get(k) or [], now) for k in KINDS}
+
+
+def pill_text(kinds, layer_counts, mobile=False):
+    """Truthful, global summary for the map chip. kinds is the visible layer set."""
+    kinds = [k for k in (kinds or KINDS) if k in (layer_counts or {})]
+    if not kinds or not layer_counts:
+        return "No matching outage stories on the Wire in the last 7 days"
+    n24 = sum(layer_counts[k]["n24"] for k in kinds)
+    n7 = sum(layer_counts[k]["n7"] for k in kinds)
+    countries = sum(layer_counts[k]["countries_24h"] for k in kinds)
+    us_bits = [layer_counts[k]["us"] for k in kinds]
+    us = "U.S.: none major" if all(x == "U.S.: none major" for x in us_bits) else next(
+        (x for x in us_bits if x != "U.S.: none major"), "U.S.: none major"
+    )
+    if n7 == 0:
+        if len(kinds) == 1:
+            return f"No {LAYER_LABEL[kinds[0]]} on the Wire in the last 7 days"
+        return "No matching outage stories on the Wire in the last 7 days"
+    active24 = [k for k in kinds if layer_counts[k]["n24"]]
+    if len(active24) == 1:
+        lab = LAYER_LABEL[active24[0]]
+        m = layer_counts[active24[0]]["countries_24h"]
+        if n24:
+            return f"{n24} {lab} in 24 h · {m} countries · {us}"
+    if n24 == 0:
+        if len(kinds) == 1:
+            return f"No {LAYER_LABEL[kinds[0]]} in 24 h · {n7} this week · {us}"
+        return f"No outages in 24 h · {n7} this week · {us}"
+    if len(kinds) == 1:
+        return f"{n24} {LAYER_LABEL[kinds[0]]} in 24 h · {countries} countries · {us}"
+    return f"{n24} outages in 24 h · {countries} countries · {us}"

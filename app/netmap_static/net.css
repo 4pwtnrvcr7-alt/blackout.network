@@ -368,3 +368,12 @@ body.nx-sky .nx-sw,body.nx-sky .nx-ss,.nx-sw,.nx-ss{display:none!important}
 .nx-ss-pin,.nx-sw-pin{position:absolute;transform:translate(-50%,-50%);padding:4px 8px;border-radius:99px;background:rgba(5,6,10,.82);border:1px solid var(--nx-bd);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font:600 11px/1.2 Inter,system-ui,sans-serif;color:var(--nx-tx);white-space:nowrap;letter-spacing:.02em}
 .nx-sw-pin{font-weight:600;color:rgba(240,240,250,.88)}
 @media (max-width:767px){.nx-ss-pin,.nx-sw-pin{font-size:10px;padding:3px 7px}}
+
+/* Nov 27 2026: Wire recency key (red / orange / grey-red; not gold) */
+:root{--nx-6h:#FF3B3B;--nx-24h:#FF8A3D;--nx-7d:#A35C55}
+.nx-leg i.s-6h{background:var(--nx-6h)}.nx-leg i.s-24h{background:var(--nx-24h)}.nx-leg i.s-7d{background:var(--nx-7d)}
+.nx-leg #nx_wire_leg_h{margin:0 0 6px;font:600 10px/1.2 Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(240,240,250,.7)}
+.nx-chip.s-24h i{background:var(--nx-24h)}.nx-chip.s-7d i{background:var(--nx-7d)}
+
+.nx-leg-mini{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:99px;background:rgba(5,6,10,.78);border:1px solid rgba(240,240,250,.28);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.nx-leg-mini i{width:10px;height:10px;border-radius:50%}
