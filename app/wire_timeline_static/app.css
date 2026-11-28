@@ -11,7 +11,7 @@ body.tl{background:#000}
 #tl_main,.tl .w2-foot{position:relative;z-index:1}
 #tl_main{padding:0!important;margin:0!important;max-width:none!important}
 .tl-qx[hidden],.tl-clear[hidden],.tl-top[hidden],.tl-jump[hidden],.tl-sheet[hidden],.tl-upd[hidden],.tl-newp[hidden],.tl-fbadge[hidden],.tl-loclab[hidden]{display:none!important}
-.tl-b,.tl-chip,.tl-jb,.tl-top,.tl-newp,.tl-clear,.tl-hd,.tl-search,.tl-now,.tl-loc input,.tl-fbadge{border-radius:0!important}
+.tl-search,.tl-loc input,.tl-hd,.tl-fbadge{border-radius:0!important}
 .tl .w2-foot{background:#000}
 /* hero */
 .tl-hero{position:relative;min-height:100svh;display:flex;align-items:flex-end;padding:0 var(--w2-gut) 14vh;box-sizing:border-box}

@@ -78,7 +78,7 @@ h2.h-h{font-size:clamp(32px,4.6vw,64px)}
 .h-scale .bnt-key{margin-top:12px}
 /* coverage tiles (peek: hover/tap for a one-line explainer) */
 .h-chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:4px 0 32px;max-width:780px}
-.h-chip{display:block;padding:13px 14px;border:1px solid var(--bnt-ink-15);background:rgba(0,0,0,.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:3px;transition:border-color .25s,background .25s}
+.h-chip{display:block;padding:13px 14px;border:1px solid var(--bnt-ink-15);background:rgba(0,0,0,.42);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:var(--bn-radius-pill, 9999px);transition:border-color .25s,background .25s}
 .h-chip .h-ct{display:flex;align-items:center;gap:10px;font:600 12px/1.2 var(--bnt-hd);letter-spacing:.06em;text-transform:uppercase}
 .h-chip svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--bnt-y);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .h-chip .bnt-peek-d p{margin:8px 0 0;font-size:12.5px;line-height:1.45;color:var(--bnt-ink-80)}
@@ -98,7 +98,7 @@ h2.h-h{font-size:clamp(32px,4.6vw,64px)}
 .h-optin .nl-trk .nl-chk{font-size:12.5px;line-height:1.45;color:var(--bnt-ink-60)}
 .h-optin input[type=email]{flex:1;min-width:0;height:56px;background:rgba(0,0,0,.5);border:2px solid var(--bnt-ink-35);color:var(--bnt-ink);font:500 16px/1 var(--bnt-tx);padding:0 16px;border-radius:2px;backdrop-filter:blur(6px)}
 .h-optin input[type=email]:focus{outline:none;border-color:var(--bnt-y)}
-.h-optin button.pri{height:56px;padding:0 24px;background:var(--bnt-y);color:#000;border:0;border-radius:2px;font:700 12.5px/1 var(--bnt-hd);letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
+.h-optin button.pri{height:56px;padding:0 24px;background:var(--bnt-y);color:#000;border:0;border-radius:var(--bn-radius-pill, 9999px);font:700 12.5px/1 var(--bnt-hd);letter-spacing:.14em;text-transform:uppercase;cursor:pointer;white-space:nowrap}
 .h-optin button.pri:hover,.h-optin button.pri:focus-visible{background:#fff}
 .h-optin .nl-freq,.h-optin .nl-loc-l,.h-optin .nl-loc,.h-optin .nl-loc+.nl-sm,.h-optin .nl-crime,.h-optin .nl-cats-d{display:none}
 .h-optin.more .nl-freq,.h-optin.more .nl-loc-l,.h-optin.more .nl-loc,.h-optin.more .nl-loc+.nl-sm,.h-optin.more .nl-crime,.h-optin.more .nl-cats-d{display:block}

@@ -12,7 +12,7 @@
 @media (max-width:560px){.bn-logo .bnt-wm{font-size:15px!important;letter-spacing:.06em!important}}
 .bnt-dot{color:var(--bnt-y)}
 /* buttons */
-.bnt-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font:700 12.5px/1 var(--bnt-hd);letter-spacing:.16em;text-transform:uppercase;color:var(--bnt-ink);border:2px solid currentColor;padding:16px 28px;border-radius:2px;position:relative;overflow:hidden;isolation:isolate;transition:color .3s;background:none;cursor:pointer;text-decoration:none}
+.bnt-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font:700 12.5px/1 var(--bnt-hd);letter-spacing:.16em;text-transform:uppercase;color:var(--bnt-ink);border:2px solid currentColor;padding:16px 28px;border-radius:var(--bn-radius-pill, 9999px);position:relative;overflow:hidden;isolation:isolate;transition:color .3s;background:none;cursor:pointer;text-decoration:none}
 .bnt-btn::before{content:"";position:absolute;inset:0;background:var(--bnt-ink);transform:translateY(101%);transition:transform .3s var(--bnt-ease);z-index:-1}
 .bnt-btn:hover,.bnt-btn:focus-visible{color:#000}.bnt-btn:hover::before,.bnt-btn:focus-visible::before{transform:none}
 .bnt-btn.y{color:var(--bnt-y)}.bnt-btn.y::before{background:var(--bnt-y)}.bnt-btn.y:hover,.bnt-btn.y:focus-visible{color:#000}
@@ -92,7 +92,7 @@ html body [data-bn-refresh],html body .bn-rf-st,html body [data-bn-theme],html b
 
 /* Nov 17 2:37 AM (Matt): SpaceX-style monochrome buttons: thin white outline, square corners, small tracked uppercase, white fill + black text on hover.
    Colour is reserved for data meaning (rank chips, gauges). */
-.bnt-btn,.bnt-btn.y{border-width:1px!important;border-radius:0!important;font-size:11.5px!important;letter-spacing:.18em!important;color:#F2F2F4!important;padding:14px 26px}
+.bnt-btn,.bnt-btn.y{border-width:1px!important;font-size:11.5px!important;letter-spacing:.18em!important;color:#F2F2F4!important;padding:14px 26px}
 .bnt-btn::before,.bnt-btn.y::before{background:#F2F2F4!important}
 .bnt-btn:hover,.bnt-btn:focus-visible,.bnt-btn.y:hover,.bnt-btn.y:focus-visible{color:#05060a!important}
 
@@ -102,7 +102,7 @@ html body [data-bn-refresh],html body .bn-rf-st,html body [data-bn-theme],html b
 :root:root:root{--bn-brand:#F2F2F4;--bn-brand-ink:#F2F2F4;--bn-accent:#F2F2F4;--bn-active:rgba(242,242,244,.06);--v3-glow:transparent;
  --bn-link:#E6E9EE;--ac:#E6E9EE;--bn-mark-hi:#F2F2F4;--bn-ink-on-brand:#05060a;--v3-rule:none;--a-y:#F2F2F4;--a-lk:#E6E9EE}
 html body header.bn-top::after{display:none!important}
-html body :is(button.pri,.pri[role=button],a.pri,.nl-card button[type=submit],a.np-btn,.btn-primary,.cta-btn){background:transparent!important;border:1px solid rgba(242,242,244,.85)!important;color:#F2F2F4!important;border-radius:0!important;
+html body :is(button.pri,.pri[role=button],a.pri,.nl-card button[type=submit],a.np-btn,.btn-primary,.cta-btn){background:transparent!important;border:1px solid rgba(242,242,244,.85)!important;color:#F2F2F4!important;
  font-family:var(--bnt-hd,Montserrat,sans-serif)!important;font-weight:700!important;font-size:11.5px!important;letter-spacing:.18em!important;text-transform:uppercase!important;padding:13px 22px!important;box-shadow:none!important;transition:background .2s,color .2s}
 html body :is(button.pri,.pri[role=button],a.pri,.nl-card button[type=submit],a.np-btn,.btn-primary,.cta-btn):is(:hover,:focus-visible){background:#F2F2F4!important;color:#05060a!important}
 html body .bn-primary a[aria-current="page"]{box-shadow:inset 0 -1px 0 #F2F2F4}
@@ -164,7 +164,7 @@ details.bnt-sacc>summary::after{content:"+";font:300 26px/1 var(--bnt-hd,Montser
 details.bnt-sacc[open]>summary::after{content:"\2013"}
 details.bnt-sacc[open]>summary{margin-bottom:16px}
 /* legacy text buttons -> monochrome square (theme.js mbtn()) */
-html body .bnt-mbtn{border-radius:0!important;background:transparent!important;border:1px solid rgba(242,242,244,.35)!important;color:#F2F2F4!important;
+html body .bnt-mbtn{background:transparent!important;border:1px solid rgba(242,242,244,.35)!important;color:#F2F2F4!important;
  font-family:var(--bnt-hd,Montserrat,sans-serif)!important;font-weight:700!important;font-size:11px!important;letter-spacing:.16em!important;text-transform:uppercase!important;padding:10px 16px!important;box-shadow:none!important}
 html body .bnt-mbtn:is(:hover,:focus-visible){background:#F2F2F4!important;color:#05060a!important}
 html body .bnt-mbtn[aria-pressed=true],html body .bnt-mbtn.on,html body .bnt-mbtn.active{background:#F2F2F4!important;color:#05060a!important}
@@ -176,14 +176,14 @@ details.bnt-leg{margin:6px 0 12px}
 html body main select{border-radius:0!important}
 
 /* Nov 17 push C: square monochrome section-nav chips */
-body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a{border-radius:0!important;border:1px solid rgba(242,242,244,.55)!important;background:transparent!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.1em;font-size:11px!important}
+body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a{border:1px solid rgba(242,242,244,.55)!important;background:transparent!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.1em;font-size:11px!important}
 body:not(.bnt-home) :is(.sc-toc,[class$=-toc],.chips) a:hover{background:#F2F2F4!important;color:#000!important}
 
 /* Nov 17 push D: Push to Mesh stays hidden unless BN_MESH_SHARE=1 unhides it; story headline in sentence case */
 html body .bng-mesh[hidden]{display:none!important}
 body:has(#bn_story) h1.t{text-transform:none!important;letter-spacing:-.01em}
 /* Nov 17 push E: story share row = square outlined monochrome buttons (all of them); solar lead = diagram only */
-html body .bng-share .bng-sb{border-radius:0!important;background:transparent!important;border:1px solid rgba(242,242,244,.55)!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.12em;font:600 11px/1 Inter,system-ui,sans-serif!important;padding:10px 14px!important;min-height:36px}
+html body .bng-share .bng-sb{background:transparent!important;border:1px solid rgba(242,242,244,.55)!important;color:#F2F2F4!important;text-transform:uppercase;letter-spacing:.12em;font:600 11px/1 Inter,system-ui,sans-serif!important;padding:10px 14px!important;min-height:36px}
 html body .bng-share .bng-sb:is(:hover,:focus-visible){background:#F2F2F4!important;color:#05060a!important}
 html body .bng-share .bng-sb[hidden]{display:none!important}
 .ss-lead.ss-lead-fig{display:block!important}
@@ -228,3 +228,26 @@ html.bn-snap-js{scroll-snap-type:none!important;scroll-behavior:auto!important}
 html.bn-menu-on body header.bn-top{z-index:2700!important}
 /* Matt 5:25 PM: old regional heat map tab is retired; Heat Map opens /map */
 nav.tabs button[data-tab="heatmap"],.tabs button[data-tab="heatmap"]{display:none!important}
+
+/* Matt Nov 28 2026: every button-like control is a pill (border-radius 9999px)
+   through --bn-radius-pill. Not cards, panels, images, text fields, map vendor
+   controls, full-width menu/accordion/Wire row headers, or the attached
+   menu-search go button. Story-page .pill typography stays an underline. */
+:is(
+  button,
+  .btn,
+  [role="button"],
+  input[type="submit"],
+  input[type="button"],
+  input[type="reset"],
+  a.btn,a.pri,a.np-btn,a.cta-btn,a.bnt-btn,a.bng-sb,a.bn-follow,a.bn-fbm,
+  .pri[role="button"],
+  .btn-primary,.cta-btn,.bnt-btn,.bnt-mbtn,.bng-sb,.bng-btn,.bn-fbm,
+  .bn-ref,#tl_ref,.bn-ib,.bn-primary a,.bn-mbar .bn-close,
+  .w2-btn,.w2-btn-s,.nl-btn,.nla-btn,.tl-b,.tl-chip,.tl-jb,.tl-top,.tl-newp,.tl-clear,.tl-now,
+  [class*="-chip"]:not([class*="-chips"]),
+  .chip,.pill
+):not(.leaflet-control *,.leaflet-ctrl *,.maplibregl-ctrl-group *,.maplibregl-popup-close-button,.maplibregl-ctrl-attrib-button):not(.nsa-b,.ss-ah,.hm-ah,.ns-row,.bn-mrow,.bn-theme-row,.bns-go,.bna-barday,.tl-hd){
+  border-radius:var(--bn-radius-pill, 9999px)!important;
+}
+html body:has(#bn_story) .pill{border-radius:0!important}
