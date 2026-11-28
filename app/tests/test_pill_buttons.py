@@ -48,6 +48,14 @@ class PillToken(unittest.TestCase):
         self.assertIn(".tl-hd", SITENAV)
         self.assertIn(".wt-it>button", SITENAV)
         self.assertIn(".wt-it>button", THEME)
+        self.assertIn(".nb-t", SITENAV)
+        self.assertIn(".nb-t", THEME)
+        self.assertIn(".nb-key", SITENAV)
+        self.assertIn(".nb-key", THEME)
+        start=SITENAV.index("every button-like control is a pill")
+        rule=SITENAV[SITENAV.index(":is(", start):SITENAV.index("html body:has(#bn_story)")]
+        self.assertNotIn('[class*="-chip"]', rule)
+        self.assertIn('.nx-chip,.bnm-chip,.tl-chip', rule)
         self.assertIn(".bn-mrow", SITENAV)
         self.assertIn(".bns-go", SITENAV)
         # Story typography .pill stays an underline, not a capsule.
