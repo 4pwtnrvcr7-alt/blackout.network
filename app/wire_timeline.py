@@ -1348,14 +1348,7 @@ def page_html():
         import wire_v2; menu = wire_v2.menu_html(); w2 = wire_v2.ST
     except Exception:
         menu = ""; w2 = "/wire2/static"
-    m = meta_cached()
     cfg = {"cats": [{"k": k, "label": l, "color": col} for k, l, col in CATS], "regions": [{"k": k, "label": l} for k, l in REGIONS]}
-    tot = m.get("total") or 0
-    since = ""
-    if m.get("earliest"):
-        try: since = datetime.fromisoformat(m["earliest"].replace("Z", "+00:00")).strftime("%b %-d, %Y")
-        except Exception: since = ""
-    line = f"{tot:,} signals since {since}. Newest at the top." if tot and since else "Every signal we have collected, newest at the top."
     v_css, v_js = _ver("app.css"), _ver("app.js")
     title = "The Wire: live threat feed | BLACKOUT.NETWORK"
     desc = "Every signal BLACKOUT.NETWORK has collected, in one timeline."
@@ -1377,7 +1370,7 @@ def page_html():
 <video class="tl-vid" muted loop playsinline preload="none" disablepictureinpicture tabindex="-1" data-webm="/bnt/media/wtvid-d.webm?v=1" data-mp4="/bnt/media/wtvid-d.mp4?v=1"></video><i class="tl-veil"></i></div>
 <main id="tl_main">
 <section class="tl-hero" aria-label="The Wire"><div class="tl-hc"><p class="w2-eb">The Wire &middot; Timeline</p><h1 class="w2-ht">Every signal</h1>
-<p class="w2-hl" id="tl_line">{E(line)}</p><p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
+<p class="tl-stale" id="tl_stale" hidden aria-live="polite"></p><a class="w2-btn" href="#tl_start" id="tl_enter">Enter the timeline <span aria-hidden="true">&darr;</span></a></div>
 <a class="tl-cue" href="#tl_start" aria-label="Scroll to the timeline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></a></section>
 <div id="tl_start"></div>
 <div class="tl-ctl" id="tl_ctl">
