@@ -66,6 +66,13 @@ body.wt{margin:0;background:var(--wt-bg);color:var(--wt-tx);font:14px/1.5 Inter,
 .wt-pop b{display:block;font-size:14px;margin-bottom:2px}.wt-pop .k{color:var(--wt-mu);font-size:12px;display:block}
 .wt-pop a{color:var(--wt-tx);text-decoration:underline;text-underline-offset:3px}
 .maplibregl-popup-close-button{color:#fff;font-size:20px;width:32px;height:32px}
+
+.wt-page-share{margin:12px 0 4px}
+.wt-page-share .bng-share{margin:0}
+.wt-it .x .bng-share{margin:10px 0 0}
+.wt-it .x .bng-share a{text-decoration:none}
+body.wt .bng-mesh{display:none!important}
+.wt-panel .bng-foot{margin:28px 0 0;padding:22px 0 0;border-top:1px solid var(--wt-bd);background:transparent}
 @media(min-width:900px){
  #wt_main{height:calc(100dvh - var(--wt-hd));min-height:520px;display:grid;grid-template-columns:minmax(0,1fr) 440px}
  .wt-map-wrap{height:auto;min-height:0;border-bottom:0;border-right:1px solid var(--wt-bd)}
