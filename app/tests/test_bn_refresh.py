@@ -149,5 +149,114 @@ class TestFreshBypassesCaches(unittest.TestCase):
         self.assertIn("force", inspect.signature(netmap.swr).parameters)
 
 
+
+class TestRefreshModes(unittest.TestCase):
+    def setUp(self):
+        import sitenav_ui as UI
+        self.UI = UI
+        UI.set_page_path("")
+
+    def tearDown(self):
+        self.UI.set_page_path("")
+
+    def test_mode_table(self):
+        UI = self.UI
+        cases = {
+            "/wire": "inpage", "/map": "inpage", "/grid": "inpage", "/weather": "inpage", "/markets": "inpage",
+            "/people": "header", "/people/ada-lovelace": "header", "/mesh": "header", "/mesh/chat": "header",
+            "/stats": "header", "/sources": "header", "/wire-classic": "header", "/grid/aws": "header",
+            "/privacy": "off", "/tos": "off", "/terms": "off", "/cookies": "off", "/privacy-choices": "off",
+            "/do-not-sell": "off", "/credits": "off", "/scoring": "off", "/about/scoring": "off",
+            "/welcome": "off", "/ready": "off", "/report-status": "off", "/newsletter": "off",
+            "/newsletter/sample": "off", "/social": "off", "/story/x": "off", "/mesh/guide": "off",
+            "/sources/admin": "off", "/wire/deadbeefdeadbeef": "off", "/": "off", "/figures": "off",
+        }
+        for path, mode in cases.items():
+            self.assertEqual(UI.refresh_mode(path), mode, path)
+
+    def test_compact_markup(self):
+        UI = self.UI
+        html = UI.refresh_fill_btn("bn_hdr_ref", compact=True)
+        self.assertIn("bn-ref-sm", html)
+        self.assertIn('id="bn_hdr_ref"', html)
+        self.assertIn("tl-ref-fill", html)
+        self.assertIn(">Refresh</span>", html)
+        self.assertIn("linear-gradient" if False else "tl-ref-sheen", html)
+        css = _read("static", "bn-refresh.css")
+        self.assertIn(".bn-ref.bn-ref-sm", css)
+        js = _read("static", "bn-refresh.js")
+        self.assertIn("headerRun", js)
+        self.assertIn("bindHeader", js)
+
+    def test_legal_pages_have_no_old_or_new_refresh_control(self):
+        import sitenav
+        UI = self.UI
+        for path in ("/privacy", "/tos", "/cookies", "/credits", "/scoring", "/welcome"):
+            UI.set_page_path(path)
+            html = sitenav.header_html()
+            self.assertNotIn("data-bn-refresh", html, path)
+            self.assertNotIn('id="bn_hdr_ref"', html, path)
+            self.assertNotIn("bn-rf-row", html, path)
+
+    def test_header_pages_emit_compact_button(self):
+        import sitenav
+        UI = self.UI
+        for path in ("/people", "/stats", "/sources", "/mesh"):
+            UI.set_page_path(path)
+            html = sitenav.header_html()
+            self.assertIn('id="bn_hdr_ref"', html, path)
+            self.assertIn("bn-ref-sm", html, path)
+            self.assertIn("tl-ref-fill", html, path)
+            self.assertNotIn("data-bn-refresh", html, path)
+
+    def test_inpage_pages_do_not_also_get_header_button(self):
+        import sitenav
+        UI = self.UI
+        for path in ("/wire", "/map", "/grid", "/weather", "/markets"):
+            UI.set_page_path(path)
+            html = sitenav.header_html()
+            self.assertNotIn('id="bn_hdr_ref"', html, path)
+            self.assertEqual(UI.refresh_btn(), "")
+
+    def test_markets_nav_wraps_at_390(self):
+        css = _read("markets_static", "app.css")
+        self.assertIn(".mk-nav{flex-wrap:wrap", css)
+        self.assertIn(".mk-navi{flex:1 1 100%", css)
+
+    def test_people_and_netpages_force_signatures(self):
+        import inspect, people, netpages, stats, meshnet
+        self.assertIn("force", inspect.signature(people.index_payload).parameters)
+        self.assertIn("force", inspect.signature(netpages.brief).parameters)
+        self.assertIn("force", inspect.signature(netpages.data).parameters)
+        self.assertIn("force", inspect.signature(stats.load).parameters)
+        self.assertIn("force", inspect.signature(stats.public_json).parameters)
+        self.assertIn("force", inspect.signature(meshnet.data).parameters)
+        self.assertIn("force", inspect.signature(meshnet.public_feed).parameters)
+
+    def test_sources_and_mesh_and_classic_hooks(self):
+        self.assertIn("window.bnRefreshPage", _read("sources_static", "app.js"))
+        self.assertIn("fresh=1", _read("sources_static", "app.js"))
+        self.assertIn("id=\"sc_up\"", _read("sources.py"))
+        self.assertIn("window.bnRefreshPage", _read("meshnet_static", "app.js"))
+        self.assertIn("/api/mesh/nodes?fresh=1", _read("meshnet_static", "app.js"))
+        self.assertIn("window.bnRefreshPage", _read("meshnet_static", "chat.js"))
+        self.assertIn("/api/mesh/chat?fresh=1", _read("meshnet_static", "chat.js"))
+        w2 = _read("wire_v2.py")
+        self.assertIn("bn_hdr_ref", w2)
+        self.assertIn("fresh=1", w2)
+        self.assertIn("wc_up", w2)
+        st = _read("stats.py")
+        self.assertIn("st_up", st)
+        self.assertIn("/api/stats?fresh=1", st)
+        self.assertIn("id=\"st_yt_up\"", st)
+        np = _read("netpages.py")
+        self.assertIn("np_fetched", np)
+        self.assertIn("brief?fresh=1", np)
+        pe = _read("people.py")
+        self.assertIn("/api/people/index?fresh=1", pe)
+        self.assertIn("id=\"pf_up\"", pe)
+
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -165,14 +165,52 @@ def shell(title, desc, body, path, rank=None, noindex=False):
     except Exception:
         meta = ""
     robots = '<meta name="robots" content="noindex,nofollow,noarchive">' if noindex else ""
-    return f'''<!doctype html><html lang="en" data-bnt-home data-bn-w2><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>{E(title)}</title><meta name="description" content="{E(desc)}"><link rel="canonical" href="https://blackout.network{E(path)}">
-{robots}{meta}<meta name="theme-color" content="#000"><!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here --><link rel="stylesheet" href="{ST}/wire2.css?v=7"></head>
-<body class="w2"><header class="w2-bar" id="w2_bar"><a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>
-<button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false"><span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span><span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button></header>
-{menu_html()}<main id="w2_main">{body}</main>
-<footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p><p class="w2-legal">Independent early-warning signals. Not an official alert service. <a href="/scoring">How we score</a> · <a href="/privacy">Privacy</a> · <a href="/tos">Terms</a></p></footer>
-<script src="{ST}/wire2.js?v=3" defer></script></body></html>'''
+    extra_head, extra_js = "", ""
+    menu_btn = (
+        '<button type="button" class="w2-mbtn" id="w2_open" aria-label="Open menu" aria-controls="w2_menu" aria-expanded="false">'
+        '<span class="bn-hx" aria-hidden="true"><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span><span class="bn-hx-bar"></span></span>'
+        '<span class="bn-bl"><span class="bn-bl-a">Menu</span><span class="bn-bl-b">Close</span></span></button>'
+    )
+    if path == "/wire-classic":
+        try:
+            import sitenav_ui
+            extra_head = sitenav_ui.refresh_fill_assets() + (
+                "<style>.w2-bar-end{display:flex;align-items:center;gap:10px}"
+                ".w2-bar .bn-ref-sm{flex:none}</style>"
+            )
+            btn = sitenav_ui.refresh_fill_btn("bn_hdr_ref", compact=True)
+            extra_js = (
+                '<script>window.bnRefreshPage=function(){return fetch("/wire-classic?fresh=1&_="+Date.now(),{cache:"no-store"})'
+                ".then(function(r){if(!r.ok)throw new Error(r.status);return r.text()}).then(function(html){"
+                'var doc=new DOMParser().parseFromString(html,"text/html");'
+                'var neu=doc.getElementById("w2_main"),cur=document.getElementById("w2_main");'
+                "if(neu&&cur)cur.innerHTML=neu.innerHTML;return \"Updated\"})};</script>"
+            )
+        except Exception:
+            btn = ""
+        bar_end = f'<div class="w2-bar-end">{btn}{menu_btn}</div>'
+    else:
+        bar_end = menu_btn
+    mid = chr(183)  # middle dot
+    return (
+        f'<!doctype html><html lang="en" data-bnt-home data-bn-w2><head><meta charset="utf-8">'
+        f'<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+        f'<title>{E(title)}</title><meta name="description" content="{E(desc)}">'
+        f'<link rel="canonical" href="https://blackout.network{E(path)}">'
+        f'{robots}{meta}<meta name="theme-color" content="#000">'
+        f'<!-- w2: own design system; server.pwa_head skips the shared theme layer when it sees /bnt/theme.css here -->'
+        f'<link rel="stylesheet" href="{ST}/wire2.css?v=7">{extra_head}</head>'
+        f'<body class="w2"><header class="w2-bar" id="w2_bar">'
+        f'<a class="w2-wm" href="/?intro=1" aria-label="BLACKOUT.NETWORK intro">blackout.network</a>'
+        f'{bar_end}</header>'
+        f'{menu_html()}<main id="w2_main">{body}</main>'
+        f'<footer class="w2-foot"><p class="w2-tag">Global threat monitoring</p>'
+        f'<p class="w2-legal">Independent early-warning signals. Not an official alert service. '
+        f'<a href="/scoring">How we score</a> {mid} <a href="/privacy">Privacy</a> {mid} <a href="/tos">Terms</a></p></footer>'
+        f'<script src="{ST}/wire2.js?v=3" defer></script>{extra_js}</body></html>'
+    )
+
+
 
 def srcset(f):   # Push F: portrait mobile crop (wire_v2_static/img/*_m.webp, 720x1280) for phones
     m = f.replace(".webp", "_m.webp")
@@ -212,6 +250,8 @@ def render_list(state, path="/wire", noindex=False):
     top = m[0] if m else None
     body = hero("list_hero", "THE WIRE", "What matters now", f"{len(m)} ranked stories · updated {gen}",
                 btn("#w2_top", "Top story"), cls="w2-hero-list")
+    if path == "/wire-classic":
+        body += f'<p id="wc_up" class="w2-meta" style="padding:8px var(--w2-gut,20px)">Updated {E(gen)}</p>'
     if top:
         k = used.take(img_keys(top)) or used.take(["night"]) or "night"
         p = brief_parts(top.get("brief"))
@@ -405,6 +445,26 @@ def handle(path, qs=None, headers=None):
         if not m or (qs or {}).get("since") or _qs_flag(qs, "full"): return None
         key = m.group(1)
     now = time.time()
+    force = _qs_flag(qs, "fresh") and key == "/wire-classic"
+    if force:
+        oldfut = _INFL.get(key)
+        if oldfut is not None:
+            try:
+                oldfut.result(timeout=8)
+            except Exception:
+                pass
+        _C.pop(key, None)
+        fut = _INFL[key] = _pool().submit(_build, key, list_path, noindex)
+        try:
+            body = fut.result(timeout=8)
+        except Exception:
+            hit = _C.get(key)
+            if hit:
+                return 200, hit[1], "text/html"
+            return None
+        if not body:
+            return None
+        return 200, body, "text/html"
     hit = _C.get(key)
     if hit:
         if now - hit[0] >= 60 and key not in _INFL:
