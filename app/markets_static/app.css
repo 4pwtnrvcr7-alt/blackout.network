@@ -17,8 +17,8 @@
 .mk-navi{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0}.mk-navi::-webkit-scrollbar{display:none}
 .mk-navi a{flex:none;font:600 11px/1 Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#C9CDD3;text-decoration:none;padding:10px 12px;border:1px solid rgba(255,255,255,.18)}
 .mk-navi a:hover,.mk-navi a:focus-visible{color:#fff;border-color:#fff}
-.mk-ref{flex:none;display:inline-flex;align-items:center;gap:8px;background:transparent;color:#fff;border:1px solid #fff;padding:9px 14px;font:600 11px/1 Inter,sans-serif;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
-.mk-ref svg{width:15px;height:15px}.mk-ref:hover{background:rgba(255,255,255,.1)}.mk-ref[aria-busy=true] svg{animation:mkspin 1s linear infinite}
+.mk-ref{flex:none}
+/* #293 fill button styles come from /bn-refresh.css */
 @keyframes mkspin{to{transform:rotate(360deg)}}
 .mk-stat{padding:12px var(--w2-gut) 0;font-size:12px;color:#9AA0A8;min-height:18px;background:rgba(0,0,0,.6)}
 .mk-sec{padding:44px var(--w2-gut) 8px;background:rgba(0,0,0,.6);scroll-margin-top:118px}
@@ -43,5 +43,5 @@
 .mk-lg{display:flex;gap:18px;font-size:12px;color:#9AA0A8;margin-top:8px}.mk-lg i{display:inline-block;width:18px;height:0;border-top:2px solid #fff;vertical-align:middle;margin-right:6px}.mk-lg i.a{border-top:2px dashed #6C727A}
 .mk-more{padding-bottom:64px}.mk-src a{color:#C9CDD3}.mk-src{font-size:12px;line-height:1.6;color:#8A9099;margin-top:22px!important;max-width:90ch}
 @media(max-width:700px){.mk-hero{padding-bottom:9vh}.mk-tiles{grid-template-columns:repeat(2,1fr)}.mk-t{padding:12px;min-height:104px}.mk-tp{font-size:19px}
- .mk-big{grid-template-columns:1fr}.mk-sec{padding-top:34px}.mk-ref span{display:none}.mk-ref{padding:9px}}
+ .mk-big{grid-template-columns:1fr}.mk-sec{padding-top:34px}.mk-ref{padding:0 10px}}
 @media(prefers-reduced-motion:reduce){.mk-vid{display:none}}

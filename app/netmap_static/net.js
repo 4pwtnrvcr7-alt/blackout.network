@@ -1683,6 +1683,32 @@
     } else if (LASTFT && card && !card.hidden) showCard(LASTFT, LASTPT, pinned);
   });
 
-  /* ---------- live refresh every 5 minutes ---------- */
+  /* ---------- live refresh every 5 minutes, plus the shared #293 Refresh button ---------- */
+  function refreshNow(btn) {
+    var R = window.BNRefresh, b = btn || document.getElementById("nx_ref");
+    if (b && R && R.isBusy(b)) return Promise.resolve();
+    if (b && R) { R.busy(b, true); R.stage(b, 10); }
+    function fin(lab) {
+      if (b && R) { R.stage(b, 100); var wait = (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) ? 0 : 220;
+        setTimeout(function () { R.busy(b, false); if (lab) R.done(b, lab); }, wait); }
+    }
+    return getJSON("/api/netmap/data?fresh=1&_=" + Date.now()).then(function (j) {
+      if (b && R) R.stage(b, 70);
+      D = liveOnly(j);
+      applyData();
+      try { document.dispatchEvent(new CustomEvent("nx:data", { detail: j })); } catch (e) {}
+      var n = (D && D.summary && (D.summary.issues != null)) ? D.summary.issues : null;
+      var lab = "Updated";
+      fin(lab);
+      return j;
+    }).catch(function () {
+      if (b && R) { R.stage(b, 100); R.busy(b, false); }
+    });
+  }
+  window.bnRefreshPage = function () { return refreshNow(document.getElementById("nx_ref")); };
+  if (window.BNRefresh) {
+    var _rb = document.getElementById("nx_ref");
+    if (_rb) BNRefresh.bind(_rb, function () { return refreshNow(_rb); });
+  }
   setInterval(function () { if (document.hidden) return; getJSON("/api/netmap/data").then(function (j) { D = liveOnly(j); applyData(); try { document.dispatchEvent(new CustomEvent("nx:data", { detail: j })); } catch (e) {} }, function () {}); }, 300000);
 })();
