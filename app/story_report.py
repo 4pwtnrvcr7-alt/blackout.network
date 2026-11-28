@@ -480,6 +480,36 @@ def _srclist(note, rows, anchor=None, desk=False):
         if len(out) >= 8: break
     return out[:8]
 
+_IATA_LOC_RE = re.compile(r"^[A-Z]{3}(?:\s*,\s*US(?:A)?)?$")
+
+def _is_template_note(note):
+    if not isinstance(note, dict):
+        return False
+    return note.get("file") == "story_writer_template" or (note.get("writer") or {}).get("model") == "template"
+
+def _rewrite_template_place(note, raw, labeled):
+    """Replace a baked-in IATA location ('ORD, US') with the resolved airport name in template ledes."""
+    if not note or not raw or not labeled or raw == labeled:
+        return note
+    if not _IATA_LOC_RE.match(str(raw).strip()):
+        return note
+    out = dict(note)
+    def sub(s):
+        return s.replace(raw, labeled) if isinstance(s, str) else s
+    for k in ("why_it_matters", "what_happened", "analysis", "place"):
+        if k in out:
+            out[k] = sub(out[k])
+    story = out.get("story")
+    if isinstance(story, dict):
+        story = dict(story)
+        if "dek" in story:
+            story["dek"] = sub(story["dek"])
+        secs = story.get("sections")
+        if isinstance(secs, dict):
+            story["sections"] = {sk: sub(sv) for sk, sv in secs.items()}
+        out["story"] = story
+    return out
+
 def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, locator="", people=""):
     """Returns (html, dek_override). rows: deduped alerts in time order."""
     R = reports(); notes = R.get("notes") or {}
@@ -519,6 +549,9 @@ def render(cid, r, rows, rank, tname, title, what, loc, officials, eff, fams, lo
         loc = _geo.place_label(title or "", raw_loc or "") or loc
     except Exception:
         loc = loc if (loc or "").count(";") < 2 else ""
+    # Stored template briefs still say "in ORD, US"; show the airport name at render time.
+    if note and raw_loc and loc and loc != raw_loc and _is_template_note(note):
+        note = _rewrite_template_place(note, raw_loc, loc)
     # ---- 1 What happened
     if desk:
         wh = [note["what_happened"]]; dek = note.get("headline") or ""

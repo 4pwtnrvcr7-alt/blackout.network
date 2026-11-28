@@ -116,6 +116,39 @@ class Render(unittest.TestCase):
         body = h.split("</style>", 1)[1]
         for w in ("verified", "BREAKING", "before the news", "first to"): self.assertNotIn(w, body)
 
+    def test_template_lede_uses_airport_name_not_iata(self):
+        """Stored auto-briefs that say 'in ORD, US' must show the resolved airport on the page."""
+        title = "FAA Ground stop: ORD (equipment outage)"
+        stale = {
+            "headline": title,
+            "what_happened": "FAA Ground stop: ORD (equipment outage). The record places this in ORD, US, Nov 24, 2026 4:35 PM ET.",
+            "why_it_matters": "A low-risk story in ORD, US, from the reports we track. Logged Nov 24, 2026 4:35 PM ET.",
+            "analysis": "The location in the record is ORD, US.",
+            "place": "ORD, US",
+            "file": "story_writer_template",
+            "writer": {"model": "template"},
+            "edition": "BLACKOUT.NETWORK write-up",
+            "desk": True,
+        }
+        cl = {"cluster_id": CID, "title": title, "category": "other", "location": "ORD, US",
+              "brief": "", "first_seen": "2026-11-24T21:35:00Z", "updated": "2026-11-24T21:35:00Z"}
+        SR = load({"notes": {CID: stale}})
+        h, _ = SR.render(CID, cl, [ROW(1, "FAA")], 1, "Background", title, "", "ORD, US", ["FAA"], 1, ["FAA"])
+        import html as _html
+        body = _html.unescape(h.split("</style>", 1)[-1])
+        self.assertRegex(body, r"O.?Hare")
+        self.assertIn("Illinois", body)
+        self.assertNotIn("in ORD, US", body)
+        self.assertNotIn("location in the record is ORD, US", body)
+        # the headline may still name the IATA code
+        self.assertIn("ORD", body)
+        # a paid desk note is left alone
+        paid = dict(stale, file="desk", writer={"model": "paid"}, desk=True)
+        SR = load({"notes": {CID: paid}})
+        h, _ = SR.render(CID, cl, [ROW(1, "FAA")], 1, "Background", title, "", "ORD, US", ["FAA"], 1, ["FAA"])
+        body = _html.unescape(h.split("</style>", 1)[-1])
+        self.assertIn("in ORD, US", body)
+
 class Builder(unittest.TestCase):
     def test_word_rules_and_prep_tips_dropped(self):
         import build as B
